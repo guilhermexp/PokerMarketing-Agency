@@ -96,3 +96,11 @@ export interface ImageFile {
     mimeType: string;
     preview: string;
 }
+
+// --- Gallery Types ---
+export interface GalleryImage {
+  id: string;
+  src: string;
+  prompt: string;
+  source: 'Thumbnail' | 'Post' | 'Anúncio' | 'Flyer' | 'Flyer Diário' | 'Logo';
+}

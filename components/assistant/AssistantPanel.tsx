@@ -89,7 +89,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, onClose,
     };
 
     return (
-        <aside className={`fixed top-0 right-0 h-full w-96 bg-surface shadow-2xl z-40 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'} border-l border-muted/30 flex flex-col`}>
+        <aside className={`fixed bottom-24 right-6 z-40 w-96 max-w-[calc(100vw-3rem)] h-[600px] max-h-[calc(100vh-7.5rem)] bg-surface/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-muted/30 flex flex-col origin-bottom-right transition-all duration-300 ease-in-out ${isOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4 pointer-events-none'}`}>
             {/* Header */}
             <div className="flex-shrink-0 h-16 flex items-center justify-between px-4 border-b border-muted/30">
                 <div className="flex items-center space-x-2">

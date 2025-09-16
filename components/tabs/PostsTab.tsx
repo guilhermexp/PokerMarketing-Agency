@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Post, BrandProfile, ContentInput } from '../../types';
+import type { Post, BrandProfile, ContentInput, GalleryImage } from '../../types';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { Loader } from '../common/Loader';
@@ -11,9 +11,10 @@ interface PostsTabProps {
   posts: Post[];
   brandProfile: BrandProfile;
   referenceImage: ContentInput['image'] | null;
+  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void;
 }
 
-const PostCard: React.FC<{ post: Post, brandProfile: BrandProfile, referenceImage: ContentInput['image'] | null }> = ({ post, brandProfile, referenceImage }) => {
+const PostCard: React.FC<{ post: Post, brandProfile: BrandProfile, referenceImage: ContentInput['image'] | null, onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void; }> = ({ post, brandProfile, referenceImage, onAddImageToGallery }) => {
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -25,6 +26,8 @@ const PostCard: React.FC<{ post: Post, brandProfile: BrandProfile, referenceImag
         setError(null);
         try {
             let imageUrl;
+            let finalPrompt = currentPrompt;
+
             if (generatedImage) {
                 // This is a regeneration, so we edit the existing image
                 if (!currentPrompt) return;
@@ -34,6 +37,7 @@ const PostCard: React.FC<{ post: Post, brandProfile: BrandProfile, referenceImag
                 imageUrl = await editImage(base64Data, mimeType, currentPrompt);
             } else if (referenceImage) {
                  // First generation with a reference image
+                 finalPrompt = `Imagem de marca baseada em referência para o post: "${post.content}"`;
                  imageUrl = await createBrandedImageVariant(referenceImage, brandProfile, post.content);
             } else {
                 // This is the first generation from a text prompt
@@ -41,6 +45,7 @@ const PostCard: React.FC<{ post: Post, brandProfile: BrandProfile, referenceImag
                 imageUrl = await generateImage(currentPrompt);
             }
             setGeneratedImage(imageUrl);
+            onAddImageToGallery({ src: imageUrl, prompt: finalPrompt, source: 'Post' });
         } catch (err: any) {
             setError(err.message || 'A geração da imagem falhou.');
         } finally {
@@ -50,6 +55,7 @@ const PostCard: React.FC<{ post: Post, brandProfile: BrandProfile, referenceImag
     
     const handleImageUpdate = (newImageUrl: string) => {
         setGeneratedImage(newImageUrl);
+        onAddImageToGallery({ src: newImageUrl, prompt: "Edição Manual via Modal", source: 'Post' });
     };
 
     const handleShare = () => {
@@ -94,9 +100,8 @@ const PostCard: React.FC<{ post: Post, brandProfile: BrandProfile, referenceImag
                 canGenerateFirstImage && (
                     <div className="w-full h-48 bg-surface/40 flex flex-col items-center justify-center p-4 text-center">
                         <Icon name="image" className="w-10 h-10 text-muted mb-2"/>
-                        <Button onClick={handleImageAction} disabled={isGenerating} size="small" variant="secondary">
-                            {isGenerating ? <Loader /> : <Icon name="zap" className="w-4 h-4" />}
-                            <span>Gerar Imagem</span>
+                        <Button onClick={handleImageAction} isLoading={isGenerating} size="small" variant="secondary" icon="zap">
+                            Gerar Imagem
                         </Button>
                         {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
                     </div>
@@ -121,9 +126,8 @@ const PostCard: React.FC<{ post: Post, brandProfile: BrandProfile, referenceImag
                     className="w-full bg-background/80 border border-muted/50 rounded-lg p-2 text-sm text-text-main focus:ring-2 focus:ring-primary focus:border-primary transition"
                     placeholder="Descreva as mudanças que você quer na imagem..."
                     />
-                    <Button onClick={handleImageAction} disabled={isGenerating || !currentPrompt} size="small" variant="secondary" className="mt-2 w-full">
-                    {isGenerating ? <Loader /> : <Icon name="zap" className="w-4 h-4" />}
-                    <span>Regenerar Imagem</span>
+                    <Button onClick={handleImageAction} isLoading={isGenerating} disabled={!currentPrompt} size="small" variant="secondary" className="mt-2 w-full" icon="zap">
+                      Regenerar Imagem
                     </Button>
                     {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
                 </div>
@@ -149,13 +153,13 @@ const PostCard: React.FC<{ post: Post, brandProfile: BrandProfile, referenceImag
     )
 }
 
-export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referenceImage }) => {
+export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referenceImage, onAddImageToGallery }) => {
   return (
     <div>
       {posts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {posts.map((post, index) => (
-            <PostCard key={index} post={post} brandProfile={brandProfile} referenceImage={referenceImage} />
+            <PostCard key={index} post={post} brandProfile={brandProfile} referenceImage={referenceImage} onAddImageToGallery={onAddImageToGallery} />
           ))}
         </div>
       ) : (

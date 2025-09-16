@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent } from '../types';
+import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage } from '../types';
 import { UploadForm } from './UploadForm';
 import { ClipsTab } from './tabs/ClipsTab';
 import { PostsTab } from './tabs/PostsTab';
@@ -7,8 +7,10 @@ import { AdCreativesTab } from './tabs/AdCreativesTab';
 import { Loader } from './common/Loader';
 import { Icon } from './common/Icon';
 import { Button } from './common/Button';
-import { FlyerGenerator } from './FlyerGenerator';
+import { FlyerGenerator, TimePeriod } from './FlyerGenerator';
 import { AssistantPanel } from './assistant/AssistantPanel';
+import { GalleryView } from './GalleryView';
+
 
 interface DashboardProps {
   brandProfile: BrandProfile;
@@ -27,13 +29,21 @@ interface DashboardProps {
   // Theme Props
   theme: Theme;
   onThemeToggle: () => void;
+  // Gallery Props
+  galleryImages: GalleryImage[];
+  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void;
+  onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   // Flyer Generator Props
   tournamentEvents: TournamentEvent[];
   onTournamentFileUpload: (file: File) => Promise<void>;
+  flyerState: Record<string, (string | 'loading')[]>;
+  setFlyerState: React.Dispatch<React.SetStateAction<Record<string, (string | 'loading')[]>>>;
+  dailyFlyerState: Record<TimePeriod, (string | 'loading')[]>;
+  setDailyFlyerState: React.Dispatch<React.SetStateAction<Record<TimePeriod, (string | 'loading')[]>>>;
 }
 
 type Tab = 'clips' | 'posts' | 'ads';
-type View = 'campaign' | 'flyer';
+type View = 'campaign' | 'flyer' | 'gallery';
 
 interface NavItemProps {
     icon: IconName;
@@ -47,8 +57,8 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick }) => (
     onClick={onClick}
     className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
       active
-        ? 'bg-primary/20 text-primary'
-        : 'text-subtle hover:bg-surface hover:text-text-main'
+        ? 'bg-primary text-white'
+        : 'text-text-muted hover:bg-muted/20 hover:text-text-main'
     }`}
     aria-current={active ? 'page' : undefined}
   >
@@ -58,24 +68,15 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick }) => (
 );
 
 
-export const Dashboard: React.FC<DashboardProps> = ({ 
-  brandProfile, 
-  campaign, 
-  onGenerate, 
-  isGenerating,
-  onEditProfile,
-  onResetCampaign,
-  referenceImage,
-  isAssistantOpen,
-  onToggleAssistant,
-  assistantHistory,
-  isAssistantLoading,
-  onAssistantSendMessage,
-  theme,
-  onThemeToggle,
-  tournamentEvents,
-  onTournamentFileUpload
-}) => {
+export const Dashboard: React.FC<DashboardProps> = (props) => {
+  const { 
+    brandProfile, campaign, onGenerate, isGenerating, onEditProfile, onResetCampaign,
+    referenceImage, isAssistantOpen, onToggleAssistant, assistantHistory, 
+    isAssistantLoading, onAssistantSendMessage, theme, onThemeToggle, 
+    galleryImages, onAddImageToGallery, onUpdateGalleryImage, tournamentEvents, onTournamentFileUpload,
+    flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState
+  } = props;
+  
   const [activeTab, setActiveTab] = useState<Tab>('clips');
   const [activeView, setActiveView] = useState<View>('campaign');
 
@@ -90,8 +91,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="h-screen flex overflow-hidden bg-background text-text-main font-sans">
       {/* Sidebar */}
-      <aside className="w-64 bg-surface flex flex-col flex-shrink-0 border-r border-muted/20">
-        <div className="h-16 flex items-center px-4 border-b border-muted/20 flex-shrink-0">
+      <aside className="w-64 bg-black flex flex-col flex-shrink-0 border-r border-muted/30">
+        <div className="h-16 flex items-center px-4 border-b border-muted/30 flex-shrink-0">
           <Icon name="logo" className="h-8 w-8 text-primary" />
           <h1 className="text-xl font-bold text-text-main ml-2">DirectorAi</h1>
         </div>
@@ -108,15 +109,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 active={activeView === 'flyer'} 
                 onClick={() => setActiveView('flyer')} 
             />
-            <div className="border-t border-muted/20 my-2"></div>
-            <NavItem
-                icon="bot"
-                label="Assistente de IA"
-                active={isAssistantOpen}
-                onClick={onToggleAssistant}
+            <NavItem 
+                icon="layout" 
+                label="Galeria" 
+                active={activeView === 'gallery'} 
+                onClick={() => setActiveView('gallery')} 
             />
         </nav>
-        <div className="p-4 border-t border-muted/20 space-y-4 flex-shrink-0">
+        <div className="p-4 border-t border-muted/30 space-y-4 flex-shrink-0">
              <div className="flex items-center space-x-3">
                 {brandProfile.logo && (
                     <img src={brandProfile.logo} alt={`${brandProfile.name} logo`} className="h-10 w-10 rounded-full object-contain bg-white border border-muted/20"/>
@@ -136,7 +136,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </aside>
 
       {/* Main Content */}
-      <main className={`flex-1 overflow-y-auto transition-all duration-300 ${isAssistantOpen ? 'pr-96' : ''}`}>
+      <main className="flex-1 overflow-y-auto">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             {activeView === 'campaign' && (
                 <>
@@ -155,7 +155,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     {campaign && (
                         <div>
                             <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
-                                <h2 className="text-3xl font-extrabold">Sua Campanha Gerada</h2>
+                                <h2 className="text-2xl font-bold">Sua Campanha Gerada</h2>
                                 <Button onClick={onResetCampaign} variant="secondary" icon="zap">
                                     Gerar Nova Campanha
                                 </Button>
@@ -181,9 +181,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             </div>
 
                             <div>
-                            {activeTab === 'clips' && <ClipsTab videoClipScripts={campaign.videoClipScripts} />}
-                            {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={referenceImage} />}
-                            {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={referenceImage} />}
+                            {activeTab === 'clips' && <ClipsTab videoClipScripts={campaign.videoClipScripts} onAddImageToGallery={onAddImageToGallery} />}
+                            {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={referenceImage} onAddImageToGallery={onAddImageToGallery} />}
+                            {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={referenceImage} onAddImageToGallery={onAddImageToGallery} />}
                             </div>
                         </div>
                     )}
@@ -194,12 +194,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   brandProfile={brandProfile}
                   events={tournamentEvents}
                   onFileUpload={onTournamentFileUpload}
+                  onAddImageToGallery={onAddImageToGallery}
+                  flyerState={flyerState}
+                  setFlyerState={setFlyerState}
+                  dailyFlyerState={dailyFlyerState}
+                  setDailyFlyerState={setDailyFlyerState}
                 />
+            )}
+            {activeView === 'gallery' && (
+                <GalleryView images={galleryImages} onUpdateImage={onUpdateGalleryImage} />
             )}
         </div>
       </main>
 
-       {/* Assistant Panel */}
+       {/* Assistant Components */}
        <AssistantPanel 
             isOpen={isAssistantOpen}
             onClose={onToggleAssistant}
@@ -207,6 +215,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
             isLoading={isAssistantLoading}
             onSendMessage={onAssistantSendMessage}
        />
+       <div className="fixed bottom-6 right-6 z-50">
+          <button 
+            onClick={onToggleAssistant}
+            aria-label={isAssistantOpen ? "Fechar assistente de IA" : "Abrir assistente de IA"}
+            aria-expanded={isAssistantOpen}
+            className={`w-16 h-16 rounded-full flex items-center justify-center text-white shadow-2xl transform-gpu transition-all duration-300 ease-in-out hover:scale-110 focus:outline-none focus:ring-4 focus:ring-primary/50 ${isAssistantOpen ? 'bg-muted hover:bg-muted/80' : 'bg-primary hover:bg-primary-hover'}`}
+          >
+            <div className="relative w-8 h-8 flex items-center justify-center">
+                <Icon name='bot' className={`absolute inset-0 w-8 h-8 transition-all duration-300 ${isAssistantOpen ? 'opacity-0 -rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'}`} />
+                <Icon name='x' className={`absolute inset-0 w-8 h-8 transition-all duration-300 ${isAssistantOpen ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 rotate-90 scale-50'}`} />
+            </div>
+          </button>
+       </div>
     </div>
   );
 };

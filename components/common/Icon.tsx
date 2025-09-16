@@ -26,7 +26,9 @@ export type IconName =
   | 'send'
   // Theme Icons
   | 'sun'
-  | 'moon';
+  | 'moon'
+  // Gallery Icon
+  | 'layout';
 
 interface IconProps {
   name: IconName;
@@ -170,6 +172,13 @@ const iconPaths: Record<IconName, React.ReactNode> = {
   ),
   moon: (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+  ),
+  layout: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+      <line x1="3" y1="9" x2="21" y2="9"></line>
+      <line x1="9" y1="21" x2="9" y2="9"></line>
+    </>
   ),
 };
 

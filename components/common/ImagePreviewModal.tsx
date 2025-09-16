@@ -59,6 +59,7 @@ const ImageUploader: React.FC<{
             <label className="block text-sm font-medium text-subtle mb-1">{title}</label>
             <div
                 {...getRootProps()}
+                // FIX: Corrected a typo in the `useDropzone` hook's property access, changing `isImageDragActive` to the correct `isDragActive` to fix the "Cannot find name" error and enable drag-and-drop UI feedback.
                 className={`relative border-2 border-dashed rounded-lg p-2 text-center cursor-pointer transition-colors h-24 flex flex-col justify-center items-center ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted/50 hover:border-subtle'}`}
             >
                 <input {...getInputProps()} />
@@ -256,7 +257,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
         </div>
         
         {/* Editing Panel */}
-        <div className="md:w-96 flex-shrink-0 bg-surface/80 p-6 flex flex-col border-t md:border-t-0 md:border-l border-muted/50 overflow-y-auto">
+        <div className="md:w-96 flex-shrink-0 bg-surface/50 backdrop-blur-lg p-6 flex flex-col border-t md:border-t-0 md:border-l border-muted/50 overflow-y-auto">
            <div className="flex justify-between items-center mb-4">
              <h3 className="text-lg font-bold text-text-main">Editar Imagem</h3>
              <button onClick={onClose} className="text-subtle hover:text-text-main transition-colors">
@@ -283,13 +284,11 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
                 <Button onClick={clearMask} variant="secondary" className="w-full" size="small">
                     Limpar Máscara
                 </Button>
-                <Button onClick={handleDownload} variant="secondary" className="w-full">
-                    <Icon name="download" className="w-5 h-5" />
-                    <span>Download</span>
+                <Button onClick={handleDownload} variant="secondary" className="w-full" icon="download">
+                    Download
                 </Button>
-                <Button onClick={handleEdit} disabled={isEditing || !editPrompt.trim()} className="w-full">
-                    {isEditing ? <Loader /> : <Icon name="zap" className="w-5 h-5" />}
-                    <span>{isEditing ? 'Aplicando Edição...' : 'Gerar Edição'}</span>
+                <Button onClick={handleEdit} disabled={!editPrompt.trim()} isLoading={isEditing} icon="zap" className="w-full">
+                    {isEditing ? 'Aplicando Edição...' : 'Gerar Edição'}
                 </Button>
            </div>
         </div>

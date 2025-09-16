@@ -5,7 +5,11 @@ import { Dashboard } from './components/Dashboard';
 import { Loader } from './components/common/Loader';
 import { generateCampaign, editImage, generateLogo } from './services/geminiService';
 import { runAssistantConversationStream } from './services/assistantService';
-import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent } from './types';
+import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage } from './types';
+
+// Define TimePeriod here as it's used for state
+export type TimePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'NIGHT';
+const MAX_GALLERY_SIZE = 30; // Limit to 30 images to avoid storage quota issues
 
 function App() {
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
@@ -21,8 +25,14 @@ function App() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isAssistantLoading, setIsAssistantLoading] = useState(false);
 
+  // Gallery State
+  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
+
   // Flyer Generator State
   const [tournamentEvents, setTournamentEvents] = useState<TournamentEvent[]>([]);
+  const [flyerState, setFlyerState] = useState<Record<string, (string | 'loading')[]>>({});
+  const [dailyFlyerState, setDailyFlyerState] = useState<Record<TimePeriod, (string | 'loading')[]>>({ ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [] });
+
 
   // Theme State
   const [theme, setTheme] = useState<Theme>(() => {
@@ -51,15 +61,19 @@ function App() {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   };
 
-  // Load brand profile from local storage on initial load
+  // Load brand profile and gallery from local storage on initial load
   useEffect(() => {
     try {
       const savedProfile = localStorage.getItem('brandProfile');
       if (savedProfile) {
         setBrandProfile(JSON.parse(savedProfile));
       }
+      const savedGallery = localStorage.getItem('galleryImages');
+      if (savedGallery) {
+        setGalleryImages(JSON.parse(savedGallery));
+      }
     } catch (e) {
-      console.error("Failed to load brand profile from local storage", e);
+      console.error("Failed to load data from local storage", e);
     } finally {
       setIsLoading(false);
     }
@@ -114,6 +128,46 @@ function App() {
       setCampaign(null);
       setError(null);
       setReferenceImage(null); // Clear the reference image
+      // Reset flyer states as well if a new campaign implies a full reset
+      setFlyerState({});
+      setDailyFlyerState({ ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [] });
+      setTournamentEvents([]);
+  };
+
+  // --- Gallery Logic ---
+  const handleAddImageToGallery = (image: Omit<GalleryImage, 'id'>) => {
+    const newImage: GalleryImage = { ...image, id: new Date().toISOString() + Math.random() };
+    setGalleryImages(prev => {
+      // Add the new image and then slice the array to respect the size limit
+      const updatedGallery = [...prev, newImage];
+      
+      // If the gallery exceeds the max size, remove the oldest images (from the start of the array)
+      if (updatedGallery.length > MAX_GALLERY_SIZE) {
+        updatedGallery.splice(0, updatedGallery.length - MAX_GALLERY_SIZE);
+      }
+  
+      try {
+        localStorage.setItem('galleryImages', JSON.stringify(updatedGallery));
+      } catch (e) {
+        console.error("Failed to save gallery to local storage", e);
+        // This catch block will now likely only be hit for other reasons than quota.
+      }
+      return updatedGallery;
+    });
+  };
+
+  const handleUpdateGalleryImage = (imageId: string, newImageSrc: string) => {
+    setGalleryImages(prev => {
+      const updatedGallery = prev.map(img =>
+        img.id === imageId ? { ...img, src: newImageSrc, prompt: "Edição Manual via Galeria" } : img
+      );
+      try {
+        localStorage.setItem('galleryImages', JSON.stringify(updatedGallery));
+      } catch (e) {
+        console.error("Failed to save updated gallery to local storage", e);
+      }
+      return updatedGallery;
+    });
   };
 
   // --- Flyer Generator Logic ---
@@ -134,6 +188,7 @@ function App() {
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
+          // FIX: Corrected typo from Uint88Array to Uint8Array.
           const data = new Uint8Array(event.target!.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array', cellDates: true });
           
@@ -166,6 +221,9 @@ function App() {
           });
           
           setTournamentEvents(processedEvents);
+          // Reset flyer state when a new file is uploaded
+          setFlyerState({});
+          setDailyFlyerState({ ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [] });
           resolve();
         } catch (error: any) {
           setError('Erro ao processar arquivo: ' + error.message);
@@ -193,6 +251,7 @@ function App() {
             const newLogoUrl = await generateLogo(args.prompt);
             const updatedProfile = { ...brandProfile, logo: newLogoUrl };
             handleProfileSubmit(updatedProfile);
+            handleAddImageToGallery({ src: newLogoUrl, prompt: args.prompt, source: 'Logo' });
             return { success: true, message: "Criei e salvei o novo logo com sucesso. Agora ele está aplicado ao seu perfil de marca." };
         } catch (e: any) {
             return { error: `Falha ao criar o logo: ${e.message}` };
@@ -212,6 +271,7 @@ function App() {
             
             const updatedProfile = { ...brandProfile!, logo: newLogoUrl };
             handleProfileSubmit(updatedProfile); // This updates state and localStorage
+            handleAddImageToGallery({ src: newLogoUrl, prompt: args.prompt, source: 'Logo' });
 
             return { success: true, message: "Logo atualizado com sucesso. O novo logo agora está visível no seu perfil de marca." };
         } catch (e: any) {
@@ -357,9 +417,17 @@ function App() {
           // Theme Props
           theme={theme}
           onThemeToggle={handleThemeToggle}
+          // Gallery Props
+          galleryImages={galleryImages}
+          onAddImageToGallery={handleAddImageToGallery}
+          onUpdateGalleryImage={handleUpdateGalleryImage}
           // Flyer Generator Props
           tournamentEvents={tournamentEvents}
           onTournamentFileUpload={handleTournamentFileUpload}
+          flyerState={flyerState}
+          setFlyerState={setFlyerState}
+          dailyFlyerState={dailyFlyerState}
+          setDailyFlyerState={setDailyFlyerState}
         />
       )}
     </>

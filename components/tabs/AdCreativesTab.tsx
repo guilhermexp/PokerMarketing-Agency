@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { AdCreative, BrandProfile, ContentInput } from '../../types';
+import type { AdCreative, BrandProfile, ContentInput, GalleryImage } from '../../types';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { Loader } from '../common/Loader';
@@ -11,9 +11,10 @@ interface AdCreativesTabProps {
   adCreatives: AdCreative[];
   brandProfile: BrandProfile;
   referenceImage: ContentInput['image'] | null;
+  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void;
 }
 
-const AdCard: React.FC<{ ad: AdCreative, brandProfile: BrandProfile, referenceImage: ContentInput['image'] | null }> = ({ ad, brandProfile, referenceImage }) => {
+const AdCard: React.FC<{ ad: AdCreative, brandProfile: BrandProfile, referenceImage: ContentInput['image'] | null, onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void; }> = ({ ad, brandProfile, referenceImage, onAddImageToGallery }) => {
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -26,6 +27,7 @@ const AdCard: React.FC<{ ad: AdCreative, brandProfile: BrandProfile, referenceIm
         setError(null);
         try {
             let imageUrl;
+            let finalPrompt = currentPrompt;
             
             if (generatedImage) {
                 // This is a regeneration, so we edit the existing image
@@ -36,15 +38,17 @@ const AdCard: React.FC<{ ad: AdCreative, brandProfile: BrandProfile, referenceIm
             } else if (referenceImage) {
                 // First generation with a reference image
                 const contextPrompt = `Título: ${ad.headline}. Corpo: ${ad.body}`;
+                finalPrompt = `Visual de anúncio com base em referência para: ${contextPrompt}`;
                 imageUrl = await createBrandedImageVariant(referenceImage, brandProfile, contextPrompt);
             }
             else {
                 // This is the first generation from a text prompt
-                const fullPrompt = `${currentPrompt}, in the style of ${brandProfile.name}, using colors ${brandProfile.primaryColor} and ${brandProfile.secondaryColor}.`;
-                imageUrl = await generateImage(fullPrompt);
+                finalPrompt = `${currentPrompt}, in the style of ${brandProfile.name}, using colors ${brandProfile.primaryColor} and ${brandProfile.secondaryColor}.`;
+                imageUrl = await generateImage(finalPrompt);
             }
 
             setGeneratedImage(imageUrl);
+            onAddImageToGallery({ src: imageUrl, prompt: finalPrompt, source: 'Anúncio' });
         } catch (err: any) {
             setError(err.message || 'A geração da imagem falhou.');
         } finally {
@@ -54,6 +58,7 @@ const AdCard: React.FC<{ ad: AdCreative, brandProfile: BrandProfile, referenceIm
     
     const handleImageUpdate = (newImageUrl: string) => {
         setGeneratedImage(newImageUrl);
+        onAddImageToGallery({ src: newImageUrl, prompt: "Edição Manual via Modal", source: 'Anúncio' });
     };
 
     return (
@@ -72,9 +77,8 @@ const AdCard: React.FC<{ ad: AdCreative, brandProfile: BrandProfile, referenceIm
                             <div className="w-full h-full bg-surface/40 flex flex-col items-center justify-center p-6 text-center min-h-[200px]">
                                 <Icon name="image" className="w-12 h-12 text-muted mb-3"/>
                                 <p className="text-sm text-text-muted mb-3 italic">"{ad.image_prompt}"</p>
-                                <Button onClick={handleImageAction} disabled={isGenerating} size="small" variant="secondary">
-                                    {isGenerating ? <Loader /> : <Icon name="zap" className="w-4 h-4" />}
-                                    <span>Gerar Visual</span>
+                                <Button onClick={handleImageAction} isLoading={isGenerating} size="small" variant="secondary" icon="zap">
+                                    Gerar Visual
                                 </Button>
                                 {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
                             </div>
@@ -98,16 +102,15 @@ const AdCard: React.FC<{ ad: AdCreative, brandProfile: BrandProfile, referenceIm
                                 rows={3}
                                 className="w-full bg-background/80 border border-muted/50 rounded-lg p-2 text-sm text-text-main focus:ring-2 focus:ring-primary focus:border-primary transition"
                                 />
-                                <Button onClick={handleImageAction} disabled={isGenerating || !currentPrompt} size="small" variant="secondary" className="mt-2 w-full">
-                                {isGenerating ? <Loader /> : <Icon name="zap" className="w-4 h-4" />}
-                                <span>Regenerar Visual</span>
+                                <Button onClick={handleImageAction} isLoading={isGenerating} disabled={!currentPrompt} size="small" variant="secondary" className="mt-2 w-full" icon="zap">
+                                  Regenerar Visual
                                 </Button>
                                 {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
                             </div>
                             )}
                         </div>
                         <div className="mt-4">
-                            <Button variant="primary" className="w-full">{ad.cta}</Button>
+                            <Button variant="secondary" className="w-full">{ad.cta}</Button>
                         </div>
                     </div>
                 </div>
@@ -123,13 +126,13 @@ const AdCard: React.FC<{ ad: AdCreative, brandProfile: BrandProfile, referenceIm
     );
 };
 
-export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, brandProfile, referenceImage }) => {
+export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, brandProfile, referenceImage, onAddImageToGallery }) => {
   return (
     <div>
       {adCreatives.length > 0 ? (
         <div className="space-y-6">
           {adCreatives.map((ad, index) => (
-            <AdCard key={index} ad={ad} brandProfile={brandProfile} referenceImage={referenceImage} />
+            <AdCard key={index} ad={ad} brandProfile={brandProfile} referenceImage={referenceImage} onAddImageToGallery={onAddImageToGallery} />
           ))}
         </div>
       ) : (

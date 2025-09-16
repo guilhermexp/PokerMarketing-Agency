@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { BrandProfile, ToneOfVoice, TournamentEvent, ImageFile } from '../types';
+import type { BrandProfile, ToneOfVoice, TournamentEvent, ImageFile, GalleryImage } from '../types';
 import { Card } from './common/Card';
 import { Button } from './common/Button';
 import { Loader } from './common/Loader';
@@ -8,11 +8,17 @@ import { generateFlyer } from '../services/geminiService';
 import { ImagePreviewModal } from './common/ImagePreviewModal';
 import { useDropzone } from 'react-dropzone';
 
+export type TimePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'NIGHT';
 
 interface FlyerGeneratorProps {
   brandProfile: BrandProfile;
   events: TournamentEvent[];
   onFileUpload: (file: File) => Promise<void>;
+  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void;
+  flyerState: Record<string, (string | 'loading')[]>;
+  setFlyerState: React.Dispatch<React.SetStateAction<Record<string, (string | 'loading')[]>>>;
+  dailyFlyerState: Record<TimePeriod, (string | 'loading')[]>;
+  setDailyFlyerState: React.Dispatch<React.SetStateAction<Record<TimePeriod, (string | 'loading')[]>>>;
 }
 
 // Sub-component for displaying a single tournament
@@ -25,9 +31,14 @@ const TournamentEventCard: React.FC<{
   aspectRatio: string;
   language: 'pt' | 'en';
   dayTranslations: Record<string, string>;
-}> = ({ event, timezone, brandProfile, logo, referenceImage, aspectRatio, language, dayTranslations }) => {
+  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void;
+  generatedFlyers: (string | 'loading')[];
+  setGeneratedFlyers: (updater: (prev: (string | 'loading')[]) => (string | 'loading')[]) => void;
+}> = ({ 
+  event, timezone, brandProfile, logo, referenceImage, aspectRatio, language, dayTranslations, 
+  onAddImageToGallery, generatedFlyers, setGeneratedFlyers 
+}) => {
   const [expanded, setExpanded] = useState(false);
-  const [generatedFlyers, setGeneratedFlyers] = useState<(string | 'loading')[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingFlyer, setEditingFlyer] = useState<{ url: string; index: number } | null>(null);
@@ -102,6 +113,7 @@ const TournamentEventCard: React.FC<{
       const refImageData = referenceImage ? { base64: referenceImage.base64, mimeType: referenceImage.mimeType } : null;
 
       const imageUrl = await generateFlyer(prompt, logoData, refImageData, aspectRatio);
+      onAddImageToGallery({ src: imageUrl, prompt: prompt, source: 'Flyer' });
       setGeneratedFlyers(prev => {
         const newFlyers = [...prev];
         const index = newFlyers.indexOf('loading');
@@ -120,6 +132,7 @@ const TournamentEventCard: React.FC<{
   
   const handleImageUpdate = (newImageUrl: string) => {
     if (editingFlyer === null) return;
+    onAddImageToGallery({ src: newImageUrl, prompt: "Edição Manual via Modal", source: 'Flyer' });
     setGeneratedFlyers(prev => {
       const newFlyers = [...prev];
       newFlyers[editingFlyer.index] = newImageUrl;
@@ -236,9 +249,8 @@ const TournamentEventCard: React.FC<{
             </div>
 
             <div>
-              <Button onClick={handleGenerateFlyer} size="small" disabled={isGenerating} className="w-full sm:w-auto">
-                {isGenerating ? <Loader /> : <Icon name="zap" className="w-4 h-4" />}
-                <span>{totalItems > 0 ? 'Gerar Outro' : 'Gerar Flyer'}</span>
+              <Button onClick={handleGenerateFlyer} size="small" isLoading={isGenerating} className="w-full sm:w-auto" icon="zap">
+                {totalItems > 0 ? 'Gerar Outro' : 'Gerar Flyer'}
               </Button>
               {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
             </div>
@@ -326,8 +338,6 @@ const ImageUploader: React.FC<{
     );
 };
 
-type TimePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'NIGHT';
-
 const ImageCarousel: React.FC<{
   images: (string | 'loading')[];
   onImageClick: (url: string, index: number) => void;
@@ -343,7 +353,7 @@ const ImageCarousel: React.FC<{
       // If the current index becomes invalid (e.g. image deleted), reset
       setCurrentIndex(0);
     }
-  }, [images]);
+  }, [images, currentIndex]);
 
   const goToPrevious = () => {
     const isFirstSlide = currentIndex === 0;
@@ -358,6 +368,8 @@ const ImageCarousel: React.FC<{
   };
   
   const currentImage = images[currentIndex];
+
+  if (!images || images.length === 0) return null;
 
   return (
     <div className="w-full h-full relative group">
@@ -423,15 +435,17 @@ const DailySummaryCard: React.FC<{
                 </div>
             )}
         </div>
-        <Button onClick={onGenerate} disabled={isGenerating} size="small" className="mt-4 w-full">
-            {isGenerating ? <Loader /> : <Icon name="zap" className="w-4 h-4" />}
-            <span>{flyers.length > 0 ? 'Gerar Outro' : 'Gerar Flyer'}</span>
+        <Button onClick={onGenerate} isLoading={isGenerating} size="small" className="mt-4 w-full" icon="zap">
+            {flyers.length > 0 ? 'Gerar Outro' : 'Gerar Flyer'}
         </Button>
     </Card>
 );
 
 
-export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({ brandProfile, events, onFileUpload }) => {
+export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({ 
+    brandProfile, events, onFileUpload, onAddImageToGallery, 
+    flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState 
+}) => {
   const [filteredEvents, setFilteredEvents] = useState<TournamentEvent[]>([]);
   const [selectedDay, setSelectedDay] = useState('ALL');
   const [selectedTimezone, setSelectedTimezone] = useState('-3');
@@ -445,7 +459,6 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({ brandProfile, ev
   const [referenceImage, setReferenceImage] = useState<ImageFile | null>(null);
 
   // State for daily summary flyer
-  const [dailyFlyers, setDailyFlyers] = useState<Record<TimePeriod, (string | 'loading')[]>>({ ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [] });
   const [isGeneratingIndividual, setIsGeneratingIndividual] = useState<Partial<Record<TimePeriod, boolean>>>({});
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [dailyFlyerError, setDailyFlyerError] = useState<string | null>(null);
@@ -484,7 +497,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({ brandProfile, ev
     }
   };
 
-  const createDailyFlyerForPeriod = async (periodToGenerate: TimePeriod): Promise<string> => {
+  const createDailyFlyerForPeriod = async (periodToGenerate: TimePeriod): Promise<{imageUrl: string; prompt: string}> => {
     const timeToMinutes = (timeStr: string): number => {
         if (!timeStr || !timeStr.includes(':')) return -1;
         const [hours, minutes] = timeStr.split(':').map(Number);
@@ -567,7 +580,8 @@ ${eventListStringEn}
     const refImageData = referenceImage ? { base64: referenceImage.base64, mimeType: referenceImage.mimeType } : null;
     const prompt = selectedLanguage === 'en' ? promptEn : promptPt;
     
-    return await generateFlyer(prompt, logoData, refImageData, selectedAspectRatio);
+    const imageUrl = await generateFlyer(prompt, logoData, refImageData, selectedAspectRatio);
+    return { imageUrl, prompt };
   };
 
   const handleGenerateDailyFlyer = async (periodToGenerate: TimePeriod) => {
@@ -576,14 +590,15 @@ ${eventListStringEn}
     setIsGeneratingIndividual(prev => ({ ...prev, [periodToGenerate]: true }));
     setDailyFlyerError(null);
     
-    setDailyFlyers(prev => ({
+    setDailyFlyerState(prev => ({
         ...prev,
         [periodToGenerate]: ['loading', ...prev[periodToGenerate]]
     }));
 
     try {
-        const imageUrl = await createDailyFlyerForPeriod(periodToGenerate);
-        setDailyFlyers(prev => {
+        const { imageUrl, prompt } = await createDailyFlyerForPeriod(periodToGenerate);
+        onAddImageToGallery({ src: imageUrl, prompt, source: 'Flyer Diário' });
+        setDailyFlyerState(prev => {
             const newPeriodFlyers = [...prev[periodToGenerate]];
             const loadingIndex = newPeriodFlyers.indexOf('loading');
             if (loadingIndex !== -1) newPeriodFlyers[loadingIndex] = imageUrl;
@@ -591,7 +606,7 @@ ${eventListStringEn}
         });
     } catch (err: any) {
         setDailyFlyerError(err.message || 'A geração do flyer falhou.');
-        setDailyFlyers(prev => {
+        setDailyFlyerState(prev => {
             const newPeriodFlyers = prev[periodToGenerate].filter(f => f !== 'loading');
             return { ...prev, [periodToGenerate]: newPeriodFlyers };
         });
@@ -607,7 +622,7 @@ ${eventListStringEn}
     setDailyFlyerError(null);
     const periodsToGenerate: TimePeriod[] = ['ALL', 'MORNING', 'AFTERNOON', 'NIGHT'];
 
-    setDailyFlyers(prev => {
+    setDailyFlyerState(prev => {
         const newState = { ...prev };
         periodsToGenerate.forEach(period => {
             newState[period] = ['loading', ...(newState[period] || [])];
@@ -622,13 +637,17 @@ ${eventListStringEn}
         
         results.forEach((result, index) => {
             const period = periodsToGenerate[index];
-            setDailyFlyers(prev => {
+            if (result.status === 'fulfilled') {
+              const { imageUrl, prompt } = result.value;
+              onAddImageToGallery({ src: imageUrl, prompt, source: 'Flyer Diário' });
+            }
+            setDailyFlyerState(prev => {
                 const newPeriodFlyers = [...(prev[period] || [])];
                 const loadingIndex = newPeriodFlyers.indexOf('loading');
 
                 if (loadingIndex !== -1) {
                     if (result.status === 'fulfilled') {
-                        newPeriodFlyers[loadingIndex] = result.value;
+                        newPeriodFlyers[loadingIndex] = result.value.imageUrl;
                     } else {
                         newPeriodFlyers.splice(loadingIndex, 1);
                         console.error(`Falha ao gerar o flyer para ${period}:`, result.reason);
@@ -648,7 +667,8 @@ ${eventListStringEn}
   const handleDailyFlyerUpdate = (newImageUrl: string) => {
     if (editingDailyFlyer === null) return;
     const { index, period } = editingDailyFlyer;
-    setDailyFlyers(prev => {
+    onAddImageToGallery({ src: newImageUrl, prompt: "Edição Manual via Modal", source: 'Flyer Diário' });
+    setDailyFlyerState(prev => {
         const newPeriodFlyers = [...(prev[period] || [])];
         if (typeof newPeriodFlyers[index] === 'string') {
             (newPeriodFlyers[index] as string) = newImageUrl;
@@ -681,14 +701,14 @@ ${eventListStringEn}
   return (
     <div>
         <div className="text-center mb-10">
-            <h2 className="text-4xl font-extrabold text-text-main">Gerador de Flyer de Torneios</h2>
+            <h2 className="text-3xl font-bold text-text-main">Gerador de Flyer de Torneios</h2>
             <p className="text-lg text-text-muted mt-2 max-w-3xl mx-auto">Importe sua planilha de torneios (XLSX) e gere flyers com IA, com opções de logo e referência visual.</p>
         </div>
 
         <Card className="p-6 mb-8">
             {/* Upload */}
             <label htmlFor="file-upload" className="w-full">
-                <div className="bg-primary hover:bg-primary-hover text-white font-bold py-3 px-4 rounded-lg cursor-pointer flex items-center justify-center transition-colors">
+                <div className="bg-surface/50 text-text-main hover:bg-surface/80 border border-muted/60 backdrop-blur-sm font-semibold py-3 px-4 rounded-lg cursor-pointer flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg">
                     <Icon name="upload" className="w-5 h-5 mr-2" />
                     {fileLoaded ? 'Carregar Nova Planilha' : 'Carregar Planilha de Eventos'}
                 </div>
@@ -761,9 +781,15 @@ ${eventListStringEn}
                 <div className="text-center">
                     <h3 className="text-2xl font-bold text-text-main">Flyer Resumo do Dia: {dayTranslations[selectedDay]}</h3>
                     <p className="text-text-muted mt-1 mb-4">Gere flyers para os diferentes períodos do dia.</p>
-                    <Button onClick={handleGenerateAllPeriods} variant="primary" disabled={isGeneratingAll || Object.values(isGeneratingIndividual).some(v => v)} size="large">
-                        {isGeneratingAll ? <Loader /> : <Icon name="zap" className="w-5 h-5" />}
-                        <span>{isGeneratingAll ? 'Gerando Todos...' : 'Gerar Todos os Períodos'}</span>
+                    <Button 
+                        onClick={handleGenerateAllPeriods} 
+                        variant="secondary" 
+                        isLoading={isGeneratingAll}
+                        disabled={Object.values(isGeneratingIndividual).some(v => v)} 
+                        size="large"
+                        icon="zap"
+                    >
+                        {isGeneratingAll ? 'Gerando Todos...' : 'Gerar Todos os Períodos'}
                     </Button>
                     {dailyFlyerError && <p className="text-red-400 text-xs mt-2">{dailyFlyerError}</p>}
                 </div>
@@ -773,8 +799,8 @@ ${eventListStringEn}
                         <DailySummaryCard
                             key={period}
                             period={period}
-                            title={periodTranslations[period].pt}
-                            flyers={dailyFlyers[period]}
+                            title={periodTranslations[period][selectedLanguage]}
+                            flyers={dailyFlyerState[period]}
                             isGenerating={isGeneratingAll || !!isGeneratingIndividual[period]}
                             onGenerate={() => handleGenerateDailyFlyer(period)}
                             onImageClick={(url, index) => setEditingDailyFlyer({ url, index, period })}
@@ -798,6 +824,9 @@ ${eventListStringEn}
                             aspectRatio={selectedAspectRatio}
                             language={selectedLanguage}
                             dayTranslations={dayTranslations}
+                            onAddImageToGallery={onAddImageToGallery}
+                            generatedFlyers={flyerState[event.id] || []}
+                            setGeneratedFlyers={(updater) => setFlyerState(prev => ({...prev, [event.id]: updater(prev[event.id] || [])}))}
                         />
                     ))
                 ) : (

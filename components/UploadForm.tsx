@@ -65,7 +65,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({ onGenerate, isGenerating
   return (
     <div className="max-w-5xl mx-auto">
       <div className="text-center mb-10">
-        <h2 className="text-4xl font-extrabold text-text-main">Gerar uma Nova Campanha</h2>
+        <h2 className="text-3xl font-bold text-text-main">Gerar uma Nova Campanha</h2>
         <p className="text-lg text-text-muted mt-2 max-w-2xl mx-auto">Comece colando seu conteúdo. O DirectorAi irá transformá-lo em uma campanha de marketing completa com roteiros de vídeo, posts para redes sociais e criativos de anúncio.</p>
       </div>
 
@@ -110,9 +110,14 @@ export const UploadForm: React.FC<UploadFormProps> = ({ onGenerate, isGenerating
 
       <div className="mt-8 text-center">
         {error && <p className="text-red-400 mb-4">{error}</p>}
-        <Button onClick={handleGenerateClick} disabled={!canGenerate} size="large">
-          {isGenerating ? <Loader /> : <Icon name="zap" className="w-5 h-5" />}
-          <span>{isGenerating ? 'Gerando Sua Campanha...' : 'Gerar com a IA DirectorAi'}</span>
+        <Button 
+          onClick={handleGenerateClick} 
+          disabled={!canGenerate} 
+          size="large" 
+          isLoading={isGenerating} 
+          icon="zap"
+        >
+          {isGenerating ? 'Gerando Sua Campanha...' : 'Gerar com a IA DirectorAi'}
         </Button>
       </div>
     </div>

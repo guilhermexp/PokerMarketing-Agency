@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { VideoClipScript } from '../../types';
+import type { VideoClipScript, GalleryImage } from '../../types';
 import { Card } from '../common/Card';
 import { Icon } from '../common/Icon';
 import { Button } from '../common/Button';
@@ -8,9 +8,10 @@ import { generateImage } from '../../services/geminiService';
 
 interface ClipCardProps {
   clip: VideoClipScript;
+  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void;
 }
 
-const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
+const ClipCard: React.FC<ClipCardProps> = ({ clip, onAddImageToGallery }) => {
   const [generatedThumbnail, setGeneratedThumbnail] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +25,7 @@ const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
       const fullPrompt = `${clip.thumbnail.image_prompt}. Estilo de thumbnail do YouTube, vibrante, com alto contraste, chamativo. Incluir espaço para texto.`;
       const imageUrl = await generateImage(fullPrompt, '16:9');
       setGeneratedThumbnail(imageUrl);
+      onAddImageToGallery({ src: imageUrl, prompt: fullPrompt, source: 'Thumbnail' });
     } catch (err: any) {
       setError(err.message || 'A geração da thumbnail falhou.');
     } finally {
@@ -60,9 +62,8 @@ const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
                         <p className="text-white text-lg font-extrabold text-center drop-shadow-lg">{clip.thumbnail.title}</p>
                     </div>
                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                         <Button onClick={handleGenerateThumbnail} disabled={isGenerating} size="small" variant="secondary">
-                            {isGenerating ? <Loader /> : <Icon name="zap" className="w-4 h-4" />}
-                            <span>Regenerar</span>
+                         <Button onClick={handleGenerateThumbnail} isLoading={isGenerating} size="small" variant="secondary" icon="zap">
+                            Regenerar
                         </Button>
                     </div>
                  </div>
@@ -70,9 +71,8 @@ const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
                 <div className="aspect-video bg-surface/40 rounded-lg flex flex-col items-center justify-center p-4 text-center">
                     <Icon name="image" className="w-10 h-10 text-muted mb-2"/>
                     <p className="text-xs text-text-muted mb-3 italic">"{clip.thumbnail.image_prompt}"</p>
-                    <Button onClick={handleGenerateThumbnail} disabled={isGenerating} size="small">
-                        {isGenerating ? <Loader /> : <Icon name="zap" className="w-4 h-4" />}
-                        <span>Gerar Thumbnail</span>
+                    <Button onClick={handleGenerateThumbnail} isLoading={isGenerating} size="small" icon="zap" variant="secondary">
+                        Gerar Thumbnail
                     </Button>
                 </div>
               )}
@@ -92,13 +92,13 @@ const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
 };
 
 
-export const ClipsTab: React.FC<{ videoClipScripts: VideoClipScript[] }> = ({ videoClipScripts }) => {
+export const ClipsTab: React.FC<{ videoClipScripts: VideoClipScript[], onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void; }> = ({ videoClipScripts, onAddImageToGallery }) => {
   return (
     <div>
       {videoClipScripts.length > 0 ? (
         <div className="space-y-6">
           {videoClipScripts.map((clip, index) => (
-            <ClipCard key={index} clip={clip} />
+            <ClipCard key={index} clip={clip} onAddImageToGallery={onAddImageToGallery} />
           ))}
         </div>
       ) : (
