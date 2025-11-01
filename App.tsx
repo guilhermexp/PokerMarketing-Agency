@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { BrandProfileSetup } from './components/BrandProfileSetup';
@@ -259,7 +260,8 @@ function App() {
         // the 'model' property was being widened to 'string' instead of 'ImageModel'.
         const updatedGallery = prev.map(img => {
             if (img.id === imageId) {
-                const updatedImage: GalleryImage = { ...img, src: newImageSrc, prompt: "Edição via Assistente", model: 'gemini-imagen' };
+                // FIX: Update hardcoded image model name to 'imagen-4.0-generate-001' to align with the updated ImageModel type and Gemini API guidelines.
+                const updatedImage: GalleryImage = { ...img, src: newImageSrc, prompt: "Edição via Assistente", model: 'imagen-4.0-generate-001' };
                 return updatedImage;
             }
             return img;
@@ -395,7 +397,8 @@ function App() {
             const newLogoUrl = await generateLogo(args.prompt);
             const updatedProfile = { ...brandProfile, logo: newLogoUrl };
             handleProfileSubmit(updatedProfile);
-            handleAddImageToGallery({ src: newLogoUrl, prompt: args.prompt, source: 'Logo', model: 'gemini-imagen' });
+            // FIX: Update hardcoded image model name to 'imagen-4.0-generate-001' to align with the updated ImageModel type and Gemini API guidelines.
+            handleAddImageToGallery({ src: newLogoUrl, prompt: args.prompt, source: 'Logo', model: 'imagen-4.0-generate-001' });
             return { success: true, message: "Criei e salvei o novo logo com sucesso. Agora ele está aplicado ao seu perfil de marca." };
         } catch (e: any) {
             return { error: `Falha ao criar o logo: ${e.message}` };
@@ -415,7 +418,8 @@ function App() {
             
             const updatedProfile = { ...brandProfile!, logo: newLogoUrl };
             handleProfileSubmit(updatedProfile);
-            handleAddImageToGallery({ src: newLogoUrl, prompt: args.prompt, source: 'Logo', model: 'gemini-imagen' });
+            // FIX: Update hardcoded image model name to 'imagen-4.0-generate-001' to align with the updated ImageModel type and Gemini API guidelines.
+            handleAddImageToGallery({ src: newLogoUrl, prompt: args.prompt, source: 'Logo', model: 'imagen-4.0-generate-001' });
 
             return { success: true, message: "Logo atualizado com sucesso. O novo logo agora está visível no seu perfil de marca." };
         } catch (e: any) {
@@ -473,18 +477,14 @@ function App() {
       return { error: `Ferramenta desconhecida: ${name}` };
   };
 
-  const handleAssistantSendMessage = async (message: string) => {
+  const handleAssistantSendMessage = async (message: string, image: ChatReferenceImage | null) => {
       setIsAssistantLoading(true);
 
-      const imageRef = chatReferenceImage;
-      if (imageRef) {
-        setToolImageReference(imageRef); // Store original for high-res tool use
-        setChatReferenceImage(null);
-      }
-
+      const imageRef = image;
       const userMessageParts: ChatPart[] = [];
       
       if (imageRef) {
+        setToolImageReference(imageRef); // Store original for high-res tool use
         try {
           // Further reduce size for chat context to prevent token overflow even on first message.
           const { base64: resizedBase64, mimeType: resizedMimeType } = await resizeImageForChat(imageRef.src, 256, 256);
@@ -502,6 +502,11 @@ function App() {
       userMessageParts.push({ text: message });
       const userMessage: ChatMessage = { role: 'user', parts: userMessageParts };
       
+      // The message is constructed, now clear the reference image from the input UI.
+      if (imageRef) {
+          setChatReferenceImage(null);
+      }
+
       // Update state with the user's message immediately
       const newHistoryWithUserMessage = [...chatHistory, userMessage];
       setChatHistory(newHistoryWithUserMessage);

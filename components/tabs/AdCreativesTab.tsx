@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { AdCreative, BrandProfile, ContentInput, GalleryImage, ImageModel } from '../../types';
 import { Card } from '../common/Card';
@@ -85,7 +86,7 @@ const AdCard: React.FC<{
                             </>
                         ) : (
                             <div className="text-center p-4">
-                               <p className="text-xs text-text-muted italic">"{ad.image_prompt}"</p>
+                               <p className="text-xs text-text-muted italic line-clamp-4">"{ad.image_prompt}"</p>
                             </div>
                         )}
                     </div>
@@ -127,7 +128,8 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
     errors: [],
   });
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
-  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-flash-image-preview');
+  // FIX: Update default model name and available options to be compliant with Gemini API guidelines.
+  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-2.5-flash-image');
 
   useEffect(() => {
     const length = adCreatives.length;
@@ -148,10 +150,20 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
         return { isGenerating: newGenerating, errors: newErrors };
     });
     try {
+        const productImages: { base64: string; mimeType: string }[] = [];
+        if (referenceImage) {
+            productImages.push(referenceImage);
+        }
+        if (brandProfile.logo) {
+            const [header, base64Data] = brandProfile.logo.split(',');
+            const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+            productImages.push({ base64: base64Data, mimeType });
+        }
+        
         const generatedImageUrl = await generateImage(ad.image_prompt, brandProfile, {
             aspectRatio: '1.91:1',
             model: selectedImageModel,
-            productImages: referenceImage ? [referenceImage] : undefined,
+            productImages: productImages.length > 0 ? productImages : undefined,
         });
 
         const galleryImage = onAddImageToGallery({
@@ -219,9 +231,9 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
                 onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)} 
                 className="bg-surface/80 border-muted/50 border rounded-lg p-2 text-sm text-text-main focus:ring-2 focus:ring-primary w-full sm:w-auto"
             >
-                <option value="gemini-flash-image-preview">gemini-2.5-flash-image-preview</option>
-                <option value="gemini-imagen">imagen-4.0-generate-001</option>
-                <option value="bytedance-seedream">bytedance/seedream</option>
+                {/* FIX: Update model options to be compliant with Gemini API guidelines. */}
+                <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+                <option value="imagen-4.0-generate-001">Imagen 4.0</option>
             </select>
         </div>
       </Card>

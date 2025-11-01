@@ -53,7 +53,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ images, onUpdateImage,
                   {image.model && (
                     <span className="text-xs text-white/70 font-medium bg-white/20 px-1.5 py-0.5 rounded backdrop-blur-sm flex items-center">
                       <Icon name="zap" className="inline-block w-3 h-3 mr-1" />
-                      {image.model === 'gemini-imagen' ? 'Gemini' : 'Bytedance'}
+                      {/* FIX: Correct the model name comparison to a valid value from the ImageModel type. */}
+                      {image.model === 'imagen-4.0-generate-001' ? 'Imagen 4.0' : 'Gemini 2.5 Flash'}
                     </span>
                   )}
                 </div>

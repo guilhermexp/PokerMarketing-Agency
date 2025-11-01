@@ -8,7 +8,7 @@ interface AssistantPanelProps {
     onClose: () => void;
     history: ChatMessage[];
     isLoading: boolean;
-    onSendMessage: (message: string) => void;
+    onSendMessage: (message: string, image: ChatReferenceImage | null) => void;
     referenceImage: ChatReferenceImage | null;
     onClearReference: () => void;
 }
@@ -94,7 +94,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, onClose,
     const handleSend = (e: React.FormEvent) => {
         e.preventDefault();
         if ((input.trim() || referenceImage) && !isLoading) {
-            onSendMessage(input.trim());
+            onSendMessage(input.trim(), referenceImage);
             setInput('');
         }
     };

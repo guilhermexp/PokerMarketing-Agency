@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import type { BrandProfile, ChatMessage } from '../types';
 
@@ -84,7 +85,7 @@ export const runAssistantConversationStream = async (
 
     try {
         return ai.models.generateContentStream({
-// FIX: Use 'gemini-2.5-flash' for general text tasks as per guidelines.
+            // FIX: Use 'gemini-2.5-flash' for general text tasks as per guidelines.
             model: 'gemini-2.5-flash',
             contents: history,
             config: {

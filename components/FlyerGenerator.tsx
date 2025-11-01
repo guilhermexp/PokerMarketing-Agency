@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { BrandProfile, ToneOfVoice, TournamentEvent, ImageFile, GalleryImage, ImageModel } from '../types';
 import { Card } from './common/Card';
@@ -283,8 +284,14 @@ const TournamentEventCard: React.FC<{
   );
 };
 
+// FIX: Define a local interface for image files that includes the 'preview' URL needed for UI rendering.
+interface ImageFileWithPreview extends ImageFile {
+  preview: string;
+}
+
 // FIX: Rename function from 'fileToBase64' to 'fileToImageFile' to match usage.
-const fileToImageFile = (file: File): Promise<ImageFile> =>
+// FIX: Update return type to match the local ImageFileWithPreview interface, resolving the type error on 'preview'.
+const fileToImageFile = (file: File): Promise<ImageFileWithPreview> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -296,9 +303,10 @@ const fileToImageFile = (file: File): Promise<ImageFile> =>
     reader.onerror = error => reject(error);
   });
 
+// FIX: Update props to use the local ImageFileWithPreview type.
 const ImageUploader: React.FC<{
-    image: ImageFile | null;
-    onImageChange: (image: ImageFile | null) => void;
+    image: ImageFileWithPreview | null;
+    onImageChange: (image: ImageFileWithPreview | null) => void;
     title: string;
 }> = ({ image, onImageChange, title }) => {
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -330,6 +338,7 @@ const ImageUploader: React.FC<{
                 <input {...getInputProps()} />
                 {image ? (
                     <>
+                        {/* FIX: image.preview is now valid due to updated prop type. */}
                         <img src={image.preview} alt="Preview" className="max-h-20 max-w-full mx-auto rounded-md object-contain" onDragStart={(e) => e.preventDefault()} />
                         <button
                             onClick={(e) => {
@@ -557,10 +566,12 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   const [loading, setLoading] = useState(false);
   const [fileLoaded, setFileLoaded] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
-  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-flash-image-preview');
+  // FIX: Update default model name and available options to be compliant with Gemini API guidelines.
+  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-2.5-flash-image');
   
-  const [logo, setLogo] = useState<ImageFile | null>(null);
-  const [referenceImage, setReferenceImage] = useState<ImageFile | null>(null);
+  // FIX: Update state to use the local ImageFileWithPreview type.
+  const [logo, setLogo] = useState<ImageFileWithPreview | null>(null);
+  const [referenceImage, setReferenceImage] = useState<ImageFileWithPreview | null>(null);
 
   // State for daily summary flyer
   const [isGeneratingIndividual, setIsGeneratingIndividual] = useState<Partial<Record<TimePeriod, boolean>>>({});
@@ -889,9 +900,9 @@ ${eventListStringEn}
                         <div>
                             <label className="block text-sm font-medium text-subtle mb-1"><Icon name="zap" className="inline w-4 h-4 mr-1" /> Modelo</label>
                             <select value={selectedImageModel} onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)} className="w-full bg-surface/80 border-muted/50 border rounded-lg p-2.5 text-text-main focus:ring-2 focus:ring-primary">
-                                <option value="gemini-flash-image-preview">gemini-2.5-flash-image-preview</option>
-                                <option value="gemini-imagen">imagen-4.0-generate-001</option>
-                                <option value="bytedance-seedream">bytedance/seedream</option>
+                                {/* FIX: Update model options to be compliant with Gemini API guidelines. */}
+                                <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+                                <option value="imagen-4.0-generate-001">Imagen 4.0</option>
                             </select>
                         </div>
 

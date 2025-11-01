@@ -26,7 +26,7 @@ interface DashboardProps {
   onToggleAssistant: () => void;
   assistantHistory: ChatMessage[];
   isAssistantLoading: boolean;
-  onAssistantSendMessage: (message: string) => void;
+  onAssistantSendMessage: (message: string, image: ChatReferenceImage | null) => void;
   chatReferenceImage: ChatReferenceImage | null;
   onSetChatReference: (image: GalleryImage | null) => void;
   // Theme Props
