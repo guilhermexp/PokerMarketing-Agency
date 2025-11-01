@@ -1,172 +1,251 @@
-import React, { useState } from 'react';
-import type { Post, BrandProfile, ContentInput, GalleryImage } from '../../types';
+import React, { useState, useEffect } from 'react';
+import type { Post, BrandProfile, ContentInput, GalleryImage, IconName, ImageModel } from '../../types';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
-import { Loader } from '../common/Loader';
 import { Icon } from '../common/Icon';
-import { generateImage, editImage, createBrandedImageVariant } from '../../services/geminiService';
+import { Loader } from '../common/Loader';
+import { generateImage } from '../../services/geminiService';
 import { ImagePreviewModal } from '../common/ImagePreviewModal';
 
 interface PostsTabProps {
   posts: Post[];
   brandProfile: BrandProfile;
-  referenceImage: ContentInput['image'] | null;
-  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void;
+  referenceImage: NonNullable<ContentInput['productImages']>[number] | null;
+  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
+  onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
+  onSetChatReference: (image: GalleryImage | null) => void;
 }
 
-const PostCard: React.FC<{ post: Post, brandProfile: BrandProfile, referenceImage: ContentInput['image'] | null, onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void; }> = ({ post, brandProfile, referenceImage, onAddImageToGallery }) => {
-    const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [currentPrompt, setCurrentPrompt] = useState<string>(post.image_prompt || '');
-    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+const socialIcons: Record<string, IconName> = {
+  'Instagram': 'image',
+  'LinkedIn': 'share',
+  'Twitter': 'zap',
+  'Facebook': 'users'
+}
 
-    const handleImageAction = async () => {
-        setIsGenerating(true);
-        setError(null);
-        try {
-            let imageUrl;
-            let finalPrompt = currentPrompt;
+const PostCard: React.FC<{
+    post: Post;
+    image: GalleryImage | null;
+    isGenerating: boolean;
+    error: string | null;
+    onGenerate: () => void;
+    onImageUpdate: (newSrc: string) => void;
+    onSetChatReference: (image: GalleryImage | null) => void;
+}> = ({ post, image, isGenerating, error, onGenerate, onImageUpdate, onSetChatReference }) => {
+    const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
+    const [isCopied, setIsCopied] = useState(false);
 
-            if (generatedImage) {
-                // This is a regeneration, so we edit the existing image
-                if (!currentPrompt) return;
-                const [header, base64Data] = generatedImage.split(',');
-                if (!base64Data) throw new Error("Invalid image data URL.");
-                const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
-                imageUrl = await editImage(base64Data, mimeType, currentPrompt);
-            } else if (referenceImage) {
-                 // First generation with a reference image
-                 finalPrompt = `Imagem de marca baseada em referência para o post: "${post.content}"`;
-                 imageUrl = await createBrandedImageVariant(referenceImage, brandProfile, post.content);
-            } else {
-                // This is the first generation from a text prompt
-                if (!currentPrompt) return;
-                imageUrl = await generateImage(currentPrompt);
-            }
-            setGeneratedImage(imageUrl);
-            onAddImageToGallery({ src: imageUrl, prompt: finalPrompt, source: 'Post' });
-        } catch (err: any) {
-            setError(err.message || 'A geração da imagem falhou.');
-        } finally {
-            setIsGenerating(false);
+    const handleEditClick = () => {
+        if (image) {
+          setEditingImage(image);
         }
     };
     
-    const handleImageUpdate = (newImageUrl: string) => {
-        setGeneratedImage(newImageUrl);
-        onAddImageToGallery({ src: newImageUrl, prompt: "Edição Manual via Modal", source: 'Post' });
+    const handleModalUpdate = (newSrc: string) => {
+        onImageUpdate(newSrc);
+        setEditingImage(prev => prev ? { ...prev, src: newSrc } : null);
     };
 
     const handleShare = () => {
-        // The AI generates hashtags without '#', so we add it here for sharing and display.
-        const fullContent = `${post.content}\n\n${post.hashtags.map(h => `#${h}`).join(' ')}`;
-        
-        const platform = post.platform.toLowerCase();
-
-        if (platform.includes('twitter') || platform.includes('x')) {
-            const encodedContent = encodeURIComponent(fullContent);
-            const shareUrl = `https://twitter.com/intent/tweet?text=${encodedContent}`;
-            window.open(shareUrl, '_blank', 'noopener,noreferrer');
-        } else {
-            // For LinkedIn, Instagram, etc., copy-to-clipboard is the most reliable web-based action.
-            navigator.clipboard.writeText(fullContent).then(() => {
-                let message = `Conteúdo para ${post.platform} copiado para a área de transferência!`;
-                if (platform.includes('linkedin')) {
-                    message = 'Conteúdo do post copiado! Abrindo o LinkedIn para você colar.';
-                    window.open('https://www.linkedin.com/feed/', '_blank', 'noopener,noreferrer');
-                }
-                alert(message);
-            }).catch(err => {
-                console.error('Could not copy text: ', err);
-                alert('Falha ao copiar conteúdo para a área de transferência.');
-            });
-        }
+        if (!image) return;
+        const shareText = `${post.content}\n\n${post.hashtags.map(tag => `#${tag}`).join(' ')}`;
+        navigator.clipboard.writeText(shareText).then(() => {
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2500);
+        }, (err) => {
+            console.error('Failed to copy text: ', err);
+            alert('Falha ao copiar o texto.');
+        });
     };
     
-    const canGenerateFirstImage = referenceImage || post.image_prompt;
+    const icon = socialIcons[post.platform] || 'share';
 
     return (
         <>
-            <Card className="flex flex-col overflow-hidden">
-            {generatedImage ? (
-                <img
-                    src={generatedImage}
-                    alt="Generated for post"
-                    className="w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => setIsPreviewOpen(true)}
-                />
-            ) : (
-                canGenerateFirstImage && (
-                    <div className="w-full h-48 bg-surface/40 flex flex-col items-center justify-center p-4 text-center">
-                        <Icon name="image" className="w-10 h-10 text-muted mb-2"/>
-                        <Button onClick={handleImageAction} isLoading={isGenerating} size="small" variant="secondary" icon="zap">
-                            Gerar Imagem
-                        </Button>
-                        {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+            <Card className="p-6 flex flex-col md:flex-row gap-6">
+                <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-3">
+                        <Icon name={icon} className="w-5 h-5 text-primary" />
+                        <h3 className="text-lg font-bold text-text-main">{post.platform} Post</h3>
                     </div>
-                )
-            )}
-            <div className="p-5 flex-grow flex flex-col justify-between">
-                <div>
-                <h4 className="font-bold text-text-main mb-2">Post para {post.platform}</h4>
-                <p className="text-text-muted text-sm mb-4 whitespace-pre-line">{post.content}</p>
+                    <div className="prose prose-sm text-text-muted max-w-none bg-background/50 p-3 rounded-md mb-3">
+                        <p>{post.content}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {post.hashtags.map((tag, i) => (
+                            <span key={i} className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">#{tag}</span>
+                        ))}
+                    </div>
                 </div>
-
-                {generatedImage && (
-                <div className="mt-4">
-                    <label htmlFor={`prompt-${post.platform}`} className="block text-xs font-medium text-subtle mb-1">
-                    Instruções da Imagem (edite para regenerar)
-                    </label>
-                    <textarea
-                    id={`prompt-${post.platform}`}
-                    value={currentPrompt}
-                    onChange={(e) => setCurrentPrompt(e.target.value)}
-                    rows={3}
-                    className="w-full bg-background/80 border border-muted/50 rounded-lg p-2 text-sm text-text-main focus:ring-2 focus:ring-primary focus:border-primary transition"
-                    placeholder="Descreva as mudanças que você quer na imagem..."
-                    />
-                    <Button onClick={handleImageAction} isLoading={isGenerating} disabled={!currentPrompt} size="small" variant="secondary" className="mt-2 w-full" icon="zap">
-                      Regenerar Imagem
-                    </Button>
+                <div className="md:w-72 flex-shrink-0">
+                    <h4 className="font-semibold text-text-main mb-2">Sugestão de Imagem</h4>
+                    <div className="aspect-square bg-surface rounded-lg flex items-center justify-center relative overflow-hidden">
+                        {isGenerating ? (
+                            <Loader />
+                        ) : image ? (
+                            <>
+                                <img src={image.src} alt={`Visual for ${post.platform} post`} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                    <Button size="small" onClick={handleEditClick}>Editar</Button>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="text-center p-4">
+                               <p className="text-xs text-text-muted italic">"{post.image_prompt}"</p>
+                            </div>
+                        )}
+                    </div>
+                    {post.image_prompt && !image && (
+                        <div className="mt-4 space-y-2">
+                            <Button onClick={onGenerate} isLoading={isGenerating} size="small" className="w-full" icon="image">
+                                Gerar Imagem
+                            </Button>
+                        </div>
+                    )}
+                    {image && (
+                         <div className="mt-4">
+                            <Button onClick={handleShare} size="small" variant="secondary" className="w-full" icon="share-alt">
+                                {isCopied ? 'Texto Copiado!' : 'Copiar Texto para Compartilhar'}
+                            </Button>
+                        </div>
+                    )}
                     {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
                 </div>
-                )}
-            </div>
-            <div className="p-5 bg-surface/60 border-t border-muted/50 flex justify-between items-center gap-4">
-                <p className="text-xs text-subtle break-words flex-1">
-                    {post.hashtags.map(tag => `#${tag}`).join(' ')}
-                </p>
-                <Button onClick={handleShare} size="small" variant="secondary" icon="share" className="flex-shrink-0">
-                    Compartilhar
-                </Button>
-            </div>
             </Card>
-            {isPreviewOpen && generatedImage && (
-                <ImagePreviewModal 
-                    imageUrl={generatedImage} 
-                    onClose={() => setIsPreviewOpen(false)}
-                    onImageUpdate={handleImageUpdate}
+            {editingImage && (
+                <ImagePreviewModal
+                    image={editingImage}
+                    onClose={() => setEditingImage(null)}
+                    onImageUpdate={handleModalUpdate}
+                    onSetChatReference={onSetChatReference}
+                    downloadFilename={`post-${post.platform.toLowerCase().replace(/\s+/g, '_')}.png`}
                 />
             )}
         </>
-    )
-}
+    );
+};
 
-export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referenceImage, onAddImageToGallery }) => {
+
+export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referenceImage, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference }) => {
+  const [images, setImages] = useState<(GalleryImage | null)[]>([]);
+  const [generationState, setGenerationState] = useState<{ isGenerating: boolean[], errors: (string | null)[] }>({
+    isGenerating: [],
+    errors: [],
+  });
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-flash-image-preview');
+
+  useEffect(() => {
+    const length = posts.length;
+    setImages(Array(length).fill(null));
+    setGenerationState({
+      isGenerating: Array(length).fill(false),
+      errors: Array(length).fill(null),
+    });
+  }, [posts]);
+
+  const handleGenerate = async (index: number) => {
+    const post = posts[index];
+    if (!post.image_prompt) return;
+
+    setGenerationState(prev => {
+        const newGenerating = [...prev.isGenerating];
+        const newErrors = [...prev.errors];
+        newGenerating[index] = true;
+        newErrors[index] = null;
+        return { isGenerating: newGenerating, errors: newErrors };
+    });
+
+    try {
+        const generatedImageUrl = await generateImage(post.image_prompt, brandProfile, {
+            aspectRatio: '1:1',
+            model: selectedImageModel,
+            productImages: referenceImage ? [referenceImage] : undefined,
+        });
+
+        const galleryImage = onAddImageToGallery({
+            src: generatedImageUrl,
+            prompt: post.image_prompt,
+            source: 'Post',
+            model: selectedImageModel
+        });
+        setImages(prev => {
+            const newImages = [...prev];
+            newImages[index] = galleryImage;
+            return newImages;
+        });
+    } catch (err: any) {
+         setGenerationState(prev => {
+            const newErrors = [...prev.errors];
+            newErrors[index] = err.message || 'Falha ao gerar imagem.';
+            return { ...prev, errors: newErrors };
+        });
+    } finally {
+        setGenerationState(prev => {
+            const newGenerating = [...prev.isGenerating];
+            newGenerating[index] = false;
+            return { ...prev, isGenerating: newGenerating };
+        });
+    }
+  };
+
+  const handleGenerateAll = async () => {
+    setIsGeneratingAll(true);
+    const generationPromises = posts.map((_, index) => {
+        if (!images[index]) {
+            return handleGenerate(index);
+        }
+        return Promise.resolve();
+    });
+    await Promise.allSettled(generationPromises);
+    setIsGeneratingAll(false);
+  };
+  
+  const handleImageUpdate = (index: number, newSrc: string) => {
+      const image = images[index];
+      if (image) {
+          onUpdateGalleryImage(image.id, newSrc);
+          const updatedImage = { ...image, src: newSrc };
+          setImages(prev => {
+              const newImages = [...prev];
+              newImages[index] = updatedImage;
+              return newImages;
+          });
+      }
+  };
+
   return (
-    <div>
-      {posts.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {posts.map((post, index) => (
-            <PostCard key={index} post={post} brandProfile={brandProfile} referenceImage={referenceImage} onAddImageToGallery={onAddImageToGallery} />
-          ))}
+    <div className="space-y-6">
+       <Card className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <Button onClick={handleGenerateAll} isLoading={isGeneratingAll} disabled={isGeneratingAll || generationState.isGenerating.some(Boolean)} icon="zap">
+          Gerar Todas as Imagens
+        </Button>
+         <div className="flex items-center gap-2">
+            <label htmlFor="model-select-posts" className="text-sm font-medium text-subtle flex-shrink-0">Modelo de IA:</label>
+            <select 
+                id="model-select-posts"
+                value={selectedImageModel} 
+                onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)} 
+                className="bg-surface/80 border-muted/50 border rounded-lg p-2 text-sm text-text-main focus:ring-2 focus:ring-primary w-full sm:w-auto"
+            >
+                <option value="gemini-flash-image-preview">gemini-2.5-flash-image-preview</option>
+                <option value="gemini-imagen">imagen-4.0-generate-001</option>
+                <option value="bytedance-seedream">bytedance/seedream</option>
+            </select>
         </div>
-      ) : (
-         <Card className="text-center p-8">
-            <p className="text-text-muted">Nenhum post para redes sociais foi gerado ainda.</p>
-        </Card>
-      )}
+      </Card>
+      {posts.map((post, index) => (
+        <PostCard 
+            key={index} 
+            post={post}
+            image={images[index]}
+            isGenerating={generationState.isGenerating[index]}
+            error={generationState.errors[index]}
+            onGenerate={() => handleGenerate(index)}
+            onImageUpdate={(newSrc) => handleImageUpdate(index, newSrc)}
+            onSetChatReference={onSetChatReference}
+        />
+      ))}
     </div>
   );
 };

@@ -4,11 +4,13 @@ import { editImage } from '../../services/geminiService';
 import { Button } from './Button';
 import { Icon } from './Icon';
 import { Loader } from './Loader';
+import type { GalleryImage } from '../../types';
 
 interface ImagePreviewModalProps {
-  imageUrl: string;
+  image: GalleryImage;
   onClose: () => void;
   onImageUpdate: (newImageUrl: string) => void;
+  onSetChatReference: (image: GalleryImage) => void;
   downloadFilename?: string;
 }
 
@@ -59,7 +61,6 @@ const ImageUploader: React.FC<{
             <label className="block text-sm font-medium text-subtle mb-1">{title}</label>
             <div
                 {...getRootProps()}
-                // FIX: Corrected a typo in the `useDropzone` hook's property access, changing `isImageDragActive` to the correct `isDragActive` to fix the "Cannot find name" error and enable drag-and-drop UI feedback.
                 className={`relative border-2 border-dashed rounded-lg p-2 text-center cursor-pointer transition-colors h-24 flex flex-col justify-center items-center ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted/50 hover:border-subtle'}`}
             >
                 <input {...getInputProps()} />
@@ -89,9 +90,10 @@ const ImageUploader: React.FC<{
 };
 
 
-export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, onClose, onImageUpdate, downloadFilename }) => {
+export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onClose, onImageUpdate, onSetChatReference, downloadFilename }) => {
   const [editPrompt, setEditPrompt] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [isRemovingBackground, setIsRemovingBackground] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<ImageFile | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -101,28 +103,26 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
   const containerRef = useRef<HTMLDivElement>(null);
 
   const drawCanvases = useCallback(() => {
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.src = imageUrl;
-    image.onload = () => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = image.src;
+    img.onload = () => {
         const imageCanvas = imageCanvasRef.current;
         const maskCanvas = maskCanvasRef.current;
         const container = containerRef.current;
         if (!imageCanvas || !maskCanvas || !container) return;
         
-        const { naturalWidth, naturalHeight } = image;
+        const { naturalWidth, naturalHeight } = img;
         
-        // Set canvas resolution to the original image size
         imageCanvas.width = naturalWidth;
         imageCanvas.height = naturalHeight;
         maskCanvas.width = naturalWidth;
         maskCanvas.height = naturalHeight;
 
-        // Draw the original image onto the image canvas
         const ctx = imageCanvas.getContext('2d');
-        ctx?.drawImage(image, 0, 0, naturalWidth, naturalHeight);
+        ctx?.drawImage(img, 0, 0, naturalWidth, naturalHeight);
     };
-  }, [imageUrl]);
+  }, [image.src]);
 
   useEffect(() => {
     drawCanvases();
@@ -164,8 +164,8 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
     const ctx = maskCanvasRef.current?.getContext('2d');
     if (!ctx) return;
     ctx.lineTo(x, y);
-    ctx.strokeStyle = 'rgba(236, 72, 153, 0.7)'; // secondary color with alpha
-    ctx.lineWidth = 40; // Increased line width for better visibility on scaled images
+    ctx.strokeStyle = 'white'; // Use solid white for a clear mask
+    ctx.lineWidth = 40; 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
@@ -191,7 +191,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
     setIsEditing(true);
     setError(null);
     try {
-        const [imgHeader, imgBase64] = imageUrl.split(',');
+        const [imgHeader, imgBase64] = image.src.split(',');
         const imgMimeType = imgHeader.match(/:(.*?);/)?.[1] || 'image/png';
 
         const maskCanvas = maskCanvasRef.current;
@@ -200,7 +200,6 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
         if (maskCanvas) {
             const maskDataUrl = maskCanvas.toDataURL('image/png');
             const [maskHeader, maskBase64] = maskDataUrl.split(',');
-            // Check if mask is not empty
             const isMaskEmpty = !maskCanvas.getContext('2d')?.getImageData(0,0,maskCanvas.width, maskCanvas.height).data.some(channel => channel !== 0);
             if (!isMaskEmpty) {
                maskData = { base64: maskBase64, mimeType: 'image/png' };
@@ -215,7 +214,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
         
         onImageUpdate(newImageUrl);
         setEditPrompt('');
-        onClose();
+        clearMask();
     } catch (err: any) {
         setError(err.message || 'Falha ao editar a imagem.');
     } finally {
@@ -223,14 +222,40 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
     }
   };
 
+  const handleRemoveBackground = async () => {
+    setIsRemovingBackground(true);
+    setError(null);
+    try {
+        const [imgHeader, imgBase64] = image.src.split(',');
+        const imgMimeType = imgHeader.match(/:(.*?);/)?.[1] || 'image/png';
+
+        const removeBgPrompt = "Remova o fundo desta imagem, deixando-o transparente. Mantenha apenas o objeto principal em primeiro plano, preservando todos os seus detalhes e contornos.";
+        
+        const newImageUrl = await editImage(imgBase64, imgMimeType, removeBgPrompt);
+        
+        onImageUpdate(newImageUrl);
+    } catch (err: any) {
+        setError(err.message || 'Falha ao remover o fundo.');
+    } finally {
+        setIsRemovingBackground(false);
+    }
+  };
+
   const handleDownload = () => {
     const link = document.createElement('a');
-    link.href = imageUrl;
+    link.href = image.src;
     link.download = downloadFilename || 'edited-image.png';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
+  
+  const handleUseInChat = () => {
+    onSetChatReference(image);
+    onClose();
+  };
+  
+  const isActionRunning = isEditing || isRemovingBackground;
 
   return (
     <div 
@@ -281,13 +306,19 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, 
            </div>
 
            <div className="mt-6 space-y-2">
-                <Button onClick={clearMask} variant="secondary" className="w-full" size="small">
+                <Button onClick={clearMask} variant="secondary" className="w-full" size="small" disabled={isActionRunning}>
                     Limpar Máscara
                 </Button>
-                <Button onClick={handleDownload} variant="secondary" className="w-full" icon="download">
+                <Button onClick={handleRemoveBackground} variant="secondary" className="w-full" icon="scissors" isLoading={isRemovingBackground} disabled={isActionRunning}>
+                    Remover Fundo
+                </Button>
+                <Button onClick={handleUseInChat} variant="secondary" className="w-full" icon="paperclip" disabled={isActionRunning}>
+                    Usar no chat do Assistente
+                </Button>
+                <Button onClick={handleDownload} variant="secondary" className="w-full" icon="download" disabled={isActionRunning}>
                     Download
                 </Button>
-                <Button onClick={handleEdit} disabled={!editPrompt.trim()} isLoading={isEditing} icon="zap" className="w-full">
+                <Button onClick={handleEdit} disabled={!editPrompt.trim() || isActionRunning} isLoading={isEditing} icon="zap" className="w-full">
                     {isEditing ? 'Aplicando Edição...' : 'Gerar Edição'}
                 </Button>
            </div>

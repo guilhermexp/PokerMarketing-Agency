@@ -16,7 +16,8 @@ interface DashboardProps {
   onEditProfile: () => void;
   onResetCampaign: () => void;
   // FIX: Add referenceImage to the props interface to resolve type error in App.tsx.
-  referenceImage: ContentInput['image'] | null;
+  // FIX: Correct the type for 'referenceImage'. It should be an element of 'ContentInput['productImages']'.
+  referenceImage: NonNullable<ContentInput['productImages']>[number] | null;
 }
 
 type Tab = 'clips' | 'posts' | 'ads';

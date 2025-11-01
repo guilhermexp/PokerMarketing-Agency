@@ -7,15 +7,15 @@ import { ImagePreviewModal } from './common/ImagePreviewModal';
 interface GalleryViewProps {
   images: GalleryImage[];
   onUpdateImage: (imageId: string, newImageSrc: string) => void;
+  onSetChatReference: (image: GalleryImage) => void;
 }
 
-export const GalleryView: React.FC<GalleryViewProps> = ({ images, onUpdateImage }) => {
+export const GalleryView: React.FC<GalleryViewProps> = ({ images, onUpdateImage, onSetChatReference }) => {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
 
   const handleImageUpdate = (newSrc: string) => {
     if (selectedImage) {
       onUpdateImage(selectedImage.id, newSrc);
-      // Update the image source in the modal as well for immediate feedback
       setSelectedImage(prev => prev ? { ...prev, src: newSrc } : null);
     }
   };
@@ -46,9 +46,17 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ images, onUpdateImage 
                 <p className="text-white text-xs font-semibold leading-tight line-clamp-3">
                   {image.prompt}
                 </p>
-                <span className="mt-1 text-xs text-white/70 font-medium bg-white/20 px-1.5 py-0.5 rounded self-start">
-                  {image.source}
-                </span>
+                <div className="flex flex-wrap gap-1 mt-1 self-start">
+                  <span className="text-xs text-white/70 font-medium bg-white/20 px-1.5 py-0.5 rounded">
+                    {image.source}
+                  </span>
+                  {image.model && (
+                    <span className="text-xs text-white/70 font-medium bg-white/20 px-1.5 py-0.5 rounded backdrop-blur-sm flex items-center">
+                      <Icon name="zap" className="inline-block w-3 h-3 mr-1" />
+                      {image.model === 'gemini-imagen' ? 'Gemini' : 'Bytedance'}
+                    </span>
+                  )}
+                </div>
               </div>
             </button>
           ))}
@@ -63,9 +71,10 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ images, onUpdateImage 
 
       {selectedImage && (
         <ImagePreviewModal
-            imageUrl={selectedImage.src}
+            image={selectedImage}
             onClose={() => setSelectedImage(null)}
             onImageUpdate={handleImageUpdate}
+            onSetChatReference={onSetChatReference}
             downloadFilename={`directorai-gallery-${selectedImage.source.toLowerCase().replace(/ /g, '_')}-${selectedImage.id.substring(0, 8)}.png`}
         />
       )}

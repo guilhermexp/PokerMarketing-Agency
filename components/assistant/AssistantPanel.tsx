@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { ChatMessage } from '../../types';
+import type { ChatMessage, ChatReferenceImage } from '../../types';
 import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 
@@ -9,6 +9,8 @@ interface AssistantPanelProps {
     history: ChatMessage[];
     isLoading: boolean;
     onSendMessage: (message: string) => void;
+    referenceImage: ChatReferenceImage | null;
+    onClearReference: () => void;
 }
 
 const parseMarkdown = (text: string) => {
@@ -57,32 +59,41 @@ const parseMarkdown = (text: string) => {
 
 const ChatBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
     const isModel = message.role === 'model';
-    const content = message.parts[0].text;
+    const textPart = message.parts.find(p => p.text)?.text;
+    const imagePart = message.parts.find(p => p.inlineData);
 
-    if (!content && !message.parts[0].functionCall) return null;
+    if (!textPart && !message.parts[0].functionCall && !imagePart) return null;
 
-    const htmlContent = parseMarkdown(content || '');
+    const htmlContent = textPart ? parseMarkdown(textPart) : '';
 
     return (
         <div className={`flex ${isModel ? 'justify-start' : 'justify-end'}`}>
             <div className={`max-w-xs md:max-w-sm lg:max-w-md rounded-2xl px-4 py-2.5 ${isModel ? 'bg-surface/80 rounded-bl-none' : 'bg-primary text-white rounded-br-none'}`}>
-                 <div className="prose text-sm" dangerouslySetInnerHTML={{ __html: htmlContent }} />
+                 {imagePart && <img src={`data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`} alt="Referência" className="rounded-md mb-2 max-h-40" />}
+                 {htmlContent && <div className="prose text-sm" dangerouslySetInnerHTML={{ __html: htmlContent }} />}
             </div>
         </div>
     );
 };
 
-export const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, onClose, history, isLoading, onSendMessage }) => {
+export const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, onClose, history, isLoading, onSendMessage, referenceImage, onClearReference }) => {
     const [input, setInput] = useState('');
     const chatEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [history, isLoading]);
+    
+    useEffect(() => {
+        if(isOpen && referenceImage) {
+            inputRef.current?.focus();
+        }
+    }, [isOpen, referenceImage])
 
     const handleSend = (e: React.FormEvent) => {
         e.preventDefault();
-        if (input.trim() && !isLoading) {
+        if ((input.trim() || referenceImage) && !isLoading) {
             onSendMessage(input.trim());
             setInput('');
         }
@@ -118,8 +129,21 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, onClose,
 
             {/* Input Form */}
             <div className="flex-shrink-0 p-4 border-t border-muted/30">
+                {referenceImage && (
+                    <div className="relative mb-2 p-2 bg-background/50 rounded-lg">
+                        <img src={referenceImage.src} alt="Imagem de referência" className="w-16 h-16 object-cover rounded" />
+                        <button 
+                            onClick={onClearReference}
+                            className="absolute top-0 right-0 -mt-1 -mr-1 bg-muted text-background rounded-full p-0.5 hover:bg-subtle transition-colors"
+                            aria-label="Remover imagem de referência"
+                        >
+                            <Icon name="x" className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
                 <form onSubmit={handleSend} className="relative">
                     <input
+                        ref={inputRef}
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
@@ -127,7 +151,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, onClose,
                         className="w-full bg-background/80 border border-muted/50 rounded-lg py-2 pl-4 pr-12 text-text-main focus:ring-2 focus:ring-primary focus:border-primary transition"
                         disabled={isLoading}
                     />
-                    <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full text-primary disabled:text-muted disabled:cursor-not-allowed hover:bg-primary/10 transition-colors" disabled={isLoading || !input.trim()}>
+                    <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full text-primary disabled:text-muted disabled:cursor-not-allowed hover:bg-primary/10 transition-colors" disabled={isLoading || (!input.trim() && !referenceImage)}>
                         <Icon name="arrowRight" className="w-5 h-5" />
                     </button>
                 </form>

@@ -34,6 +34,20 @@ const assistantTools = {
       },
     },
     {
+      name: "edit_referenced_image",
+      description: "Edita a imagem que o usuário anexou à sua mensagem de chat. Use esta ferramenta quando o usuário fornecer uma imagem e solicitar modificações nela.",
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          prompt: {
+            type: Type.STRING,
+            description: "Uma descrição detalhada das alterações a serem feitas na imagem referenciada.",
+          },
+        },
+        required: ["prompt"],
+      },
+    },
+    {
       name: "get_tournament_events",
       description: "Recupera uma lista de eventos de torneio da planilha carregada. Pode ser filtrado por dia da semana ou por um termo de pesquisa no nome do evento.",
       parameters: {
@@ -62,6 +76,7 @@ export const runAssistantConversationStream = async (
 - O perfil de marca atual do usuário é: ${JSON.stringify(brandProfile, null, 2)}
 - Quando um usuário pedir para criar um logo do zero, use a ferramenta 'create_brand_logo'.
 - Quando um usuário pedir para você modificar um logo existente, use a ferramenta 'edit_brand_logo'. Se o usuário não tiver um logo, você deve sugerir criá-lo primeiro.
+- Quando um usuário enviar uma imagem no chat e pedir para modificá-la, use a ferramenta 'edit_referenced_image'.
 - Você também pode consultar a lista de eventos de torneio carregados usando a ferramenta 'get_tournament_events'. Isso é útil para responder a perguntas do usuário sobre a programação, como 'Quais eventos acontecem na segunda-feira?' ou 'Fale-me sobre o torneio Deepstack'.
 - Seja prestativo, conciso e proativo. Ao concluir uma ação, confirme-a com o usuário.
 - Se não puder atender a uma solicitação, explique o motivo e sugira o que você pode fazer.
@@ -69,6 +84,7 @@ export const runAssistantConversationStream = async (
 
     try {
         return ai.models.generateContentStream({
+// FIX: Use 'gemini-2.5-flash' for general text tasks as per guidelines.
             model: 'gemini-2.5-flash',
             contents: history,
             config: {

@@ -5,11 +5,68 @@ import { Dashboard } from './components/Dashboard';
 import { Loader } from './components/common/Loader';
 import { generateCampaign, editImage, generateLogo } from './services/geminiService';
 import { runAssistantConversationStream } from './services/assistantService';
-import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage } from './types';
+import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, ChatPart, GenerationOptions } from './types';
+import { Icon } from './components/common/Icon';
 
 // Define TimePeriod here as it's used for state
 export type TimePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'NIGHT';
-const MAX_GALLERY_SIZE = 30; // Limit to 30 images to avoid storage quota issues
+const MAX_GALLERY_SIZE = 15; // Limit to 15 images to avoid storage quota issues
+const MAX_CHAT_HISTORY_MESSAGES = 10; // Limit chat history sent to API to prevent token overflow
+
+// Helper function to resize an image for chat context to avoid token limits
+const resizeImageForChat = (
+  dataUrl: string,
+  maxWidth: number,
+  maxHeight: number
+): Promise<{ base64: string; mimeType: 'image/jpeg' }> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round(height * (maxWidth / width));
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round(width * (maxHeight / height));
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        return reject(new Error('Could not get canvas context'));
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      // Use JPEG for better compression and specify quality
+      const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8); 
+      const base64 = resizedDataUrl.split(',')[1];
+      
+      resolve({ base64, mimeType: 'image/jpeg' });
+    };
+    img.onerror = (err) => {
+      reject(err);
+    };
+    img.src = dataUrl;
+  });
+};
+
+// Helper function for truncating chat history
+const getTruncatedHistory = (history: ChatMessage[], maxLength: number = MAX_CHAT_HISTORY_MESSAGES): ChatMessage[] => {
+    if (history.length <= maxLength) {
+        return history;
+    }
+    // Keep the last `maxLength` messages
+    return history.slice(-maxLength);
+};
+
 
 function App() {
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
@@ -18,20 +75,26 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [referenceImage, setReferenceImage] = useState<ContentInput['image'] | null>(null);
+  const [productImages, setProductImages] = useState<ContentInput['productImages'] | null>(null);
+  const [inspirationImages, setInspirationImages] = useState<ContentInput['inspirationImages'] | null>(null);
+
 
   // Assistant State
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isAssistantLoading, setIsAssistantLoading] = useState(false);
+  const [chatReferenceImage, setChatReferenceImage] = useState<ChatReferenceImage | null>(null);
+  const [toolImageReference, setToolImageReference] = useState<ChatReferenceImage | null>(null);
+
 
   // Gallery State
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
 
   // Flyer Generator State
   const [tournamentEvents, setTournamentEvents] = useState<TournamentEvent[]>([]);
-  const [flyerState, setFlyerState] = useState<Record<string, (string | 'loading')[]>>({});
-  const [dailyFlyerState, setDailyFlyerState] = useState<Record<TimePeriod, (string | 'loading')[]>>({ ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [] });
+  // FIX: Update flyer state to store GalleryImage objects instead of string URLs.
+  const [flyerState, setFlyerState] = useState<Record<string, (GalleryImage | 'loading')[]>>({});
+  const [dailyFlyerState, setDailyFlyerState] = useState<Record<TimePeriod, (GalleryImage | 'loading')[]>>({ ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [] });
 
 
   // Theme State
@@ -42,6 +105,16 @@ function App() {
     }
     return 'dark'; // Default to dark mode
   });
+  
+  // Auto-dismiss for the error message
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError(null);
+      }, 5000); // Auto-dismiss after 5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
 
   // Theme effect
   useEffect(() => {
@@ -94,12 +167,17 @@ function App() {
     setIsEditingProfile(false);
     try {
       localStorage.setItem('brandProfile', JSON.stringify(profile));
-    } catch (e) {
-       console.error("Failed to save brand profile to local storage", e);
+    } catch (e: any) {
+       if (e.name === 'QuotaExceededError') {
+           console.error("Failed to save brand profile to local storage: Quota exceeded. The logo image might be too large.", e);
+           setError("Falha ao salvar o perfil da marca. A imagem do logo pode ser muito grande.");
+       } else {
+           console.error("Failed to save brand profile to local storage", e);
+       }
     }
   };
 
-  const handleGenerate = async (input: ContentInput) => {
+  const handleGenerate = async (input: ContentInput, options: GenerationOptions) => {
     if (!brandProfile) {
       setError("O perfil da marca não está definido.");
       return;
@@ -113,9 +191,10 @@ function App() {
     setIsGenerating(true);
     setError(null);
     setCampaign(null); // Clear previous campaign results
-    setReferenceImage(input.image); // Store the reference image
+    setProductImages(input.productImages);
+    setInspirationImages(input.inspirationImages);
     try {
-      const result = await generateCampaign(brandProfile, input);
+      const result = await generateCampaign(brandProfile, input, options);
       setCampaign(result);
     } catch (err: any) {
       setError(err.message || 'Ocorreu um erro inesperado.');
@@ -127,7 +206,8 @@ function App() {
   const handleResetCampaign = () => {
       setCampaign(null);
       setError(null);
-      setReferenceImage(null); // Clear the reference image
+      setProductImages(null);
+      setInspirationImages(null);
       // Reset flyer states as well if a new campaign implies a full reset
       setFlyerState({});
       setDailyFlyerState({ ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [] });
@@ -135,38 +215,87 @@ function App() {
   };
 
   // --- Gallery Logic ---
-  const handleAddImageToGallery = (image: Omit<GalleryImage, 'id'>) => {
+  const handleAddImageToGallery = (image: Omit<GalleryImage, 'id'>): GalleryImage => {
     const newImage: GalleryImage = { ...image, id: new Date().toISOString() + Math.random() };
     setGalleryImages(prev => {
-      // Add the new image and then slice the array to respect the size limit
-      const updatedGallery = [...prev, newImage];
+      let updatedGallery = [...prev, newImage];
       
-      // If the gallery exceeds the max size, remove the oldest images (from the start of the array)
+      // First, enforce the MAX_GALLERY_SIZE limit.
       if (updatedGallery.length > MAX_GALLERY_SIZE) {
         updatedGallery.splice(0, updatedGallery.length - MAX_GALLERY_SIZE);
       }
   
-      try {
-        localStorage.setItem('galleryImages', JSON.stringify(updatedGallery));
-      } catch (e) {
-        console.error("Failed to save gallery to local storage", e);
-        // This catch block will now likely only be hit for other reasons than quota.
+      // Now, try to save and handle quota errors by removing oldest images until it fits.
+      while (updatedGallery.length > 0) {
+          try {
+              localStorage.setItem('galleryImages', JSON.stringify(updatedGallery));
+              // If setItem succeeds, break the loop.
+              break;
+          } catch (e: any) {
+              // Check if it's a quota error and if there are images to remove.
+              if (e.name === 'QuotaExceededError' && updatedGallery.length > 1) {
+                  console.warn("Local storage quota exceeded. Removing oldest image from gallery and retrying.");
+                  // Remove the oldest image (at the beginning of the array). The new image is at the end.
+                  updatedGallery.shift(); 
+              } else {
+                  // If it's not a quota error, or we can't remove any more images, log the error and break.
+                  console.error("Failed to save gallery to local storage even after reducing size.", e);
+                  // We might want to set an app-level error here to notify the user.
+                  setError("Falha ao salvar a imagem na galeria. O armazenamento local pode estar cheio ou corrompido.");
+                  break;
+              }
+          }
       }
+
       return updatedGallery;
     });
+    return newImage;
   };
 
   const handleUpdateGalleryImage = (imageId: string, newImageSrc: string) => {
+    // 1. Update main gallery
     setGalleryImages(prev => {
-      const updatedGallery = prev.map(img =>
-        img.id === imageId ? { ...img, src: newImageSrc, prompt: "Edição Manual via Galeria" } : img
-      );
-      try {
-        localStorage.setItem('galleryImages', JSON.stringify(updatedGallery));
-      } catch (e) {
-        console.error("Failed to save updated gallery to local storage", e);
-      }
-      return updatedGallery;
+        // FIX: Explicitly type the updated object to fix a type inference issue where
+        // the 'model' property was being widened to 'string' instead of 'ImageModel'.
+        const updatedGallery = prev.map(img => {
+            if (img.id === imageId) {
+                const updatedImage: GalleryImage = { ...img, src: newImageSrc, prompt: "Edição via Assistente", model: 'gemini-imagen' };
+                return updatedImage;
+            }
+            return img;
+        });
+        try {
+            localStorage.setItem('galleryImages', JSON.stringify(updatedGallery));
+        } catch (e: any) {
+            console.error("Failed to save updated gallery to local storage", e);
+             if (e.name === 'QuotaExceededError') {
+                setError("Falha ao salvar a galeria. O armazenamento local está cheio.");
+            }
+        }
+        return updatedGallery;
+    });
+
+    // 2. Update individual flyer state to reflect changes
+    setFlyerState(prev => {
+        const newState = { ...prev };
+        for (const eventId in newState) {
+            newState[eventId] = newState[eventId].map(img =>
+                img !== 'loading' && img.id === imageId ? { ...img, src: newImageSrc } : img
+            );
+        }
+        return newState;
+    });
+
+    // 3. Update daily flyer state to reflect changes
+    setDailyFlyerState(prev => {
+        const newState = { ...prev };
+        for (const periodKey in newState) {
+            const period = periodKey as TimePeriod;
+            newState[period] = newState[period].map(img =>
+                img !== 'loading' && img.id === imageId ? { ...img, src: newImageSrc } : img
+            );
+        }
+        return newState;
     });
   };
 
@@ -188,7 +317,6 @@ function App() {
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
-          // FIX: Corrected typo from Uint88Array to Uint8Array.
           const data = new Uint8Array(event.target!.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array', cellDates: true });
           
@@ -238,8 +366,24 @@ function App() {
     });
   };
 
+  const handleAddTournamentEvent = (newEvent: TournamentEvent) => {
+    setTournamentEvents(prevEvents => [newEvent, ...prevEvents]);
+  };
+
 
   // --- Assistant Logic ---
+  const handleSetChatReference = (image: GalleryImage | null) => {
+    if (image) {
+      setChatReferenceImage({ id: image.id, src: image.src });
+      // Open assistant if not already open
+      if (!isAssistantOpen) {
+          setIsAssistantOpen(true);
+      }
+    } else {
+      setChatReferenceImage(null);
+    }
+  };
+
   const executeTool = async (toolCall: any): Promise<any> => {
       const { name, args } = toolCall;
       
@@ -251,7 +395,7 @@ function App() {
             const newLogoUrl = await generateLogo(args.prompt);
             const updatedProfile = { ...brandProfile, logo: newLogoUrl };
             handleProfileSubmit(updatedProfile);
-            handleAddImageToGallery({ src: newLogoUrl, prompt: args.prompt, source: 'Logo' });
+            handleAddImageToGallery({ src: newLogoUrl, prompt: args.prompt, source: 'Logo', model: 'gemini-imagen' });
             return { success: true, message: "Criei e salvei o novo logo com sucesso. Agora ele está aplicado ao seu perfil de marca." };
         } catch (e: any) {
             return { error: `Falha ao criar o logo: ${e.message}` };
@@ -270,12 +414,31 @@ function App() {
             const newLogoUrl = await editImage(base64Data, mimeType, args.prompt);
             
             const updatedProfile = { ...brandProfile!, logo: newLogoUrl };
-            handleProfileSubmit(updatedProfile); // This updates state and localStorage
-            handleAddImageToGallery({ src: newLogoUrl, prompt: args.prompt, source: 'Logo' });
+            handleProfileSubmit(updatedProfile);
+            handleAddImageToGallery({ src: newLogoUrl, prompt: args.prompt, source: 'Logo', model: 'gemini-imagen' });
 
             return { success: true, message: "Logo atualizado com sucesso. O novo logo agora está visível no seu perfil de marca." };
         } catch (e: any) {
             return { error: `Falha ao editar o logo: ${e.message}` };
+        }
+      }
+
+      if (name === 'edit_referenced_image') {
+        if (!toolImageReference) {
+          return { error: "Nenhuma imagem foi referenciada no chat. Por favor, peça ao usuário para fornecer uma imagem primeiro." };
+        }
+        try {
+          const [header, base64Data] = toolImageReference.src.split(',');
+          const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+          const newImageUrl = await editImage(base64Data, mimeType, args.prompt);
+          
+          handleUpdateGalleryImage(toolImageReference.id, newImageUrl);
+          setToolImageReference(null);
+          
+          return { success: true, message: "A imagem foi editada com sucesso e atualizada na sua galeria." };
+        } catch (e: any) {
+          setToolImageReference(null);
+          return { error: `Falha ao editar a imagem: ${e.message}` };
         }
       }
 
@@ -312,15 +475,42 @@ function App() {
 
   const handleAssistantSendMessage = async (message: string) => {
       setIsAssistantLoading(true);
-      const userMessage: ChatMessage = { role: 'user', parts: [{ text: message }] };
-      let currentHistory: ChatMessage[] = [...chatHistory, userMessage];
-      setChatHistory(currentHistory);
+
+      const imageRef = chatReferenceImage;
+      if (imageRef) {
+        setToolImageReference(imageRef); // Store original for high-res tool use
+        setChatReferenceImage(null);
+      }
+
+      const userMessageParts: ChatPart[] = [];
+      
+      if (imageRef) {
+        try {
+          // Further reduce size for chat context to prevent token overflow even on first message.
+          const { base64: resizedBase64, mimeType: resizedMimeType } = await resizeImageForChat(imageRef.src, 256, 256);
+          userMessageParts.push({
+              inlineData: { data: resizedBase64, mimeType: resizedMimeType }
+          });
+        } catch (resizeError) {
+          console.error("Failed to resize image for chat:", resizeError);
+          setError("Falha ao processar a imagem para o assistente.");
+          setIsAssistantLoading(false);
+          return;
+        }
+      }
+
+      userMessageParts.push({ text: message });
+      const userMessage: ChatMessage = { role: 'user', parts: userMessageParts };
+      
+      // Update state with the user's message immediately
+      const newHistoryWithUserMessage = [...chatHistory, userMessage];
+      setChatHistory(newHistoryWithUserMessage);
       
       try {
-          // Add placeholder for model response
+          // Add a placeholder for the model's response
           setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: '' }] }]);
 
-          const streamResponse = await runAssistantConversationStream(currentHistory, brandProfile);
+          const streamResponse = await runAssistantConversationStream(getTruncatedHistory(newHistoryWithUserMessage), brandProfile);
 
           let accumulatedText = '';
           let functionCall: any;
@@ -329,7 +519,9 @@ function App() {
                   accumulatedText += chunk.text;
                   setChatHistory(prev => {
                       const newHistory = [...prev];
-                      newHistory[newHistory.length - 1].parts = [{ text: accumulatedText }];
+                      if (newHistory.length > 0 && newHistory[newHistory.length - 1].role === 'model') {
+                        newHistory[newHistory.length - 1] = { role: 'model', parts: [{ text: accumulatedText }] };
+                      }
                       return newHistory;
                   });
               }
@@ -340,19 +532,23 @@ function App() {
           }
 
           if (functionCall) {
-              const historyWithFunctionCall = [...currentHistory, { role: 'model', parts: [{ functionCall }] } as ChatMessage];
+              const modelFunctionCallMessage: ChatMessage = { role: 'model', parts: [{ functionCall }] };
+              setChatHistory(prev => {
+                  const newHistory = [...prev];
+                  newHistory[newHistory.length - 1] = modelFunctionCallMessage;
+                  return newHistory;
+              });
               
               const toolResult = await executeTool(functionCall);
               const toolResponseMessage: ChatMessage = { role: 'tool', parts: [{ functionResponse: { name: functionCall.name, response: toolResult } }] };
               
-              const historyWithToolResult = [...historyWithFunctionCall, toolResponseMessage];
-              currentHistory = historyWithToolResult;
-              setChatHistory(currentHistory);
+              setChatHistory(prev => [...prev, toolResponseMessage]);
               
-              // Add new placeholder for final model response
+              const historyForFinalApiCall = [...newHistoryWithUserMessage, modelFunctionCallMessage, toolResponseMessage];
+              
               setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: '' }] }]);
 
-              const finalStreamResponse = await runAssistantConversationStream(currentHistory, brandProfile);
+              const finalStreamResponse = await runAssistantConversationStream(getTruncatedHistory(historyForFinalApiCall), brandProfile);
               
               let finalAccumulatedText = '';
               for await (const chunk of finalStreamResponse) {
@@ -360,7 +556,9 @@ function App() {
                       finalAccumulatedText += chunk.text;
                       setChatHistory(prev => {
                           const newHistory = [...prev];
-                          newHistory[newHistory.length - 1].parts = [{ text: finalAccumulatedText }];
+                          if (newHistory.length > 0 && newHistory[newHistory.length - 1].role === 'model') {
+                            newHistory[newHistory.length - 1] = { role: 'model', parts: [{ text: finalAccumulatedText }] };
+                          }
                           return newHistory;
                       });
                   }
@@ -368,13 +566,29 @@ function App() {
           } 
 
       } catch (err: any) {
-           const errorMessage = `Desculpe, ocorreu um erro: ${err.message}`;
+           let finalMessage = "Ocorreu um erro inesperado.";
+           if (err.message) {
+               if (err.message.includes("token count exceeds")) {
+                   finalMessage = "A imagem ou a conversa é muito longa e excedeu o limite de contexto da IA.";
+               } else {
+                   // Try to parse nested JSON errors, but default to the raw message if parsing fails
+                   finalMessage = err.message;
+               }
+           }
+           const errorMessage = `Desculpe, ocorreu um erro: ${finalMessage}`;
            setChatHistory(prev => {
-               const newHistory = [...prev.slice(0, -1)];
-               return [...newHistory, { role: 'model', parts: [{ text: errorMessage }] }];
+              const newHistory = [...prev];
+              // Replace the 'loading' model bubble with the error message
+              if (newHistory.length > 0 && newHistory[newHistory.length - 1].role === 'model') {
+                  newHistory[newHistory.length - 1] = { role: 'model', parts: [{ text: errorMessage }] };
+              }
+              return newHistory;
            });
       } finally {
           setIsAssistantLoading(false);
+          if (toolImageReference) {
+              setToolImageReference(null);
+          }
       }
   };
 
@@ -392,28 +606,47 @@ function App() {
   return (
     <>
       {error && (
-        <div className="fixed top-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50">
-          <p>{error}</p>
-          <button onClick={() => setError(null)} className="absolute top-1 right-2 text-white font-bold">&times;</button>
+        <div 
+          className="fixed bottom-6 right-6 bg-surface border border-red-500/50 rounded-xl shadow-2xl z-50 max-w-sm p-4 flex items-start space-x-4 animate-fade-in-up"
+          role="alert"
+          aria-live="assertive"
+        >
+            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center">
+                <Icon name="x" className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+                <p className="font-bold text-text-main text-sm">Ocorreu um Erro</p>
+                <p className="text-sm text-text-muted mt-1">{error}</p>
+            </div>
+            <button 
+                onClick={() => setError(null)} 
+                className="text-subtle hover:text-text-main transition-colors"
+                aria-label="Fechar notificação"
+            >
+                <Icon name="x" className="w-5 h-5" />
+            </button>
         </div>
       )}
       {showProfileSetup ? (
         <BrandProfileSetup onProfileSubmit={handleProfileSubmit} existingProfile={brandProfile} />
       ) : (
         <Dashboard
-          brandProfile={brandProfile!} // brandProfile is guaranteed to be non-null here
+          brandProfile={brandProfile!}
           campaign={campaign}
           onGenerate={handleGenerate}
           isGenerating={isGenerating}
           onEditProfile={() => setIsEditingProfile(true)}
           onResetCampaign={handleResetCampaign}
-          referenceImage={referenceImage}
+          productImages={productImages}
+          inspirationImages={inspirationImages}
           // Assistant Props
           isAssistantOpen={isAssistantOpen}
           onToggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
           assistantHistory={chatHistory}
           isAssistantLoading={isAssistantLoading}
           onAssistantSendMessage={handleAssistantSendMessage}
+          chatReferenceImage={chatReferenceImage}
+          onSetChatReference={handleSetChatReference}
           // Theme Props
           theme={theme}
           onThemeToggle={handleThemeToggle}
@@ -424,6 +657,7 @@ function App() {
           // Flyer Generator Props
           tournamentEvents={tournamentEvents}
           onTournamentFileUpload={handleTournamentFileUpload}
+          onAddTournamentEvent={handleAddTournamentEvent}
           flyerState={flyerState}
           setFlyerState={setFlyerState}
           dailyFlyerState={dailyFlyerState}

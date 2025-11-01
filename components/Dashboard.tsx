@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage } from '../types';
+import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, GenerationOptions } from '../types';
 import { UploadForm } from './UploadForm';
 import { ClipsTab } from './tabs/ClipsTab';
 import { PostsTab } from './tabs/PostsTab';
@@ -15,31 +15,36 @@ import { GalleryView } from './GalleryView';
 interface DashboardProps {
   brandProfile: BrandProfile;
   campaign: MarketingCampaign | null;
-  onGenerate: (input: ContentInput) => void;
+  onGenerate: (input: ContentInput, options: GenerationOptions) => void;
   isGenerating: boolean;
   onEditProfile: () => void;
   onResetCampaign: () => void;
-  referenceImage: ContentInput['image'] | null;
+  productImages: ContentInput['productImages'] | null;
+  inspirationImages: ContentInput['inspirationImages'] | null;
   // Assistant Props
   isAssistantOpen: boolean;
   onToggleAssistant: () => void;
   assistantHistory: ChatMessage[];
   isAssistantLoading: boolean;
   onAssistantSendMessage: (message: string) => void;
+  chatReferenceImage: ChatReferenceImage | null;
+  onSetChatReference: (image: GalleryImage | null) => void;
   // Theme Props
   theme: Theme;
   onThemeToggle: () => void;
   // Gallery Props
   galleryImages: GalleryImage[];
-  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void;
+  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   // Flyer Generator Props
   tournamentEvents: TournamentEvent[];
   onTournamentFileUpload: (file: File) => Promise<void>;
-  flyerState: Record<string, (string | 'loading')[]>;
-  setFlyerState: React.Dispatch<React.SetStateAction<Record<string, (string | 'loading')[]>>>;
-  dailyFlyerState: Record<TimePeriod, (string | 'loading')[]>;
-  setDailyFlyerState: React.Dispatch<React.SetStateAction<Record<TimePeriod, (string | 'loading')[]>>>;
+  onAddTournamentEvent: (event: TournamentEvent) => void;
+  // FIX: Update flyer state types to use GalleryImage objects.
+  flyerState: Record<string, (GalleryImage | 'loading')[]>;
+  setFlyerState: React.Dispatch<React.SetStateAction<Record<string, (GalleryImage | 'loading')[]>>>;
+  dailyFlyerState: Record<TimePeriod, (GalleryImage | 'loading')[]>;
+  setDailyFlyerState: React.Dispatch<React.SetStateAction<Record<TimePeriod, (GalleryImage | 'loading')[]>>>;
 }
 
 type Tab = 'clips' | 'posts' | 'ads';
@@ -71,10 +76,11 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick }) => (
 export const Dashboard: React.FC<DashboardProps> = (props) => {
   const { 
     brandProfile, campaign, onGenerate, isGenerating, onEditProfile, onResetCampaign,
-    referenceImage, isAssistantOpen, onToggleAssistant, assistantHistory, 
+    productImages, isAssistantOpen, onToggleAssistant, assistantHistory, 
     isAssistantLoading, onAssistantSendMessage, theme, onThemeToggle, 
-    galleryImages, onAddImageToGallery, onUpdateGalleryImage, tournamentEvents, onTournamentFileUpload,
-    flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState
+    galleryImages, onAddImageToGallery, onUpdateGalleryImage, tournamentEvents, onTournamentFileUpload, onAddTournamentEvent,
+    flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState,
+    chatReferenceImage, onSetChatReference
   } = props;
   
   const [activeTab, setActiveTab] = useState<Tab>('clips');
@@ -87,11 +93,12 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
   ];
 
   const showUploadForm = !campaign && !isGenerating;
+  const firstProductImage = productImages && productImages.length > 0 ? productImages[0] : null;
 
   return (
     <div className="h-screen flex overflow-hidden bg-background text-text-main font-sans">
       {/* Sidebar */}
-      <aside className="w-64 bg-black flex flex-col flex-shrink-0 border-r border-muted/30">
+      <aside className="dark w-64 bg-black flex flex-col flex-shrink-0 border-r border-muted/30">
         <div className="h-16 flex items-center px-4 border-b border-muted/30 flex-shrink-0">
           <Icon name="logo" className="h-8 w-8 text-primary" />
           <h1 className="text-xl font-bold text-text-main ml-2">DirectorAi</h1>
@@ -181,9 +188,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                             </div>
 
                             <div>
-                            {activeTab === 'clips' && <ClipsTab videoClipScripts={campaign.videoClipScripts} onAddImageToGallery={onAddImageToGallery} />}
-                            {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={referenceImage} onAddImageToGallery={onAddImageToGallery} />}
-                            {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={referenceImage} onAddImageToGallery={onAddImageToGallery} />}
+                            {activeTab === 'clips' && <ClipsTab brandProfile={brandProfile} videoClipScripts={campaign.videoClipScripts} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
+                            {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={firstProductImage} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
+                            {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={firstProductImage} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
                             </div>
                         </div>
                     )}
@@ -194,15 +201,18 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                   brandProfile={brandProfile}
                   events={tournamentEvents}
                   onFileUpload={onTournamentFileUpload}
+                  onAddEvent={onAddTournamentEvent}
                   onAddImageToGallery={onAddImageToGallery}
                   flyerState={flyerState}
                   setFlyerState={setFlyerState}
                   dailyFlyerState={dailyFlyerState}
                   setDailyFlyerState={setDailyFlyerState}
+                  onUpdateGalleryImage={onUpdateGalleryImage}
+                  onSetChatReference={onSetChatReference}
                 />
             )}
             {activeView === 'gallery' && (
-                <GalleryView images={galleryImages} onUpdateImage={onUpdateGalleryImage} />
+                <GalleryView images={galleryImages} onUpdateImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />
             )}
         </div>
       </main>
@@ -214,6 +224,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             history={assistantHistory}
             isLoading={isAssistantLoading}
             onSendMessage={onAssistantSendMessage}
+            referenceImage={chatReferenceImage}
+            onClearReference={() => onSetChatReference(null)}
        />
        <div className="fixed bottom-6 right-6 z-50">
           <button 

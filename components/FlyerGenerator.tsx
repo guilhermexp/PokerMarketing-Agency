@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { BrandProfile, ToneOfVoice, TournamentEvent, ImageFile, GalleryImage } from '../types';
+import type { BrandProfile, ToneOfVoice, TournamentEvent, ImageFile, GalleryImage, ImageModel } from '../types';
 import { Card } from './common/Card';
 import { Button } from './common/Button';
 import { Loader } from './common/Loader';
@@ -14,11 +14,15 @@ interface FlyerGeneratorProps {
   brandProfile: BrandProfile;
   events: TournamentEvent[];
   onFileUpload: (file: File) => Promise<void>;
-  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void;
-  flyerState: Record<string, (string | 'loading')[]>;
-  setFlyerState: React.Dispatch<React.SetStateAction<Record<string, (string | 'loading')[]>>>;
-  dailyFlyerState: Record<TimePeriod, (string | 'loading')[]>;
-  setDailyFlyerState: React.Dispatch<React.SetStateAction<Record<TimePeriod, (string | 'loading')[]>>>;
+  onAddEvent: (event: TournamentEvent) => void;
+  // FIX: Update prop types to handle GalleryImage objects for robust state management.
+  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
+  flyerState: Record<string, (GalleryImage | 'loading')[]>;
+  setFlyerState: React.Dispatch<React.SetStateAction<Record<string, (GalleryImage | 'loading')[]>>>;
+  dailyFlyerState: Record<TimePeriod, (GalleryImage | 'loading')[]>;
+  setDailyFlyerState: React.Dispatch<React.SetStateAction<Record<TimePeriod, (GalleryImage | 'loading')[]>>>;
+  onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
+  onSetChatReference: (image: GalleryImage) => void;
 }
 
 // Sub-component for displaying a single tournament
@@ -31,17 +35,20 @@ const TournamentEventCard: React.FC<{
   aspectRatio: string;
   language: 'pt' | 'en';
   dayTranslations: Record<string, string>;
-  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => void;
-  generatedFlyers: (string | 'loading')[];
-  setGeneratedFlyers: (updater: (prev: (string | 'loading')[]) => (string | 'loading')[]) => void;
+  onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
+  onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
+  onSetChatReference: (image: GalleryImage) => void;
+  generatedFlyers: (GalleryImage | 'loading')[];
+  setGeneratedFlyers: (updater: (prev: (GalleryImage | 'loading')[]) => (GalleryImage | 'loading')[]) => void;
+  model: ImageModel;
 }> = ({ 
   event, timezone, brandProfile, logo, referenceImage, aspectRatio, language, dayTranslations, 
-  onAddImageToGallery, generatedFlyers, setGeneratedFlyers 
+  onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, generatedFlyers, setGeneratedFlyers, model
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [editingFlyer, setEditingFlyer] = useState<{ url: string; index: number } | null>(null);
+  const [editingFlyer, setEditingFlyer] = useState<GalleryImage | null>(null);
   const [galleryScrollIndex, setGalleryScrollIndex] = useState(0);
 
   const MAX_VISIBLE_ITEMS = 4;
@@ -112,13 +119,13 @@ const TournamentEventCard: React.FC<{
       const logoData = logo ? { base64: logo.base64, mimeType: logo.mimeType } : null;
       const refImageData = referenceImage ? { base64: referenceImage.base64, mimeType: referenceImage.mimeType } : null;
 
-      const imageUrl = await generateFlyer(prompt, logoData, refImageData, aspectRatio);
-      onAddImageToGallery({ src: imageUrl, prompt: prompt, source: 'Flyer' });
+      const imageUrl = await generateFlyer(prompt, brandProfile, logoData, refImageData, aspectRatio, model);
+      const newImage = onAddImageToGallery({ src: imageUrl, prompt: prompt, source: 'Flyer', model: model });
       setGeneratedFlyers(prev => {
         const newFlyers = [...prev];
         const index = newFlyers.indexOf('loading');
         if (index > -1) {
-            newFlyers[index] = imageUrl;
+            newFlyers[index] = newImage;
         }
         return newFlyers;
       });
@@ -132,12 +139,17 @@ const TournamentEventCard: React.FC<{
   
   const handleImageUpdate = (newImageUrl: string) => {
     if (editingFlyer === null) return;
-    onAddImageToGallery({ src: newImageUrl, prompt: "Edição Manual via Modal", source: 'Flyer' });
+    onUpdateGalleryImage(editingFlyer.id, newImageUrl);
+    const updatedFlyer = { ...editingFlyer, src: newImageUrl };
     setGeneratedFlyers(prev => {
-      const newFlyers = [...prev];
-      newFlyers[editingFlyer.index] = newImageUrl;
-      return newFlyers;
+        const newFlyers = [...prev];
+        const index = prev.findIndex(f => f !== 'loading' && f.id === editingFlyer.id);
+        if (index > -1) {
+            newFlyers[index] = updatedFlyer;
+        }
+        return newFlyers;
     });
+    setEditingFlyer(updatedFlyer);
   };
 
   const getStructureColor = (structure: string) => {
@@ -179,10 +191,10 @@ const TournamentEventCard: React.FC<{
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                 <div><span className="text-subtle">Game:</span><span className="ml-2 font-medium">{event.game || 'N/A'}</span></div>
                 <div><span className="text-subtle">Stack:</span><span className="ml-2 font-medium">{event.stack || 'N/A'}</span></div>
-                <div><span className="text-subtle">Late Reg:</span><span className="ml-2 font-medium">{event.lateReg || 'N/A'} níveis</span></div>
+                <div><span className="text-subtle">Late Reg:</span><span className="ml-2 font-medium">{event.lateReg || 'N/A'}</span></div>
                 <div><span className="text-subtle">Rebuy:</span><span className="ml-2 font-medium">${event.rebuy || 'N/A'}</span></div>
                 <div><span className="text-subtle">Add-on:</span><span className="ml-2 font-medium">${event.addOn || 'N/A'}</span></div>
-                <div><span className="text-subtle">Níveis:</span><span className="ml-2 font-medium">{event.minutes || 'N/A'} min</span></div>
+                <div><span className="text-subtle">Níveis:</span><span className="ml-2 font-medium">{event.minutes || 'N/A'}</span></div>
             </div>
           </div>
         )}
@@ -205,7 +217,7 @@ const TournamentEventCard: React.FC<{
                         >
                             {generatedFlyers.map((flyer, index) => (
                                 <div
-                                    key={index}
+                                    key={flyer === 'loading' ? `loading-${index}` : flyer.id}
                                     className="flex-shrink-0 h-full p-1"
                                     style={{ width: `${100 / MAX_VISIBLE_ITEMS}%` }}
                                 >
@@ -215,10 +227,10 @@ const TournamentEventCard: React.FC<{
                                         </div>
                                     ) : (
                                         <img
-                                            src={flyer}
+                                            src={flyer.src}
                                             alt={`Flyer for ${event.name} #${index + 1}`}
                                             className="w-full h-full object-contain rounded-md cursor-pointer"
-                                            onClick={() => setEditingFlyer({ url: flyer, index })}
+                                            onClick={() => setEditingFlyer(flyer)}
                                         />
                                     )}
                                 </div>
@@ -257,11 +269,13 @@ const TournamentEventCard: React.FC<{
         </div>
 
       </div>
+      {/* FIX: Pass a GalleryImage object to the 'image' prop instead of 'imageUrl'. */}
       {editingFlyer && (
         <ImagePreviewModal
-          imageUrl={editingFlyer.url}
+          image={editingFlyer}
           onClose={() => setEditingFlyer(null)}
           onImageUpdate={handleImageUpdate}
+          onSetChatReference={onSetChatReference}
           downloadFilename={`flyer-${event.name.replace(/\s+/g, '_')}.png`}
         />
       )}
@@ -269,7 +283,8 @@ const TournamentEventCard: React.FC<{
   );
 };
 
-const fileToBase64 = (file: File): Promise<ImageFile> =>
+// FIX: Rename function from 'fileToBase64' to 'fileToImageFile' to match usage.
+const fileToImageFile = (file: File): Promise<ImageFile> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -290,7 +305,7 @@ const ImageUploader: React.FC<{
         if (acceptedFiles.length > 0) {
             try {
                 const file = acceptedFiles[0];
-                const imageData = await fileToBase64(file);
+                const imageData = await fileToImageFile(file);
                 onImageChange(imageData);
             } catch (e) {
                 console.error("Error processing file:", e);
@@ -339,8 +354,8 @@ const ImageUploader: React.FC<{
 };
 
 const ImageCarousel: React.FC<{
-  images: (string | 'loading')[];
-  onImageClick: (url: string, index: number) => void;
+  images: (GalleryImage | 'loading')[];
+  onImageClick: (image: GalleryImage, index: number) => void;
   alt: string;
 }> = ({ images, onImageClick, alt }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -379,7 +394,7 @@ const ImageCarousel: React.FC<{
         </div>
       ) : (
         <img
-            src={currentImage}
+            src={currentImage.src}
             alt={`${alt} #${currentIndex + 1}`}
             className="w-full h-full object-contain rounded-md cursor-pointer"
             onClick={() => onImageClick(currentImage, currentIndex)}
@@ -415,10 +430,10 @@ const ImageCarousel: React.FC<{
 const DailySummaryCard: React.FC<{
     period: TimePeriod;
     title: string;
-    flyers: (string | 'loading')[];
+    flyers: (GalleryImage | 'loading')[];
     isGenerating: boolean;
     onGenerate: () => void;
-    onImageClick: (flyer: string, index: number) => void;
+    onImageClick: (image: GalleryImage, index: number) => void;
 }> = ({ period, title, flyers, isGenerating, onGenerate, onImageClick }) => (
     <Card className="p-4 flex flex-col">
         <h4 className="text-lg font-bold text-text-main mb-3">{title}</h4>
@@ -441,10 +456,97 @@ const DailySummaryCard: React.FC<{
     </Card>
 );
 
+const FormInput: React.FC<{label: string, name: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, placeholder?: string}> = ({ label, name, value, onChange, placeholder = '' }) => (
+    <div>
+        <label htmlFor={name} className="block text-sm font-medium text-subtle mb-1">{label}</label>
+        <input type="text" name={name} id={name} value={value} onChange={onChange} placeholder={placeholder} className="w-full bg-surface/80 border-muted/50 border rounded-lg p-2 text-text-main focus:ring-2 focus:ring-primary"/>
+    </div>
+);
+
+const ManualEventForm: React.FC<{
+  onAddEvent: (event: TournamentEvent) => void;
+  onCancel: () => void;
+  daysOfWeek: string[];
+  dayTranslations: Record<string, string>;
+  timezones: string[];
+  selectedTimezone: string;
+}> = ({ onAddEvent, onCancel, daysOfWeek, dayTranslations, timezones, selectedTimezone }) => {
+    const [eventData, setEventData] = useState({
+        name: '', game: '', gtd: '', buyIn: '', rebuy: '', addOn: '', stack: '',
+        players: '', lateReg: '', minutes: '', structure: '',
+        day: daysOfWeek[0], time: '12:00',
+    });
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setEventData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!eventData.name.trim() || !eventData.day || !eventData.time) {
+            alert("Nome do Torneio, Dia e Horário são obrigatórios.");
+            return;
+        }
+
+        const times: Record<string, string> = {};
+        timezones.forEach(tz => {
+            times[tz] = tz === selectedTimezone ? eventData.time : '--:--';
+        });
+        
+        const newEvent: TournamentEvent = {
+            id: `manual-${new Date().toISOString()}`,
+            ...eventData,
+            times,
+        };
+        
+        onAddEvent(newEvent);
+        onCancel();
+    };
+
+    return (
+        <div className="mt-4 pt-4 border-t border-muted/30">
+            <h3 className="text-xl font-bold mb-4 text-text-main">Adicionar Torneio Manualmente</h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-3">
+                        <FormInput label="Nome do Torneio" name="name" value={eventData.name} onChange={handleChange} placeholder="Ex: BOXING KO" />
+                    </div>
+                    <div>
+                        <label htmlFor="day" className="block text-sm font-medium text-subtle mb-1">Dia</label>
+                        <select name="day" id="day" value={eventData.day} onChange={handleChange} className="w-full bg-surface/80 border-muted/50 border rounded-lg p-2.5 text-text-main focus:ring-2 focus:ring-primary">
+                            {daysOfWeek.map(day => <option key={day} value={day}>{dayTranslations[day]}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="time" className="block text-sm font-medium text-subtle mb-1">Horário (fuso atual)</label>
+                        <input type="time" name="time" id="time" value={eventData.time} onChange={handleChange} className="w-full bg-surface/80 border-muted/50 border rounded-lg p-2.5 text-text-main focus:ring-2 focus:ring-primary"/>
+                    </div>
+                    <FormInput label="Game" name="game" value={eventData.game} onChange={handleChange} placeholder="Ex: NLH KO" />
+                    <FormInput label="Buy-in ($)" name="buyIn" value={eventData.buyIn} onChange={handleChange} placeholder="Ex: 1" />
+                    <FormInput label="GTD ($)" name="gtd" value={eventData.gtd} onChange={handleChange} placeholder="Ex: 200" />
+                    <FormInput label="Rebuy ($)" name="rebuy" value={eventData.rebuy} onChange={handleChange} placeholder="Ex: 1" />
+                    <FormInput label="Add-on ($)" name="addOn" value={eventData.addOn} onChange={handleChange} placeholder="Ex: N/A" />
+                    <FormInput label="Stack" name="stack" value={eventData.stack} onChange={handleChange} placeholder="Ex: 15000" />
+                    <FormInput label="Jogadores" name="players" value={eventData.players} onChange={handleChange} placeholder="Ex: 8 max" />
+                    <FormInput label="Late Reg." name="lateReg" value={eventData.lateReg} onChange={handleChange} placeholder="Ex: 11 níveis" />
+                    <FormInput label="Níveis (min)" name="minutes" value={eventData.minutes} onChange={handleChange} placeholder="Ex: 6 min" />
+                    <FormInput label="Estrutura" name="structure" value={eventData.structure} onChange={handleChange} placeholder="Ex: Turbo" />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" onClick={onCancel} variant="secondary">Cancelar</Button>
+                    <Button type="submit" icon="zap">Salvar Torneio</Button>
+                </div>
+            </form>
+        </div>
+    );
+};
+
 
 export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({ 
-    brandProfile, events, onFileUpload, onAddImageToGallery, 
-    flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState 
+    brandProfile, events, onFileUpload, onAddEvent, onAddImageToGallery, 
+    flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState,
+    onUpdateGalleryImage, onSetChatReference
 }) => {
   const [filteredEvents, setFilteredEvents] = useState<TournamentEvent[]>([]);
   const [selectedDay, setSelectedDay] = useState('ALL');
@@ -454,6 +556,8 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   const [selectedLanguage, setSelectedLanguage] = useState<'pt' | 'en'>('pt');
   const [loading, setLoading] = useState(false);
   const [fileLoaded, setFileLoaded] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-flash-image-preview');
   
   const [logo, setLogo] = useState<ImageFile | null>(null);
   const [referenceImage, setReferenceImage] = useState<ImageFile | null>(null);
@@ -462,7 +566,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   const [isGeneratingIndividual, setIsGeneratingIndividual] = useState<Partial<Record<TimePeriod, boolean>>>({});
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [dailyFlyerError, setDailyFlyerError] = useState<string | null>(null);
-  const [editingDailyFlyer, setEditingDailyFlyer] = useState<{ url: string; index: number; period: TimePeriod } | null>(null);
+  const [editingDailyFlyer, setEditingDailyFlyer] = useState<{ image: GalleryImage; period: TimePeriod } | null>(null);
 
 
   const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
@@ -580,7 +684,7 @@ ${eventListStringEn}
     const refImageData = referenceImage ? { base64: referenceImage.base64, mimeType: referenceImage.mimeType } : null;
     const prompt = selectedLanguage === 'en' ? promptEn : promptPt;
     
-    const imageUrl = await generateFlyer(prompt, logoData, refImageData, selectedAspectRatio);
+    const imageUrl = await generateFlyer(prompt, brandProfile, logoData, refImageData, selectedAspectRatio, selectedImageModel);
     return { imageUrl, prompt };
   };
 
@@ -597,11 +701,11 @@ ${eventListStringEn}
 
     try {
         const { imageUrl, prompt } = await createDailyFlyerForPeriod(periodToGenerate);
-        onAddImageToGallery({ src: imageUrl, prompt, source: 'Flyer Diário' });
+        const newImage = onAddImageToGallery({ src: imageUrl, prompt, source: 'Flyer Diário', model: selectedImageModel });
         setDailyFlyerState(prev => {
             const newPeriodFlyers = [...prev[periodToGenerate]];
             const loadingIndex = newPeriodFlyers.indexOf('loading');
-            if (loadingIndex !== -1) newPeriodFlyers[loadingIndex] = imageUrl;
+            if (loadingIndex !== -1) newPeriodFlyers[loadingIndex] = newImage;
             return { ...prev, [periodToGenerate]: newPeriodFlyers };
         });
     } catch (err: any) {
@@ -637,20 +741,24 @@ ${eventListStringEn}
         
         results.forEach((result, index) => {
             const period = periodsToGenerate[index];
+            let newImage: GalleryImage | null = null;
             if (result.status === 'fulfilled') {
               const { imageUrl, prompt } = result.value;
-              onAddImageToGallery({ src: imageUrl, prompt, source: 'Flyer Diário' });
+              newImage = onAddImageToGallery({ src: imageUrl, prompt, source: 'Flyer Diário', model: selectedImageModel });
             }
+
             setDailyFlyerState(prev => {
                 const newPeriodFlyers = [...(prev[period] || [])];
                 const loadingIndex = newPeriodFlyers.indexOf('loading');
 
                 if (loadingIndex !== -1) {
-                    if (result.status === 'fulfilled') {
-                        newPeriodFlyers[loadingIndex] = result.value.imageUrl;
+                    if (newImage) {
+                        newPeriodFlyers[loadingIndex] = newImage;
                     } else {
                         newPeriodFlyers.splice(loadingIndex, 1);
-                        console.error(`Falha ao gerar o flyer para ${period}:`, result.reason);
+                        if (result.status === 'rejected') {
+                            console.error(`Falha ao gerar o flyer para ${period}:`, result.reason);
+                        }
                     }
                 }
                 return { ...prev, [period]: newPeriodFlyers };
@@ -666,18 +774,22 @@ ${eventListStringEn}
   
   const handleDailyFlyerUpdate = (newImageUrl: string) => {
     if (editingDailyFlyer === null) return;
-    const { index, period } = editingDailyFlyer;
-    onAddImageToGallery({ src: newImageUrl, prompt: "Edição Manual via Modal", source: 'Flyer Diário' });
+    const { image, period } = editingDailyFlyer;
+    onUpdateGalleryImage(image.id, newImageUrl);
+    const updatedImage = { ...image, src: newImageUrl };
+
     setDailyFlyerState(prev => {
         const newPeriodFlyers = [...(prev[period] || [])];
-        if (typeof newPeriodFlyers[index] === 'string') {
-            (newPeriodFlyers[index] as string) = newImageUrl;
+        const index = newPeriodFlyers.findIndex(f => f !== 'loading' && f.id === image.id);
+        if (index > -1) {
+            (newPeriodFlyers[index] as GalleryImage) = updatedImage;
         }
         return {
             ...prev,
             [period]: newPeriodFlyers,
         };
     });
+    setEditingDailyFlyer({ image: updatedImage, period });
   };
 
   useEffect(() => {
@@ -706,18 +818,39 @@ ${eventListStringEn}
         </div>
 
         <Card className="p-6 mb-8">
-            {/* Upload */}
-            <label htmlFor="file-upload" className="w-full">
-                <div className="bg-surface/50 text-text-main hover:bg-surface/80 border border-muted/60 backdrop-blur-sm font-semibold py-3 px-4 rounded-lg cursor-pointer flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg">
-                    <Icon name="upload" className="w-5 h-5 mr-2" />
-                    {fileLoaded ? 'Carregar Nova Planilha' : 'Carregar Planilha de Eventos'}
-                </div>
-                <input id="file-upload" type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
-            </label>
+            <div className="flex flex-col sm:flex-row gap-4">
+                <label htmlFor="file-upload" className="flex-1">
+                    <div className="bg-surface/50 text-text-main hover:bg-surface/80 border border-muted/60 backdrop-blur-sm font-semibold py-3 px-4 rounded-lg cursor-pointer flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg h-full">
+                        <Icon name="upload" className="w-5 h-5 mr-2" />
+                        {fileLoaded ? 'Carregar Nova Planilha' : 'Carregar Planilha'}
+                    </div>
+                    <input id="file-upload" type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
+                </label>
+                <Button 
+                    onClick={() => setShowManualForm(prev => !prev)}
+                    variant="secondary"
+                    className="flex-1 sm:flex-none"
+                    icon={showManualForm ? 'chevron-up' : 'edit'}
+                >
+                    {showManualForm ? 'Fechar Formulário' : 'Adicionar Manualmente'}
+                </Button>
+            </div>
+
+
+            {showManualForm && (
+                 <ManualEventForm
+                    onAddEvent={onAddEvent}
+                    onCancel={() => setShowManualForm(false)}
+                    daysOfWeek={daysOfWeek}
+                    dayTranslations={dayTranslations}
+                    timezones={timezones}
+                    selectedTimezone={selectedTimezone}
+                />
+            )}
 
             {fileLoaded && (
                 <div className="mt-4 pt-4 border-t border-muted/30">
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
                         {/* Day Filter */}
                         <div>
                             <label className="block text-sm font-medium text-subtle mb-1"><Icon name="calendar" className="inline w-4 h-4 mr-1" /> Dia da Semana</label>
@@ -752,10 +885,20 @@ ${eventListStringEn}
                             </select>
                         </div>
 
+                        {/* Model Selector */}
+                        <div>
+                            <label className="block text-sm font-medium text-subtle mb-1"><Icon name="zap" className="inline w-4 h-4 mr-1" /> Modelo</label>
+                            <select value={selectedImageModel} onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)} className="w-full bg-surface/80 border-muted/50 border rounded-lg p-2.5 text-text-main focus:ring-2 focus:ring-primary">
+                                <option value="gemini-flash-image-preview">gemini-2.5-flash-image-preview</option>
+                                <option value="gemini-imagen">imagen-4.0-generate-001</option>
+                                <option value="bytedance-seedream">bytedance/seedream</option>
+                            </select>
+                        </div>
+
                         {/* Search */}
-                        <div className="md:col-span-2 lg:col-span-1">
+                        <div>
                             <label className="block text-sm font-medium text-subtle mb-1"><Icon name="search" className="inline w-4 h-4 mr-1" /> Buscar Evento</label>
-                            <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Nome do torneio ou tipo de jogo..." className="w-full bg-surface/80 border-muted/50 border rounded-lg p-2.5 text-text-main focus:ring-2 focus:ring-primary" />
+                            <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Nome do torneio..." className="w-full bg-surface/80 border-muted/50 border rounded-lg p-2.5 text-text-main focus:ring-2 focus:ring-primary" />
                         </div>
                     </div>
                      <div className="mt-4 pt-4 border-t border-muted/30 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -768,11 +911,11 @@ ${eventListStringEn}
 
         {loading && <div className="flex justify-center p-12"><Loader className="h-12 w-12" /></div>}
         
-        {!fileLoaded && !loading && (
+        {!fileLoaded && !loading && !showManualForm && events.length === 0 && (
             <Card className="p-12 text-center">
                 <Icon name="upload" className="w-16 h-16 mx-auto text-muted mb-4" />
-                <h3 className="text-xl font-semibold text-text-main mb-2">Nenhuma planilha carregada</h3>
-                <p className="text-text-muted">Clique no botão acima para carregar sua planilha Excel com a programação semanal.</p>
+                <h3 className="text-xl font-semibold text-text-main mb-2">Nenhum evento carregado</h3>
+                <p className="text-text-muted">Clique nos botões acima para carregar uma planilha ou adicionar um evento manualmente.</p>
             </Card>
         )}
 
@@ -803,14 +946,14 @@ ${eventListStringEn}
                             flyers={dailyFlyerState[period]}
                             isGenerating={isGeneratingAll || !!isGeneratingIndividual[period]}
                             onGenerate={() => handleGenerateDailyFlyer(period)}
-                            onImageClick={(url, index) => setEditingDailyFlyer({ url, index, period })}
+                            onImageClick={(image, index) => setEditingDailyFlyer({ image, period })}
                         />
                     ))}
                 </div>
             </Card>
         )}
 
-        {fileLoaded && !loading && (
+        {(fileLoaded || events.length > 0) && !loading && (
             <div className="space-y-6">
                 {filteredEvents.length > 0 ? (
                     filteredEvents.map(event => (
@@ -825,8 +968,11 @@ ${eventListStringEn}
                             language={selectedLanguage}
                             dayTranslations={dayTranslations}
                             onAddImageToGallery={onAddImageToGallery}
+                            onUpdateGalleryImage={onUpdateGalleryImage}
+                            onSetChatReference={onSetChatReference}
                             generatedFlyers={flyerState[event.id] || []}
                             setGeneratedFlyers={(updater) => setFlyerState(prev => ({...prev, [event.id]: updater(prev[event.id] || [])}))}
+                            model={selectedImageModel}
                         />
                     ))
                 ) : (
@@ -837,11 +983,13 @@ ${eventListStringEn}
             </div>
         )}
 
+      {/* FIX: Pass a GalleryImage object to the 'image' prop instead of 'imageUrl'. */}
       {editingDailyFlyer && (
         <ImagePreviewModal
-            imageUrl={editingDailyFlyer.url}
+            image={editingDailyFlyer.image}
             onClose={() => setEditingDailyFlyer(null)}
             onImageUpdate={handleDailyFlyerUpdate}
+            onSetChatReference={onSetChatReference}
             downloadFilename={`flyer_diario_${selectedDay}_${editingDailyFlyer.period}.png`}
         />
       )}

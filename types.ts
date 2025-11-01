@@ -3,6 +3,7 @@ import type { IconName as CommonIconName } from './components/common/Icon';
 export type ToneOfVoice = 'Profissional' | 'Espirituoso' | 'Casual' | 'Inspirador' | 'Técnico';
 export type IconName = CommonIconName;
 export type Theme = 'light' | 'dark';
+export type ImageModel = 'gemini-imagen' | 'bytedance-seedream' | 'gemini-flash-image-preview';
 
 export interface BrandProfile {
   name: string;
@@ -15,10 +16,14 @@ export interface BrandProfile {
 
 export interface ContentInput {
   transcript: string;
-  image: {
+  productImages: {
     base64: string;
     mimeType: string;
-  } | null;
+  }[] | null;
+  inspirationImages: {
+    base64: string;
+    mimeType: string;
+  }[] | null;
 }
 
 export interface VideoClipScript {
@@ -54,6 +59,25 @@ export interface MarketingCampaign {
 
 export type GenerationMode = 'full' | 'clips' | 'posts' | 'ads';
 
+export interface GenerationSetting {
+    generate: boolean;
+    count: number;
+}
+
+export interface GenerationOptions {
+  videoClipScripts: GenerationSetting;
+  posts: {
+    linkedin: GenerationSetting;
+    twitter: GenerationSetting;
+    instagram: GenerationSetting;
+    facebook: GenerationSetting;
+  };
+  adCreatives: {
+    facebook: GenerationSetting;
+    google: GenerationSetting;
+  };
+}
+
 
 // --- Assistant Types ---
 
@@ -68,6 +92,15 @@ export interface ChatPart {
     text?: string;
     functionCall?: any;
     functionResponse?: any;
+    inlineData?: {
+      data: string;
+      mimeType: string;
+    }
+}
+
+export interface ChatReferenceImage {
+  id: string; // The ID from the gallery
+  src: string; // The data URL for display and sending
 }
 
 
@@ -103,4 +136,5 @@ export interface GalleryImage {
   src: string;
   prompt: string;
   source: 'Thumbnail' | 'Post' | 'Anúncio' | 'Flyer' | 'Flyer Diário' | 'Logo';
+  model?: ImageModel;
 }
