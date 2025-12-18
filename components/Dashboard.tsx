@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, GenerationOptions } from '../types';
 import { UploadForm } from './UploadForm';
@@ -11,6 +12,7 @@ import { FlyerGenerator, TimePeriod } from './FlyerGenerator';
 import { AssistantPanel } from './assistant/AssistantPanel';
 import { GalleryView } from './GalleryView';
 
+type View = 'campaign' | 'flyer' | 'gallery';
 
 interface DashboardProps {
   brandProfile: BrandProfile;
@@ -19,9 +21,6 @@ interface DashboardProps {
   isGenerating: boolean;
   onEditProfile: () => void;
   onResetCampaign: () => void;
-  productImages: ContentInput['productImages'] | null;
-  inspirationImages: ContentInput['inspirationImages'] | null;
-  // Assistant Props
   isAssistantOpen: boolean;
   onToggleAssistant: () => void;
   assistantHistory: ChatMessage[];
@@ -29,26 +28,25 @@ interface DashboardProps {
   onAssistantSendMessage: (message: string, image: ChatReferenceImage | null) => void;
   chatReferenceImage: ChatReferenceImage | null;
   onSetChatReference: (image: GalleryImage | null) => void;
-  // Theme Props
   theme: Theme;
   onThemeToggle: () => void;
-  // Gallery Props
   galleryImages: GalleryImage[];
   onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
-  // Flyer Generator Props
   tournamentEvents: TournamentEvent[];
   onTournamentFileUpload: (file: File) => Promise<void>;
   onAddTournamentEvent: (event: TournamentEvent) => void;
-  // FIX: Update flyer state types to use GalleryImage objects.
   flyerState: Record<string, (GalleryImage | 'loading')[]>;
   setFlyerState: React.Dispatch<React.SetStateAction<Record<string, (GalleryImage | 'loading')[]>>>;
   dailyFlyerState: Record<TimePeriod, (GalleryImage | 'loading')[]>;
   setDailyFlyerState: React.Dispatch<React.SetStateAction<Record<TimePeriod, (GalleryImage | 'loading')[]>>>;
+  // Navigation
+  activeView: View;
+  onViewChange: (view: View) => void;
+  onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
 }
 
 type Tab = 'clips' | 'posts' | 'ads';
-type View = 'campaign' | 'flyer' | 'gallery';
 
 interface NavItemProps {
     icon: IconName;
@@ -60,137 +58,101 @@ interface NavItemProps {
 const NavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick }) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+    className={`w-full flex items-center space-x-4 px-6 py-4 rounded-2xl text-[9px] font-black uppercase tracking-[0.3em] transition-all duration-500 ${
       active
-        ? 'bg-primary text-white'
-        : 'text-text-muted hover:bg-muted/20 hover:text-text-main'
+        ? 'bg-white text-black shadow-2xl'
+        : 'text-white/30 hover:text-white hover:bg-white/5'
     }`}
-    aria-current={active ? 'page' : undefined}
   >
-    <Icon name={icon} className="w-5 h-5" />
+    <Icon name={icon} className={`w-4 h-4 ${active ? 'text-black' : 'text-white/20'}`} />
     <span>{label}</span>
   </button>
 );
 
-
 export const Dashboard: React.FC<DashboardProps> = (props) => {
   const { 
     brandProfile, campaign, onGenerate, isGenerating, onEditProfile, onResetCampaign,
-    productImages, isAssistantOpen, onToggleAssistant, assistantHistory, 
-    isAssistantLoading, onAssistantSendMessage, theme, onThemeToggle, 
-    galleryImages, onAddImageToGallery, onUpdateGalleryImage, tournamentEvents, onTournamentFileUpload, onAddTournamentEvent,
+    isAssistantOpen, onToggleAssistant, assistantHistory, 
+    isAssistantLoading, onAssistantSendMessage, galleryImages, onAddImageToGallery, 
+    onUpdateGalleryImage, tournamentEvents, onTournamentFileUpload, onAddTournamentEvent,
     flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState,
-    chatReferenceImage, onSetChatReference
+    chatReferenceImage, onSetChatReference, activeView, onViewChange, onPublishToCampaign
   } = props;
   
   const [activeTab, setActiveTab] = useState<Tab>('clips');
-  const [activeView, setActiveView] = useState<View>('campaign');
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'clips', label: 'Clipes de Vídeo' },
-    { id: 'posts', label: 'Posts Sociais' },
-    { id: 'ads', label: 'Criativos de Anúncio' },
+    { id: 'clips', label: 'Clips' },
+    { id: 'posts', label: 'Social' },
+    { id: 'ads', label: 'Ads' },
   ];
 
   const showUploadForm = !campaign && !isGenerating;
-  const firstProductImage = productImages && productImages.length > 0 ? productImages[0] : null;
 
   return (
-    <div className="h-screen flex overflow-hidden bg-background text-text-main font-sans">
-      {/* Sidebar */}
-      <aside className="dark w-64 bg-black flex flex-col flex-shrink-0 border-r border-muted/30">
-        <div className="h-16 flex items-center px-4 border-b border-muted/30 flex-shrink-0">
-          <Icon name="logo" className="h-8 w-8 text-primary" />
-          <h1 className="text-xl font-bold text-text-main ml-2">DirectorAi</h1>
+    <div className="h-screen flex overflow-hidden bg-black text-white font-sans selection:bg-primary selection:text-black">
+      <aside className="w-72 bg-[#050505]/60 flex flex-col flex-shrink-0 border-r border-white/5 backdrop-blur-3xl z-20">
+        <div className="h-24 flex items-center px-8 flex-shrink-0">
+          <div className="w-10 h-10 aura-card flex items-center justify-center mr-4 bg-white/5 border-white/10 shadow-inner">
+             <Icon name="logo" className="h-5 w-5 text-white" />
+          </div>
+          <h1 className="text-sm font-black text-white tracking-[0.4em] uppercase">Director<span className="opacity-30">Ai</span></h1>
         </div>
-        <nav className="flex-grow p-4 space-y-2 overflow-y-auto">
-            <NavItem 
-                icon="zap" 
-                label="Gerador de Campanha" 
-                active={activeView === 'campaign'} 
-                onClick={() => setActiveView('campaign')} 
-            />
-            <NavItem 
-                icon="image" 
-                label="Gerador de Flyer" 
-                active={activeView === 'flyer'} 
-                onClick={() => setActiveView('flyer')} 
-            />
-            <NavItem 
-                icon="layout" 
-                label="Galeria" 
-                active={activeView === 'gallery'} 
-                onClick={() => setActiveView('gallery')} 
-            />
+
+        <nav className="flex-grow p-6 space-y-3">
+            <NavItem icon="zap" label="Direct" active={activeView === 'campaign'} onClick={() => onViewChange('campaign')} />
+            <NavItem icon="image" label="Flyers" active={activeView === 'flyer'} onClick={() => onViewChange('flyer')} />
+            <NavItem icon="layout" label="Assets" active={activeView === 'gallery'} onClick={() => onViewChange('gallery')} />
         </nav>
-        <div className="p-4 border-t border-muted/30 space-y-4 flex-shrink-0">
-             <div className="flex items-center space-x-3">
-                {brandProfile.logo && (
-                    <img src={brandProfile.logo} alt={`${brandProfile.name} logo`} className="h-10 w-10 rounded-full object-contain bg-white border border-muted/20"/>
-                )}
-                <div className="flex-1 overflow-hidden">
-                    <span className="text-sm font-medium text-text-main truncate block">{brandProfile.name}</span>
-                    <span className="text-xs text-text-muted truncate block">Sua Marca</span>
+
+        <div className="p-8 space-y-6">
+             <div className="p-5 aura-card border-white/10 space-y-4 bg-white/[0.02]">
+                <div className="flex items-center space-x-4">
+                    {brandProfile.logo ? (
+                        <img src={brandProfile.logo} alt="Logo" className="h-10 w-10 rounded-full object-contain filter grayscale brightness-125"/>
+                    ) : (
+                        <div className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center border border-white/10"><Icon name="bot" className="w-5 h-5 text-white/40" /></div>
+                    )}
+                    <div className="flex-1 overflow-hidden">
+                        <span className="text-[10px] font-black text-white truncate block uppercase tracking-widest">{brandProfile.name}</span>
+                        <span className="text-[8px] text-white/30 uppercase font-bold tracking-[0.2em] mt-1">Status: Operational</span>
+                    </div>
                 </div>
             </div>
-            <Button onClick={onEditProfile} size="small" variant="secondary" icon="edit" className="w-full">
-              Editar Marca
-            </Button>
-            <Button onClick={onThemeToggle} size="small" variant="secondary" icon={theme === 'light' ? 'moon' : 'sun'} className="w-full">
-              Mudar para modo {theme === 'light' ? 'Escuro' : 'Claro'}
-            </Button>
+            <button onClick={onEditProfile} className="w-full text-[9px] font-black uppercase tracking-[0.4em] text-white/20 hover:text-white transition-colors py-3 border border-white/5 rounded-xl hover:bg-white/5">System Setup</button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <main className="flex-1 overflow-y-auto relative z-10 bg-[#070707]">
+        <div className="max-w-[1400px] mx-auto px-6 sm:px-10 py-12 sm:py-16 relative">
             {activeView === 'campaign' && (
                 <>
-                    {showUploadForm && (
-                        <UploadForm onGenerate={onGenerate} isGenerating={isGenerating} />
-                    )}
-
+                    {showUploadForm && <UploadForm onGenerate={onGenerate} isGenerating={isGenerating} />}
                     {isGenerating && (
-                        <div className="flex flex-col items-center justify-center text-center p-12 bg-surface rounded-xl border border-muted/20">
+                        <div className="flex flex-col items-center justify-center text-center p-32 aura-card border-white/5 bg-white/[0.01]">
                             <Loader className="h-12 w-12" />
-                            <h2 className="text-2xl font-bold mt-6">Criando Sua Campanha...</h2>
-                            <p className="text-text-muted mt-2 max-w-md">A IA DirectorAi está analisando seu conteúdo e perfil de marca para gerar um conjunto completo de materiais de marketing. Isso pode levar um momento.</p>
+                            <h2 className="text-4xl font-black mt-10 tracking-[-0.05em] uppercase">Synthesizing Identity</h2>
+                            <p className="text-white/40 mt-4 max-w-xs text-xs font-medium tracking-wide">Autonomous agents are configuring your marketing ecosystem.</p>
                         </div>
                     )}
-
                     {campaign && (
-                        <div>
-                            <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
-                                <h2 className="text-2xl font-bold">Sua Campanha Gerada</h2>
-                                <Button onClick={onResetCampaign} variant="secondary" icon="zap">
-                                    Gerar Nova Campanha
-                                </Button>
+                        <div className="animate-fade-in-up">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-16 gap-6">
+                                <div>
+                                    <h2 className="text-5xl font-black tracking-[-0.05em] uppercase leading-none">Generated Output</h2>
+                                    <p className="text-[10px] uppercase tracking-[0.4em] text-white/30 font-black mt-4">Multi-Platform Campaign Strategy</p>
+                                </div>
+                                <Button onClick={onResetCampaign} variant="primary" icon="zap" size="large">New Strategy</Button>
                             </div>
-                            
-                            <div className="border-b border-muted/30 mb-6">
-                                <nav className="-mb-px flex space-x-6 overflow-x-auto">
-                                    {tabs.map(tab => (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() => setActiveTab(tab.id)}
-                                            className={`${
-                                                activeTab === tab.id
-                                                    ? 'border-primary text-primary'
-                                                    : 'border-transparent text-subtle hover:text-text-main hover:border-muted'
-                                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors focus:outline-none`}
-                                            aria-current={activeTab === tab.id ? 'page' : undefined}
-                                        >
-                                            {tab.label}
-                                        </button>
-                                    ))}
-                                </nav>
+                            <div className="mb-12 flex flex-wrap gap-4">
+                                {tabs.map(tab => (
+                                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-10 py-4 rounded-full text-[9px] font-black uppercase tracking-[0.3em] transition-all duration-500 border ${activeTab === tab.id ? 'bg-white text-black border-white' : 'bg-transparent text-white/40 border-white/10 hover:border-white/30 hover:text-white'}`}>{tab.label}</button>
+                                ))}
                             </div>
-
-                            <div>
-                            {activeTab === 'clips' && <ClipsTab brandProfile={brandProfile} videoClipScripts={campaign.videoClipScripts} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
-                            {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={firstProductImage} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
-                            {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={firstProductImage} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
+                            <div className="space-y-12">
+                                {activeTab === 'clips' && <ClipsTab brandProfile={brandProfile} videoClipScripts={campaign.videoClipScripts} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
+                                {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
+                                {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
                             </div>
                         </div>
                     )}
@@ -198,45 +160,20 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             )}
             {activeView === 'flyer' && (
                 <FlyerGenerator 
-                  brandProfile={brandProfile}
-                  events={tournamentEvents}
-                  onFileUpload={onTournamentFileUpload}
-                  onAddEvent={onAddTournamentEvent}
-                  onAddImageToGallery={onAddImageToGallery}
-                  flyerState={flyerState}
-                  setFlyerState={setFlyerState}
-                  dailyFlyerState={dailyFlyerState}
-                  setDailyFlyerState={setDailyFlyerState}
-                  onUpdateGalleryImage={onUpdateGalleryImage}
-                  onSetChatReference={onSetChatReference}
+                  brandProfile={brandProfile} events={tournamentEvents} onFileUpload={onTournamentFileUpload} onAddEvent={onAddTournamentEvent} onAddImageToGallery={onAddImageToGallery} flyerState={flyerState} setFlyerState={setFlyerState} dailyFlyerState={dailyFlyerState} setDailyFlyerState={setDailyFlyerState} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference}
+                  onPublishToCampaign={onPublishToCampaign}
                 />
             )}
-            {activeView === 'gallery' && (
-                <GalleryView images={galleryImages} onUpdateImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />
-            )}
+            {activeView === 'gallery' && <GalleryView images={galleryImages} onUpdateImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
         </div>
       </main>
 
-       {/* Assistant Components */}
-       <AssistantPanel 
-            isOpen={isAssistantOpen}
-            onClose={onToggleAssistant}
-            history={assistantHistory}
-            isLoading={isAssistantLoading}
-            onSendMessage={onAssistantSendMessage}
-            referenceImage={chatReferenceImage}
-            onClearReference={() => onSetChatReference(null)}
-       />
-       <div className="fixed bottom-6 right-6 z-50">
-          <button 
-            onClick={onToggleAssistant}
-            aria-label={isAssistantOpen ? "Fechar assistente de IA" : "Abrir assistente de IA"}
-            aria-expanded={isAssistantOpen}
-            className={`w-16 h-16 rounded-full flex items-center justify-center text-white shadow-2xl transform-gpu transition-all duration-300 ease-in-out hover:scale-110 focus:outline-none focus:ring-4 focus:ring-primary/50 ${isAssistantOpen ? 'bg-muted hover:bg-muted/80' : 'bg-primary hover:bg-primary-hover'}`}
-          >
+       <AssistantPanel isOpen={isAssistantOpen} onClose={onToggleAssistant} history={assistantHistory} isLoading={isAssistantLoading} onSendMessage={onAssistantSendMessage} referenceImage={chatReferenceImage} onClearReference={() => onSetChatReference(null)} />
+       <div className="fixed bottom-10 right-10 z-50">
+          <button onClick={onToggleAssistant} className={`w-20 h-20 rounded-[2.5rem] flex items-center justify-center shadow-2xl transition-all duration-700 hover:scale-110 border border-white/10 ${isAssistantOpen ? 'bg-white/5 backdrop-blur-2xl text-white' : 'bg-white text-black'}`}>
             <div className="relative w-8 h-8 flex items-center justify-center">
-                <Icon name='bot' className={`absolute inset-0 w-8 h-8 transition-all duration-300 ${isAssistantOpen ? 'opacity-0 -rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'}`} />
-                <Icon name='x' className={`absolute inset-0 w-8 h-8 transition-all duration-300 ${isAssistantOpen ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 rotate-90 scale-50'}`} />
+                <Icon name='bot' className={`absolute inset-0 w-8 h-8 transition-all duration-700 ${isAssistantOpen ? 'opacity-0 -rotate-180 scale-50' : 'opacity-100 rotate-0 scale-100'}`} />
+                <Icon name='x' className={`absolute inset-0 w-8 h-8 transition-all duration-700 ${isAssistantOpen ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 rotate-180 scale-50'}`} />
             </div>
           </button>
        </div>

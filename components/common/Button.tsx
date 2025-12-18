@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
@@ -20,23 +21,23 @@ export const Button: React.FC<ButtonProps> = ({
   isLoading = false,
   ...props
 }) => {
-  const baseClasses = 'font-semibold rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md';
+  const baseClasses = 'font-bold rounded-full transition-all duration-300 focus:outline-none flex items-center justify-center space-x-2 disabled:opacity-30 disabled:cursor-not-allowed tracking-tight antialiased';
   
   const variantClasses = {
-    primary: 'bg-primary text-white hover:bg-primary-hover focus:ring-primary',
-    secondary: 'bg-surface/50 text-text-main hover:bg-surface/80 focus:ring-primary border border-muted/60 backdrop-blur-sm',
+    primary: 'bg-gradient-to-r from-primary to-primary-hover text-black hover:scale-[1.02] active:scale-[0.98] shadow-[0_10px_30px_rgba(245,158,11,0.2)]',
+    secondary: 'bg-[#1A1A1A] text-white border border-[#2A2A2A] hover:bg-[#222] hover:border-[#333] active:scale-[0.98]',
   };
 
   const sizeClasses = {
-      normal: 'px-4 py-2 text-sm',
-      large: 'px-5 py-2.5 text-base', // Refined size
-      small: 'px-3 py-1.5 text-xs',
+      normal: 'px-6 py-2.5 text-xs',
+      large: 'px-10 py-4 text-sm', 
+      small: 'px-4 py-2 text-[10px]',
   }
   
   const iconSizeClasses = {
       normal: 'w-4 h-4',
       large: 'w-5 h-5',
-      small: 'w-4 h-4',
+      small: 'w-3.5 h-3.5',
   };
 
   const finalProps = { ...props, disabled: props.disabled || isLoading };
@@ -51,7 +52,7 @@ export const Button: React.FC<ButtonProps> = ({
       ) : (
         icon && <Icon name={icon} className={iconSizeClasses[size]}/>
       )}
-      {children}
+      <span>{children}</span>
     </button>
   );
 };

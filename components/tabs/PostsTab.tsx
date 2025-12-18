@@ -134,8 +134,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referen
     errors: [],
   });
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
-  // FIX: Update default model name and available options to be compliant with Gemini API guidelines.
-  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-2.5-flash-image');
+  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
 
   useEffect(() => {
     const length = posts.length;
@@ -147,6 +146,15 @@ export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referen
   }, [posts]);
 
   const handleGenerate = async (index: number) => {
+    if (selectedImageModel === 'gemini-3-pro-image-preview') {
+         if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+            const hasKey = await window.aistudio.hasSelectedApiKey();
+            if (!hasKey) {
+                await window.aistudio.openSelectKey();
+            }
+        }
+    }
+
     const post = posts[index];
     if (!post.image_prompt) return;
 
@@ -240,7 +248,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referen
                 onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)} 
                 className="bg-surface/80 border-muted/50 border rounded-lg p-2 text-sm text-text-main focus:ring-2 focus:ring-primary w-full sm:w-auto"
             >
-                {/* FIX: Update model options to be compliant with Gemini API guidelines. */}
+                <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image (Alta Qualidade)</option>
                 <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
                 <option value="imagen-4.0-generate-001">Imagen 4.0</option>
             </select>

@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 // FIX: Define and export IconName type to be used across the application.
@@ -43,9 +44,9 @@ interface IconProps {
 const iconPaths: Record<IconName, React.ReactNode> = {
   logo: (
     <>
-      <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-      <path d="M2 17l10 5 10-5"></path>
-      <path d="M2 12l10 5 10-5"></path>
+      <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"></path>
+      <line x1="16" y1="8" x2="2" y2="22"></line>
+      <line x1="17.5" y1="15" x2="9" y2="15"></line>
     </>
   ),
   zap: (

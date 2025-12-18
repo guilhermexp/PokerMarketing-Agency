@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import type { VideoClipScript, BrandProfile, GalleryImage, ImageModel, VideoModel, ImageFile } from '../../types';
 import { Card } from '../common/Card';
@@ -25,7 +26,7 @@ const getWavHeader = (dataLength: number, sampleRate: number, numChannels: numbe
     const header = new ArrayBuffer(44);
     const view = new DataView(header);
     const RIFF = new Uint8Array([82, 73, 70, 70]);
-    const WAVE = new Uint8Array([87, 65, 86, 86, 69]);
+    const WAVE = new Uint8Array([87, 65, 86, 69]);
     const fmt = new Uint8Array([102, 109, 116, 32]);
     const data = new Uint8Array([100, 97, 116, 97]);
     const blockAlign = (numChannels * bitsPerSample) / 8;
@@ -187,17 +188,25 @@ const ClipCard: React.FC<ClipCardProps> = ({
         if (!clip.audio_script) return;
         setAudioState({ isLoading: true, error: null });
         try {
-            // Regex to extract only the narration text, ignoring timestamps and sound effect cues.
-            const narrationRegex = /Narração:\s*(.*?)(?=\s*\[|$)/g;
+            // Regex melhorado para extrair narrações de forma insensível a maiúsculas/minúsculas
+            // e ignorar marcações de tempo ou efeitos sonoros em colchetes.
+            const narrationRegex = /narra[çc][ãa]o:\s*(.*?)(?=\s*\[|narra[çc][ãa]o:|$)/gi;
             let match;
             const narrations: string[] = [];
             while ((match = narrationRegex.exec(clip.audio_script)) !== null) {
-                narrations.push(match[1].trim());
+                if (match[1]) narrations.push(match[1].trim());
             }
-            const narrationOnlyScript = narrations.join(' ');
+            
+            let narrationOnlyScript = narrations.join(' ');
+
+            // Fallback: se o regex não encontrou tags "Narração:", 
+            // limpa o texto de colchetes e usa o conteúdo bruto.
+            if (!narrationOnlyScript.trim()) {
+                narrationOnlyScript = clip.audio_script.replace(/\[.*?\]/g, '').trim();
+            }
 
             if (!narrationOnlyScript) {
-                throw new Error("Não foi encontrada nenhuma narração no roteiro de áudio.");
+                throw new Error("O roteiro de áudio está vazio ou em formato inválido.");
             }
 
             const base64Audio = await generateSpeech(narrationOnlyScript);
@@ -252,7 +261,10 @@ const ClipCard: React.FC<ClipCardProps> = ({
                          <h4 className="font-semibold text-text-main mb-2">Roteiro de Áudio</h4>
                          <p className="text-sm text-text-muted italic bg-background/50 p-3 rounded-md mb-3">{clip.audio_script}</p>
                          {audioState.isLoading ? (
-                            <Loader />
+                            <div className="flex items-center gap-3 bg-background/30 p-4 rounded-xl">
+                                <Loader />
+                                <span className="text-xs font-black uppercase tracking-widest animate-pulse">Sintetizando Voz...</span>
+                            </div>
                          ) : audioState.url ? (
                             <audio controls src={audioState.url} className="w-full" />
                          ) : (
@@ -294,7 +306,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
                         <h4 className="font-semibold text-text-main mb-3 text-center">Controles Gerais do Clipe</h4>
                         {!apiKeySelected && (
                             <div className="text-center p-2 bg-yellow-500/10 text-yellow-300 rounded-md text-xs mb-3">
-                                A geração de vídeo requer uma chave de API Veo. <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline">Verifique a cobrança.</a>
+                                A geração de vídeo e imagens Pro requer uma chave de API paga. <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline">Verifique a cobrança.</a>
                             </div>
                         )}
                         <Button
@@ -333,7 +345,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
         errors: [],
     });
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
-    const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-2.5-flash-image');
+    const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
 
     useEffect(() => {
         const length = videoClipScripts.length;
@@ -345,6 +357,15 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
     }, [videoClipScripts]);
 
     const handleGenerateThumbnail = async (index: number) => {
+        if (selectedImageModel === 'gemini-3-pro-image-preview') {
+             if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+                const hasKey = await window.aistudio.hasSelectedApiKey();
+                if (!hasKey) {
+                    await window.aistudio.openSelectKey();
+                }
+            }
+        }
+
         const clip = videoClipScripts[index];
         if (!clip.image_prompt) return;
 
@@ -423,6 +444,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
                         onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
                         className="bg-surface/80 border-muted/50 border rounded-lg p-2 text-sm text-text-main focus:ring-2 focus:ring-primary w-full sm:w-auto"
                     >
+                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image (Alta Qualidade)</option>
                         <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
                         <option value="imagen-4.0-generate-001">Imagen 4.0</option>
                     </select>

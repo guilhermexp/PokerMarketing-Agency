@@ -1,3 +1,4 @@
+
 import type { IconName } from './components/common/Icon';
 
 export type ToneOfVoice = 'Profissional' | 'Espirituoso' | 'Casual' | 'Inspirador' | 'Técnico';
@@ -75,7 +76,8 @@ export interface TournamentEvent {
   times: Record<string, string>;
 }
 
-export type ImageModel = 'gemini-2.5-flash-image' | 'imagen-4.0-generate-001';
+export type ImageModel = 'gemini-3-pro-image-preview' | 'imagen-4.0-generate-001';
+export type ImageSize = '1K' | '2K' | '4K';
 export type VideoModel = 'veo-3.1-fast-generate-preview';
 
 
@@ -102,9 +104,19 @@ export interface ChatPart {
     functionResponse?: any;
 }
 
+export interface GroundingChunk {
+    web?: {
+        uri: string;
+        title: string;
+    };
+}
+
 export interface ChatMessage {
     role: 'user' | 'model' | 'tool';
     parts: ChatPart[];
+    groundingMetadata?: {
+        groundingChunks: GroundingChunk[];
+    };
 }
 
 export interface GenerationSetting {

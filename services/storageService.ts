@@ -1,0 +1,49 @@
+
+import type { GalleryImage } from '../types';
+
+const DB_NAME = 'DirectorAi_DB';
+const STORE_NAME = 'gallery_images';
+const DB_VERSION = 1;
+
+export const initDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject('Erro ao abrir o banco de dados');
+    request.onsuccess = () => resolve(request.result);
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+  });
+};
+
+export const saveImagesToDB = async (images: GalleryImage[]): Promise<void> => {
+  const db = await initDB();
+  const transaction = db.transaction(STORE_NAME, 'readwrite');
+  const store = transaction.objectStore(STORE_NAME);
+
+  // Limpa o store para manter sincronizado com o estado do App (que já faz o slice de MAX_SIZE)
+  store.clear();
+  images.forEach((img) => store.add(img));
+
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject('Erro ao salvar imagens');
+  });
+};
+
+export const loadImagesFromDB = async (): Promise<GalleryImage[]> => {
+  const db = await initDB();
+  const transaction = db.transaction(STORE_NAME, 'readonly');
+  const store = transaction.objectStore(STORE_NAME);
+  const request = store.getAll();
+
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject('Erro ao carregar imagens');
+  });
+};
