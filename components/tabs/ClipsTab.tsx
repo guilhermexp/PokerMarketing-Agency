@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { VideoClipScript, BrandProfile, GalleryImage, ImageModel, VideoModel, ImageFile } from '../../types';
-import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { Loader } from '../common/Loader';
 import { Icon } from '../common/Icon';
@@ -10,7 +9,6 @@ import { ImagePreviewModal } from '../common/ImagePreviewModal';
 
 // --- Helper Functions for Audio Processing ---
 
-// Decodes base64 string to a Uint8Array.
 const decode = (base64: string): Uint8Array => {
     const binaryString = atob(base64);
     const len = binaryString.length;
@@ -21,7 +19,6 @@ const decode = (base64: string): Uint8Array => {
     return bytes;
 };
 
-// Creates a WAV file header.
 const getWavHeader = (dataLength: number, sampleRate: number, numChannels: number, bitsPerSample: number): Uint8Array => {
     const header = new ArrayBuffer(44);
     const view = new DataView(header);
@@ -49,13 +46,11 @@ const getWavHeader = (dataLength: number, sampleRate: number, numChannels: numbe
     return new Uint8Array(header);
 };
 
-// Converts raw PCM audio data to a playable WAV Blob URL.
 const pcmToWavDataUrl = (pcmData: Uint8Array): string => {
     const header = getWavHeader(pcmData.length, 24000, 1, 16);
     const wavBlob = new Blob([header, pcmData], { type: 'audio/wav' });
     return URL.createObjectURL(wavBlob);
 };
-
 
 // --- Component Interfaces ---
 
@@ -80,32 +75,30 @@ interface VideoState {
   error?: string | null;
 }
 
+// --- Clip Card (Inline with Scenes) ---
+
 interface ClipCardProps {
   clip: VideoClipScript;
   brandProfile: BrandProfile;
   thumbnail: GalleryImage | null;
   onGenerateThumbnail: () => void;
   isGeneratingThumbnail: boolean;
-  thumbnailError: string | null;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
 }
 
-// --- ClipCard Component ---
-
 const ClipCard: React.FC<ClipCardProps> = ({
-  clip, brandProfile, thumbnail, onGenerateThumbnail, isGeneratingThumbnail,
-  thumbnailError, onUpdateGalleryImage, onSetChatReference
+    clip, brandProfile, thumbnail, onGenerateThumbnail, isGeneratingThumbnail,
+    onUpdateGalleryImage, onSetChatReference
 }) => {
-    const [apiKeySelected, setApiKeySelected] = useState(false);
     const [scenes, setScenes] = useState<Scene[]>([]);
     const [videoStates, setVideoStates] = useState<Record<number, VideoState>>({});
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [editingThumbnail, setEditingThumbnail] = useState<GalleryImage | null>(null);
     const [audioState, setAudioState] = useState<{ url?: string; isLoading: boolean; error?: string | null }>({ isLoading: false });
 
-
     useEffect(() => {
+        if (!clip.scenes) return;
         const parsedScenes = clip.scenes.map(s => ({
             sceneNumber: s.scene,
             visual: s.visual,
@@ -118,43 +111,21 @@ const ClipCard: React.FC<ClipCardProps> = ({
             initialVideoStates[scene.sceneNumber] = { isLoading: false };
         });
         setVideoStates(initialVideoStates);
-
-        // Check for API key on mount
-        const checkApiKey = async () => {
-            if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-                const hasKey = await window.aistudio.hasSelectedApiKey();
-                setApiKeySelected(hasKey);
-            }
-        };
-        checkApiKey();
     }, [clip]);
 
-    const handleSelectApiKey = async () => {
-        if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
-            await window.aistudio.openSelectKey();
-            setApiKeySelected(true); // Assume success to avoid race condition
-        }
-    };
-
     const handleGenerateVideo = useCallback(async (sceneNumber: number) => {
-        if (!apiKeySelected) {
-            handleSelectApiKey();
-            return;
-        }
-
         setVideoStates(prev => ({ ...prev, [sceneNumber]: { isLoading: true } }));
-
         try {
             const currentScene = scenes.find(s => s.sceneNumber === sceneNumber);
             if (!currentScene) throw new Error("Cena não encontrada.");
-            
+
             const contextPrompt = scenes
                 .filter(s => s.sceneNumber < sceneNumber)
                 .map(s => `Contexto anterior: ${s.visual}`)
                 .join('\n');
 
             const prompt = `Crie um clipe de vídeo para esta cena:\n- Visual: ${currentScene.visual}\n- Narração: ${currentScene.narration}\n${contextPrompt}\n\nGaranta consistência visual com o contexto anterior, se houver. O estilo deve corresponder à identidade da marca: ${brandProfile.toneOfVoice}, usando as cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.`;
-            
+
             const logoImage: ImageFile | null = brandProfile.logo ? {
                 base64: brandProfile.logo.split(',')[1],
                 mimeType: brandProfile.logo.match(/:(.*?);/)?.[1] || 'image/png'
@@ -163,18 +134,11 @@ const ClipCard: React.FC<ClipCardProps> = ({
             const videoUrl = await generateVideo(prompt, "9:16", 'veo-3.1-fast-generate-preview', logoImage);
             setVideoStates(prev => ({ ...prev, [sceneNumber]: { url: videoUrl, isLoading: false } }));
         } catch (err: any) {
-            if (err.message && err.message.includes("selecione uma chave de API")) {
-                setApiKeySelected(false);
-            }
             setVideoStates(prev => ({ ...prev, [sceneNumber]: { isLoading: false, error: err.message || 'Falha ao gerar o vídeo.' } }));
         }
-    }, [scenes, brandProfile, apiKeySelected]);
+    }, [scenes, brandProfile]);
 
     const handleGenerateAllVideos = async () => {
-        if (!apiKeySelected) {
-            handleSelectApiKey();
-            return;
-        }
         setIsGeneratingAll(true);
         for (const scene of scenes) {
             if (!videoStates[scene.sceneNumber]?.url) {
@@ -188,27 +152,19 @@ const ClipCard: React.FC<ClipCardProps> = ({
         if (!clip.audio_script) return;
         setAudioState({ isLoading: true, error: null });
         try {
-            // Regex melhorado para extrair narrações de forma insensível a maiúsculas/minúsculas
-            // e ignorar marcações de tempo ou efeitos sonoros em colchetes.
             const narrationRegex = /narra[çc][ãa]o:\s*(.*?)(?=\s*\[|narra[çc][ãa]o:|$)/gi;
             let match;
             const narrations: string[] = [];
             while ((match = narrationRegex.exec(clip.audio_script)) !== null) {
                 if (match[1]) narrations.push(match[1].trim());
             }
-            
             let narrationOnlyScript = narrations.join(' ');
-
-            // Fallback: se o regex não encontrou tags "Narração:", 
-            // limpa o texto de colchetes e usa o conteúdo bruto.
             if (!narrationOnlyScript.trim()) {
                 narrationOnlyScript = clip.audio_script.replace(/\[.*?\]/g, '').trim();
             }
-
             if (!narrationOnlyScript) {
                 throw new Error("O roteiro de áudio está vazio ou em formato inválido.");
             }
-
             const base64Audio = await generateSpeech(narrationOnlyScript);
             const pcmData = decode(base64Audio);
             const wavUrl = pcmToWavDataUrl(pcmData);
@@ -217,111 +173,124 @@ const ClipCard: React.FC<ClipCardProps> = ({
             setAudioState({ isLoading: false, error: err.message || 'Falha ao gerar áudio.' });
         }
     };
-    
+
     const handleThumbnailUpdate = (newSrc: string) => {
         if (thumbnail) {
             onUpdateGalleryImage(thumbnail.id, newSrc);
             setEditingThumbnail(prev => prev ? { ...prev, src: newSrc } : null);
         }
     };
-    
+
+    const totalDuration = scenes.reduce((acc, s) => acc + s.duration, 0);
+
     return (
         <>
-            <Card className="p-6 flex flex-col xl:flex-row gap-6">
-                {/* Script and Video Section */}
-                <div className="flex-1">
-                    <h3 className="text-lg font-bold text-text-main mb-2">{clip.title}</h3>
-                    <p className="text-sm text-subtle mb-4"><strong>Gancho:</strong> {clip.hook}</p>
-                    
-                    {/* Scene Generation */}
-                    <div className="space-y-4">
-                        {scenes.map((scene) => (
-                            <div key={scene.sceneNumber} className="flex gap-4 items-start">
-                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">{scene.sceneNumber}</div>
-                                <div className="flex-1">
-                                    <p className="font-semibold text-text-main text-sm">{scene.visual}</p>
-                                    <p className="text-sm text-text-muted">{scene.narration} ({scene.duration}s)</p>
-                                </div>
-                                <div className="w-24 flex-shrink-0">
-                                    {videoStates[scene.sceneNumber]?.isLoading ? (
-                                        <div className="w-full aspect-video bg-surface rounded-md flex items-center justify-center"><Loader /></div>
-                                    ) : videoStates[scene.sceneNumber]?.url ? (
-                                        <video src={videoStates[scene.sceneNumber].url} controls className="w-full aspect-video rounded-md" />
-                                    ) : (
-                                        <Button onClick={() => handleGenerateVideo(scene.sceneNumber)} size="small" className="w-full">Gerar Vídeo</Button>
-                                    )}
-                                     {videoStates[scene.sceneNumber]?.error && <p className="text-red-400 text-xs mt-1">{videoStates[scene.sceneNumber].error}</p>}
-                                </div>
-                            </div>
-                        ))}
+            <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 overflow-hidden">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-white/5 bg-[#0d0d0d] flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                            <Icon name="play" className="w-4 h-4 text-primary" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black text-white uppercase tracking-wide">{clip.title}</h3>
+                            <p className="text-[10px] text-white/40">{scenes.length} cenas • {totalDuration}s • {clip.hook}</p>
+                        </div>
                     </div>
-
-                    {/* Audio Generation */}
-                    <div className="mt-6 pt-4 border-t border-muted/30">
-                         <h4 className="font-semibold text-text-main mb-2">Roteiro de Áudio</h4>
-                         <p className="text-sm text-text-muted italic bg-background/50 p-3 rounded-md mb-3">{clip.audio_script}</p>
-                         {audioState.isLoading ? (
-                            <div className="flex items-center gap-3 bg-background/30 p-4 rounded-xl">
-                                <Loader />
-                                <span className="text-xs font-black uppercase tracking-widest animate-pulse">Sintetizando Voz...</span>
-                            </div>
-                         ) : audioState.url ? (
-                            <audio controls src={audioState.url} className="w-full" />
-                         ) : (
-                            <Button onClick={handleGenerateAudio} size="small" icon="zap" variant="secondary">Gerar Áudio</Button>
-                         )}
-                         {audioState.error && <p className="text-red-400 text-xs mt-2">{audioState.error}</p>}
-                    </div>
+                    <Button onClick={handleGenerateAllVideos} isLoading={isGeneratingAll} disabled={isGeneratingAll} size="small" icon="zap">
+                        Gerar Todos
+                    </Button>
                 </div>
 
-                {/* Thumbnail and Controls Section */}
-                <div className="xl:w-80 flex-shrink-0 space-y-4">
-                    <div>
-                        <h4 className="font-semibold text-text-main mb-2">Sugestão de Capa/Fundo</h4>
-                        <div className="aspect-[9/16] bg-surface rounded-lg flex items-center justify-center relative overflow-hidden">
+                <div className="flex flex-col lg:flex-row">
+                    {/* Thumbnail */}
+                    <div className="lg:w-48 flex-shrink-0 p-4 bg-[#0d0d0d] border-b lg:border-b-0 lg:border-r border-white/5">
+                        <div className="aspect-[9/16] bg-[#080808] rounded-xl overflow-hidden relative border border-white/5">
                             {isGeneratingThumbnail ? (
-                                <Loader />
+                                <div className="absolute inset-0 flex items-center justify-center"><Loader /></div>
                             ) : thumbnail ? (
                                 <>
-                                    <img src={thumbnail.src} alt={`Cover for ${clip.title}`} className="w-full h-full object-cover" />
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                    <img src={thumbnail.src} alt={clip.title} className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center">
                                         <Button size="small" onClick={() => setEditingThumbnail(thumbnail)}>Editar</Button>
                                     </div>
                                 </>
                             ) : (
-                                <div className="text-center p-4">
-                                   <p className="text-xs text-text-muted italic line-clamp-6">"{clip.image_prompt}"</p>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center p-3">
+                                    <Icon name="image" className="w-6 h-6 text-white/10 mb-2" />
+                                    <p className="text-[8px] text-white/20 text-center italic line-clamp-3">"{clip.image_prompt}"</p>
                                 </div>
                             )}
                         </div>
-                        {clip.image_prompt && !thumbnail && (
-                            <Button onClick={onGenerateThumbnail} isLoading={isGeneratingThumbnail} size="small" className="w-full mt-4" icon="image">
-                                Gerar Imagem de Fundo
+                        {!thumbnail && clip.image_prompt && (
+                            <Button onClick={onGenerateThumbnail} isLoading={isGeneratingThumbnail} size="small" className="w-full mt-3" icon="image" variant="secondary">
+                                Gerar Capa
                             </Button>
                         )}
-                        {thumbnailError && <p className="text-red-400 text-xs mt-2">{thumbnailError}</p>}
+                        {/* Audio */}
+                        <div className="mt-4 pt-4 border-t border-white/5">
+                            <h4 className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2">Narração</h4>
+                            {audioState.isLoading ? (
+                                <div className="flex items-center gap-2 p-2 bg-[#080808] rounded-lg">
+                                    <Loader />
+                                    <span className="text-[8px] text-white/30">Gerando...</span>
+                                </div>
+                            ) : audioState.url ? (
+                                <audio controls src={audioState.url} className="w-full h-8" />
+                            ) : (
+                                <Button onClick={handleGenerateAudio} size="small" variant="secondary" className="w-full text-[9px]">
+                                    Gerar Áudio
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
-                    <Card className="p-4 bg-background/50">
-                        <h4 className="font-semibold text-text-main mb-3 text-center">Controles Gerais do Clipe</h4>
-                        {!apiKeySelected && (
-                            <div className="text-center p-2 bg-yellow-500/10 text-yellow-300 rounded-md text-xs mb-3">
-                                A geração de vídeo e imagens Pro requer uma chave de API paga. <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline">Verifique a cobrança.</a>
-                            </div>
-                        )}
-                        <Button
-                            onClick={apiKeySelected ? handleGenerateAllVideos : handleSelectApiKey}
-                            isLoading={isGeneratingAll}
-                            disabled={isGeneratingAll || Object.values(videoStates).some((s: VideoState) => s.isLoading)}
-                            size="small"
-                            className="w-full"
-                            icon="zap"
-                        >
-                            {apiKeySelected ? 'Gerar Todos os Vídeos' : 'Selecionar Chave de API'}
-                        </Button>
-                    </Card>
+                    {/* Scenes Grid */}
+                    <div className="flex-1 p-4">
+                        <h4 className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-3">Cenas do Roteiro</h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                            {scenes.map((scene) => (
+                                <div key={scene.sceneNumber} className="bg-[#0a0a0a] rounded-xl border border-white/5 overflow-hidden flex flex-col">
+                                    {/* Scene Preview */}
+                                    <div className="aspect-[9/16] bg-[#080808] relative">
+                                        {videoStates[scene.sceneNumber]?.isLoading ? (
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <Loader />
+                                            </div>
+                                        ) : videoStates[scene.sceneNumber]?.url ? (
+                                            <video src={videoStates[scene.sceneNumber].url} controls className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
+                                                <Icon name="play" className="w-6 h-6 text-white/10 mb-1" />
+                                                <p className="text-[7px] text-white/20 text-center line-clamp-3">{scene.visual}</p>
+                                            </div>
+                                        )}
+                                        {/* Badge */}
+                                        <div className="absolute top-1.5 left-1.5 right-1.5 flex justify-between items-center">
+                                            <span className="text-[7px] font-black bg-primary/90 text-black px-1.5 py-0.5 rounded-full">
+                                                {scene.sceneNumber}
+                                            </span>
+                                            <span className="text-[7px] font-bold text-white/60 bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
+                                                {scene.duration}s
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {/* Scene Action */}
+                                    <div className="p-2">
+                                        <p className="text-[8px] text-white/40 line-clamp-2 mb-2">{scene.narration}</p>
+                                        {!videoStates[scene.sceneNumber]?.url && !videoStates[scene.sceneNumber]?.isLoading && (
+                                            <Button onClick={() => handleGenerateVideo(scene.sceneNumber)} size="small" variant="secondary" className="w-full text-[8px]" icon="play">
+                                                Gerar
+                                            </Button>
+                                        )}
+                                        {videoStates[scene.sceneNumber]?.error && <p className="text-red-400 text-[7px] mt-1">{videoStates[scene.sceneNumber].error}</p>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
-            </Card>
+            </div>
 
             {editingThumbnail && (
                 <ImagePreviewModal
@@ -385,7 +354,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
                     mimeType: brandProfile.logo.match(/:(.*?);/)?.[1] || 'image/png'
                 });
             }
-            
+
             const generatedImageUrl = await generateImage(clip.image_prompt, brandProfile, {
                 aspectRatio: '9:16',
                 model: selectedImageModel,
@@ -417,7 +386,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
             });
         }
     };
-    
+
     const handleGenerateAllThumbnails = async () => {
         setIsGeneratingAll(true);
         const generationPromises = videoClipScripts.map((_, index) => {
@@ -432,24 +401,27 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
 
     return (
         <div className="space-y-6">
-            <Card className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <Button onClick={handleGenerateAllThumbnails} isLoading={isGeneratingAll} disabled={isGeneratingAll || generationState.isGenerating.some(Boolean)} icon="zap">
-                    Gerar Todas as Imagens de Capa
+            {/* Controls Bar */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-5 bg-[#0a0a0a] rounded-2xl border border-white/5">
+                <Button onClick={handleGenerateAllThumbnails} isLoading={isGeneratingAll} disabled={isGeneratingAll || generationState.isGenerating.some(Boolean)} icon="zap" size="small">
+                    Gerar Todas Capas
                 </Button>
-                <div className="flex items-center gap-2">
-                    <label htmlFor="model-select-clips" className="text-sm font-medium text-subtle flex-shrink-0">Modelo de IA:</label>
+                <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black uppercase tracking-[0.15em] text-white/30">Modelo:</span>
                     <select
                         id="model-select-clips"
                         value={selectedImageModel}
                         onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
-                        className="bg-surface/80 border-muted/50 border rounded-lg p-2 text-sm text-text-main focus:ring-2 focus:ring-primary w-full sm:w-auto"
+                        className="bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-primary/30 focus:border-primary/50 outline-none transition-all"
                     >
-                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image (Alta Qualidade)</option>
-                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
+                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash</option>
                         <option value="imagen-4.0-generate-001">Imagen 4.0</option>
                     </select>
                 </div>
-            </Card>
+            </div>
+
+            {/* Clips */}
             {videoClipScripts.map((clip, index) => (
                 <ClipCard
                     key={index}
@@ -457,7 +429,6 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
                     brandProfile={brandProfile}
                     thumbnail={thumbnails[index]}
                     isGeneratingThumbnail={generationState.isGenerating[index]}
-                    thumbnailError={generationState.errors[index]}
                     onGenerateThumbnail={() => handleGenerateThumbnail(index)}
                     onUpdateGalleryImage={onUpdateGalleryImage}
                     onSetChatReference={onSetChatReference}

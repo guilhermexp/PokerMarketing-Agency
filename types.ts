@@ -76,6 +76,12 @@ export interface TournamentEvent {
   times: Record<string, string>;
 }
 
+export interface WeekScheduleInfo {
+  startDate: string;
+  endDate: string;
+  filename: string;
+}
+
 export type ImageModel = 'gemini-3-pro-image-preview' | 'imagen-4.0-generate-001';
 export type ImageSize = '1K' | '2K' | '4K';
 export type VideoModel = 'veo-3.1-fast-generate-preview';
@@ -87,6 +93,15 @@ export interface GalleryImage {
   prompt: string;
   source: 'Post' | 'Anúncio' | 'Clipe' | 'Flyer' | 'Flyer Diário' | 'Logo' | 'Edição';
   model: ImageModel;
+  aspectRatio?: string;
+  imageSize?: ImageSize;
+}
+
+export interface StyleReference {
+  id: string;
+  src: string;
+  name: string;
+  createdAt: number;
 }
 
 export interface ChatReferenceImage {
@@ -112,7 +127,7 @@ export interface GroundingChunk {
 }
 
 export interface ChatMessage {
-    role: 'user' | 'model' | 'tool';
+    role: 'user' | 'model';
     parts: ChatPart[];
     groundingMetadata?: {
         groundingChunks: GroundingChunk[];

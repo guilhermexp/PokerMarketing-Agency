@@ -11,6 +11,7 @@ interface GenerationOptionsModalProps {
   setOptions: React.Dispatch<React.SetStateAction<GenerationOptions>>;
   onConfirm: () => void;
   isGenerating: boolean;
+  mode?: 'generate' | 'edit';
 }
 
 const NumberStepper: React.FC<{
@@ -137,7 +138,7 @@ const GenerationCategory: React.FC<{
 };
 
 
-export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({ isOpen, onClose, options, setOptions, onConfirm, isGenerating }) => {
+export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({ isOpen, onClose, options, setOptions, onConfirm, isGenerating, mode = 'generate' }) => {
   if (!isOpen) return null;
   
   // FIX: Explicitly type the argument 'v' to 'GenerationSetting' to resolve 'unknown' type error.
@@ -191,14 +192,20 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({ 
         </div>
         <div className="p-6 bg-surface/50 border-t border-muted/30 flex justify-end items-center gap-3">
           <Button variant="secondary" onClick={onClose} disabled={isGenerating}>Cancelar</Button>
-          <Button 
-            onClick={onConfirm}
-            isLoading={isGenerating}
-            disabled={isGenerating || nothingSelected}
-            icon="zap"
-          >
-            Gerar Campanha
-          </Button>
+          {mode === 'edit' ? (
+            <Button onClick={onClose}>
+              Salvar
+            </Button>
+          ) : (
+            <Button
+              onClick={onConfirm}
+              isLoading={isGenerating}
+              disabled={isGenerating || nothingSelected}
+              icon="zap"
+            >
+              Gerar Campanha
+            </Button>
+          )}
         </div>
       </div>
     </div>

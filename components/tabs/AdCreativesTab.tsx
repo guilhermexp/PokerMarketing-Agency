@@ -54,59 +54,70 @@ const AdCard: React.FC<{
 
     return (
         <>
-            <Card className="p-6 flex flex-col md:flex-row gap-6">
-                <div className="flex-1">
-                    <h3 className="text-lg font-bold text-text-main">{ad.platform} Ad Creative</h3>
-                    <div className="mt-4 space-y-3">
-                        <div>
-                            <p className="text-xs font-semibold text-subtle uppercase">Headline</p>
-                            <p className="text-text-main font-semibold">{ad.headline}</p>
+            <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 overflow-hidden">
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-white/5 bg-[#0d0d0d] flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                            <Icon name="zap" className="w-4 h-4 text-primary" />
                         </div>
-                         <div>
-                            <p className="text-xs font-semibold text-subtle uppercase">Body</p>
-                            <p className="text-text-muted text-sm">{ad.body}</p>
-                        </div>
-                         <div>
-                            <p className="text-xs font-semibold text-subtle uppercase">Call to Action</p>
-                            <span className="inline-block mt-1 bg-primary text-white text-sm font-bold py-1.5 px-3 rounded">{ad.cta}</span>
-                        </div>
+                        <h3 className="text-sm font-black text-white uppercase tracking-wide">{ad.platform} Ads</h3>
                     </div>
+                    <span className="text-[9px] bg-white/5 text-white/40 px-2 py-1 rounded-full uppercase tracking-wider font-medium border border-white/10">1.91:1</span>
                 </div>
-                <div className="md:w-96 flex-shrink-0">
-                    <h4 className="font-semibold text-text-main mb-2">Sugestão de Visual</h4>
-                    <div className="aspect-[1.91/1] bg-surface rounded-lg flex items-center justify-center relative overflow-hidden">
-                        {isGenerating ? (
-                            <Loader />
-                        ) : image ? (
-                            <>
-                                <img src={image.src} alt={`Visual for ${ad.headline}`} className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                    <Button size="small" onClick={handleEditClick}>Editar</Button>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="text-center p-4">
-                               <p className="text-xs text-text-muted italic line-clamp-4">"{ad.image_prompt}"</p>
+
+                <div className="flex flex-col lg:flex-row">
+                    {/* Content Section */}
+                    <div className="flex-1 p-6 space-y-4">
+                        <div>
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Headline</h4>
+                            <p className="text-white font-bold text-lg">{ad.headline}</p>
+                        </div>
+                        <div>
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Corpo</h4>
+                            <p className="text-sm text-white/60 leading-relaxed bg-[#0a0a0a] p-4 rounded-xl border border-white/5">{ad.body}</p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <div>
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">CTA</h4>
+                                <span className="inline-block bg-primary text-black text-xs font-black py-2 px-4 rounded-lg uppercase tracking-wide">{ad.cta}</span>
                             </div>
-                        )}
+                            {image && (
+                                <Button onClick={handleShare} size="small" variant="secondary" icon="share-alt" className="ml-auto">
+                                    {isCopied ? 'Copiado!' : 'Copiar'}
+                                </Button>
+                            )}
+                        </div>
                     </div>
-                    {!image && (
-                         <div className="mt-4 space-y-2">
-                            <Button onClick={onGenerate} isLoading={isGenerating} size="small" className="w-full" icon="image">
+
+                    {/* Image Section */}
+                    <div className="lg:w-[400px] flex-shrink-0 p-6 lg:border-l border-t lg:border-t-0 border-white/5 bg-[#0d0d0d] space-y-4">
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Visual do Anúncio</h4>
+                        <div className="aspect-[1.91/1] bg-[#080808] rounded-xl flex items-center justify-center relative overflow-hidden border border-white/5">
+                            {isGenerating ? (
+                                <Loader />
+                            ) : image ? (
+                                <>
+                                    <img src={image.src} alt={`Visual for ${ad.headline}`} className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/70 opacity-0 hover:opacity-100 transition-all flex items-center justify-center">
+                                        <Button size="small" onClick={handleEditClick}>Editar</Button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center p-4">
+                                    <p className="text-[10px] text-white/30 italic line-clamp-4">"{ad.image_prompt}"</p>
+                                </div>
+                            )}
+                        </div>
+                        {!image && (
+                            <Button onClick={onGenerate} isLoading={isGenerating} size="small" className="w-full" icon="image" variant="secondary">
                                 Gerar Visual
                             </Button>
-                        </div>
-                    )}
-                    {image && (
-                         <div className="mt-4">
-                            <Button onClick={handleShare} size="small" variant="secondary" className="w-full" icon="share-alt">
-                                {isCopied ? 'Texto Copiado!' : 'Copiar Texto para Compartilhar'}
-                            </Button>
-                        </div>
-                    )}
-                    {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+                        )}
+                        {error && <p className="text-red-400 text-[10px] mt-2">{error}</p>}
+                    </div>
                 </div>
-            </Card>
+            </div>
             {editingImage && (
                 <ImagePreviewModal
                     image={editingImage}
@@ -227,24 +238,25 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
 
   return (
     <div className="space-y-6">
-       <Card className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <Button onClick={handleGenerateAll} isLoading={isGeneratingAll} disabled={isGeneratingAll || generationState.isGenerating.some(Boolean)} icon="zap">
-          Gerar Todos os Visuais
+       {/* Controls Bar */}
+       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-5 bg-[#0a0a0a] rounded-2xl border border-white/5">
+        <Button onClick={handleGenerateAll} isLoading={isGeneratingAll} disabled={isGeneratingAll || generationState.isGenerating.some(Boolean)} icon="zap" size="small">
+          Gerar Todos Visuais
         </Button>
-         <div className="flex items-center gap-2">
-            <label htmlFor="model-select-ads" className="text-sm font-medium text-subtle flex-shrink-0">Modelo de IA:</label>
-            <select 
+        <div className="flex items-center gap-3">
+            <span className="text-[10px] font-black uppercase tracking-[0.15em] text-white/30">Modelo:</span>
+            <select
                 id="model-select-ads"
-                value={selectedImageModel} 
-                onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)} 
-                className="bg-surface/80 border-muted/50 border rounded-lg p-2 text-sm text-text-main focus:ring-2 focus:ring-primary w-full sm:w-auto"
+                value={selectedImageModel}
+                onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
+                className="bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-primary/30 focus:border-primary/50 outline-none transition-all"
             >
-                <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image (Alta Qualidade)</option>
-                <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+                <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
+                <option value="gemini-2.5-flash-image">Gemini 2.5 Flash</option>
                 <option value="imagen-4.0-generate-001">Imagen 4.0</option>
             </select>
         </div>
-      </Card>
+      </div>
       {adCreatives.map((ad, index) => (
         <AdCard 
             key={index} 

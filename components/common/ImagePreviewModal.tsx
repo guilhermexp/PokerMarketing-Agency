@@ -98,21 +98,11 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
   const [error, setError] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<ImageFile | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [hasPayedKey, setHasPayedKey] = useState(false);
+  const [hasPayedKey] = useState(true); // Chaves já configuradas no .env
 
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const checkKey = async () => {
-        if (window.aistudio?.hasSelectedApiKey) {
-            const has = await window.aistudio.hasSelectedApiKey();
-            setHasPayedKey(has);
-        }
-    };
-    checkKey();
-  }, []);
 
   const drawCanvases = useCallback(() => {
     const img = new Image();
@@ -294,40 +284,38 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
   const isActionRunning = isEditing || isRemovingBackground;
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-0 sm:p-4"
+    <div
+      className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] p-4"
       onClick={onClose}
     >
-      <div 
-        className="bg-background sm:rounded-2xl shadow-2xl w-full max-w-[95vw] h-full sm:h-[90vh] flex flex-col overflow-hidden border border-muted/20"
+      <div
+        className="bg-[#0a0a0a] rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden border border-white/10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header/Toolbar */}
-        <div className="h-16 flex-shrink-0 bg-surface/50 border-b border-muted/20 px-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-                <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
-                    <Icon name="image" className="w-5 h-5" />
+        <div className="h-14 flex-shrink-0 bg-[#111111] border-b border-white/5 px-5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
+                    <Icon name="edit" className="w-4 h-4" />
                 </div>
                 <div>
-                    <h2 className="text-sm font-bold text-text-main leading-none">Studio de Edição</h2>
-                    <p className="text-[10px] text-text-muted uppercase tracking-widest mt-1">IA Powered Workspace</p>
+                    <h2 className="text-xs font-black text-white uppercase tracking-wide">Editor</h2>
                 </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
                 <Button onClick={handleUseInChat} variant="secondary" size="small" icon="paperclip" className="hidden md:flex">
-                    Usar no Assistente
+                    Assistente
                 </Button>
                 <Button onClick={handleDownload} variant="secondary" size="small" icon="download">
                     Download
                 </Button>
-                <div className="w-px h-6 bg-muted/30 mx-2"></div>
-                <button 
-                    onClick={onClose} 
-                    className="p-2 hover:bg-muted/20 rounded-full transition-colors text-text-muted hover:text-text-main"
+                <button
+                    onClick={onClose}
+                    className="ml-2 p-2 hover:bg-white/10 rounded-lg transition-colors text-white/40 hover:text-white"
                     aria-label="Fechar"
                 >
-                    <Icon name="x" className="w-5 h-5" />
+                    <Icon name="x" className="w-4 h-4" />
                 </button>
             </div>
         </div>
@@ -367,7 +355,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
             </div>
             
             {/* Control Sidebar */}
-            <div className="w-full md:w-[400px] flex-shrink-0 bg-surface/30 backdrop-blur-xl p-6 flex flex-col border-t md:border-t-0 md:border-l border-muted/20 overflow-y-auto">
+            <div className="w-full md:w-[320px] flex-shrink-0 bg-[#111111] p-5 flex flex-col border-t md:border-t-0 md:border-l border-white/5 overflow-y-auto">
                 <div className="flex-grow">
                     <section className="mb-6">
                         <div className="flex items-center justify-between mb-3">

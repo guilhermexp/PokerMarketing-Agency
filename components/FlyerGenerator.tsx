@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import type { BrandProfile, TournamentEvent, GalleryImage, ImageModel, ImageSize, ImageFile, Post } from '../types';
+import type { BrandProfile, TournamentEvent, GalleryImage, ImageModel, ImageSize, ImageFile, Post, WeekScheduleInfo, StyleReference } from '../types';
 import { Card } from './common/Card';
 import { Button } from './common/Button';
 import { Loader } from './common/Loader';
@@ -14,6 +14,7 @@ export type Currency = 'USD' | 'BRL';
 interface FlyerGeneratorProps {
   brandProfile: BrandProfile;
   events: TournamentEvent[];
+  weekScheduleInfo: WeekScheduleInfo | null;
   onFileUpload: (file: File) => Promise<void>;
   onAddEvent: (event: TournamentEvent) => void;
   onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
@@ -24,6 +25,8 @@ interface FlyerGeneratorProps {
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
   onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
+  selectedStyleReference?: StyleReference | null;
+  onClearSelectedStyleReference?: () => void;
 }
 
 const formatCurrencyValue = (val: string, currency: Currency): string => {
@@ -63,12 +66,21 @@ const QuickPostModal: React.FC<{
     context: string;
 }> = ({ isOpen, onClose, flyer, brandProfile, context }) => {
     const [post, setPost] = useState<Post | null>(null);
+    const [editedContent, setEditedContent] = useState('');
+    const [editedHashtags, setEditedHashtags] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
 
     useEffect(() => {
         if (isOpen && !post) handleGenerate();
     }, [isOpen]);
+
+    useEffect(() => {
+        if (post) {
+            setEditedContent(post.content);
+            setEditedHashtags(post.hashtags.map(h => `#${h}`).join(' '));
+        }
+    }, [post]);
 
     const handleGenerate = async () => {
         setIsGenerating(true);
@@ -82,9 +94,35 @@ const QuickPostModal: React.FC<{
         }
     };
 
-    const handleCopyAndOpen = () => {
+    const handleShare = async () => {
         if (!post) return;
-        const text = `${post.content}\n\n${post.hashtags.map(h => `#${h}`).join(' ')}`;
+        const text = `${editedContent}\n\n${editedHashtags}`;
+
+        // Tenta usar Web Share API (funciona bem em mobile)
+        if (navigator.share && navigator.canShare) {
+            try {
+                // Converte a imagem base64 para File
+                const response = await fetch(flyer.src);
+                const blob = await response.blob();
+                const file = new File([blob], 'flyer.png', { type: 'image/png' });
+
+                const shareData = {
+                    files: [file],
+                    title: brandProfile.name,
+                    text: text,
+                };
+
+                if (navigator.canShare(shareData)) {
+                    await navigator.share(shareData);
+                    return;
+                }
+            } catch (err) {
+                // Se usuário cancelou ou erro, continua para fallback
+                if ((err as Error).name === 'AbortError') return;
+            }
+        }
+
+        // Fallback: copia texto e abre Instagram
         navigator.clipboard.writeText(text).then(() => {
             setIsCopied(true);
             setTimeout(() => {
@@ -98,40 +136,52 @@ const QuickPostModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
-            <Card className="w-full max-w-lg border-white/10 bg-[#080808] overflow-hidden flex flex-col h-[80vh]">
-                <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
-                    <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-                            <Icon name="image" className="w-4 h-4 text-primary" />
+            <Card className="w-full max-w-lg border-white/10 bg-[#080808] overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center bg-[#0d0d0d]">
+                    <div className="flex items-center space-x-2">
+                        <div className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center">
+                            <Icon name="image" className="w-3 h-3 text-primary" />
                         </div>
-                        <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">QuickPost Forge</h3>
+                        <h3 className="text-[10px] font-black text-white uppercase tracking-wide">QuickPost Forge</h3>
                     </div>
-                    <button onClick={onClose} className="text-white/20 hover:text-white transition-colors"><Icon name="x" className="w-5 h-5" /></button>
+                    <button onClick={onClose} className="text-white/20 hover:text-white transition-colors"><Icon name="x" className="w-4 h-4" /></button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                    <div className="aspect-square w-48 mx-auto rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-                        <img src={flyer.src} className="w-full h-full object-contain" />
+                <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                    <div className="w-full max-w-xs mx-auto rounded-xl overflow-hidden border border-white/10 shadow-xl">
+                        <img src={flyer.src} className="w-full h-auto object-contain" />
                     </div>
                     {isGenerating ? (
-                        <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                            <Loader className="w-10 h-10" />
-                            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.4em] animate-pulse">Forjando Copy...</p>
+                        <div className="flex flex-col items-center justify-center py-8 space-y-3">
+                            <Loader className="w-8 h-8" />
+                            <p className="text-[9px] font-black text-white/30 uppercase tracking-widest animate-pulse">Forjando Copy...</p>
                         </div>
                     ) : post ? (
-                        <div className="space-y-6 animate-fade-in-up">
-                            <div className="bg-black/40 border border-white/5 rounded-2xl p-6 font-medium text-xs leading-relaxed text-white/80 whitespace-pre-wrap selection:bg-primary selection:text-black">
-                                {post.content}
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    {post.hashtags.map(h => <span key={h} className="text-primary font-bold">#{h}</span>)}
-                                </div>
+                        <div className="space-y-3 animate-fade-in-up">
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black text-white/30 uppercase tracking-wide">Legenda</label>
+                                <textarea
+                                    value={editedContent}
+                                    onChange={(e) => setEditedContent(e.target.value)}
+                                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs leading-relaxed text-white/90 resize-none outline-none focus:border-primary/50 transition-colors min-h-[120px]"
+                                    placeholder="Escreva sua legenda..."
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black text-white/30 uppercase tracking-wide">Hashtags</label>
+                                <textarea
+                                    value={editedHashtags}
+                                    onChange={(e) => setEditedHashtags(e.target.value)}
+                                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs leading-relaxed text-primary resize-none outline-none focus:border-primary/50 transition-colors min-h-[50px]"
+                                    placeholder="#hashtag1 #hashtag2..."
+                                />
                             </div>
                         </div>
                     ) : null}
                 </div>
-                <div className="p-8 border-t border-white/5 bg-white/[0.02] flex gap-4">
-                    <Button onClick={handleGenerate} variant="secondary" className="flex-1" icon="zap" disabled={isGenerating}>Refazer</Button>
-                    <Button onClick={handleCopyAndOpen} variant="primary" className="flex-1 shadow-2xl" icon="share-alt" disabled={isGenerating || !post}>
-                        {isCopied ? 'Copiado!' : 'Copiar & Instagram'}
+                <div className="p-5 border-t border-white/5 bg-[#0d0d0d] flex gap-3">
+                    <Button onClick={handleGenerate} variant="secondary" size="small" className="flex-1" icon="zap" disabled={isGenerating}>Refazer</Button>
+                    <Button onClick={handleShare} variant="primary" size="small" className="flex-1" icon="share-alt" disabled={isGenerating || !post}>
+                        {isCopied ? 'Copiado!' : 'Compartilhar'}
                     </Button>
                 </div>
             </Card>
@@ -165,7 +215,7 @@ const ImageCarousel: React.FC<{
         setActiveIndex(prev => (prev - 1 + images.length) % images.length);
     };
 
-    if (images.length === 0) return <div className="text-center opacity-10 flex flex-col items-center"><Icon name="image" className="w-14 h-14 mb-4 text-white" /><p className="text-[10px] font-black uppercase tracking-[0.6em]">Awaiting Data</p></div>;
+    if (images.length === 0) return <div className="text-center opacity-10 flex flex-col items-center"><Icon name="image" className="w-10 h-10 mb-2 text-white" /><p className="text-[9px] font-black uppercase tracking-widest">Awaiting Data</p></div>;
 
     const currentItem = images[activeIndex];
 
@@ -173,13 +223,13 @@ const ImageCarousel: React.FC<{
         <div className="relative w-full h-full group/carousel">
             {currentItem === 'loading' ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md z-10">
-                    <Loader className="w-10 h-10 mb-4 text-primary" />
-                    <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.4em] animate-pulse">Neural Forge...</p>
+                    <Loader className="w-8 h-8 mb-3 text-primary" />
+                    <p className="text-[8px] font-black text-white/40 uppercase tracking-widest animate-pulse">Neural Forge...</p>
                 </div>
             ) : (
                 <>
                     <img src={currentItem.src} className="w-full h-full object-contain transition-transform duration-700 hover:scale-105 cursor-pointer" onClick={() => onEdit(currentItem)} />
-                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover/carousel:opacity-100 transition-all duration-300 flex flex-col items-center justify-center gap-2 backdrop-blur-sm z-20">
+                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover/carousel:opacity-100 transition-all duration-300 flex flex-col items-center justify-center gap-1.5 backdrop-blur-sm z-20">
                         <Button size="small" variant="primary" onClick={() => onQuickPost(currentItem)} icon="zap">QuickPost</Button>
                         <Button size="small" onClick={() => onEdit(currentItem)} icon="edit">Editar</Button>
                         <Button size="small" onClick={() => onPublish(currentItem)} icon="users">Campanha</Button>
@@ -190,18 +240,18 @@ const ImageCarousel: React.FC<{
             )}
 
             {images.length > 1 && (
-                <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none z-30 opacity-0 group-hover/carousel:opacity-100 transition-opacity">
-                    <button onClick={prev} className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center text-white pointer-events-auto hover:bg-primary hover:text-black transition-all">
-                        <Icon name="chevron-up" className="w-5 h-5 -rotate-90" />
+                <div className="absolute inset-x-3 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none z-30 opacity-0 group-hover/carousel:opacity-100 transition-opacity">
+                    <button onClick={prev} className="w-8 h-8 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center text-white pointer-events-auto hover:bg-primary hover:text-black transition-all">
+                        <Icon name="chevron-up" className="w-4 h-4 -rotate-90" />
                     </button>
-                    <button onClick={next} className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center text-white pointer-events-auto hover:bg-primary hover:text-black transition-all">
-                        <Icon name="chevron-up" className="w-5 h-5 rotate-90" />
+                    <button onClick={next} className="w-8 h-8 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center text-white pointer-events-auto hover:bg-primary hover:text-black transition-all">
+                        <Icon name="chevron-up" className="w-4 h-4 rotate-90" />
                     </button>
                 </div>
             )}
-            
+
             {images.length > 1 && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-[8px] font-black text-white/60 uppercase tracking-widest z-30">
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/10 text-[7px] font-black text-white/60 uppercase tracking-widest z-30">
                     {activeIndex + 1} / {images.length}
                 </div>
             )}
@@ -238,14 +288,25 @@ const TournamentEventCard: React.FC<{
         const gtdVal = formatCurrencyValue(event.gtd, currency);
         
         const prompt = `
-        FLYER DE TORNEIO INDIVIDUAL.
-        NOME DO EVENTO: ${event.name}.
-        DADOS OBRIGATÓRIOS (EXIBIR EM DESTAQUE): 
-        - GARANTIDO (GTD): ${gtdVal} (ESTE VALOR DEVE SER O ELEMENTO VISUAL CENTRAL)
-        - BUY-IN: ${biVal}
-        - HORÁRIO: ${event.times?.['-3']} GMT-3
-        
-        ESTILO: ${brandProfile.toneOfVoice}, Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}.
+        TIPO: Flyer de Torneio Individual (single event highlight)
+
+        DADOS DO EVENTO:
+        • Torneio: ${event.name}
+        • Garantido (GTD): ${gtdVal} ← DESTAQUE MÁXIMO
+        • Buy-in: ${biVal}
+        • Horário: ${event.times?.['-3']} (GMT-3)
+
+        ESTRUTURA DO LAYOUT:
+        1. TOPO: Logo da marca centralizado ou canto superior
+        2. CENTRO: Nome do torneio + Valor GTD em GRANDE DESTAQUE
+        3. INFERIOR: Horário e buy-in com boa legibilidade
+
+        REGRAS VISUAIS:
+        - O GTD (${gtdVal}) deve ocupar pelo menos 30% da área visual
+        - Use a cor ${brandProfile.secondaryColor} no valor GTD
+        - Fundo escuro/elegante baseado em ${brandProfile.primaryColor}
+        - Atmosfera: mesa de poker premium, cassino de luxo
+        - Tipografia impactante e moderna para o valor monetário
         `;
 
         try {
@@ -253,7 +314,7 @@ const TournamentEventCard: React.FC<{
             let collabLogoToUse = collabLogo ? { base64: collabLogo.split(',')[1], mimeType: 'image/png' } : null;
             const assetsToUse = compositionAssets.map(a => ({ base64: a.base64, mimeType: a.mimeType }));
             const imageUrl = await generateFlyer(prompt, brandProfile, logoToUse, null, aspectRatio, model, collabLogoToUse, imageSize, assetsToUse);
-            const newImage = onAddImageToGallery({ src: imageUrl, prompt, source: 'Flyer', model });
+            const newImage = onAddImageToGallery({ src: imageUrl, prompt, source: 'Flyer', model, aspectRatio, imageSize });
             setGeneratedFlyers(prev => prev.map(f => f === 'loading' ? newImage : f));
         } catch (err) {
             setGeneratedFlyers(prev => prev.filter(f => f !== 'loading'));
@@ -263,24 +324,24 @@ const TournamentEventCard: React.FC<{
     };
 
     return (
-        <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl overflow-hidden transition-all hover:border-white/10 shadow-lg mb-4">
-            <div className="p-6 flex items-center justify-between cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-6 items-center text-left">
+        <div className="bg-[#111111] border border-white/5 rounded-2xl overflow-hidden transition-all hover:border-white/10 mb-3">
+            <div className="px-4 py-3 flex items-center justify-between cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-center text-left">
                     <div className="md:col-span-2">
-                        <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em]">{event.name}</h3>
-                        <p className="text-[9px] font-bold text-white/30 uppercase mt-1">{event.game} • {event.structure}</p>
+                        <h3 className="text-[10px] font-black text-white uppercase tracking-wide">{event.name}</h3>
+                        <p className="text-[8px] font-bold text-white/30 uppercase">{event.game} • {event.structure}</p>
                     </div>
-                    <div><span className="text-[8px] font-black text-white/20 uppercase block">Time</span><span className="text-[12px] font-black text-white">{event.times?.['-3']}</span></div>
-                    <div><span className="text-[8px] font-black text-primary/40 uppercase block">Value</span><span className="text-[12px] font-black text-primary">GTD: {formatCurrencyValue(event.gtd, currency)}</span></div>
+                    <div><span className="text-[8px] font-black text-white/20 uppercase block">Time</span><span className="text-[10px] font-black text-white">{event.times?.['-3']}</span></div>
+                    <div><span className="text-[8px] font-black text-primary/40 uppercase block">Value</span><span className="text-[10px] font-black text-primary">GTD: {formatCurrencyValue(event.gtd, currency)}</span></div>
                 </div>
-                <div className="flex items-center space-x-6">
+                <div className="flex items-center space-x-4">
                     <Button size="small" variant="primary" onClick={(e) => { e.stopPropagation(); handleGenerate(); }} isLoading={isGenerating}>Gerar</Button>
-                    <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} className="w-5 h-5 text-white/10" />
+                    <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} className="w-4 h-4 text-white/10" />
                 </div>
             </div>
             {isExpanded && (
-                <div className="px-6 pb-8 pt-4 border-t border-white/5 animate-fade-in-up flex justify-center">
-                    <div className="w-full max-w-lg aspect-[9/16] bg-black/80 rounded-2xl overflow-hidden border border-white/5 shadow-2xl relative">
+                <div className="px-4 pb-4 pt-3 border-t border-white/5 animate-fade-in-up flex justify-center">
+                    <div className="w-full max-w-[200px] aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border border-white/5 relative">
                         <ImageCarousel 
                             images={generatedFlyers} 
                             onEdit={setEditingFlyer} 
@@ -336,14 +397,37 @@ const PeriodCard: React.FC<{
         const eventsList = events.map(e => `- ${e.times?.['-3']} | ${e.name} (GTD: ${formatCurrencyValue(e.gtd, currency)})`).join('\n');
         
         const prompt = `
-        RESUMO DE SESSÃO: ${label}.
-        DADOS OBRIGATÓRIOS (EXIBIR TODOS OS TORNEIOS ABAIXO):
+        TIPO: Grade de Programação / Schedule Board
+        TÍTULO: ${label.toUpperCase()}
+        QUANTIDADE: ${events.length} torneios
+
+        LISTA DE TORNEIOS (exibir TODOS):
         ${eventsList}
-        
-        MISSÃO DE DESIGN: 
-        1. Crie uma grade ou tabela limpa.
-        2. OS VALORES DE GARANTIDO (GTD) DEVEM ESTAR MUITO VISÍVEIS EM CADA LINHA.
-        3. Identidade: ${brandProfile.toneOfVoice}, Cores: ${brandProfile.primaryColor}.
+
+        ESTRUTURA OBRIGATÓRIA DO LAYOUT:
+        1. CABEÇALHO:
+           - Logo no topo
+           - Título "${label}" em destaque abaixo do logo
+
+        2. CORPO - TABELA/GRADE:
+           - Cada torneio em uma linha clara e legível
+           - Colunas: HORÁRIO | NOME | GTD
+           - Os valores GTD devem estar na cor ${brandProfile.secondaryColor}
+           - Linhas alternadas ou separadores sutis para facilitar leitura
+           - Alinhamento consistente em todas as linhas
+
+        3. HIERARQUIA DE INFORMAÇÃO:
+           - Horário: fonte média, fácil identificação
+           - Nome do torneio: fonte regular, descrição clara
+           - GTD: DESTAQUE MÁXIMO, cor ${brandProfile.secondaryColor}, fonte bold
+
+        REGRAS DE DESIGN:
+        - Layout tipo tabela/grade profissional estilo sportsbook
+        - Fundo baseado em ${brandProfile.primaryColor}
+        - Máxima legibilidade - jogador precisa ler rápido
+        - Visual limpo, organizado, sem poluição
+        - Espaçamento uniforme entre linhas
+        - NÃO use título genérico - use exatamente "${label}"
         `;
 
         try {
@@ -352,7 +436,7 @@ const PeriodCard: React.FC<{
             let refData = styleReference ? { base64: styleReference.src.split(',')[1], mimeType: 'image/png' } : null;
             const assetsToUse = compositionAssets.map(a => ({ base64: a.base64, mimeType: a.mimeType }));
             const imageUrl = await generateFlyer(prompt, brandProfile, logoToUse, refData, aspectRatio, model, collabLogoToUse, imageSize, assetsToUse);
-            const newImage = onAddImageToGallery({ src: imageUrl, prompt, source: 'Flyer Diário', model });
+            const newImage = onAddImageToGallery({ src: imageUrl, prompt, source: 'Flyer Diário', model, aspectRatio, imageSize });
             setGeneratedFlyers(prev => prev.map(f => f === 'loading' ? newImage : f));
         } catch (err) {
             setGeneratedFlyers(prev => prev.filter(f => f !== 'loading'));
@@ -364,15 +448,22 @@ const PeriodCard: React.FC<{
     useEffect(() => { if (triggerBatch && events.length > 0) handleGenerate(); }, [triggerBatch, events.length, handleGenerate]);
 
     return (
-        <div className="bg-[#0A0A0A] border border-white/5 rounded-[2.5rem] overflow-hidden flex flex-col h-full transition-all hover:border-white/10 shadow-lg">
-            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
-                <div className="text-left">
-                    <h4 className="text-xs font-black text-white uppercase tracking-[0.2em]">{label}</h4>
-                    <p className={`text-[9px] uppercase mt-1 font-bold ${events.length > 0 ? 'text-primary' : 'text-white/20'}`}>{events.length} Torneios</p>
+        <div className={`bg-[#111111] border rounded-2xl overflow-hidden flex flex-col h-full transition-all hover:border-white/10 ${styleReference ? 'border-primary/30' : 'border-white/5'}`}>
+            <div className="px-4 py-3 border-b border-white/5 flex justify-between items-center bg-[#0d0d0d]">
+                <div className="text-left flex items-center gap-2">
+                    {styleReference && (
+                        <div className="w-8 h-8 rounded-md overflow-hidden border border-primary/30 flex-shrink-0">
+                            <img src={styleReference.src} className="w-full h-full object-cover" />
+                        </div>
+                    )}
+                    <div>
+                        <h4 className="text-[10px] font-black text-white uppercase tracking-wide">{label}</h4>
+                        <p className={`text-[8px] uppercase font-bold ${events.length > 0 ? 'text-primary' : 'text-white/20'}`}>{events.length} Torneios</p>
+                    </div>
                 </div>
                 <Button size="small" variant={events.length > 0 ? "primary" : "secondary"} onClick={() => handleGenerate(true)} isLoading={isGenerating} disabled={events.length === 0} icon="zap">Gerar</Button>
             </div>
-            <div className="flex-1 p-6 relative min-h-[400px] bg-black/40">
+            <div className="flex-1 p-4 relative min-h-[300px] bg-black/40">
                 <ImageCarousel 
                     images={generatedFlyers} 
                     onEdit={setEditingFlyer} 
@@ -404,37 +495,38 @@ const ManualEventModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
-            <Card className="w-full max-w-2xl border-white/10 bg-[#080808] overflow-hidden">
-                <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
-                    <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Manual Entry</h3>
-                    <button onClick={onClose} className="text-white/20 hover:text-white transition-colors"><Icon name="x" className="w-5 h-5" /></button>
+            <Card className="w-full max-w-lg border-white/10 bg-[#080808] overflow-hidden">
+                <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center bg-[#0d0d0d]">
+                    <h3 className="text-[10px] font-black text-white uppercase tracking-wide">Manual Entry</h3>
+                    <button onClick={onClose} className="text-white/20 hover:text-white transition-colors"><Icon name="x" className="w-4 h-4" /></button>
                 </div>
-                <div className="p-8 grid grid-cols-2 gap-6">
-                    <div className="col-span-2 space-y-2">
-                        <label className="text-[8px] font-black text-white/30 uppercase tracking-[0.4em]">Nome do Torneio</label>
-                        <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-black border border-white/5 rounded-2xl p-4 text-white font-bold outline-none" placeholder="Ex: BIG BANG PKO" />
+                <div className="p-5 grid grid-cols-2 gap-4">
+                    <div className="col-span-2 space-y-1.5">
+                        <label className="text-[9px] font-black text-white/30 uppercase tracking-wide">Nome do Torneio</label>
+                        <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-primary/50" placeholder="Ex: BIG BANG PKO" />
                     </div>
-                    <div className="space-y-2">
-                        <label className="text-[8px] font-black text-white/30 uppercase tracking-[0.4em]">Horário</label>
-                        <input type="time" value={formData.times?.['-3']} onChange={e => setFormData({...formData, times: { '-3': e.target.value }})} className="w-full bg-black border border-white/5 rounded-2xl p-4 text-white font-bold outline-none" />
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-white/30 uppercase tracking-wide">Horário</label>
+                        <input type="time" value={formData.times?.['-3']} onChange={e => setFormData({...formData, times: { '-3': e.target.value }})} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-primary/50" />
                     </div>
-                    <div className="space-y-2">
-                        <label className="text-[8px] font-black text-white/30 uppercase tracking-[0.4em]">Garantido (GTD)</label>
-                        <input value={formData.gtd} onChange={e => setFormData({...formData, gtd: e.target.value})} className="w-full bg-black border border-white/5 rounded-2xl p-4 text-white font-bold outline-none" placeholder="Ex: 50000" />
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-white/30 uppercase tracking-wide">Garantido (GTD)</label>
+                        <input value={formData.gtd} onChange={e => setFormData({...formData, gtd: e.target.value})} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-primary/50" placeholder="Ex: 50000" />
                     </div>
                 </div>
-                <div className="p-8 border-t border-white/5 flex gap-4">
-                    <Button onClick={onClose} variant="secondary" className="flex-1">Cancelar</Button>
-                    <Button onClick={() => { onSave({...formData, id: `manual-${Date.now()}`} as any); onClose(); }} variant="primary" className="flex-1">Salvar</Button>
+                <div className="p-5 border-t border-white/5 flex gap-3">
+                    <Button onClick={onClose} variant="secondary" size="small" className="flex-1">Cancelar</Button>
+                    <Button onClick={() => { onSave({...formData, id: `manual-${Date.now()}`} as any); onClose(); }} variant="primary" size="small" className="flex-1">Salvar</Button>
                 </div>
             </Card>
         </div>
     );
 };
 
-export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({ 
-    brandProfile, events, onFileUpload, onAddEvent, onAddImageToGallery, 
-    flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState, onUpdateGalleryImage, onSetChatReference, onPublishToCampaign
+export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
+    brandProfile, events, weekScheduleInfo, onFileUpload, onAddEvent, onAddImageToGallery,
+    flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState, onUpdateGalleryImage, onSetChatReference, onPublishToCampaign,
+    selectedStyleReference, onClearSelectedStyleReference
 }) => {
   const daysMap = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
   const currentDayName = daysMap[new Date().getDay()];
@@ -450,72 +542,217 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [collabLogo, setCollabLogo] = useState<string | null>(null);
   const [manualStyleRef, setManualStyleRef] = useState<string | null>(null);
+  const [showIndividualTournaments, setShowIndividualTournaments] = useState(false);
+
+  // Aplicar referência selecionada da galeria
+  useEffect(() => {
+    if (selectedStyleReference) {
+      setGlobalStyleReference({
+        id: selectedStyleReference.id,
+        src: selectedStyleReference.src,
+        prompt: selectedStyleReference.name,
+        source: 'Edição',
+        model: selectedImageModel
+      });
+      setManualStyleRef(selectedStyleReference.src);
+    }
+  }, [selectedStyleReference]);
+
+  // Handler para quando uma imagem é selecionada como modelo (sincroniza UI e estado de geração)
+  const handleSetStyleReference = (image: GalleryImage) => {
+    setGlobalStyleReference(image);
+    setManualStyleRef(image.src);
+  };
   const [compositionAssets, setCompositionAssets] = useState<ImageFile[]>([]);
 
   const dayTranslations: any = { 'MONDAY': 'Segunda-feira', 'TUESDAY': 'Terça-feira', 'WEDNESDAY': 'Quarta-feira', 'THURSDAY': 'Quinta-feira', 'FRIDAY': 'Sexta-feira', 'SATURDAY': 'Sábado', 'SUNDAY': 'Domingo' };
+  const dayOrder = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
   const periodLabels: any = { pt: { ALL: 'Resumo do Dia', MORNING: 'Sessão da Manhã', AFTERNOON: 'Tarde de Grind', NIGHT: 'Sessão da Noite', HIGHLIGHTS: 'Destaques do Dia' }, en: { ALL: 'Full Day Summary', MORNING: 'Morning Session', AFTERNOON: 'Afternoon Grind', NIGHT: 'Night Prime Time', HIGHLIGHTS: 'Daily Highlights' } };
-  
+
   const getSortValue = (timeStr: string) => {
     const [h, m] = (timeStr || '00:00').split(':').map(Number);
     const virtualHour = h < 6 ? h + 24 : h;
     return virtualHour * 60 + (m || 0);
   };
 
+  const parseGtd = (gtd: string): number => {
+    if (!gtd || gtd === '---') return 0;
+    return parseFloat(String(gtd).replace(/[^0-9.-]+/g, '')) || 0;
+  };
+
   const currentEvents = events.filter(e => e.day === selectedDay).sort((a, b) => getSortValue(a.times?.['-3']) - getSortValue(b.times?.['-3']));
+
+  // Estatísticas do dia selecionado
+  const dayStats = {
+    count: currentEvents.length,
+    withGtd: currentEvents.filter(e => parseGtd(e.gtd) > 0).length,
+    totalGtd: currentEvents.reduce((sum, e) => sum + parseGtd(e.gtd), 0),
+    top3: [...currentEvents].sort((a, b) => parseGtd(b.gtd) - parseGtd(a.gtd)).slice(0, 3)
+  };
+
+  // Estatísticas da semana
+  const weekStats = {
+    totalTournaments: events.length,
+    totalGtd: events.reduce((sum, e) => sum + parseGtd(e.gtd), 0),
+    byDay: dayOrder.reduce((acc, day) => {
+      const dayEvents = events.filter(e => e.day === day);
+      acc[day] = {
+        count: dayEvents.length,
+        gtd: dayEvents.reduce((sum, e) => sum + parseGtd(e.gtd), 0)
+      };
+      return acc;
+    }, {} as Record<string, { count: number; gtd: number }>)
+  };
+
+  // Calcular data numérica baseado no período da semana
+  const getDayDate = (day: string): string => {
+    if (!weekScheduleInfo) return '';
+    const [startDay, startMonth] = weekScheduleInfo.startDate.split('/').map(Number);
+    const dayIndex = dayOrder.indexOf(day);
+    const startDayIndex = dayOrder.indexOf('MONDAY');
+    const diff = dayIndex - startDayIndex;
+    const date = startDay + diff;
+    return `${String(date).padStart(2, '0')}/${String(startMonth).padStart(2, '0')}`;
+  };
 
   const getEventsByPeriod = (period: TimePeriod): TournamentEvent[] => {
     if (period === 'ALL') return currentEvents;
     const morning = currentEvents.filter(e => { const h = (e.times?.['-3'] || '').split(':'); const hour = parseInt(h[0]); return !isNaN(hour) && hour >= 6 && hour < 12; });
     const afternoon = currentEvents.filter(e => { const h = (e.times?.['-3'] || '').split(':'); const hour = parseInt(h[0]); return !isNaN(hour) && hour >= 12 && hour < 18; });
     const night = currentEvents.filter(e => { const h = (e.times?.['-3'] || '').split(':'); const hour = parseInt(h[0]); return !isNaN(hour) && ((hour >= 18 && hour <= 23) || (hour >= 0 && hour < 6)); });
-    if (period === 'MORNING') return morning; 
-    if (period === 'AFTERNOON') return afternoon; 
+    if (period === 'MORNING') return morning;
+    if (period === 'AFTERNOON') return afternoon;
     if (period === 'NIGHT') return night;
-    if (period === 'HIGHLIGHTS') return currentEvents.slice(0, 3);
+    // HIGHLIGHTS: top 3 torneios com maior GTD (não os primeiros por horário)
+    if (period === 'HIGHLIGHTS') return [...currentEvents].sort((a, b) => parseGtd(b.gtd) - parseGtd(a.gtd)).slice(0, 3);
     return [];
   };
 
   return (
-    <div className="space-y-12 animate-fade-in-up">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 mb-12">
-            <div className="text-left"><h2 className="text-6xl font-black text-white uppercase tracking-tighter leading-none">Daily Protocol</h2><p className="text-[10px] font-black text-white/30 uppercase tracking-[0.6em] mt-4">Agrupamento Inteligente • Ciclo Diário</p></div>
-            <div className="flex flex-wrap gap-4"><Button onClick={() => setIsManualModalOpen(true)} variant="secondary" icon="edit" size="large">Add Manual</Button><label className="cursor-pointer group"><div className="bg-white text-black font-black px-10 py-5 rounded-[1.5rem] flex items-center space-x-3 transition-all active:scale-95 text-[10px] tracking-[0.3em] uppercase shadow-xl hover:bg-white/90"><Icon name="upload" className="w-4 h-4" /><span>Upload Spreadsheet</span></div><input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])} /></label></div>
+    <div className="space-y-6 animate-fade-in-up">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="text-left"><h2 className="text-2xl font-black text-white uppercase tracking-tight">Daily Protocol</h2><p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">Agrupamento Inteligente • Ciclo Diário</p></div>
+            <div className="flex flex-wrap gap-2"><Button onClick={() => setShowIndividualTournaments(!showIndividualTournaments)} variant={showIndividualTournaments ? "primary" : "secondary"} icon={showIndividualTournaments ? "zap" : "calendar"} size="small">{showIndividualTournaments ? 'Grades de Período' : `Torneios Individuais ${currentEvents.length > 0 ? `(${currentEvents.length})` : ''}`}</Button><Button onClick={() => setIsManualModalOpen(true)} variant="secondary" icon="edit" size="small">Add Manual</Button><label className="cursor-pointer group"><div className="bg-white text-black font-black px-4 py-2.5 rounded-xl flex items-center space-x-2 transition-all active:scale-95 text-[10px] tracking-wide uppercase hover:bg-white/90"><Icon name="upload" className="w-3.5 h-3.5" /><span>Upload Spreadsheet</span></div><input type="file" className="hidden" accept=".xlsx,.xls" onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])} /></label></div>
         </div>
-        <Card className="p-8 border-white/10 bg-[#0A0A0A]/60 backdrop-blur-3xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-6 shadow-2xl">
-            <div className="space-y-3"><label className="text-[8px] font-black text-white/20 uppercase block ml-1">Dia Ativo</label><select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="w-full bg-black border border-white/5 rounded-2xl px-5 py-4 text-[10px] font-black text-white uppercase outline-none focus:border-primary/50 appearance-none cursor-pointer">{Object.keys(dayTranslations).map(d => <option key={d} value={d}>{dayTranslations[d]}</option>)}</select></div>
-            <div className="space-y-3"><label className="text-[8px] font-black text-white/20 uppercase block ml-1">Aspect Ratio</label><select value={selectedAspectRatio} onChange={(e) => setSelectedAspectRatio(e.target.value)} className="w-full bg-black border border-white/5 rounded-2xl px-5 py-4 text-[10px] font-black text-white uppercase outline-none appearance-none cursor-pointer"><option value="9:16">Vertical (9:16)</option><option value="1:1">Quadrado (1:1)</option><option value="16:9">Widescreen (16:9)</option></select></div>
-            <div className="space-y-3"><label className="text-[8px] font-black text-white/20 uppercase block ml-1">Moeda</label><select value={selectedCurrency} onChange={(e) => setSelectedCurrency(e.target.value as Currency)} className="w-full bg-black border border-white/5 rounded-2xl px-5 py-4 text-[10px] font-black text-white uppercase outline-none appearance-none cursor-pointer"><option value="BRL">Real (R$)</option><option value="USD">Dólar ($)</option></select></div>
-            <div className="space-y-3"><label className="text-[8px] font-black text-white/20 uppercase block ml-1">Idioma</label><select value={selectedLanguage} onChange={(e) => setSelectedLanguage(e.target.value as 'pt' | 'en')} className="w-full bg-black border border-white/5 rounded-2xl px-5 py-4 text-[10px] font-black text-white uppercase outline-none appearance-none cursor-pointer"><option value="pt">Português (BR)</option><option value="en">English (US)</option></select></div>
-            <div className="space-y-3"><label className="text-[8px] font-black text-white/20 uppercase block ml-1">Engine IA</label><select value={selectedImageModel} onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)} className="w-full bg-black border border-white/5 rounded-2xl px-5 py-4 text-[10px] font-black text-white uppercase outline-none appearance-none cursor-pointer"><option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option><option value="imagen-4.0-generate-001">Imagen 4.0</option></select></div>
-            <div className="space-y-3"><label className="text-[8px] font-black text-white/20 uppercase block ml-1">Resolução</label><select value={selectedImageSize} onChange={(e) => setSelectedImageSize(e.target.value as ImageSize)} disabled={selectedImageModel === 'imagen-4.0-generate-001'} className="w-full bg-black border border-white/5 rounded-2xl px-5 py-4 text-[10px] font-black text-white uppercase outline-none appearance-none cursor-pointer disabled:opacity-20"><option value="1K">HD (1K)</option><option value="2K">QuadHD (2K)</option><option value="4K">UltraHD (4K)</option></select></div>
-            <div className="flex items-end"><Button variant="primary" className="w-full h-[58px] text-[10px] font-black tracking-[0.5em] shadow-lg active:scale-95" onClick={() => { setIsBatchGenerating(true); setDailyFlyerState({ ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: [] }); setBatchTrigger(true); setTimeout(() => { setBatchTrigger(false); setIsBatchGenerating(false); }, 1500); }} isLoading={isBatchGenerating} icon="zap">INIT_BATCH</Button></div>
+
+        {/* Indicador de referência selecionada */}
+        {selectedStyleReference && (
+          <div className="flex items-center justify-between gap-3 px-4 py-3 bg-primary/10 border border-primary/30 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg overflow-hidden border border-primary/30 flex-shrink-0">
+                <img src={selectedStyleReference.src} className="w-full h-full object-cover" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-primary uppercase tracking-wide">Referência Ativa</p>
+                <p className="text-[9px] text-white/50">{selectedStyleReference.name}</p>
+              </div>
+            </div>
+            <Button size="small" variant="secondary" onClick={onClearSelectedStyleReference} icon="x">Remover</Button>
+          </div>
+        )}
+
+        {/* Legenda fixa da semana - só aparece quando tem planilha carregada */}
+        {events.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[#111111] border border-white/5 rounded-xl">
+            <div className="flex items-center gap-4">
+              {weekScheduleInfo && (
+                <div className="flex items-center gap-1.5">
+                  <Icon name="calendar" className="w-3 h-3 text-white/20" />
+                  <span className="text-[8px] font-bold text-white/40 uppercase">Semana {weekScheduleInfo.startDate} a {weekScheduleInfo.endDate}</span>
+                </div>
+              )}
+              <div className="h-3 w-px bg-white/10" />
+              <span className="text-[8px] font-black text-white/30 uppercase">{weekStats.totalTournaments} torneios</span>
+              <div className="h-3 w-px bg-white/10" />
+              <span className="text-[8px] font-black text-primary/60 uppercase">GTD Total: {formatCurrencyValue(String(weekStats.totalGtd), selectedCurrency)}</span>
+            </div>
+          </div>
+        )}
+
+        <Card className="p-5 border-white/5 bg-[#111111] space-y-4">
+            {/* Linha de controles */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+              <div className="space-y-1.5"><label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">Dia Ativo</label><select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-primary/50 appearance-none cursor-pointer">{Object.keys(dayTranslations).map(d => <option key={d} value={d}>{dayTranslations[d]} {weekScheduleInfo ? `(${getDayDate(d)})` : ''}</option>)}</select></div>
+              <div className="space-y-1.5"><label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">Aspect Ratio</label><select value={selectedAspectRatio} onChange={(e) => setSelectedAspectRatio(e.target.value)} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none appearance-none cursor-pointer"><option value="9:16">Vertical (9:16)</option><option value="1:1">Quadrado (1:1)</option><option value="16:9">Widescreen (16:9)</option></select></div>
+              <div className="space-y-1.5"><label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">Moeda</label><select value={selectedCurrency} onChange={(e) => setSelectedCurrency(e.target.value as Currency)} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none appearance-none cursor-pointer"><option value="BRL">Real (R$)</option><option value="USD">Dólar ($)</option></select></div>
+              <div className="space-y-1.5"><label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">Idioma</label><select value={selectedLanguage} onChange={(e) => setSelectedLanguage(e.target.value as 'pt' | 'en')} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none appearance-none cursor-pointer"><option value="pt">Português (BR)</option><option value="en">English (US)</option></select></div>
+              <div className="space-y-1.5"><label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">Engine IA</label><select value={selectedImageModel} onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none appearance-none cursor-pointer"><option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option><option value="imagen-4.0-generate-001">Imagen 4.0</option></select></div>
+              <div className="space-y-1.5"><label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">Resolução</label><select value={selectedImageSize} onChange={(e) => setSelectedImageSize(e.target.value as ImageSize)} disabled={selectedImageModel === 'imagen-4.0-generate-001'} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none appearance-none cursor-pointer disabled:opacity-20"><option value="1K">HD (1K)</option><option value="2K">QuadHD (2K)</option><option value="4K">UltraHD (4K)</option></select></div>
+              <div className="flex items-end"><Button variant="primary" size="small" className="w-full" onClick={() => { setIsBatchGenerating(true); setDailyFlyerState({ ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: [] }); setBatchTrigger(true); setTimeout(() => { setBatchTrigger(false); setIsBatchGenerating(false); }, 1500); }} isLoading={isBatchGenerating} icon="zap">Gerar Grade</Button></div>
+            </div>
+
+            {/* Estatísticas do dia - integrado */}
+            {events.length > 0 && (
+              <div className="pt-4 border-t border-white/5 grid grid-cols-1 lg:grid-cols-5 gap-4">
+                {/* Info do dia */}
+                <div className="lg:col-span-1 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Icon name="calendar" className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-white uppercase tracking-wide">{dayTranslations[selectedDay]}</p>
+                    {weekScheduleInfo && <p className="text-[9px] font-bold text-white/40">{getDayDate(selectedDay)}</p>}
+                  </div>
+                </div>
+
+                {/* Stats inline */}
+                <div className="lg:col-span-1 flex items-center gap-4">
+                  <div className="text-center">
+                    <p className="text-sm font-black text-white">{dayStats.count}</p>
+                    <p className="text-[8px] text-white/30 uppercase">Torneios</p>
+                  </div>
+                  <div className="h-6 w-px bg-white/10" />
+                  <div className="text-center">
+                    <p className="text-sm font-black text-primary">{formatCurrencyValue(String(dayStats.totalGtd), selectedCurrency)}</p>
+                    <p className="text-[8px] text-primary/50 uppercase">GTD Total</p>
+                  </div>
+                </div>
+
+                {/* Top 3 inline */}
+                <div className="lg:col-span-3 flex items-center gap-2">
+                  <p className="text-[8px] font-black text-white/20 uppercase whitespace-nowrap">Top 3:</p>
+                  {dayStats.top3.length > 0 ? dayStats.top3.map((event, idx) => (
+                    <div key={event.id} className="flex items-center gap-1.5 px-2 py-1.5 bg-black/40 rounded-lg border border-white/5 flex-1 min-w-0">
+                      <span className={`text-[9px] font-black ${idx === 0 ? 'text-primary' : 'text-white/30'}`}>{idx + 1}º</span>
+                      <span className="text-[8px] font-bold text-white truncate flex-1">{event.name}</span>
+                      <span className={`text-[8px] font-black whitespace-nowrap ${idx === 0 ? 'text-primary' : 'text-white/50'}`}>{formatCurrencyValue(event.gtd, selectedCurrency)}</span>
+                    </div>
+                  )) : <p className="text-[9px] text-white/20">Sem dados</p>}
+                </div>
+              </div>
+            )}
         </Card>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="p-6 bg-[#0A0A0A]/40 border-white/5 flex items-center space-x-6 text-left"><div className="w-20 h-20 rounded-2xl bg-black border border-dashed border-white/10 flex items-center justify-center relative overflow-hidden group">{collabLogo ? <><img src={collabLogo} className="w-full h-full object-contain p-2" /><button onClick={() => setCollabLogo(null)} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover/opacity-100 flex items-center justify-center text-white text-[10px] font-black uppercase">Remove</button></> : <label className="cursor-pointer w-full h-full flex items-center justify-center"><Icon name="upload" className="w-5 h-5 text-white/10" /><input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { dataUrl } = await fileToBase64(f); setCollabLogo(dataUrl); } }} /></label>}</div><div><h4 className="text-[9px] font-black text-white uppercase tracking-[0.3em]">Logo Colab</h4><p className="text-[8px] text-white/20 uppercase mt-1">Incluso em todos os flyers</p></div></Card>
-            <Card className="p-6 bg-[#0A0A0A]/40 border-white/5 flex items-center space-x-6 text-left"><div className="w-20 h-20 rounded-2xl bg-black border border-dashed border-white/10 flex items-center justify-center relative overflow-hidden group">{manualStyleRef ? <><img src={manualStyleRef} className="w-full h-full object-cover" /><button onClick={() => setManualStyleRef(null)} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover/opacity-100 flex items-center justify-center text-white text-[10px] font-black uppercase">Remove</button></> : <label className="cursor-pointer w-full h-full flex items-center justify-center"><Icon name="image" className="w-5 h-5 text-white/10" /><input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { dataUrl } = await fileToBase64(f); setManualStyleRef(dataUrl); setGlobalStyleReference({ id: 'manual-ref', src: dataUrl, prompt: 'Estilo Manual', source: 'Edição', model: selectedImageModel }); } }} /></label>}</div><div><h4 className="text-[9px] font-black text-white uppercase tracking-[0.3em]">Referência de Estilo</h4><p className="text-[8px] text-white/20 uppercase mt-1">Layout Global</p></div></Card>
-            <Card className="p-6 bg-[#0A0A0A]/40 border-white/5 flex flex-col justify-center text-left"><div className="flex items-center justify-between mb-4"><div><h4 className="text-[9px] font-black text-white uppercase tracking-[0.3em]">Ativos Adicionais</h4><p className="text-[8px] text-white/20 uppercase mt-1">Mockups e Pessoas</p></div><label className="cursor-pointer w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10"><Icon name="upload" className="w-3.5 h-3.5 text-white/40" /><input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { base64, mimeType, dataUrl } = await fileToBase64(f); setCompositionAssets(prev => [...prev, { base64, mimeType, preview: dataUrl } as any]); } }} /></label></div><div className="flex gap-2.5 overflow-x-auto pb-2">{compositionAssets.map((asset, idx) => (<div key={idx} className="w-12 h-12 flex-shrink-0 rounded-lg bg-black border border-white/10 relative group overflow-hidden"><img src={(asset as any).preview} className="w-full h-full object-cover" /><button onClick={() => setCompositionAssets(prev => prev.filter((_, i) => i !== idx))} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover/opacity-100 flex items-center justify-center text-white text-[8px] font-black">X</button></div>))}</div></Card>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {(['ALL', 'MORNING', 'AFTERNOON', 'NIGHT', 'HIGHLIGHTS'] as TimePeriod[]).map(p => (
-                <PeriodCard 
-                    key={p} period={p} label={periodLabels[selectedLanguage][p]} events={getEventsByPeriod(p)} brandProfile={brandProfile} aspectRatio={selectedAspectRatio} currency={selectedCurrency} model={selectedImageModel} imageSize={selectedImageSize} language={selectedLanguage}
-                    onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} generatedFlyers={dailyFlyerState[p]} setGeneratedFlyers={(u) => setDailyFlyerState(prev => ({...prev, [p]: u(prev[p])}))} triggerBatch={batchTrigger} styleReference={globalStyleReference} onCloneStyle={setGlobalStyleReference} collabLogo={collabLogo} compositionAssets={compositionAssets} onPublishToCampaign={onPublishToCampaign}
-                />
-            ))}
-        </div>
-        <div className="mt-24 text-left">
-            <h3 className="text-4xl font-black text-white uppercase tracking-widest leading-none mb-12">Ativos Individuais</h3>
-            <div className="space-y-6">
+
+        {!showIndividualTournaments ? (
+            <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 -mt-2">
+                    <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl flex items-center space-x-4 text-left"><div className="w-12 h-12 rounded-xl bg-black/50 border border-dashed border-white/10 flex items-center justify-center relative overflow-hidden group">{collabLogo ? <><img src={collabLogo} className="w-full h-full object-contain p-1" /><button onClick={() => setCollabLogo(null)} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[8px] font-black uppercase">X</button></> : <label className="cursor-pointer w-full h-full flex items-center justify-center"><Icon name="upload" className="w-4 h-4 text-white/10" /><input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { dataUrl } = await fileToBase64(f); setCollabLogo(dataUrl); } }} /></label>}</div><div><h4 className="text-[9px] font-black text-white uppercase tracking-wide">Logo Colab</h4><p className="text-[8px] text-white/20 mt-0.5">Incluso em todos os flyers</p></div></div>
+                    <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl flex items-center space-x-4 text-left"><div className="w-12 h-12 rounded-xl bg-black/50 border border-dashed border-white/10 flex items-center justify-center relative overflow-hidden group">{manualStyleRef ? <><img src={manualStyleRef} className="w-full h-full object-cover" /><button onClick={() => setManualStyleRef(null)} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[8px] font-black uppercase">X</button></> : <label className="cursor-pointer w-full h-full flex items-center justify-center"><Icon name="image" className="w-4 h-4 text-white/10" /><input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { dataUrl } = await fileToBase64(f); setManualStyleRef(dataUrl); setGlobalStyleReference({ id: 'manual-ref', src: dataUrl, prompt: 'Estilo Manual', source: 'Edição', model: selectedImageModel }); } }} /></label>}</div><div><h4 className="text-[9px] font-black text-white uppercase tracking-wide">Referência de Estilo</h4><p className="text-[8px] text-white/20 mt-0.5">Layout Global</p></div></div>
+                    <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl flex items-center text-left gap-4"><div className="w-12 h-12 rounded-xl bg-black/50 border border-dashed border-white/10 flex items-center justify-center flex-shrink-0"><label className="cursor-pointer w-full h-full flex items-center justify-center"><Icon name="upload" className="w-4 h-4 text-white/10" /><input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { base64, mimeType, dataUrl } = await fileToBase64(f); setCompositionAssets(prev => [...prev, { base64, mimeType, preview: dataUrl } as any]); } }} /></label></div><div className="flex-1 min-w-0"><h4 className="text-[9px] font-black text-white uppercase tracking-wide">Ativos Adicionais</h4><div className="flex gap-1.5 mt-1.5 overflow-x-auto">{compositionAssets.length > 0 ? compositionAssets.map((asset, idx) => (<div key={idx} className="w-8 h-8 flex-shrink-0 rounded-md bg-black border border-white/10 relative group overflow-hidden"><img src={(asset as any).preview} className="w-full h-full object-cover" /><button onClick={() => setCompositionAssets(prev => prev.filter((_, i) => i !== idx))} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[7px] font-black">X</button></div>)) : <p className="text-[8px] text-white/20">Mockups e pessoas</p>}</div></div></div>
+                </div>
+                <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 snap-x snap-mandatory scrollbar-none">
+                    {(['ALL', 'MORNING', 'AFTERNOON', 'NIGHT', 'HIGHLIGHTS'] as TimePeriod[]).map(p => (
+                        <div key={p} className="flex-shrink-0 w-[320px] snap-start">
+                            <PeriodCard
+                                period={p} label={periodLabels[selectedLanguage][p]} events={getEventsByPeriod(p)} brandProfile={brandProfile} aspectRatio={selectedAspectRatio} currency={selectedCurrency} model={selectedImageModel} imageSize={selectedImageSize} language={selectedLanguage}
+                                onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} generatedFlyers={dailyFlyerState[p]} setGeneratedFlyers={(u) => setDailyFlyerState(prev => ({...prev, [p]: u(prev[p])}))} triggerBatch={batchTrigger} styleReference={globalStyleReference} onCloneStyle={handleSetStyleReference} collabLogo={collabLogo} compositionAssets={compositionAssets} onPublishToCampaign={onPublishToCampaign}
+                            />
+                        </div>
+                    ))}
+                </div>
+            </>
+        ) : (
+            <div className="space-y-2">
                 {currentEvents.length > 0 ? currentEvents.map(e => (
-                    <TournamentEventCard 
+                    <TournamentEventCard
                         key={e.id} event={e} brandProfile={brandProfile} aspectRatio={selectedAspectRatio} currency={selectedCurrency} language={selectedLanguage} model={selectedImageModel} imageSize={selectedImageSize}
                         onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference}
                         generatedFlyers={flyerState[e.id] || []} setGeneratedFlyers={(u) => setFlyerState(prev => ({...prev, [e.id]: u(prev[e.id] || [])}))}
                         collabLogo={collabLogo} compositionAssets={compositionAssets} onPublishToCampaign={onPublishToCampaign}
                     />
-                )) : <p className="text-white/20 font-black uppercase tracking-widest text-center py-20">Nenhum torneio detectado para este dia.</p>}
+                )) : <p className="text-white/20 text-xs font-bold uppercase tracking-wide text-center py-12">Nenhum torneio detectado para este dia.</p>}
             </div>
-        </div>
+        )}
         <ManualEventModal isOpen={isManualModalOpen} onClose={() => setIsManualModalOpen(false)} onSave={(ev) => onAddEvent(ev)} day={selectedDay} />
     </div>
   );

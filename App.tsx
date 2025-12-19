@@ -7,7 +7,7 @@ import { Loader } from './components/common/Loader';
 import { generateCampaign, editImage, generateLogo, generateImage } from './services/geminiService';
 import { runAssistantConversationStream } from './services/assistantService';
 import { loadImagesFromDB, saveImagesToDB } from './services/storageService';
-import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, ChatPart, GenerationOptions } from './types';
+import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, ChatPart, GenerationOptions, WeekScheduleInfo, StyleReference } from './types';
 import { Icon } from './components/common/Icon';
 
 export type TimePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'NIGHT' | 'HIGHLIGHTS';
@@ -80,18 +80,23 @@ function App() {
 
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [tournamentEvents, setTournamentEvents] = useState<TournamentEvent[]>([]);
+  const [weekScheduleInfo, setWeekScheduleInfo] = useState<WeekScheduleInfo | null>(null);
   const [flyerState, setFlyerState] = useState<Record<string, (GalleryImage | 'loading')[]>>({});
   const [dailyFlyerState, setDailyFlyerState] = useState<Record<TimePeriod, (GalleryImage | 'loading')[]>>({ 
     ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: [] 
   });
 
   const [theme, setTheme] = useState<Theme>('dark');
-  
+  const [styleReferences, setStyleReferences] = useState<StyleReference[]>([]);
+  const [selectedStyleReference, setSelectedStyleReference] = useState<StyleReference | null>(null);
+
   useEffect(() => {
     const initAppData = async () => {
         try {
           const savedProfile = localStorage.getItem('brandProfile');
           if (savedProfile) setBrandProfile(JSON.parse(savedProfile));
+          const savedRefs = localStorage.getItem('styleReferences');
+          if (savedRefs) setStyleReferences(JSON.parse(savedRefs));
           const dbImages = await loadImagesFromDB();
           setGalleryImages(dbImages.sort((a,b) => Number(b.id) - Number(a.id)));
         } catch (e) { console.error(e); } finally { setIsLoading(false); }
@@ -125,6 +130,37 @@ function App() {
         return updatedGallery;
     });
     if (toolImageReference?.id === imageId) setToolImageReference({ id: imageId, src: newImageSrc });
+  };
+
+  const handleAddStyleReference = (ref: Omit<StyleReference, 'id' | 'createdAt'>) => {
+    const newRef: StyleReference = { ...ref, id: Date.now().toString(), createdAt: Date.now() };
+    setStyleReferences(prev => {
+      const updated = [newRef, ...prev];
+      try {
+        localStorage.setItem('styleReferences', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Não foi possível salvar no localStorage (limite excedido)');
+      }
+      return updated;
+    });
+  };
+
+  const handleRemoveStyleReference = (id: string) => {
+    setStyleReferences(prev => {
+      const updated = prev.filter(r => r.id !== id);
+      try {
+        localStorage.setItem('styleReferences', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Não foi possível salvar no localStorage');
+      }
+      return updated;
+    });
+    if (selectedStyleReference?.id === id) setSelectedStyleReference(null);
+  };
+
+  const handleSelectStyleReference = (ref: StyleReference) => {
+    setSelectedStyleReference(ref);
+    setActiveView('flyer');
   };
 
   const handleGenerateCampaign = async (input: ContentInput, options: GenerationOptions) => {
@@ -180,6 +216,26 @@ function App() {
           return { success: true, image_data: newUrl, message: "Ajuste aplicado." };
         } catch (e: any) { return { error: e.message }; }
       }
+      if (name === 'add_collab_logo_to_image') {
+        if (!toolImageReference) return { error: "Nenhuma imagem de arte em foco para adicionar o logo." };
+        if (!lastUploadedImage) return { error: "Nenhum logo foi enviado no chat. Peça ao usuário para anexar o logo." };
+        try {
+          const [h, b64] = toolImageReference.src.split(',');
+          const m = h.match(/:(.*?);/)?.[1] || 'image/png';
+          const editPrompt = `Adicione um logotipo de parceiro na imagem. ${args.style_instruction || 'Posicione no canto inferior direito de forma harmoniosa.'}`;
+          const newUrl = await editImage(b64, m, editPrompt);
+          handleUpdateGalleryImage(toolImageReference.id, newUrl);
+          return { success: true, image_data: newUrl, message: "Logo de parceria adicionado com sucesso." };
+        } catch (e: any) { return { error: e.message }; }
+      }
+      if (name === 'create_brand_logo') {
+        try {
+          const logoUrl = await generateLogo(args.prompt);
+          const newImg = handleAddImageToGallery({ src: logoUrl, prompt: args.prompt, source: 'Logo', model: 'imagen-3.0-generate-002' });
+          setToolImageReference({ id: newImg.id, src: newImg.src });
+          return { success: true, image_data: logoUrl, message: "Logo criado com sucesso." };
+        } catch (e: any) { return { error: e.message }; }
+      }
       return { error: `Comando não reconhecido: ${name}` };
   };
 
@@ -218,7 +274,7 @@ function App() {
               const modelMsg: ChatMessage = { role: 'model', parts: [{ functionCall }] };
               setChatHistory(prev => { const next = [...prev]; next[next.length - 1] = modelMsg; return next; });
               const result = await executeTool(functionCall);
-              const toolMsg: ChatMessage = { role: 'tool', parts: [{ functionResponse: { name: functionCall.name, response: result } }] };
+              const toolMsg: ChatMessage = { role: 'user', parts: [{ functionResponse: { name: functionCall.name, response: result } }] };
               setChatHistory(prev => [...prev, toolMsg]);
               if (result.image_data) {
                   const [header, base64] = result.image_data.split(',');
@@ -247,6 +303,20 @@ function App() {
       } finally { setIsAssistantLoading(false); }
   };
 
+  const parseWeekFromFilename = (filename: string): WeekScheduleInfo | null => {
+    // Padrão: "PPST 16 18 al 21 18" ou "PPST_16_18_al_21_18"
+    const match = filename.match(/(\d{1,2})[\s_](\d{1,2})[\s_]al[\s_](\d{1,2})[\s_](\d{1,2})/i);
+    if (match) {
+      const [, startDay, startMonth, endDay, endMonth] = match;
+      return {
+        startDate: `${startDay.padStart(2, '0')}/${startMonth.padStart(2, '0')}`,
+        endDate: `${endDay.padStart(2, '0')}/${endMonth.padStart(2, '0')}`,
+        filename
+      };
+    }
+    return null;
+  };
+
   const handleTournamentFileUpload = (file: File) => {
     return new Promise<void>((resolve, reject) => {
       const reader = new FileReader();
@@ -269,6 +339,11 @@ function App() {
             }
           });
           setTournamentEvents(events);
+
+          // Extrair info da semana do nome do arquivo ou da aba
+          const weekInfo = parseWeekFromFilename(file.name) || parseWeekFromFilename(wb.SheetNames[0]);
+          if (weekInfo) setWeekScheduleInfo(weekInfo);
+
           resolve();
         } catch (err) { reject(err); }
       };
@@ -309,6 +384,7 @@ function App() {
           onAddImageToGallery={handleAddImageToGallery}
           onUpdateGalleryImage={handleUpdateGalleryImage}
           tournamentEvents={tournamentEvents}
+          weekScheduleInfo={weekScheduleInfo}
           onTournamentFileUpload={handleTournamentFileUpload}
           onAddTournamentEvent={(ev) => setTournamentEvents(p => [ev, ...p])}
           flyerState={flyerState}
@@ -318,6 +394,12 @@ function App() {
           activeView={activeView}
           onViewChange={setActiveView}
           onPublishToCampaign={handlePublishFlyerToCampaign}
+          styleReferences={styleReferences}
+          onAddStyleReference={handleAddStyleReference}
+          onRemoveStyleReference={handleRemoveStyleReference}
+          onSelectStyleReference={handleSelectStyleReference}
+          selectedStyleReference={selectedStyleReference}
+          onClearSelectedStyleReference={() => setSelectedStyleReference(null)}
         />
       )}
     </>

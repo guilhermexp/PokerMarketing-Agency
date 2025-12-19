@@ -136,55 +136,55 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, onClose,
             </div>
 
             {/* Input Ecosystem */}
-            <div className="flex-shrink-0 p-8 pt-4 border-t border-white/5 bg-white/[0.01]">
+            <div className="flex-shrink-0 p-5 border-t border-white/5 bg-white/[0.01]">
                 {referenceImage && (
-                    <div className="relative mb-5 p-3 bg-primary/10 border border-primary/20 rounded-[1.5rem] flex items-center space-x-4 animate-fade-in-up">
-                        <img src={referenceImage.src} alt="Reference" className="w-14 h-14 object-cover rounded-xl border border-white/10 shadow-lg" />
+                    <div className="relative mb-3 p-2 bg-primary/10 border border-primary/20 rounded-xl flex items-center gap-3 animate-fade-in-up">
+                        <img src={referenceImage.src} alt="Reference" className="w-10 h-10 object-cover rounded-lg border border-white/10" />
                         <div className="flex-1 min-w-0">
-                            <p className="text-[9px] font-black text-primary uppercase tracking-widest">Active Reference</p>
-                            <p className="text-[10px] text-white/40 truncate font-mono mt-0.5">Asset Protocol: {referenceImage.id.substring(0,8)}</p>
+                            <p className="text-[8px] font-bold text-primary uppercase tracking-wide">Referência Ativa</p>
+                            <p className="text-[9px] text-white/40 truncate">{referenceImage.id.substring(0,8)}</p>
                         </div>
-                        <button 
+                        <button
                             onClick={onClearReference}
-                            className="w-10 h-10 rounded-xl bg-black/40 text-white/20 hover:text-red-400 hover:bg-red-400/10 transition-all flex items-center justify-center border border-white/5"
+                            className="w-7 h-7 rounded-lg bg-black/40 text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-all flex items-center justify-center"
                         >
-                            <Icon name="x" className="w-4 h-4" />
+                            <Icon name="x" className="w-3 h-3" />
                         </button>
                     </div>
                 )}
-                
-                <form onSubmit={handleSend} className="relative flex items-center space-x-4">
-                    <button 
+
+                <form onSubmit={handleSend} className="relative flex items-center gap-2">
+                    <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex-shrink-0 w-14 h-14 rounded-2xl bg-white/5 border border-white/10 text-white/20 hover:text-primary hover:border-primary/40 transition-all flex items-center justify-center hover:shadow-[0_0_20px_rgba(245,158,11,0.15)] group"
+                        className="flex-shrink-0 w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-white/30 hover:text-white/60 hover:border-white/20 transition-all flex items-center justify-center"
                     >
-                        <Icon name="paperclip" className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                        <Icon name="paperclip" className="w-4 h-4" />
                     </button>
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleFileUpload} 
-                        className="hidden" 
-                        accept="image/*" 
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        accept="image/*"
                     />
-                    
-                    <div className="relative flex-grow group">
+
+                    <div className="relative flex-grow">
                         <input
                             ref={inputRef}
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             placeholder="Crie ou edite ativos visuais..."
-                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4.5 px-6 text-[13px] text-white placeholder:text-white/10 focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all outline-none"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-4 pr-11 text-xs text-white placeholder:text-white/20 focus:border-white/20 transition-all outline-none"
                             disabled={isLoading}
                         />
-                        <button 
-                            type="submit" 
-                            className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-primary text-black disabled:opacity-10 disabled:grayscale hover:scale-105 active:scale-95 transition-all flex items-center justify-center shadow-[0_10px_30px_rgba(245,158,11,0.2)]" 
+                        <button
+                            type="submit"
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-white/10 text-white/50 hover:bg-primary hover:text-black disabled:opacity-20 transition-all flex items-center justify-center"
                             disabled={isLoading || (!input.trim() && !referenceImage)}
                         >
-                            <Icon name="send" className="w-5 h-5" />
+                            <Icon name="send" className="w-3.5 h-3.5" />
                         </button>
                     </div>
                 </form>

@@ -302,15 +302,95 @@ export const generateFlyer = async (
     const ai = getAi();
     
     const brandingInstruction = `
-    **IDENTIDADE VISUAL (ESTRITO):**
-    - Marca: ${brandProfile.name} | Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}.
-    - Tom de Voz: ${brandProfile.toneOfVoice}.
+    Você é um diretor de arte sênior e diretor de fotografia cinematográfica de uma agência de publicidade de elite especializada em iGaming e Poker.
 
-    **REGRA DE OURO DOS DADOS (CRÍTICO):**
-    1. O valor do **GARANTIDO (GTD)** é a informação mais importante do flyer. Você DEVE escrevê-lo em destaque total, com fontes grandes e cores vibrantes.
-    2. Insira o Horário e o Nome do Torneio de forma legível.
-    3. Use o logotipo fornecido de forma profissional.
-    4. Estilo: Poker de elite, cassino, alta fidelidade.
+    **IDENTIDADE DA MARCA:**
+    - Cliente: ${brandProfile.name}
+    - Cor Primária (fundos, áreas principais): ${brandProfile.primaryColor}
+    - Cor de Destaque (CTAs, valores importantes, destaques): ${brandProfile.secondaryColor}
+    - Tom de Comunicação: ${brandProfile.toneOfVoice}
+
+    **DIRETRIZES DE DESIGN PROFISSIONAL:**
+
+    1. HIERARQUIA VISUAL (CRÍTICO):
+       - O valor GTD (garantido) DEVE ser o elemento de maior destaque visual
+       - Use a cor de destaque (${brandProfile.secondaryColor}) para valores GTD
+       - Tipografia: GTD em fonte bold/black, 3x maior que texto secundário
+       - Horários e buy-ins em tamanho médio, alta legibilidade
+
+    2. SISTEMA DE CORES HARMÔNICO:
+       - Fundo principal: ${brandProfile.primaryColor} ou gradiente sutil derivado
+       - Elementos de destaque: ${brandProfile.secondaryColor}
+       - Texto principal: branco ou off-white (#F5F5F5) para contraste
+       - Texto secundário: branco com 70% opacidade
+       - NUNCA misture cores aleatórias - mantenha a paleta da marca
+
+    3. TIPOGRAFIA PROFISSIONAL:
+       - Use fontes sans-serif modernas e bold para títulos
+       - Valores monetários sempre em destaque com fonte impactante
+       - Mínimo de 2 níveis de hierarquia tipográfica
+       - Espaçamento entre linhas adequado para legibilidade
+
+    4. COMPOSIÇÃO E LAYOUT:
+       - Grid limpo e organizado
+       - Alinhamento consistente (esquerda ou centro)
+       - Margens e padding uniformes
+       - Logo posicionado no topo ou canto superior
+       - Respire: use espaço negativo estrategicamente
+
+    5. ESTÉTICA PREMIUM:
+       - Qualidade de cassino/poker de alto nível
+       - Efeitos sutis: gradientes suaves, sombras leves
+       - Evite: cliparts, elementos amadores, cores neon excessivas
+       - Atmosfera: sofisticada, profissional, confiável
+
+    6. CONSISTÊNCIA OBRIGATÓRIA:
+       - Todos os flyers da mesma sessão devem parecer uma família visual
+       - Mantenha o mesmo estilo de layout entre gerações
+       - Se houver imagem de referência, SIGA o estilo dela fielmente
+
+    **ESTÉTICA CINEMATOGRÁFICA (DIFERENCIAL DE QUALIDADE):**
+
+    7. ILUMINAÇÃO DRAMÁTICA:
+       - Use iluminação low-key com sombras profundas e misteriosas
+       - Aplique rim light (luz de contorno) nos elementos principais
+       - Volumetric lighting: raios de luz atravessando névoa/fumaça
+       - Luz quente dourada (${brandProfile.secondaryColor}) como destaque
+       - Contraste dramático entre luz e sombra (chiaroscuro)
+
+    8. ATMOSFERA E PROFUNDIDADE:
+       - Adicione haze/névoa sutil para criar profundidade atmosférica
+       - Smoke effects: fumaça elegante de charuto/ambiente de cassino
+       - Shallow depth of field: foco no elemento principal, fundo em bokeh
+       - Partículas de poeira dourada flutuando na luz
+       - Reflexos sutis em superfícies (mesa de poker, fichas, cartas)
+
+    9. COLOR GRADING CINEMATOGRÁFICO:
+       - Teal and orange: sombras em tons frios, highlights quentes
+       - Blacks elevados (não 100% preto, mas tons de cinza profundo)
+       - Highlights com bloom sutil e glow
+       - Gradiente de cor atmosférico do fundo para frente
+       - Vignette sutil nas bordas para direcionar o olhar
+
+    10. COMPOSIÇÃO DE CENA:
+        - Rule of thirds para posicionamento dos elementos principais
+        - Leading lines direcionando para o valor GTD
+        - Foreground elements: fichas de poker, cartas em primeiro plano desfocadas
+        - Layering: múltiplas camadas de profundidade (frente, meio, fundo)
+        - Negative space dramático para respiro visual
+
+    11. TEXTURAS E MATERIAIS PREMIUM:
+        - Feltro verde de mesa de poker com textura visível
+        - Fichas de poker com reflexos metálicos realistas
+        - Cartas com acabamento fosco/brilhante
+        - Superfícies de madeira nobre e couro
+        - Metal dourado/bronze nos elementos decorativos
+
+    12. MOTION BLUR E DINAMISMO:
+        - Sugestão de movimento em elementos secundários
+        - Cartas "caindo" com motion blur sutil
+        - Fichas em movimento sugerido
+        - Energia e ação congelada no momento perfeito
     `;
 
     const parts: any[] = [

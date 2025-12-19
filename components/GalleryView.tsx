@@ -1,18 +1,42 @@
 
 import React, { useState } from 'react';
-import type { GalleryImage } from '../types';
+import type { GalleryImage, StyleReference } from '../types';
 import { Icon } from './common/Icon';
-import { Card } from './common/Card';
+import { Button } from './common/Button';
 import { ImagePreviewModal } from './common/ImagePreviewModal';
 
 interface GalleryViewProps {
   images: GalleryImage[];
   onUpdateImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage) => void;
+  styleReferences: StyleReference[];
+  onAddStyleReference: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
+  onRemoveStyleReference: (id: string) => void;
+  onSelectStyleReference: (ref: StyleReference) => void;
 }
 
-export const GalleryView: React.FC<GalleryViewProps> = ({ images, onUpdateImage, onSetChatReference }) => {
+type ViewMode = 'gallery' | 'references';
+
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+
+export const GalleryView: React.FC<GalleryViewProps> = ({
+  images,
+  onUpdateImage,
+  onSetChatReference,
+  styleReferences,
+  onAddStyleReference,
+  onRemoveStyleReference,
+  onSelectStyleReference
+}) => {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('gallery');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleImageUpdate = (newSrc: string) => {
     if (selectedImage) {
@@ -20,69 +44,166 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ images, onUpdateImage,
       setSelectedImage(prev => prev ? { ...prev, src: newSrc } : null);
     }
   };
-  
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      for (const file of Array.from(files)) {
+        const dataUrl = await fileToBase64(file);
+        onAddStyleReference({
+          src: dataUrl,
+          name: `Referência ${new Date().toLocaleDateString('pt-BR')}`
+        });
+      }
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Check if image is already in favorites
+  const isFavorite = (image: GalleryImage) => {
+    return styleReferences.some(ref => ref.src === image.src);
+  };
+
+  // Get the favorite reference for an image
+  const getFavoriteRef = (image: GalleryImage) => {
+    return styleReferences.find(ref => ref.src === image.src);
+  };
+
+  const handleToggleFavorite = (image: GalleryImage) => {
+    const existingRef = getFavoriteRef(image);
+    if (existingRef) {
+      // Remove from favorites
+      onRemoveStyleReference(existingRef.id);
+    } else {
+      // Add to favorites
+      onAddStyleReference({
+        src: image.src,
+        name: image.prompt.substring(0, 50) || `Favorito ${new Date().toLocaleDateString('pt-BR')}`
+      });
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest mb-4">
-            <Icon name="layout" className="w-3 h-3" />
-            Ativos de Marca
-        </div>
-        <h2 className="text-4xl font-extrabold text-text-main tracking-tight">Sua Galeria Criativa</h2>
-        <p className="text-lg text-text-muted mt-3 max-w-2xl mx-auto">
-          Gerencie e edite todos os flyers, posts e anúncios gerados pela inteligência artificial.
-        </p>
+    <>
+      {/* Hidden file input - outside main container */}
+      <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
+
+      <div className="space-y-6 animate-fade-in-up">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="text-left"><h2 className="text-2xl font-black text-white uppercase tracking-tight">{viewMode === 'gallery' ? 'Galeria de Assets' : 'Favoritos'}</h2><p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">{viewMode === 'gallery' ? `${images.length} itens • Flyers, Posts e Anúncios` : `${styleReferences.length} itens salvos`}</p></div>
+        <div className="flex flex-wrap gap-2">{viewMode === 'references' && (<Button onClick={() => fileInputRef.current?.click()} variant="secondary" size="small" icon="upload">Adicionar</Button>)}<Button onClick={() => setViewMode(viewMode === 'gallery' ? 'references' : 'gallery')} variant={viewMode === 'references' ? 'primary' : 'secondary'} size="small" icon={viewMode === 'gallery' ? 'heart' : 'layout'}>{viewMode === 'gallery' ? 'Favoritos' : 'Galeria de Assets'}</Button></div>
       </div>
 
-      {images.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-          {[...images].reverse().map((image) => (
-            <button
-                key={image.id}
-                onClick={() => setSelectedImage(image)}
-                className="group relative aspect-square overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 focus:outline-none focus:ring-4 focus:ring-primary/30 border border-muted/20 bg-surface/30"
-            >
-              <img
-                src={image.src}
-                alt={image.prompt}
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-              />
-              
-              {/* Refined Overlays */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col justify-end p-4">
-                <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-                    <p className="text-white text-xs font-bold leading-snug line-clamp-2 mb-2">
-                        {image.prompt}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5 mt-1 self-start">
-                        <span className="text-[9px] text-white font-bold bg-white/10 backdrop-blur-md border border-white/20 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                            {image.source}
-                        </span>
-                        {image.model && (
-                            <span className="text-[9px] text-primary-hover font-bold bg-primary/20 backdrop-blur-md border border-primary/30 px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center">
-                                <Icon name="zap" className="w-2.5 h-2.5 mr-1" />
-                                {image.model === 'imagen-4.0-generate-001' ? 'Imagen 4' : image.model.includes('pro') ? 'Gemini Pro' : 'Gemini Flash'}
-                            </span>
-                        )}
-                    </div>
+      {viewMode === 'gallery' ? (
+        /* Gallery View */
+        images.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {[...images].reverse().map((image) => (
+              <div
+                  key={image.id}
+                  onClick={() => setSelectedImage(image)}
+                  className="group relative aspect-square overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/10 cursor-pointer"
+              >
+                <img
+                  src={image.src}
+                  alt={image.prompt}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+
+                {/* Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
+                  <p className="text-white text-[9px] font-bold leading-snug line-clamp-2 mb-1.5">
+                      {image.prompt}
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                      <span className="text-[8px] text-white/70 font-bold bg-white/10 px-1.5 py-0.5 rounded uppercase">
+                          {image.source}
+                      </span>
+                      {image.model && (
+                          <span className="text-[8px] text-primary font-bold bg-primary/20 px-1.5 py-0.5 rounded uppercase">
+                              {image.model === 'imagen-4.0-generate-001' ? 'Imagen' : 'Gemini'}
+                          </span>
+                      )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleToggleFavorite(image); }}
+                    className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${isFavorite(image) ? 'bg-primary text-black' : 'bg-black/50 text-white/70 hover:text-primary'}`}
+                    title={isFavorite(image) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                  >
+                    <Icon name="heart" className="w-3 h-3" />
+                  </button>
+                  <div className="w-6 h-6 rounded-md bg-black/50 flex items-center justify-center text-white">
+                    <Icon name="edit" className="w-3 h-3" />
+                  </div>
                 </div>
               </div>
-              
-              {/* Interaction Hint */}
-              <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform scale-75 group-hover:scale-100">
-                <Icon name="edit" className="w-4 h-4" />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-[#111111] border border-dashed border-white/10 rounded-2xl p-12 text-center">
+              <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Icon name="image" className="w-6 h-6 text-white/20" />
               </div>
-            </button>
-          ))}
-        </div>
+              <h3 className="text-sm font-black text-white uppercase tracking-wide mb-2">Galeria Vazia</h3>
+              <p className="text-[10px] text-white/30 max-w-xs mx-auto">As imagens geradas em Campanhas ou Flyers aparecerão aqui automaticamente.</p>
+          </div>
+        )
       ) : (
-        <Card className="p-20 text-center bg-surface/20 border-dashed border-muted/50">
-            <div className="w-20 h-20 bg-muted/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Icon name="image" className="w-10 h-10 text-muted/40" />
+        /* References View */
+        <div className="space-y-4">
+          {/* References Grid */}
+          {styleReferences.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {[...styleReferences].reverse().map((ref) => (
+                <div
+                  key={ref.id}
+                  className="group relative aspect-square overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-primary/30"
+                >
+                  <img
+                    src={ref.src}
+                    alt={ref.name}
+                    className="w-full h-full object-cover"
+                  />
+
+                  {/* Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
+                    <p className="text-white text-[10px] font-black uppercase tracking-wide mb-2">
+                      {ref.name}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="small"
+                        onClick={() => onSelectStyleReference(ref)}
+                        className="flex-1"
+                      >
+                        Usar
+                      </Button>
+                      <button
+                        onClick={() => onRemoveStyleReference(ref.id)}
+                        className="w-8 h-8 rounded-lg bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/30"
+                      >
+                        <Icon name="x" className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <h3 className="text-2xl font-bold text-text-main mb-2">A vitrine está vazia</h3>
-            <p className="text-text-muted max-w-sm mx-auto">As imagens que você gerar em Campanhas ou Flyers serão organizadas automaticamente nesta galeria central.</p>
-        </Card>
+          ) : (
+            <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl p-8 text-center">
+              <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <Icon name="heart" className="w-6 h-6 text-white/20" />
+              </div>
+              <h3 className="text-sm font-black text-white uppercase tracking-wide mb-2">Nenhum Favorito</h3>
+              <p className="text-[10px] text-white/30 max-w-xs mx-auto">Clique em "Adicionar" para salvar imagens de referência.</p>
+            </div>
+          )}
+        </div>
       )}
 
       {selectedImage && (
@@ -94,6 +215,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ images, onUpdateImage,
             downloadFilename={`directorai-${selectedImage.source.toLowerCase().replace(/ /g, '-')}-${selectedImage.id.substring(0, 5)}.png`}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 };

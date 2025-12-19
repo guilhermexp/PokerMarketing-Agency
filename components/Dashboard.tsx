@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, GenerationOptions } from '../types';
+import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, GenerationOptions, WeekScheduleInfo, StyleReference } from '../types';
 import { UploadForm } from './UploadForm';
 import { ClipsTab } from './tabs/ClipsTab';
 import { PostsTab } from './tabs/PostsTab';
@@ -34,6 +34,7 @@ interface DashboardProps {
   onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   tournamentEvents: TournamentEvent[];
+  weekScheduleInfo: WeekScheduleInfo | null;
   onTournamentFileUpload: (file: File) => Promise<void>;
   onAddTournamentEvent: (event: TournamentEvent) => void;
   flyerState: Record<string, (GalleryImage | 'loading')[]>;
@@ -44,6 +45,13 @@ interface DashboardProps {
   activeView: View;
   onViewChange: (view: View) => void;
   onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
+  // Style References
+  styleReferences: StyleReference[];
+  onAddStyleReference: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
+  onRemoveStyleReference: (id: string) => void;
+  onSelectStyleReference: (ref: StyleReference) => void;
+  selectedStyleReference: StyleReference | null;
+  onClearSelectedStyleReference: () => void;
 }
 
 type Tab = 'clips' | 'posts' | 'ads';
@@ -53,33 +61,37 @@ interface NavItemProps {
     label: string;
     active: boolean;
     onClick: () => void;
+    collapsed?: boolean;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick }) => (
+const NavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick, collapsed }) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center space-x-4 px-6 py-4 rounded-2xl text-[9px] font-black uppercase tracking-[0.3em] transition-all duration-500 ${
+    title={collapsed ? label : undefined}
+    className={`w-full flex items-center ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'} py-2.5 rounded-xl text-[8px] font-black uppercase tracking-[0.2em] transition-all duration-300 ${
       active
-        ? 'bg-white text-black shadow-2xl'
+        ? 'bg-white text-black'
         : 'text-white/30 hover:text-white hover:bg-white/5'
     }`}
   >
-    <Icon name={icon} className={`w-4 h-4 ${active ? 'text-black' : 'text-white/20'}`} />
-    <span>{label}</span>
+    <Icon name={icon} className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-black' : 'text-white/20'}`} />
+    {!collapsed && <span>{label}</span>}
   </button>
 );
 
 export const Dashboard: React.FC<DashboardProps> = (props) => {
-  const { 
+  const {
     brandProfile, campaign, onGenerate, isGenerating, onEditProfile, onResetCampaign,
-    isAssistantOpen, onToggleAssistant, assistantHistory, 
-    isAssistantLoading, onAssistantSendMessage, galleryImages, onAddImageToGallery, 
-    onUpdateGalleryImage, tournamentEvents, onTournamentFileUpload, onAddTournamentEvent,
+    isAssistantOpen, onToggleAssistant, assistantHistory,
+    isAssistantLoading, onAssistantSendMessage, galleryImages, onAddImageToGallery,
+    onUpdateGalleryImage, tournamentEvents, weekScheduleInfo, onTournamentFileUpload, onAddTournamentEvent,
     flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState,
-    chatReferenceImage, onSetChatReference, activeView, onViewChange, onPublishToCampaign
+    chatReferenceImage, onSetChatReference, activeView, onViewChange, onPublishToCampaign,
+    styleReferences, onAddStyleReference, onRemoveStyleReference, onSelectStyleReference, selectedStyleReference, onClearSelectedStyleReference
   } = props;
-  
+
   const [activeTab, setActiveTab] = useState<Tab>('clips');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'clips', label: 'Clips' },
@@ -91,40 +103,53 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
   return (
     <div className="h-screen flex overflow-hidden bg-black text-white font-sans selection:bg-primary selection:text-black">
-      <aside className="w-72 bg-[#050505]/60 flex flex-col flex-shrink-0 border-r border-white/5 backdrop-blur-3xl z-20">
-        <div className="h-24 flex items-center px-8 flex-shrink-0">
-          <div className="w-10 h-10 aura-card flex items-center justify-center mr-4 bg-white/5 border-white/10 shadow-inner">
-             <Icon name="logo" className="h-5 w-5 text-white" />
+      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-56'} bg-[#050505]/60 flex flex-col flex-shrink-0 border-r border-white/5 backdrop-blur-3xl z-20 transition-all duration-300`}>
+        <div className={`h-16 flex items-center justify-between ${sidebarCollapsed ? 'px-3' : 'px-4'} flex-shrink-0`}>
+          <div className="flex items-center">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 flex-shrink-0">
+               <Icon name="logo" className="h-4 w-4 text-white" />
+            </div>
+            {!sidebarCollapsed && <h1 className="text-[10px] font-black text-white tracking-[0.3em] uppercase ml-3">Director<span className="opacity-30">Ai</span></h1>}
           </div>
-          <h1 className="text-sm font-black text-white tracking-[0.4em] uppercase">Director<span className="opacity-30">Ai</span></h1>
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="p-1.5 text-white/20 hover:text-white/60 transition-colors"
+          >
+            <Icon name={sidebarCollapsed ? 'chevron-right' : 'chevron-left'} className="w-3.5 h-3.5" />
+          </button>
         </div>
 
-        <nav className="flex-grow p-6 space-y-3">
-            <NavItem icon="zap" label="Direct" active={activeView === 'campaign'} onClick={() => onViewChange('campaign')} />
-            <NavItem icon="image" label="Flyers" active={activeView === 'flyer'} onClick={() => onViewChange('flyer')} />
-            <NavItem icon="layout" label="Assets" active={activeView === 'gallery'} onClick={() => onViewChange('gallery')} />
+        <nav className={`flex-grow ${sidebarCollapsed ? 'p-2' : 'p-3'} space-y-1`}>
+            <NavItem icon="zap" label="Direct" active={activeView === 'campaign'} onClick={() => onViewChange('campaign')} collapsed={sidebarCollapsed} />
+            <NavItem icon="image" label="Flyers" active={activeView === 'flyer'} onClick={() => onViewChange('flyer')} collapsed={sidebarCollapsed} />
+            <NavItem icon="layout" label="Assets" active={activeView === 'gallery'} onClick={() => onViewChange('gallery')} collapsed={sidebarCollapsed} />
         </nav>
 
-        <div className="p-8 space-y-6">
-             <div className="p-5 aura-card border-white/10 space-y-4 bg-white/[0.02]">
-                <div className="flex items-center space-x-4">
+        <div className={`${sidebarCollapsed ? 'p-2' : 'p-3'} space-y-3`}>
+             {!sidebarCollapsed ? (
+               <>
+                 <div className="w-full flex items-center gap-2 py-2 px-3 border border-white/5 rounded-lg">
                     {brandProfile.logo ? (
-                        <img src={brandProfile.logo} alt="Logo" className="h-10 w-10 rounded-full object-contain filter grayscale brightness-125"/>
+                        <img src={brandProfile.logo} alt="Logo" className="h-5 w-5 rounded object-contain filter grayscale brightness-125 flex-shrink-0"/>
                     ) : (
-                        <div className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center border border-white/10"><Icon name="bot" className="w-5 h-5 text-white/40" /></div>
+                        <div className="h-5 w-5 rounded bg-white/10 flex items-center justify-center flex-shrink-0"><Icon name="bot" className="w-2.5 h-2.5 text-white/40" /></div>
                     )}
                     <div className="flex-1 overflow-hidden">
-                        <span className="text-[10px] font-black text-white truncate block uppercase tracking-widest">{brandProfile.name}</span>
-                        <span className="text-[8px] text-white/30 uppercase font-bold tracking-[0.2em] mt-1">Status: Operational</span>
+                        <span className="text-[8px] font-black text-white/20 truncate block uppercase tracking-[0.2em]">{brandProfile.name}</span>
                     </div>
                 </div>
-            </div>
-            <button onClick={onEditProfile} className="w-full text-[9px] font-black uppercase tracking-[0.4em] text-white/20 hover:text-white transition-colors py-3 border border-white/5 rounded-xl hover:bg-white/5">System Setup</button>
+                <button onClick={onEditProfile} className="w-full text-[8px] font-black uppercase tracking-[0.3em] text-white/20 hover:text-white transition-colors py-2 border border-white/5 rounded-lg hover:bg-white/5">System Setup</button>
+               </>
+             ) : (
+               <button onClick={onEditProfile} title="System Setup" className="w-full flex justify-center py-2 text-white/20 hover:text-white transition-colors border border-white/5 rounded-lg hover:bg-white/5">
+                 <Icon name="settings" className="w-3.5 h-3.5" />
+               </button>
+             )}
         </div>
       </aside>
 
       <main className="flex-1 overflow-y-auto relative z-10 bg-[#070707]">
-        <div className="max-w-[1400px] mx-auto px-6 sm:px-10 py-12 sm:py-16 relative">
+        <div className="max-w-[1400px] mx-auto px-6 sm:px-8 pt-5 pb-10 relative">
             {activeView === 'campaign' && (
                 <>
                     {showUploadForm && <UploadForm onGenerate={onGenerate} isGenerating={isGenerating} />}
@@ -136,20 +161,42 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                         </div>
                     )}
                     {campaign && (
-                        <div className="animate-fade-in-up">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-16 gap-6">
-                                <div>
-                                    <h2 className="text-5xl font-black tracking-[-0.05em] uppercase leading-none">Generated Output</h2>
-                                    <p className="text-[10px] uppercase tracking-[0.4em] text-white/30 font-black mt-4">Multi-Platform Campaign Strategy</p>
+                        <div className="animate-fade-in-up space-y-8">
+                            {/* Header Section */}
+                            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 pb-8 border-b border-white/5">
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                                            <Icon name="zap" className="w-5 h-5 text-primary" />
+                                        </div>
+                                        <h2 className="text-2xl font-black tracking-tight uppercase">Campanha Gerada</h2>
+                                    </div>
+                                    <p className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-medium ml-[52px]">
+                                        {campaign.videoClipScripts.length} clips • {campaign.posts.length} posts • {campaign.adCreatives.length} anúncios
+                                    </p>
                                 </div>
-                                <Button onClick={onResetCampaign} variant="primary" icon="zap" size="large">New Strategy</Button>
+                                <Button onClick={onResetCampaign} variant="secondary" icon="zap" size="small">Nova Campanha</Button>
                             </div>
-                            <div className="mb-12 flex flex-wrap gap-4">
+
+                            {/* Tabs Navigation */}
+                            <div className="flex items-center gap-2 p-1.5 bg-[#111111] rounded-2xl border border-white/5 w-fit">
                                 {tabs.map(tab => (
-                                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-10 py-4 rounded-full text-[9px] font-black uppercase tracking-[0.3em] transition-all duration-500 border ${activeTab === tab.id ? 'bg-white text-black border-white' : 'bg-transparent text-white/40 border-white/10 hover:border-white/30 hover:text-white'}`}>{tab.label}</button>
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 ${
+                                            activeTab === tab.id
+                                                ? 'bg-white text-black shadow-lg'
+                                                : 'text-white/40 hover:text-white hover:bg-white/5'
+                                        }`}
+                                    >
+                                        {tab.label}
+                                    </button>
                                 ))}
                             </div>
-                            <div className="space-y-12">
+
+                            {/* Content */}
+                            <div className="space-y-6">
                                 {activeTab === 'clips' && <ClipsTab brandProfile={brandProfile} videoClipScripts={campaign.videoClipScripts} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
                                 {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
                                 {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
@@ -159,22 +206,21 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 </>
             )}
             {activeView === 'flyer' && (
-                <FlyerGenerator 
-                  brandProfile={brandProfile} events={tournamentEvents} onFileUpload={onTournamentFileUpload} onAddEvent={onAddTournamentEvent} onAddImageToGallery={onAddImageToGallery} flyerState={flyerState} setFlyerState={setFlyerState} dailyFlyerState={dailyFlyerState} setDailyFlyerState={setDailyFlyerState} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference}
+                <FlyerGenerator
+                  brandProfile={brandProfile} events={tournamentEvents} weekScheduleInfo={weekScheduleInfo} onFileUpload={onTournamentFileUpload} onAddEvent={onAddTournamentEvent} onAddImageToGallery={onAddImageToGallery} flyerState={flyerState} setFlyerState={setFlyerState} dailyFlyerState={dailyFlyerState} setDailyFlyerState={setDailyFlyerState} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference}
                   onPublishToCampaign={onPublishToCampaign}
+                  selectedStyleReference={selectedStyleReference}
+                  onClearSelectedStyleReference={onClearSelectedStyleReference}
                 />
             )}
-            {activeView === 'gallery' && <GalleryView images={galleryImages} onUpdateImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
+            {activeView === 'gallery' && <GalleryView images={galleryImages} onUpdateImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} onSelectStyleReference={onSelectStyleReference} />}
         </div>
       </main>
 
        <AssistantPanel isOpen={isAssistantOpen} onClose={onToggleAssistant} history={assistantHistory} isLoading={isAssistantLoading} onSendMessage={onAssistantSendMessage} referenceImage={chatReferenceImage} onClearReference={() => onSetChatReference(null)} />
-       <div className="fixed bottom-10 right-10 z-50">
-          <button onClick={onToggleAssistant} className={`w-20 h-20 rounded-[2.5rem] flex items-center justify-center shadow-2xl transition-all duration-700 hover:scale-110 border border-white/10 ${isAssistantOpen ? 'bg-white/5 backdrop-blur-2xl text-white' : 'bg-white text-black'}`}>
-            <div className="relative w-8 h-8 flex items-center justify-center">
-                <Icon name='bot' className={`absolute inset-0 w-8 h-8 transition-all duration-700 ${isAssistantOpen ? 'opacity-0 -rotate-180 scale-50' : 'opacity-100 rotate-0 scale-100'}`} />
-                <Icon name='x' className={`absolute inset-0 w-8 h-8 transition-all duration-700 ${isAssistantOpen ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 rotate-180 scale-50'}`} />
-            </div>
+       <div className="fixed bottom-6 right-6 z-50">
+          <button onClick={onToggleAssistant} className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-105 ${isAssistantOpen ? 'bg-white/10 backdrop-blur-xl text-white border border-white/10' : 'bg-white/10 backdrop-blur-xl text-white/60 hover:text-white border border-white/5'}`}>
+            <Icon name={isAssistantOpen ? 'x' : 'zap'} className="w-5 h-5" />
           </button>
        </div>
     </div>

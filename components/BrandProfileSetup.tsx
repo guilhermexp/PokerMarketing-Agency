@@ -52,7 +52,7 @@ const CustomSelect: React.FC<{
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-[#0A0A0A] border border-white/5 rounded-xl p-3 flex items-center justify-between text-left transition-all hover:border-white/20 active:scale-[0.98] outline-none"
+        className="w-full bg-[#111111] border border-white/5 rounded-xl p-3 flex items-center justify-between text-left transition-all hover:border-white/20 active:scale-[0.98] outline-none"
       >
         <span className="text-[9px] font-black text-white uppercase tracking-widest truncate">{value}</span>
         <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} className="w-2.5 h-2.5 text-white/20 flex-shrink-0 ml-1.5" />
@@ -88,7 +88,7 @@ const ColorWidget: React.FC<{
     name: string;
     isAnalyzing: boolean;
 }> = ({ label, color, onChange, name, isAnalyzing }) => (
-    <div className="bg-[#0A0A0A] border border-white/5 p-3 rounded-xl flex items-center justify-between group transition-all hover:border-white/10 w-full overflow-hidden">
+    <div className="bg-[#111111] border border-white/5 p-3 rounded-xl flex items-center justify-between group transition-all hover:border-white/10 w-full overflow-hidden">
         <div className="flex flex-col min-w-0 flex-1 pr-1.5">
             <label className="text-[7px] font-black text-white/30 uppercase tracking-[0.2em] mb-1 truncate">{label}</label>
             <span className={`text-[8px] font-mono text-white/40 group-hover:text-white transition-colors truncate ${isAnalyzing ? 'animate-pulse' : ''}`}>
@@ -209,7 +209,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                 </p>
 
                 <div className="hidden lg:block space-y-4">
-                    <div className="aura-card p-4 flex items-center justify-between border-white/10 bg-white/[0.02]">
+                    <div className="aura-card p-4 flex items-center justify-between border-white/10 bg-[#161616]">
                         <div className="flex items-center space-x-3">
                             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_#F59E0B]"></div>
                             <div>
@@ -248,7 +248,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                                         onChange={handleChange} 
                                         required 
                                         placeholder="EX: CPC POKER ONLINE"
-                                        className="w-full bg-[#0A0A0A] border border-white/5 rounded-2xl p-4 text-white text-base font-bold focus:outline-none focus:border-primary/50 transition-all placeholder:text-white/5"
+                                        className="w-full bg-[#111111] border border-white/5 rounded-2xl p-4 text-white text-base font-bold focus:outline-none focus:border-primary/50 transition-all placeholder:text-white/5"
                                     />
                                 </div>
                                 <div className="group">
@@ -260,7 +260,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                                         required 
                                         rows={4} 
                                         placeholder="Defina a essência da sua marca..."
-                                        className="w-full bg-[#0A0A0A] border border-white/5 rounded-2xl p-4 text-white text-sm focus:outline-none focus:border-primary/50 transition-all resize-none placeholder:text-white/5"
+                                        className="w-full bg-[#111111] border border-white/5 rounded-2xl p-4 text-white text-sm focus:outline-none focus:border-primary/50 transition-all resize-none placeholder:text-white/5"
                                     />
                                 </div>
                             </div>
@@ -271,7 +271,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                                     <label className="block text-[8px] font-black text-white/30 uppercase tracking-[0.2em] mb-4">Master Logo Asset</label>
                                     <div 
                                         {...getRootProps()} 
-                                        className={`group relative cursor-pointer bg-[#0A0A0A] border border-white/5 rounded-3xl p-6 h-[200px] flex flex-col items-center justify-center transition-all ${isDragActive ? 'border-primary' : 'hover:border-white/10'}`}
+                                        className={`group relative cursor-pointer bg-[#111111] border border-white/5 rounded-3xl p-6 h-[200px] flex flex-col items-center justify-center transition-all ${isDragActive ? 'border-primary' : 'hover:border-white/10'}`}
                                     >
                                         <input {...getInputProps()} />
                                         {isAnalyzingLogo && (

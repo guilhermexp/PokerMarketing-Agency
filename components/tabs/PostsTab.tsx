@@ -63,56 +63,64 @@ const PostCard: React.FC<{
 
     return (
         <>
-            <Card className="p-6 flex flex-col md:flex-row gap-6">
-                <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-3">
-                        <Icon name={icon} className="w-5 h-5 text-primary" />
-                        <h3 className="text-lg font-bold text-text-main">{post.platform} Post</h3>
+            <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 overflow-hidden h-full flex flex-col">
+                {/* Header */}
+                <div className="px-5 py-3 border-b border-white/5 bg-[#0d0d0d] flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center">
+                        <Icon name={icon} className="w-3 h-3 text-primary" />
                     </div>
-                    <div className="prose prose-sm text-text-muted max-w-none bg-background/50 p-3 rounded-md mb-3">
-                        <p>{post.content}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {post.hashtags.map((tag, i) => (
-                            <span key={i} className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">#{tag}</span>
-                        ))}
-                    </div>
+                    <h3 className="text-xs font-black text-white uppercase tracking-wide">{post.platform}</h3>
                 </div>
-                <div className="md:w-72 flex-shrink-0">
-                    <h4 className="font-semibold text-text-main mb-2">Sugestão de Imagem</h4>
-                    <div className="aspect-square bg-surface rounded-lg flex items-center justify-center relative overflow-hidden">
+
+                <div className="flex-1 p-4 space-y-3">
+                    {/* Image */}
+                    <div className="aspect-square bg-[#080808] rounded-xl flex items-center justify-center relative overflow-hidden border border-white/5">
                         {isGenerating ? (
                             <Loader />
                         ) : image ? (
                             <>
                                 <img src={image.src} alt={`Visual for ${post.platform} post`} className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <div className="absolute inset-0 bg-black/70 opacity-0 hover:opacity-100 transition-all flex items-center justify-center">
                                     <Button size="small" onClick={handleEditClick}>Editar</Button>
                                 </div>
                             </>
                         ) : (
-                            <div className="text-center p-4">
-                               <p className="text-xs text-text-muted italic line-clamp-4">"{post.image_prompt}"</p>
+                            <div className="text-center p-3">
+                                <Icon name="image" className="w-8 h-8 text-white/10 mx-auto mb-2" />
+                                <p className="text-[9px] text-white/20 italic line-clamp-3">"{post.image_prompt}"</p>
                             </div>
                         )}
                     </div>
+
+                    {/* Content */}
+                    <p className="text-[11px] text-white/60 leading-relaxed line-clamp-4">{post.content}</p>
+
+                    {/* Hashtags */}
+                    <div className="flex flex-wrap gap-1.5">
+                        {post.hashtags.slice(0, 4).map((tag, i) => (
+                            <span key={i} className="text-[9px] bg-primary/10 text-primary/70 px-2 py-1 rounded-full border border-primary/20 font-medium">#{tag}</span>
+                        ))}
+                        {post.hashtags.length > 4 && (
+                            <span className="text-[9px] text-white/30 px-2 py-1">+{post.hashtags.length - 4}</span>
+                        )}
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div className="p-4 pt-0 flex gap-2">
                     {post.image_prompt && !image && (
-                        <div className="mt-4 space-y-2">
-                            <Button onClick={onGenerate} isLoading={isGenerating} size="small" className="w-full" icon="image">
-                                Gerar Imagem
-                            </Button>
-                        </div>
+                        <Button onClick={onGenerate} isLoading={isGenerating} size="small" className="flex-1" icon="image" variant="secondary">
+                            Gerar
+                        </Button>
                     )}
                     {image && (
-                         <div className="mt-4">
-                            <Button onClick={handleShare} size="small" variant="secondary" className="w-full" icon="share-alt">
-                                {isCopied ? 'Texto Copiado!' : 'Copiar Texto para Compartilhar'}
-                            </Button>
-                        </div>
+                        <Button onClick={handleShare} size="small" variant="secondary" className="flex-1" icon="share-alt">
+                            {isCopied ? 'Copiado!' : 'Copiar'}
+                        </Button>
                     )}
-                    {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
                 </div>
-            </Card>
+                {error && <p className="text-red-400 text-[9px] px-4 pb-3">{error}</p>}
+            </div>
             {editingImage && (
                 <ImagePreviewModal
                     image={editingImage}
@@ -236,36 +244,39 @@ export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referen
 
   return (
     <div className="space-y-6">
-       <Card className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <Button onClick={handleGenerateAll} isLoading={isGeneratingAll} disabled={isGeneratingAll || generationState.isGenerating.some(Boolean)} icon="zap">
-          Gerar Todas as Imagens
+       {/* Controls Bar */}
+       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-5 bg-[#0a0a0a] rounded-2xl border border-white/5">
+        <Button onClick={handleGenerateAll} isLoading={isGeneratingAll} disabled={isGeneratingAll || generationState.isGenerating.some(Boolean)} icon="zap" size="small">
+          Gerar Todas Imagens
         </Button>
-         <div className="flex items-center gap-2">
-            <label htmlFor="model-select-posts" className="text-sm font-medium text-subtle flex-shrink-0">Modelo de IA:</label>
-            <select 
+        <div className="flex items-center gap-3">
+            <span className="text-[10px] font-black uppercase tracking-[0.15em] text-white/30">Modelo:</span>
+            <select
                 id="model-select-posts"
-                value={selectedImageModel} 
-                onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)} 
-                className="bg-surface/80 border-muted/50 border rounded-lg p-2 text-sm text-text-main focus:ring-2 focus:ring-primary w-full sm:w-auto"
+                value={selectedImageModel}
+                onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
+                className="bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-primary/30 focus:border-primary/50 outline-none transition-all"
             >
-                <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image (Alta Qualidade)</option>
-                <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+                <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
+                <option value="gemini-2.5-flash-image">Gemini 2.5 Flash</option>
                 <option value="imagen-4.0-generate-001">Imagen 4.0</option>
             </select>
         </div>
-      </Card>
-      {posts.map((post, index) => (
-        <PostCard 
-            key={index} 
-            post={post}
-            image={images[index]}
-            isGenerating={generationState.isGenerating[index]}
-            error={generationState.errors[index]}
-            onGenerate={() => handleGenerate(index)}
-            onImageUpdate={(newSrc) => handleImageUpdate(index, newSrc)}
-            onSetChatReference={onSetChatReference}
-        />
-      ))}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {posts.map((post, index) => (
+          <PostCard
+              key={index}
+              post={post}
+              image={images[index]}
+              isGenerating={generationState.isGenerating[index]}
+              error={generationState.errors[index]}
+              onGenerate={() => handleGenerate(index)}
+              onImageUpdate={(newSrc) => handleImageUpdate(index, newSrc)}
+              onSetChatReference={onSetChatReference}
+          />
+        ))}
+      </div>
     </div>
   );
 };
