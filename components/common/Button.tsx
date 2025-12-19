@@ -24,7 +24,7 @@ export const Button: React.FC<ButtonProps> = ({
   const baseClasses = 'font-bold rounded-full transition-all duration-300 focus:outline-none flex items-center justify-center space-x-2 disabled:opacity-30 disabled:cursor-not-allowed tracking-tight antialiased';
   
   const variantClasses = {
-    primary: 'bg-gradient-to-r from-primary to-primary-hover text-black hover:scale-[1.02] active:scale-[0.98] shadow-[0_10px_30px_rgba(245,158,11,0.2)]',
+    primary: 'bg-gradient-to-r from-[#f59e0b] to-[#d97706] text-black hover:scale-[1.02] active:scale-[0.98] shadow-[0_10px_30px_rgba(245,158,11,0.2)]',
     secondary: 'bg-[#1A1A1A] text-white border border-[#2A2A2A] hover:bg-[#222] hover:border-[#333] active:scale-[0.98]',
   };
 

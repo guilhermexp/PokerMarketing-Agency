@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { BrandProfile, TournamentEvent, GalleryImage, ImageModel, ImageSize, ImageFile, Post, WeekScheduleInfo, StyleReference } from '../types';
 import { Card } from './common/Card';
 import { Button } from './common/Button';
@@ -27,6 +27,8 @@ interface FlyerGeneratorProps {
   onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
   selectedStyleReference?: StyleReference | null;
   onClearSelectedStyleReference?: () => void;
+  styleReferences?: StyleReference[];
+  onSelectStyleReference?: (ref: StyleReference) => void;
 }
 
 const formatCurrencyValue = (val: string, currency: Currency): string => {
@@ -198,6 +200,7 @@ const ImageCarousel: React.FC<{
     onCloneStyle?: (image: GalleryImage) => void;
 }> = ({ images, onEdit, onQuickPost, onPublish, onDownload, onCloneStyle }) => {
     const [activeIndex, setActiveIndex] = useState(0);
+    const [isHovered, setIsHovered] = useState(false);
 
     useEffect(() => {
         // Auto-switch para a imagem mais recente quando ela termina de carregar
@@ -220,7 +223,11 @@ const ImageCarousel: React.FC<{
     const currentItem = images[activeIndex];
 
     return (
-        <div className="relative w-full h-full group/carousel">
+        <div
+            className="relative w-full h-full"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
             {currentItem === 'loading' ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md z-10">
                     <Loader className="w-8 h-8 mb-3 text-primary" />
@@ -229,7 +236,7 @@ const ImageCarousel: React.FC<{
             ) : (
                 <>
                     <img src={currentItem.src} className="w-full h-full object-contain transition-transform duration-700 hover:scale-105 cursor-pointer" onClick={() => onEdit(currentItem)} />
-                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover/carousel:opacity-100 transition-all duration-300 flex flex-col items-center justify-center gap-1.5 backdrop-blur-sm z-20">
+                    <div className={`absolute inset-0 bg-black/70 transition-all duration-300 flex flex-col items-center justify-center gap-1.5 backdrop-blur-sm z-20 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
                         <Button size="small" variant="primary" onClick={() => onQuickPost(currentItem)} icon="zap">QuickPost</Button>
                         <Button size="small" onClick={() => onEdit(currentItem)} icon="edit">Editar</Button>
                         <Button size="small" onClick={() => onPublish(currentItem)} icon="users">Campanha</Button>
@@ -240,7 +247,7 @@ const ImageCarousel: React.FC<{
             )}
 
             {images.length > 1 && (
-                <div className="absolute inset-x-3 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none z-30 opacity-0 group-hover/carousel:opacity-100 transition-opacity">
+                <div className={`absolute inset-x-3 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none z-30 transition-opacity ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
                     <button onClick={prev} className="w-8 h-8 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center text-white pointer-events-auto hover:bg-primary hover:text-black transition-all">
                         <Icon name="chevron-up" className="w-4 h-4 -rotate-90" />
                     </button>
@@ -388,46 +395,77 @@ const PeriodCard: React.FC<{
     const [editingFlyer, setEditingFlyer] = useState<GalleryImage | null>(null);
     const [quickPostFlyer, setQuickPostFlyer] = useState<GalleryImage | null>(null);
 
+    const parseGtd = (gtd: string): number => {
+        if (!gtd || gtd === '---') return 0;
+        return parseFloat(String(gtd).replace(/[^0-9.-]+/g, '')) || 0;
+    };
+
+    const getSortValue = (timeStr: string) => {
+        const [h, m] = (timeStr || '00:00').split(':').map(Number);
+        const virtualHour = h < 6 ? h + 24 : h;
+        return virtualHour * 60 + (m || 0);
+    };
+
     const handleGenerate = useCallback(async (forced: boolean = false) => {
         if (isGenerating || events.length === 0) return;
         if (triggerBatch && !forced && generatedFlyers.length > 0) return;
         setIsGenerating(true);
         setGeneratedFlyers(prev => ['loading', ...prev]);
-        
-        const eventsList = events.map(e => `- ${e.times?.['-3']} | ${e.name} (GTD: ${formatCurrencyValue(e.gtd, currency)})`).join('\n');
-        
+
+        // Ordenar eventos por GTD e separar o maior
+        const sortedByGtd = [...events].sort((a, b) => parseGtd(b.gtd) - parseGtd(a.gtd));
+        const topEvent = sortedByGtd[0];
+        // Outros eventos ordenados por horário
+        const otherEvents = sortedByGtd.slice(1).sort((a, b) => getSortValue(a.times?.['-3'] || '') - getSortValue(b.times?.['-3'] || ''));
+
+        const topEventText = topEvent ? `${topEvent.name} - GTD: ${formatCurrencyValue(topEvent.gtd, currency)} - Horário: ${topEvent.times?.['-3']} - Buy-in: ${formatCurrencyValue(topEvent.buyIn, currency)}` : '';
+        const otherEventsList = otherEvents.map(e => `${e.times?.['-3']} | ${e.name} | Buy-in: ${formatCurrencyValue(e.buyIn, currency)} | GTD: ${formatCurrencyValue(e.gtd, currency)}`).join('\n');
+
         const prompt = `
-        TIPO: Grade de Programação / Schedule Board
-        TÍTULO: ${label.toUpperCase()}
-        QUANTIDADE: ${events.length} torneios
+        TIPO: Grade de Programação com Destaque Principal
+        TÍTULO DA SESSÃO: ${label.toUpperCase()}
+        TOTAL: ${events.length} torneios
 
-        LISTA DE TORNEIOS (exibir TODOS):
-        ${eventsList}
+        ESTRUTURA OBRIGATÓRIA - 2 SEÇÕES DISTINTAS:
 
-        ESTRUTURA OBRIGATÓRIA DO LAYOUT:
-        1. CABEÇALHO:
-           - Logo no topo
-           - Título "${label}" em destaque abaixo do logo
+        ═══════════════════════════════════════════
+        SEÇÃO 1 - DESTAQUE PRINCIPAL (TOPO - 40% do espaço):
+        ═══════════════════════════════════════════
 
-        2. CORPO - TABELA/GRADE:
-           - Cada torneio em uma linha clara e legível
-           - Colunas: HORÁRIO | NOME | GTD
-           - Os valores GTD devem estar na cor ${brandProfile.secondaryColor}
-           - Linhas alternadas ou separadores sutis para facilitar leitura
-           - Alinhamento consistente em todas as linhas
+        TORNEIO EM EVIDÊNCIA (maior GTD):
+        ${topEventText}
 
-        3. HIERARQUIA DE INFORMAÇÃO:
-           - Horário: fonte média, fácil identificação
-           - Nome do torneio: fonte regular, descrição clara
-           - GTD: DESTAQUE MÁXIMO, cor ${brandProfile.secondaryColor}, fonte bold
+        REGRAS DO DESTAQUE:
+        - Esta seção deve ocupar aproximadamente 40% da área do flyer
+        - Nome do torneio em FONTE GIGANTE E BOLD
+        - GTD (${topEvent ? formatCurrencyValue(topEvent.gtd, currency) : ''}) deve ser o MAIOR elemento visual - cor ${brandProfile.secondaryColor}
+        - Efeitos visuais: partículas, brilhos, explosão de elementos (fichas/cartas voando são opcionais)
+        - Background desta área pode ter gradiente ou elementos visuais dinâmicos
+        - Horário e Buy-in em tamanho médio, bem legíveis
 
-        REGRAS DE DESIGN:
-        - Layout tipo tabela/grade profissional estilo sportsbook
-        - Fundo baseado em ${brandProfile.primaryColor}
-        - Máxima legibilidade - jogador precisa ler rápido
-        - Visual limpo, organizado, sem poluição
+        ═══════════════════════════════════════════
+        SEÇÃO 2 - GRADE DE OUTROS TORNEIOS (60% do espaço):
+        ═══════════════════════════════════════════
+
+        LISTA DOS DEMAIS TORNEIOS:
+        ${otherEventsList}
+
+        FORMATO DA GRADE:
+        - Layout tipo tabela/lista profissional
+        - Cada linha: [HORÁRIO] | [NOME] | [BUY-IN] | [GTD]
+        - GTD em cor ${brandProfile.secondaryColor} (menor que o destaque, mas visível)
+        - Linhas alternadas ou separadores para facilitar leitura
+        - Fonte menor que o destaque, mas perfeitamente legível
         - Espaçamento uniforme entre linhas
-        - NÃO use título genérico - use exatamente "${label}"
+
+        ═══════════════════════════════════════════
+        DESIGN GERAL:
+        ═══════════════════════════════════════════
+        - Logo da marca no topo
+        - Título "${label}" logo após o logo
+        - Fundo baseado em ${brandProfile.primaryColor}
+        - Contraste forte entre o DESTAQUE (topo) e a GRADE (inferior)
+        - Visual profissional de sportsbook/cassino premium
         `;
 
         try {
@@ -526,7 +564,7 @@ const ManualEventModal: React.FC<{
 export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     brandProfile, events, weekScheduleInfo, onFileUpload, onAddEvent, onAddImageToGallery,
     flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState, onUpdateGalleryImage, onSetChatReference, onPublishToCampaign,
-    selectedStyleReference, onClearSelectedStyleReference
+    selectedStyleReference, onClearSelectedStyleReference, styleReferences = [], onSelectStyleReference
 }) => {
   const daysMap = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
   const currentDayName = daysMap[new Date().getDay()];
@@ -543,6 +581,29 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   const [collabLogo, setCollabLogo] = useState<string | null>(null);
   const [manualStyleRef, setManualStyleRef] = useState<string | null>(null);
   const [showIndividualTournaments, setShowIndividualTournaments] = useState(false);
+  const [isStylePanelOpen, setIsStylePanelOpen] = useState(() => {
+    const saved = localStorage.getItem('stylePanel_isOpen');
+    return saved === 'true';
+  });
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  // Persistir estado do painel
+  useEffect(() => {
+    localStorage.setItem('stylePanel_isOpen', String(isStylePanelOpen));
+  }, [isStylePanelOpen]);
+
+  const scrollCarousel = (direction: 'left' | 'right') => {
+    if (!carouselRef.current) return;
+    const scrollAmount = 340; // 320px card + 20px gap
+    const newScrollLeft = direction === 'left'
+      ? carouselRef.current.scrollLeft - scrollAmount
+      : carouselRef.current.scrollLeft + scrollAmount;
+
+    carouselRef.current.scrollTo({
+      left: newScrollLeft,
+      behavior: 'smooth'
+    });
+  };
 
   // Aplicar referência selecionada da galeria
   useEffect(() => {
@@ -629,10 +690,24 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <>
+    <div className="space-y-6 animate-fade-in-up flex-1 overflow-y-auto px-6 py-5">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="text-left"><h2 className="text-2xl font-black text-white uppercase tracking-tight">Daily Protocol</h2><p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">Agrupamento Inteligente • Ciclo Diário</p></div>
-            <div className="flex flex-wrap gap-2"><Button onClick={() => setShowIndividualTournaments(!showIndividualTournaments)} variant={showIndividualTournaments ? "primary" : "secondary"} icon={showIndividualTournaments ? "zap" : "calendar"} size="small">{showIndividualTournaments ? 'Grades de Período' : `Torneios Individuais ${currentEvents.length > 0 ? `(${currentEvents.length})` : ''}`}</Button><Button onClick={() => setIsManualModalOpen(true)} variant="secondary" icon="edit" size="small">Add Manual</Button><label className="cursor-pointer group"><div className="bg-white text-black font-black px-4 py-2.5 rounded-xl flex items-center space-x-2 transition-all active:scale-95 text-[10px] tracking-wide uppercase hover:bg-white/90"><Icon name="upload" className="w-3.5 h-3.5" /><span>Upload Spreadsheet</span></div><input type="file" className="hidden" accept=".xlsx,.xls" onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])} /></label></div>
+            <div className="flex flex-wrap items-center gap-2">
+                <Button onClick={() => setShowIndividualTournaments(!showIndividualTournaments)} variant={showIndividualTournaments ? "primary" : "secondary"} icon={showIndividualTournaments ? "zap" : "calendar"} size="small">
+                    {showIndividualTournaments ? 'Grades de Período' : 'Torneios Individuais'}
+                </Button>
+                {currentEvents.length > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[#0a0a0a] border border-white/10 rounded-lg">
+                        <span className="text-[9px] font-black text-white/40 uppercase tracking-wider">{dayStats.count} torneios</span>
+                        <div className="h-3 w-px bg-white/20" />
+                        <span className="text-[9px] font-black text-primary/70 uppercase tracking-wider">{formatCurrencyValue(String(dayStats.totalGtd), selectedCurrency)}</span>
+                    </div>
+                )}
+                <Button onClick={() => setIsManualModalOpen(true)} variant="secondary" icon="edit" size="small">Add Manual</Button>
+                <label className="cursor-pointer group"><div className="bg-white text-black font-black px-4 py-2.5 rounded-xl flex items-center space-x-2 transition-all active:scale-95 text-[10px] tracking-wide uppercase hover:bg-white/90"><Icon name="upload" className="w-3.5 h-3.5" /><span>Upload Spreadsheet</span></div><input type="file" className="hidden" accept=".xlsx,.xls" onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])} /></label>
+            </div>
         </div>
 
         {/* Indicador de referência selecionada */}
@@ -669,7 +744,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
           </div>
         )}
 
-        <Card className="p-5 border-white/5 bg-[#111111] space-y-4">
+        <div className="space-y-4">
             {/* Linha de controles */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
               <div className="space-y-1.5"><label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">Dia Ativo</label><select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-primary/50 appearance-none cursor-pointer">{Object.keys(dayTranslations).map(d => <option key={d} value={d}>{dayTranslations[d]} {weekScheduleInfo ? `(${getDayDate(d)})` : ''}</option>)}</select></div>
@@ -680,65 +755,81 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               <div className="space-y-1.5"><label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">Resolução</label><select value={selectedImageSize} onChange={(e) => setSelectedImageSize(e.target.value as ImageSize)} disabled={selectedImageModel === 'imagen-4.0-generate-001'} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none appearance-none cursor-pointer disabled:opacity-20"><option value="1K">HD (1K)</option><option value="2K">QuadHD (2K)</option><option value="4K">UltraHD (4K)</option></select></div>
               <div className="flex items-end"><Button variant="primary" size="small" className="w-full" onClick={() => { setIsBatchGenerating(true); setDailyFlyerState({ ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: [] }); setBatchTrigger(true); setTimeout(() => { setBatchTrigger(false); setIsBatchGenerating(false); }, 1500); }} isLoading={isBatchGenerating} icon="zap">Gerar Grade</Button></div>
             </div>
-
-            {/* Estatísticas do dia - integrado */}
-            {events.length > 0 && (
-              <div className="pt-4 border-t border-white/5 grid grid-cols-1 lg:grid-cols-5 gap-4">
-                {/* Info do dia */}
-                <div className="lg:col-span-1 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Icon name="calendar" className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-white uppercase tracking-wide">{dayTranslations[selectedDay]}</p>
-                    {weekScheduleInfo && <p className="text-[9px] font-bold text-white/40">{getDayDate(selectedDay)}</p>}
-                  </div>
-                </div>
-
-                {/* Stats inline */}
-                <div className="lg:col-span-1 flex items-center gap-4">
-                  <div className="text-center">
-                    <p className="text-sm font-black text-white">{dayStats.count}</p>
-                    <p className="text-[8px] text-white/30 uppercase">Torneios</p>
-                  </div>
-                  <div className="h-6 w-px bg-white/10" />
-                  <div className="text-center">
-                    <p className="text-sm font-black text-primary">{formatCurrencyValue(String(dayStats.totalGtd), selectedCurrency)}</p>
-                    <p className="text-[8px] text-primary/50 uppercase">GTD Total</p>
-                  </div>
-                </div>
-
-                {/* Top 3 inline */}
-                <div className="lg:col-span-3 flex items-center gap-2">
-                  <p className="text-[8px] font-black text-white/20 uppercase whitespace-nowrap">Top 3:</p>
-                  {dayStats.top3.length > 0 ? dayStats.top3.map((event, idx) => (
-                    <div key={event.id} className="flex items-center gap-1.5 px-2 py-1.5 bg-black/40 rounded-lg border border-white/5 flex-1 min-w-0">
-                      <span className={`text-[9px] font-black ${idx === 0 ? 'text-primary' : 'text-white/30'}`}>{idx + 1}º</span>
-                      <span className="text-[8px] font-bold text-white truncate flex-1">{event.name}</span>
-                      <span className={`text-[8px] font-black whitespace-nowrap ${idx === 0 ? 'text-primary' : 'text-white/50'}`}>{formatCurrencyValue(event.gtd, selectedCurrency)}</span>
-                    </div>
-                  )) : <p className="text-[9px] text-white/20">Sem dados</p>}
-                </div>
-              </div>
-            )}
-        </Card>
+        </div>
 
         {!showIndividualTournaments ? (
             <>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 -mt-2">
                     <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl flex items-center space-x-4 text-left"><div className="w-12 h-12 rounded-xl bg-black/50 border border-dashed border-white/10 flex items-center justify-center relative overflow-hidden group">{collabLogo ? <><img src={collabLogo} className="w-full h-full object-contain p-1" /><button onClick={() => setCollabLogo(null)} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[8px] font-black uppercase">X</button></> : <label className="cursor-pointer w-full h-full flex items-center justify-center"><Icon name="upload" className="w-4 h-4 text-white/10" /><input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { dataUrl } = await fileToBase64(f); setCollabLogo(dataUrl); } }} /></label>}</div><div><h4 className="text-[9px] font-black text-white uppercase tracking-wide">Logo Colab</h4><p className="text-[8px] text-white/20 mt-0.5">Incluso em todos os flyers</p></div></div>
-                    <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl flex items-center space-x-4 text-left"><div className="w-12 h-12 rounded-xl bg-black/50 border border-dashed border-white/10 flex items-center justify-center relative overflow-hidden group">{manualStyleRef ? <><img src={manualStyleRef} className="w-full h-full object-cover" /><button onClick={() => setManualStyleRef(null)} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[8px] font-black uppercase">X</button></> : <label className="cursor-pointer w-full h-full flex items-center justify-center"><Icon name="image" className="w-4 h-4 text-white/10" /><input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { dataUrl } = await fileToBase64(f); setManualStyleRef(dataUrl); setGlobalStyleReference({ id: 'manual-ref', src: dataUrl, prompt: 'Estilo Manual', source: 'Edição', model: selectedImageModel }); } }} /></label>}</div><div><h4 className="text-[9px] font-black text-white uppercase tracking-wide">Referência de Estilo</h4><p className="text-[8px] text-white/20 mt-0.5">Layout Global</p></div></div>
+                    <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl flex items-center gap-4 text-left">
+                        <div className="w-12 h-12 rounded-xl bg-black/50 border border-dashed border-white/10 flex items-center justify-center relative overflow-hidden group flex-shrink-0">
+                            {manualStyleRef ? (
+                                <>
+                                    <img src={manualStyleRef} className="w-full h-full object-cover" />
+                                    <button onClick={() => setManualStyleRef(null)} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[8px] font-black uppercase">X</button>
+                                </>
+                            ) : (
+                                <label className="cursor-pointer w-full h-full flex items-center justify-center">
+                                    <Icon name="image" className="w-4 h-4 text-white/10" />
+                                    <input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { dataUrl } = await fileToBase64(f); setManualStyleRef(dataUrl); setGlobalStyleReference({ id: 'manual-ref', src: dataUrl, prompt: 'Estilo Manual', source: 'Edição', model: selectedImageModel }); } }} />
+                                </label>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h4 className="text-[9px] font-black text-white uppercase tracking-wide">Referência de Estilo</h4>
+                            <p className="text-[8px] text-white/20 mt-0.5">Layout Global</p>
+                        </div>
+                        <Button
+                            size="small"
+                            variant={isStylePanelOpen ? "primary" : "secondary"}
+                            onClick={() => setIsStylePanelOpen(!isStylePanelOpen)}
+                            icon="layout"
+                        >
+                            {isStylePanelOpen ? 'Fechar' : 'Favoritos'}
+                        </Button>
+                    </div>
                     <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl flex items-center text-left gap-4"><div className="w-12 h-12 rounded-xl bg-black/50 border border-dashed border-white/10 flex items-center justify-center flex-shrink-0"><label className="cursor-pointer w-full h-full flex items-center justify-center"><Icon name="upload" className="w-4 h-4 text-white/10" /><input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { base64, mimeType, dataUrl } = await fileToBase64(f); setCompositionAssets(prev => [...prev, { base64, mimeType, preview: dataUrl } as any]); } }} /></label></div><div className="flex-1 min-w-0"><h4 className="text-[9px] font-black text-white uppercase tracking-wide">Ativos Adicionais</h4><div className="flex gap-1.5 mt-1.5 overflow-x-auto">{compositionAssets.length > 0 ? compositionAssets.map((asset, idx) => (<div key={idx} className="w-8 h-8 flex-shrink-0 rounded-md bg-black border border-white/10 relative group overflow-hidden"><img src={(asset as any).preview} className="w-full h-full object-cover" /><button onClick={() => setCompositionAssets(prev => prev.filter((_, i) => i !== idx))} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[7px] font-black">X</button></div>)) : <p className="text-[8px] text-white/20">Mockups e pessoas</p>}</div></div></div>
                 </div>
-                <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 snap-x snap-mandatory scrollbar-none">
-                    {(['ALL', 'MORNING', 'AFTERNOON', 'NIGHT', 'HIGHLIGHTS'] as TimePeriod[]).map(p => (
-                        <div key={p} className="flex-shrink-0 w-[320px] snap-start">
-                            <PeriodCard
-                                period={p} label={periodLabels[selectedLanguage][p]} events={getEventsByPeriod(p)} brandProfile={brandProfile} aspectRatio={selectedAspectRatio} currency={selectedCurrency} model={selectedImageModel} imageSize={selectedImageSize} language={selectedLanguage}
-                                onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} generatedFlyers={dailyFlyerState[p]} setGeneratedFlyers={(u) => setDailyFlyerState(prev => ({...prev, [p]: u(prev[p])}))} triggerBatch={batchTrigger} styleReference={globalStyleReference} onCloneStyle={handleSetStyleReference} collabLogo={collabLogo} compositionAssets={compositionAssets} onPublishToCampaign={onPublishToCampaign}
-                            />
-                        </div>
-                    ))}
+                <div className="relative">
+                    {/* Botão Esquerda */}
+                    <button
+                        onClick={() => scrollCarousel('left')}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/90 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-primary hover:text-black hover:border-primary transition-all opacity-0 hover:opacity-100 peer-hover:opacity-100 shadow-2xl pointer-events-auto"
+                    >
+                        <Icon name="chevron-up" className="w-5 h-5 -rotate-90" />
+                    </button>
+
+                    {/* Carrossel */}
+                    <div
+                        ref={carouselRef}
+                        className="peer flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden group/carousel"
+                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                        onMouseEnter={(e) => {
+                            const buttons = e.currentTarget.parentElement?.querySelectorAll('button');
+                            buttons?.forEach(btn => btn.classList.add('!opacity-100'));
+                        }}
+                        onMouseLeave={(e) => {
+                            const buttons = e.currentTarget.parentElement?.querySelectorAll('button');
+                            buttons?.forEach(btn => btn.classList.remove('!opacity-100'));
+                        }}
+                    >
+                        {(['ALL', 'MORNING', 'AFTERNOON', 'NIGHT', 'HIGHLIGHTS'] as TimePeriod[]).map(p => (
+                            <div key={p} className="flex-shrink-0 w-[320px] snap-start">
+                                <PeriodCard
+                                    period={p} label={periodLabels[selectedLanguage][p]} events={getEventsByPeriod(p)} brandProfile={brandProfile} aspectRatio={selectedAspectRatio} currency={selectedCurrency} model={selectedImageModel} imageSize={selectedImageSize} language={selectedLanguage}
+                                    onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} generatedFlyers={dailyFlyerState[p]} setGeneratedFlyers={(u) => setDailyFlyerState(prev => ({...prev, [p]: u(prev[p])}))} triggerBatch={batchTrigger} styleReference={globalStyleReference} onCloneStyle={handleSetStyleReference} collabLogo={collabLogo} compositionAssets={compositionAssets} onPublishToCampaign={onPublishToCampaign}
+                                />
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Botão Direita */}
+                    <button
+                        onClick={() => scrollCarousel('right')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/90 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-primary hover:text-black hover:border-primary transition-all opacity-0 hover:opacity-100 peer-hover:opacity-100 shadow-2xl pointer-events-auto"
+                    >
+                        <Icon name="chevron-up" className="w-5 h-5 rotate-90" />
+                    </button>
                 </div>
             </>
         ) : (
@@ -755,5 +846,118 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
         )}
         <ManualEventModal isOpen={isManualModalOpen} onClose={() => setIsManualModalOpen(false)} onSave={(ev) => onAddEvent(ev)} day={selectedDay} />
     </div>
+
+    {/* Painel Lateral Integrado de Favoritos */}
+    <div
+      className={`bg-[#070707] border-l border-white/5 flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out ${
+        isStylePanelOpen ? 'w-80' : 'w-0 opacity-0 pointer-events-none'
+      }`}
+    >
+      {isStylePanelOpen && (
+        <>
+          {/* Header */}
+          <div className="px-6 py-5 border-b border-white/5 flex justify-between items-center bg-gradient-to-b from-[#0d0d0d] to-[#070707]">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
+                <Icon name="layout" className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-[11px] font-black text-white uppercase tracking-wider">Favoritos</h3>
+                <p className="text-[8px] text-white/30 font-bold uppercase tracking-wide mt-0.5">{styleReferences.length} Estilos</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsStylePanelOpen(false)}
+              className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all group"
+            >
+              <Icon name="chevron-up" className="w-4 h-4 rotate-90 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          </div>
+
+          {/* Info Banner */}
+          {selectedStyleReference && (
+            <div className="px-6 py-3 bg-primary/10 border-b border-primary/20 flex items-center gap-3">
+              <div className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <Icon name="check" className="w-3 h-3 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[8px] font-black text-primary uppercase tracking-wide">Estilo Ativo</p>
+                <p className="text-[9px] text-white/70 truncate font-bold">{selectedStyleReference.name}</p>
+              </div>
+              <button
+                onClick={() => {
+                  if (onClearSelectedStyleReference) onClearSelectedStyleReference();
+                }}
+                className="text-primary/50 hover:text-primary transition-colors"
+              >
+                <Icon name="x" className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            {styleReferences.length > 0 ? (
+              <div className="space-y-3">
+                {styleReferences.map((ref) => {
+                  const isSelected = selectedStyleReference?.id === ref.id;
+                  return (
+                    <button
+                      key={ref.id}
+                      onClick={() => {
+                        if (onSelectStyleReference) {
+                          onSelectStyleReference(ref);
+                        }
+                      }}
+                      className={`group relative w-full aspect-[4/3] rounded-xl overflow-hidden transition-all cursor-pointer ${
+                        isSelected
+                          ? 'ring-2 ring-primary ring-offset-2 ring-offset-[#070707] scale-[1.02]'
+                          : 'border border-white/10 hover:border-primary/30 hover:scale-[1.01]'
+                      }`}
+                    >
+                      <img src={ref.src} className="w-full h-full object-cover" alt={ref.name} />
+
+                      {/* Gradient Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+
+                      {/* Info */}
+                      <div className="absolute bottom-0 left-0 right-0 p-3">
+                        <p className="text-[9px] font-black text-white uppercase tracking-wide truncate">
+                          {ref.name}
+                        </p>
+                        <p className="text-[7px] text-white/50 uppercase tracking-wider mt-0.5 font-bold">
+                          {new Date(ref.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                        </p>
+                      </div>
+
+                      {/* Selected Badge */}
+                      {isSelected && (
+                        <div className="absolute top-3 right-3 w-7 h-7 rounded-lg bg-primary shadow-lg shadow-primary/50 flex items-center justify-center">
+                          <Icon name="check" className="w-4 h-4 text-black" />
+                        </div>
+                      )}
+
+                      {/* Hover Overlay */}
+                      <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
+                  <Icon name="layout" className="w-8 h-8 text-white/10" />
+                </div>
+                <p className="text-[11px] font-black text-white/40 uppercase tracking-wider mb-1">Nenhum Favorito</p>
+                <p className="text-[9px] text-white/20 font-medium max-w-[200px]">
+                  Salve estilos de imagens na galeria para usar aqui
+                </p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+    </>
   );
 };

@@ -103,7 +103,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
   return (
     <div className="h-screen flex overflow-hidden bg-black text-white font-sans selection:bg-primary selection:text-black">
-      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-56'} bg-[#050505]/60 flex flex-col flex-shrink-0 border-r border-white/5 backdrop-blur-3xl z-20 transition-all duration-300`}>
+      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-56'} bg-[#070707] flex flex-col flex-shrink-0 border-r border-white/5 z-20 transition-all duration-300`}>
         <div className={`h-16 flex items-center justify-between ${sidebarCollapsed ? 'px-3' : 'px-4'} flex-shrink-0`}>
           <div className="flex items-center">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 flex-shrink-0">
@@ -149,9 +149,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
       </aside>
 
       <main className="flex-1 overflow-y-auto relative z-10 bg-[#070707]">
-        <div className="max-w-[1400px] mx-auto px-6 sm:px-8 pt-5 pb-10 relative">
             {activeView === 'campaign' && (
-                <>
+                <div className="px-6 py-5">
                     {showUploadForm && <UploadForm onGenerate={onGenerate} isGenerating={isGenerating} />}
                     {isGenerating && (
                         <div className="flex flex-col items-center justify-center text-center p-32 aura-card border-white/5 bg-white/[0.01]">
@@ -161,60 +160,62 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                         </div>
                     )}
                     {campaign && (
-                        <div className="animate-fade-in-up space-y-8">
+                        <div className="animate-fade-in-up space-y-6">
                             {/* Header Section */}
-                            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 pb-8 border-b border-white/5">
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                                            <Icon name="zap" className="w-5 h-5 text-primary" />
-                                        </div>
-                                        <h2 className="text-2xl font-black tracking-tight uppercase">Campanha Gerada</h2>
-                                    </div>
-                                    <p className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-medium ml-[52px]">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <div className="text-left">
+                                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Campanha Gerada</h2>
+                                    <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
                                         {campaign.videoClipScripts.length} clips • {campaign.posts.length} posts • {campaign.adCreatives.length} anúncios
                                     </p>
                                 </div>
-                                <Button onClick={onResetCampaign} variant="secondary" icon="zap" size="small">Nova Campanha</Button>
-                            </div>
-
-                            {/* Tabs Navigation */}
-                            <div className="flex items-center gap-2 p-1.5 bg-[#111111] rounded-2xl border border-white/5 w-fit">
-                                {tabs.map(tab => (
-                                    <button
-                                        key={tab.id}
-                                        onClick={() => setActiveTab(tab.id)}
-                                        className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 ${
-                                            activeTab === tab.id
-                                                ? 'bg-white text-black shadow-lg'
-                                                : 'text-white/40 hover:text-white hover:bg-white/5'
-                                        }`}
-                                    >
-                                        {tab.label}
-                                    </button>
-                                ))}
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {/* Tabs Navigation */}
+                                    {tabs.map(tab => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setActiveTab(tab.id)}
+                                            className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-200 ${
+                                                activeTab === tab.id
+                                                    ? 'bg-white text-black'
+                                                    : 'bg-white/5 text-white/40 hover:text-white hover:bg-white/10 border border-white/5'
+                                            }`}
+                                        >
+                                            {tab.label}
+                                        </button>
+                                    ))}
+                                    <div className="w-px h-6 bg-white/10 mx-1"></div>
+                                    <Button onClick={onResetCampaign} variant="secondary" icon="zap" size="small">Nova Campanha</Button>
+                                </div>
                             </div>
 
                             {/* Content */}
-                            <div className="space-y-6">
-                                {activeTab === 'clips' && <ClipsTab brandProfile={brandProfile} videoClipScripts={campaign.videoClipScripts} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
-                                {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
-                                {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} />}
+                            <div className="space-y-4">
+                                {activeTab === 'clips' && <ClipsTab brandProfile={brandProfile} videoClipScripts={campaign.videoClipScripts} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} />}
+                                {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} />}
+                                {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} />}
                             </div>
                         </div>
                     )}
-                </>
+                </div>
             )}
             {activeView === 'flyer' && (
-                <FlyerGenerator
-                  brandProfile={brandProfile} events={tournamentEvents} weekScheduleInfo={weekScheduleInfo} onFileUpload={onTournamentFileUpload} onAddEvent={onAddTournamentEvent} onAddImageToGallery={onAddImageToGallery} flyerState={flyerState} setFlyerState={setFlyerState} dailyFlyerState={dailyFlyerState} setDailyFlyerState={setDailyFlyerState} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference}
-                  onPublishToCampaign={onPublishToCampaign}
-                  selectedStyleReference={selectedStyleReference}
-                  onClearSelectedStyleReference={onClearSelectedStyleReference}
-                />
+                <div className="flex h-full overflow-hidden">
+                    <FlyerGenerator
+                      brandProfile={brandProfile} events={tournamentEvents} weekScheduleInfo={weekScheduleInfo} onFileUpload={onTournamentFileUpload} onAddEvent={onAddTournamentEvent} onAddImageToGallery={onAddImageToGallery} flyerState={flyerState} setFlyerState={setFlyerState} dailyFlyerState={dailyFlyerState} setDailyFlyerState={setDailyFlyerState} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference}
+                      onPublishToCampaign={onPublishToCampaign}
+                      selectedStyleReference={selectedStyleReference}
+                      onClearSelectedStyleReference={onClearSelectedStyleReference}
+                      styleReferences={styleReferences}
+                      onSelectStyleReference={onSelectStyleReference}
+                    />
+                </div>
             )}
-            {activeView === 'gallery' && <GalleryView images={galleryImages} onUpdateImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} onSelectStyleReference={onSelectStyleReference} />}
-        </div>
+            {activeView === 'gallery' && (
+                <div className="px-6 py-5">
+                    <GalleryView images={galleryImages} onUpdateImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} onSelectStyleReference={onSelectStyleReference} />
+                </div>
+            )}
       </main>
 
        <AssistantPanel isOpen={isAssistantOpen} onClose={onToggleAssistant} history={assistantHistory} isLoading={isAssistantLoading} onSendMessage={onAssistantSendMessage} referenceImage={chatReferenceImage} onClearReference={() => onSetChatReference(null)} />

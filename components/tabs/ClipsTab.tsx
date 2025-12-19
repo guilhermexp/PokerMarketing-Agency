@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import type { VideoClipScript, BrandProfile, GalleryImage, ImageModel, VideoModel, ImageFile } from '../../types';
+import type { VideoClipScript, BrandProfile, GalleryImage, ImageModel, VideoModel, ImageFile, StyleReference } from '../../types';
 import { Button } from '../common/Button';
 import { Loader } from '../common/Loader';
 import { Icon } from '../common/Icon';
 import { generateImage, generateVideo, generateSpeech } from '../../services/geminiService';
 import { ImagePreviewModal } from '../common/ImagePreviewModal';
+import { ExportVideoModal } from '../common/ExportVideoModal';
+import { concatenateVideos, downloadBlob, type ExportProgress, type VideoInput } from '../../services/ffmpegService';
 
 // --- Helper Functions for Audio Processing ---
 
@@ -60,6 +62,9 @@ interface ClipsTabProps {
   onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
+  styleReferences?: StyleReference[];
+  onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
+  onRemoveStyleReference?: (id: string) => void;
 }
 
 interface Scene {
@@ -85,17 +90,24 @@ interface ClipCardProps {
   isGeneratingThumbnail: boolean;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
+  styleReferences?: StyleReference[];
+  onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
+  onRemoveStyleReference?: (id: string) => void;
 }
 
 const ClipCard: React.FC<ClipCardProps> = ({
     clip, brandProfile, thumbnail, onGenerateThumbnail, isGeneratingThumbnail,
-    onUpdateGalleryImage, onSetChatReference
+    onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference
 }) => {
     const [scenes, setScenes] = useState<Scene[]>([]);
     const [videoStates, setVideoStates] = useState<Record<number, VideoState>>({});
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [editingThumbnail, setEditingThumbnail] = useState<GalleryImage | null>(null);
     const [audioState, setAudioState] = useState<{ url?: string; isLoading: boolean; error?: string | null }>({ isLoading: false });
+    const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [mergedVideoUrl, setMergedVideoUrl] = useState<string | null>(null);
+    const [isMerging, setIsMerging] = useState(false);
 
     useEffect(() => {
         if (!clip.scenes) return;
@@ -181,6 +193,154 @@ const ClipCard: React.FC<ClipCardProps> = ({
         }
     };
 
+    const handleExportVideo = async () => {
+        const generatedVideos: VideoInput[] = [];
+
+        for (const scene of scenes) {
+            const videoState = videoStates[scene.sceneNumber];
+            if (videoState?.url) {
+                generatedVideos.push({
+                    url: videoState.url,
+                    sceneNumber: scene.sceneNumber,
+                    duration: scene.duration,
+                });
+            }
+        }
+
+        if (generatedVideos.length === 0) {
+            alert('Nenhum video gerado para exportar. Gere pelo menos um video primeiro.');
+            return;
+        }
+
+        if (generatedVideos.length !== scenes.length) {
+            const missing = scenes.length - generatedVideos.length;
+            const confirmExport = window.confirm(
+                `${missing} cena(s) ainda nao foram geradas. Deseja exportar apenas as cenas disponiveis?`
+            );
+            if (!confirmExport) return;
+        }
+
+        setIsExportModalOpen(true);
+        setExportProgress({ phase: 'loading', progress: 0, message: 'Iniciando...' });
+
+        try {
+            const outputBlob = await concatenateVideos(generatedVideos, {
+                outputFormat: 'mp4',
+                onProgress: setExportProgress,
+            });
+
+            const timestamp = new Date().toISOString().slice(0, 10);
+            const safeTitle = clip.title.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+            const filename = `${safeTitle}_${timestamp}.mp4`;
+
+            downloadBlob(outputBlob, filename);
+        } catch (error) {
+            console.error('Export failed:', error);
+            setExportProgress({
+                phase: 'error',
+                progress: 0,
+                message: error instanceof Error ? error.message : 'Falha na exportacao',
+            });
+        }
+    };
+
+    const handleMergeVideos = async () => {
+        const generatedVideos: VideoInput[] = [];
+
+        for (const scene of scenes) {
+            const videoState = videoStates[scene.sceneNumber];
+            if (videoState?.url) {
+                generatedVideos.push({
+                    url: videoState.url,
+                    sceneNumber: scene.sceneNumber,
+                    duration: scene.duration,
+                });
+            }
+        }
+
+        if (generatedVideos.length === 0) {
+            alert('Nenhum video gerado. Gere pelo menos um video primeiro.');
+            return;
+        }
+
+        if (generatedVideos.length < 2) {
+            alert('Precisa de pelo menos 2 videos para juntar.');
+            return;
+        }
+
+        setIsMerging(true);
+        setIsExportModalOpen(true);
+        setExportProgress({ phase: 'loading', progress: 0, message: 'Iniciando...' });
+
+        try {
+            const outputBlob = await concatenateVideos(generatedVideos, {
+                outputFormat: 'mp4',
+                onProgress: setExportProgress,
+            });
+
+            // Revoke old URL if exists
+            if (mergedVideoUrl) {
+                URL.revokeObjectURL(mergedVideoUrl);
+            }
+
+            const previewUrl = URL.createObjectURL(outputBlob);
+            setMergedVideoUrl(previewUrl);
+            setIsExportModalOpen(false);
+        } catch (error) {
+            console.error('Merge failed:', error);
+            setExportProgress({
+                phase: 'error',
+                progress: 0,
+                message: error instanceof Error ? error.message : 'Falha ao juntar videos',
+            });
+        } finally {
+            setIsMerging(false);
+        }
+    };
+
+    const handleDownloadMerged = () => {
+        if (!mergedVideoUrl) return;
+
+        const timestamp = new Date().toISOString().slice(0, 10);
+        const safeTitle = clip.title.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+        const filename = `${safeTitle}_${timestamp}.mp4`;
+
+        const a = document.createElement('a');
+        a.href = mergedVideoUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+
+    // Check if thumbnail is already in favorites
+    const isFavorite = (image: GalleryImage) => {
+        return styleReferences?.some(ref => ref.src === image.src) || false;
+    };
+
+    // Get the favorite reference for an image
+    const getFavoriteRef = (image: GalleryImage) => {
+        return styleReferences?.find(ref => ref.src === image.src);
+    };
+
+    const handleToggleFavorite = (image: GalleryImage) => {
+        if (!onAddStyleReference || !onRemoveStyleReference) return;
+
+        const existingRef = getFavoriteRef(image);
+        if (existingRef) {
+            // Remove from favorites
+            onRemoveStyleReference(existingRef.id);
+        } else {
+            // Add to favorites
+            onAddStyleReference({
+                src: image.src,
+                name: image.prompt.substring(0, 50) || `Favorito ${new Date().toLocaleDateString('pt-BR')}`
+            });
+        }
+    };
+
+    const hasGeneratedVideos = Object.values(videoStates).some(v => v.url);
+    const generatedVideosCount = Object.values(videoStates).filter(v => v.url).length;
     const totalDuration = scenes.reduce((acc, s) => acc + s.duration, 0);
 
     return (
@@ -197,10 +357,69 @@ const ClipCard: React.FC<ClipCardProps> = ({
                             <p className="text-[10px] text-white/40">{scenes.length} cenas • {totalDuration}s • {clip.hook}</p>
                         </div>
                     </div>
-                    <Button onClick={handleGenerateAllVideos} isLoading={isGeneratingAll} disabled={isGeneratingAll} size="small" icon="zap">
-                        Gerar Todos
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button onClick={handleGenerateAllVideos} isLoading={isGeneratingAll} disabled={isGeneratingAll} size="small" icon="zap">
+                            Gerar Todos
+                        </Button>
+                        <Button
+                            onClick={handleMergeVideos}
+                            disabled={isGeneratingAll || isMerging || generatedVideosCount < 2}
+                            isLoading={isMerging}
+                            size="small"
+                            icon="video"
+                        >
+                            Juntar ({generatedVideosCount})
+                        </Button>
+                        <Button
+                            onClick={mergedVideoUrl ? handleDownloadMerged : handleExportVideo}
+                            disabled={isGeneratingAll || (!mergedVideoUrl && !hasGeneratedVideos)}
+                            size="small"
+                            icon="download"
+                            variant="primary"
+                        >
+                            Exportar
+                        </Button>
+                    </div>
                 </div>
+
+                {/* Merged Video Preview */}
+                {mergedVideoUrl && (
+                    <div className="border-b border-white/5 bg-gradient-to-r from-primary/5 to-transparent">
+                        <div className="p-4 flex items-center gap-4">
+                            <div className="flex-shrink-0">
+                                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                                    <Icon name="video" className="w-5 h-5 text-primary" />
+                                </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h4 className="text-xs font-black text-white uppercase tracking-wide">Vídeo Final</h4>
+                                <p className="text-[10px] text-white/40">{generatedVideosCount} cenas concatenadas • Pronto para exportar</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => {
+                                        URL.revokeObjectURL(mergedVideoUrl);
+                                        setMergedVideoUrl(null);
+                                    }}
+                                    className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                                    title="Remover preview"
+                                >
+                                    <Icon name="x" className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="px-4 pb-4">
+                            <div className="aspect-video bg-black rounded-xl overflow-hidden border border-white/5 max-w-2xl">
+                                <video
+                                    src={mergedVideoUrl}
+                                    controls
+                                    className="w-full h-full"
+                                    autoPlay
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex flex-col lg:flex-row">
                     {/* Thumbnail */}
@@ -211,7 +430,14 @@ const ClipCard: React.FC<ClipCardProps> = ({
                             ) : thumbnail ? (
                                 <>
                                     <img src={thumbnail.src} alt={clip.title} className="w-full h-full object-cover" />
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center">
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleToggleFavorite(thumbnail); }}
+                                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isFavorite(thumbnail) ? 'bg-primary text-black' : 'bg-white/10 text-white/70 hover:text-primary'}`}
+                                            title={isFavorite(thumbnail) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                                        >
+                                            <Icon name="heart" className="w-4 h-4" />
+                                        </button>
                                         <Button size="small" onClick={() => setEditingThumbnail(thumbnail)}>Editar</Button>
                                     </div>
                                 </>
@@ -301,13 +527,22 @@ const ClipCard: React.FC<ClipCardProps> = ({
                     downloadFilename={`thumbnail-${clip.title.toLowerCase().replace(/\s+/g, '_')}.png`}
                 />
             )}
+
+            <ExportVideoModal
+                isOpen={isExportModalOpen}
+                onClose={() => {
+                    setIsExportModalOpen(false);
+                    setExportProgress(null);
+                }}
+                progress={exportProgress}
+            />
         </>
     );
 };
 
 // --- ClipsTab Component ---
 
-export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfile, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference }) => {
+export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfile, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference }) => {
     const [thumbnails, setThumbnails] = useState<(GalleryImage | null)[]>([]);
     const [generationState, setGenerationState] = useState<{ isGenerating: boolean[], errors: (string | null)[] }>({
         isGenerating: [],
@@ -401,18 +636,17 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
 
     return (
         <div className="space-y-6">
-            {/* Controls Bar */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-5 bg-[#0a0a0a] rounded-2xl border border-white/5">
+            {/* Controls Bar - Minimal */}
+            <div className="flex items-center justify-between">
                 <Button onClick={handleGenerateAllThumbnails} isLoading={isGeneratingAll} disabled={isGeneratingAll || generationState.isGenerating.some(Boolean)} icon="zap" size="small">
                     Gerar Todas Capas
                 </Button>
-                <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-black uppercase tracking-[0.15em] text-white/30">Modelo:</span>
+                <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-white/30">Modelo:</span>
                     <select
-                        id="model-select-clips"
                         value={selectedImageModel}
                         onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
-                        className="bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-primary/30 focus:border-primary/50 outline-none transition-all"
+                        className="bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-primary/50 outline-none transition-all"
                     >
                         <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
                         <option value="gemini-2.5-flash-image">Gemini 2.5 Flash</option>
@@ -432,6 +666,9 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
                     onGenerateThumbnail={() => handleGenerateThumbnail(index)}
                     onUpdateGalleryImage={onUpdateGalleryImage}
                     onSetChatReference={onSetChatReference}
+                    styleReferences={styleReferences}
+                    onAddStyleReference={onAddStyleReference}
+                    onRemoveStyleReference={onRemoveStyleReference}
                 />
             ))}
         </div>

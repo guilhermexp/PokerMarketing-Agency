@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Post, BrandProfile, ContentInput, GalleryImage, IconName, ImageModel } from '../../types';
+import type { Post, BrandProfile, ContentInput, GalleryImage, IconName, ImageModel, StyleReference } from '../../types';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
@@ -15,6 +15,9 @@ interface PostsTabProps {
   onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
+  styleReferences?: StyleReference[];
+  onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
+  onRemoveStyleReference?: (id: string) => void;
 }
 
 const socialIcons: Record<string, IconName> = {
@@ -32,7 +35,10 @@ const PostCard: React.FC<{
     onGenerate: () => void;
     onImageUpdate: (newSrc: string) => void;
     onSetChatReference: (image: GalleryImage | null) => void;
-}> = ({ post, image, isGenerating, error, onGenerate, onImageUpdate, onSetChatReference }) => {
+    styleReferences?: StyleReference[];
+    onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
+    onRemoveStyleReference?: (id: string) => void;
+}> = ({ post, image, isGenerating, error, onGenerate, onImageUpdate, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference }) => {
     const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
     const [isCopied, setIsCopied] = useState(false);
 
@@ -58,7 +64,33 @@ const PostCard: React.FC<{
             alert('Falha ao copiar o texto.');
         });
     };
-    
+
+    // Check if image is already in favorites
+    const isFavorite = (img: GalleryImage) => {
+        return styleReferences?.some(ref => ref.src === img.src) || false;
+    };
+
+    // Get the favorite reference for an image
+    const getFavoriteRef = (img: GalleryImage) => {
+        return styleReferences?.find(ref => ref.src === img.src);
+    };
+
+    const handleToggleFavorite = (img: GalleryImage) => {
+        if (!onAddStyleReference || !onRemoveStyleReference) return;
+
+        const existingRef = getFavoriteRef(img);
+        if (existingRef) {
+            // Remove from favorites
+            onRemoveStyleReference(existingRef.id);
+        } else {
+            // Add to favorites
+            onAddStyleReference({
+                src: img.src,
+                name: img.prompt.substring(0, 50) || `Favorito ${new Date().toLocaleDateString('pt-BR')}`
+            });
+        }
+    };
+
     const icon = socialIcons[post.platform] || 'share';
 
     return (
@@ -80,7 +112,14 @@ const PostCard: React.FC<{
                         ) : image ? (
                             <>
                                 <img src={image.src} alt={`Visual for ${post.platform} post`} className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/70 opacity-0 hover:opacity-100 transition-all flex items-center justify-center">
+                                <div className="absolute inset-0 bg-black/70 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleToggleFavorite(image); }}
+                                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isFavorite(image) ? 'bg-primary text-black' : 'bg-white/10 text-white/70 hover:text-primary'}`}
+                                        title={isFavorite(image) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                                    >
+                                        <Icon name="heart" className="w-4 h-4" />
+                                    </button>
                                     <Button size="small" onClick={handleEditClick}>Editar</Button>
                                 </div>
                             </>
@@ -135,7 +174,7 @@ const PostCard: React.FC<{
 };
 
 
-export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referenceImage, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference }) => {
+export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referenceImage, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference }) => {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
   const [generationState, setGenerationState] = useState<{ isGenerating: boolean[], errors: (string | null)[] }>({
     isGenerating: [],
@@ -274,6 +313,9 @@ export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referen
               onGenerate={() => handleGenerate(index)}
               onImageUpdate={(newSrc) => handleImageUpdate(index, newSrc)}
               onSetChatReference={onSetChatReference}
+              styleReferences={styleReferences}
+              onAddStyleReference={onAddStyleReference}
+              onRemoveStyleReference={onRemoveStyleReference}
           />
         ))}
       </div>

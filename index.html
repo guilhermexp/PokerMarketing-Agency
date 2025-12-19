@@ -9,23 +9,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      :root {
-        /* Aura OS Edition - Obsidian & Pearl */
-        --color-primary: 245 158 11; /* Amber Accent */
-        --color-primary-hover: 217 119 6;
-        --color-background: 12 12 12;
-        --color-surface: 18 18 18;
-        --color-muted: 24 24 24;
-        --color-subtle: 48 48 48;
-        --color-text-main: 255 255 255;
-        --color-text-muted: 100 100 100;
-      }
-
       body {
-        background-color: rgb(var(--color-background));
-        color: rgb(var(--color-text-main));
+        background-color: var(--color-background);
+        color: var(--color-text-main);
         -webkit-font-smoothing: antialiased;
         overflow-x: hidden;
       }
@@ -69,25 +56,6 @@
         animation: slow-glow 15s infinite ease-in-out;
       }
     </style>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: { sans: ['Inter', 'sans-serif'] },
-            colors: {
-              'primary': 'rgb(var(--color-primary) / <alpha-value>)',
-              'primary-hover': 'rgb(var(--color-primary-hover) / <alpha-value>)',
-              'background': 'rgb(var(--color-background) / <alpha-value>)',
-              'surface': 'rgb(var(--color-surface) / <alpha-value>)',
-              'muted': 'rgb(var(--color-muted) / <alpha-value>)',
-              'subtle': 'rgb(var(--color-subtle) / <alpha-value>)',
-              'text-main': 'rgb(var(--color-text-main) / <alpha-value>)',
-              'text-muted': 'rgb(var(--color-text-muted) / <alpha-value>)',
-            },
-          }
-        }
-      }
-    </script>
     <script type="importmap">
     {
       "imports": {

@@ -302,107 +302,86 @@ export const generateFlyer = async (
     const ai = getAi();
     
     const brandingInstruction = `
-    Você é um diretor de arte sênior e diretor de fotografia cinematográfica de uma agência de publicidade de elite especializada em iGaming e Poker.
+    **PERSONA:** Você é Diretor de Arte Sênior de uma agência de publicidade internacional de elite especializada em iGaming e Poker.
 
-    **IDENTIDADE DA MARCA:**
-    - Cliente: ${brandProfile.name}
-    - Cor Primária (fundos, áreas principais): ${brandProfile.primaryColor}
-    - Cor de Destaque (CTAs, valores importantes, destaques): ${brandProfile.secondaryColor}
+    **MISSÃO CRÍTICA (NÃO PULE ESTA REGRA):**
+    Todo torneio de poker é definido pelo seu VALOR GARANTIDO (GTD).
+    Você DEVE escrever o valor do **GARANTIDO (GTD)** em cada item da lista.
+    O GTD deve estar em destaque visual (fonte negrito, cor vibrante ou tamanho maior).
+
+    **REGRAS DE CONTEÚDO:**
+    1. Se o prompt fornecer um valor de "GTD", ele deve aparecer obrigatoriamente.
+    2. O Horário e o Nome do Torneio devem estar perfeitamente legíveis.
+    3. Use a marca ${brandProfile.name}.
+
+    **IDENTIDADE DA MARCA - ${brandProfile.name}:**
     - Tom de Comunicação: ${brandProfile.toneOfVoice}
+    - Cor Primária (dominante): ${brandProfile.primaryColor}
+    - Cor de Acento (destaques, GTD, CTAs): ${brandProfile.secondaryColor}
 
-    **DIRETRIZES DE DESIGN PROFISSIONAL:**
+    **PRINCÍPIOS DE DESIGN PROFISSIONAL:**
 
-    1. HIERARQUIA VISUAL (CRÍTICO):
-       - O valor GTD (garantido) DEVE ser o elemento de maior destaque visual
-       - Use a cor de destaque (${brandProfile.secondaryColor}) para valores GTD
-       - Tipografia: GTD em fonte bold/black, 3x maior que texto secundário
-       - Horários e buy-ins em tamanho médio, alta legibilidade
+    1. HARMONIA CROMÁTICA:
+       - Use APENAS as cores da marca: ${brandProfile.primaryColor} (primária) e ${brandProfile.secondaryColor} (acento)
+       - Crie variações tonais dessas cores (mais claras/escuras) para profundidade
+       - Evite introduzir cores aleatórias - mantenha a paleta restrita e sofisticada
+       - Gradientes sutis entre tons da mesma cor são bem-vindos
 
-    2. SISTEMA DE CORES HARMÔNICO:
-       - Fundo principal: ${brandProfile.primaryColor} ou gradiente sutil derivado
-       - Elementos de destaque: ${brandProfile.secondaryColor}
-       - Texto principal: branco ou off-white (#F5F5F5) para contraste
-       - Texto secundário: branco com 70% opacidade
-       - NUNCA misture cores aleatórias - mantenha a paleta da marca
+    2. RESPIRAÇÃO VISUAL (Anti-Poluição):
+       - Menos é mais: priorize espaços negativos estratégicos
+       - Não sobrecarregue com elementos decorativos desnecessários
+       - Cada elemento deve ter uma função clara
+       - Margens e padding generosos para respiração
+       - Hierarquia visual clara: 1 elemento principal, 2-3 secundários, demais terciários
 
-    3. TIPOGRAFIA PROFISSIONAL:
-       - Use fontes sans-serif modernas e bold para títulos
-       - Valores monetários sempre em destaque com fonte impactante
-       - Mínimo de 2 níveis de hierarquia tipográfica
-       - Espaçamento entre linhas adequado para legibilidade
+    3. TIPOGRAFIA CINEMATOGRÁFICA:
+       - Máximo 2-3 famílias tipográficas diferentes
+       - Contraste forte entre títulos (bold/black) e corpo (regular/medium)
+       - Kerning e tracking profissionais
+       - Alinhamento consistente e intencional
 
-    4. COMPOSIÇÃO E LAYOUT:
-       - Grid limpo e organizado
-       - Alinhamento consistente (esquerda ou centro)
-       - Margens e padding uniformes
-       - Logo posicionado no topo ou canto superior
-       - Respire: use espaço negativo estrategicamente
+    4. COMPOSIÇÃO CINEMATOGRÁFICA:
+       - Pense como diretor de fotografia: onde o olho deve pousar primeiro?
+       - Use regra dos terços, golden ratio, ou composição centralizada intencional
+       - Profundidade através de camadas (foreground, middle, background)
+       - Iluminação direcionada - crie foco com luz e sombra
 
-    5. ESTÉTICA PREMIUM:
-       - Qualidade de cassino/poker de alto nível
-       - Efeitos sutis: gradientes suaves, sombras leves
-       - Evite: cliparts, elementos amadores, cores neon excessivas
-       - Atmosfera: sofisticada, profissional, confiável
+    5. ESTÉTICA PREMIUM SEM CLICHÊS:
+       - Evite excesso de efeitos (brilhos, sombras, neons chamativos)
+       - Prefira elegância sutil a ostentação visual
+       - Qualidade de marca luxury - refinamento, não exagero
+       - Se usar elementos de poker (fichas, cartas), que sejam fotorealistas e integrados, não clipart
 
-    6. CONSISTÊNCIA OBRIGATÓRIA:
-       - Todos os flyers da mesma sessão devem parecer uma família visual
-       - Mantenha o mesmo estilo de layout entre gerações
-       - Se houver imagem de referência, SIGA o estilo dela fielmente
+    6. PERSONALIZAÇÃO DA MARCA:
+       - O flyer deve parecer EXCLUSIVAMENTE da marca ${brandProfile.name}
+       - Se houver logo, integre-o de forma orgânica (não apenas colado)
+       - O estilo visual deve refletir o tom: ${brandProfile.toneOfVoice}
+       - Seja consistente: todos os flyers desta marca devem ter DNA visual comum
 
-    **ESTÉTICA CINEMATOGRÁFICA (DIFERENCIAL DE QUALIDADE):**
-
-    7. ILUMINAÇÃO DRAMÁTICA:
-       - Use iluminação low-key com sombras profundas e misteriosas
-       - Aplique rim light (luz de contorno) nos elementos principais
-       - Volumetric lighting: raios de luz atravessando névoa/fumaça
-       - Luz quente dourada (${brandProfile.secondaryColor}) como destaque
-       - Contraste dramático entre luz e sombra (chiaroscuro)
-
-    8. ATMOSFERA E PROFUNDIDADE:
-       - Adicione haze/névoa sutil para criar profundidade atmosférica
-       - Smoke effects: fumaça elegante de charuto/ambiente de cassino
-       - Shallow depth of field: foco no elemento principal, fundo em bokeh
-       - Partículas de poeira dourada flutuando na luz
-       - Reflexos sutis em superfícies (mesa de poker, fichas, cartas)
-
-    9. COLOR GRADING CINEMATOGRÁFICO:
-       - Teal and orange: sombras em tons frios, highlights quentes
-       - Blacks elevados (não 100% preto, mas tons de cinza profundo)
-       - Highlights com bloom sutil e glow
-       - Gradiente de cor atmosférico do fundo para frente
-       - Vignette sutil nas bordas para direcionar o olhar
-
-    10. COMPOSIÇÃO DE CENA:
-        - Rule of thirds para posicionamento dos elementos principais
-        - Leading lines direcionando para o valor GTD
-        - Foreground elements: fichas de poker, cartas em primeiro plano desfocadas
-        - Layering: múltiplas camadas de profundidade (frente, meio, fundo)
-        - Negative space dramático para respiro visual
-
-    11. TEXTURAS E MATERIAIS PREMIUM:
-        - Feltro verde de mesa de poker com textura visível
-        - Fichas de poker com reflexos metálicos realistas
-        - Cartas com acabamento fosco/brilhante
-        - Superfícies de madeira nobre e couro
-        - Metal dourado/bronze nos elementos decorativos
-
-    12. MOTION BLUR E DINAMISMO:
-        - Sugestão de movimento em elementos secundários
-        - Cartas "caindo" com motion blur sutil
-        - Fichas em movimento sugerido
-        - Energia e ação congelada no momento perfeito
+    **ATMOSFERA FINAL:**
+    - Poker de alta classe, luxo e sofisticação
+    - Cinematográfico mas não exagerado
+    - Profissional mas criativo
+    - Impactante mas elegante
     `;
 
     const parts: any[] = [
         { text: brandingInstruction },
-        { text: `SOLICITAÇÃO ESPECÍFICA: ${prompt}` }
+        { text: `DADOS DO FLYER PARA INSERIR NA ARTE:\n${prompt}` }
     ];
 
     if (logo) parts.push({ inlineData: { data: logo.base64, mimeType: logo.mimeType } });
     if (collabLogo) parts.push({ inlineData: { data: collabLogo.base64, mimeType: collabLogo.mimeType } });
-    if (referenceImage) parts.push({ inlineData: { data: referenceImage.base64, mimeType: referenceImage.mimeType } });
+    if (referenceImage) {
+        parts.push({ text: "USE ESTA IMAGEM COMO REFERÊNCIA DE LAYOUT E FONTES:" });
+        parts.push({ inlineData: { data: referenceImage.base64, mimeType: referenceImage.mimeType } });
+    }
+
     if (compositionAssets) {
-        compositionAssets.forEach(asset => parts.push({ inlineData: { data: asset.base64, mimeType: asset.mimeType } }));
+        compositionAssets.forEach((asset, i) => {
+            parts.push({ text: `Ativo de composição ${i+1}:` });
+            parts.push({ inlineData: { data: asset.base64, mimeType: asset.mimeType } });
+        });
     }
     
     const response = await ai.models.generateContent({
