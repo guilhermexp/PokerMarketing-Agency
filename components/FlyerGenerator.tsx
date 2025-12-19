@@ -421,7 +421,53 @@ const PeriodCard: React.FC<{
         const topEventText = topEvent ? `${topEvent.name} - GTD: ${formatCurrencyValue(topEvent.gtd, currency)} - Horário: ${topEvent.times?.['-3']} - Buy-in: ${formatCurrencyValue(topEvent.buyIn, currency)}` : '';
         const otherEventsList = otherEvents.map(e => `${e.times?.['-3']} | ${e.name} | Buy-in: ${formatCurrencyValue(e.buyIn, currency)} | GTD: ${formatCurrencyValue(e.gtd, currency)}`).join('\n');
 
-        const prompt = `
+        // DEBUG: Ver dados enviados para IA
+        console.log(`\n===== DEBUG FLYER ${label} =====`);
+        console.log(`Total eventos recebidos: ${events.length}`);
+        console.log(`Eventos:`, events.map(e => `${e.times?.['-3']} | ${e.name} | ${e.id}`));
+        console.log(`Top Event: ${topEventText}`);
+        console.log(`Lista outros:\n${otherEventsList}`);
+        console.log(`================================\n`);
+
+        // Prompt específico para HIGHLIGHTS (apenas 3 torneios)
+        const isHighlights = period === 'HIGHLIGHTS';
+
+        const prompt = isHighlights ? `
+        TIPO: Flyer de Destaques do Dia - TOP 3 TORNEIOS
+        TÍTULO: ${label.toUpperCase()}
+
+        ⚠️ REGRA CRÍTICA: Este flyer mostra EXATAMENTE 3 torneios. NÃO ADICIONE, NÃO DUPLIQUE, NÃO REPITA nenhum torneio.
+
+        ═══════════════════════════════════════════
+        OS 3 TORNEIOS DESTAQUES (cada um aparece UMA ÚNICA VEZ):
+        ═══════════════════════════════════════════
+
+        🥇 1º DESTAQUE (MAIOR GTD - área principal):
+        ${topEventText}
+
+        🥈 2º DESTAQUE:
+        ${otherEvents[0] ? `${otherEvents[0].times?.['-3']} | ${otherEvents[0].name} | Buy-in: ${formatCurrencyValue(otherEvents[0].buyIn, currency)} | GTD: ${formatCurrencyValue(otherEvents[0].gtd, currency)}` : ''}
+
+        🥉 3º DESTAQUE:
+        ${otherEvents[1] ? `${otherEvents[1].times?.['-3']} | ${otherEvents[1].name} | Buy-in: ${formatCurrencyValue(otherEvents[1].buyIn, currency)} | GTD: ${formatCurrencyValue(otherEvents[1].gtd, currency)}` : ''}
+
+        ═══════════════════════════════════════════
+        LAYOUT OBRIGATÓRIO:
+        ═══════════════════════════════════════════
+        - O 1º destaque (${topEvent?.name}) ocupa a METADE SUPERIOR com visual impactante
+        - Os outros 2 torneios ficam na METADE INFERIOR em formato de cards ou lista
+        - TOTAL DE ITENS NA IMAGEM: EXATAMENTE 3 torneios
+        - NÃO crie linhas extras, NÃO repita nenhum nome
+
+        ═══════════════════════════════════════════
+        DESIGN:
+        ═══════════════════════════════════════════
+        - Logo da marca no topo
+        - GTD em destaque com cor ${brandProfile.secondaryColor}
+        - Fundo baseado em ${brandProfile.primaryColor}
+        - Visual premium de poker/cassino
+        - Efeitos visuais: partículas, brilhos, fichas decorativas
+        ` : `
         TIPO: Grade de Programação com Destaque Principal
         TÍTULO DA SESSÃO: ${label.toUpperCase()}
         TOTAL: ${events.length} torneios
@@ -447,12 +493,13 @@ const PeriodCard: React.FC<{
         SEÇÃO 2 - GRADE DE OUTROS TORNEIOS (60% do espaço):
         ═══════════════════════════════════════════
 
-        LISTA DOS DEMAIS TORNEIOS:
+        LISTA DOS DEMAIS TORNEIOS (cada torneio aparece UMA ÚNICA VEZ, não repita):
         ${otherEventsList}
 
         FORMATO DA GRADE:
         - Layout tipo tabela/lista profissional
         - Cada linha: [HORÁRIO] | [NOME] | [BUY-IN] | [GTD]
+        - IMPORTANTE: Cada torneio deve aparecer EXATAMENTE 1 vez na grade
         - GTD em cor ${brandProfile.secondaryColor} (menor que o destaque, mas visível)
         - Linhas alternadas ou separadores para facilitar leitura
         - Fonte menor que o destaque, mas perfeitamente legível

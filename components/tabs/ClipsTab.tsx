@@ -382,45 +382,6 @@ const ClipCard: React.FC<ClipCardProps> = ({
                     </div>
                 </div>
 
-                {/* Merged Video Preview */}
-                {mergedVideoUrl && (
-                    <div className="border-b border-white/5 bg-gradient-to-r from-primary/5 to-transparent">
-                        <div className="p-4 flex items-center gap-4">
-                            <div className="flex-shrink-0">
-                                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                                    <Icon name="video" className="w-5 h-5 text-primary" />
-                                </div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h4 className="text-xs font-black text-white uppercase tracking-wide">Vídeo Final</h4>
-                                <p className="text-[10px] text-white/40">{generatedVideosCount} cenas concatenadas • Pronto para exportar</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => {
-                                        URL.revokeObjectURL(mergedVideoUrl);
-                                        setMergedVideoUrl(null);
-                                    }}
-                                    className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
-                                    title="Remover preview"
-                                >
-                                    <Icon name="x" className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-                        <div className="px-4 pb-4">
-                            <div className="aspect-video bg-black rounded-xl overflow-hidden border border-white/5 max-w-2xl">
-                                <video
-                                    src={mergedVideoUrl}
-                                    controls
-                                    className="w-full h-full"
-                                    autoPlay
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
                 <div className="flex flex-col lg:flex-row">
                     {/* Thumbnail */}
                     <div className="lg:w-48 flex-shrink-0 p-4 bg-[#0d0d0d] border-b lg:border-b-0 lg:border-r border-white/5">
@@ -475,6 +436,55 @@ const ClipCard: React.FC<ClipCardProps> = ({
                     <div className="flex-1 p-4">
                         <h4 className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-3">Cenas do Roteiro</h4>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                            {/* Merged Video - First Position */}
+                            {mergedVideoUrl && (
+                                <div className="bg-[#0a0a0a] rounded-xl border-2 border-primary/50 overflow-hidden flex flex-col ring-2 ring-primary/20">
+                                    {/* Video Preview */}
+                                    <div className="aspect-[9/16] bg-[#080808] relative">
+                                        <video
+                                            src={mergedVideoUrl}
+                                            controls
+                                            className="w-full h-full object-cover"
+                                            autoPlay
+                                        />
+                                        {/* Badge */}
+                                        <div className="absolute top-1.5 left-1.5 right-1.5 flex justify-between items-center">
+                                            <span className="text-[7px] font-black bg-primary text-black px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                                                <Icon name="video" className="w-2.5 h-2.5" />
+                                                FINAL
+                                            </span>
+                                            <span className="text-[7px] font-bold text-white/60 bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
+                                                {totalDuration}s
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {/* Action */}
+                                    <div className="p-2">
+                                        <p className="text-[8px] text-white/40 line-clamp-2 mb-2">{generatedVideosCount} cenas concatenadas</p>
+                                        <div className="flex gap-1">
+                                            <Button
+                                                onClick={handleDownloadMerged}
+                                                size="small"
+                                                variant="primary"
+                                                className="flex-1 text-[8px]"
+                                                icon="download"
+                                            >
+                                                Baixar
+                                            </Button>
+                                            <button
+                                                onClick={() => {
+                                                    URL.revokeObjectURL(mergedVideoUrl);
+                                                    setMergedVideoUrl(null);
+                                                }}
+                                                className="w-7 h-7 rounded-lg bg-white/5 hover:bg-red-500/20 flex items-center justify-center text-white/40 hover:text-red-400 transition-colors"
+                                                title="Remover"
+                                            >
+                                                <Icon name="x" className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             {scenes.map((scene) => (
                                 <div key={scene.sceneNumber} className="bg-[#0a0a0a] rounded-xl border border-white/5 overflow-hidden flex flex-col">
                                     {/* Scene Preview */}
