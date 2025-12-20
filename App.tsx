@@ -7,11 +7,12 @@ import { Loader } from './components/common/Loader';
 import { generateCampaign, editImage, generateLogo, generateImage } from './services/geminiService';
 import { runAssistantConversationStream } from './services/assistantService';
 import { loadImagesFromDB, saveImagesToDB } from './services/storageService';
-import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, ChatPart, GenerationOptions, WeekScheduleInfo, StyleReference } from './types';
+import { loadScheduledPosts, saveScheduledPost, updateScheduledPost, deleteScheduledPost } from './services/schedulerService';
+import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, ChatPart, GenerationOptions, WeekScheduleInfo, StyleReference, ScheduledPost } from './types';
 import { Icon } from './components/common/Icon';
 
 export type TimePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'NIGHT' | 'HIGHLIGHTS';
-export type ViewType = 'campaign' | 'flyer' | 'gallery';
+export type ViewType = 'campaign' | 'flyer' | 'gallery' | 'calendar';
 
 const MAX_GALLERY_SIZE = 12; 
 const MAX_CHAT_HISTORY_MESSAGES = 10;
@@ -89,6 +90,7 @@ function App() {
   const [theme, setTheme] = useState<Theme>('dark');
   const [styleReferences, setStyleReferences] = useState<StyleReference[]>([]);
   const [selectedStyleReference, setSelectedStyleReference] = useState<StyleReference | null>(null);
+  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
 
   useEffect(() => {
     const initAppData = async () => {
@@ -99,6 +101,8 @@ function App() {
           if (savedRefs) setStyleReferences(JSON.parse(savedRefs));
           const dbImages = await loadImagesFromDB();
           setGalleryImages(dbImages.sort((a,b) => Number(b.id) - Number(a.id)));
+          const dbScheduled = await loadScheduledPosts();
+          setScheduledPosts(dbScheduled);
         } catch (e) { console.error(e); } finally { setIsLoading(false); }
     };
     initAppData();
@@ -161,6 +165,36 @@ function App() {
   const handleSelectStyleReference = (ref: StyleReference) => {
     setSelectedStyleReference(ref);
     setActiveView('flyer');
+  };
+
+  // Scheduled Posts Handlers
+  const handleSchedulePost = async (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const newPost = await saveScheduledPost(post);
+      setScheduledPosts(prev => [...prev, newPost].sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp));
+    } catch (e) {
+      console.error('Failed to schedule post:', e);
+    }
+  };
+
+  const handleUpdateScheduledPost = async (postId: string, updates: Partial<ScheduledPost>) => {
+    try {
+      const updatedPost = await updateScheduledPost(postId, updates);
+      if (updatedPost) {
+        setScheduledPosts(prev => prev.map(p => p.id === postId ? updatedPost : p));
+      }
+    } catch (e) {
+      console.error('Failed to update scheduled post:', e);
+    }
+  };
+
+  const handleDeleteScheduledPost = async (postId: string) => {
+    try {
+      await deleteScheduledPost(postId);
+      setScheduledPosts(prev => prev.filter(p => p.id !== postId));
+    } catch (e) {
+      console.error('Failed to delete scheduled post:', e);
+    }
   };
 
   const handleGenerateCampaign = async (input: ContentInput, options: GenerationOptions) => {
@@ -400,6 +434,10 @@ function App() {
           onSelectStyleReference={handleSelectStyleReference}
           selectedStyleReference={selectedStyleReference}
           onClearSelectedStyleReference={() => setSelectedStyleReference(null)}
+          scheduledPosts={scheduledPosts}
+          onSchedulePost={handleSchedulePost}
+          onUpdateScheduledPost={handleUpdateScheduledPost}
+          onDeleteScheduledPost={handleDeleteScheduledPost}
         />
       )}
     </>

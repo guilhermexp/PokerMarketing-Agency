@@ -45,7 +45,15 @@ export type IconName =
   // Favorites
   | 'heart'
   | 'star'
-  | 'copy';
+  | 'copy'
+  // Social & Actions
+  | 'instagram'
+  | 'facebook'
+  | 'plus'
+  | 'check'
+  | 'trash'
+  | 'alert-circle'
+  | 'eye';
 
 interface IconProps {
   name: IconName;
@@ -255,6 +263,46 @@ const iconPaths: Record<IconName, React.ReactNode> = {
     <>
       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </>
+  ),
+  instagram: (
+    <>
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+    </>
+  ),
+  facebook: (
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+  ),
+  plus: (
+    <>
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </>
+  ),
+  check: (
+    <polyline points="20 6 9 17 4 12"></polyline>
+  ),
+  trash: (
+    <>
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      <line x1="10" y1="11" x2="10" y2="17"></line>
+      <line x1="14" y1="11" x2="14" y2="17"></line>
+    </>
+  ),
+  'alert-circle': (
+    <>
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="12" y1="8" x2="12" y2="12"></line>
+      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+      <circle cx="12" cy="12" r="3"></circle>
     </>
   ),
 };

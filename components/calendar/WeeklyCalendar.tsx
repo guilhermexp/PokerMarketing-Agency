@@ -1,0 +1,167 @@
+import React, { useMemo } from 'react';
+import type { ScheduledPost } from '../../types';
+import { ScheduledPostCard } from './ScheduledPostCard';
+
+interface WeeklyCalendarProps {
+  currentDate: Date;
+  scheduledPosts: ScheduledPost[];
+  onDayClick: (date: string) => void;
+  onUpdatePost: (postId: string, updates: Partial<ScheduledPost>) => void;
+  onDeletePost: (postId: string) => void;
+}
+
+const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const hours = Array.from({ length: 24 }, (_, i) => i);
+
+export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
+  currentDate,
+  scheduledPosts,
+  onDayClick,
+  onUpdatePost,
+  onDeletePost
+}) => {
+  const weekDays = useMemo(() => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    // Get the start of the week (Sunday)
+    const startOfWeek = new Date(currentDate);
+    const dayOfWeek = startOfWeek.getDay();
+    startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek);
+
+    const days: Array<{
+      date: string;
+      dayName: string;
+      dayNumber: number;
+      month: string;
+      isToday: boolean;
+    }> = [];
+
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startOfWeek);
+      date.setDate(startOfWeek.getDate() + i);
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+      days.push({
+        date: dateStr,
+        dayName: dayNames[date.getDay()],
+        dayNumber: date.getDate(),
+        month: date.toLocaleDateString('pt-BR', { month: 'short' }),
+        isToday: dateStr === todayStr
+      });
+    }
+
+    return days;
+  }, [currentDate]);
+
+  const getPostsForDate = (date: string): ScheduledPost[] => {
+    return scheduledPosts
+      .filter(post => post.scheduledDate === date)
+      .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+  };
+
+  const getPostsForHour = (date: string, hour: number): ScheduledPost[] => {
+    return scheduledPosts.filter(post => {
+      if (post.scheduledDate !== date) return false;
+      const postHour = parseInt(post.scheduledTime.split(':')[0], 10);
+      return postHour === hour;
+    });
+  };
+
+  return (
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Day Headers */}
+      <div className="grid grid-cols-8 border-b border-white/5 flex-shrink-0">
+        {/* Time column header */}
+        <div className="py-3 px-2 text-center text-[9px] font-black text-white/20 uppercase tracking-wider border-r border-white/5">
+          Hora
+        </div>
+        {/* Day columns */}
+        {weekDays.map(day => (
+          <div
+            key={day.date}
+            className={`py-3 px-2 text-center border-r border-white/5 last:border-r-0 ${
+              day.isToday ? 'bg-primary/10' : ''
+            }`}
+          >
+            <div className="text-[8px] font-black text-white/30 uppercase tracking-wider">
+              {day.dayName}
+            </div>
+            <div className={`text-lg font-black ${day.isToday ? 'text-primary' : 'text-white/60'}`}>
+              {day.dayNumber}
+            </div>
+            <div className="text-[8px] text-white/20 uppercase">{day.month}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Time Grid */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="grid grid-cols-8">
+          {hours.map(hour => (
+            <React.Fragment key={hour}>
+              {/* Time Label */}
+              <div className="py-3 px-2 text-center text-[9px] font-bold text-white/20 border-b border-r border-white/5 sticky left-0 bg-[#111111]">
+                {String(hour).padStart(2, '0')}:00
+              </div>
+              {/* Day Cells */}
+              {weekDays.map(day => {
+                const posts = getPostsForHour(day.date, hour);
+                return (
+                  <div
+                    key={`${day.date}-${hour}`}
+                    onClick={() => onDayClick(day.date)}
+                    className={`
+                      min-h-[60px] p-1 border-b border-r border-white/5 last:border-r-0
+                      cursor-pointer transition-colors hover:bg-white/5
+                      ${day.isToday ? 'bg-primary/5' : ''}
+                    `}
+                  >
+                    {posts.map(post => (
+                      <ScheduledPostCard
+                        key={post.id}
+                        post={post}
+                        variant="compact"
+                        onUpdate={onUpdatePost}
+                        onDelete={onDeletePost}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      {/* Summary Footer */}
+      <div className="border-t border-white/5 p-3 bg-black/40 flex-shrink-0">
+        <div className="grid grid-cols-8 gap-2">
+          <div className="text-[8px] font-black text-white/20 uppercase text-center">Total</div>
+          {weekDays.map(day => {
+            const posts = getPostsForDate(day.date);
+            const scheduled = posts.filter(p => p.status === 'scheduled').length;
+            const published = posts.filter(p => p.status === 'published').length;
+
+            return (
+              <div key={day.date} className="text-center">
+                {posts.length > 0 ? (
+                  <div className="flex items-center justify-center gap-2">
+                    {scheduled > 0 && (
+                      <span className="text-[9px] font-bold text-amber-500">{scheduled}</span>
+                    )}
+                    {published > 0 && (
+                      <span className="text-[9px] font-bold text-green-500">{published}</span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-[9px] text-white/10">-</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};

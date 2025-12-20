@@ -84,7 +84,17 @@ export interface WeekScheduleInfo {
 
 export type ImageModel = 'gemini-3-pro-image-preview' | 'imagen-4.0-generate-001';
 export type ImageSize = '1K' | '2K' | '4K';
-export type VideoModel = 'veo-3.1-fast-generate-preview';
+
+// Video Models
+export type VeoVideoModel = 'veo-3.1-fast-generate-preview';
+export type FalVideoModel =
+  | 'fal-ai/sora-2/text-to-video'         // OpenAI Sora 2 - state of the art
+
+export type VideoModel = VeoVideoModel | FalVideoModel;
+
+// Helper to check if model is from fal.ai
+export const isFalModel = (model: VideoModel): model is FalVideoModel =>
+  model.startsWith('fal-ai/');
 
 
 export interface GalleryImage {
@@ -143,6 +153,39 @@ export interface GenerationOptions {
     videoClipScripts: GenerationSetting;
     posts: Record<'linkedin' | 'twitter' | 'instagram' | 'facebook', GenerationSetting>;
     adCreatives: Record<'facebook' | 'google', GenerationSetting>;
+}
+
+// Calendar & Scheduling Types
+export type SchedulingPlatform = 'instagram' | 'facebook' | 'both';
+export type PublicationStatus = 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
+export type CalendarViewType = 'monthly' | 'weekly';
+
+export interface ScheduledPost {
+  id: string;
+  type: 'flyer' | 'campaign_post' | 'ad_creative';
+  contentId: string;
+  imageUrl: string;
+  caption: string;
+  hashtags: string[];
+  scheduledDate: string;     // YYYY-MM-DD
+  scheduledTime: string;     // HH:mm
+  scheduledTimestamp: number;
+  timezone: string;
+  platforms: SchedulingPlatform;
+  status: PublicationStatus;
+  publishedAt?: number;
+  errorMessage?: string;
+  createdAt: number;
+  updatedAt: number;
+  createdFrom: 'gallery' | 'campaign' | 'flyer_generator';
+}
+
+export interface CalendarDay {
+  date: string;
+  dayOfWeek: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  scheduledPosts: ScheduledPost[];
 }
 
 export { IconName };

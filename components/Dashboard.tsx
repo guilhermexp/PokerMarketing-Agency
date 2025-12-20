@@ -11,8 +11,10 @@ import { Button } from './common/Button';
 import { FlyerGenerator, TimePeriod } from './FlyerGenerator';
 import { AssistantPanel } from './assistant/AssistantPanel';
 import { GalleryView } from './GalleryView';
+import { CalendarView } from './calendar/CalendarView';
+import type { ScheduledPost } from '../types';
 
-type View = 'campaign' | 'flyer' | 'gallery';
+type View = 'campaign' | 'flyer' | 'gallery' | 'calendar';
 
 interface DashboardProps {
   brandProfile: BrandProfile;
@@ -52,6 +54,11 @@ interface DashboardProps {
   onSelectStyleReference: (ref: StyleReference) => void;
   selectedStyleReference: StyleReference | null;
   onClearSelectedStyleReference: () => void;
+  // Calendar & Scheduling
+  scheduledPosts: ScheduledPost[];
+  onSchedulePost: (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onUpdateScheduledPost: (postId: string, updates: Partial<ScheduledPost>) => void;
+  onDeleteScheduledPost: (postId: string) => void;
 }
 
 type Tab = 'clips' | 'posts' | 'ads';
@@ -87,7 +94,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     onUpdateGalleryImage, tournamentEvents, weekScheduleInfo, onTournamentFileUpload, onAddTournamentEvent,
     flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState,
     chatReferenceImage, onSetChatReference, activeView, onViewChange, onPublishToCampaign,
-    styleReferences, onAddStyleReference, onRemoveStyleReference, onSelectStyleReference, selectedStyleReference, onClearSelectedStyleReference
+    styleReferences, onAddStyleReference, onRemoveStyleReference, onSelectStyleReference, selectedStyleReference, onClearSelectedStyleReference,
+    scheduledPosts, onSchedulePost, onUpdateScheduledPost, onDeleteScheduledPost
   } = props;
 
   const [activeTab, setActiveTab] = useState<Tab>('clips');
@@ -122,6 +130,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         <nav className={`flex-grow ${sidebarCollapsed ? 'p-2' : 'p-3'} space-y-1`}>
             <NavItem icon="zap" label="Direct" active={activeView === 'campaign'} onClick={() => onViewChange('campaign')} collapsed={sidebarCollapsed} />
             <NavItem icon="image" label="Flyers" active={activeView === 'flyer'} onClick={() => onViewChange('flyer')} collapsed={sidebarCollapsed} />
+            <NavItem icon="calendar" label="Agenda" active={activeView === 'calendar'} onClick={() => onViewChange('calendar')} collapsed={sidebarCollapsed} />
             <NavItem icon="layout" label="Assets" active={activeView === 'gallery'} onClick={() => onViewChange('gallery')} collapsed={sidebarCollapsed} />
         </nav>
 
@@ -214,6 +223,17 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             {activeView === 'gallery' && (
                 <div className="px-6 py-5">
                     <GalleryView images={galleryImages} onUpdateImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} onSelectStyleReference={onSelectStyleReference} />
+                </div>
+            )}
+            {activeView === 'calendar' && (
+                <div className="px-6 py-5 h-full">
+                    <CalendarView
+                      scheduledPosts={scheduledPosts}
+                      onSchedulePost={onSchedulePost}
+                      onUpdateScheduledPost={onUpdateScheduledPost}
+                      onDeleteScheduledPost={onDeleteScheduledPost}
+                      galleryImages={galleryImages}
+                    />
                 </div>
             )}
       </main>

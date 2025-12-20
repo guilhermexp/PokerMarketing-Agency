@@ -1,6 +1,8 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import type { BrandProfile, ContentInput, MarketingCampaign, ImageFile, ImageModel, VideoModel, GenerationOptions, ImageSize, Post } from '../types';
+import type { BrandProfile, ContentInput, MarketingCampaign, ImageFile, ImageModel, VideoModel, GenerationOptions, ImageSize, Post, FalVideoModel } from '../types';
+import { isFalModel } from '../types';
+import { generateFalVideo } from './falService';
 
 // Helper to ensure fresh GoogleGenAI instance with latest API key
 const getAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY });

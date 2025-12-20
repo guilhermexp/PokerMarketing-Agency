@@ -1,6 +1,9 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 
+// Constants
+const CROSSFADE_DURATION = 0.5; // segundos de transição entre vídeos
+
 // Types
 export interface ExportProgress {
   phase: 'loading' | 'preparing' | 'concatenating' | 'finalizing' | 'complete' | 'error';
@@ -103,6 +106,55 @@ const blobUrlToArrayBuffer = async (blobUrl: string): Promise<Uint8Array> => {
 };
 
 /**
+ * Build filter complex for concatenating videos with fade transitions
+ * Applies fade in/out to video and concatenates both video and audio
+ */
+const buildConcatWithFadeFilter = (
+  videos: VideoInput[]
+): { filterComplex: string; videoOutput: string; audioOutput: string } => {
+  const videoCount = videos.length;
+  if (videoCount < 2) {
+    return { filterComplex: '', videoOutput: '[0:v]', audioOutput: '[0:a]' };
+  }
+
+  const filters: string[] = [];
+  const fadeD = CROSSFADE_DURATION;
+
+  // Apply fade in/out to each video stream
+  for (let i = 0; i < videoCount; i++) {
+    const vIn = `[${i}:v]`;
+    const vOut = `[v${i}]`;
+    const duration = videos[i].duration;
+    const fadeOutStart = Math.max(0, duration - fadeD);
+
+    if (i === 0) {
+      // First video: only fade out at end
+      filters.push(`${vIn}fade=t=out:st=${fadeOutStart}:d=${fadeD}${vOut}`);
+    } else if (i === videoCount - 1) {
+      // Last video: only fade in at start
+      filters.push(`${vIn}fade=t=in:st=0:d=${fadeD}${vOut}`);
+    } else {
+      // Middle videos: fade in at start and fade out at end
+      filters.push(`${vIn}fade=t=in:st=0:d=${fadeD},fade=t=out:st=${fadeOutStart}:d=${fadeD}${vOut}`);
+    }
+  }
+
+  // Concat all video streams
+  const vStreams = Array.from({ length: videoCount }, (_, i) => `[v${i}]`).join('');
+  filters.push(`${vStreams}concat=n=${videoCount}:v=1:a=0[vfinal]`);
+
+  // Concat all audio streams (no fade, just concatenate)
+  const aStreams = Array.from({ length: videoCount }, (_, i) => `[${i}:a]`).join('');
+  filters.push(`${aStreams}concat=n=${videoCount}:v=0:a=1[afinal]`);
+
+  return {
+    filterComplex: filters.join(';'),
+    videoOutput: '[vfinal]',
+    audioOutput: '[afinal]',
+  };
+};
+
+/**
  * Concatenate multiple videos into single output
  */
 export const concatenateVideos = async (
@@ -126,6 +178,18 @@ export const concatenateVideos = async (
     totalFiles: sortedVideos.length,
   });
 
+  // Progress handler with clamping to avoid >100%
+  // Declared outside try block so it can be cleaned up in catch
+  const progressHandler = ({ progress }: { progress: number }) => {
+    // FFmpeg progress can exceed 1.0 with filter_complex, so we clamp it
+    const clampedProgress = Math.min(Math.max(progress, 0), 1);
+    onProgress?.({
+      phase: 'concatenating',
+      progress: 45 + Math.round(clampedProgress * 45),
+      message: `Processando: ${Math.round(clampedProgress * 100)}%`,
+    });
+  };
+
   try {
     const inputFilenames: string[] = [];
 
@@ -146,32 +210,64 @@ export const concatenateVideos = async (
       inputFilenames.push(filename);
     }
 
-    const concatList = inputFilenames.map(name => `file ${name}`).join('\n');
-    await ffmpeg.writeFile('concat_list.txt', concatList);
-
     onProgress?.({
       phase: 'concatenating',
       progress: 45,
-      message: 'Concatenando videos...',
+      message: 'Aplicando transições...',
     });
 
-    ffmpeg.on('progress', ({ progress }) => {
-      onProgress?.({
-        phase: 'concatenating',
-        progress: 45 + Math.round(progress * 45),
-        message: `Processando: ${Math.round(progress * 100)}%`,
-      });
-    });
+    ffmpeg.on('progress', progressHandler);
 
     const outputFilename = `output.${outputFormat}`;
 
-    await ffmpeg.exec([
-      '-f', 'concat',
-      '-safe', '0',
-      '-i', 'concat_list.txt',
-      '-c', 'copy',
-      outputFilename,
-    ]);
+    if (sortedVideos.length === 1) {
+      // Single video: just copy
+      await ffmpeg.exec([
+        '-i', inputFilenames[0],
+        '-c', 'copy',
+        outputFilename,
+      ]);
+    } else {
+      // Multiple videos: use concat with fade transitions
+      const { filterComplex, videoOutput, audioOutput } = buildConcatWithFadeFilter(sortedVideos);
+
+      // Build input arguments
+      const inputArgs: string[] = [];
+      for (const filename of inputFilenames) {
+        inputArgs.push('-i', filename);
+      }
+
+      try {
+        // Try with fade transitions on video + concatenated audio
+        await ffmpeg.exec([
+          ...inputArgs,
+          '-filter_complex', filterComplex,
+          '-map', videoOutput,
+          '-map', audioOutput,
+          '-y',
+          outputFilename,
+        ]);
+      } catch (fadeError) {
+        console.warn('Fade transition failed, falling back to simple concat:', fadeError);
+
+        // Fallback: simple concat without transitions
+        const concatList = inputFilenames.map(name => `file ${name}`).join('\n');
+        await ffmpeg.writeFile('concat_list.txt', concatList);
+
+        await ffmpeg.exec([
+          '-f', 'concat',
+          '-safe', '0',
+          '-i', 'concat_list.txt',
+          '-c', 'copy',
+          outputFilename,
+        ]);
+
+        await ffmpeg.deleteFile('concat_list.txt');
+      }
+    }
+
+    // Remove progress handler to prevent duplicate listeners
+    ffmpeg.off('progress', progressHandler);
 
     onProgress?.({
       phase: 'finalizing',
@@ -185,7 +281,6 @@ export const concatenateVideos = async (
     for (const filename of inputFilenames) {
       await ffmpeg.deleteFile(filename);
     }
-    await ffmpeg.deleteFile('concat_list.txt');
     await ffmpeg.deleteFile(outputFilename);
 
     onProgress?.({
@@ -197,6 +292,9 @@ export const concatenateVideos = async (
     return new Blob([outputData], { type: `video/${outputFormat}` });
 
   } catch (error) {
+    // Remove progress handler on error to prevent memory leaks
+    ffmpeg.off('progress', progressHandler);
+
     onProgress?.({
       phase: 'error',
       progress: 0,

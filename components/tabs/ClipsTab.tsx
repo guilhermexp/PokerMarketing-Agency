@@ -1,10 +1,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { VideoClipScript, BrandProfile, GalleryImage, ImageModel, VideoModel, ImageFile, StyleReference } from '../../types';
+import { isFalModel } from '../../types';
 import { Button } from '../common/Button';
 import { Loader } from '../common/Loader';
 import { Icon } from '../common/Icon';
 import { generateImage, generateVideo, generateSpeech } from '../../services/geminiService';
+import { generateFalVideo } from '../../services/falService';
 import { ImagePreviewModal } from '../common/ImagePreviewModal';
 import { ExportVideoModal } from '../common/ExportVideoModal';
 import { concatenateVideos, downloadBlob, type ExportProgress, type VideoInput } from '../../services/ffmpegService';
@@ -93,11 +95,13 @@ interface ClipCardProps {
   styleReferences?: StyleReference[];
   onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
   onRemoveStyleReference?: (id: string) => void;
+  selectedVideoModel: VideoModel;
 }
 
 const ClipCard: React.FC<ClipCardProps> = ({
     clip, brandProfile, thumbnail, onGenerateThumbnail, isGeneratingThumbnail,
-    onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference
+    onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference,
+    selectedVideoModel
 }) => {
     const [scenes, setScenes] = useState<Scene[]>([]);
     const [videoStates, setVideoStates] = useState<Record<number, VideoState>>({});
@@ -108,6 +112,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [mergedVideoUrl, setMergedVideoUrl] = useState<string | null>(null);
     const [isMerging, setIsMerging] = useState(false);
+    const [promptPreview, setPromptPreview] = useState<{ sceneNumber: number; prompt: string } | null>(null);
 
     useEffect(() => {
         if (!clip.scenes) return;
@@ -125,30 +130,51 @@ const ClipCard: React.FC<ClipCardProps> = ({
         setVideoStates(initialVideoStates);
     }, [clip]);
 
+    const buildPromptForScene = useCallback((sceneNumber: number): string => {
+        const currentScene = scenes.find(s => s.sceneNumber === sceneNumber);
+        if (!currentScene) return '';
+
+        const contextPrompt = scenes
+            .filter(s => s.sceneNumber < sceneNumber)
+            .map(s => `Contexto anterior: ${s.visual}`)
+            .join('\n');
+
+        return `Crie um clipe de vídeo para esta cena:\n- Visual: ${currentScene.visual}\n- Narração: ${currentScene.narration}\n${contextPrompt}\n\nGaranta consistência visual com o contexto anterior, se houver. O estilo deve corresponder à identidade da marca: ${brandProfile.toneOfVoice}, usando as cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.`;
+    }, [scenes, brandProfile]);
+
+    const handleShowPrompt = (sceneNumber: number) => {
+        const prompt = buildPromptForScene(sceneNumber);
+        setPromptPreview({ sceneNumber, prompt });
+    };
+
     const handleGenerateVideo = useCallback(async (sceneNumber: number) => {
         setVideoStates(prev => ({ ...prev, [sceneNumber]: { isLoading: true } }));
         try {
             const currentScene = scenes.find(s => s.sceneNumber === sceneNumber);
             if (!currentScene) throw new Error("Cena não encontrada.");
 
-            const contextPrompt = scenes
-                .filter(s => s.sceneNumber < sceneNumber)
-                .map(s => `Contexto anterior: ${s.visual}`)
-                .join('\n');
+            const prompt = buildPromptForScene(sceneNumber);
+            let videoUrl: string;
 
-            const prompt = `Crie um clipe de vídeo para esta cena:\n- Visual: ${currentScene.visual}\n- Narração: ${currentScene.narration}\n${contextPrompt}\n\nGaranta consistência visual com o contexto anterior, se houver. O estilo deve corresponder à identidade da marca: ${brandProfile.toneOfVoice}, usando as cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.`;
+            if (isFalModel(selectedVideoModel)) {
+                // Use fal.ai (Sora 2, Kling, etc.) - pass logo as image URL if available
+                const logoUrl = brandProfile.logo || undefined;
+                videoUrl = await generateFalVideo(prompt, "9:16", selectedVideoModel, logoUrl, currentScene.duration);
+            } else {
+                // Use Veo 3.1
+                const logoImage: ImageFile | null = brandProfile.logo ? {
+                    base64: brandProfile.logo.split(',')[1],
+                    mimeType: brandProfile.logo.match(/:(.*?);/)?.[1] || 'image/png'
+                } : null;
 
-            const logoImage: ImageFile | null = brandProfile.logo ? {
-                base64: brandProfile.logo.split(',')[1],
-                mimeType: brandProfile.logo.match(/:(.*?);/)?.[1] || 'image/png'
-            } : null;
+                videoUrl = await generateVideo(prompt, "9:16", selectedVideoModel, logoImage);
+            }
 
-            const videoUrl = await generateVideo(prompt, "9:16", 'veo-3.1-fast-generate-preview', logoImage);
             setVideoStates(prev => ({ ...prev, [sceneNumber]: { url: videoUrl, isLoading: false } }));
         } catch (err: any) {
             setVideoStates(prev => ({ ...prev, [sceneNumber]: { isLoading: false, error: err.message || 'Falha ao gerar o vídeo.' } }));
         }
-    }, [scenes, brandProfile]);
+    }, [scenes, brandProfile, buildPromptForScene, selectedVideoModel]);
 
     const handleGenerateAllVideos = async () => {
         setIsGeneratingAll(true);
@@ -506,9 +532,18 @@ const ClipCard: React.FC<ClipCardProps> = ({
                                             <span className="text-[7px] font-black bg-primary/90 text-black px-1.5 py-0.5 rounded-full">
                                                 {scene.sceneNumber}
                                             </span>
-                                            <span className="text-[7px] font-bold text-white/60 bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
-                                                {scene.duration}s
-                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => handleShowPrompt(scene.sceneNumber)}
+                                                    className="w-5 h-5 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white/40 hover:text-white hover:bg-black/70 transition-colors"
+                                                    title="Ver prompt"
+                                                >
+                                                    <Icon name="eye" className="w-2.5 h-2.5" />
+                                                </button>
+                                                <span className="text-[7px] font-bold text-white/60 bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
+                                                    {scene.duration}s
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                     {/* Scene Action */}
@@ -546,6 +581,51 @@ const ClipCard: React.FC<ClipCardProps> = ({
                 }}
                 progress={exportProgress}
             />
+
+            {/* Prompt Preview Modal */}
+            {promptPreview && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setPromptPreview(null)}>
+                    <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center">
+                                    <Icon name="eye" className="w-3 h-3 text-primary" />
+                                </div>
+                                <h3 className="text-xs font-black text-white uppercase tracking-wide">Prompt da Cena {promptPreview.sceneNumber}</h3>
+                            </div>
+                            <button
+                                onClick={() => setPromptPreview(null)}
+                                className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                            >
+                                <Icon name="x" className="w-3 h-3" />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto max-h-[60vh]">
+                            <pre className="text-[11px] text-white/70 whitespace-pre-wrap font-mono bg-black/30 rounded-xl p-4 border border-white/5">
+                                {promptPreview.prompt}
+                            </pre>
+                        </div>
+                        <div className="px-4 py-3 border-t border-white/5 flex justify-end gap-2">
+                            <Button
+                                size="small"
+                                variant="secondary"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(promptPreview.prompt);
+                                }}
+                                icon="copy"
+                            >
+                                Copiar
+                            </Button>
+                            <Button
+                                size="small"
+                                onClick={() => setPromptPreview(null)}
+                            >
+                                Fechar
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };
@@ -560,6 +640,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
     });
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
+    const [selectedVideoModel, setSelectedVideoModel] = useState<VideoModel>('veo-3.1-fast-generate-preview');
 
     useEffect(() => {
         const length = videoClipScripts.length;
@@ -647,21 +728,35 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
     return (
         <div className="space-y-6">
             {/* Controls Bar - Minimal */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-4">
                 <Button onClick={handleGenerateAllThumbnails} isLoading={isGeneratingAll} disabled={isGeneratingAll || generationState.isGenerating.some(Boolean)} icon="zap" size="small">
                     Gerar Todas Capas
                 </Button>
-                <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-white/30">Modelo:</span>
-                    <select
-                        value={selectedImageModel}
-                        onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
-                        className="bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-primary/50 outline-none transition-all"
-                    >
-                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
-                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash</option>
-                        <option value="imagen-4.0-generate-001">Imagen 4.0</option>
-                    </select>
+                <div className="flex items-center gap-4 flex-wrap">
+                    {/* Image Model Selector */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-white/30">Imagem:</span>
+                        <select
+                            value={selectedImageModel}
+                            onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
+                            className="bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-primary/50 outline-none transition-all"
+                        >
+                            <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
+                            <option value="imagen-4.0-generate-001">Imagen 4.0</option>
+                        </select>
+                    </div>
+                    {/* Video Model Selector */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-white/30">Vídeo:</span>
+                        <select
+                            value={selectedVideoModel}
+                            onChange={(e) => setSelectedVideoModel(e.target.value as VideoModel)}
+                            className="bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-primary/50 outline-none transition-all"
+                        >
+                            <option value="veo-3.1-fast-generate-preview">Veo 3.1 (Google)</option>
+                            <option value="fal-ai/sora-2/text-to-video">Sora 2 (OpenAI)</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -679,6 +774,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
                     styleReferences={styleReferences}
                     onAddStyleReference={onAddStyleReference}
                     onRemoveStyleReference={onRemoveStyleReference}
+                    selectedVideoModel={selectedVideoModel}
                 />
             ))}
         </div>
