@@ -1,29 +1,7 @@
 import type { ScheduledPost } from '../types';
+import { initDB } from './storageService';
 
-const DB_NAME = 'DirectorAi_DB';
 const STORE_SCHEDULED = 'scheduled_posts';
-const DB_VERSION = 2;
-
-const initDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-
-      // Create scheduled posts store if it doesn't exist
-      if (!db.objectStoreNames.contains(STORE_SCHEDULED)) {
-        const store = db.createObjectStore(STORE_SCHEDULED, { keyPath: 'id' });
-        store.createIndex('by_date', 'scheduledDate', { unique: false });
-        store.createIndex('by_status', 'status', { unique: false });
-        store.createIndex('by_timestamp', 'scheduledTimestamp', { unique: false });
-      }
-    };
-  });
-};
 
 // Generate unique ID
 const generateId = (): string => {

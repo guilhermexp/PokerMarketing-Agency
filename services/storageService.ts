@@ -3,7 +3,8 @@ import type { GalleryImage } from '../types';
 
 const DB_NAME = 'DirectorAi_DB';
 const STORE_NAME = 'gallery_images';
-const DB_VERSION = 1;
+const STORE_SCHEDULED = 'scheduled_posts';
+const DB_VERSION = 2;
 
 export const initDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
@@ -14,8 +15,18 @@ export const initDB = (): Promise<IDBDatabase> => {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
+
+      // Create gallery images store
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+
+      // Create scheduled posts store
+      if (!db.objectStoreNames.contains(STORE_SCHEDULED)) {
+        const store = db.createObjectStore(STORE_SCHEDULED, { keyPath: 'id' });
+        store.createIndex('by_date', 'scheduledDate', { unique: false });
+        store.createIndex('by_status', 'status', { unique: false });
+        store.createIndex('by_timestamp', 'scheduledTimestamp', { unique: false });
       }
     };
   });

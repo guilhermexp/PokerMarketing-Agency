@@ -53,6 +53,8 @@ export const generateFalVideo = async (
 ): Promise<string> => {
   console.log(`[fal.ai] Generating video with model: ${model}`);
 
+  try {
+    switch (model) {
       case 'fal-ai/sora-2/text-to-video': {
         // Use image-to-video only if image is a valid HTTP URL (not data URL)
         const isHttpUrl = imageUrl && imageUrl.startsWith('http');
@@ -137,14 +139,6 @@ export const generateFalVideo = async (
       default:
         throw new Error(`Modelo não suportado: ${model}`);
     }
-
-    if (!result?.video?.url) {
-      throw new Error('Falha ao gerar vídeo - resposta inválida');
-    }
-
-    console.log(`[fal.ai] Video generated: ${result.video.url}`);
-    return result.video.url;
-
   } catch (error) {
     console.error('[fal.ai] Error generating video:', error);
     throw error;

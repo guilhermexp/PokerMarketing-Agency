@@ -295,8 +295,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
         }
 
         setIsMerging(true);
-        setIsExportModalOpen(true);
-        setExportProgress({ phase: 'loading', progress: 0, message: 'Iniciando...' });
+        setExportProgress({ phase: 'loading', progress: 0, message: 'Carregando FFmpeg...' });
 
         try {
             const outputBlob = await concatenateVideos(generatedVideos, {
@@ -311,7 +310,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
 
             const previewUrl = URL.createObjectURL(outputBlob);
             setMergedVideoUrl(previewUrl);
-            setIsExportModalOpen(false);
+            setExportProgress(null);
         } catch (error) {
             console.error('Merge failed:', error);
             setExportProgress({
@@ -462,17 +461,40 @@ const ClipCard: React.FC<ClipCardProps> = ({
                     <div className="flex-1 p-4">
                         <h4 className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-3">Cenas do Roteiro</h4>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                            {/* Merged Video - First Position */}
-                            {mergedVideoUrl && (
+                            {/* Merged Video / Progress Card - First Position */}
+                            {(mergedVideoUrl || isMerging) && (
                                 <div className="bg-[#0a0a0a] rounded-xl border-2 border-primary/50 overflow-hidden flex flex-col ring-2 ring-primary/20">
-                                    {/* Video Preview */}
+                                    {/* Video Preview or Progress */}
                                     <div className="aspect-[9/16] bg-[#080808] relative">
-                                        <video
-                                            src={mergedVideoUrl}
-                                            controls
-                                            className="w-full h-full object-cover"
-                                            autoPlay
-                                        />
+                                        {isMerging ? (
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                                                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center mb-3">
+                                                    <Loader />
+                                                </div>
+                                                <p className="text-[9px] text-white/70 text-center mb-3">
+                                                    {exportProgress?.message || 'Processando...'}
+                                                </p>
+                                                {/* Progress bar */}
+                                                <div className="w-full px-2">
+                                                    <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                                                        <div
+                                                            className="h-full rounded-full bg-primary transition-all duration-300"
+                                                            style={{ width: `${exportProgress?.progress || 0}%` }}
+                                                        />
+                                                    </div>
+                                                    <p className="text-[8px] text-white/40 text-center mt-1">
+                                                        {exportProgress?.progress || 0}%
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ) : mergedVideoUrl ? (
+                                            <video
+                                                src={mergedVideoUrl}
+                                                controls
+                                                className="w-full h-full object-cover"
+                                                autoPlay
+                                            />
+                                        ) : null}
                                         {/* Badge */}
                                         <div className="absolute top-1.5 left-1.5 right-1.5 flex justify-between items-center">
                                             <span className="text-[7px] font-black bg-primary text-black px-1.5 py-0.5 rounded-full flex items-center gap-1">
@@ -486,28 +508,32 @@ const ClipCard: React.FC<ClipCardProps> = ({
                                     </div>
                                     {/* Action */}
                                     <div className="p-2">
-                                        <p className="text-[8px] text-white/40 line-clamp-2 mb-2">{generatedVideosCount} cenas concatenadas</p>
-                                        <div className="flex gap-1">
-                                            <Button
-                                                onClick={handleDownloadMerged}
-                                                size="small"
-                                                variant="primary"
-                                                className="flex-1 text-[8px]"
-                                                icon="download"
-                                            >
-                                                Baixar
-                                            </Button>
-                                            <button
-                                                onClick={() => {
-                                                    URL.revokeObjectURL(mergedVideoUrl);
-                                                    setMergedVideoUrl(null);
-                                                }}
-                                                className="w-7 h-7 rounded-lg bg-white/5 hover:bg-red-500/20 flex items-center justify-center text-white/40 hover:text-red-400 transition-colors"
-                                                title="Remover"
-                                            >
-                                                <Icon name="x" className="w-3 h-3" />
-                                            </button>
-                                        </div>
+                                        <p className="text-[8px] text-white/40 line-clamp-2 mb-2">
+                                            {isMerging ? `Juntando ${generatedVideosCount} cenas...` : `${generatedVideosCount} cenas concatenadas`}
+                                        </p>
+                                        {!isMerging && mergedVideoUrl && (
+                                            <div className="flex gap-1">
+                                                <Button
+                                                    onClick={handleDownloadMerged}
+                                                    size="small"
+                                                    variant="primary"
+                                                    className="flex-1 text-[8px]"
+                                                    icon="download"
+                                                >
+                                                    Baixar
+                                                </Button>
+                                                <button
+                                                    onClick={() => {
+                                                        URL.revokeObjectURL(mergedVideoUrl);
+                                                        setMergedVideoUrl(null);
+                                                    }}
+                                                    className="w-7 h-7 rounded-lg bg-white/5 hover:bg-red-500/20 flex items-center justify-center text-white/40 hover:text-red-400 transition-colors"
+                                                    title="Remover"
+                                                >
+                                                    <Icon name="x" className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
