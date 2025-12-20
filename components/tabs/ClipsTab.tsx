@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { VideoClipScript, BrandProfile, GalleryImage, ImageModel, VideoModel, ImageFile, StyleReference } from '../../types';
 import { isFalModel } from '../../types';
 import { Button } from '../common/Button';
 import { Loader } from '../common/Loader';
 import { Icon } from '../common/Icon';
 import { generateImage, generateVideo, generateSpeech } from '../../services/geminiService';
-import { generateFalVideo } from '../../services/falService';
+import { generateFalVideo, uploadImageToFal } from '../../services/falService';
 import { ImagePreviewModal } from '../common/ImagePreviewModal';
 import { ExportVideoModal } from '../common/ExportVideoModal';
 import { concatenateVideos, downloadBlob, type ExportProgress, type VideoInput } from '../../services/ffmpegService';
@@ -80,6 +80,21 @@ interface VideoState {
   url?: string;
   isLoading: boolean;
   error?: string | null;
+  model?: string; // Track which model generated this video
+}
+
+// Get short model name for display
+const getModelShortName = (model: string): string => {
+  if (model.includes('sora')) return 'Sora';
+  if (model.includes('veo')) return 'Veo';
+  return model.split('/').pop() || model;
+};
+
+interface SceneReferenceImage {
+  dataUrl: string;       // Data URL para preview local
+  httpUrl?: string;      // URL HTTP para Sora (fal.ai storage)
+  isUploading: boolean;
+  error?: string | null;
 }
 
 // --- Clip Card (Inline with Scenes) ---
@@ -95,16 +110,22 @@ interface ClipCardProps {
   styleReferences?: StyleReference[];
   onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
   onRemoveStyleReference?: (id: string) => void;
-  selectedVideoModel: VideoModel;
+  triggerSceneImageGeneration?: number; // Increment to trigger auto-generation of scene images
 }
 
 const ClipCard: React.FC<ClipCardProps> = ({
     clip, brandProfile, thumbnail, onGenerateThumbnail, isGeneratingThumbnail,
     onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference,
-    selectedVideoModel
+    triggerSceneImageGeneration
 }) => {
     const [scenes, setScenes] = useState<Scene[]>([]);
-    const [videoStates, setVideoStates] = useState<Record<number, VideoState>>({});
+    const [videoStates, setVideoStates] = useState<Record<number, VideoState[]>>({}); // Multiple videos per scene
+    const [sceneVideoIndex, setSceneVideoIndex] = useState<Record<number, number>>({}); // Which video is shown per scene
+    const [isGeneratingVideo, setIsGeneratingVideo] = useState<Record<number, boolean>>({}); // Loading state per scene
+    const [sceneImages, setSceneImages] = useState<Record<number, SceneReferenceImage>>({});
+    const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+    const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
+    const [selectedVideoModel, setSelectedVideoModel] = useState<VideoModel>('fal-ai/sora-2/text-to-video');
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [editingThumbnail, setEditingThumbnail] = useState<GalleryImage | null>(null);
     const [audioState, setAudioState] = useState<{ url?: string; isLoading: boolean; error?: string | null }>({ isLoading: false });
@@ -113,6 +134,20 @@ const ClipCard: React.FC<ClipCardProps> = ({
     const [mergedVideoUrl, setMergedVideoUrl] = useState<string | null>(null);
     const [isMerging, setIsMerging] = useState(false);
     const [promptPreview, setPromptPreview] = useState<{ sceneNumber: number; prompt: string } | null>(null);
+    const [previewSlide, setPreviewSlide] = useState<'video' | 'thumbnail'>('thumbnail'); // Carousel state
+    const [scenePreviewSlides, setScenePreviewSlides] = useState<Record<number, 'image' | 'video'>>({}); // Per-scene carousel
+
+    // Auto-switch to video when merged video is ready
+    useEffect(() => {
+        if (mergedVideoUrl) {
+            setPreviewSlide('video');
+        }
+    }, [mergedVideoUrl]);
+
+    // Auto-switch scene to video when video is generated
+    const setSceneSlide = (sceneNumber: number, slide: 'image' | 'video') => {
+        setScenePreviewSlides(prev => ({ ...prev, [sceneNumber]: slide }));
+    };
 
     useEffect(() => {
         if (!clip.scenes) return;
@@ -123,67 +158,284 @@ const ClipCard: React.FC<ClipCardProps> = ({
             duration: s.duration_seconds
         }));
         setScenes(parsedScenes);
-        const initialVideoStates: Record<number, VideoState> = {};
+        // Initialize with empty arrays for each scene
+        const initialVideoStates: Record<number, VideoState[]> = {};
         parsedScenes.forEach(scene => {
-            initialVideoStates[scene.sceneNumber] = { isLoading: false };
+            initialVideoStates[scene.sceneNumber] = [];
         });
         setVideoStates(initialVideoStates);
     }, [clip]);
 
-    const buildPromptForScene = useCallback((sceneNumber: number): string => {
+    // Track trigger changes and auto-generate scene images
+    const prevTriggerRef = useRef(triggerSceneImageGeneration);
+    useEffect(() => {
+        if (
+            triggerSceneImageGeneration !== undefined &&
+            triggerSceneImageGeneration !== prevTriggerRef.current &&
+            thumbnail &&
+            scenes.length > 0 &&
+            !isGeneratingImages
+        ) {
+            prevTriggerRef.current = triggerSceneImageGeneration;
+            // Auto-trigger scene image generation
+            handleGenerateSceneImages();
+        }
+    }, [triggerSceneImageGeneration, thumbnail, scenes.length, isGeneratingImages]);
+
+    // Build prompt for Sora (includes narration for context, even though no audio)
+    const buildPromptForSora = useCallback((sceneNumber: number): string => {
         const currentScene = scenes.find(s => s.sceneNumber === sceneNumber);
         if (!currentScene) return '';
 
-        const contextPrompt = scenes
-            .filter(s => s.sceneNumber < sceneNumber)
-            .map(s => `Contexto anterior: ${s.visual}`)
-            .join('\n');
+        // Sora: Include narration context for better visual storytelling
+        return `Cena de vídeo promocional de poker:
 
-        return `Crie um clipe de vídeo para esta cena:\n- Visual: ${currentScene.visual}\n- Narração: ${currentScene.narration}\n${contextPrompt}\n\nGaranta consistência visual com o contexto anterior, se houver. O estilo deve corresponder à identidade da marca: ${brandProfile.toneOfVoice}, usando as cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.`;
+VISUAL: ${currentScene.visual}
+
+CONTEXTO DA NARRAÇÃO: "${currentScene.narration}"
+
+Estilo: ${brandProfile.toneOfVoice}, cinematográfico, cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.
+Movimento de câmera suave, iluminação dramática de cassino. Criar visual que combine com o contexto da narração.`;
+    }, [scenes, brandProfile]);
+
+    // Build prompt for Veo 3.1 (visual + narration for audio generation)
+    const buildPromptForVeo = useCallback((sceneNumber: number): string => {
+        const currentScene = scenes.find(s => s.sceneNumber === sceneNumber);
+        if (!currentScene) return '';
+
+        // Veo 3.1: Inclui narração para gerar áudio/voz
+        return `Cena de vídeo promocional de poker:
+
+VISUAL: ${currentScene.visual}
+
+NARRAÇÃO (falar em português brasileiro, voz empolgante e profissional): "${currentScene.narration}"
+
+Estilo: ${brandProfile.toneOfVoice}, cinematográfico, cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.
+Movimento de câmera suave, iluminação dramática de cassino.`;
     }, [scenes, brandProfile]);
 
     const handleShowPrompt = (sceneNumber: number) => {
-        const prompt = buildPromptForScene(sceneNumber);
+        // Show Veo prompt by default (more complete)
+        const prompt = buildPromptForVeo(sceneNumber);
         setPromptPreview({ sceneNumber, prompt });
     };
 
     const handleGenerateVideo = useCallback(async (sceneNumber: number) => {
-        setVideoStates(prev => ({ ...prev, [sceneNumber]: { isLoading: true } }));
+        // Set loading state for this scene
+        setIsGeneratingVideo(prev => ({ ...prev, [sceneNumber]: true }));
         try {
             const currentScene = scenes.find(s => s.sceneNumber === sceneNumber);
             if (!currentScene) throw new Error("Cena não encontrada.");
 
-            const prompt = buildPromptForScene(sceneNumber);
-            let videoUrl: string;
+            // Get reference image for this scene (works for both Sora and Veo)
+            const sceneImage = sceneImages[sceneNumber];
+            const hasReferenceImage = !!sceneImage?.dataUrl;
 
-            if (isFalModel(selectedVideoModel)) {
-                // Use fal.ai (Sora 2, Kling, etc.) - pass logo as image URL if available
-                const logoUrl = brandProfile.logo || undefined;
-                videoUrl = await generateFalVideo(prompt, "9:16", selectedVideoModel, logoUrl, currentScene.duration);
+            if (hasReferenceImage) {
+                console.log(`[ClipsTab] Using reference image for scene ${sceneNumber}`);
             } else {
-                // Use Veo 3.1
-                const logoImage: ImageFile | null = brandProfile.logo ? {
-                    base64: brandProfile.logo.split(',')[1],
-                    mimeType: brandProfile.logo.match(/:(.*?);/)?.[1] || 'image/png'
-                } : null;
-
-                videoUrl = await generateVideo(prompt, "9:16", selectedVideoModel, logoImage);
+                console.log(`[ClipsTab] No reference image for scene ${sceneNumber}, using text-to-video`);
             }
 
-            setVideoStates(prev => ({ ...prev, [sceneNumber]: { url: videoUrl, isLoading: false } }));
+            let videoUrl: string;
+            const modelUsed = selectedVideoModel;
+
+            if (isFalModel(selectedVideoModel)) {
+                // Use fal.ai (Sora 2) - includes narration context
+                const prompt = buildPromptForSora(sceneNumber);
+                const imageUrl = sceneImage?.httpUrl || undefined;
+
+                console.log(`[ClipsTab] Sora prompt for scene ${sceneNumber}:`, prompt);
+                videoUrl = await generateFalVideo(prompt, "9:16", selectedVideoModel, imageUrl, currentScene.duration);
+            } else {
+                // Use Veo 3.1 - includes narration for audio generation
+                const prompt = buildPromptForVeo(sceneNumber);
+
+                // Prioritize scene reference image, fallback to logo
+                let referenceImage: ImageFile | null = null;
+
+                if (hasReferenceImage && sceneImage.dataUrl) {
+                    // Use scene reference image
+                    const base64Data = sceneImage.dataUrl.split(',')[1];
+                    const mimeType = sceneImage.dataUrl.match(/data:(.*?);/)?.[1] || 'image/png';
+                    referenceImage = { base64: base64Data, mimeType };
+                } else if (brandProfile.logo) {
+                    // Fallback to logo
+                    referenceImage = {
+                        base64: brandProfile.logo.split(',')[1],
+                        mimeType: brandProfile.logo.match(/:(.*?);/)?.[1] || 'image/png'
+                    };
+                }
+
+                console.log(`[ClipsTab] Veo prompt for scene ${sceneNumber}:`, prompt);
+                videoUrl = await generateVideo(prompt, "9:16", selectedVideoModel, referenceImage);
+            }
+
+            // Add new video to array (keep existing videos from other models)
+            const newVideo: VideoState = { url: videoUrl, isLoading: false, model: modelUsed };
+            setVideoStates(prev => ({
+                ...prev,
+                [sceneNumber]: [...(prev[sceneNumber] || []), newVideo]
+            }));
+            // Set index to show the new video
+            setSceneVideoIndex(prev => ({
+                ...prev,
+                [sceneNumber]: (videoStates[sceneNumber]?.length || 0) // Will be the last index
+            }));
+            setIsGeneratingVideo(prev => ({ ...prev, [sceneNumber]: false }));
         } catch (err: any) {
-            setVideoStates(prev => ({ ...prev, [sceneNumber]: { isLoading: false, error: err.message || 'Falha ao gerar o vídeo.' } }));
+            setIsGeneratingVideo(prev => ({ ...prev, [sceneNumber]: false }));
         }
-    }, [scenes, brandProfile, buildPromptForScene, selectedVideoModel]);
+    }, [scenes, brandProfile, buildPromptForSora, buildPromptForVeo, selectedVideoModel, sceneImages]);
 
     const handleGenerateAllVideos = async () => {
         setIsGeneratingAll(true);
         for (const scene of scenes) {
-            if (!videoStates[scene.sceneNumber]?.url) {
+            // Only generate if scene has no videos yet
+            const sceneVideos = videoStates[scene.sceneNumber] || [];
+            if (sceneVideos.length === 0 || !sceneVideos.some(v => v.url)) {
                 await handleGenerateVideo(scene.sceneNumber);
             }
         }
         setIsGeneratingAll(false);
+    };
+
+    // Regenerate all videos with current model (adds new videos, keeps existing)
+    const handleRegenerateAllVideos = async () => {
+        // Clear merged video since we're generating new ones
+        if (mergedVideoUrl) {
+            URL.revokeObjectURL(mergedVideoUrl);
+            setMergedVideoUrl(null);
+        }
+
+        // Reset carousel to thumbnail
+        setPreviewSlide('thumbnail');
+
+        // Generate all videos with current model (adds to array, doesn't delete)
+        setIsGeneratingAll(true);
+        for (const scene of scenes) {
+            await handleGenerateVideo(scene.sceneNumber);
+        }
+        setIsGeneratingAll(false);
+    };
+
+    // Generate reference images for all scenes using the thumbnail as style reference
+    const handleGenerateSceneImages = async () => {
+        if (!thumbnail) {
+            alert('Por favor, gere a capa primeiro para usar como referência de estilo.');
+            return;
+        }
+
+        setIsGeneratingImages(true);
+
+        // Extract base64 from thumbnail for style reference
+        const thumbnailBase64 = thumbnail.src.split(',')[1];
+        const thumbnailMimeType = thumbnail.src.match(/data:(.*?);/)?.[1] || 'image/png';
+        const styleRef: ImageFile = { base64: thumbnailBase64, mimeType: thumbnailMimeType };
+
+        // Generate image for each scene sequentially
+        for (const scene of scenes) {
+            // Skip if scene already has an image
+            if (sceneImages[scene.sceneNumber]?.dataUrl) continue;
+
+            try {
+                // Mark as loading
+                setSceneImages(prev => ({
+                    ...prev,
+                    [scene.sceneNumber]: { dataUrl: '', isUploading: true }
+                }));
+
+                // Generate image using Gemini with style reference
+                // The prompt emphasizes that this is part of a sequence and must match the cover style
+                const prompt = `CENA ${scene.sceneNumber} DE UM VÍDEO - DEVE USAR A MESMA TIPOGRAFIA DA IMAGEM DE REFERÊNCIA
+
+Descrição visual: ${scene.visual}
+Texto/Narração para incluir: ${scene.narration}
+
+IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, cor, efeitos) DEVE ser IDÊNTICA à imagem de referência anexada. NÃO use fontes diferentes.`;
+                const imageDataUrl = await generateImage(prompt, brandProfile, {
+                    aspectRatio: '9:16',
+                    model: 'gemini-3-pro-image-preview',
+                    styleReferenceImage: styleRef,
+                });
+
+                // Upload to fal.ai to get HTTP URL for Sora
+                const base64Data = imageDataUrl.split(',')[1];
+                const mimeType = imageDataUrl.match(/data:(.*?);/)?.[1] || 'image/png';
+                const httpUrl = await uploadImageToFal(base64Data, mimeType);
+
+                // Update state with both URLs
+                setSceneImages(prev => ({
+                    ...prev,
+                    [scene.sceneNumber]: {
+                        dataUrl: imageDataUrl,
+                        httpUrl,
+                        isUploading: false
+                    }
+                }));
+
+            } catch (err: any) {
+                console.error(`Error generating image for scene ${scene.sceneNumber}:`, err);
+                setSceneImages(prev => ({
+                    ...prev,
+                    [scene.sceneNumber]: {
+                        dataUrl: '',
+                        isUploading: false,
+                        error: err.message || 'Falha ao gerar imagem'
+                    }
+                }));
+            }
+        }
+
+        setIsGeneratingImages(false);
+    };
+
+    // Generate single scene image
+    const handleGenerateSingleSceneImage = async (sceneNumber: number) => {
+        if (!thumbnail) {
+            alert('Por favor, gere a capa primeiro para usar como referência de estilo.');
+            return;
+        }
+
+        const scene = scenes.find(s => s.sceneNumber === sceneNumber);
+        if (!scene) return;
+
+        const thumbnailBase64 = thumbnail.src.split(',')[1];
+        const thumbnailMimeType = thumbnail.src.match(/data:(.*?);/)?.[1] || 'image/png';
+        const styleRef: ImageFile = { base64: thumbnailBase64, mimeType: thumbnailMimeType };
+
+        try {
+            setSceneImages(prev => ({
+                ...prev,
+                [sceneNumber]: { dataUrl: '', isUploading: true }
+            }));
+
+            const prompt = `CENA ${scene.sceneNumber} DE UM VÍDEO - DEVE USAR A MESMA TIPOGRAFIA DA IMAGEM DE REFERÊNCIA
+
+Descrição visual: ${scene.visual}
+Texto/Narração para incluir: ${scene.narration}
+
+IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, cor, efeitos) DEVE ser IDÊNTICA à imagem de referência anexada. NÃO use fontes diferentes.`;
+            const imageDataUrl = await generateImage(prompt, brandProfile, {
+                aspectRatio: '9:16',
+                model: 'gemini-3-pro-image-preview',
+                styleReferenceImage: styleRef,
+            });
+
+            const base64Data = imageDataUrl.split(',')[1];
+            const mimeType = imageDataUrl.match(/data:(.*?);/)?.[1] || 'image/png';
+            const httpUrl = await uploadImageToFal(base64Data, mimeType);
+
+            setSceneImages(prev => ({
+                ...prev,
+                [sceneNumber]: { dataUrl: imageDataUrl, httpUrl, isUploading: false }
+            }));
+        } catch (err: any) {
+            setSceneImages(prev => ({
+                ...prev,
+                [sceneNumber]: { dataUrl: '', isUploading: false, error: err.message }
+            }));
+        }
     };
 
     const handleGenerateAudio = async () => {
@@ -223,10 +475,13 @@ const ClipCard: React.FC<ClipCardProps> = ({
         const generatedVideos: VideoInput[] = [];
 
         for (const scene of scenes) {
-            const videoState = videoStates[scene.sceneNumber];
-            if (videoState?.url) {
+            const sceneVideos = videoStates[scene.sceneNumber] || [];
+            // Use the currently selected video for this scene (or the last one if not set)
+            const selectedIdx = sceneVideoIndex[scene.sceneNumber] ?? sceneVideos.length - 1;
+            const selectedVideo = sceneVideos[selectedIdx];
+            if (selectedVideo?.url) {
                 generatedVideos.push({
-                    url: videoState.url,
+                    url: selectedVideo.url,
                     sceneNumber: scene.sceneNumber,
                     duration: scene.duration,
                 });
@@ -271,13 +526,19 @@ const ClipCard: React.FC<ClipCardProps> = ({
     };
 
     const handleMergeVideos = async () => {
+        // Switch to video view immediately when starting merge
+        setPreviewSlide('video');
+
         const generatedVideos: VideoInput[] = [];
 
         for (const scene of scenes) {
-            const videoState = videoStates[scene.sceneNumber];
-            if (videoState?.url) {
+            const sceneVideos = videoStates[scene.sceneNumber] || [];
+            // Use the currently selected video for this scene (or the last one if not set)
+            const selectedIdx = sceneVideoIndex[scene.sceneNumber] ?? sceneVideos.length - 1;
+            const selectedVideo = sceneVideos[selectedIdx];
+            if (selectedVideo?.url) {
                 generatedVideos.push({
-                    url: videoState.url,
+                    url: selectedVideo.url,
                     sceneNumber: scene.sceneNumber,
                     duration: scene.duration,
                 });
@@ -364,8 +625,11 @@ const ClipCard: React.FC<ClipCardProps> = ({
         }
     };
 
-    const hasGeneratedVideos = Object.values(videoStates).some(v => v.url);
-    const generatedVideosCount = Object.values(videoStates).filter(v => v.url).length;
+    // Count scenes that have at least one video with a URL
+    const hasGeneratedVideos = Object.values(videoStates).some(videos => videos.some(v => v.url));
+    const generatedVideosCount = Object.values(videoStates).filter(videos => videos.some(v => v.url)).length;
+    const generatedImagesCount = Object.values(sceneImages).filter(img => img.dataUrl).length;
+    const hasAllImages = generatedImagesCount === scenes.length && scenes.length > 0;
     const totalDuration = scenes.reduce((acc, s) => acc + s.duration, 0);
 
     return (
@@ -382,10 +646,62 @@ const ClipCard: React.FC<ClipCardProps> = ({
                             <p className="text-[10px] text-white/40">{scenes.length} cenas • {totalDuration}s • {clip.hook}</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button onClick={handleGenerateAllVideos} isLoading={isGeneratingAll} disabled={isGeneratingAll} size="small" icon="zap">
-                            Gerar Todos
+                    <div className="flex items-center gap-3">
+                        {/* Model Selectors */}
+                        <div className="flex items-center gap-2 border-r border-white/10 pr-3">
+                            <select
+                                value={selectedImageModel}
+                                onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
+                                className="bg-[#080808] border border-white/10 rounded-lg px-2 py-1.5 text-[9px] text-white/70 focus:border-primary/50 outline-none transition-all"
+                                title="Modelo de Imagem"
+                            >
+                                <option value="gemini-3-pro-image-preview">Gemini 3</option>
+                                <option value="imagen-4.0-generate-001">Imagen 4</option>
+                            </select>
+                            <select
+                                value={selectedVideoModel}
+                                onChange={(e) => setSelectedVideoModel(e.target.value as VideoModel)}
+                                className="bg-[#080808] border border-white/10 rounded-lg px-2 py-1.5 text-[9px] text-white/70 focus:border-primary/50 outline-none transition-all"
+                                title="Modelo de Vídeo"
+                            >
+                                <option value="fal-ai/sora-2/text-to-video">Sora 2</option>
+                                <option value="veo-3.1-fast-generate-preview">Veo 3.1</option>
+                            </select>
+                        </div>
+                        {/* Action Buttons */}
+                        <Button
+                            onClick={handleGenerateSceneImages}
+                            isLoading={isGeneratingImages}
+                            disabled={isGeneratingImages || !thumbnail}
+                            size="small"
+                            icon="image"
+                            variant="secondary"
+                            title={!thumbnail ? 'Gere a capa primeiro' : undefined}
+                        >
+                            Imagens ({generatedImagesCount}/{scenes.length})
                         </Button>
+                        <Button
+                            onClick={handleGenerateAllVideos}
+                            isLoading={isGeneratingAll}
+                            disabled={isGeneratingAll || generatedVideosCount === scenes.length}
+                            size="small"
+                            icon="zap"
+                        >
+                            Vídeos ({generatedVideosCount}/{scenes.length})
+                        </Button>
+                        {generatedVideosCount > 0 && (
+                            <Button
+                                onClick={handleRegenerateAllVideos}
+                                isLoading={isGeneratingAll}
+                                disabled={isGeneratingAll}
+                                size="small"
+                                icon="refresh"
+                                variant="secondary"
+                                title="Regenerar todos os vídeos com o modelo selecionado"
+                            >
+                                Regenerar
+                            </Button>
+                        )}
                         <Button
                             onClick={handleMergeVideos}
                             disabled={isGeneratingAll || isMerging || generatedVideosCount < 2}
@@ -408,37 +724,125 @@ const ClipCard: React.FC<ClipCardProps> = ({
                 </div>
 
                 <div className="flex flex-col lg:flex-row">
-                    {/* Thumbnail */}
-                    <div className="lg:w-48 flex-shrink-0 p-4 bg-[#0d0d0d] border-b lg:border-b-0 lg:border-r border-white/5">
+                    {/* Preview Carousel - Thumbnail / Merged Video */}
+                    <div className="lg:w-64 flex-shrink-0 p-4 bg-[#0d0d0d] border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col justify-center">
                         <div className="aspect-[9/16] bg-[#080808] rounded-xl overflow-hidden relative border border-white/5">
-                            {isGeneratingThumbnail ? (
-                                <div className="absolute inset-0 flex items-center justify-center"><Loader /></div>
-                            ) : thumbnail ? (
+                            {/* Merged Video Slide */}
+                            {previewSlide === 'video' && (mergedVideoUrl || isMerging) && (
                                 <>
-                                    <img src={thumbnail.src} alt={clip.title} className="w-full h-full object-cover" />
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleToggleFavorite(thumbnail); }}
-                                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isFavorite(thumbnail) ? 'bg-primary text-black' : 'bg-white/10 text-white/70 hover:text-primary'}`}
-                                            title={isFavorite(thumbnail) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-                                        >
-                                            <Icon name="heart" className="w-4 h-4" />
-                                        </button>
-                                        <Button size="small" onClick={() => setEditingThumbnail(thumbnail)}>Editar</Button>
+                                    {isMerging ? (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                                            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-3">
+                                                <Loader />
+                                            </div>
+                                            <p className="text-[10px] text-white/70 text-center mb-3">
+                                                {exportProgress?.message || 'Processando...'}
+                                            </p>
+                                            <div className="w-full px-2">
+                                                <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                                                    <div
+                                                        className="h-full rounded-full bg-primary transition-all duration-300"
+                                                        style={{ width: `${exportProgress?.progress || 0}%` }}
+                                                    />
+                                                </div>
+                                                <p className="text-[9px] text-white/40 text-center mt-1">
+                                                    {exportProgress?.progress || 0}%
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ) : mergedVideoUrl ? (
+                                        <video
+                                            src={mergedVideoUrl}
+                                            controls
+                                            className="w-full h-full object-cover"
+                                            autoPlay
+                                        />
+                                    ) : null}
+                                    {/* Video Badge */}
+                                    <div className="absolute top-2 left-2">
+                                        <span className="text-[8px] font-black bg-primary text-black px-2 py-1 rounded-full flex items-center gap-1">
+                                            <Icon name="video" className="w-3 h-3" />
+                                            VÍDEO FINAL
+                                        </span>
                                     </div>
                                 </>
-                            ) : (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center p-3">
-                                    <Icon name="image" className="w-6 h-6 text-white/10 mb-2" />
-                                    <p className="text-[8px] text-white/20 text-center italic line-clamp-3">"{clip.image_prompt}"</p>
-                                </div>
+                            )}
+
+                            {/* Thumbnail Slide */}
+                            {previewSlide === 'thumbnail' && (
+                                <>
+                                    {isGeneratingThumbnail ? (
+                                        <div className="absolute inset-0 flex items-center justify-center"><Loader /></div>
+                                    ) : thumbnail ? (
+                                        <>
+                                            <img src={thumbnail.src} alt={clip.title} className="w-full h-full object-cover" />
+                                            <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleToggleFavorite(thumbnail); }}
+                                                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isFavorite(thumbnail) ? 'bg-primary text-black' : 'bg-white/10 text-white/70 hover:text-primary'}`}
+                                                    title={isFavorite(thumbnail) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                                                >
+                                                    <Icon name="heart" className="w-4 h-4" />
+                                                </button>
+                                                <Button size="small" onClick={() => setEditingThumbnail(thumbnail)}>Editar</Button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center p-3">
+                                            <Icon name="image" className="w-6 h-6 text-white/10 mb-2" />
+                                            <p className="text-[8px] text-white/20 text-center italic line-clamp-3">"{clip.image_prompt}"</p>
+                                        </div>
+                                    )}
+                                    {/* Thumbnail Badge */}
+                                    {thumbnail && (
+                                        <div className="absolute top-2 left-2">
+                                            <span className="text-[8px] font-black bg-white/20 backdrop-blur-sm text-white px-2 py-1 rounded-full flex items-center gap-1">
+                                                <Icon name="image" className="w-3 h-3" />
+                                                CAPA
+                                            </span>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Navigation Arrows - Only show when both exist */}
+                            {mergedVideoUrl && thumbnail && (
+                                <>
+                                    <button
+                                        onClick={() => setPreviewSlide('video')}
+                                        className={`absolute left-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center transition-all ${previewSlide === 'video' ? 'bg-primary/30 text-primary' : 'bg-black/50 text-white/70 hover:bg-black/70 hover:text-white'}`}
+                                        title="Ver vídeo final"
+                                    >
+                                        <Icon name="chevron-left" className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setPreviewSlide('thumbnail')}
+                                        className={`absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center transition-all ${previewSlide === 'thumbnail' ? 'bg-primary/30 text-primary' : 'bg-black/50 text-white/70 hover:bg-black/70 hover:text-white'}`}
+                                        title="Ver capa"
+                                    >
+                                        <Icon name="chevron-right" className="w-4 h-4" />
+                                    </button>
+                                    {/* Dots indicator */}
+                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                                        <button
+                                            onClick={() => setPreviewSlide('video')}
+                                            className={`w-2 h-2 rounded-full transition-all ${previewSlide === 'video' ? 'bg-primary w-4' : 'bg-white/30'}`}
+                                        />
+                                        <button
+                                            onClick={() => setPreviewSlide('thumbnail')}
+                                            className={`w-2 h-2 rounded-full transition-all ${previewSlide === 'thumbnail' ? 'bg-primary w-4' : 'bg-white/30'}`}
+                                        />
+                                    </div>
+                                </>
                             )}
                         </div>
+
                         {!thumbnail && clip.image_prompt && (
                             <Button onClick={onGenerateThumbnail} isLoading={isGeneratingThumbnail} size="small" className="w-full mt-3" icon="image" variant="secondary">
                                 Gerar Capa
                             </Button>
                         )}
+
                         {/* Audio */}
                         <div className="mt-4 pt-4 border-t border-white/5">
                             <h4 className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2">Narração</h4>
@@ -457,108 +861,228 @@ const ClipCard: React.FC<ClipCardProps> = ({
                         </div>
                     </div>
 
-                    {/* Scenes Grid */}
-                    <div className="flex-1 p-4">
+                    {/* Scenes Horizontal Carousel */}
+                    <div className="flex-1 p-4 overflow-hidden relative">
                         <h4 className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-3">Cenas do Roteiro</h4>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                            {/* Merged Video / Progress Card - First Position */}
-                            {(mergedVideoUrl || isMerging) && (
-                                <div className="bg-[#0a0a0a] rounded-xl border-2 border-primary/50 overflow-hidden flex flex-col ring-2 ring-primary/20">
-                                    {/* Video Preview or Progress */}
+
+                        {/* Navigation Arrows */}
+                        {scenes.length > 3 && (
+                            <>
+                                <button
+                                    onClick={() => {
+                                        const container = document.getElementById(`scenes-carousel-${clip.title}`);
+                                        if (container) container.scrollBy({ left: -280, behavior: 'smooth' });
+                                    }}
+                                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/80 hover:bg-primary/20 border border-white/10 flex items-center justify-center text-white/70 hover:text-primary transition-all shadow-lg"
+                                >
+                                    <Icon name="chevron-left" className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const container = document.getElementById(`scenes-carousel-${clip.title}`);
+                                        if (container) container.scrollBy({ left: 280, behavior: 'smooth' });
+                                    }}
+                                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/80 hover:bg-primary/20 border border-white/10 flex items-center justify-center text-white/70 hover:text-primary transition-all shadow-lg"
+                                >
+                                    <Icon name="chevron-right" className="w-5 h-5" />
+                                </button>
+                            </>
+                        )}
+
+                        <div
+                            id={`scenes-carousel-${clip.title}`}
+                            className="flex gap-4 overflow-x-auto pb-4 px-6 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent scroll-smooth"
+                        >
+                            {scenes.map((scene) => {
+                                const sceneImage = sceneImages[scene.sceneNumber];
+                                const hasImage = !!sceneImage?.dataUrl;
+                                const sceneVideos = videoStates[scene.sceneNumber] || [];
+                                const hasVideo = sceneVideos.some(v => v.url);
+                                const isLoadingImage = sceneImage?.isUploading;
+                                const isLoadingVideo = isGeneratingVideo[scene.sceneNumber];
+                                // Get current video index (default to last)
+                                const currentVideoIdx = sceneVideoIndex[scene.sceneNumber] ?? Math.max(0, sceneVideos.length - 1);
+                                const currentVideo = sceneVideos[currentVideoIdx];
+                                const videosWithUrl = sceneVideos.filter(v => v.url);
+                                const hasMultipleVideos = videosWithUrl.length > 1;
+                                // Default to video if available, otherwise image
+                                const currentSlide = scenePreviewSlides[scene.sceneNumber] || (hasVideo ? 'video' : 'image');
+                                const showCarousel = hasImage && hasVideo;
+
+                                // Navigate between videos
+                                const navigateVideo = (direction: 'prev' | 'next') => {
+                                    const currentIdx = sceneVideoIndex[scene.sceneNumber] ?? sceneVideos.length - 1;
+                                    let newIdx = direction === 'prev' ? currentIdx - 1 : currentIdx + 1;
+                                    // Wrap around
+                                    if (newIdx < 0) newIdx = sceneVideos.length - 1;
+                                    if (newIdx >= sceneVideos.length) newIdx = 0;
+                                    setSceneVideoIndex(prev => ({ ...prev, [scene.sceneNumber]: newIdx }));
+                                };
+
+                                return (
+                                <div key={scene.sceneNumber} className={`bg-[#0a0a0a] rounded-xl border overflow-hidden flex flex-col flex-shrink-0 w-64 ${hasVideo ? 'border-blue-500/30' : hasImage ? 'border-green-500/30' : 'border-white/5'}`}>
+                                    {/* Scene Preview - Carousel */}
                                     <div className="aspect-[9/16] bg-[#080808] relative">
-                                        {isMerging ? (
-                                            <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-                                                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center mb-3">
-                                                    <Loader />
-                                                </div>
-                                                <p className="text-[9px] text-white/70 text-center mb-3">
-                                                    {exportProgress?.message || 'Processando...'}
-                                                </p>
-                                                {/* Progress bar */}
-                                                <div className="w-full px-2">
-                                                    <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
-                                                        <div
-                                                            className="h-full rounded-full bg-primary transition-all duration-300"
-                                                            style={{ width: `${exportProgress?.progress || 0}%` }}
-                                                        />
-                                                    </div>
-                                                    <p className="text-[8px] text-white/40 text-center mt-1">
-                                                        {exportProgress?.progress || 0}%
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        ) : mergedVideoUrl ? (
-                                            <video
-                                                src={mergedVideoUrl}
-                                                controls
-                                                className="w-full h-full object-cover"
-                                                autoPlay
-                                            />
-                                        ) : null}
-                                        {/* Badge */}
-                                        <div className="absolute top-1.5 left-1.5 right-1.5 flex justify-between items-center">
-                                            <span className="text-[7px] font-black bg-primary text-black px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                                                <Icon name="video" className="w-2.5 h-2.5" />
-                                                FINAL
-                                            </span>
-                                            <span className="text-[7px] font-bold text-white/60 bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
-                                                {totalDuration}s
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {/* Action */}
-                                    <div className="p-2">
-                                        <p className="text-[8px] text-white/40 line-clamp-2 mb-2">
-                                            {isMerging ? `Juntando ${generatedVideosCount} cenas...` : `${generatedVideosCount} cenas concatenadas`}
-                                        </p>
-                                        {!isMerging && mergedVideoUrl && (
-                                            <div className="flex gap-1">
-                                                <Button
-                                                    onClick={handleDownloadMerged}
-                                                    size="small"
-                                                    variant="primary"
-                                                    className="flex-1 text-[8px]"
-                                                    icon="download"
-                                                >
-                                                    Baixar
-                                                </Button>
-                                                <button
-                                                    onClick={() => {
-                                                        URL.revokeObjectURL(mergedVideoUrl);
-                                                        setMergedVideoUrl(null);
-                                                    }}
-                                                    className="w-7 h-7 rounded-lg bg-white/5 hover:bg-red-500/20 flex items-center justify-center text-white/40 hover:text-red-400 transition-colors"
-                                                    title="Remover"
-                                                >
-                                                    <Icon name="x" className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                            {scenes.map((scene) => (
-                                <div key={scene.sceneNumber} className="bg-[#0a0a0a] rounded-xl border border-white/5 overflow-hidden flex flex-col">
-                                    {/* Scene Preview */}
-                                    <div className="aspect-[9/16] bg-[#080808] relative">
-                                        {videoStates[scene.sceneNumber]?.isLoading ? (
-                                            <div className="absolute inset-0 flex items-center justify-center">
+                                        {/* Loading States */}
+                                        {isLoadingVideo ? (
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center">
                                                 <Loader />
+                                                <p className="text-[7px] text-white/40 mt-2">Gerando vídeo...</p>
                                             </div>
-                                        ) : videoStates[scene.sceneNumber]?.url ? (
-                                            <video src={videoStates[scene.sceneNumber].url} controls className="w-full h-full object-cover" />
+                                        ) : isLoadingImage ? (
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                <Loader />
+                                                <p className="text-[7px] text-white/40 mt-2">Gerando imagem...</p>
+                                            </div>
                                         ) : (
-                                            <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
-                                                <Icon name="play" className="w-6 h-6 text-white/10 mb-1" />
-                                                <p className="text-[7px] text-white/20 text-center line-clamp-3">{scene.visual}</p>
-                                            </div>
+                                            <>
+                                                {/* Video Slide */}
+                                                {currentSlide === 'video' && hasVideo && currentVideo?.url && (
+                                                    <>
+                                                        <video
+                                                            src={currentVideo.url}
+                                                            controls
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                        {/* Model tag */}
+                                                        {currentVideo.model && (
+                                                            <div className="absolute bottom-12 left-1/2 -translate-x-1/2">
+                                                                <span className="text-[7px] font-bold bg-blue-600/90 text-white px-2 py-0.5 rounded-full">
+                                                                    {getModelShortName(currentVideo.model)}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {/* Video navigation arrows for multiple videos */}
+                                                        {hasMultipleVideos && (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => navigateVideo('prev')}
+                                                                    className="absolute left-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-black/70 hover:bg-black/90 flex items-center justify-center text-white/80 transition-all z-10"
+                                                                    title="Vídeo anterior"
+                                                                >
+                                                                    <Icon name="chevron-left" className="w-3 h-3" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => navigateVideo('next')}
+                                                                    className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-black/70 hover:bg-black/90 flex items-center justify-center text-white/80 transition-all z-10"
+                                                                    title="Próximo vídeo"
+                                                                >
+                                                                    <Icon name="chevron-right" className="w-3 h-3" />
+                                                                </button>
+                                                                {/* Video counter */}
+                                                                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-1">
+                                                                    {sceneVideos.map((_, idx) => (
+                                                                        <button
+                                                                            key={idx}
+                                                                            onClick={() => setSceneVideoIndex(prev => ({ ...prev, [scene.sceneNumber]: idx }))}
+                                                                            className={`w-1.5 h-1.5 rounded-full transition-all ${idx === currentVideoIdx ? 'bg-blue-500 w-3' : 'bg-white/40'}`}
+                                                                        />
+                                                                    ))}
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </>
+                                                )}
+
+                                                {/* Image Slide */}
+                                                {currentSlide === 'image' && hasImage && (
+                                                    <>
+                                                        <img src={sceneImage.dataUrl} alt={`Referência cena ${scene.sceneNumber}`} className="w-full h-full object-cover" />
+                                                        {/* Hover overlay to regenerate image */}
+                                                        <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center">
+                                                            <button
+                                                                onClick={() => handleGenerateSingleSceneImage(scene.sceneNumber)}
+                                                                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-primary/20 flex items-center justify-center text-white/70 hover:text-primary transition-colors"
+                                                                title="Regenerar imagem"
+                                                            >
+                                                                <Icon name="refresh" className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+
+                                                {/* Empty state - no image or video */}
+                                                {!hasImage && !hasVideo && (
+                                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
+                                                        <Icon name="image" className="w-6 h-6 text-white/10 mb-1" />
+                                                        <p className="text-[7px] text-white/20 text-center line-clamp-3">{scene.visual}</p>
+                                                    </div>
+                                                )}
+
+                                                {/* Image/Video Carousel Navigation - Only when both exist */}
+                                                {showCarousel && !hasMultipleVideos && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => setSceneSlide(scene.sceneNumber, 'image')}
+                                                            className={`absolute left-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center transition-all ${currentSlide === 'image' ? 'bg-green-500/50 text-white' : 'bg-black/50 text-white/70 hover:bg-black/70'}`}
+                                                            title="Ver imagem"
+                                                        >
+                                                            <Icon name="chevron-left" className="w-3 h-3" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setSceneSlide(scene.sceneNumber, 'video')}
+                                                            className={`absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center transition-all ${currentSlide === 'video' ? 'bg-blue-500/50 text-white' : 'bg-black/50 text-white/70 hover:bg-black/70'}`}
+                                                            title="Ver vídeo"
+                                                        >
+                                                            <Icon name="chevron-right" className="w-3 h-3" />
+                                                        </button>
+                                                        {/* Dots indicator */}
+                                                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                                                            <button
+                                                                onClick={() => setSceneSlide(scene.sceneNumber, 'image')}
+                                                                className={`w-1.5 h-1.5 rounded-full transition-all ${currentSlide === 'image' ? 'bg-green-500 w-3' : 'bg-white/30'}`}
+                                                                title="Imagem"
+                                                            />
+                                                            <button
+                                                                onClick={() => setSceneSlide(scene.sceneNumber, 'video')}
+                                                                className={`w-1.5 h-1.5 rounded-full transition-all ${currentSlide === 'video' ? 'bg-blue-500 w-3' : 'bg-white/30'}`}
+                                                                title="Vídeo"
+                                                            />
+                                                        </div>
+                                                    </>
+                                                )}
+
+                                                {/* Tab buttons when multiple videos - switch between image and videos */}
+                                                {showCarousel && hasMultipleVideos && (
+                                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 bg-black/50 rounded-full px-1 py-0.5">
+                                                        <button
+                                                            onClick={() => setSceneSlide(scene.sceneNumber, 'image')}
+                                                            className={`text-[6px] px-2 py-0.5 rounded-full transition-all ${currentSlide === 'image' ? 'bg-green-500 text-white' : 'text-white/60 hover:text-white'}`}
+                                                        >
+                                                            IMG
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setSceneSlide(scene.sceneNumber, 'video')}
+                                                            className={`text-[6px] px-2 py-0.5 rounded-full transition-all ${currentSlide === 'video' ? 'bg-blue-500 text-white' : 'text-white/60 hover:text-white'}`}
+                                                        >
+                                                            VID ({videosWithUrl.length})
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
                                         )}
+
                                         {/* Badge */}
-                                        <div className="absolute top-1.5 left-1.5 right-1.5 flex justify-between items-center">
-                                            <span className="text-[7px] font-black bg-primary/90 text-black px-1.5 py-0.5 rounded-full">
-                                                {scene.sceneNumber}
-                                            </span>
+                                        <div className="absolute top-1.5 left-1.5 right-1.5 flex justify-between items-center pointer-events-none">
                                             <div className="flex items-center gap-1">
+                                                <span className="text-[7px] font-black bg-primary/90 text-black px-1.5 py-0.5 rounded-full">
+                                                    {scene.sceneNumber}
+                                                </span>
+                                                {hasImage && !hasVideo && (
+                                                    <span className="text-[6px] font-bold bg-green-500/80 text-white px-1 py-0.5 rounded-full">IMG</span>
+                                                )}
+                                                {hasVideo && !hasImage && (
+                                                    <span className="text-[6px] font-bold bg-blue-500/80 text-white px-1 py-0.5 rounded-full">
+                                                        VID{hasMultipleVideos ? ` (${videosWithUrl.length})` : ''}
+                                                    </span>
+                                                )}
+                                                {showCarousel && (
+                                                    <span className={`text-[6px] font-bold px-1 py-0.5 rounded-full ${currentSlide === 'video' ? 'bg-blue-500/80 text-white' : 'bg-green-500/80 text-white'}`}>
+                                                        {currentSlide === 'video' ? `VID${hasMultipleVideos ? ` ${currentVideoIdx + 1}/${videosWithUrl.length}` : ''}` : 'IMG'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-1 pointer-events-auto">
                                                 <button
                                                     onClick={() => handleShowPrompt(scene.sceneNumber)}
                                                     className="w-5 h-5 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white/40 hover:text-white hover:bg-black/70 transition-colors"
@@ -572,18 +1096,35 @@ const ClipCard: React.FC<ClipCardProps> = ({
                                             </div>
                                         </div>
                                     </div>
+
                                     {/* Scene Action */}
                                     <div className="p-2">
                                         <p className="text-[8px] text-white/40 line-clamp-2 mb-2">{scene.narration}</p>
-                                        {!videoStates[scene.sceneNumber]?.url && !videoStates[scene.sceneNumber]?.isLoading && (
-                                            <Button onClick={() => handleGenerateVideo(scene.sceneNumber)} size="small" variant="secondary" className="w-full text-[8px]" icon="play">
-                                                Gerar
-                                            </Button>
-                                        )}
-                                        {videoStates[scene.sceneNumber]?.error && <p className="text-red-400 text-[7px] mt-1">{videoStates[scene.sceneNumber].error}</p>}
+                                        <div className="flex gap-1">
+                                            {/* Generate Image button - show when no image and not loading */}
+                                            {!hasImage && !isLoadingImage && !hasVideo && (
+                                                <button
+                                                    onClick={() => handleGenerateSingleSceneImage(scene.sceneNumber)}
+                                                    disabled={!thumbnail}
+                                                    className="flex-1 h-6 rounded-lg bg-green-500/10 hover:bg-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 text-green-400 text-[8px] font-medium transition-colors"
+                                                    title={!thumbnail ? 'Gere a capa primeiro' : 'Gerar imagem de referência'}
+                                                >
+                                                    <Icon name="image" className="w-3 h-3" />
+                                                    Img
+                                                </button>
+                                            )}
+                                            {/* Generate Video button - always show if not loading */}
+                                            {!isLoadingVideo && (
+                                                <Button onClick={() => handleGenerateVideo(scene.sceneNumber)} size="small" variant="secondary" className="flex-1 text-[8px]" icon="play">
+                                                    {hasVideo ? '+Vídeo' : hasImage ? 'Vídeo' : 'Gerar'}
+                                                </Button>
+                                            )}
+                                        </div>
+                                        {sceneImage?.error && <p className="text-red-400 text-[7px] mt-1">{sceneImage.error}</p>}
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -665,8 +1206,8 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
         errors: [],
     });
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
-    const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
-    const [selectedVideoModel, setSelectedVideoModel] = useState<VideoModel>('veo-3.1-fast-generate-preview');
+    const [selectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
+    const [sceneImageTriggers, setSceneImageTriggers] = useState<number[]>([]);
 
     useEffect(() => {
         const length = videoClipScripts.length;
@@ -675,6 +1216,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
             isGenerating: Array(length).fill(false),
             errors: Array(length).fill(null),
         });
+        setSceneImageTriggers(Array(length).fill(0));
     }, [videoClipScripts]);
 
     const handleGenerateThumbnail = async (index: number) => {
@@ -739,51 +1281,35 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
         }
     };
 
-    const handleGenerateAllThumbnails = async () => {
+    const handleGenerateAllImages = async () => {
         setIsGeneratingAll(true);
-        const generationPromises = videoClipScripts.map((_, index) => {
+
+        // Generate thumbnails and trigger scene images for each clip sequentially
+        for (let index = 0; index < videoClipScripts.length; index++) {
             if (!thumbnails[index]) {
-                return handleGenerateThumbnail(index);
+                await handleGenerateThumbnail(index);
             }
-            return Promise.resolve();
-        });
-        await Promise.allSettled(generationPromises);
+            // Trigger scene image generation for this clip after its thumbnail is ready
+            // Small delay to ensure thumbnail state is updated
+            await new Promise(resolve => setTimeout(resolve, 200));
+            setSceneImageTriggers(prev => {
+                const next = [...prev];
+                next[index] = prev[index] + 1;
+                return next;
+            });
+        }
+
         setIsGeneratingAll(false);
     };
 
     return (
         <div className="space-y-6">
-            {/* Controls Bar - Minimal */}
-            <div className="flex items-center justify-between flex-wrap gap-4">
-                <Button onClick={handleGenerateAllThumbnails} isLoading={isGeneratingAll} disabled={isGeneratingAll || generationState.isGenerating.some(Boolean)} icon="zap" size="small">
-                    Gerar Todas Capas
+            {/* Controls Bar */}
+            <div className="flex items-center gap-4">
+                <Button onClick={handleGenerateAllImages} isLoading={isGeneratingAll} disabled={isGeneratingAll || generationState.isGenerating.some(Boolean)} icon="zap" size="small">
+                    Gerar Todas Imagens
                 </Button>
-                <div className="flex items-center gap-4 flex-wrap">
-                    {/* Image Model Selector */}
-                    <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-black uppercase tracking-wider text-white/30">Imagem:</span>
-                        <select
-                            value={selectedImageModel}
-                            onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
-                            className="bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-primary/50 outline-none transition-all"
-                        >
-                            <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
-                            <option value="imagen-4.0-generate-001">Imagen 4.0</option>
-                        </select>
-                    </div>
-                    {/* Video Model Selector */}
-                    <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-black uppercase tracking-wider text-white/30">Vídeo:</span>
-                        <select
-                            value={selectedVideoModel}
-                            onChange={(e) => setSelectedVideoModel(e.target.value as VideoModel)}
-                            className="bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-primary/50 outline-none transition-all"
-                        >
-                            <option value="veo-3.1-fast-generate-preview">Veo 3.1 (Google)</option>
-                            <option value="fal-ai/sora-2/text-to-video">Sora 2 (OpenAI)</option>
-                        </select>
-                    </div>
-                </div>
+                <p className="text-[9px] text-white/30">Gera capas + imagens de referência para todas as cenas</p>
             </div>
 
             {/* Clips */}
@@ -800,7 +1326,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
                     styleReferences={styleReferences}
                     onAddStyleReference={onAddStyleReference}
                     onRemoveStyleReference={onRemoveStyleReference}
-                    selectedVideoModel={selectedVideoModel}
+                    triggerSceneImageGeneration={sceneImageTriggers[index]}
                 />
             ))}
         </div>

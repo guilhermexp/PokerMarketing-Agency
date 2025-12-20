@@ -154,11 +154,44 @@ export const generateQuickPostText = async (brandProfile: BrandProfile, context:
 export const generateImage = async (
     prompt: string,
     brandProfile: BrandProfile,
-    options: { aspectRatio: string; model: ImageModel; imageSize?: ImageSize; productImages?: ImageFile[] }
+    options: {
+        aspectRatio: string;
+        model: ImageModel;
+        imageSize?: ImageSize;
+        productImages?: ImageFile[];
+        styleReferenceImage?: ImageFile;  // Imagem de referência de estilo para consistência visual
+    }
 ): Promise<string> => {
     const ai = getAi();
-    const fullPrompt = `PROMPT TÉCNICO: ${prompt}\nESTILO VISUAL: ${brandProfile.toneOfVoice}, Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
-    
+
+    // Build prompt with style reference instruction if provided
+    let fullPrompt = `PROMPT TÉCNICO: ${prompt}\nESTILO VISUAL: ${brandProfile.toneOfVoice}, Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
+
+    if (options.styleReferenceImage) {
+        fullPrompt = `${fullPrompt}
+
+INSTRUÇÕES CRÍTICAS DE CONSISTÊNCIA VISUAL:
+A imagem de referência anexada é o GUIA DE ESTILO ABSOLUTO. Você DEVE copiar EXATAMENTE:
+
+1. **TIPOGRAFIA (CRÍTICO)**:
+   - Use a MESMA FONTE/FAMÍLIA tipográfica da referência (bold, condensed, serif, sans-serif, etc.)
+   - Copie o MESMO PESO da fonte (regular, bold, black, etc.)
+   - Mantenha o MESMO ESTILO de texto (maiúsculas, espaçamento, alinhamento)
+   - Replique os MESMOS EFEITOS no texto (sombras, brilhos, bordas, gradientes)
+   - Se o texto na referência é BOLD com SOMBRA VERMELHA, TODOS os textos devem ser assim
+
+2. **CORES E TRATAMENTO**:
+   - Use EXATAMENTE a mesma paleta de cores
+   - Mesma intensidade, saturação e brilho
+   - Mesmos gradientes e efeitos de luz
+
+3. **COMPOSIÇÃO**:
+   - Mesmo estilo de layout e distribuição de elementos
+   - Mesma atmosfera e iluminação (fumaça, brilhos, etc.)
+
+REGRA DE OURO: Se a imagem de referência usa fonte BOLD VERMELHA com efeito de BRILHO, TODAS as cenas devem usar EXATAMENTE essa mesma tipografia. NÃO invente novas fontes.`;
+    }
+
     if (options.model === 'imagen-4.0-generate-001') {
         const response = await ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
@@ -169,6 +202,13 @@ export const generateImage = async (
     } else {
         const modelName = 'gemini-3-pro-image-preview'; // Força Gemini 3 Pro Image
         const parts: any[] = [{ text: fullPrompt }];
+
+        // Add style reference image FIRST for better context
+        if (options.styleReferenceImage) {
+            parts.push({ inlineData: { data: options.styleReferenceImage.base64, mimeType: options.styleReferenceImage.mimeType } });
+        }
+
+        // Then add product images
         if (options.productImages) {
             options.productImages.forEach(img => {
                 parts.push({ inlineData: { data: img.base64, mimeType: img.mimeType } });
@@ -179,9 +219,9 @@ export const generateImage = async (
             model: modelName,
             contents: { parts },
             config: {
-                imageConfig: { 
-                    aspectRatio: mapAspectRatio(options.aspectRatio) as any, 
-                    imageSize: options.imageSize || "1K" 
+                imageConfig: {
+                    aspectRatio: mapAspectRatio(options.aspectRatio) as any,
+                    imageSize: options.imageSize || "1K"
                 }
             },
         });

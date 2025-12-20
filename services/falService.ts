@@ -6,6 +6,37 @@ fal.config({
   credentials: import.meta.env.VITE_FAL_KEY || process.env.FAL_KEY,
 });
 
+/**
+ * Upload an image to fal.ai storage and get an HTTP URL
+ * This is needed because Sora image-to-video requires HTTP URLs, not data URLs
+ */
+export const uploadImageToFal = async (base64Data: string, mimeType: string = 'image/png'): Promise<string> => {
+  console.log('[fal.ai] Uploading image to fal.ai storage...');
+
+  try {
+    // Convert base64 to Blob
+    const byteString = atob(base64Data);
+    const arrayBuffer = new ArrayBuffer(byteString.length);
+    const uint8Array = new Uint8Array(arrayBuffer);
+    for (let i = 0; i < byteString.length; i++) {
+      uint8Array[i] = byteString.charCodeAt(i);
+    }
+    const blob = new Blob([uint8Array], { type: mimeType });
+
+    // Create File object for upload
+    const extension = mimeType.split('/')[1] || 'png';
+    const file = new File([blob], `reference-${Date.now()}.${extension}`, { type: mimeType });
+
+    // Upload to fal.ai storage
+    const url = await fal.storage.upload(file);
+
+    console.log(`[fal.ai] Image uploaded successfully: ${url}`);
+    return url;
+  } catch (error) {
+    console.error('[fal.ai] Error uploading image:', error);
+    throw new Error(`Falha ao fazer upload da imagem: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+  }
+};
 
 interface Sora2TextToVideoInput {
   prompt: string;
@@ -32,12 +63,13 @@ interface FalVideoResponse {
 }
 
 /**
- * Map scene duration to Sora 2 duration options (4, 8, or 12 seconds)
- * Uses the smallest duration that covers the scene to optimize costs
+ * Get Sora 2 duration - always use 12 seconds for maximum quality and coherence
+ * Sora 2 generates better, more coherent videos with longer durations
+ * The video can be trimmed later if needed
  */
-const getSora2Duration = (sceneDuration: number): 4 | 8 | 12 => {
-  if (sceneDuration <= 4) return 4;
-  if (sceneDuration <= 8) return 8;
+const getSora2Duration = (_sceneDuration?: number): 12 => {
+  // Always use 12 seconds for best quality
+  // Shorter durations result in choppy, incoherent videos
   return 12;
 };
 
