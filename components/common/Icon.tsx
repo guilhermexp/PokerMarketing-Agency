@@ -11,6 +11,7 @@ export type IconName =
   | 'share'
   | 'upload'
   | 'arrowRight'
+  | 'arrow-left'
   | 'x'
   // FIX: Add new icons for FlyerGenerator and ImagePreviewModal
   | 'dollar-sign'
@@ -40,6 +41,7 @@ export type IconName =
   | 'share-alt'
   // Video Icons
   | 'play'
+  | 'pause'
   | 'video'
   | 'film'
   // Favorites
@@ -53,6 +55,7 @@ export type IconName =
   | 'check'
   | 'trash'
   | 'alert-circle'
+  | 'refresh'
   | 'eye';
 
 interface IconProps {
@@ -108,6 +111,12 @@ const iconPaths: Record<IconName, React.ReactNode> = {
     <>
       <line x1="5" y1="12" x2="19" y2="12"></line>
       <polyline points="12 5 19 12 12 19"></polyline>
+    </>
+  ),
+  'arrow-left': (
+    <>
+      <line x1="19" y1="12" x2="5" y2="12"></line>
+      <polyline points="12 19 5 12 12 5"></polyline>
     </>
   ),
   x: (
@@ -235,6 +244,12 @@ const iconPaths: Record<IconName, React.ReactNode> = {
     </>
   ),
   play: <polygon points="5 3 19 12 5 21 5 3"></polygon>,
+  pause: (
+    <>
+      <rect x="6" y="4" width="4" height="16"></rect>
+      <rect x="14" y="4" width="4" height="16"></rect>
+    </>
+  ),
   video: (
     <>
       <polygon points="23 7 16 12 23 17 23 7"></polygon>
@@ -303,6 +318,13 @@ const iconPaths: Record<IconName, React.ReactNode> = {
     <>
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
       <circle cx="12" cy="12" r="3"></circle>
+    </>
+  ),
+  refresh: (
+    <>
+      <polyline points="23 4 23 10 17 10"></polyline>
+      <polyline points="1 20 1 14 7 14"></polyline>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
     </>
   ),
 };

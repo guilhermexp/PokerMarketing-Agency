@@ -97,6 +97,33 @@ interface SceneReferenceImage {
   error?: string | null;
 }
 
+// --- Video Editor Interfaces ---
+
+interface EditableClip {
+  id: string;
+  sceneNumber: number;
+  videoUrl: string;
+  originalDuration: number;
+  trimStart: number;
+  trimEnd: number;
+  model?: string;
+}
+
+interface EditorState {
+  clips: EditableClip[];
+  currentTime: number;
+  isPlaying: boolean;
+  selectedClipId: string | null;
+  totalDuration: number;
+}
+
+// Format time in MM:SS format
+const formatTime = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
 // --- Clip Card (Inline with Scenes) ---
 
 interface ClipCardProps {
@@ -136,6 +163,13 @@ const ClipCard: React.FC<ClipCardProps> = ({
     const [promptPreview, setPromptPreview] = useState<{ sceneNumber: number; prompt: string } | null>(null);
     const [previewSlide, setPreviewSlide] = useState<'video' | 'thumbnail'>('thumbnail'); // Carousel state
     const [scenePreviewSlides, setScenePreviewSlides] = useState<Record<number, 'image' | 'video'>>({}); // Per-scene carousel
+
+    // Video Editor State
+    const [isEditing, setIsEditing] = useState(false);
+    const [editorState, setEditorState] = useState<EditorState | null>(null);
+    const [draggedClipId, setDraggedClipId] = useState<string | null>(null);
+    const editorVideoRef = useRef<HTMLVideoElement>(null);
+    const [showAddClipModal, setShowAddClipModal] = useState(false);
 
     // Auto-switch to video when merged video is ready
     useEffect(() => {
@@ -599,6 +633,197 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         document.body.removeChild(a);
     };
 
+    // --- Video Editor Functions ---
+
+    const handleEnterEditMode = () => {
+        // Start with empty timeline - user adds clips manually
+        setEditorState({
+            clips: [],
+            currentTime: 0,
+            isPlaying: false,
+            selectedClipId: null,
+            totalDuration: 0,
+        });
+        setIsEditing(true);
+    };
+
+    // Get all available videos for adding to timeline
+    const getAvailableVideos = () => {
+        const available: { sceneNumber: number; video: VideoState; duration: number; videoIndex: number }[] = [];
+        scenes.forEach(scene => {
+            const videos = videoStates[scene.sceneNumber] || [];
+            videos.forEach((video, idx) => {
+                if (video.url) {
+                    available.push({
+                        sceneNumber: scene.sceneNumber,
+                        video,
+                        duration: scene.duration,
+                        videoIndex: idx,
+                    });
+                }
+            });
+        });
+        return available;
+    };
+
+    // Add a video to the timeline
+    const handleAddClipToTimeline = (sceneNumber: number, video: VideoState, duration: number) => {
+        if (!editorState) return;
+
+        const newClip: EditableClip = {
+            id: `clip-${sceneNumber}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            sceneNumber,
+            videoUrl: video.url!,
+            originalDuration: duration,
+            trimStart: 0,
+            trimEnd: duration,
+            model: video.model,
+        };
+
+        const newClips = [...editorState.clips, newClip];
+        const totalDuration = newClips.reduce((acc, c) => acc + (c.trimEnd - c.trimStart), 0);
+
+        setEditorState({
+            ...editorState,
+            clips: newClips,
+            totalDuration,
+        });
+    };
+
+    const handleExitEditMode = () => {
+        setIsEditing(false);
+        setEditorState(null);
+        setDraggedClipId(null);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editorState || editorState.clips.length === 0) return;
+
+        // Build VideoInput array from editor state
+        const videoInputs: VideoInput[] = editorState.clips.map((clip, idx) => ({
+            url: clip.videoUrl,
+            sceneNumber: idx + 1, // Use index for ordering
+            duration: clip.trimEnd - clip.trimStart,
+            trimStart: clip.trimStart,
+            trimEnd: clip.trimEnd,
+        }));
+
+        // Clear merged video if exists
+        if (mergedVideoUrl) {
+            URL.revokeObjectURL(mergedVideoUrl);
+            setMergedVideoUrl(null);
+        }
+
+        setIsMerging(true);
+        setPreviewSlide('video');
+        setExportProgress({ phase: 'loading', progress: 0, message: 'Carregando FFmpeg...' });
+
+        try {
+            const outputBlob = await concatenateVideos(videoInputs, {
+                outputFormat: 'mp4',
+                onProgress: setExportProgress,
+            });
+
+            const previewUrl = URL.createObjectURL(outputBlob);
+            setMergedVideoUrl(previewUrl);
+            setExportProgress(null);
+            setIsEditing(false);
+            setEditorState(null);
+        } catch (error) {
+            console.error('Edit save failed:', error);
+            setExportProgress({
+                phase: 'error',
+                progress: 0,
+                message: error instanceof Error ? error.message : 'Falha ao processar edição',
+            });
+        } finally {
+            setIsMerging(false);
+        }
+    };
+
+    const updateEditorClips = (newClips: EditableClip[]) => {
+        if (!editorState) return;
+        const totalDuration = newClips.reduce((acc, c) => acc + (c.trimEnd - c.trimStart), 0);
+        setEditorState({
+            ...editorState,
+            clips: newClips,
+            totalDuration,
+        });
+    };
+
+    const handleDragStart = (clipId: string) => {
+        setDraggedClipId(clipId);
+    };
+
+    const handleDragOver = (e: React.DragEvent, targetClipId: string) => {
+        e.preventDefault();
+        if (!draggedClipId || draggedClipId === targetClipId || !editorState) return;
+
+        const clips = [...editorState.clips];
+        const draggedIndex = clips.findIndex(c => c.id === draggedClipId);
+        const targetIndex = clips.findIndex(c => c.id === targetClipId);
+
+        if (draggedIndex === -1 || targetIndex === -1) return;
+
+        // Reorder clips
+        const [removed] = clips.splice(draggedIndex, 1);
+        clips.splice(targetIndex, 0, removed);
+
+        updateEditorClips(clips);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedClipId(null);
+    };
+
+    const handleSelectClip = (clipId: string) => {
+        if (!editorState) return;
+        setEditorState({
+            ...editorState,
+            selectedClipId: editorState.selectedClipId === clipId ? null : clipId,
+        });
+
+        // Find clip and set video to that time
+        const clipIndex = editorState.clips.findIndex(c => c.id === clipId);
+        if (clipIndex !== -1) {
+            let timeOffset = 0;
+            for (let i = 0; i < clipIndex; i++) {
+                const c = editorState.clips[i];
+                timeOffset += c.trimEnd - c.trimStart;
+            }
+            setEditorState(prev => prev ? { ...prev, currentTime: timeOffset } : null);
+
+            // Load that clip's video in the preview
+            const clip = editorState.clips[clipIndex];
+            if (editorVideoRef.current && clip) {
+                editorVideoRef.current.src = clip.videoUrl;
+                editorVideoRef.current.currentTime = clip.trimStart;
+            }
+        }
+    };
+
+    const handlePlayPause = () => {
+        if (!editorState) return;
+        const video = editorVideoRef.current;
+        if (!video) return;
+
+        if (editorState.isPlaying) {
+            video.pause();
+        } else {
+            video.play();
+        }
+        setEditorState(prev => prev ? { ...prev, isPlaying: !prev.isPlaying } : null);
+    };
+
+    const handleDeleteClip = (clipId: string) => {
+        if (!editorState) return;
+        const newClips = editorState.clips.filter(c => c.id !== clipId);
+        updateEditorClips(newClips);
+        if (editorState.selectedClipId === clipId) {
+            setEditorState(prev => prev ? { ...prev, selectedClipId: null } : null);
+        }
+    };
+
     // Check if thumbnail is already in favorites
     const isFavorite = (image: GalleryImage) => {
         return styleReferences?.some(ref => ref.src === image.src) || false;
@@ -702,6 +927,18 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                 Regenerar
                             </Button>
                         )}
+                        {generatedVideosCount > 0 && (
+                            <Button
+                                onClick={handleEnterEditMode}
+                                disabled={isGeneratingAll || isMerging}
+                                size="small"
+                                icon="edit"
+                                variant="secondary"
+                                title="Editar timeline manualmente"
+                            >
+                                Editar
+                            </Button>
+                        )}
                         <Button
                             onClick={handleMergeVideos}
                             disabled={isGeneratingAll || isMerging || generatedVideosCount < 2}
@@ -723,7 +960,194 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                     </div>
                 </div>
 
-                <div className="flex flex-col lg:flex-row">
+                {/* Video Editor Mode */}
+                {isEditing && editorState ? (
+                    <div className="flex flex-col min-h-[500px]">
+                        {/* Editor Header */}
+                        <div className="px-5 py-3 border-b border-white/5 bg-[#0d0d0d] flex items-center justify-between">
+                            <button
+                                onClick={handleExitEditMode}
+                                className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
+                            >
+                                <Icon name="arrow-left" className="w-4 h-4" />
+                                <span className="text-sm font-medium">Voltar</span>
+                            </button>
+                            <div className="flex items-center gap-2">
+                                <Icon name="edit" className="w-4 h-4 text-primary" />
+                                <span className="text-sm font-bold text-white">Editando Timeline</span>
+                            </div>
+                            <Button onClick={handleSaveEdit} size="small" icon="check" disabled={isMerging}>
+                                {isMerging ? 'Processando...' : 'Salvar'}
+                            </Button>
+                        </div>
+
+                        {/* Editor Preview Area */}
+                        <div className="flex-1 flex items-center justify-center p-6 bg-black/50 relative">
+                            {isMerging ? (
+                                <div className="flex flex-col items-center justify-center">
+                                    <Loader />
+                                    <p className="text-sm text-white/70 mt-4">{exportProgress?.message || 'Processando...'}</p>
+                                    <div className="w-64 bg-white/10 rounded-full h-2 mt-3 overflow-hidden">
+                                        <div
+                                            className="h-full bg-primary rounded-full transition-all duration-300"
+                                            style={{ width: `${exportProgress?.progress || 0}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="aspect-[9/16] h-full max-h-[400px] bg-[#0a0a0a] rounded-xl overflow-hidden border border-white/10">
+                                    {editorState.clips.length > 0 && (
+                                        <video
+                                            ref={editorVideoRef}
+                                            src={editorState.clips[0]?.videoUrl}
+                                            className="w-full h-full object-cover"
+                                            controls
+                                            onPlay={() => setEditorState(prev => prev ? { ...prev, isPlaying: true } : null)}
+                                            onPause={() => setEditorState(prev => prev ? { ...prev, isPlaying: false } : null)}
+                                        />
+                                    )}
+                                </div>
+                            )}
+                            {/* Selected clip info */}
+                            {editorState.selectedClipId && (
+                                <div className="absolute top-4 right-4 bg-black/80 rounded-lg px-3 py-2 border border-white/10">
+                                    <p className="text-[10px] text-white/50">Clip Selecionado</p>
+                                    <p className="text-sm font-bold text-white">
+                                        Cena {editorState.clips.find(c => c.id === editorState.selectedClipId)?.sceneNumber}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Timeline */}
+                        <div className="py-4 bg-[#0d0d0d] border-t border-white/5 flex items-center px-4 gap-4">
+                            {/* Play/Pause Button */}
+                            <button
+                                onClick={handlePlayPause}
+                                disabled={editorState.clips.length === 0}
+                                className="w-10 h-10 rounded-full bg-white hover:bg-white/90 disabled:bg-white/30 disabled:cursor-not-allowed flex items-center justify-center text-black transition-colors flex-shrink-0"
+                            >
+                                <Icon name={editorState.isPlaying ? 'pause' : 'play'} className="w-4 h-4" />
+                            </button>
+
+                            {/* Timeline Track with Playhead */}
+                            <div className="flex-1 relative min-h-[80px] flex items-center">
+                                {editorState.clips.length === 0 ? (
+                                    /* Empty state */
+                                    <div className="flex-1 flex items-center justify-center border-2 border-dashed border-white/20 rounded-lg h-16">
+                                        <p className="text-white/30 text-sm">Clique em + para adicionar vídeos</p>
+                                    </div>
+                                ) : (
+                                    /* Clips Container */
+                                    <div className="relative flex overflow-x-auto py-2 scrollbar-thin scrollbar-thumb-white/10">
+                                        {/* Clips Strip */}
+                                        <div className="flex relative border-2 border-white/20 rounded-lg overflow-hidden">
+                                            {editorState.clips.map((clip, idx) => {
+                                                const isSelected = editorState.selectedClipId === clip.id;
+                                                const clipWidth = Math.max(80, (clip.trimEnd - clip.trimStart) * 10);
+
+                                                return (
+                                                    <div
+                                                        key={clip.id}
+                                                        draggable
+                                                        onDragStart={() => handleDragStart(clip.id)}
+                                                        onDragOver={(e) => handleDragOver(e, clip.id)}
+                                                        onDragEnd={handleDragEnd}
+                                                        onClick={() => handleSelectClip(clip.id)}
+                                                        className={`relative h-16 cursor-move transition-all ${
+                                                            isSelected ? 'ring-2 ring-white z-10' : ''
+                                                        } ${draggedClipId === clip.id ? 'opacity-50' : ''}`}
+                                                        style={{ width: `${clipWidth}px` }}
+                                                    >
+                                                        {/* Video thumbnail */}
+                                                        <video
+                                                            src={clip.videoUrl}
+                                                            className="w-full h-full object-cover pointer-events-none"
+                                                            muted
+                                                        />
+
+                                                        {/* Trim Handles - Only show on selected clip */}
+                                                        {isSelected && (
+                                                            <>
+                                                                <div className="absolute left-0 top-0 bottom-0 w-2 bg-white cursor-ew-resize flex items-center justify-center hover:bg-white/90">
+                                                                    <div className="w-0.5 h-6 bg-black/30 rounded-full" />
+                                                                </div>
+                                                                <div className="absolute right-0 top-0 bottom-0 w-2 bg-white cursor-ew-resize flex items-center justify-center hover:bg-white/90">
+                                                                    <div className="w-0.5 h-6 bg-black/30 rounded-full" />
+                                                                </div>
+                                                            </>
+                                                        )}
+
+                                                        {/* Clip divider line */}
+                                                        {idx < editorState.clips.length - 1 && (
+                                                            <div className="absolute right-0 top-0 bottom-0 w-px bg-white/30" />
+                                                        )}
+
+                                                        {/* Duration badge */}
+                                                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2">
+                                                            <span className="text-[8px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
+                                                                {Math.round(clip.trimEnd - clip.trimStart)}s
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Model tag */}
+                                                        {clip.model && (
+                                                            <div className="absolute top-1 right-2">
+                                                                <span className="text-[6px] font-bold bg-blue-600/90 text-white px-1 py-0.5 rounded">
+                                                                    {getModelShortName(clip.model)}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Playhead */}
+                                        {editorState.clips.length > 0 && (
+                                            <div
+                                                className="absolute top-0 bottom-0 w-0.5 bg-white z-20 pointer-events-none"
+                                                style={{
+                                                    left: `${Math.min(95, (editorState.currentTime / Math.max(1, editorState.totalDuration)) * 100)}%`,
+                                                    transition: 'left 0.1s linear'
+                                                }}
+                                            >
+                                                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full" />
+                                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full" />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Add clip button */}
+                                <button
+                                    onClick={() => setShowAddClipModal(true)}
+                                    className="ml-3 w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/50 hover:text-white transition-colors flex-shrink-0"
+                                    title="Adicionar vídeo"
+                                >
+                                    <Icon name="plus" className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Time & Controls */}
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                                <span className="text-sm text-white/60 font-mono tabular-nums">
+                                    {formatTime(editorState.currentTime)} / {formatTime(editorState.totalDuration)}
+                                </span>
+                                <button
+                                    onClick={handleSaveEdit}
+                                    disabled={editorState.clips.length === 0}
+                                    className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                                    title="Exportar"
+                                >
+                                    <Icon name="download" className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    /* Normal View */
+                    <div className="flex flex-col lg:flex-row">
                     {/* Preview Carousel - Thumbnail / Merged Video */}
                     <div className="lg:w-64 flex-shrink-0 p-4 bg-[#0d0d0d] border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col justify-center">
                         <div className="aspect-[9/16] bg-[#080808] rounded-xl overflow-hidden relative border border-white/5">
@@ -1128,6 +1552,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                         </div>
                     </div>
                 </div>
+                )}
             </div>
 
             {editingThumbnail && (
@@ -1186,6 +1611,85 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                             <Button
                                 size="small"
                                 onClick={() => setPromptPreview(null)}
+                            >
+                                Fechar
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Clip Modal */}
+            {showAddClipModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAddClipModal(false)}>
+                    <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center">
+                                    <Icon name="video" className="w-3 h-3 text-primary" />
+                                </div>
+                                <h3 className="text-xs font-black text-white uppercase tracking-wide">Adicionar Vídeo à Timeline</h3>
+                            </div>
+                            <button
+                                onClick={() => setShowAddClipModal(false)}
+                                className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                            >
+                                <Icon name="x" className="w-3 h-3" />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto max-h-[60vh]">
+                            <p className="text-xs text-white/50 mb-4">Clique em um vídeo para adicioná-lo à timeline</p>
+                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                                {getAvailableVideos().map((item, idx) => (
+                                    <button
+                                        key={`${item.sceneNumber}-${item.videoIndex}-${idx}`}
+                                        onClick={() => {
+                                            handleAddClipToTimeline(item.sceneNumber, item.video, item.duration);
+                                        }}
+                                        className="group relative aspect-[9/16] bg-[#080808] rounded-lg overflow-hidden border border-white/10 hover:border-primary/50 transition-all hover:scale-105"
+                                    >
+                                        <video
+                                            src={item.video.url}
+                                            className="w-full h-full object-cover"
+                                            muted
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                                        <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between">
+                                            <span className="text-[8px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
+                                                Cena {item.sceneNumber}
+                                            </span>
+                                            <span className="text-[8px] text-white/70">
+                                                {item.duration}s
+                                            </span>
+                                        </div>
+                                        {item.video.model && (
+                                            <div className="absolute top-1 right-1">
+                                                <span className="text-[6px] font-bold bg-blue-600/90 text-white px-1 py-0.5 rounded">
+                                                    {getModelShortName(item.video.model)}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {/* Hover overlay */}
+                                        <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                                                <Icon name="plus" className="w-4 h-4 text-black" />
+                                            </div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                            {getAvailableVideos().length === 0 && (
+                                <div className="text-center py-8">
+                                    <Icon name="video" className="w-12 h-12 text-white/10 mx-auto mb-3" />
+                                    <p className="text-white/40 text-sm">Nenhum vídeo disponível</p>
+                                    <p className="text-white/30 text-xs mt-1">Gere vídeos nas cenas primeiro</p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-4 py-3 border-t border-white/5 flex justify-end">
+                            <Button
+                                size="small"
+                                onClick={() => setShowAddClipModal(false)}
                             >
                                 Fechar
                             </Button>

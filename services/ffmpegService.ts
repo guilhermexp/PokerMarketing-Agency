@@ -22,6 +22,8 @@ export interface VideoInput {
   url: string;
   sceneNumber: number;
   duration: number;
+  trimStart?: number;  // Start time in seconds (optional)
+  trimEnd?: number;    // End time in seconds (optional)
 }
 
 // Singleton FFmpeg instance
@@ -128,6 +130,71 @@ const buildSimpleConcatFilter = (
 };
 
 /**
+ * Build filter complex for concatenating videos with trim support
+ * Applies trim to each video before concatenation
+ */
+const buildTrimConcatFilter = (
+  videos: VideoInput[]
+): { filterComplex: string; videoOutput: string; audioOutput: string } => {
+  if (videos.length === 0) {
+    return { filterComplex: '', videoOutput: '', audioOutput: '' };
+  }
+
+  if (videos.length === 1) {
+    const v = videos[0];
+    const hasTrim = v.trimStart !== undefined || v.trimEnd !== undefined;
+    if (!hasTrim) {
+      return { filterComplex: '', videoOutput: '[0:v]', audioOutput: '[0:a]' };
+    }
+    const start = v.trimStart ?? 0;
+    const end = v.trimEnd ?? v.duration;
+    return {
+      filterComplex: `[0:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[vfinal];[0:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS[afinal]`,
+      videoOutput: '[vfinal]',
+      audioOutput: '[afinal]',
+    };
+  }
+
+  const parts: string[] = [];
+
+  // Apply trim to each video
+  videos.forEach((video, i) => {
+    const start = video.trimStart ?? 0;
+    const end = video.trimEnd ?? video.duration;
+    const hasTrim = start > 0 || end < video.duration;
+
+    if (hasTrim) {
+      parts.push(`[${i}:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[v${i}]`);
+      parts.push(`[${i}:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS[a${i}]`);
+    } else {
+      // No trim needed, just copy
+      parts.push(`[${i}:v]copy[v${i}]`);
+      parts.push(`[${i}:a]acopy[a${i}]`);
+    }
+  });
+
+  // Concat all trimmed streams
+  const streams = videos.map((_, i) => `[v${i}][a${i}]`).join('');
+  parts.push(`${streams}concat=n=${videos.length}:v=1:a=1[vfinal][afinal]`);
+
+  return {
+    filterComplex: parts.join(';'),
+    videoOutput: '[vfinal]',
+    audioOutput: '[afinal]',
+  };
+};
+
+/**
+ * Check if any video has trim applied
+ */
+const hasTrimApplied = (videos: VideoInput[]): boolean => {
+  return videos.some(v =>
+    (v.trimStart !== undefined && v.trimStart > 0) ||
+    (v.trimEnd !== undefined && v.trimEnd < v.duration)
+  );
+};
+
+/**
  * Concatenate multiple videos into single output
  */
 export const concatenateVideos = async (
@@ -194,16 +261,21 @@ export const concatenateVideos = async (
 
     const outputFilename = `output.${outputFormat}`;
 
-    if (sortedVideos.length === 1) {
-      // Single video: just copy
+    // Check if any trim is applied
+    const useTrim = hasTrimApplied(sortedVideos);
+
+    if (sortedVideos.length === 1 && !useTrim) {
+      // Single video without trim: just copy
       await ffmpeg.exec([
         '-i', inputFilenames[0],
         '-c', 'copy',
         outputFilename,
       ]);
     } else {
-      // Multiple videos: simple concat with clean cuts (no transitions)
-      const { filterComplex, videoOutput, audioOutput } = buildSimpleConcatFilter(sortedVideos.length);
+      // Use trim filter if trim is applied, otherwise use simple concat
+      const { filterComplex, videoOutput, audioOutput } = useTrim
+        ? buildTrimConcatFilter(sortedVideos)
+        : buildSimpleConcatFilter(sortedVideos.length);
 
       // Build input arguments
       const inputArgs: string[] = [];
@@ -212,17 +284,27 @@ export const concatenateVideos = async (
       }
 
       try {
-        // Try with fade transitions on video + concatenated audio
-        await ffmpeg.exec([
-          ...inputArgs,
-          '-filter_complex', filterComplex,
-          '-map', videoOutput,
-          '-map', audioOutput,
-          '-y',
-          outputFilename,
-        ]);
+        // Execute with filter complex
+        if (filterComplex) {
+          await ffmpeg.exec([
+            ...inputArgs,
+            '-filter_complex', filterComplex,
+            '-map', videoOutput,
+            '-map', audioOutput,
+            '-y',
+            outputFilename,
+          ]);
+        } else {
+          // No filter needed (single video without trim)
+          await ffmpeg.exec([
+            '-i', inputFilenames[0],
+            '-c', 'copy',
+            '-y',
+            outputFilename,
+          ]);
+        }
       } catch (fadeError) {
-        console.warn('Fade transition failed, falling back to simple concat:', fadeError);
+        console.warn('Filter complex failed, falling back to simple concat:', fadeError);
 
         // Fallback: simple concat without transitions
         const concatList = inputFilenames.map(name => `file ${name}`).join('\n');
