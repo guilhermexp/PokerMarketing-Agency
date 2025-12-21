@@ -8,7 +8,8 @@ import { generateCampaign, editImage, generateLogo, generateImage } from './serv
 import { runAssistantConversationStream } from './services/assistantService';
 import { loadImagesFromDB, saveImagesToDB } from './services/storageService';
 import { loadScheduledPosts, saveScheduledPost, updateScheduledPost, deleteScheduledPost } from './services/schedulerService';
-import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, ChatPart, GenerationOptions, WeekScheduleInfo, StyleReference, ScheduledPost } from './types';
+import { publishToInstagram, uploadImageForInstagram, type InstagramContentType } from './services/rubeService';
+import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, ChatPart, GenerationOptions, WeekScheduleInfo, StyleReference, ScheduledPost, InstagramPublishState } from './types';
 import { Icon } from './components/common/Icon';
 
 export type TimePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'NIGHT' | 'HIGHLIGHTS';
@@ -91,6 +92,7 @@ function App() {
   const [styleReferences, setStyleReferences] = useState<StyleReference[]>([]);
   const [selectedStyleReference, setSelectedStyleReference] = useState<StyleReference | null>(null);
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
+  const [publishingStates, setPublishingStates] = useState<Record<string, InstagramPublishState>>({});
 
   useEffect(() => {
     const initAppData = async () => {
@@ -194,6 +196,81 @@ function App() {
       setScheduledPosts(prev => prev.filter(p => p.id !== postId));
     } catch (e) {
       console.error('Failed to delete scheduled post:', e);
+    }
+  };
+
+  const handlePublishToInstagram = async (post: ScheduledPost) => {
+    const postId = post.id;
+
+    // Initialize publishing state
+    setPublishingStates(prev => ({
+      ...prev,
+      [postId]: { step: 'uploading_image', message: 'Preparando imagem...', progress: 10 }
+    }));
+
+    try {
+      // Update post status to publishing
+      await handleUpdateScheduledPost(postId, { status: 'publishing' });
+
+      // Step 1: Upload image to get HTTP URL (Instagram requires HTTP URLs, not data URLs)
+      setPublishingStates(prev => ({
+        ...prev,
+        [postId]: { step: 'uploading_image', message: 'Fazendo upload da imagem...', progress: 15 }
+      }));
+
+      const imageUrl = await uploadImageForInstagram(post.imageUrl);
+
+      // Step 2: Prepare caption with hashtags
+      const fullCaption = `${post.caption}\n\n${post.hashtags.join(' ')}`;
+
+      // Step 3: Determine content type (default to photo)
+      const contentType: InstagramContentType = post.instagramContentType || 'photo';
+
+      // Step 4: Publish to Instagram with progress tracking
+      const result = await publishToInstagram(imageUrl, fullCaption, contentType, (progress) => {
+        setPublishingStates(prev => ({
+          ...prev,
+          [postId]: progress
+        }));
+      });
+
+      if (result.success) {
+        await handleUpdateScheduledPost(postId, {
+          status: 'published',
+          publishedAt: Date.now(),
+          instagramMediaId: result.mediaId
+        });
+
+        setPublishingStates(prev => ({
+          ...prev,
+          [postId]: { step: 'completed', message: 'Publicado!', progress: 100, postId: result.mediaId }
+        }));
+
+        // Clear state after 3 seconds
+        setTimeout(() => {
+          setPublishingStates(prev => {
+            const { [postId]: _, ...rest } = prev;
+            return rest;
+          });
+        }, 3000);
+      } else {
+        throw new Error(result.errorMessage || 'Falha na publicacao');
+      }
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+
+      await handleUpdateScheduledPost(postId, {
+        status: 'failed',
+        errorMessage,
+        publishAttempts: (post.publishAttempts || 0) + 1,
+        lastPublishAttempt: Date.now()
+      });
+
+      setPublishingStates(prev => ({
+        ...prev,
+        [postId]: { step: 'failed', message: errorMessage, progress: 0 }
+      }));
     }
   };
 
@@ -438,6 +515,8 @@ function App() {
           onSchedulePost={handleSchedulePost}
           onUpdateScheduledPost={handleUpdateScheduledPost}
           onDeleteScheduledPost={handleDeleteScheduledPost}
+          onPublishToInstagram={handlePublishToInstagram}
+          publishingStates={publishingStates}
         />
       )}
     </>

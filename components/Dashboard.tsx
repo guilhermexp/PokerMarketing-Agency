@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, GenerationOptions, WeekScheduleInfo, StyleReference } from '../types';
+import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, GenerationOptions, WeekScheduleInfo, StyleReference, InstagramPublishState } from '../types';
 import { UploadForm } from './UploadForm';
 import { ClipsTab } from './tabs/ClipsTab';
 import { PostsTab } from './tabs/PostsTab';
@@ -59,6 +59,9 @@ interface DashboardProps {
   onSchedulePost: (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onUpdateScheduledPost: (postId: string, updates: Partial<ScheduledPost>) => void;
   onDeleteScheduledPost: (postId: string) => void;
+  // Instagram Publishing
+  onPublishToInstagram: (post: ScheduledPost) => void;
+  publishingStates: Record<string, InstagramPublishState>;
 }
 
 type Tab = 'clips' | 'posts' | 'ads';
@@ -95,7 +98,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState,
     chatReferenceImage, onSetChatReference, activeView, onViewChange, onPublishToCampaign,
     styleReferences, onAddStyleReference, onRemoveStyleReference, onSelectStyleReference, selectedStyleReference, onClearSelectedStyleReference,
-    scheduledPosts, onSchedulePost, onUpdateScheduledPost, onDeleteScheduledPost
+    scheduledPosts, onSchedulePost, onUpdateScheduledPost, onDeleteScheduledPost,
+    onPublishToInstagram, publishingStates
   } = props;
 
   const [activeTab, setActiveTab] = useState<Tab>('clips');
@@ -233,6 +237,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       onUpdateScheduledPost={onUpdateScheduledPost}
                       onDeleteScheduledPost={onDeleteScheduledPost}
                       galleryImages={galleryImages}
+                      onPublishToInstagram={onPublishToInstagram}
+                      publishingStates={publishingStates}
                     />
                 </div>
             )}

@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
-import type { ScheduledPost, CalendarViewType, GalleryImage } from '../../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { ScheduledPost, CalendarViewType, GalleryImage, InstagramPublishState } from '../../types';
 import { Icon } from '../common/Icon';
 import { Button } from '../common/Button';
 import { MonthlyCalendar } from './MonthlyCalendar';
 import { WeeklyCalendar } from './WeeklyCalendar';
 import { SchedulePostModal } from './SchedulePostModal';
+import { isRubeConfigured } from '../../services/rubeService';
 
 interface CalendarViewProps {
   scheduledPosts: ScheduledPost[];
@@ -12,6 +13,8 @@ interface CalendarViewProps {
   onUpdateScheduledPost: (postId: string, updates: Partial<ScheduledPost>) => void;
   onDeleteScheduledPost: (postId: string) => void;
   galleryImages: GalleryImage[];
+  onPublishToInstagram: (post: ScheduledPost) => void;
+  publishingStates: Record<string, InstagramPublishState>;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
@@ -19,12 +22,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onSchedulePost,
   onUpdateScheduledPost,
   onDeleteScheduledPost,
-  galleryImages
+  galleryImages,
+  onPublishToInstagram,
+  publishingStates
 }) => {
   const [viewType, setViewType] = useState<CalendarViewType>('monthly');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showNotificationBanner, setShowNotificationBanner] = useState(false);
+  const [pendingPosts, setPendingPosts] = useState<ScheduledPost[]>([]);
 
   const monthNames = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -77,6 +84,61 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return { scheduled, published, failed, total: scheduledPosts.length };
   }, [scheduledPosts]);
 
+  // Notification system - check for pending/overdue posts
+  useEffect(() => {
+    const checkNotifications = () => {
+      const now = Date.now();
+      const fifteenMinutes = 15 * 60 * 1000;
+
+      // Find posts due in next 15 minutes or overdue
+      const pending = scheduledPosts.filter(post => {
+        if (post.status !== 'scheduled') return false;
+        const timeUntil = post.scheduledTimestamp - now;
+        // Due in next 15 minutes OR overdue
+        return timeUntil <= fifteenMinutes;
+      });
+
+      if (pending.length > 0) {
+        setPendingPosts(pending);
+        setShowNotificationBanner(true);
+
+        // Browser notification if permitted
+        if ('Notification' in window && Notification.permission === 'granted') {
+          const overdue = pending.filter(p => p.scheduledTimestamp < now);
+          if (overdue.length > 0) {
+            new Notification('Posts Pendentes!', {
+              body: `${overdue.length} post(s) aguardando publicacao`,
+              icon: '/favicon.ico'
+            });
+          }
+        }
+      } else {
+        setPendingPosts([]);
+        setShowNotificationBanner(false);
+      }
+    };
+
+    checkNotifications();
+    const interval = setInterval(checkNotifications, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [scheduledPosts]);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  const handlePublishAll = async () => {
+    const instagramPosts = pendingPosts.filter(p => p.platforms === 'instagram' || p.platforms === 'both');
+    for (const post of instagramPosts) {
+      onPublishToInstagram(post);
+      // Small delay between publications to avoid rate limits
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in-up h-full flex flex-col">
       {/* Header */}
@@ -119,6 +181,45 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Notification Banner */}
+      {showNotificationBanner && pendingPosts.length > 0 && (
+        <div className="px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between animate-fade-in-up">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+              <Icon name="bell" className="w-4 h-4 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-amber-400">
+                {pendingPosts.length} post{pendingPosts.length > 1 ? 's' : ''} pendente{pendingPosts.length > 1 ? 's' : ''}
+              </p>
+              <p className="text-[9px] text-amber-400/60">
+                {pendingPosts.some(p => p.scheduledTimestamp < Date.now())
+                  ? 'Alguns posts estao atrasados!'
+                  : 'Pronto para publicar'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {isRubeConfigured() && pendingPosts.some(p => p.platforms === 'instagram' || p.platforms === 'both') && (
+              <Button
+                onClick={handlePublishAll}
+                variant="primary"
+                size="small"
+                icon="send"
+              >
+                Publicar Todos
+              </Button>
+            )}
+            <button
+              onClick={() => setShowNotificationBanner(false)}
+              className="p-1.5 text-amber-400/40 hover:text-amber-400 transition-colors"
+            >
+              <Icon name="x" className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Calendar Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-4 py-3 bg-[#111111] border border-white/5 rounded-xl">
@@ -190,6 +291,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             onDayClick={handleDayClick}
             onUpdatePost={onUpdateScheduledPost}
             onDeletePost={onDeleteScheduledPost}
+            onPublishToInstagram={onPublishToInstagram}
+            publishingStates={publishingStates}
           />
         ) : (
           <WeeklyCalendar
@@ -198,6 +301,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             onDayClick={handleDayClick}
             onUpdatePost={onUpdateScheduledPost}
             onDeletePost={onDeleteScheduledPost}
+            onPublishToInstagram={onPublishToInstagram}
+            publishingStates={publishingStates}
           />
         )}
       </div>

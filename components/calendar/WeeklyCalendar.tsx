@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { ScheduledPost } from '../../types';
+import type { ScheduledPost, InstagramPublishState } from '../../types';
 import { ScheduledPostCard } from './ScheduledPostCard';
 
 interface WeeklyCalendarProps {
@@ -8,6 +8,8 @@ interface WeeklyCalendarProps {
   onDayClick: (date: string) => void;
   onUpdatePost: (postId: string, updates: Partial<ScheduledPost>) => void;
   onDeletePost: (postId: string) => void;
+  onPublishToInstagram: (post: ScheduledPost) => void;
+  publishingStates: Record<string, InstagramPublishState>;
 }
 
 const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -18,7 +20,9 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
   scheduledPosts,
   onDayClick,
   onUpdatePost,
-  onDeletePost
+  onDeletePost,
+  onPublishToInstagram,
+  publishingStates
 }) => {
   const weekDays = useMemo(() => {
     const today = new Date();
@@ -124,6 +128,8 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                         variant="compact"
                         onUpdate={onUpdatePost}
                         onDelete={onDeletePost}
+                        onPublishToInstagram={onPublishToInstagram}
+                        publishingState={publishingStates[post.id] || null}
                       />
                     ))}
                   </div>

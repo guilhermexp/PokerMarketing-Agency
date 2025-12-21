@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { ScheduledPost } from '../../types';
+import type { ScheduledPost, InstagramPublishState } from '../../types';
 import { ScheduledPostCard } from './ScheduledPostCard';
 
 interface MonthlyCalendarProps {
@@ -8,6 +8,8 @@ interface MonthlyCalendarProps {
   onDayClick: (date: string) => void;
   onUpdatePost: (postId: string, updates: Partial<ScheduledPost>) => void;
   onDeletePost: (postId: string) => void;
+  onPublishToInstagram: (post: ScheduledPost) => void;
+  publishingStates: Record<string, InstagramPublishState>;
 }
 
 const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -17,7 +19,9 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
   scheduledPosts,
   onDayClick,
   onUpdatePost,
-  onDeletePost
+  onDeletePost,
+  onPublishToInstagram,
+  publishingStates
 }) => {
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
@@ -158,6 +162,8 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
                     variant="compact"
                     onUpdate={onUpdatePost}
                     onDelete={onDeletePost}
+                    onPublishToInstagram={onPublishToInstagram}
+                    publishingState={publishingStates[post.id] || null}
                   />
                 ))}
                 {posts.length > 2 && (

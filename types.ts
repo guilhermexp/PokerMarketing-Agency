@@ -159,6 +159,7 @@ export interface GenerationOptions {
 export type SchedulingPlatform = 'instagram' | 'facebook' | 'both';
 export type PublicationStatus = 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
 export type CalendarViewType = 'monthly' | 'weekly';
+export type InstagramContentType = 'photo' | 'video' | 'reel' | 'story' | 'carousel';
 
 export interface ScheduledPost {
   id: string;
@@ -178,6 +179,35 @@ export interface ScheduledPost {
   createdAt: number;
   updatedAt: number;
   createdFrom: 'gallery' | 'campaign' | 'flyer_generator';
+  // Instagram publishing metadata
+  instagramContentType?: InstagramContentType; // photo, video, reel, story, carousel
+  instagramMediaId?: string;
+  instagramContainerId?: string;
+  publishAttempts?: number;
+  lastPublishAttempt?: number;
+}
+
+// Instagram Publishing Types (Rube MCP)
+export type InstagramPublishStep =
+  | 'idle'
+  | 'uploading_image'
+  | 'creating_container'
+  | 'checking_status'
+  | 'publishing'
+  | 'completed'
+  | 'failed';
+
+export interface InstagramPublishState {
+  step: InstagramPublishStep;
+  message: string;
+  progress: number;
+  postId?: string;
+}
+
+export interface ScheduleNotification {
+  postId: string;
+  scheduledTime: number;
+  shown: boolean;
 }
 
 export interface CalendarDay {
