@@ -29,6 +29,8 @@ interface FlyerGeneratorProps {
   onClearSelectedStyleReference?: () => void;
   styleReferences?: StyleReference[];
   onSelectStyleReference?: (ref: StyleReference) => void;
+  isWeekExpired?: boolean;
+  onClearExpiredSchedule?: () => void;
 }
 
 const formatCurrencyValue = (val: string, currency: Currency): string => {
@@ -573,35 +575,124 @@ const ManualEventModal: React.FC<{
     day: string;
 }> = ({ isOpen, onClose, onSave, day }) => {
     const [formData, setFormData] = useState<Partial<TournamentEvent>>({
-        day, name: '', game: "Hold'em", gtd: '0', buyIn: '0', times: { '-3': '12:00' }
+        day, name: '', game: "Hold'em", gtd: '0', buyIn: '0', rebuy: '', addOn: '', stack: '', players: '', lateReg: '', minutes: '', structure: 'Regular', times: { '-3': '12:00' }
     });
+
+    const resetForm = () => {
+        setFormData({
+            day, name: '', game: "Hold'em", gtd: '0', buyIn: '0', rebuy: '', addOn: '', stack: '', players: '', lateReg: '', minutes: '', structure: 'Regular', times: { '-3': '12:00' }
+        });
+    };
 
     if (!isOpen) return null;
 
+    const inputClass = "w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-primary/50 placeholder:text-white/20";
+    const labelClass = "text-[9px] font-black text-white/30 uppercase tracking-wide";
+
     return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
-            <Card className="w-full max-w-lg border-white/10 bg-[#080808] overflow-hidden">
+            <Card className="w-full max-w-2xl border-white/10 bg-[#080808] overflow-hidden max-h-[90vh] flex flex-col">
                 <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center bg-[#0d0d0d]">
-                    <h3 className="text-[10px] font-black text-white uppercase tracking-wide">Manual Entry</h3>
+                    <h3 className="text-[10px] font-black text-white uppercase tracking-wide">Adicionar Torneio Manual</h3>
                     <button onClick={onClose} className="text-white/20 hover:text-white transition-colors"><Icon name="x" className="w-4 h-4" /></button>
                 </div>
-                <div className="p-5 grid grid-cols-2 gap-4">
-                    <div className="col-span-2 space-y-1.5">
-                        <label className="text-[9px] font-black text-white/30 uppercase tracking-wide">Nome do Torneio</label>
-                        <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-primary/50" placeholder="Ex: BIG BANG PKO" />
+                <div className="p-5 overflow-y-auto flex-1 space-y-4">
+                    {/* Nome e Jogo */}
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2 space-y-1.5">
+                            <label className={labelClass}>Nome do Torneio *</label>
+                            <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} placeholder="Ex: BIG BANG PKO" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className={labelClass}>Modalidade</label>
+                            <select value={formData.game} onChange={e => setFormData({...formData, game: e.target.value})} className={inputClass + " appearance-none cursor-pointer"}>
+                                <option value="Hold'em">Hold'em</option>
+                                <option value="PLO">PLO</option>
+                                <option value="PLO5">PLO 5</option>
+                                <option value="PLO6">PLO 6</option>
+                                <option value="Mixed">Mixed</option>
+                                <option value="Stud">Stud</option>
+                                <option value="Razz">Razz</option>
+                                <option value="2-7 Triple Draw">2-7 Triple Draw</option>
+                                <option value="8-Game">8-Game</option>
+                            </select>
+                        </div>
                     </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-white/30 uppercase tracking-wide">Horário</label>
-                        <input type="time" value={formData.times?.['-3']} onChange={e => setFormData({...formData, times: { '-3': e.target.value }})} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-primary/50" />
+
+                    {/* Horário e GTD */}
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                            <label className={labelClass}>Horário (BRT) *</label>
+                            <input type="time" value={formData.times?.['-3']} onChange={e => setFormData({...formData, times: { '-3': e.target.value }})} className={inputClass} />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className={labelClass}>Garantido (GTD)</label>
+                            <input value={formData.gtd} onChange={e => setFormData({...formData, gtd: e.target.value})} className={inputClass} placeholder="50000" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className={labelClass}>Estrutura</label>
+                            <select value={formData.structure} onChange={e => setFormData({...formData, structure: e.target.value})} className={inputClass + " appearance-none cursor-pointer"}>
+                                <option value="Regular">Regular</option>
+                                <option value="Turbo">Turbo</option>
+                                <option value="Hyper">Hyper</option>
+                                <option value="Super Turbo">Super Turbo</option>
+                                <option value="Deep Stack">Deep Stack</option>
+                            </select>
+                        </div>
                     </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-white/30 uppercase tracking-wide">Garantido (GTD)</label>
-                        <input value={formData.gtd} onChange={e => setFormData({...formData, gtd: e.target.value})} className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-primary/50" placeholder="Ex: 50000" />
+
+                    {/* Buy-in, Rebuy, Add-on */}
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                            <label className={labelClass}>Buy-in ($)</label>
+                            <input value={formData.buyIn} onChange={e => setFormData({...formData, buyIn: e.target.value})} className={inputClass} placeholder="55" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className={labelClass}>Rebuy ($)</label>
+                            <input value={formData.rebuy} onChange={e => setFormData({...formData, rebuy: e.target.value})} className={inputClass} placeholder="55" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className={labelClass}>Add-on ($)</label>
+                            <input value={formData.addOn} onChange={e => setFormData({...formData, addOn: e.target.value})} className={inputClass} placeholder="55" />
+                        </div>
+                    </div>
+
+                    {/* Stack, Players, Late Reg, Minutes */}
+                    <div className="grid grid-cols-4 gap-4">
+                        <div className="space-y-1.5">
+                            <label className={labelClass}>Stack Inicial</label>
+                            <input value={formData.stack} onChange={e => setFormData({...formData, stack: e.target.value})} className={inputClass} placeholder="50000" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className={labelClass}>Max Players</label>
+                            <input value={formData.players} onChange={e => setFormData({...formData, players: e.target.value})} className={inputClass} placeholder="Unlimited" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className={labelClass}>Late Reg (min)</label>
+                            <input value={formData.lateReg} onChange={e => setFormData({...formData, lateReg: e.target.value})} className={inputClass} placeholder="120" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className={labelClass}>Blind Time</label>
+                            <input value={formData.minutes} onChange={e => setFormData({...formData, minutes: e.target.value})} className={inputClass} placeholder="15" />
+                        </div>
                     </div>
                 </div>
-                <div className="p-5 border-t border-white/5 flex gap-3">
-                    <Button onClick={onClose} variant="secondary" size="small" className="flex-1">Cancelar</Button>
-                    <Button onClick={() => { onSave({...formData, id: `manual-${Date.now()}`} as any); onClose(); }} variant="primary" size="small" className="flex-1">Salvar</Button>
+                <div className="p-5 border-t border-white/5 flex gap-3 bg-[#0a0a0a]">
+                    <Button onClick={() => { resetForm(); onClose(); }} variant="secondary" size="small" className="flex-1">Cancelar</Button>
+                    <Button
+                        onClick={() => {
+                            if (!formData.name?.trim()) return;
+                            onSave({...formData, id: `manual-${Date.now()}`} as TournamentEvent);
+                            resetForm();
+                            onClose();
+                        }}
+                        variant="primary"
+                        size="small"
+                        className="flex-1"
+                        disabled={!formData.name?.trim()}
+                    >
+                        Salvar Torneio
+                    </Button>
                 </div>
             </Card>
         </div>
@@ -611,7 +702,8 @@ const ManualEventModal: React.FC<{
 export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     brandProfile, events, weekScheduleInfo, onFileUpload, onAddEvent, onAddImageToGallery,
     flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState, onUpdateGalleryImage, onSetChatReference, onPublishToCampaign,
-    selectedStyleReference, onClearSelectedStyleReference, styleReferences = [], onSelectStyleReference
+    selectedStyleReference, onClearSelectedStyleReference, styleReferences = [], onSelectStyleReference,
+    isWeekExpired, onClearExpiredSchedule
 }) => {
   const daysMap = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
   const currentDayName = daysMap[new Date().getDay()];
@@ -735,6 +827,89 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     if (period === 'HIGHLIGHTS') return [...currentEvents].sort((a, b) => parseGtd(b.gtd) - parseGtd(a.gtd)).slice(0, 3);
     return [];
   };
+
+  // Empty state: No schedule data OR week expired
+  const hasNoData = events.length === 0 && !weekScheduleInfo;
+  const showEmptyState = hasNoData || isWeekExpired;
+
+  if (showEmptyState) {
+    return (
+      <div className="flex-1 flex items-center justify-center px-6 py-12">
+        <div className="max-w-md text-center space-y-6 animate-fade-in-up">
+          <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center">
+            <Icon name="calendar" className="w-10 h-10 text-primary/60" />
+          </div>
+
+          {isWeekExpired ? (
+            <>
+              <div>
+                <h3 className="text-xl font-black text-white uppercase tracking-tight">Semana Expirada</h3>
+                <p className="text-sm text-white/40 mt-2">
+                  A planilha de torneios da semana anterior venceu. Insira uma nova planilha para continuar gerando flyers.
+                </p>
+                {weekScheduleInfo && (
+                  <p className="text-xs text-white/30 mt-2">
+                    Última planilha: {weekScheduleInfo.startDate} a {weekScheduleInfo.endDate}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-col gap-3">
+                <label className="cursor-pointer group inline-block">
+                  <div className="bg-white text-black font-black px-6 py-3 rounded-xl flex items-center justify-center space-x-3 transition-all hover:bg-white/90 active:scale-95">
+                    <Icon name="upload" className="w-4 h-4" />
+                    <span className="text-sm uppercase tracking-wide">Carregar Nova Planilha</span>
+                  </div>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".xlsx,.xls"
+                    onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])}
+                  />
+                </label>
+                {onClearExpiredSchedule && (
+                  <Button variant="secondary" onClick={onClearExpiredSchedule} className="w-full">
+                    Limpar dados antigos
+                  </Button>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <h3 className="text-xl font-black text-white uppercase tracking-tight">Nenhuma Planilha</h3>
+                <p className="text-sm text-white/40 mt-2">
+                  Carregue a planilha de torneios da semana para começar a gerar flyers automaticamente.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3">
+                <label className="cursor-pointer group inline-block">
+                  <div className="bg-white text-black font-black px-6 py-3 rounded-xl flex items-center justify-center space-x-3 transition-all hover:bg-white/90 active:scale-95">
+                    <Icon name="upload" className="w-4 h-4" />
+                    <span className="text-sm uppercase tracking-wide">Carregar Planilha Excel</span>
+                  </div>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".xlsx,.xls"
+                    onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])}
+                  />
+                </label>
+                <Button variant="secondary" onClick={() => setIsManualModalOpen(true)} icon="edit" className="w-full">
+                  Adicionar Torneio Manual
+                </Button>
+              </div>
+              <p className="text-[10px] text-white/20 uppercase tracking-wider">
+                Formatos suportados: .xlsx, .xls
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* Manual modal still needs to be available */}
+        <ManualEventModal isOpen={isManualModalOpen} onClose={() => setIsManualModalOpen(false)} onSave={(ev) => onAddEvent(ev)} day={currentDayName} />
+      </div>
+    );
+  }
 
   return (
     <>

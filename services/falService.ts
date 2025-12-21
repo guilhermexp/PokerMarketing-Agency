@@ -168,6 +168,85 @@ export const generateFalVideo = async (
         return blobUrl;
       }
 
+      case 'fal-ai/veo3.1/fast': {
+        // Veo 3.1 Fast via fal.ai (same model as Gemini but through fal.ai)
+        const isHttpUrl = imageUrl && imageUrl.startsWith('http');
+
+        // Map scene duration to Veo 3.1 duration options
+        const veo31Duration = sceneDuration && sceneDuration <= 4 ? '4s' : sceneDuration && sceneDuration <= 6 ? '6s' : '8s';
+        console.log(`[fal.ai] Scene duration: ${sceneDuration}s → Veo 3.1 duration: ${veo31Duration}`);
+
+        interface Veo31Result {
+          data?: {
+            video: { url: string };
+          };
+          video?: { url: string };
+        }
+
+        let veo31Result: Veo31Result;
+
+        if (isHttpUrl) {
+          // Image-to-video
+          console.log(`[fal.ai] Starting Veo 3.1 Fast image-to-video (${veo31Duration})...`);
+          veo31Result = await fal.subscribe('fal-ai/veo3.1/fast/image-to-video', {
+            input: {
+              prompt,
+              image_url: imageUrl,
+              aspect_ratio: aspectRatio,
+              duration: veo31Duration,
+              resolution: '720p',
+              generate_audio: true,
+            },
+            logs: true,
+            onQueueUpdate: (update) => {
+              if (update.status === 'IN_PROGRESS') {
+                console.log(`[fal.ai] Veo 3.1 (image-to-video) processing...`);
+              }
+            },
+          }) as Veo31Result;
+        } else {
+          // Text-to-video
+          console.log(`[fal.ai] Starting Veo 3.1 Fast text-to-video (${veo31Duration})...`);
+          veo31Result = await fal.subscribe('fal-ai/veo3.1/fast', {
+            input: {
+              prompt,
+              aspect_ratio: aspectRatio,
+              duration: veo31Duration,
+              resolution: '720p',
+              generate_audio: true,
+              auto_fix: true,
+            },
+            logs: true,
+            onQueueUpdate: (update) => {
+              if (update.status === 'IN_PROGRESS') {
+                console.log(`[fal.ai] Veo 3.1 (text-to-video) processing...`);
+              }
+            },
+          }) as Veo31Result;
+        }
+
+        console.log(`[fal.ai] Veo 3.1 response:`, veo31Result);
+
+        // fal.ai client wraps response in 'data' property
+        const videoUrl = veo31Result?.data?.video?.url || veo31Result?.video?.url;
+
+        if (!videoUrl) {
+          console.error('[fal.ai] Invalid Veo 3.1 response:', JSON.stringify(veo31Result, null, 2));
+          throw new Error('Falha ao gerar vídeo Veo 3.1 - resposta inválida');
+        }
+
+        console.log(`[fal.ai] Video URL from fal.ai: ${videoUrl}`);
+
+        // Download video as blob to avoid COEP/CORS issues
+        console.log(`[fal.ai] Downloading video as blob...`);
+        const veoResponse = await fetch(videoUrl);
+        const veoBlob = await veoResponse.blob();
+        const veoBlobUrl = URL.createObjectURL(veoBlob);
+
+        console.log(`[fal.ai] Video blob URL created: ${veoBlobUrl}`);
+        return veoBlobUrl;
+      }
+
       default:
         throw new Error(`Modelo não suportado: ${model}`);
     }
@@ -183,7 +262,7 @@ export const generateFalVideo = async (
 export const getFalModelDisplayName = (model: FalVideoModel): string => {
   const names: Record<FalVideoModel, string> = {
     'fal-ai/sora-2/text-to-video': 'Sora 2 (OpenAI)',
-    
+    'fal-ai/veo3.1/fast': 'Veo 3.1 Fast (fal.ai)',
   };
   return names[model] || model;
 };

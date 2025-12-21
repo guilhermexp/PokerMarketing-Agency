@@ -11,7 +11,7 @@ import { config } from 'dotenv';
 config();
 
 const app = express();
-const PORT = 3001;
+const PORT = 3002;
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -407,6 +407,133 @@ app.post('/api/db/campaigns', async (req, res) => {
     res.status(201).json(result[0]);
   } catch (error) {
     console.error('[Campaigns API] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Tournaments API
+app.get('/api/db/tournaments', async (req, res) => {
+  try {
+    const sql = getSql();
+    const { user_id, week_schedule_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    // If week_schedule_id is provided, get events for that schedule
+    if (week_schedule_id) {
+      const events = await sql`
+        SELECT * FROM tournament_events
+        WHERE user_id = ${user_id}
+          AND week_schedule_id = ${week_schedule_id}
+        ORDER BY day_of_week, name
+      `;
+      return res.json({ events });
+    }
+
+    // Get the most recent week schedule
+    const schedules = await sql`
+      SELECT * FROM week_schedules
+      WHERE user_id = ${user_id}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+
+    if (schedules.length === 0) {
+      return res.json({ schedule: null, events: [] });
+    }
+
+    const schedule = schedules[0];
+
+    // Get events for this schedule
+    const events = await sql`
+      SELECT * FROM tournament_events
+      WHERE user_id = ${user_id}
+        AND week_schedule_id = ${schedule.id}
+      ORDER BY day_of_week, name
+    `;
+
+    res.json({ schedule, events });
+  } catch (error) {
+    console.error('[Tournaments API] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/db/tournaments', async (req, res) => {
+  try {
+    const sql = getSql();
+    const { user_id, start_date, end_date, filename, events } = req.body;
+
+    if (!user_id || !start_date || !end_date) {
+      return res.status(400).json({ error: 'user_id, start_date, and end_date are required' });
+    }
+
+    // Create week schedule
+    const scheduleResult = await sql`
+      INSERT INTO week_schedules (user_id, start_date, end_date, filename, original_filename)
+      VALUES (${user_id}, ${start_date}, ${end_date}, ${filename || null}, ${filename || null})
+      RETURNING *
+    `;
+
+    const schedule = scheduleResult[0];
+
+    // Create events if provided
+    if (events && Array.isArray(events) && events.length > 0) {
+      for (const event of events) {
+        await sql`
+          INSERT INTO tournament_events (
+            user_id, week_schedule_id, day_of_week, name, game, gtd, buy_in,
+            rebuy, add_on, stack, players, late_reg, minutes, structure, times, event_date
+          )
+          VALUES (
+            ${user_id}, ${schedule.id}, ${event.day}, ${event.name}, ${event.game || null},
+            ${event.gtd || null}, ${event.buyIn || null}, ${event.rebuy || null},
+            ${event.addOn || null}, ${event.stack || null}, ${event.players || null},
+            ${event.lateReg || null}, ${event.minutes || null}, ${event.structure || null},
+            ${JSON.stringify(event.times || {})}, ${event.eventDate || null}
+          )
+        `;
+      }
+    }
+
+    res.status(201).json({
+      schedule,
+      eventsCount: events?.length || 0,
+    });
+  } catch (error) {
+    console.error('[Tournaments API] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/db/tournaments', async (req, res) => {
+  try {
+    const sql = getSql();
+    const { id, user_id } = req.query;
+
+    if (!id || !user_id) {
+      return res.status(400).json({ error: 'id and user_id are required' });
+    }
+
+    // Delete events first
+    await sql`
+      DELETE FROM tournament_events
+      WHERE week_schedule_id = ${id}
+        AND user_id = ${user_id}
+    `;
+
+    // Delete schedule
+    await sql`
+      DELETE FROM week_schedules
+      WHERE id = ${id}
+        AND user_id = ${user_id}
+    `;
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Tournaments API] Error:', error);
     res.status(500).json({ error: error.message });
   }
 });

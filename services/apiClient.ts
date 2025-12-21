@@ -218,31 +218,122 @@ export async function deleteScheduledPost(id: string): Promise<void> {
 // Campaigns API
 // ============================================================================
 
+export interface DbVideoClipScript {
+  id: string;
+  campaign_id: string;
+  title: string;
+  hook: string;
+  image_prompt: string | null;
+  audio_script: string | null;
+  scenes: Array<{
+    scene: number;
+    visual: string;
+    narration: string;
+    duration_seconds: number;
+  }>;
+  thumbnail_url: string | null;
+  video_url: string | null;
+  audio_url: string | null;
+  sort_order: number;
+}
+
+export interface DbPost {
+  id: string;
+  campaign_id: string | null;
+  platform: string;
+  content: string;
+  hashtags: string[];
+  image_prompt: string | null;
+  image_url: string | null;
+  sort_order: number;
+}
+
+export interface DbAdCreative {
+  id: string;
+  campaign_id: string | null;
+  platform: string;
+  headline: string;
+  body: string;
+  cta: string;
+  image_prompt: string | null;
+  image_url: string | null;
+  sort_order: number;
+}
+
 export interface DbCampaign {
   id: string;
   user_id: string;
   name: string | null;
+  description: string | null;
+  input_transcript: string | null;
+  generation_options: Record<string, unknown> | null;
   status: string;
   created_at: string;
+  updated_at: string;
+}
+
+export interface DbCampaignFull extends DbCampaign {
+  video_clip_scripts: DbVideoClipScript[];
+  posts: DbPost[];
+  ad_creatives: DbAdCreative[];
 }
 
 export async function getCampaigns(userId: string): Promise<DbCampaign[]> {
   return fetchApi<DbCampaign[]>(`/campaigns?user_id=${userId}`);
 }
 
+export async function getCampaignById(id: string, userId: string): Promise<DbCampaignFull | null> {
+  return fetchApi<DbCampaignFull | null>(`/campaigns?id=${id}&user_id=${userId}&include_content=true`);
+}
+
 export async function createCampaign(userId: string, data: {
   name?: string;
+  description?: string;
   brand_profile_id?: string;
   input_transcript?: string;
   generation_options?: Record<string, unknown>;
-  video_clip_scripts?: unknown[];
-  posts?: unknown[];
-  ad_creatives?: unknown[];
+  status?: string;
+  video_clip_scripts?: Array<{
+    title: string;
+    hook: string;
+    image_prompt?: string;
+    audio_script?: string;
+    scenes: Array<{
+      scene: number;
+      visual: string;
+      narration: string;
+      duration_seconds: number;
+    }>;
+  }>;
+  posts?: Array<{
+    platform: string;
+    content: string;
+    hashtags: string[];
+    image_prompt?: string;
+  }>;
+  ad_creatives?: Array<{
+    platform: string;
+    headline: string;
+    body: string;
+    cta: string;
+    image_prompt?: string;
+  }>;
 }): Promise<DbCampaign> {
   return fetchApi<DbCampaign>('/campaigns', {
     method: 'POST',
     body: JSON.stringify({ user_id: userId, ...data }),
   });
+}
+
+export async function updateCampaign(id: string, data: Partial<DbCampaign>): Promise<DbCampaign> {
+  return fetchApi<DbCampaign>(`/campaigns?id=${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteCampaign(id: string): Promise<void> {
+  await fetchApi(`/campaigns?id=${id}`, { method: 'DELETE' });
 }
 
 // ============================================================================
@@ -257,4 +348,160 @@ export async function checkDatabaseHealth(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ============================================================================
+// File Upload API (Vercel Blob)
+// ============================================================================
+
+export interface UploadResult {
+  success: boolean;
+  url: string;
+  filename: string;
+  size: number;
+}
+
+/**
+ * Upload a blob to Vercel Blob storage
+ * @param blob - The blob to upload
+ * @param filename - The filename to use
+ * @param contentType - The MIME type of the file
+ */
+export async function uploadToBlob(
+  blob: Blob,
+  filename: string,
+  contentType: string
+): Promise<UploadResult> {
+  // Convert blob to base64
+  const arrayBuffer = await blob.arrayBuffer();
+  const base64 = btoa(
+    new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+  );
+
+  const response = await fetch('/api/upload', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      filename,
+      contentType,
+      data: base64,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Upload a video blob to Vercel Blob storage
+ */
+export async function uploadVideo(blob: Blob, filename?: string): Promise<string> {
+  const name = filename || `video-${Date.now()}.mp4`;
+  const result = await uploadToBlob(blob, name, 'video/mp4');
+  return result.url;
+}
+
+/**
+ * Upload an audio blob to Vercel Blob storage
+ */
+export async function uploadAudio(blob: Blob, filename?: string): Promise<string> {
+  const name = filename || `audio-${Date.now()}.wav`;
+  const contentType = blob.type || 'audio/wav';
+  const result = await uploadToBlob(blob, name, contentType);
+  return result.url;
+}
+
+// ============================================================================
+// Tournament Events API
+// ============================================================================
+
+export interface DbWeekSchedule {
+  id: string;
+  user_id: string;
+  start_date: string;
+  end_date: string;
+  filename: string | null;
+  original_filename: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbTournamentEvent {
+  id: string;
+  user_id: string;
+  week_schedule_id: string | null;
+  day_of_week: string;
+  name: string;
+  game: string | null;
+  gtd: string | null;
+  buy_in: string | null;
+  rebuy: string | null;
+  add_on: string | null;
+  stack: string | null;
+  players: string | null;
+  late_reg: string | null;
+  minutes: string | null;
+  structure: string | null;
+  times: Record<string, string>;
+  event_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TournamentData {
+  schedule: DbWeekSchedule | null;
+  events: DbTournamentEvent[];
+}
+
+/**
+ * Get current week schedule and events
+ */
+export async function getTournamentData(userId: string): Promise<TournamentData> {
+  return fetchApi<TournamentData>(`/tournaments?user_id=${userId}`);
+}
+
+/**
+ * Create new week schedule with events
+ */
+export async function createWeekSchedule(
+  userId: string,
+  data: {
+    start_date: string;
+    end_date: string;
+    filename?: string;
+    events: Array<{
+      day: string;
+      name: string;
+      game?: string;
+      gtd?: string;
+      buyIn?: string;
+      rebuy?: string;
+      addOn?: string;
+      stack?: string;
+      players?: string;
+      lateReg?: string;
+      minutes?: string;
+      structure?: string;
+      times?: Record<string, string>;
+      eventDate?: string;
+    }>;
+  }
+): Promise<{ schedule: DbWeekSchedule; eventsCount: number }> {
+  return fetchApi<{ schedule: DbWeekSchedule; eventsCount: number }>('/tournaments', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, ...data }),
+  });
+}
+
+/**
+ * Delete week schedule and its events
+ */
+export async function deleteWeekSchedule(userId: string, scheduleId: string): Promise<void> {
+  await fetchApi(`/tournaments?id=${scheduleId}&user_id=${userId}`, { method: 'DELETE' });
 }

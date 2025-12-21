@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, GenerationOptions, WeekScheduleInfo, StyleReference, InstagramPublishState } from '../types';
+import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, GenerationOptions, WeekScheduleInfo, StyleReference, InstagramPublishState, CampaignSummary } from '../types';
 import { UploadForm } from './UploadForm';
 import { ClipsTab } from './tabs/ClipsTab';
 import { PostsTab } from './tabs/PostsTab';
@@ -12,9 +12,10 @@ import { FlyerGenerator, TimePeriod } from './FlyerGenerator';
 import { AssistantPanel } from './assistant/AssistantPanel';
 import { GalleryView } from './GalleryView';
 import { CalendarView } from './calendar/CalendarView';
+import { CampaignsList } from './CampaignsList';
 import type { ScheduledPost } from '../types';
 
-type View = 'campaign' | 'flyer' | 'gallery' | 'calendar';
+type View = 'campaign' | 'campaigns' | 'flyer' | 'gallery' | 'calendar';
 
 interface DashboardProps {
   brandProfile: BrandProfile;
@@ -62,6 +63,13 @@ interface DashboardProps {
   // Instagram Publishing
   onPublishToInstagram: (post: ScheduledPost) => void;
   publishingStates: Record<string, InstagramPublishState>;
+  // Campaigns List
+  campaignsList: CampaignSummary[];
+  onLoadCampaign: (campaignId: string) => void;
+  userId?: string;
+  // Week Schedule
+  isWeekExpired?: boolean;
+  onClearExpiredSchedule?: () => void;
 }
 
 type Tab = 'clips' | 'posts' | 'ads';
@@ -99,7 +107,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     chatReferenceImage, onSetChatReference, activeView, onViewChange, onPublishToCampaign,
     styleReferences, onAddStyleReference, onRemoveStyleReference, onSelectStyleReference, selectedStyleReference, onClearSelectedStyleReference,
     scheduledPosts, onSchedulePost, onUpdateScheduledPost, onDeleteScheduledPost,
-    onPublishToInstagram, publishingStates
+    onPublishToInstagram, publishingStates,
+    campaignsList, onLoadCampaign, userId,
+    isWeekExpired, onClearExpiredSchedule
   } = props;
 
   const [activeTab, setActiveTab] = useState<Tab>('clips');
@@ -133,6 +143,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
         <nav className={`flex-grow ${sidebarCollapsed ? 'p-2' : 'p-3'} space-y-1`}>
             <NavItem icon="zap" label="Direct" active={activeView === 'campaign'} onClick={() => onViewChange('campaign')} collapsed={sidebarCollapsed} />
+            <NavItem icon="layers" label="Campanhas" active={activeView === 'campaigns'} onClick={() => onViewChange('campaigns')} collapsed={sidebarCollapsed} />
             <NavItem icon="image" label="Flyers" active={activeView === 'flyer'} onClick={() => onViewChange('flyer')} collapsed={sidebarCollapsed} />
             <NavItem icon="calendar" label="Agenda" active={activeView === 'calendar'} onClick={() => onViewChange('calendar')} collapsed={sidebarCollapsed} />
             <NavItem icon="layout" label="Assets" active={activeView === 'gallery'} onClick={() => onViewChange('gallery')} collapsed={sidebarCollapsed} />
@@ -221,6 +232,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       onClearSelectedStyleReference={onClearSelectedStyleReference}
                       styleReferences={styleReferences}
                       onSelectStyleReference={onSelectStyleReference}
+                      isWeekExpired={isWeekExpired}
+                      onClearExpiredSchedule={onClearExpiredSchedule}
                     />
                 </div>
             )}
@@ -239,6 +252,16 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       galleryImages={galleryImages}
                       onPublishToInstagram={onPublishToInstagram}
                       publishingStates={publishingStates}
+                    />
+                </div>
+            )}
+            {activeView === 'campaigns' && userId && (
+                <div className="px-6 py-5">
+                    <CampaignsList
+                      userId={userId}
+                      onSelectCampaign={onLoadCampaign}
+                      onNewCampaign={() => onViewChange('campaign')}
+                      currentCampaignId={campaign?.id}
                     />
                 </div>
             )}

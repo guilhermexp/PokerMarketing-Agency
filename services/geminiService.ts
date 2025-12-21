@@ -356,7 +356,7 @@ Mantenha a essência do prompt original mas expanda com detalhes visuais cinemat
 Se o prompt mencionar narração/fala, inclua isso no campo appropriate.`;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-preview-05-20',
+        model: 'gemini-3-pro-preview',
         contents: [
             { role: 'user', parts: [{ text: `${systemPrompt}\n\nPrompt genérico:\n${genericPrompt}` }] }
         ],
@@ -371,23 +371,73 @@ Se o prompt mencionar narração/fala, inclua isso no campo appropriate.`;
     return jsonResult;
 };
 
-export const generateVideo = async (prompt: string, aspectRatio: "16:9" | "9:16", model: VideoModel, image?: ImageFile | null): Promise<string> => {
-    const freshAi = getAi();
-    let operation = await freshAi.models.generateVideos({
-        model, prompt,
-        image: image ? { imageBytes: image.base64, mimeType: image.mimeType } : undefined,
-        config: { numberOfVideos: 1, resolution: '720p', aspectRatio }
-    });
+export interface GenerateVideoResult {
+    videoUrl: string;
+    usedFallback: boolean;
+}
 
-    while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 8000));
-        operation = await freshAi.operations.getVideosOperation({ operation });
+export const generateVideo = async (
+    prompt: string,
+    aspectRatio: "16:9" | "9:16",
+    model: VideoModel,
+    image?: ImageFile | null,
+    useFallbackDirectly: boolean = false
+): Promise<GenerateVideoResult> => {
+    // Helper function to use fal.ai
+    const useFalAi = async (): Promise<string> => {
+        // If there's an image, upload it to fal.ai storage first (needs HTTP URL)
+        let imageUrl: string | undefined;
+        if (image) {
+            const { uploadImageToFal } = await import('./falService');
+            imageUrl = await uploadImageToFal(image.base64, image.mimeType);
+        }
+
+        // Use fal.ai Veo 3.1 Fast (same model, different API)
+        const result = await generateFalVideo(prompt, aspectRatio, 'fal-ai/veo3.1/fast', imageUrl);
+        console.log('[fal.ai] Video generated successfully via fal.ai');
+        return result;
+    };
+
+    // If forced to use fallback directly (e.g., Gemini already failed in batch)
+    if (useFallbackDirectly) {
+        console.log('[Video] Using fal.ai directly (Gemini skipped due to previous failure)');
+        const videoUrl = await useFalAi();
+        return { videoUrl, usedFallback: true };
     }
 
-    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-    const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-    const videoBlob = await videoResponse.blob();
-    return URL.createObjectURL(videoBlob);
+    // Try Gemini first
+    try {
+        console.log('[Gemini] Attempting video generation with Gemini Veo...');
+        const freshAi = getAi();
+        let operation = await freshAi.models.generateVideos({
+            model, prompt,
+            image: image ? { imageBytes: image.base64, mimeType: image.mimeType } : undefined,
+            config: { numberOfVideos: 1, resolution: '720p', aspectRatio }
+        });
+
+        while (!operation.done) {
+            await new Promise(resolve => setTimeout(resolve, 8000));
+            operation = await freshAi.operations.getVideosOperation({ operation });
+        }
+
+        const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+        const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+        const videoBlob = await videoResponse.blob();
+        console.log('[Gemini] Video generated successfully via Gemini');
+        return { videoUrl: URL.createObjectURL(videoBlob), usedFallback: false };
+    } catch (geminiError) {
+        // Fallback to fal.ai Veo 3.1 on Gemini failure (429 rate limit, etc.)
+        console.warn('[Gemini] Video generation failed, falling back to fal.ai Veo 3.1...', geminiError);
+
+        try {
+            const videoUrl = await useFalAi();
+            return { videoUrl, usedFallback: true };
+        } catch (falError) {
+            console.error('[fal.ai] Fallback also failed:', falError);
+            // Re-throw the original Gemini error for better debugging
+            throw geminiError;
+        }
+    }
 };
 
 export const generateSpeech = async (script: string): Promise<string> => {

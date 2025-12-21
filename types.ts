@@ -47,9 +47,25 @@ export interface AdCreative {
 }
 
 export interface MarketingCampaign {
+  id?: string;                    // Database ID (optional for new campaigns)
+  name?: string;                  // Campaign name
+  inputTranscript?: string;       // Original transcript used to generate
   videoClipScripts: VideoClipScript[];
   posts: Post[];
   adCreatives: AdCreative[];
+  createdAt?: string;             // ISO timestamp
+  updatedAt?: string;             // ISO timestamp
+}
+
+// Summary for campaigns list
+export interface CampaignSummary {
+  id: string;
+  name: string | null;
+  status: string;
+  createdAt: string;
+  videoCount?: number;
+  postCount?: number;
+  adCount?: number;
 }
 
 export interface ImageFile {
@@ -89,6 +105,7 @@ export type ImageSize = '1K' | '2K' | '4K';
 export type VeoVideoModel = 'veo-3.1-fast-generate-preview';
 export type FalVideoModel =
   | 'fal-ai/sora-2/text-to-video'         // OpenAI Sora 2 - state of the art
+  | 'fal-ai/veo3.1/fast'                  // Google Veo 3.1 via fal.ai (fallback)
 
 export type VideoModel = VeoVideoModel | FalVideoModel;
 
@@ -97,14 +114,19 @@ export const isFalModel = (model: VideoModel): model is FalVideoModel =>
   model.startsWith('fal-ai/');
 
 
+// Gallery can contain images and videos
+export type GalleryMediaType = 'image' | 'video';
+
 export interface GalleryImage {
   id: string;
   src: string;
-  prompt: string;
-  source: 'Post' | 'Anúncio' | 'Clipe' | 'Flyer' | 'Flyer Diário' | 'Logo' | 'Edição';
-  model: ImageModel;
+  prompt?: string;
+  source: 'Post' | 'Anúncio' | 'Clipe' | 'Flyer' | 'Flyer Diário' | 'Logo' | 'Edição' | 'Video Final';
+  model: ImageModel | 'video-export';  // Extended for videos
   aspectRatio?: string;
   imageSize?: ImageSize;
+  mediaType?: GalleryMediaType;  // 'image' by default
+  duration?: number;  // For videos, duration in seconds
 }
 
 export interface StyleReference {

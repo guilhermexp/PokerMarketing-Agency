@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // GET - List campaigns or get single campaign
     if (req.method === 'GET') {
-      const { user_id, id, status, limit = '50', offset = '0' } = req.query;
+      const { user_id, id, status, limit = '50', offset = '0', include_content } = req.query;
 
       // Get single campaign by ID
       if (id) {
@@ -42,7 +42,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           WHERE id = ${id as string} AND deleted_at IS NULL
           LIMIT 1
         `;
-        return res.status(200).json(result[0] || null);
+
+        if (!result[0]) {
+          return res.status(200).json(null);
+        }
+
+        // If include_content is true, also fetch video_clip_scripts, posts, and ad_creatives
+        if (include_content === 'true') {
+          const campaign = result[0];
+
+          const [videoScripts, posts, adCreatives] = await Promise.all([
+            sql`
+              SELECT * FROM video_clip_scripts
+              WHERE campaign_id = ${id as string}
+              ORDER BY sort_order ASC
+            `,
+            sql`
+              SELECT * FROM posts
+              WHERE campaign_id = ${id as string}
+              ORDER BY sort_order ASC
+            `,
+            sql`
+              SELECT * FROM ad_creatives
+              WHERE campaign_id = ${id as string}
+              ORDER BY sort_order ASC
+            `
+          ]);
+
+          return res.status(200).json({
+            ...campaign,
+            video_clip_scripts: videoScripts,
+            posts: posts,
+            ad_creatives: adCreatives,
+          });
+        }
+
+        return res.status(200).json(result[0]);
       }
 
       if (!user_id) {

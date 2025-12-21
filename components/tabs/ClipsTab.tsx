@@ -5,11 +5,12 @@ import { isFalModel } from '../../types';
 import { Button } from '../common/Button';
 import { Loader } from '../common/Loader';
 import { Icon } from '../common/Icon';
-import { generateImage, generateVideo, generateSpeech, convertToJsonPrompt } from '../../services/geminiService';
+import { generateImage, generateVideo, generateSpeech, convertToJsonPrompt, type GenerateVideoResult } from '../../services/geminiService';
 import { generateFalVideo, uploadImageToFal } from '../../services/falService';
 import { ImagePreviewModal } from '../common/ImagePreviewModal';
 import { ExportVideoModal } from '../common/ExportVideoModal';
-import { concatenateVideos, downloadBlob, type ExportProgress, type VideoInput } from '../../services/ffmpegService';
+import { concatenateVideos, downloadBlob, type ExportProgress, type VideoInput, type AudioInput } from '../../services/ffmpegService';
+import { uploadVideo } from '../../services/apiClient';
 
 // --- Helper Functions for Audio Processing ---
 
@@ -109,11 +110,22 @@ interface EditableClip {
   model?: string;
 }
 
+interface AudioTrack {
+  id: string;
+  name: string;
+  url: string;
+  duration: number;
+  offsetMs: number;  // Offset in milliseconds for manual sync (can be negative)
+  volume: number;    // 0-1
+}
+
 interface EditorState {
   clips: EditableClip[];
+  audioTracks: AudioTrack[];
   currentTime: number;
   isPlaying: boolean;
   selectedClipId: string | null;
+  selectedAudioId: string | null;
   totalDuration: number;
 }
 
@@ -153,6 +165,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
     const [isGeneratingImages, setIsGeneratingImages] = useState(false);
     const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
     const [selectedVideoModel, setSelectedVideoModel] = useState<VideoModel>('fal-ai/sora-2/text-to-video');
+    const [includeNarration, setIncludeNarration] = useState(true); // Generate audio with videos
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [editingThumbnail, setEditingThumbnail] = useState<GalleryImage | null>(null);
     const [audioState, setAudioState] = useState<{ url?: string; isLoading: boolean; error?: string | null }>({ isLoading: false });
@@ -254,9 +267,12 @@ Movimento de câmera suave, iluminação dramática de cassino.`;
         setPromptPreview({ sceneNumber, prompt });
     };
 
-    const handleGenerateVideo = useCallback(async (sceneNumber: number) => {
+    // Returns whether fallback was used (for batch operations to skip Gemini on subsequent calls)
+    const handleGenerateVideo = useCallback(async (sceneNumber: number, useFallbackDirectly: boolean = false): Promise<boolean> => {
         // Set loading state for this scene
         setIsGeneratingVideo(prev => ({ ...prev, [sceneNumber]: true }));
+        let usedFallback = false;
+
         try {
             const currentScene = scenes.find(s => s.sceneNumber === sceneNumber);
             if (!currentScene) throw new Error("Cena não encontrada.");
@@ -310,7 +326,10 @@ Movimento de câmera suave, iluminação dramática de cassino.`;
                     };
                 }
 
-                videoUrl = await generateVideo(jsonPrompt, "9:16", selectedVideoModel, referenceImage);
+                // Pass useFallbackDirectly to skip Gemini if already failed in batch
+                const result = await generateVideo(jsonPrompt, "9:16", selectedVideoModel, referenceImage, useFallbackDirectly);
+                videoUrl = result.videoUrl;
+                usedFallback = result.usedFallback;
             }
 
             // Add new video to array (keep existing videos from other models)
@@ -325,18 +344,51 @@ Movimento de câmera suave, iluminação dramática de cassino.`;
                 [sceneNumber]: (videoStates[sceneNumber]?.length || 0) // Will be the last index
             }));
             setIsGeneratingVideo(prev => ({ ...prev, [sceneNumber]: false }));
+            return usedFallback;
         } catch (err: any) {
             setIsGeneratingVideo(prev => ({ ...prev, [sceneNumber]: false }));
+            return usedFallback;
         }
     }, [scenes, brandProfile, buildPromptForSora, buildPromptForVeo, selectedVideoModel, sceneImages]);
 
     const handleGenerateAllVideos = async () => {
         setIsGeneratingAll(true);
+        let useFallback = false; // Track if we should skip Gemini for remaining scenes
+
+        // Generate audio first if narration is enabled and not already generated
+        if (includeNarration && !audioState.url && clip.audio_script) {
+            console.log('[ClipsTab] Generating narration audio first...');
+            setAudioState({ isLoading: true, error: null });
+            try {
+                const narrationRegex = /narra[çc][ãa]o:\s*(.*?)(?=\s*\[|narra[çc][ãa]o:|$)/gi;
+                let match;
+                const narrations: string[] = [];
+                while ((match = narrationRegex.exec(clip.audio_script)) !== null) {
+                    if (match[1]) narrations.push(match[1].trim());
+                }
+                let narrationOnlyScript = narrations.join(' ');
+                if (!narrationOnlyScript) narrationOnlyScript = clip.audio_script;
+                const base64Audio = await generateSpeech(narrationOnlyScript);
+                const pcmData = decode(base64Audio);
+                const wavUrl = pcmToWavDataUrl(pcmData);
+                setAudioState({ url: wavUrl, isLoading: false });
+                console.log('[ClipsTab] Narration audio generated successfully');
+            } catch (err: any) {
+                console.error('[ClipsTab] Failed to generate narration:', err);
+                setAudioState({ isLoading: false, error: err.message || 'Falha ao gerar áudio.' });
+            }
+        }
+
         for (const scene of scenes) {
             // Only generate if scene has no videos yet
             const sceneVideos = videoStates[scene.sceneNumber] || [];
             if (sceneVideos.length === 0 || !sceneVideos.some(v => v.url)) {
-                await handleGenerateVideo(scene.sceneNumber);
+                const usedFallback = await handleGenerateVideo(scene.sceneNumber, useFallback);
+                // If fallback was used, skip Gemini for all remaining scenes
+                if (usedFallback) {
+                    useFallback = true;
+                    console.log('[ClipsTab] Gemini failed, using fal.ai directly for remaining scenes');
+                }
             }
         }
         setIsGeneratingAll(false);
@@ -355,8 +407,15 @@ Movimento de câmera suave, iluminação dramática de cassino.`;
 
         // Generate all videos with current model (adds to array, doesn't delete)
         setIsGeneratingAll(true);
+        let useFallback = false; // Track if we should skip Gemini for remaining scenes
+
         for (const scene of scenes) {
-            await handleGenerateVideo(scene.sceneNumber);
+            const usedFallback = await handleGenerateVideo(scene.sceneNumber, useFallback);
+            // If fallback was used, skip Gemini for all remaining scenes
+            if (usedFallback) {
+                useFallback = true;
+                console.log('[ClipsTab] Gemini failed, using fal.ai directly for remaining scenes');
+            }
         }
         setIsGeneratingAll(false);
     };
@@ -647,9 +706,11 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         // Start with empty timeline - user adds clips manually
         setEditorState({
             clips: [],
+            audioTracks: [],
             currentTime: 0,
             isPlaying: false,
             selectedClipId: null,
+            selectedAudioId: null,
             totalDuration: 0,
         });
         setIsEditing(true);
@@ -727,13 +788,49 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         setExportProgress({ phase: 'loading', progress: 0, message: 'Carregando FFmpeg...' });
 
         try {
+            // Build audio track options if we have audio in the editor
+            let audioTrack: AudioInput | undefined;
+            if (editorState.audioTracks.length > 0) {
+                const track = editorState.audioTracks[0]; // Use first audio track
+                audioTrack = {
+                    url: track.url,
+                    offsetMs: track.offsetMs,
+                    volume: track.volume,
+                };
+            }
+
             const outputBlob = await concatenateVideos(videoInputs, {
                 outputFormat: 'mp4',
                 onProgress: setExportProgress,
+                audioTrack,
             });
 
             const previewUrl = URL.createObjectURL(outputBlob);
             setMergedVideoUrl(previewUrl);
+
+            // Upload to Vercel Blob and save to gallery
+            setExportProgress({ phase: 'finalizing', progress: 95, message: 'Salvando na galeria...' });
+            try {
+                const totalDuration = editorState.clips.reduce((acc, c) => acc + (c.trimEnd - c.trimStart), 0);
+                const videoUrl = await uploadVideo(outputBlob, `video-final-${Date.now()}.mp4`);
+
+                // Add to gallery as a video
+                onAddImageToGallery({
+                    src: videoUrl,
+                    prompt: `Video editado com ${editorState.clips.length} cenas`,
+                    source: 'Video Final',
+                    model: 'video-export' as any,  // Cast to any since we extended the type
+                    mediaType: 'video',
+                    duration: totalDuration,
+                    aspectRatio: '9:16',
+                });
+
+                console.log('[ClipsTab] Video saved to gallery:', videoUrl);
+            } catch (uploadError) {
+                console.error('[ClipsTab] Failed to upload video to gallery:', uploadError);
+                // Continue anyway - video is still available locally
+            }
+
             setExportProgress(null);
             setIsEditing(false);
             setEditorState(null);
@@ -832,6 +929,66 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         }
     };
 
+    // --- Audio Track Functions ---
+
+    const handleAddAudioTrack = (audioUrl: string, name: string, duration: number) => {
+        if (!editorState) return;
+
+        const newTrack: AudioTrack = {
+            id: `audio-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            name,
+            url: audioUrl,
+            duration,
+            offsetMs: 0,
+            volume: 1,
+        };
+
+        setEditorState({
+            ...editorState,
+            audioTracks: [...editorState.audioTracks, newTrack],
+        });
+    };
+
+    const handleSelectAudio = (audioId: string) => {
+        if (!editorState) return;
+        setEditorState({
+            ...editorState,
+            selectedAudioId: editorState.selectedAudioId === audioId ? null : audioId,
+            selectedClipId: null, // Deselect video when selecting audio
+        });
+    };
+
+    const handleUpdateAudioOffset = (audioId: string, offsetMs: number) => {
+        if (!editorState) return;
+        const updatedTracks = editorState.audioTracks.map(track =>
+            track.id === audioId ? { ...track, offsetMs } : track
+        );
+        setEditorState({
+            ...editorState,
+            audioTracks: updatedTracks,
+        });
+    };
+
+    const handleUpdateAudioVolume = (audioId: string, volume: number) => {
+        if (!editorState) return;
+        const updatedTracks = editorState.audioTracks.map(track =>
+            track.id === audioId ? { ...track, volume: Math.max(0, Math.min(1, volume)) } : track
+        );
+        setEditorState({
+            ...editorState,
+            audioTracks: updatedTracks,
+        });
+    };
+
+    const handleDeleteAudioTrack = (audioId: string) => {
+        if (!editorState) return;
+        setEditorState({
+            ...editorState,
+            audioTracks: editorState.audioTracks.filter(t => t.id !== audioId),
+            selectedAudioId: editorState.selectedAudioId === audioId ? null : editorState.selectedAudioId,
+        });
+    };
+
     // Check if thumbnail is already in favorites
     const isFavorite = (image: GalleryImage) => {
         return styleReferences?.some(ref => ref.src === image.src) || false;
@@ -901,6 +1058,19 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                 <option value="veo-3.1-fast-generate-preview">Veo 3.1</option>
                             </select>
                         </div>
+                        {/* Narration Toggle */}
+                        <button
+                            onClick={() => setIncludeNarration(!includeNarration)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all text-[9px] font-bold ${
+                                includeNarration
+                                    ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                                    : 'bg-[#080808] border-white/10 text-white/40 hover:text-white/60'
+                            }`}
+                            title={includeNarration ? 'Narração será gerada junto com os vídeos' : 'Vídeos sem narração'}
+                        >
+                            <Icon name={includeNarration ? 'mic' : 'mic-off'} className="w-3 h-3" />
+                            <span className="uppercase tracking-wide">{includeNarration ? 'Com Voz' : 'Sem Voz'}</span>
+                        </button>
                         {/* Action Buttons */}
                         <Button
                             onClick={handleGenerateSceneImages}
@@ -1151,6 +1321,116 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                     <Icon name="download" className="w-4 h-4" />
                                 </button>
                             </div>
+                        </div>
+
+                        {/* Audio Track Section */}
+                        <div className="px-4 pb-4 bg-[#0d0d0d] border-t border-white/5">
+                            <div className="flex items-center gap-4">
+                                {/* Audio label */}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    <Icon name="audio" className="w-4 h-4 text-green-400" />
+                                    <span className="text-[10px] text-white/50 uppercase tracking-wider">Áudio</span>
+                                </div>
+
+                                {/* Audio tracks container */}
+                                <div className="flex-1 min-h-[40px] flex items-center gap-2">
+                                    {editorState.audioTracks.length === 0 ? (
+                                        <div className="flex-1 flex items-center justify-center border-2 border-dashed border-green-500/20 rounded-lg h-10">
+                                            <p className="text-white/30 text-xs">
+                                                {audioState.url ? 'Clique em + para adicionar o áudio gerado' : 'Gere o áudio primeiro'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="flex gap-2 overflow-x-auto py-1">
+                                            {editorState.audioTracks.map(track => {
+                                                const isSelected = editorState.selectedAudioId === track.id;
+                                                const offsetLeft = Math.max(0, track.offsetMs / 100); // Convert ms to pixels
+
+                                                return (
+                                                    <div
+                                                        key={track.id}
+                                                        onClick={() => handleSelectAudio(track.id)}
+                                                        className={`relative h-10 px-3 rounded-lg bg-green-500/20 border flex items-center gap-2 cursor-pointer transition-all ${
+                                                            isSelected ? 'border-green-400 ring-1 ring-green-400' : 'border-green-500/30'
+                                                        }`}
+                                                        style={{ marginLeft: `${offsetLeft}px` }}
+                                                    >
+                                                        <Icon name="audio" className="w-3 h-3 text-green-400" />
+                                                        <span className="text-[10px] text-white/80 whitespace-nowrap">{track.name}</span>
+                                                        <span className="text-[8px] text-green-400/80">{Math.round(track.duration)}s</span>
+
+                                                        {/* Delete button */}
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDeleteAudioTrack(track.id); }}
+                                                            className="ml-1 text-white/40 hover:text-red-400 transition-colors"
+                                                        >
+                                                            <Icon name="x" className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Add audio button */}
+                                <button
+                                    onClick={() => {
+                                        if (audioState.url) {
+                                            // Get duration from audio element if possible
+                                            const audioDuration = totalDuration || 10; // Fallback to clip duration
+                                            handleAddAudioTrack(audioState.url, 'Narração', audioDuration);
+                                        }
+                                    }}
+                                    disabled={!audioState.url || editorState.audioTracks.length > 0}
+                                    className="w-8 h-8 rounded-lg bg-green-500/10 hover:bg-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-green-400/50 hover:text-green-400 transition-colors flex-shrink-0"
+                                    title="Adicionar áudio gerado"
+                                >
+                                    <Icon name="plus" className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Audio Sync Controls - Show when audio is selected */}
+                            {editorState.selectedAudioId && (
+                                <div className="mt-3 p-3 rounded-lg bg-white/5 border border-green-500/20">
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-[10px] text-white/50 uppercase tracking-wider flex-shrink-0">Sincronizar</span>
+
+                                        {/* Offset slider */}
+                                        <div className="flex-1 flex items-center gap-2">
+                                            <span className="text-[9px] text-white/40">-2s</span>
+                                            <input
+                                                type="range"
+                                                min="-2000"
+                                                max="2000"
+                                                step="50"
+                                                value={editorState.audioTracks.find(t => t.id === editorState.selectedAudioId)?.offsetMs || 0}
+                                                onChange={(e) => handleUpdateAudioOffset(editorState.selectedAudioId!, parseInt(e.target.value))}
+                                                className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-green-400"
+                                            />
+                                            <span className="text-[9px] text-white/40">+2s</span>
+                                        </div>
+
+                                        {/* Offset value display */}
+                                        <span className="text-[10px] text-green-400 font-mono tabular-nums w-12 text-right">
+                                            {((editorState.audioTracks.find(t => t.id === editorState.selectedAudioId)?.offsetMs || 0) / 1000).toFixed(1)}s
+                                        </span>
+
+                                        {/* Volume control */}
+                                        <div className="flex items-center gap-2">
+                                            <Icon name="audio" className="w-3 h-3 text-white/40" />
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="100"
+                                                value={(editorState.audioTracks.find(t => t.id === editorState.selectedAudioId)?.volume || 1) * 100}
+                                                onChange={(e) => handleUpdateAudioVolume(editorState.selectedAudioId!, parseInt(e.target.value) / 100)}
+                                                className="w-16 h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ) : (

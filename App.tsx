@@ -20,10 +20,19 @@ import {
   createScheduledPost,
   updateScheduledPost as updateScheduledPostApi,
   deleteScheduledPost as deleteScheduledPostApi,
+  getCampaigns,
+  getCampaignById,
+  createCampaign as createCampaignApi,
+  getTournamentData,
+  createWeekSchedule,
+  deleteWeekSchedule,
+  type DbCampaign,
+  type DbWeekSchedule,
 } from './services/apiClient';
+import type { CampaignSummary } from './types';
 
 export type TimePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'NIGHT' | 'HIGHLIGHTS';
-export type ViewType = 'campaign' | 'flyer' | 'gallery' | 'calendar';
+export type ViewType = 'campaign' | 'campaigns' | 'flyer' | 'gallery' | 'calendar';
 
 const MAX_GALLERY_SIZE = 12; 
 const MAX_CHAT_HISTORY_MESSAGES = 10;
@@ -94,6 +103,8 @@ function AppContent() {
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [tournamentEvents, setTournamentEvents] = useState<TournamentEvent[]>([]);
   const [weekScheduleInfo, setWeekScheduleInfo] = useState<WeekScheduleInfo | null>(null);
+  const [currentScheduleId, setCurrentScheduleId] = useState<string | null>(null);
+  const [isWeekExpired, setIsWeekExpired] = useState(false);
   const [flyerState, setFlyerState] = useState<Record<string, (GalleryImage | 'loading')[]>>({});
   const [dailyFlyerState, setDailyFlyerState] = useState<Record<TimePeriod, (GalleryImage | 'loading')[]>>({
     ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: []
@@ -104,6 +115,7 @@ function AppContent() {
   const [selectedStyleReference, setSelectedStyleReference] = useState<StyleReference | null>(null);
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [publishingStates, setPublishingStates] = useState<Record<string, InstagramPublishState>>({});
+  const [campaignsList, setCampaignsList] = useState<CampaignSummary[]>([]);
 
   // Load data from database when user is authenticated
   useEffect(() => {
@@ -163,6 +175,70 @@ function AppContent() {
           createdAt: new Date(post.created_at).getTime(),
         }));
         setScheduledPosts(mappedPosts.sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp));
+
+        // Load campaigns list from database
+        const dbCampaigns = await getCampaigns(userId);
+        const mappedCampaigns: CampaignSummary[] = dbCampaigns.map((c: DbCampaign) => ({
+          id: c.id,
+          name: c.name,
+          status: c.status,
+          createdAt: c.created_at,
+        }));
+        setCampaignsList(mappedCampaigns);
+
+        // Load tournament data from database
+        try {
+          const tournamentData = await getTournamentData(userId);
+          if (tournamentData.schedule) {
+            const schedule = tournamentData.schedule;
+            setCurrentScheduleId(schedule.id);
+
+            // Check if week is expired
+            const endDate = new Date(schedule.end_date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            endDate.setHours(23, 59, 59, 999);
+
+            if (today > endDate) {
+              setIsWeekExpired(true);
+              console.log('[Tournaments] Week schedule expired');
+            } else {
+              setIsWeekExpired(false);
+
+              // Load events
+              const mappedEvents: TournamentEvent[] = tournamentData.events.map(e => ({
+                id: e.id,
+                day: e.day_of_week,
+                name: e.name,
+                game: e.game || '',
+                gtd: e.gtd || '',
+                buyIn: e.buy_in || '',
+                rebuy: e.rebuy || '',
+                addOn: e.add_on || '',
+                stack: e.stack || '',
+                players: e.players || '',
+                lateReg: e.late_reg || '',
+                minutes: e.minutes || '',
+                structure: e.structure || '',
+                times: e.times || {},
+              }));
+              setTournamentEvents(mappedEvents);
+
+              // Set week schedule info
+              const startParts = schedule.start_date.split('-');
+              const endParts = schedule.end_date.split('-');
+              setWeekScheduleInfo({
+                startDate: `${startParts[2]}/${startParts[1]}`,
+                endDate: `${endParts[2]}/${endParts[1]}`,
+                filename: schedule.filename || 'Planilha carregada',
+              });
+
+              console.log(`[Tournaments] Loaded ${mappedEvents.length} events for week ${schedule.start_date} to ${schedule.end_date}`);
+            }
+          }
+        } catch (tournamentError) {
+          console.error('[Tournaments] Failed to load tournament data:', tournamentError);
+        }
       } catch (e) {
         console.error('Failed to load data from database:', e);
       } finally {
@@ -407,12 +483,113 @@ function AppContent() {
       setActiveView('campaign');
       try {
           const r = await generateCampaign(brandProfile!, input, options);
+
+          // Save campaign to database if authenticated
+          if (userId) {
+            try {
+              // Generate a name from the transcript (first 50 chars)
+              const campaignName = input.transcript
+                ? input.transcript.substring(0, 50) + (input.transcript.length > 50 ? '...' : '')
+                : `Campanha ${new Date().toLocaleDateString('pt-BR')}`;
+
+              const savedCampaign = await createCampaignApi(userId, {
+                name: campaignName,
+                input_transcript: input.transcript,
+                generation_options: options as unknown as Record<string, unknown>,
+                status: 'completed',
+                video_clip_scripts: r.videoClipScripts.map(v => ({
+                  title: v.title,
+                  hook: v.hook,
+                  image_prompt: v.image_prompt,
+                  audio_script: v.audio_script,
+                  scenes: v.scenes,
+                })),
+                posts: r.posts.map(p => ({
+                  platform: p.platform,
+                  content: p.content,
+                  hashtags: p.hashtags,
+                  image_prompt: p.image_prompt,
+                })),
+                ad_creatives: r.adCreatives.map(a => ({
+                  platform: a.platform,
+                  headline: a.headline,
+                  body: a.body,
+                  cta: a.cta,
+                  image_prompt: a.image_prompt,
+                })),
+              });
+
+              // Update campaign with database ID
+              r.id = savedCampaign.id;
+              r.name = campaignName;
+              r.inputTranscript = input.transcript;
+              r.createdAt = savedCampaign.created_at;
+
+              // Update campaigns list
+              setCampaignsList(prev => [{
+                id: savedCampaign.id,
+                name: campaignName,
+                status: 'completed',
+                createdAt: savedCampaign.created_at,
+              }, ...prev]);
+
+              console.log('[Campaign] Saved to database:', savedCampaign.id);
+            } catch (saveError) {
+              console.error('[Campaign] Failed to save to database:', saveError);
+              // Continue even if save fails - campaign is still in memory
+            }
+          }
+
           setCampaign(r);
       } catch (e: any) {
           setError(e.message);
       } finally {
           setIsGenerating(false);
       }
+  };
+
+  const handleLoadCampaign = async (campaignId: string) => {
+    if (!userId) {
+      console.error('Cannot load campaign: user not authenticated');
+      return;
+    }
+    try {
+      const fullCampaign = await getCampaignById(campaignId, userId);
+      if (fullCampaign) {
+        const loadedCampaign: MarketingCampaign = {
+          id: fullCampaign.id,
+          name: fullCampaign.name || undefined,
+          inputTranscript: fullCampaign.input_transcript || undefined,
+          createdAt: fullCampaign.created_at,
+          updatedAt: fullCampaign.updated_at,
+          videoClipScripts: (fullCampaign.video_clip_scripts || []).map(v => ({
+            title: v.title,
+            hook: v.hook,
+            image_prompt: v.image_prompt || '',
+            audio_script: v.audio_script || '',
+            scenes: v.scenes || [],
+          })),
+          posts: (fullCampaign.posts || []).map(p => ({
+            platform: p.platform as 'Instagram' | 'LinkedIn' | 'Twitter' | 'Facebook',
+            content: p.content,
+            hashtags: p.hashtags || [],
+            image_prompt: p.image_prompt || '',
+          })),
+          adCreatives: (fullCampaign.ad_creatives || []).map(a => ({
+            platform: a.platform as 'Facebook' | 'Google',
+            headline: a.headline,
+            body: a.body,
+            cta: a.cta,
+            image_prompt: a.image_prompt || '',
+          })),
+        };
+        setCampaign(loadedCampaign);
+        setActiveView('campaign');
+      }
+    } catch (error) {
+      console.error('Failed to load campaign:', error);
+      setError('Falha ao carregar campanha');
+    }
   };
 
   const handlePublishFlyerToCampaign = (text: string, flyer: GalleryImage) => {
@@ -558,7 +735,7 @@ function AppContent() {
   const handleTournamentFileUpload = (file: File) => {
     return new Promise<void>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const data = new Uint8Array(e.target!.result as ArrayBuffer);
           const wb = XLSX.read(data, { type: 'array' });
@@ -581,6 +758,58 @@ function AppContent() {
           // Extrair info da semana do nome do arquivo ou da aba
           const weekInfo = parseWeekFromFilename(file.name) || parseWeekFromFilename(wb.SheetNames[0]);
           if (weekInfo) setWeekScheduleInfo(weekInfo);
+
+          // Save to database if authenticated
+          if (userId && weekInfo) {
+            try {
+              // Delete existing schedule if any
+              if (currentScheduleId) {
+                await deleteWeekSchedule(userId, currentScheduleId);
+              }
+
+              // Parse dates for database (convert DD/MM to YYYY-MM-DD)
+              const year = new Date().getFullYear();
+              const [startDay, startMonth] = weekInfo.startDate.split('/');
+              const [endDay, endMonth] = weekInfo.endDate.split('/');
+
+              // Handle year rollover (if end month < start month, end is next year)
+              let endYear = year;
+              if (parseInt(endMonth) < parseInt(startMonth)) {
+                endYear = year + 1;
+              }
+
+              const startDateISO = `${year}-${startMonth.padStart(2, '0')}-${startDay.padStart(2, '0')}`;
+              const endDateISO = `${endYear}-${endMonth.padStart(2, '0')}-${endDay.padStart(2, '0')}`;
+
+              const result = await createWeekSchedule(userId, {
+                start_date: startDateISO,
+                end_date: endDateISO,
+                filename: file.name,
+                events: events.map(ev => ({
+                  day: ev.day,
+                  name: ev.name,
+                  game: ev.game,
+                  gtd: ev.gtd,
+                  buyIn: ev.buyIn,
+                  rebuy: ev.rebuy,
+                  addOn: ev.addOn,
+                  stack: ev.stack,
+                  players: ev.players,
+                  lateReg: ev.lateReg,
+                  minutes: ev.minutes,
+                  structure: ev.structure,
+                  times: ev.times,
+                })),
+              });
+
+              setCurrentScheduleId(result.schedule.id);
+              setIsWeekExpired(false);
+              console.log(`[Tournaments] Saved ${result.eventsCount} events to database`);
+            } catch (dbErr) {
+              console.error('[Tournaments] Failed to save to database:', dbErr);
+              // Continue anyway - data is still in local state
+            }
+          }
 
           resolve();
         } catch (err) { reject(err); }
@@ -681,6 +910,23 @@ function AppContent() {
           onDeleteScheduledPost={handleDeleteScheduledPost}
           onPublishToInstagram={handlePublishToInstagram}
           publishingStates={publishingStates}
+          campaignsList={campaignsList}
+          onLoadCampaign={handleLoadCampaign}
+          userId={userId}
+          isWeekExpired={isWeekExpired}
+          onClearExpiredSchedule={async () => {
+            if (userId && currentScheduleId) {
+              try {
+                await deleteWeekSchedule(userId, currentScheduleId);
+                setCurrentScheduleId(null);
+                setTournamentEvents([]);
+                setWeekScheduleInfo(null);
+                setIsWeekExpired(false);
+              } catch (e) {
+                console.error('[Tournaments] Failed to clear expired schedule:', e);
+              }
+            }
+          }}
         />
       )}
     </>

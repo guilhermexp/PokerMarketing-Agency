@@ -56,7 +56,10 @@ export type IconName =
   | 'trash'
   | 'alert-circle'
   | 'refresh'
-  | 'eye';
+  | 'eye'
+  | 'audio'
+  | 'mic'
+  | 'mic-off';
 
 interface IconProps {
   name: IconName;
@@ -325,6 +328,30 @@ const iconPaths: Record<IconName, React.ReactNode> = {
       <polyline points="23 4 23 10 17 10"></polyline>
       <polyline points="1 20 1 14 7 14"></polyline>
       <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+    </>
+  ),
+  audio: (
+    <>
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+    </>
+  ),
+  mic: (
+    <>
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+      <line x1="12" y1="19" x2="12" y2="23"></line>
+      <line x1="8" y1="23" x2="16" y2="23"></line>
+    </>
+  ),
+  'mic-off': (
+    <>
+      <line x1="1" y1="1" x2="23" y2="23"></line>
+      <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
+      <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
+      <line x1="12" y1="19" x2="12" y2="23"></line>
+      <line x1="8" y1="23" x2="16" y2="23"></line>
     </>
   ),
 };

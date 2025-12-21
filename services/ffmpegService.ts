@@ -13,9 +13,16 @@ export interface ExportProgress {
   totalFiles?: number;
 }
 
+export interface AudioInput {
+  url: string;
+  offsetMs: number;    // Audio offset in milliseconds (can be negative for delay)
+  volume: number;      // 0-1 volume level
+}
+
 export interface ExportOptions {
   outputFormat?: 'mp4' | 'webm';
   onProgress?: (progress: ExportProgress) => void;
+  audioTrack?: AudioInput;  // Optional separate audio track to mix
 }
 
 export interface VideoInput {
@@ -195,13 +202,13 @@ const hasTrimApplied = (videos: VideoInput[]): boolean => {
 };
 
 /**
- * Concatenate multiple videos into single output
+ * Concatenate multiple videos into single output with optional audio mixing
  */
 export const concatenateVideos = async (
   videos: VideoInput[],
   options: ExportOptions = {}
 ): Promise<Blob> => {
-  const { outputFormat = 'mp4', onProgress } = options;
+  const { outputFormat = 'mp4', onProgress, audioTrack } = options;
 
   if (!videos || videos.length === 0) {
     throw new Error('Nenhum video fornecido');
@@ -325,19 +332,84 @@ export const concatenateVideos = async (
     // Remove progress handler to prevent duplicate listeners
     ffmpeg.off('progress', progressHandler);
 
+    // If there's an audio track to mix, do a second pass
+    let finalOutputFilename = outputFilename;
+    if (audioTrack) {
+      onProgress?.({
+        phase: 'finalizing',
+        progress: 85,
+        message: 'Mixando áudio...',
+      });
+
+      // Load the audio file
+      const audioFilename = 'audio_track.wav';
+      const audioData = await blobUrlToArrayBuffer(audioTrack.url);
+      await ffmpeg.writeFile(audioFilename, audioData);
+
+      // Calculate audio offset in seconds
+      const offsetSec = audioTrack.offsetMs / 1000;
+      const audioWithMixFilename = `final_with_audio.${outputFormat}`;
+
+      // Build the audio filter with delay and volume
+      // adelay: delay audio by X ms (only for positive offset)
+      // volume: adjust volume
+      const delayMs = Math.max(0, audioTrack.offsetMs);
+      const audioFilter = `adelay=${delayMs}|${delayMs},volume=${audioTrack.volume}`;
+
+      try {
+        // Mix audio: replace original audio with our narration
+        // If offset is negative, we need to trim the start of the audio
+        if (audioTrack.offsetMs < 0) {
+          // Negative offset: skip start of audio
+          const skipSec = Math.abs(offsetSec);
+          await ffmpeg.exec([
+            '-i', outputFilename,
+            '-i', audioFilename,
+            '-filter_complex', `[1:a]atrim=start=${skipSec},asetpts=PTS-STARTPTS,volume=${audioTrack.volume}[audio];[0:a][audio]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
+            '-map', '0:v',
+            '-map', '[aout]',
+            '-c:v', 'copy',
+            '-y',
+            audioWithMixFilename,
+          ]);
+        } else {
+          // Positive or zero offset: delay audio
+          await ffmpeg.exec([
+            '-i', outputFilename,
+            '-i', audioFilename,
+            '-filter_complex', `[1:a]${audioFilter}[audio];[0:a][audio]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
+            '-map', '0:v',
+            '-map', '[aout]',
+            '-c:v', 'copy',
+            '-y',
+            audioWithMixFilename,
+          ]);
+        }
+
+        // Cleanup intermediate files
+        await ffmpeg.deleteFile(outputFilename);
+        await ffmpeg.deleteFile(audioFilename);
+        finalOutputFilename = audioWithMixFilename;
+      } catch (audioError) {
+        console.warn('Audio mixing failed, using video without mixed audio:', audioError);
+        // Keep using the original output without mixed audio
+        await ffmpeg.deleteFile(audioFilename);
+      }
+    }
+
     onProgress?.({
       phase: 'finalizing',
       progress: 92,
       message: 'Finalizando...',
     });
 
-    const outputData = await ffmpeg.readFile(outputFilename);
+    const outputData = await ffmpeg.readFile(finalOutputFilename);
 
     // Cleanup
     for (const filename of inputFilenames) {
-      await ffmpeg.deleteFile(filename);
+      try { await ffmpeg.deleteFile(filename); } catch { /* ignore */ }
     }
-    await ffmpeg.deleteFile(outputFilename);
+    try { await ffmpeg.deleteFile(finalOutputFilename); } catch { /* ignore */ }
 
     onProgress?.({
       phase: 'complete',
