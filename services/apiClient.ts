@@ -168,6 +168,12 @@ export interface DbScheduledPost {
   published_at: string | null;
   error_message: string | null;
   created_at: string;
+  updated_at?: string;
+  created_from?: string;
+  instagram_media_id?: string;
+  instagram_container_id?: string;
+  publish_attempts?: number;
+  last_publish_attempt?: string;
 }
 
 export async function getScheduledPosts(userId: string, options?: {
@@ -504,4 +510,52 @@ export async function createWeekSchedule(
  */
 export async function deleteWeekSchedule(userId: string, scheduleId: string): Promise<void> {
   await fetchApi(`/tournaments?id=${scheduleId}&user_id=${userId}`, { method: 'DELETE' });
+}
+
+// ============================================================================
+// QStash Scheduling API
+// ============================================================================
+
+export interface QStashScheduleResult {
+  success: boolean;
+  messageId: string;
+  scheduledFor: string;
+  delaySeconds: number;
+}
+
+/**
+ * Schedule a post for publication via QStash
+ * This will trigger automatic publication at the scheduled time
+ */
+export async function schedulePostWithQStash(
+  postId: string,
+  userId: string,
+  scheduledTimestamp: number | string
+): Promise<QStashScheduleResult> {
+  const response = await fetch('/api/qstash/schedule', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ postId, userId, scheduledTimestamp }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Cancel a scheduled post in QStash
+ */
+export async function cancelQStashSchedule(messageId: string): Promise<void> {
+  const response = await fetch(`/api/qstash/schedule?messageId=${messageId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
 }

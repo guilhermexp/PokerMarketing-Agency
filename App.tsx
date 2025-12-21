@@ -26,6 +26,7 @@ import {
   getTournamentData,
   createWeekSchedule,
   deleteWeekSchedule,
+  schedulePostWithQStash,
   type DbCampaign,
   type DbWeekSchedule,
 } from './services/apiClient';
@@ -158,11 +159,11 @@ function AppContent() {
         const dbScheduled = await getScheduledPosts(userId);
         const mappedPosts: ScheduledPost[] = dbScheduled.map(post => ({
           id: post.id,
-          contentType: post.content_type as ScheduledPost['contentType'],
-          contentId: post.content_id || undefined,
+          type: post.content_type as ScheduledPost['type'],
+          contentId: post.content_id || '',
           imageUrl: post.image_url,
           caption: post.caption,
-          hashtags: post.hashtags,
+          hashtags: post.hashtags || [],
           scheduledDate: post.scheduled_date,
           scheduledTime: post.scheduled_time,
           scheduledTimestamp: new Date(post.scheduled_timestamp).getTime(),
@@ -173,6 +174,8 @@ function AppContent() {
           publishedAt: post.published_at ? new Date(post.published_at).getTime() : undefined,
           errorMessage: post.error_message || undefined,
           createdAt: new Date(post.created_at).getTime(),
+          updatedAt: new Date(post.updated_at || post.created_at).getTime(),
+          createdFrom: (post.created_from || 'gallery') as ScheduledPost['createdFrom'],
         }));
         setScheduledPosts(mappedPosts.sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp));
 
@@ -338,8 +341,9 @@ function AppContent() {
     }
 
     try {
+      // 1. Create post in database
       const dbPost = await createScheduledPost(userId, {
-        content_type: post.contentType,
+        content_type: post.type,
         content_id: post.contentId,
         image_url: post.imageUrl,
         caption: post.caption,
@@ -350,15 +354,29 @@ function AppContent() {
         timezone: post.timezone,
         platforms: post.platforms,
         instagram_content_type: post.instagramContentType,
+        created_from: post.createdFrom,
       });
+
+      // 2. Schedule with QStash for automatic publication
+      try {
+        const qstashResult = await schedulePostWithQStash(
+          dbPost.id,
+          userId,
+          post.scheduledTimestamp
+        );
+        console.log(`[QStash] Post ${dbPost.id} scheduled for ${qstashResult.scheduledFor}`);
+      } catch (qstashError) {
+        console.warn('[QStash] Failed to schedule, will rely on manual publish:', qstashError);
+        // Don't fail the whole operation - post is saved, just won't auto-publish
+      }
 
       const newPost: ScheduledPost = {
         id: dbPost.id,
-        contentType: dbPost.content_type as ScheduledPost['contentType'],
-        contentId: dbPost.content_id || undefined,
+        type: dbPost.content_type as ScheduledPost['type'],
+        contentId: dbPost.content_id || '',
         imageUrl: dbPost.image_url,
         caption: dbPost.caption,
-        hashtags: dbPost.hashtags,
+        hashtags: dbPost.hashtags || [],
         scheduledDate: dbPost.scheduled_date,
         scheduledTime: dbPost.scheduled_time,
         scheduledTimestamp: new Date(dbPost.scheduled_timestamp).getTime(),
@@ -367,6 +385,8 @@ function AppContent() {
         instagramContentType: dbPost.instagram_content_type as ScheduledPost['instagramContentType'],
         status: dbPost.status as ScheduledPost['status'],
         createdAt: new Date(dbPost.created_at).getTime(),
+        updatedAt: Date.now(),
+        createdFrom: (dbPost.created_from || 'gallery') as ScheduledPost['createdFrom'],
       };
 
       setScheduledPosts(prev => [...prev, newPost].sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp));
