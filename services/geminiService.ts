@@ -263,6 +263,114 @@ export const editImage = async (
     throw new Error("Falha na edição Neural.");
 };
 
+// Schema para o JSON estruturado de prompt de vídeo
+const videoPromptJsonSchema = {
+    type: Type.OBJECT,
+    properties: {
+        video_prompt: {
+            type: Type.OBJECT,
+            properties: {
+                scene_description: { type: Type.STRING },
+                visual_style: {
+                    type: Type.OBJECT,
+                    properties: {
+                        aesthetic: { type: Type.STRING },
+                        color_palette: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        lighting: { type: Type.STRING }
+                    },
+                    required: ["aesthetic", "color_palette", "lighting"]
+                },
+                camera: {
+                    type: Type.OBJECT,
+                    properties: {
+                        movement: { type: Type.STRING },
+                        start_position: { type: Type.STRING },
+                        end_position: { type: Type.STRING }
+                    },
+                    required: ["movement", "start_position", "end_position"]
+                },
+                subject: {
+                    type: Type.OBJECT,
+                    properties: {
+                        character: { type: Type.STRING },
+                        action: { type: Type.STRING },
+                        expression: { type: Type.STRING }
+                    },
+                    required: ["character", "action", "expression"]
+                },
+                environment: {
+                    type: Type.OBJECT,
+                    properties: {
+                        setting: { type: Type.STRING },
+                        props: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        atmosphere: { type: Type.STRING }
+                    },
+                    required: ["setting", "props", "atmosphere"]
+                },
+                scene_sequence: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            beat: { type: Type.INTEGER },
+                            description: { type: Type.STRING }
+                        },
+                        required: ["beat", "description"]
+                    }
+                },
+                technical: {
+                    type: Type.OBJECT,
+                    properties: {
+                        duration: { type: Type.STRING },
+                        aspect_ratio: { type: Type.STRING },
+                        quality_tokens: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    },
+                    required: ["duration", "aspect_ratio", "quality_tokens"]
+                }
+            },
+            required: ["scene_description", "visual_style", "camera", "subject", "environment", "scene_sequence", "technical"]
+        }
+    },
+    required: ["video_prompt"]
+};
+
+/**
+ * Converte um prompt genérico de vídeo em JSON estruturado para melhor aderência do modelo.
+ * Baseado na técnica de Nested JSON do MetricsMule para Veo 3.
+ */
+export const convertToJsonPrompt = async (genericPrompt: string, duration: number, aspectRatio: "16:9" | "9:16"): Promise<string> => {
+    const ai = getAi();
+
+    const systemPrompt = `Você é um especialista em prompt engineering para vídeo de IA.
+Converta o prompt genérico fornecido em um JSON estruturado e aninhado otimizado para modelos de geração de vídeo (Veo 3, Sora 2).
+
+O JSON deve incluir detalhes ricos sobre:
+- visual_style: estética, paleta de cores, iluminação
+- camera: movimentos de câmera cinematográficos, posições inicial e final
+- subject: personagem/objeto principal, ação, expressão/estado
+- environment: cenário, props relevantes, atmosfera
+- scene_sequence: 2-3 beats de ação para criar dinamismo
+- technical: duração (${duration} seconds), aspect ratio (${aspectRatio}), tokens de qualidade
+
+Mantenha a essência do prompt original mas expanda com detalhes visuais cinematográficos.
+Se o prompt mencionar narração/fala, inclua isso no campo appropriate.`;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-preview-05-20',
+        contents: [
+            { role: 'user', parts: [{ text: `${systemPrompt}\n\nPrompt genérico:\n${genericPrompt}` }] }
+        ],
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: videoPromptJsonSchema,
+        },
+    });
+
+    const jsonResult = response.text.trim();
+    console.log('[convertToJsonPrompt] JSON estruturado gerado:', jsonResult);
+    return jsonResult;
+};
+
 export const generateVideo = async (prompt: string, aspectRatio: "16:9" | "9:16", model: VideoModel, image?: ImageFile | null): Promise<string> => {
     const freshAi = getAi();
     let operation = await freshAi.models.generateVideos({

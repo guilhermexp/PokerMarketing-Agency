@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { ScheduledPost, GalleryImage, SchedulingPlatform, InstagramContentType } from '../../types';
 import { Icon } from '../common/Icon';
-import { Button } from '../common/Button';
 import { Card } from '../common/Card';
 import { isRubeConfigured } from '../../services/rubeService';
 
@@ -183,7 +182,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   className={`
                     flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all
                     ${publishNow
-                      ? 'bg-green-500/20 border-green-500/50 text-green-400'
+                      ? 'bg-white/10 border-white/30 text-white'
                       : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20'
                     }
                   `}
@@ -196,7 +195,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   className={`
                     flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all
                     ${!publishNow
-                      ? 'bg-primary/20 border-primary/50 text-white'
+                      ? 'bg-white/10 border-white/30 text-white'
                       : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20'
                     }
                   `}
@@ -255,7 +254,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                     className={`
                       flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all
                       ${platforms === 'instagram'
-                        ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-500/50 text-white'
+                        ? 'bg-white/10 border-white/30 text-white'
                         : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20'
                       }
                     `}
@@ -268,7 +267,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                     className={`
                       flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all
                       ${platforms === 'facebook'
-                        ? 'bg-blue-500/20 border-blue-500/50 text-white'
+                        ? 'bg-white/10 border-white/30 text-white'
                         : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20'
                       }
                     `}
@@ -281,7 +280,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                     className={`
                       flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all
                       ${platforms === 'both'
-                        ? 'bg-primary/20 border-primary/50 text-white'
+                        ? 'bg-white/10 border-white/30 text-white'
                         : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20'
                       }
                     `}
@@ -304,7 +303,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                       className={`
                         flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-all
                         ${contentType === 'photo'
-                          ? 'bg-primary/20 border-primary/50 text-white'
+                          ? 'bg-white/10 border-white/30 text-white'
                           : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20'
                         }
                       `}
@@ -317,7 +316,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                       className={`
                         flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-all
                         ${contentType === 'reel'
-                          ? 'bg-primary/20 border-primary/50 text-white'
+                          ? 'bg-white/10 border-white/30 text-white'
                           : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20'
                         }
                       `}
@@ -330,7 +329,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                       className={`
                         flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-all
                         ${contentType === 'story'
-                          ? 'bg-primary/20 border-primary/50 text-white'
+                          ? 'bg-white/10 border-white/30 text-white'
                           : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20'
                         }
                       `}
@@ -343,7 +342,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                       className={`
                         flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-all
                         ${contentType === 'carousel'
-                          ? 'bg-primary/20 border-primary/50 text-white'
+                          ? 'bg-white/10 border-white/30 text-white'
                           : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20'
                         }
                       `}
@@ -356,19 +355,17 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
               )}
 
               {/* Info */}
-              <div className={`p-3 ${rubeAvailable ? 'bg-green-500/10 border-green-500/20' : 'bg-amber-500/10 border-amber-500/20'} border rounded-xl`}>
+              <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
                 <div className="flex items-start gap-2">
-                  <Icon name={rubeAvailable ? 'check-circle' : 'alert-circle'} className={`w-4 h-4 ${rubeAvailable ? 'text-green-400' : 'text-amber-400'} flex-shrink-0 mt-0.5`} />
-                  <div className={`text-[9px] ${rubeAvailable ? 'text-green-400/80' : 'text-amber-400/80'}`}>
+                  <Icon name={rubeAvailable ? 'check-circle' : 'info'} className="w-3.5 h-3.5 text-white/40 flex-shrink-0 mt-0.5" />
+                  <div className="text-[9px] text-white/50">
                     {rubeAvailable ? (
                       <>
-                        <strong className="font-black">Publicação Automática:</strong> O Rube MCP está configurado.
-                        No horário agendado, você pode publicar diretamente no Instagram com um clique.
+                        <strong className="font-bold text-white/70">Publicação com 1 clique</strong> — Rube MCP configurado.
                       </>
                     ) : (
                       <>
-                        <strong className="font-black">Publicação Manual:</strong> No horário agendado, você receberá um lembrete para publicar manualmente.
-                        Use os botões "Copiar" e "Abrir" para facilitar o processo.
+                        <strong className="font-bold text-white/70">Publicação Manual</strong> — Configure o Rube MCP para publicar automaticamente.
                       </>
                     )}
                   </div>
@@ -380,19 +377,20 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-white/5 flex gap-3 flex-shrink-0">
-          <Button onClick={onClose} variant="secondary" size="small" className="flex-1">
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            variant="primary"
-            size="small"
-            className="flex-1"
-            disabled={!selectedImage || isTimeInPast}
-            icon={publishNow ? "send" : "calendar"}
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 text-[10px] font-bold text-white/50 bg-white/5 hover:bg-white/10 rounded-xl transition-colors"
           >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!selectedImage || isTimeInPast}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-[10px] font-bold text-white bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Icon name={publishNow ? "send" : "calendar"} className="w-3.5 h-3.5" />
             {publishNow ? 'Publicar' : 'Agendar'}
-          </Button>
+          </button>
         </div>
       </Card>
     </div>

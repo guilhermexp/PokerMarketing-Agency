@@ -15,6 +15,10 @@ export default defineConfig(({ mode }) => {
           'Cross-Origin-Opener-Policy': 'same-origin',
         },
         proxy: {
+          '/api/db': {
+            target: 'http://localhost:3001',
+            changeOrigin: true,
+          },
           '/api/rube': {
             target: 'https://rube.app',
             changeOrigin: true,
@@ -42,6 +46,9 @@ export default defineConfig(({ mode }) => {
         'import.meta.env.VITE_RUBE_TOKEN': JSON.stringify(env.RUBE_TOKEN),
         'process.env.BLOB_READ_WRITE_TOKEN': JSON.stringify(env.BLOB_READ_WRITE_TOKEN),
         'import.meta.env.VITE_BLOB_READ_WRITE_TOKEN': JSON.stringify(env.BLOB_READ_WRITE_TOKEN),
+        'process.env.DATABASE_URL': JSON.stringify(env.DATABASE_URL),
+        'import.meta.env.VITE_DATABASE_URL': JSON.stringify(env.DATABASE_URL),
+        'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify(env.VITE_CLERK_PUBLISHABLE_KEY),
       },
       resolve: {
         alias: {

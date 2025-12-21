@@ -25,11 +25,11 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
   const isPublishing = publishingState && publishingState.step !== 'idle' && publishingState.step !== 'completed' && publishingState.step !== 'failed';
 
   const statusColors = {
-    scheduled: 'bg-amber-500/20 border-amber-500/30 text-amber-400',
-    publishing: 'bg-blue-500/20 border-blue-500/30 text-blue-400',
-    published: 'bg-green-500/20 border-green-500/30 text-green-400',
-    failed: 'bg-red-500/20 border-red-500/30 text-red-400',
-    cancelled: 'bg-white/10 border-white/10 text-white/40'
+    scheduled: 'bg-white/10 border-white/20 text-white/70',
+    publishing: 'bg-white/10 border-white/20 text-white/70',
+    published: 'bg-white/10 border-white/30 text-white/80',
+    failed: 'bg-red-500/10 border-red-500/20 text-red-400/80',
+    cancelled: 'bg-white/5 border-white/10 text-white/30'
   };
 
   const statusLabels = {
@@ -139,7 +139,7 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                 {post.hashtags.length > 0 && (
                   <div className="space-y-2">
                     <label className="text-[9px] font-black text-white/30 uppercase tracking-wider">Hashtags</label>
-                    <p className="text-xs text-primary/60">{post.hashtags.join(' ')}</p>
+                    <p className="text-xs text-white/40">{post.hashtags.join(' ')}</p>
                   </div>
                 )}
 
@@ -152,7 +152,7 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                     </span>
                   </div>
                   {post.instagramContentType && post.platforms !== 'facebook' && (
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-full">
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
                       <Icon
                         name={
                           post.instagramContentType === 'photo' ? 'image' :
@@ -160,9 +160,9 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                           post.instagramContentType === 'story' ? 'circle' :
                           'layers'
                         }
-                        className="w-3 h-3 text-primary/60"
+                        className="w-3 h-3 text-white/50"
                       />
-                      <span className="text-[8px] font-bold text-primary/60 uppercase">
+                      <span className="text-[8px] font-bold text-white/50 uppercase">
                         {post.instagramContentType === 'photo' ? 'Feed' :
                          post.instagramContentType === 'reel' ? 'Reel' :
                          post.instagramContentType === 'story' ? 'Story' :
@@ -175,17 +175,17 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
 
               {/* Progress Bar */}
               {isPublishing && publishingState && (
-                <div className="px-4 py-3 border-t border-blue-500/20 bg-blue-500/10">
+                <div className="px-4 py-3 border-t border-white/10 bg-white/5">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-5 h-5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin flex-shrink-0" />
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full animate-spin flex-shrink-0" />
                     <div className="flex-1">
-                      <span className="text-[10px] font-bold text-blue-400 block">{publishingState.message}</span>
-                      <span className="text-[9px] text-blue-400/60">{publishingState.progress}% concluído</span>
+                      <span className="text-[10px] font-medium text-white/70 block">{publishingState.message}</span>
+                      <span className="text-[9px] text-white/40">{publishingState.progress}%</span>
                     </div>
                   </div>
-                  <div className="w-full bg-blue-900/30 rounded-full h-2 overflow-hidden">
+                  <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
+                      className="h-full bg-white/50 transition-all duration-300"
                       style={{ width: `${publishingState.progress}%` }}
                     />
                   </div>
@@ -194,19 +194,19 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
 
               {/* Success Message */}
               {publishingState?.step === 'completed' && (
-                <div className="px-4 py-4 border-t border-green-500/30 bg-green-500/10">
+                <div className="px-4 py-3 border-t border-white/10 bg-white/5">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                      <Icon name="check" className="w-5 h-5 text-green-400" />
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                      <Icon name="check" className="w-4 h-4 text-white/70" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-[11px] font-black text-green-400 uppercase tracking-wide">Publicado com Sucesso!</p>
-                      <p className="text-[9px] text-green-400/70 mt-0.5">{publishingState.message}</p>
+                      <p className="text-[10px] font-bold text-white/80">Publicado com sucesso</p>
+                      <p className="text-[9px] text-white/40 mt-0.5">{publishingState.message}</p>
                     </div>
                   </div>
                   <button
                     onClick={() => window.open('https://www.instagram.com/cpcpokeronline/', '_blank')}
-                    className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 rounded-lg text-[9px] font-bold text-green-400 transition-colors"
+                    className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[9px] font-bold text-white/60 transition-colors"
                   >
                     <Icon name="external-link" className="w-3 h-3" />
                     Ver no Instagram
@@ -216,14 +216,14 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
 
               {/* Error Message */}
               {publishingState?.step === 'failed' && (
-                <div className="px-4 py-4 border-t border-red-500/30 bg-red-500/10">
+                <div className="px-4 py-3 border-t border-red-500/20 bg-red-500/5">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
-                      <Icon name="alert-circle" className="w-5 h-5 text-red-400" />
+                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                      <Icon name="alert-circle" className="w-4 h-4 text-red-400/70" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-[11px] font-black text-red-400 uppercase tracking-wide">Falha na Publicação</p>
-                      <p className="text-[9px] text-red-400/70 mt-0.5">{publishingState.message}</p>
+                      <p className="text-[10px] font-bold text-red-400/80">Falha na publicação</p>
+                      <p className="text-[9px] text-red-400/50 mt-0.5">{publishingState.message}</p>
                     </div>
                   </div>
                 </div>
@@ -238,10 +238,10 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                       <button
                         onClick={() => onPublishToInstagram(post)}
                         disabled={isPublishing}
-                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
                           isPublishing
-                            ? 'bg-blue-500/20 text-blue-300 cursor-wait'
-                            : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white'
+                            ? 'bg-white/10 text-white/50 cursor-wait'
+                            : 'bg-white/10 hover:bg-white/20 border border-white/20 text-white/80'
                         }`}
                       >
                         {isPublishing ? (
@@ -291,17 +291,16 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                     <div className="flex gap-2">
                       <button
                         onClick={handleMarkAsPublished}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-500/10 hover:bg-green-500/20 rounded-lg text-[9px] font-black text-green-400 uppercase tracking-wider transition-colors"
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-[9px] font-bold text-white/50 uppercase tracking-wider transition-colors"
                       >
                         <Icon name="check" className="w-3 h-3" />
                         Marcar Publicado
                       </button>
                       <button
                         onClick={() => { onDelete(post.id); setIsExpanded(false); }}
-                        className="flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-[9px] font-black text-red-400 uppercase tracking-wider transition-colors"
+                        className="flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-red-500/10 rounded-lg text-[9px] font-bold text-white/40 hover:text-red-400/80 uppercase tracking-wider transition-colors"
                       >
                         <Icon name="trash" className="w-3 h-3" />
-                        Excluir
                       </button>
                     </div>
                   </>
@@ -309,7 +308,7 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                 {post.status !== 'scheduled' && (
                   <button
                     onClick={() => { onDelete(post.id); setIsExpanded(false); }}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-[9px] font-black text-red-400 uppercase tracking-wider transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-red-500/10 rounded-lg text-[9px] font-bold text-white/40 hover:text-red-400/80 uppercase tracking-wider transition-colors"
                   >
                     <Icon name="trash" className="w-3 h-3" />
                     Excluir
@@ -342,7 +341,7 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
             </div>
             <Icon name={platformIcons[post.platforms] as any} className="w-3 h-3 text-white/40" />
             {post.instagramContentType && post.platforms !== 'facebook' && (
-              <span className="text-[7px] font-bold text-primary/50 uppercase">
+              <span className="text-[7px] font-bold text-white/40 uppercase">
                 {post.instagramContentType === 'photo' ? 'Feed' :
                  post.instagramContentType === 'reel' ? 'Reel' :
                  post.instagramContentType === 'story' ? 'Story' :
@@ -378,7 +377,7 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
               </button>
               <button
                 onClick={handleMarkAsPublished}
-                className="p-2 text-green-400/50 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
+                className="p-2 text-white/30 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                 title="Marcar como publicado"
               >
                 <Icon name="check" className="w-4 h-4" />
@@ -387,7 +386,7 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
           )}
           <button
             onClick={() => onDelete(post.id)}
-            className="p-2 text-red-400/50 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+            className="p-2 text-white/30 hover:text-red-400/80 hover:bg-red-500/10 rounded-lg transition-colors"
             title="Excluir"
           >
             <Icon name="trash" className="w-4 h-4" />

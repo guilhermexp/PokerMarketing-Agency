@@ -6,11 +6,21 @@ import { Dashboard } from './components/Dashboard';
 import { Loader } from './components/common/Loader';
 import { generateCampaign, editImage, generateLogo, generateImage } from './services/geminiService';
 import { runAssistantConversationStream } from './services/assistantService';
-import { loadImagesFromDB, saveImagesToDB } from './services/storageService';
-import { loadScheduledPosts, saveScheduledPost, updateScheduledPost, deleteScheduledPost } from './services/schedulerService';
 import { publishToInstagram, uploadImageForInstagram, type InstagramContentType } from './services/rubeService';
 import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, ChatPart, GenerationOptions, WeekScheduleInfo, StyleReference, ScheduledPost, InstagramPublishState } from './types';
 import { Icon } from './components/common/Icon';
+import { AuthWrapper, UserProfileButton, useAuth, useCurrentUser } from './components/auth/AuthWrapper';
+import {
+  getBrandProfile,
+  createBrandProfile,
+  updateBrandProfile,
+  getGalleryImages,
+  createGalleryImage,
+  getScheduledPosts,
+  createScheduledPost,
+  updateScheduledPost as updateScheduledPostApi,
+  deleteScheduledPost as deleteScheduledPostApi,
+} from './services/apiClient';
 
 export type TimePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'NIGHT' | 'HIGHLIGHTS';
 export type ViewType = 'campaign' | 'flyer' | 'gallery' | 'calendar';
@@ -64,7 +74,8 @@ const getTruncatedHistory = (history: ChatMessage[], maxLength: number = MAX_CHA
     });
 };
 
-function App() {
+function AppContent() {
+  const { userId, isLoading: authLoading } = useAuth();
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [campaign, setCampaign] = useState<MarketingCampaign | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -84,8 +95,8 @@ function App() {
   const [tournamentEvents, setTournamentEvents] = useState<TournamentEvent[]>([]);
   const [weekScheduleInfo, setWeekScheduleInfo] = useState<WeekScheduleInfo | null>(null);
   const [flyerState, setFlyerState] = useState<Record<string, (GalleryImage | 'loading')[]>>({});
-  const [dailyFlyerState, setDailyFlyerState] = useState<Record<TimePeriod, (GalleryImage | 'loading')[]>>({ 
-    ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: [] 
+  const [dailyFlyerState, setDailyFlyerState] = useState<Record<TimePeriod, (GalleryImage | 'loading')[]>>({
+    ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: []
   });
 
   const [theme, setTheme] = useState<Theme>('dark');
@@ -94,21 +105,75 @@ function App() {
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [publishingStates, setPublishingStates] = useState<Record<string, InstagramPublishState>>({});
 
+  // Load data from database when user is authenticated
   useEffect(() => {
     const initAppData = async () => {
-        try {
-          const savedProfile = localStorage.getItem('brandProfile');
-          if (savedProfile) setBrandProfile(JSON.parse(savedProfile));
-          const savedRefs = localStorage.getItem('styleReferences');
-          if (savedRefs) setStyleReferences(JSON.parse(savedRefs));
-          const dbImages = await loadImagesFromDB();
-          setGalleryImages(dbImages.sort((a,b) => Number(b.id) - Number(a.id)));
-          const dbScheduled = await loadScheduledPosts();
-          setScheduledPosts(dbScheduled);
-        } catch (e) { console.error(e); } finally { setIsLoading(false); }
+      if (!userId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Load brand profile from database
+        const dbBrandProfile = await getBrandProfile(userId);
+        if (dbBrandProfile) {
+          setBrandProfile({
+            name: dbBrandProfile.name,
+            description: dbBrandProfile.description || '',
+            logo: dbBrandProfile.logo_url || null,
+            primaryColor: dbBrandProfile.primary_color,
+            secondaryColor: dbBrandProfile.secondary_color,
+            toneOfVoice: dbBrandProfile.tone_of_voice as BrandProfile['toneOfVoice'],
+          });
+        }
+
+        // Load style references from localStorage (will migrate later)
+        const savedRefs = localStorage.getItem('styleReferences');
+        if (savedRefs) setStyleReferences(JSON.parse(savedRefs));
+
+        // Load gallery images from database
+        const dbImages = await getGalleryImages(userId);
+        const mappedImages: GalleryImage[] = dbImages.map(img => ({
+          id: img.id,
+          src: img.src_url,
+          prompt: img.prompt || undefined,
+          source: img.source as GalleryImage['source'],
+          model: img.model as GalleryImage['model'],
+        }));
+        setGalleryImages(mappedImages);
+
+        // Load scheduled posts from database
+        const dbScheduled = await getScheduledPosts(userId);
+        const mappedPosts: ScheduledPost[] = dbScheduled.map(post => ({
+          id: post.id,
+          contentType: post.content_type as ScheduledPost['contentType'],
+          contentId: post.content_id || undefined,
+          imageUrl: post.image_url,
+          caption: post.caption,
+          hashtags: post.hashtags,
+          scheduledDate: post.scheduled_date,
+          scheduledTime: post.scheduled_time,
+          scheduledTimestamp: new Date(post.scheduled_timestamp).getTime(),
+          timezone: post.timezone,
+          platforms: post.platforms as ScheduledPost['platforms'],
+          instagramContentType: post.instagram_content_type as ScheduledPost['instagramContentType'],
+          status: post.status as ScheduledPost['status'],
+          publishedAt: post.published_at ? new Date(post.published_at).getTime() : undefined,
+          errorMessage: post.error_message || undefined,
+          createdAt: new Date(post.created_at).getTime(),
+        }));
+        setScheduledPosts(mappedPosts.sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp));
+      } catch (e) {
+        console.error('Failed to load data from database:', e);
+      } finally {
+        setIsLoading(false);
+      }
     };
-    initAppData();
-  }, []);
+
+    if (!authLoading) {
+      initAppData();
+    }
+  }, [userId, authLoading]);
   
   useEffect(() => {
     if (brandProfile && chatHistory.length === 0) {
@@ -120,22 +185,42 @@ function App() {
   }, [brandProfile]);
 
   const handleAddImageToGallery = (image: Omit<GalleryImage, 'id'>): GalleryImage => {
-    const newImage: GalleryImage = { ...image, id: Date.now().toString() };
-    setGalleryImages(prev => {
-      const updated = [newImage, ...prev].slice(0, MAX_GALLERY_SIZE);
-      saveImagesToDB(updated);
-      return updated;
-    });
+    // Create image with temporary ID immediately for UI responsiveness
+    const tempId = Date.now().toString();
+    const newImage: GalleryImage = { ...image, id: tempId };
+
+    // Update state immediately
+    setGalleryImages(prev => [newImage, ...prev].slice(0, MAX_GALLERY_SIZE));
+
+    // Save to database in background (don't block UI)
+    if (userId) {
+      createGalleryImage(userId, {
+        src_url: image.src,
+        prompt: image.prompt,
+        source: image.source,
+        model: image.model,
+      }).then(dbImage => {
+        // Update the ID with the real database ID
+        setGalleryImages(prev => prev.map(img =>
+          img.id === tempId
+            ? { ...img, id: dbImage.id }
+            : img
+        ));
+      }).catch(e => {
+        console.error('Failed to save image to database:', e);
+      });
+    }
+
     return newImage;
   };
 
   const handleUpdateGalleryImage = (imageId: string, newImageSrc: string) => {
     setGalleryImages(prev => {
-        const updatedGallery = prev.map(img => img.id === imageId ? { ...img, src: newImageSrc } : img);
-        saveImagesToDB(updatedGallery);
-        return updatedGallery;
+      const updatedGallery = prev.map(img => img.id === imageId ? { ...img, src: newImageSrc } : img);
+      return updatedGallery;
     });
     if (toolImageReference?.id === imageId) setToolImageReference({ id: imageId, src: newImageSrc });
+    // TODO: Add API call to update image in database when endpoint is available
   };
 
   const handleAddStyleReference = (ref: Omit<StyleReference, 'id' | 'createdAt'>) => {
@@ -171,8 +256,43 @@ function App() {
 
   // Scheduled Posts Handlers
   const handleSchedulePost = async (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!userId) {
+      console.error('Cannot schedule post without userId');
+      return;
+    }
+
     try {
-      const newPost = await saveScheduledPost(post);
+      const dbPost = await createScheduledPost(userId, {
+        content_type: post.contentType,
+        content_id: post.contentId,
+        image_url: post.imageUrl,
+        caption: post.caption,
+        hashtags: post.hashtags,
+        scheduled_date: post.scheduledDate,
+        scheduled_time: post.scheduledTime,
+        scheduled_timestamp: new Date(post.scheduledTimestamp).toISOString(),
+        timezone: post.timezone,
+        platforms: post.platforms,
+        instagram_content_type: post.instagramContentType,
+      });
+
+      const newPost: ScheduledPost = {
+        id: dbPost.id,
+        contentType: dbPost.content_type as ScheduledPost['contentType'],
+        contentId: dbPost.content_id || undefined,
+        imageUrl: dbPost.image_url,
+        caption: dbPost.caption,
+        hashtags: dbPost.hashtags,
+        scheduledDate: dbPost.scheduled_date,
+        scheduledTime: dbPost.scheduled_time,
+        scheduledTimestamp: new Date(dbPost.scheduled_timestamp).getTime(),
+        timezone: dbPost.timezone,
+        platforms: dbPost.platforms as ScheduledPost['platforms'],
+        instagramContentType: dbPost.instagram_content_type as ScheduledPost['instagramContentType'],
+        status: dbPost.status as ScheduledPost['status'],
+        createdAt: new Date(dbPost.created_at).getTime(),
+      };
+
       setScheduledPosts(prev => [...prev, newPost].sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp));
     } catch (e) {
       console.error('Failed to schedule post:', e);
@@ -181,10 +301,17 @@ function App() {
 
   const handleUpdateScheduledPost = async (postId: string, updates: Partial<ScheduledPost>) => {
     try {
-      const updatedPost = await updateScheduledPost(postId, updates);
-      if (updatedPost) {
-        setScheduledPosts(prev => prev.map(p => p.id === postId ? updatedPost : p));
-      }
+      // Map frontend field names to database field names
+      const dbUpdates: Record<string, unknown> = {};
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
+      if (updates.publishedAt !== undefined) dbUpdates.published_at = new Date(updates.publishedAt).toISOString();
+      if (updates.errorMessage !== undefined) dbUpdates.error_message = updates.errorMessage;
+      if (updates.instagramMediaId !== undefined) dbUpdates.instagram_media_id = updates.instagramMediaId;
+      if (updates.publishAttempts !== undefined) dbUpdates.publish_attempts = updates.publishAttempts;
+      if (updates.lastPublishAttempt !== undefined) dbUpdates.last_publish_attempt = new Date(updates.lastPublishAttempt).toISOString();
+
+      await updateScheduledPostApi(postId, dbUpdates);
+      setScheduledPosts(prev => prev.map(p => p.id === postId ? { ...p, ...updates } : p));
     } catch (e) {
       console.error('Failed to update scheduled post:', e);
     }
@@ -192,7 +319,7 @@ function App() {
 
   const handleDeleteScheduledPost = async (postId: string) => {
     try {
-      await deleteScheduledPost(postId);
+      await deleteScheduledPostApi(postId);
       setScheduledPosts(prev => prev.filter(p => p.id !== postId));
     } catch (e) {
       console.error('Failed to delete scheduled post:', e);
@@ -473,7 +600,44 @@ function App() {
         </div>
       )}
       {!brandProfile || isEditingProfile ? (
-        <BrandProfileSetup onProfileSubmit={(p) => { setBrandProfile(p); setIsEditingProfile(false); localStorage.setItem('brandProfile', JSON.stringify(p)); }} existingProfile={brandProfile} />
+        <BrandProfileSetup onProfileSubmit={async (p) => {
+          console.log('[BrandProfile] onProfileSubmit called, userId:', userId);
+          setBrandProfile(p);
+          setIsEditingProfile(false);
+          // Save to database if authenticated
+          if (userId) {
+            console.log('[BrandProfile] Saving to database with userId:', userId);
+            try {
+              const existingProfile = await getBrandProfile(userId);
+              console.log('[BrandProfile] Existing profile:', existingProfile);
+              if (existingProfile) {
+                await updateBrandProfile(existingProfile.id, {
+                  name: p.name,
+                  description: p.description,
+                  logo_url: p.logo || undefined,
+                  primary_color: p.primaryColor,
+                  secondary_color: p.secondaryColor,
+                  tone_of_voice: p.toneOfVoice,
+                });
+              } else {
+                console.log('[BrandProfile] Creating new profile...');
+                const created = await createBrandProfile(userId, {
+                  name: p.name,
+                  description: p.description,
+                  logo_url: p.logo || undefined,
+                  primary_color: p.primaryColor,
+                  secondary_color: p.secondaryColor,
+                  tone_of_voice: p.toneOfVoice,
+                });
+                console.log('[BrandProfile] Created:', created);
+              }
+            } catch (e) {
+              console.error('Failed to save brand profile:', e);
+            }
+          } else {
+            console.log('[BrandProfile] userId is null/undefined, skipping save');
+          }
+        }} existingProfile={brandProfile} />
       ) : (
         <Dashboard
           brandProfile={brandProfile!}
@@ -520,6 +684,14 @@ function App() {
         />
       )}
     </>
+  );
+}
+
+function App() {
+  return (
+    <AuthWrapper>
+      <AppContent />
+    </AuthWrapper>
   );
 }
 

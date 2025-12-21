@@ -5,7 +5,7 @@ import { isFalModel } from '../../types';
 import { Button } from '../common/Button';
 import { Loader } from '../common/Loader';
 import { Icon } from '../common/Icon';
-import { generateImage, generateVideo, generateSpeech } from '../../services/geminiService';
+import { generateImage, generateVideo, generateSpeech, convertToJsonPrompt } from '../../services/geminiService';
 import { generateFalVideo, uploadImageToFal } from '../../services/falService';
 import { ImagePreviewModal } from '../common/ImagePreviewModal';
 import { ExportVideoModal } from '../common/ExportVideoModal';
@@ -276,14 +276,23 @@ Movimento de câmera suave, iluminação dramática de cassino.`;
 
             if (isFalModel(selectedVideoModel)) {
                 // Use fal.ai (Sora 2) - includes narration context
-                const prompt = buildPromptForSora(sceneNumber);
+                const genericPrompt = buildPromptForSora(sceneNumber);
                 const imageUrl = sceneImage?.httpUrl || undefined;
 
-                console.log(`[ClipsTab] Sora prompt for scene ${sceneNumber}:`, prompt);
-                videoUrl = await generateFalVideo(prompt, "9:16", selectedVideoModel, imageUrl, currentScene.duration);
+                // Converter prompt genérico para JSON estruturado
+                console.log(`[ClipsTab] Sora prompt genérico para cena ${sceneNumber}:`, genericPrompt);
+                const jsonPrompt = await convertToJsonPrompt(genericPrompt, currentScene.duration, "9:16");
+                console.log(`[ClipsTab] Sora JSON prompt para cena ${sceneNumber}:`, jsonPrompt);
+
+                videoUrl = await generateFalVideo(jsonPrompt, "9:16", selectedVideoModel, imageUrl, currentScene.duration);
             } else {
                 // Use Veo 3.1 - includes narration for audio generation
-                const prompt = buildPromptForVeo(sceneNumber);
+                const genericPrompt = buildPromptForVeo(sceneNumber);
+
+                // Converter prompt genérico para JSON estruturado
+                console.log(`[ClipsTab] Veo prompt genérico para cena ${sceneNumber}:`, genericPrompt);
+                const jsonPrompt = await convertToJsonPrompt(genericPrompt, currentScene.duration, "9:16");
+                console.log(`[ClipsTab] Veo JSON prompt para cena ${sceneNumber}:`, jsonPrompt);
 
                 // Prioritize scene reference image, fallback to logo
                 let referenceImage: ImageFile | null = null;
@@ -301,8 +310,7 @@ Movimento de câmera suave, iluminação dramática de cassino.`;
                     };
                 }
 
-                console.log(`[ClipsTab] Veo prompt for scene ${sceneNumber}:`, prompt);
-                videoUrl = await generateVideo(prompt, "9:16", selectedVideoModel, referenceImage);
+                videoUrl = await generateVideo(jsonPrompt, "9:16", selectedVideoModel, referenceImage);
             }
 
             // Add new video to array (keep existing videos from other models)
