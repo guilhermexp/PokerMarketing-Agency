@@ -509,6 +509,65 @@ CREATE INDEX idx_chat_messages_session ON chat_messages(session_id, sequence_num
 CREATE INDEX idx_chat_messages_created ON chat_messages(created_at DESC);
 
 -- ============================================================================
+-- GENERATION JOBS TABLE (Background Image Generation)
+-- ============================================================================
+
+CREATE TYPE generation_job_status AS ENUM (
+    'queued',
+    'processing',
+    'completed',
+    'failed'
+);
+
+CREATE TYPE generation_job_type AS ENUM (
+    'flyer',
+    'flyer_daily',
+    'post',
+    'ad'
+);
+
+CREATE TABLE generation_jobs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    -- Job configuration
+    job_type generation_job_type NOT NULL,
+    prompt TEXT NOT NULL,
+
+    -- Brand and style config stored as JSON
+    config JSONB NOT NULL DEFAULT '{}',
+
+    -- Status tracking
+    status generation_job_status NOT NULL DEFAULT 'queued',
+    progress INTEGER DEFAULT 0,
+
+    -- QStash message ID for cancellation
+    qstash_message_id VARCHAR(255),
+
+    -- Result
+    result_url TEXT,
+    result_gallery_id UUID REFERENCES gallery_images(id) ON DELETE SET NULL,
+    error_message TEXT,
+
+    -- Processing metadata
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    attempts INTEGER DEFAULT 0,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_generation_jobs_user ON generation_jobs(user_id);
+CREATE INDEX idx_generation_jobs_status ON generation_jobs(status) WHERE status IN ('queued', 'processing');
+CREATE INDEX idx_generation_jobs_created ON generation_jobs(created_at DESC);
+
+CREATE TRIGGER update_generation_jobs_updated_at
+    BEFORE UPDATE ON generation_jobs
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
 -- ANALYTICS DAILY TABLE
 -- ============================================================================
 
