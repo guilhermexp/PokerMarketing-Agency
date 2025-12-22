@@ -143,7 +143,13 @@ export async function createGalleryImage(userId: string, data: {
 }
 
 export async function deleteGalleryImage(id: string): Promise<void> {
-  await fetchApi(`/gallery?id=${id}`, { method: 'DELETE' });
+  const response = await fetch(`${API_BASE}/gallery?id=${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete image: HTTP ${response.status}`);
+  }
 }
 
 // ============================================================================
@@ -473,6 +479,24 @@ export async function getTournamentData(userId: string): Promise<TournamentData>
 }
 
 /**
+ * Get all week schedules for a user
+ */
+export interface WeekScheduleWithCount extends DbWeekSchedule {
+  event_count: number;
+}
+
+export async function getWeekSchedulesList(userId: string): Promise<{ schedules: WeekScheduleWithCount[] }> {
+  return fetchApi<{ schedules: WeekScheduleWithCount[] }>(`/tournaments/list?user_id=${userId}`);
+}
+
+/**
+ * Load events for a specific schedule
+ */
+export async function getScheduleEvents(userId: string, scheduleId: string): Promise<{ events: DbTournamentEvent[] }> {
+  return fetchApi<{ events: DbTournamentEvent[] }>(`/tournaments?user_id=${userId}&week_schedule_id=${scheduleId}`);
+}
+
+/**
  * Create new week schedule with events
  */
 export async function createWeekSchedule(
@@ -557,5 +581,346 @@ export async function cancelQStashSchedule(messageId: string): Promise<void> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
     throw new Error(error.error || `HTTP ${response.status}`);
+  }
+}
+
+// ============================================================================
+// Background Generation API
+// ============================================================================
+
+export interface GenerationJobConfig {
+  brandName: string;
+  brandDescription?: string;
+  brandToneOfVoice: string;
+  brandPrimaryColor: string;
+  brandSecondaryColor: string;
+  aspectRatio: string;
+  model: string;
+  imageSize?: string;
+  logo?: string;
+  collabLogo?: string;
+  styleReference?: string;
+  compositionAssets?: string[];
+  source: string;
+}
+
+export interface GenerationJob {
+  id: string;
+  user_id: string;
+  job_type: 'flyer' | 'flyer_daily' | 'post' | 'ad';
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  result_url: string | null;
+  result_gallery_id: string | null;
+  error_message: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  attempts: number;
+}
+
+export interface QueueJobResult {
+  success: boolean;
+  jobId: string;
+  messageId: string;
+  status: string;
+}
+
+/**
+ * Queue a new image generation job for background processing
+ * Returns immediately, job runs in background via QStash
+ */
+export async function queueGenerationJob(
+  userId: string,
+  jobType: 'flyer' | 'flyer_daily' | 'post' | 'ad',
+  prompt: string,
+  config: GenerationJobConfig
+): Promise<QueueJobResult> {
+  const response = await fetch('/api/generate/queue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, jobType, prompt, config }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get status of a generation job
+ */
+export async function getGenerationJobStatus(jobId: string): Promise<GenerationJob> {
+  const response = await fetch(`/api/generate/status?jobId=${jobId}`);
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get all generation jobs for a user
+ */
+export async function getGenerationJobs(
+  userId: string,
+  options?: { status?: string; limit?: number }
+): Promise<{ jobs: GenerationJob[]; total: number }> {
+  const params = new URLSearchParams({ userId });
+  if (options?.status) params.append('status', options.status);
+  if (options?.limit) params.append('limit', options.limit.toString());
+
+  const response = await fetch(`/api/generate/status?${params}`);
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// ============================================================================
+// Organizations API
+// ============================================================================
+
+export interface DbOrganization {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  logo_url: string | null;
+  owner_id: string;
+  created_at: string;
+  member_status?: string;
+  role_name?: string;
+  permissions?: string[];
+  member_count?: number;
+}
+
+export interface DbOrganizationRole {
+  id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  is_system_role: boolean;
+  permissions: string[];
+  member_count?: number;
+}
+
+export interface DbOrganizationMember {
+  id: string;
+  user_id: string;
+  organization_id: string;
+  role_id: string;
+  status: string;
+  email: string;
+  name: string;
+  avatar_url: string | null;
+  role_name: string;
+  permissions: string[];
+  is_system_role: boolean;
+  invited_by_name: string | null;
+  invited_at: string;
+  joined_at: string | null;
+}
+
+export interface DbOrganizationInvite {
+  id: string;
+  organization_id: string;
+  email: string;
+  role_id: string;
+  token: string;
+  expires_at: string;
+  status: string;
+  invited_by: string;
+  created_at: string;
+  role_name?: string;
+  invited_by_name?: string;
+  organization_name?: string;
+  organization_logo?: string;
+}
+
+// Get organizations for user
+export async function getOrganizations(userId: string): Promise<DbOrganization[]> {
+  return fetchApi<DbOrganization[]>(`/organizations?user_id=${userId}`);
+}
+
+// Create organization
+export async function createOrganization(userId: string, data: {
+  name: string;
+  description?: string;
+  logo_url?: string;
+}): Promise<DbOrganization> {
+  return fetchApi<DbOrganization>('/organizations', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, ...data }),
+  });
+}
+
+// Update organization
+export async function updateOrganization(id: string, userId: string, data: {
+  name?: string;
+  description?: string;
+  logo_url?: string;
+}): Promise<DbOrganization> {
+  return fetchApi<DbOrganization>(`/organizations?id=${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ user_id: userId, ...data }),
+  });
+}
+
+// Delete organization
+export async function deleteOrganization(id: string, userId: string): Promise<{ success: boolean }> {
+  return fetchApi<{ success: boolean }>(`/organizations?id=${id}&user_id=${userId}`, {
+    method: 'DELETE',
+  });
+}
+
+// Get organization members
+export async function getOrganizationMembers(organizationId: string, userId: string): Promise<DbOrganizationMember[]> {
+  return fetchApi<DbOrganizationMember[]>(`/organizations/members?organization_id=${organizationId}&user_id=${userId}`);
+}
+
+// Update member role
+export async function updateOrganizationMember(id: string, data: {
+  user_id: string;
+  organization_id: string;
+  role_id?: string;
+  status?: string;
+}): Promise<DbOrganizationMember> {
+  return fetchApi<DbOrganizationMember>(`/organizations/members?id=${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+// Remove member
+export async function removeOrganizationMember(id: string, userId: string, organizationId: string): Promise<{ success: boolean }> {
+  return fetchApi<{ success: boolean }>(`/organizations/members?id=${id}&user_id=${userId}&organization_id=${organizationId}`, {
+    method: 'DELETE',
+  });
+}
+
+// Get organization roles
+export async function getOrganizationRoles(organizationId: string, userId: string): Promise<DbOrganizationRole[]> {
+  return fetchApi<DbOrganizationRole[]>(`/organizations/roles?organization_id=${organizationId}&user_id=${userId}`);
+}
+
+// Create role
+export async function createOrganizationRole(data: {
+  user_id: string;
+  organization_id: string;
+  name: string;
+  description?: string;
+  permissions: string[];
+}): Promise<DbOrganizationRole> {
+  return fetchApi<DbOrganizationRole>('/organizations/roles', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+// Update role
+export async function updateOrganizationRole(id: string, data: {
+  user_id: string;
+  organization_id: string;
+  name?: string;
+  description?: string;
+  permissions?: string[];
+}): Promise<DbOrganizationRole> {
+  return fetchApi<DbOrganizationRole>(`/organizations/roles?id=${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+// Delete role
+export async function deleteOrganizationRole(id: string, userId: string, organizationId: string): Promise<{ success: boolean }> {
+  return fetchApi<{ success: boolean }>(`/organizations/roles?id=${id}&user_id=${userId}&organization_id=${organizationId}`, {
+    method: 'DELETE',
+  });
+}
+
+// Get organization invites
+export async function getOrganizationInvites(organizationId: string, userId: string): Promise<DbOrganizationInvite[]> {
+  return fetchApi<DbOrganizationInvite[]>(`/organizations/invites?organization_id=${organizationId}&user_id=${userId}`);
+}
+
+// Create invite
+export async function createOrganizationInvite(data: {
+  user_id: string;
+  organization_id: string;
+  email: string;
+  role_id: string;
+  expires_in_days?: number;
+}): Promise<DbOrganizationInvite> {
+  return fetchApi<DbOrganizationInvite>('/organizations/invites', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+// Cancel invite
+export async function cancelOrganizationInvite(id: string, userId: string, organizationId: string): Promise<{ success: boolean }> {
+  return fetchApi<{ success: boolean }>(`/organizations/invites?id=${id}&user_id=${userId}&organization_id=${organizationId}`, {
+    method: 'DELETE',
+  });
+}
+
+// Get user's pending invites
+export async function getUserInvites(userId: string): Promise<DbOrganizationInvite[]> {
+  return fetchApi<DbOrganizationInvite[]>(`/user/invites?user_id=${userId}`);
+}
+
+// Accept invite
+export async function acceptOrganizationInvite(userId: string, token: string): Promise<{ success: boolean; organization: DbOrganization }> {
+  return fetchApi<{ success: boolean; organization: DbOrganization }>('/organizations/invites/accept', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, token }),
+  });
+}
+
+// Decline invite
+export async function declineOrganizationInvite(userId: string, token: string): Promise<{ success: boolean }> {
+  return fetchApi<{ success: boolean }>('/organizations/invites/decline', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, token }),
+  });
+}
+
+/**
+ * Poll a generation job until completion
+ * @param jobId - The job ID to poll
+ * @param onProgress - Callback for progress updates
+ * @param pollInterval - How often to poll in ms (default 2000)
+ * @param timeout - Max time to wait in ms (default 300000 = 5 min)
+ */
+export async function pollGenerationJob(
+  jobId: string,
+  onProgress?: (job: GenerationJob) => void,
+  pollInterval = 2000,
+  timeout = 300000
+): Promise<GenerationJob> {
+  const startTime = Date.now();
+
+  while (true) {
+    const job = await getGenerationJobStatus(jobId);
+    onProgress?.(job);
+
+    if (job.status === 'completed' || job.status === 'failed') {
+      return job;
+    }
+
+    if (Date.now() - startTime > timeout) {
+      throw new Error('Generation job timed out');
+    }
+
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
   }
 }

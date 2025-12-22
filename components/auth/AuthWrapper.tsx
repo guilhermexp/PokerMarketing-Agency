@@ -7,6 +7,7 @@ import {
   useUser,
 } from '@clerk/clerk-react';
 import { getOrCreateUser, type DbUser } from '../../services/apiClient';
+import { OrganizationProvider } from '../../contexts/OrganizationContext';
 
 interface AuthContextType {
   dbUser: DbUser | null;
@@ -92,23 +93,24 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   return (
     <AuthContext.Provider value={contextValue}>
       <SignedOut>
-        <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="min-h-screen flex items-center justify-center bg-black">
           <div className="text-center">
             <h1 className="text-3xl font-bold text-white mb-2">DirectorAi</h1>
-            <p className="text-gray-400 mb-8">Poker Marketing Agency</p>
+            <p className="text-white/40 mb-8">Poker Marketing Agency</p>
             <SignIn
               appearance={{
                 elements: {
                   rootBox: 'mx-auto',
-                  card: 'bg-gray-800 border border-gray-700',
+                  card: 'bg-[#0a0a0a] border border-white/10',
                   headerTitle: 'text-white',
-                  headerSubtitle: 'text-gray-400',
-                  socialButtonsBlockButton: 'bg-gray-700 border-gray-600 text-white hover:bg-gray-600',
-                  formFieldLabel: 'text-gray-300',
-                  formFieldInput: 'bg-gray-700 border-gray-600 text-white',
-                  footerActionLink: 'text-blue-400 hover:text-blue-300',
+                  headerSubtitle: 'text-white/50',
+                  socialButtonsBlockButton: 'bg-white/5 border-white/10 text-white hover:bg-white/10',
+                  formFieldLabel: 'text-white/70',
+                  formFieldInput: 'bg-white/5 border-white/10 text-white',
+                  footerActionLink: 'text-amber-500 hover:text-amber-400',
                   identityPreviewText: 'text-white',
-                  identityPreviewEditButton: 'text-blue-400',
+                  identityPreviewEditButton: 'text-amber-500',
+                  formButtonPrimary: 'bg-white text-black hover:bg-white/90',
                 }
               }}
             />
@@ -116,7 +118,9 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
         </div>
       </SignedOut>
       <SignedIn>
-        {children}
+        <OrganizationProvider>
+          {children}
+        </OrganizationProvider>
       </SignedIn>
     </AuthContext.Provider>
   );
