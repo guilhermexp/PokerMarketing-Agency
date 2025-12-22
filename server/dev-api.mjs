@@ -502,6 +502,11 @@ app.post('/api/db/scheduled-posts', async (req, res) => {
       }
     }
 
+    // Convert scheduled_timestamp to bigint (milliseconds) if it's a string
+    const timestampMs = typeof scheduled_timestamp === 'string'
+      ? new Date(scheduled_timestamp).getTime()
+      : scheduled_timestamp;
+
     const result = await sql`
       INSERT INTO scheduled_posts (
         user_id, organization_id, content_type, content_id, image_url, caption, hashtags,
@@ -509,7 +514,7 @@ app.post('/api/db/scheduled-posts', async (req, res) => {
         platforms, instagram_content_type, created_from
       ) VALUES (
         ${resolvedUserId}, ${organization_id || null}, ${content_type || 'flyer'}, ${content_id || null}, ${image_url}, ${caption || ''},
-        ${hashtags || []}, ${scheduled_date}, ${scheduled_time}, ${scheduled_timestamp},
+        ${hashtags || []}, ${scheduled_date}, ${scheduled_time}, ${timestampMs},
         ${timezone || 'America/Sao_Paulo'}, ${platforms || 'instagram'},
         ${instagram_content_type || 'photo'}, ${created_from || null}
       )
