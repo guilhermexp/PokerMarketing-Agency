@@ -7,6 +7,11 @@ import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 import { generateImage } from '../../services/geminiService';
 import { ImagePreviewModal } from '../common/ImagePreviewModal';
+import { useBackgroundJobs, type ActiveJob } from '../../hooks/useBackgroundJobs';
+import type { GenerationJobConfig } from '../../services/apiClient';
+
+// Check if we're in development mode (QStash won't work locally)
+const isDevMode = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 
 interface PostsTabProps {
   posts: Post[];
@@ -18,6 +23,7 @@ interface PostsTabProps {
   styleReferences?: StyleReference[];
   onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
   onRemoveStyleReference?: (id: string) => void;
+  userId?: string | null;
 }
 
 const socialIcons: Record<string, IconName> = {
@@ -174,7 +180,7 @@ const PostCard: React.FC<{
 };
 
 
-export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referenceImage, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference }) => {
+export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referenceImage, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference, userId }) => {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
   const [generationState, setGenerationState] = useState<{ isGenerating: boolean[], errors: (string | null)[] }>({
     isGenerating: [],
@@ -182,6 +188,8 @@ export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referen
   });
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
+
+  const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
 
   useEffect(() => {
     const length = posts.length;
@@ -191,6 +199,52 @@ export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referen
       errors: Array(length).fill(null),
     });
   }, [posts]);
+
+  // Listen for job completions
+  useEffect(() => {
+    const unsubComplete = onJobComplete((job: ActiveJob) => {
+      if (job.context?.startsWith('post-') && job.result_url) {
+        const indexMatch = job.context.match(/post-(\d+)/);
+        if (indexMatch) {
+          const index = parseInt(indexMatch[1]);
+          const galleryImage = onAddImageToGallery({
+            src: job.result_url,
+            prompt: posts[index]?.image_prompt || '',
+            source: 'Post',
+            model: selectedImageModel
+          });
+          setImages(prev => {
+            const newImages = [...prev];
+            newImages[index] = galleryImage;
+            return newImages;
+          });
+          setGenerationState(prev => {
+            const newGenerating = [...prev.isGenerating];
+            newGenerating[index] = false;
+            return { ...prev, isGenerating: newGenerating };
+          });
+        }
+      }
+    });
+
+    const unsubFailed = onJobFailed((job: ActiveJob) => {
+      if (job.context?.startsWith('post-')) {
+        const indexMatch = job.context.match(/post-(\d+)/);
+        if (indexMatch) {
+          const index = parseInt(indexMatch[1]);
+          setGenerationState(prev => {
+            const newErrors = [...prev.errors];
+            const newGenerating = [...prev.isGenerating];
+            newErrors[index] = job.error_message || 'Falha ao gerar imagem.';
+            newGenerating[index] = false;
+            return { isGenerating: newGenerating, errors: newErrors };
+          });
+        }
+      }
+    });
+
+    return () => { unsubComplete(); unsubFailed(); };
+  }, [onJobComplete, onJobFailed, onAddImageToGallery, posts, selectedImageModel]);
 
   const handleGenerate = async (index: number) => {
     if (selectedImageModel === 'gemini-3-pro-image-preview') {
@@ -213,6 +267,31 @@ export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referen
         return { isGenerating: newGenerating, errors: newErrors };
     });
 
+    // Use background job if userId is available AND we're not in dev mode
+    if (userId && !isDevMode) {
+      try {
+        const config: GenerationJobConfig = {
+          brandName: brandProfile.name,
+          brandDescription: brandProfile.description,
+          brandToneOfVoice: brandProfile.toneOfVoice,
+          brandPrimaryColor: brandProfile.primaryColor,
+          brandSecondaryColor: brandProfile.secondaryColor,
+          aspectRatio: '1:1',
+          model: selectedImageModel,
+          logo: brandProfile.logo || undefined,
+          source: 'Post'
+        };
+
+        await queueJob(userId, 'post', post.image_prompt, config, `post-${index}`);
+        // Job will complete via onJobComplete callback
+        return;
+      } catch (err) {
+        console.error('[PostsTab] Failed to queue job:', err);
+        // Fall through to local generation
+      }
+    }
+
+    // Local generation (dev mode or no userId or queue failed)
     try {
         const productImages: { base64: string; mimeType: string }[] = [];
         if (referenceImage) {

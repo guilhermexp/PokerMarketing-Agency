@@ -11,6 +11,11 @@ import { ImagePreviewModal } from '../common/ImagePreviewModal';
 import { ExportVideoModal } from '../common/ExportVideoModal';
 import { concatenateVideos, downloadBlob, type ExportProgress, type VideoInput, type AudioInput } from '../../services/ffmpegService';
 import { uploadVideo } from '../../services/apiClient';
+import { useBackgroundJobs, type ActiveJob } from '../../hooks/useBackgroundJobs';
+import type { GenerationJobConfig } from '../../services/apiClient';
+
+// Check if we're in development mode (QStash won't work locally)
+const isDevMode = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 
 // --- Helper Functions for Audio Processing ---
 
@@ -68,6 +73,7 @@ interface ClipsTabProps {
   styleReferences?: StyleReference[];
   onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
   onRemoveStyleReference?: (id: string) => void;
+  userId?: string | null;
 }
 
 interface Scene {
@@ -1991,7 +1997,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
 // --- ClipsTab Component ---
 
-export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfile, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference }) => {
+export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfile, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference, userId }) => {
     const [thumbnails, setThumbnails] = useState<(GalleryImage | null)[]>([]);
     const [generationState, setGenerationState] = useState<{ isGenerating: boolean[], errors: (string | null)[] }>({
         isGenerating: [],
@@ -2000,6 +2006,8 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [selectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
     const [sceneImageTriggers, setSceneImageTriggers] = useState<number[]>([]);
+
+    const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
 
     useEffect(() => {
         const length = videoClipScripts.length;
@@ -2010,6 +2018,52 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
         });
         setSceneImageTriggers(Array(length).fill(0));
     }, [videoClipScripts]);
+
+    // Listen for job completions
+    useEffect(() => {
+        const unsubComplete = onJobComplete((job: ActiveJob) => {
+            if (job.context?.startsWith('clip-') && job.result_url) {
+                const indexMatch = job.context.match(/clip-(\d+)/);
+                if (indexMatch) {
+                    const index = parseInt(indexMatch[1]);
+                    const galleryImage = onAddImageToGallery({
+                        src: job.result_url,
+                        prompt: videoClipScripts[index]?.image_prompt || '',
+                        source: 'Clipe',
+                        model: selectedImageModel
+                    });
+                    setThumbnails(prev => {
+                        const newThumbnails = [...prev];
+                        newThumbnails[index] = galleryImage;
+                        return newThumbnails;
+                    });
+                    setGenerationState(prev => {
+                        const newGenerating = [...prev.isGenerating];
+                        newGenerating[index] = false;
+                        return { ...prev, isGenerating: newGenerating };
+                    });
+                }
+            }
+        });
+
+        const unsubFailed = onJobFailed((job: ActiveJob) => {
+            if (job.context?.startsWith('clip-')) {
+                const indexMatch = job.context.match(/clip-(\d+)/);
+                if (indexMatch) {
+                    const index = parseInt(indexMatch[1]);
+                    setGenerationState(prev => {
+                        const newErrors = [...prev.errors];
+                        const newGenerating = [...prev.isGenerating];
+                        newErrors[index] = job.error_message || 'Falha ao gerar imagem.';
+                        newGenerating[index] = false;
+                        return { isGenerating: newGenerating, errors: newErrors };
+                    });
+                }
+            }
+        });
+
+        return () => { unsubComplete(); unsubFailed(); };
+    }, [onJobComplete, onJobFailed, onAddImageToGallery, videoClipScripts, selectedImageModel]);
 
     const handleGenerateThumbnail = async (index: number) => {
         if (selectedImageModel === 'gemini-3-pro-image-preview') {
@@ -2032,6 +2086,31 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
             return { isGenerating: newGenerating, errors: newErrors };
         });
 
+        // Use background job if userId is available AND we're not in dev mode
+        if (userId && !isDevMode) {
+            try {
+                const config: GenerationJobConfig = {
+                    brandName: brandProfile.name,
+                    brandDescription: brandProfile.description,
+                    brandToneOfVoice: brandProfile.toneOfVoice,
+                    brandPrimaryColor: brandProfile.primaryColor,
+                    brandSecondaryColor: brandProfile.secondaryColor,
+                    aspectRatio: '9:16',
+                    model: selectedImageModel,
+                    logo: brandProfile.logo || undefined,
+                    source: 'Clipe'
+                };
+
+                await queueJob(userId, 'clip', clip.image_prompt, config, `clip-${index}`);
+                // Job will complete via onJobComplete callback
+                return;
+            } catch (err) {
+                console.error('[ClipsTab] Failed to queue job:', err);
+                // Fall through to local generation
+            }
+        }
+
+        // Local generation (dev mode or no userId or queue failed)
         try {
             const productImages: ImageFile[] = [];
             if (brandProfile.logo) {

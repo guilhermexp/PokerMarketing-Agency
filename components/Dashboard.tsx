@@ -1,6 +1,8 @@
 
 import React, { useState } from 'react';
+import { useClerk } from '@clerk/clerk-react';
 import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, GenerationOptions, WeekScheduleInfo, StyleReference, InstagramPublishState, CampaignSummary } from '../types';
+import type { WeekScheduleWithCount } from '../services/apiClient';
 import { UploadForm } from './UploadForm';
 import { ClipsTab } from './tabs/ClipsTab';
 import { PostsTab } from './tabs/PostsTab';
@@ -13,6 +15,8 @@ import { AssistantPanel } from './assistant/AssistantPanel';
 import { GalleryView } from './GalleryView';
 import { CalendarView } from './calendar/CalendarView';
 import { CampaignsList } from './CampaignsList';
+import { SchedulesListView } from './SchedulesListView';
+import { OrganizationSwitcher } from './organization/OrganizationSwitcher';
 import type { ScheduledPost } from '../types';
 
 type View = 'campaign' | 'campaigns' | 'flyer' | 'gallery' | 'calendar';
@@ -36,6 +40,7 @@ interface DashboardProps {
   galleryImages: GalleryImage[];
   onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
+  onDeleteGalleryImage?: (imageId: string) => void;
   tournamentEvents: TournamentEvent[];
   weekScheduleInfo: WeekScheduleInfo | null;
   onTournamentFileUpload: (file: File) => Promise<void>;
@@ -70,6 +75,11 @@ interface DashboardProps {
   // Week Schedule
   isWeekExpired?: boolean;
   onClearExpiredSchedule?: () => void;
+  // All schedules list
+  allSchedules?: WeekScheduleWithCount[];
+  currentScheduleId?: string | null;
+  onSelectSchedule?: (schedule: WeekScheduleWithCount) => void;
+  onDeleteSchedule?: (scheduleId: string) => void;
 }
 
 type Tab = 'clips' | 'posts' | 'ads';
@@ -86,13 +96,13 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick, collaps
   <button
     onClick={onClick}
     title={collapsed ? label : undefined}
-    className={`w-full flex items-center ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'} py-2.5 rounded-xl text-[8px] font-black uppercase tracking-[0.2em] transition-all duration-300 ${
+    className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-lg text-xs font-medium transition-all duration-200 ${
       active
-        ? 'bg-white text-black'
-        : 'text-white/30 hover:text-white hover:bg-white/5'
+        ? 'bg-white/[0.08] text-white'
+        : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
     }`}
   >
-    <Icon name={icon} className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-black' : 'text-white/20'}`} />
+    <Icon name={icon} className={`w-4 h-4 flex-shrink-0 ${active ? 'text-white' : 'text-white/30'}`} />
     {!collapsed && <span>{label}</span>}
   </button>
 );
@@ -104,16 +114,41 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     isAssistantLoading, onAssistantSendMessage, galleryImages, onAddImageToGallery,
     onUpdateGalleryImage, tournamentEvents, weekScheduleInfo, onTournamentFileUpload, onAddTournamentEvent,
     flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState,
-    chatReferenceImage, onSetChatReference, activeView, onViewChange, onPublishToCampaign,
+    chatReferenceImage, onSetChatReference, activeView, onViewChange, onPublishToCampaign, onDeleteGalleryImage,
     styleReferences, onAddStyleReference, onRemoveStyleReference, onSelectStyleReference, selectedStyleReference, onClearSelectedStyleReference,
     scheduledPosts, onSchedulePost, onUpdateScheduledPost, onDeleteScheduledPost,
     onPublishToInstagram, publishingStates,
     campaignsList, onLoadCampaign, userId,
-    isWeekExpired, onClearExpiredSchedule
+    isWeekExpired, onClearExpiredSchedule,
+    allSchedules, currentScheduleId, onSelectSchedule, onDeleteSchedule
   } = props;
 
+  const { signOut } = useClerk();
   const [activeTab, setActiveTab] = useState<Tab>('clips');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [isInsideSchedule, setIsInsideSchedule] = useState(false);
+
+  // Format date string (handles both ISO and DD/MM formats)
+  const formatDateDisplay = (dateStr: string) => {
+    if (!dateStr) return '';
+    // If already in DD/MM format, return as is
+    if (/^\d{2}\/\d{2}$/.test(dateStr)) return dateStr;
+    // Parse ISO date
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  // Handler para selecionar planilha e entrar no modo edição
+  const handleEnterSchedule = (schedule: WeekScheduleWithCount) => {
+    onSelectSchedule?.(schedule);
+    setIsInsideSchedule(true);
+  };
+
+  // Handler para voltar para lista de planilhas
+  const handleBackToSchedulesList = () => {
+    setIsInsideSchedule(false);
+  };
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'clips', label: 'Clips' },
@@ -125,23 +160,43 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
   return (
     <div className="h-screen flex overflow-hidden bg-black text-white font-sans selection:bg-primary selection:text-black">
-      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-56'} bg-[#070707] flex flex-col flex-shrink-0 border-r border-white/5 z-20 transition-all duration-300`}>
-        <div className={`h-16 flex items-center justify-between ${sidebarCollapsed ? 'px-3' : 'px-4'} flex-shrink-0`}>
-          <div className="flex items-center">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 flex-shrink-0">
-               <Icon name="logo" className="h-4 w-4 text-white" />
-            </div>
-            {!sidebarCollapsed && <h1 className="text-[10px] font-black text-white tracking-[0.3em] uppercase ml-3">Director<span className="opacity-30">Ai</span></h1>}
-          </div>
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-1.5 text-white/20 hover:text-white/60 transition-colors"
-          >
-            <Icon name={sidebarCollapsed ? 'chevron-right' : 'chevron-left'} className="w-3.5 h-3.5" />
-          </button>
+      <aside className={`${sidebarCollapsed ? 'w-14' : 'w-52'} bg-[#0a0a0a] flex flex-col flex-shrink-0 border-r border-white/[0.06] z-20 transition-all duration-300`}>
+        {/* Header */}
+        <div className={`h-14 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between px-3'} flex-shrink-0 border-b border-white/[0.04]`}>
+          {sidebarCollapsed ? (
+            <button
+              onClick={() => setSidebarCollapsed(false)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors"
+            >
+              <Icon name="logo" className="h-4 w-4 text-white/70" />
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 flex-shrink-0">
+                  <Icon name="logo" className="h-3.5 w-3.5 text-white/70" />
+                </div>
+                <span className="text-xs font-semibold text-white/80">Director</span>
+              </div>
+              <button
+                onClick={() => setSidebarCollapsed(true)}
+                className="p-1.5 text-white/20 hover:text-white/50 hover:bg-white/[0.04] rounded-md transition-all"
+              >
+                <Icon name="chevron-left" className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
         </div>
 
-        <nav className={`flex-grow ${sidebarCollapsed ? 'p-2' : 'p-3'} space-y-1`}>
+        {/* Organization Switcher */}
+        {!sidebarCollapsed && (
+          <div className="px-2 py-2 border-b border-white/[0.04]">
+            <OrganizationSwitcher />
+          </div>
+        )}
+
+        {/* Navigation */}
+        <nav className={`flex-grow ${sidebarCollapsed ? 'px-2 py-3' : 'px-2 py-3'} space-y-0.5`}>
             <NavItem icon="zap" label="Direct" active={activeView === 'campaign'} onClick={() => onViewChange('campaign')} collapsed={sidebarCollapsed} />
             <NavItem icon="layers" label="Campanhas" active={activeView === 'campaigns'} onClick={() => onViewChange('campaigns')} collapsed={sidebarCollapsed} />
             <NavItem icon="image" label="Flyers" active={activeView === 'flyer'} onClick={() => onViewChange('flyer')} collapsed={sidebarCollapsed} />
@@ -149,25 +204,55 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             <NavItem icon="layout" label="Assets" active={activeView === 'gallery'} onClick={() => onViewChange('gallery')} collapsed={sidebarCollapsed} />
         </nav>
 
-        <div className={`${sidebarCollapsed ? 'p-2' : 'p-3'} space-y-3`}>
+        {/* Footer - Brand Info & Logout */}
+        <div className={`${sidebarCollapsed ? 'p-2' : 'p-2'} border-t border-white/[0.04] space-y-1`}>
              {!sidebarCollapsed ? (
                <>
-                 <div className="w-full flex items-center gap-2 py-2 px-3 border border-white/5 rounded-lg">
+                 <button
+                   onClick={onEditProfile}
+                   className="w-full flex items-center gap-2 py-2 px-2 bg-white/[0.03] hover:bg-white/[0.06] rounded-lg transition-colors"
+                 >
                     {brandProfile.logo ? (
-                        <img src={brandProfile.logo} alt="Logo" className="h-5 w-5 rounded object-contain filter grayscale brightness-125 flex-shrink-0"/>
+                        <img src={brandProfile.logo} alt="Logo" className="h-6 w-6 rounded object-cover flex-shrink-0"/>
                     ) : (
-                        <div className="h-5 w-5 rounded bg-white/10 flex items-center justify-center flex-shrink-0"><Icon name="bot" className="w-2.5 h-2.5 text-white/40" /></div>
+                        <div className="h-6 w-6 rounded bg-white/10 flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-white/60">
+                          {brandProfile.name.substring(0, 2).toUpperCase()}
+                        </div>
                     )}
-                    <div className="flex-1 overflow-hidden">
-                        <span className="text-[8px] font-black text-white/20 truncate block uppercase tracking-[0.2em]">{brandProfile.name}</span>
-                    </div>
-                </div>
-                <button onClick={onEditProfile} className="w-full text-[8px] font-black uppercase tracking-[0.3em] text-white/20 hover:text-white transition-colors py-2 border border-white/5 rounded-lg hover:bg-white/5">System Setup</button>
+                    <span className="text-[10px] font-medium text-white/50 truncate flex-1 text-left">{brandProfile.name}</span>
+                    <Icon name="settings" className="w-3.5 h-3.5 text-white/20" />
+                </button>
+                <button
+                  onClick={() => signOut()}
+                  className="w-full flex items-center gap-2 py-2 px-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                >
+                  <Icon name="log-out" className="w-4 h-4" />
+                  <span className="text-[10px] font-medium">Sair</span>
+                </button>
                </>
              ) : (
-               <button onClick={onEditProfile} title="System Setup" className="w-full flex justify-center py-2 text-white/20 hover:text-white transition-colors border border-white/5 rounded-lg hover:bg-white/5">
-                 <Icon name="settings" className="w-3.5 h-3.5" />
-               </button>
+               <>
+                 <button
+                   onClick={onEditProfile}
+                   title={brandProfile.name}
+                   className="w-full flex justify-center py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
+                 >
+                   {brandProfile.logo ? (
+                     <img src={brandProfile.logo} alt="Logo" className="h-5 w-5 rounded object-cover"/>
+                   ) : (
+                     <span className="text-[9px] font-bold text-white/50">
+                       {brandProfile.name.substring(0, 2).toUpperCase()}
+                     </span>
+                   )}
+                 </button>
+                 <button
+                   onClick={() => signOut()}
+                   title="Sair"
+                   className="w-full flex justify-center py-2 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                 >
+                   <Icon name="log-out" className="w-4 h-4" />
+                 </button>
+               </>
              )}
         </div>
       </aside>
@@ -215,31 +300,96 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
                             {/* Content */}
                             <div className="space-y-4">
-                                {activeTab === 'clips' && <ClipsTab brandProfile={brandProfile} videoClipScripts={campaign.videoClipScripts} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} />}
-                                {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} />}
-                                {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} />}
+                                {activeTab === 'clips' && <ClipsTab brandProfile={brandProfile} videoClipScripts={campaign.videoClipScripts} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} userId={userId} />}
+                                {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} userId={userId} />}
+                                {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} userId={userId} />}
                             </div>
                         </div>
                     )}
                 </div>
             )}
-            {activeView === 'flyer' && (
-                <div className="flex h-full overflow-hidden">
-                    <FlyerGenerator
-                      brandProfile={brandProfile} events={tournamentEvents} weekScheduleInfo={weekScheduleInfo} onFileUpload={onTournamentFileUpload} onAddEvent={onAddTournamentEvent} onAddImageToGallery={onAddImageToGallery} flyerState={flyerState} setFlyerState={setFlyerState} dailyFlyerState={dailyFlyerState} setDailyFlyerState={setDailyFlyerState} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference}
-                      onPublishToCampaign={onPublishToCampaign}
-                      selectedStyleReference={selectedStyleReference}
-                      onClearSelectedStyleReference={onClearSelectedStyleReference}
-                      styleReferences={styleReferences}
-                      onSelectStyleReference={onSelectStyleReference}
-                      isWeekExpired={isWeekExpired}
-                      onClearExpiredSchedule={onClearExpiredSchedule}
-                    />
+            {activeView === 'flyer' && !isInsideSchedule && (
+                <SchedulesListView
+                  schedules={allSchedules || []}
+                  onSelectSchedule={handleEnterSchedule}
+                  onFileUpload={onTournamentFileUpload}
+                  currentScheduleId={currentScheduleId}
+                  onEnterAfterUpload={() => setIsInsideSchedule(true)}
+                  onDeleteSchedule={onDeleteSchedule}
+                />
+            )}
+            {activeView === 'flyer' && isInsideSchedule && (
+                <div className="flex flex-col h-full">
+                    {/* Back button header */}
+                    <div className="flex items-center gap-3 px-6 py-3 border-b border-white/5 flex-shrink-0 bg-[#070707]">
+                      <button
+                        onClick={handleBackToSchedulesList}
+                        className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors"
+                      >
+                        <Icon name="arrow-left" className="w-4 h-4" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Voltar às Planilhas</span>
+                      </button>
+                      {weekScheduleInfo && (
+                        <>
+                          <div className="h-4 w-px bg-white/10" />
+                          <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
+                            Semana {formatDateDisplay(weekScheduleInfo.startDate)} - {formatDateDisplay(weekScheduleInfo.endDate)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <FlyerGenerator
+                        brandProfile={brandProfile} events={tournamentEvents} weekScheduleInfo={weekScheduleInfo} onFileUpload={onTournamentFileUpload} onAddEvent={onAddTournamentEvent} onAddImageToGallery={onAddImageToGallery} flyerState={flyerState} setFlyerState={setFlyerState} dailyFlyerState={dailyFlyerState} setDailyFlyerState={setDailyFlyerState} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference}
+                        onPublishToCampaign={onPublishToCampaign}
+                        selectedStyleReference={selectedStyleReference}
+                        onClearSelectedStyleReference={onClearSelectedStyleReference}
+                        styleReferences={styleReferences}
+                        onSelectStyleReference={onSelectStyleReference}
+                        isWeekExpired={isWeekExpired}
+                        onClearExpiredSchedule={onClearExpiredSchedule}
+                        userId={userId}
+                        allSchedules={allSchedules}
+                        currentScheduleId={currentScheduleId}
+                        onSelectSchedule={onSelectSchedule}
+                      />
+                    </div>
                 </div>
             )}
             {activeView === 'gallery' && (
                 <div className="px-6 py-5">
-                    <GalleryView images={galleryImages} onUpdateImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} onSelectStyleReference={onSelectStyleReference} />
+                    <GalleryView
+                        images={galleryImages}
+                        onUpdateImage={onUpdateGalleryImage}
+                        onDeleteImage={onDeleteGalleryImage}
+                        onSetChatReference={onSetChatReference}
+                        styleReferences={styleReferences}
+                        onAddStyleReference={onAddStyleReference}
+                        onRemoveStyleReference={onRemoveStyleReference}
+                        onSelectStyleReference={onSelectStyleReference}
+                        onPublishToCampaign={onPublishToCampaign}
+                        onSchedulePost={(image) => {
+                            // Create scheduled post for tomorrow at noon
+                            const tomorrow = new Date();
+                            tomorrow.setDate(tomorrow.getDate() + 1);
+                            tomorrow.setHours(12, 0, 0, 0);
+                            const dateStr = tomorrow.toISOString().split('T')[0];
+                            onSchedulePost({
+                                type: 'flyer',
+                                contentId: image.id,
+                                imageUrl: image.src,
+                                caption: image.prompt || 'Post agendado',
+                                hashtags: ['poker', 'torneio'],
+                                scheduledDate: dateStr,
+                                scheduledTime: '12:00',
+                                scheduledTimestamp: tomorrow.getTime(),
+                                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                                platforms: { instagram: true, facebook: false },
+                                status: 'draft'
+                            });
+                            onViewChange('calendar');
+                        }}
+                    />
                 </div>
             )}
             {activeView === 'calendar' && (

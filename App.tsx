@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { BrandProfileSetup } from './components/BrandProfileSetup';
 import { Dashboard } from './components/Dashboard';
+import { SettingsModal } from './components/settings/SettingsModal';
 import { Loader } from './components/common/Loader';
 import { generateCampaign, editImage, generateLogo, generateImage } from './services/geminiService';
 import { runAssistantConversationStream } from './services/assistantService';
@@ -10,6 +11,8 @@ import { publishToInstagram, uploadImageForInstagram, type InstagramContentType 
 import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, ChatPart, GenerationOptions, WeekScheduleInfo, StyleReference, ScheduledPost, InstagramPublishState } from './types';
 import { Icon } from './components/common/Icon';
 import { AuthWrapper, UserProfileButton, useAuth, useCurrentUser } from './components/auth/AuthWrapper';
+import { BackgroundJobsProvider } from './hooks/useBackgroundJobs';
+import { BackgroundJobsIndicator } from './components/common/BackgroundJobsIndicator';
 import {
   getBrandProfile,
   createBrandProfile,
@@ -26,9 +29,13 @@ import {
   getTournamentData,
   createWeekSchedule,
   deleteWeekSchedule,
+  getWeekSchedulesList,
+  getScheduleEvents,
   schedulePostWithQStash,
+  deleteGalleryImage,
   type DbCampaign,
   type DbWeekSchedule,
+  type WeekScheduleWithCount,
 } from './services/apiClient';
 import type { CampaignSummary } from './types';
 
@@ -106,6 +113,7 @@ function AppContent() {
   const [weekScheduleInfo, setWeekScheduleInfo] = useState<WeekScheduleInfo | null>(null);
   const [currentScheduleId, setCurrentScheduleId] = useState<string | null>(null);
   const [isWeekExpired, setIsWeekExpired] = useState(false);
+  const [allSchedules, setAllSchedules] = useState<WeekScheduleWithCount[]>([]);
   const [flyerState, setFlyerState] = useState<Record<string, (GalleryImage | 'loading')[]>>({});
   const [dailyFlyerState, setDailyFlyerState] = useState<Record<TimePeriod, (GalleryImage | 'loading')[]>>({
     ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: []
@@ -157,14 +165,18 @@ function AppContent() {
 
         // Load scheduled posts from database
         const dbScheduled = await getScheduledPosts(userId);
-        const mappedPosts: ScheduledPost[] = dbScheduled.map(post => ({
+        console.log('[App] Loaded scheduled posts:', dbScheduled.length, dbScheduled.map(p => ({ id: p.id, date: p.scheduled_date, status: p.status })));
+        const mappedPosts: ScheduledPost[] = dbScheduled.map(post => {
+          // Normalize date to YYYY-MM-DD format (handles both "2025-12-21" and "2025-12-21T00:00:00.000Z")
+          const normalizedDate = post.scheduled_date?.split('T')[0] || post.scheduled_date;
+          return {
           id: post.id,
           type: post.content_type as ScheduledPost['type'],
           contentId: post.content_id || '',
           imageUrl: post.image_url,
           caption: post.caption,
           hashtags: post.hashtags || [],
-          scheduledDate: post.scheduled_date,
+          scheduledDate: normalizedDate,
           scheduledTime: post.scheduled_time,
           scheduledTimestamp: new Date(post.scheduled_timestamp).getTime(),
           timezone: post.timezone,
@@ -176,7 +188,8 @@ function AppContent() {
           createdAt: new Date(post.created_at).getTime(),
           updatedAt: new Date(post.updated_at || post.created_at).getTime(),
           createdFrom: (post.created_from || 'gallery') as ScheduledPost['createdFrom'],
-        }));
+        };
+        });
         setScheduledPosts(mappedPosts.sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp));
 
         // Load campaigns list from database
@@ -227,9 +240,11 @@ function AppContent() {
               }));
               setTournamentEvents(mappedEvents);
 
-              // Set week schedule info
-              const startParts = schedule.start_date.split('-');
-              const endParts = schedule.end_date.split('-');
+              // Set week schedule info (handle ISO datetime strings)
+              const startDateOnly = schedule.start_date.split('T')[0];
+              const endDateOnly = schedule.end_date.split('T')[0];
+              const startParts = startDateOnly.split('-');
+              const endParts = endDateOnly.split('-');
               setWeekScheduleInfo({
                 startDate: `${startParts[2]}/${startParts[1]}`,
                 endDate: `${endParts[2]}/${endParts[1]}`,
@@ -239,6 +254,11 @@ function AppContent() {
               console.log(`[Tournaments] Loaded ${mappedEvents.length} events for week ${schedule.start_date} to ${schedule.end_date}`);
             }
           }
+
+          // Load all schedules list
+          const schedulesData = await getWeekSchedulesList(userId);
+          setAllSchedules(schedulesData.schedules);
+          console.log(`[Tournaments] Loaded ${schedulesData.schedules.length} total schedules`);
         } catch (tournamentError) {
           console.error('[Tournaments] Failed to load tournament data:', tournamentError);
         }
@@ -302,6 +322,18 @@ function AppContent() {
     // TODO: Add API call to update image in database when endpoint is available
   };
 
+  const handleDeleteGalleryImage = async (imageId: string) => {
+    // Remove from local state immediately
+    setGalleryImages(prev => prev.filter(img => img.id !== imageId));
+
+    // Also remove from database
+    try {
+      await deleteGalleryImage(imageId);
+    } catch (e) {
+      console.error('Failed to delete image from database:', e);
+    }
+  };
+
   const handleAddStyleReference = (ref: Omit<StyleReference, 'id' | 'createdAt'>) => {
     const newRef: StyleReference = { ...ref, id: Date.now().toString(), createdAt: Date.now() };
     setStyleReferences(prev => {
@@ -340,9 +372,12 @@ function AppContent() {
       return;
     }
 
+    // Check if this is "publish now" (scheduled within 1 minute of now)
+    const isPublishNow = post.scheduledTimestamp <= Date.now() + 60000;
+
     try {
       // 1. Create post in database
-      const dbPost = await createScheduledPost(userId, {
+      const payload = {
         content_type: post.type,
         content_id: post.contentId,
         image_url: post.imageUrl,
@@ -355,20 +390,9 @@ function AppContent() {
         platforms: post.platforms,
         instagram_content_type: post.instagramContentType,
         created_from: post.createdFrom,
-      });
-
-      // 2. Schedule with QStash for automatic publication
-      try {
-        const qstashResult = await schedulePostWithQStash(
-          dbPost.id,
-          userId,
-          post.scheduledTimestamp
-        );
-        console.log(`[QStash] Post ${dbPost.id} scheduled for ${qstashResult.scheduledFor}`);
-      } catch (qstashError) {
-        console.warn('[QStash] Failed to schedule, will rely on manual publish:', qstashError);
-        // Don't fail the whole operation - post is saved, just won't auto-publish
-      }
+      };
+      console.log('[Schedule] Sending payload:', payload, isPublishNow ? '(PUBLISH NOW)' : '');
+      const dbPost = await createScheduledPost(userId, payload);
 
       const newPost: ScheduledPost = {
         id: dbPost.id,
@@ -390,6 +414,28 @@ function AppContent() {
       };
 
       setScheduledPosts(prev => [...prev, newPost].sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp));
+
+      // 2. If "Publish Now", immediately publish to Instagram
+      if (isPublishNow && (post.platforms === 'instagram' || post.platforms === 'both')) {
+        console.log('[Schedule] Publishing immediately...');
+        // Use setTimeout to ensure state is updated before publishing
+        setTimeout(() => {
+          handlePublishToInstagram(newPost);
+        }, 100);
+      } else {
+        // 3. Schedule with QStash for future automatic publication
+        try {
+          const qstashResult = await schedulePostWithQStash(
+            dbPost.id,
+            userId,
+            post.scheduledTimestamp
+          );
+          console.log(`[QStash] Post ${dbPost.id} scheduled for ${qstashResult.scheduledFor}`);
+        } catch (qstashError) {
+          console.warn('[QStash] Failed to schedule, will rely on manual publish:', qstashError);
+          // Don't fail the whole operation - post is saved, just won't auto-publish
+        }
+      }
     } catch (e) {
       console.error('Failed to schedule post:', e);
     }
@@ -574,7 +620,10 @@ function AppContent() {
       return;
     }
     try {
+      console.log('[Campaign] Loading campaign:', campaignId);
       const fullCampaign = await getCampaignById(campaignId, userId);
+      console.log('[Campaign] API response:', fullCampaign);
+
       if (fullCampaign) {
         const loadedCampaign: MarketingCampaign = {
           id: fullCampaign.id,
@@ -603,8 +652,12 @@ function AppContent() {
             image_prompt: a.image_prompt || '',
           })),
         };
+        console.log('[Campaign] Loaded:', loadedCampaign.videoClipScripts.length, 'clips,', loadedCampaign.posts.length, 'posts,', loadedCampaign.adCreatives.length, 'ads');
         setCampaign(loadedCampaign);
         setActiveView('campaign');
+      } else {
+        console.error('[Campaign] API returned null for campaign:', campaignId);
+        setError('Campanha não encontrada');
       }
     } catch (error) {
       console.error('Failed to load campaign:', error);
@@ -628,6 +681,54 @@ function AppContent() {
       };
       setCampaign(null);
       handleGenerateCampaign(input, options);
+  };
+
+  const handleSelectSchedule = async (schedule: WeekScheduleWithCount) => {
+    if (!userId) return;
+    try {
+      // Load events for selected schedule
+      const eventsData = await getScheduleEvents(userId, schedule.id);
+      const mappedEvents: TournamentEvent[] = eventsData.events.map(e => ({
+        id: e.id,
+        day: e.day_of_week,
+        name: e.name,
+        game: e.game || '',
+        gtd: e.gtd || '',
+        buyIn: e.buy_in || '',
+        rebuy: e.rebuy || '',
+        addOn: e.add_on || '',
+        stack: e.stack || '',
+        players: e.players || '',
+        lateReg: e.late_reg || '',
+        minutes: e.minutes || '',
+        structure: e.structure || '',
+        times: e.times || {},
+      }));
+      setTournamentEvents(mappedEvents);
+      setCurrentScheduleId(schedule.id);
+
+      // Check if this schedule is expired
+      const endDate = new Date(schedule.end_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+      setIsWeekExpired(today > endDate);
+
+      // Set week schedule info (handle ISO datetime strings)
+      const startDateOnly = schedule.start_date.split('T')[0];
+      const endDateOnly = schedule.end_date.split('T')[0];
+      const startParts = startDateOnly.split('-');
+      const endParts = endDateOnly.split('-');
+      setWeekScheduleInfo({
+        startDate: `${startParts[2]}/${startParts[1]}`,
+        endDate: `${endParts[2]}/${endParts[1]}`,
+        filename: schedule.filename || 'Planilha carregada',
+      });
+
+      console.log(`[Tournaments] Selected schedule ${schedule.id} with ${mappedEvents.length} events`);
+    } catch (error) {
+      console.error('[Tournaments] Failed to load schedule events:', error);
+    }
   };
 
   const executeTool = async (toolCall: any): Promise<any> => {
@@ -739,8 +840,9 @@ function AppContent() {
   };
 
   const parseWeekFromFilename = (filename: string): WeekScheduleInfo | null => {
-    // Padrão: "PPST 16 18 al 21 18" ou "PPST_16_18_al_21_18"
-    const match = filename.match(/(\d{1,2})[\s_](\d{1,2})[\s_]al[\s_](\d{1,2})[\s_](\d{1,2})/i);
+    // Padrão: "PPST 16 18 al 21 18" ou "PPST_16_18_al_21_18" ou "PPST 22-12 al 28-12"
+    // Aceita espaços, underscores ou hífens como separadores
+    const match = filename.match(/(\d{1,2})[\s_-](\d{1,2})[\s_-]al[\s_-](\d{1,2})[\s_-](\d{1,2})/i);
     if (match) {
       const [, startDay, startMonth, endDay, endMonth] = match;
       return {
@@ -753,10 +855,12 @@ function AppContent() {
   };
 
   const handleTournamentFileUpload = (file: File) => {
+    console.log('[Upload] Starting file upload:', file.name);
     return new Promise<void>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
+          console.log('[Upload] File read complete, parsing...');
           const data = new Uint8Array(e.target!.result as ArrayBuffer);
           const wb = XLSX.read(data, { type: 'array' });
           const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -773,19 +877,37 @@ function AppContent() {
               });
             }
           });
+          console.log('[Upload] Parsed', events.length, 'events from file');
           setTournamentEvents(events);
 
           // Extrair info da semana do nome do arquivo ou da aba
-          const weekInfo = parseWeekFromFilename(file.name) || parseWeekFromFilename(wb.SheetNames[0]);
-          if (weekInfo) setWeekScheduleInfo(weekInfo);
+          let weekInfo = parseWeekFromFilename(file.name) || parseWeekFromFilename(wb.SheetNames[0]);
+
+          // Se não conseguir extrair do nome, usar semana atual
+          if (!weekInfo) {
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            const monday = new Date(today);
+            monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+
+            weekInfo = {
+              startDate: `${String(monday.getDate()).padStart(2, '0')}/${String(monday.getMonth() + 1).padStart(2, '0')}`,
+              endDate: `${String(sunday.getDate()).padStart(2, '0')}/${String(sunday.getMonth() + 1).padStart(2, '0')}`,
+              filename: file.name
+            };
+          }
+
+          console.log('[Upload] WeekInfo:', weekInfo);
+          setWeekScheduleInfo(weekInfo);
 
           // Save to database if authenticated
-          if (userId && weekInfo) {
+          console.log('[Upload] userId:', userId);
+          if (userId) {
             try {
-              // Delete existing schedule if any
-              if (currentScheduleId) {
-                await deleteWeekSchedule(userId, currentScheduleId);
-              }
+              // NOTE: We no longer delete existing schedules - we keep all of them
+              // so user can switch between different weeks
 
               // Parse dates for database (convert DD/MM to YYYY-MM-DD)
               const year = new Date().getFullYear();
@@ -825,14 +947,22 @@ function AppContent() {
               setCurrentScheduleId(result.schedule.id);
               setIsWeekExpired(false);
               console.log(`[Tournaments] Saved ${result.eventsCount} events to database`);
+
+              // Refresh schedules list
+              const schedulesData = await getWeekSchedulesList(userId);
+              setAllSchedules(schedulesData.schedules);
             } catch (dbErr) {
               console.error('[Tournaments] Failed to save to database:', dbErr);
               // Continue anyway - data is still in local state
             }
           }
 
+          console.log('[Upload] Complete! Events:', events.length, 'WeekInfo:', weekInfo.startDate, '-', weekInfo.endDate);
           resolve();
-        } catch (err) { reject(err); }
+        } catch (err) {
+          console.error('[Upload] Error:', err);
+          reject(err);
+        }
       };
       reader.readAsArrayBuffer(file);
     });
@@ -848,46 +978,60 @@ function AppContent() {
             <div className="flex-1"><p className="font-bold text-sm">Erro</p><p className="text-sm opacity-50">{error}</p></div>
         </div>
       )}
-      {!brandProfile || isEditingProfile ? (
+      {!brandProfile ? (
         <BrandProfileSetup onProfileSubmit={async (p) => {
           console.log('[BrandProfile] onProfileSubmit called, userId:', userId);
           setBrandProfile(p);
-          setIsEditingProfile(false);
           // Save to database if authenticated
           if (userId) {
             console.log('[BrandProfile] Saving to database with userId:', userId);
             try {
-              const existingProfile = await getBrandProfile(userId);
-              console.log('[BrandProfile] Existing profile:', existingProfile);
-              if (existingProfile) {
-                await updateBrandProfile(existingProfile.id, {
-                  name: p.name,
-                  description: p.description,
-                  logo_url: p.logo || undefined,
-                  primary_color: p.primaryColor,
-                  secondary_color: p.secondaryColor,
-                  tone_of_voice: p.toneOfVoice,
-                });
-              } else {
-                console.log('[BrandProfile] Creating new profile...');
-                const created = await createBrandProfile(userId, {
-                  name: p.name,
-                  description: p.description,
-                  logo_url: p.logo || undefined,
-                  primary_color: p.primaryColor,
-                  secondary_color: p.secondaryColor,
-                  tone_of_voice: p.toneOfVoice,
-                });
-                console.log('[BrandProfile] Created:', created);
-              }
+              console.log('[BrandProfile] Creating new profile...');
+              const created = await createBrandProfile(userId, {
+                name: p.name,
+                description: p.description,
+                logo_url: p.logo || undefined,
+                primary_color: p.primaryColor,
+                secondary_color: p.secondaryColor,
+                tone_of_voice: p.toneOfVoice,
+              });
+              console.log('[BrandProfile] Created:', created);
             } catch (e) {
               console.error('Failed to save brand profile:', e);
             }
           } else {
             console.log('[BrandProfile] userId is null/undefined, skipping save');
           }
-        }} existingProfile={brandProfile} />
+        }} existingProfile={null} />
       ) : (
+        <>
+        <SettingsModal
+          isOpen={isEditingProfile}
+          onClose={() => setIsEditingProfile(false)}
+          brandProfile={brandProfile}
+          onSaveProfile={async (p) => {
+            console.log('[BrandProfile] Updating profile, userId:', userId);
+            setBrandProfile(p);
+            if (userId) {
+              try {
+                const existingProfile = await getBrandProfile(userId);
+                if (existingProfile) {
+                  await updateBrandProfile(existingProfile.id, {
+                    name: p.name,
+                    description: p.description,
+                    logo_url: p.logo || undefined,
+                    primary_color: p.primaryColor,
+                    secondary_color: p.secondaryColor,
+                    tone_of_voice: p.toneOfVoice,
+                  });
+                  console.log('[BrandProfile] Updated successfully');
+                }
+              } catch (e) {
+                console.error('Failed to update brand profile:', e);
+              }
+            }
+          }}
+        />
         <Dashboard
           brandProfile={brandProfile!}
           campaign={campaign}
@@ -907,10 +1051,32 @@ function AppContent() {
           galleryImages={galleryImages}
           onAddImageToGallery={handleAddImageToGallery}
           onUpdateGalleryImage={handleUpdateGalleryImage}
+          onDeleteGalleryImage={handleDeleteGalleryImage}
           tournamentEvents={tournamentEvents}
           weekScheduleInfo={weekScheduleInfo}
           onTournamentFileUpload={handleTournamentFileUpload}
           onAddTournamentEvent={(ev) => setTournamentEvents(p => [ev, ...p])}
+          allSchedules={allSchedules}
+          currentScheduleId={currentScheduleId}
+          onSelectSchedule={handleSelectSchedule}
+          onDeleteSchedule={async (scheduleId) => {
+            if (!userId) return;
+            try {
+              await deleteWeekSchedule(userId, scheduleId);
+              // Update local state
+              setAllSchedules(prev => prev.filter(s => s.id !== scheduleId));
+              // If deleted the current schedule, clear it
+              if (currentScheduleId === scheduleId) {
+                setCurrentScheduleId(null);
+                setTournamentEvents([]);
+                setWeekScheduleInfo(null);
+                setIsWeekExpired(false);
+              }
+              console.log('[Tournaments] Deleted schedule:', scheduleId);
+            } catch (e) {
+              console.error('[Tournaments] Failed to delete schedule:', e);
+            }
+          }}
           flyerState={flyerState}
           setFlyerState={setFlyerState}
           dailyFlyerState={dailyFlyerState}
@@ -948,15 +1114,27 @@ function AppContent() {
             }
           }}
         />
+        </>
       )}
     </>
+  );
+}
+
+function AppWithBackgroundJobs() {
+  const { userId } = useAuth();
+
+  return (
+    <BackgroundJobsProvider userId={userId}>
+      <AppContent />
+      <BackgroundJobsIndicator />
+    </BackgroundJobsProvider>
   );
 }
 
 function App() {
   return (
     <AuthWrapper>
-      <AppContent />
+      <AppWithBackgroundJobs />
     </AuthWrapper>
   );
 }

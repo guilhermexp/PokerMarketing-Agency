@@ -26,7 +26,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onPublishToInstagram,
   publishingStates
 }) => {
-  const [viewType, setViewType] = useState<CalendarViewType>('monthly');
+  const [viewType, setViewType] = useState<CalendarViewType>('weekly');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);

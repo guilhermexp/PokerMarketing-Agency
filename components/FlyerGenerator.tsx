@@ -7,6 +7,11 @@ import { Loader } from './common/Loader';
 import { Icon } from './common/Icon';
 import { generateFlyer, generateQuickPostText } from '../services/geminiService';
 import { ImagePreviewModal } from './common/ImagePreviewModal';
+import { useBackgroundJobs, type ActiveJob } from '../hooks/useBackgroundJobs';
+import type { GenerationJobConfig, WeekScheduleWithCount } from '../services/apiClient';
+
+// Check if we're in development mode (QStash won't work locally)
+const isDevMode = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 
 export type TimePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'NIGHT' | 'HIGHLIGHTS';
 export type Currency = 'USD' | 'BRL';
@@ -27,10 +32,15 @@ interface FlyerGeneratorProps {
   onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
   selectedStyleReference?: StyleReference | null;
   onClearSelectedStyleReference?: () => void;
+  userId?: string | null;
   styleReferences?: StyleReference[];
   onSelectStyleReference?: (ref: StyleReference) => void;
   isWeekExpired?: boolean;
   onClearExpiredSchedule?: () => void;
+  // All schedules list
+  allSchedules?: WeekScheduleWithCount[];
+  currentScheduleId?: string | null;
+  onSelectSchedule?: (schedule: WeekScheduleWithCount) => void;
 }
 
 const formatCurrencyValue = (val: string, currency: Currency): string => {
@@ -283,19 +293,62 @@ const TournamentEventCard: React.FC<{
     generatedFlyers: (GalleryImage | 'loading')[];
     setGeneratedFlyers: (updater: (prev: (GalleryImage | 'loading')[]) => (GalleryImage | 'loading')[]) => void;
     collabLogo: string | null;
+    styleReference: GalleryImage | null;
     onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
-}> = ({ event, brandProfile, aspectRatio, currency, language, model, imageSize, compositionAssets, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, generatedFlyers, setGeneratedFlyers, collabLogo, onPublishToCampaign }) => {
+    userId?: string | null;
+}> = ({ event, brandProfile, aspectRatio, currency, language, model, imageSize, compositionAssets, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, generatedFlyers, setGeneratedFlyers, collabLogo, styleReference, onPublishToCampaign, userId }) => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const [editingFlyer, setEditingFlyer] = useState<GalleryImage | null>(null);
     const [quickPostFlyer, setQuickPostFlyer] = useState<GalleryImage | null>(null);
 
+    const { queueJob, onJobComplete, onJobFailed, getJobByContext } = useBackgroundJobs();
+    const jobContext = `flyer-event-${event.id}`;
+    const pendingJob = getJobByContext(jobContext);
+
+    // Listen for job completion to add image to gallery
+    useEffect(() => {
+        const unsubComplete = onJobComplete((job: ActiveJob) => {
+            if (job.context === jobContext && job.result_url) {
+                const newImage = onAddImageToGallery({
+                    src: job.result_url,
+                    prompt: '',
+                    source: 'Flyer',
+                    model,
+                    aspectRatio,
+                    imageSize
+                });
+                setGeneratedFlyers(prev => prev.map(f => f === 'loading' ? newImage : f));
+                setIsGenerating(false);
+                setIsExpanded(true); // Auto-expand when generation completes
+            }
+        });
+
+        const unsubFailed = onJobFailed((job: ActiveJob) => {
+            if (job.context === jobContext) {
+                setGeneratedFlyers(prev => prev.filter(f => f !== 'loading'));
+                setIsGenerating(false);
+                console.error('[TournamentEventCard] Job failed:', job.error_message);
+            }
+        });
+
+        return () => { unsubComplete(); unsubFailed(); };
+    }, [jobContext, onJobComplete, onJobFailed, onAddImageToGallery, model, aspectRatio, imageSize, setGeneratedFlyers]);
+
+    // Restore loading state from pending job
+    useEffect(() => {
+        if (pendingJob && (pendingJob.status === 'queued' || pendingJob.status === 'processing') && !isGenerating) {
+            setIsGenerating(true);
+            if (!generatedFlyers.includes('loading')) {
+                setGeneratedFlyers(prev => ['loading', ...prev]);
+            }
+        }
+    }, [pendingJob, isGenerating, generatedFlyers, setGeneratedFlyers]);
+
     const handleGenerate = async () => {
-        setIsGenerating(true);
-        setGeneratedFlyers(prev => ['loading', ...prev]);
         const biVal = formatCurrencyValue(event.buyIn, currency);
         const gtdVal = formatCurrencyValue(event.gtd, currency);
-        
+
         const prompt = `
         TIPO: Flyer de Torneio Individual (single event highlight)
 
@@ -318,13 +371,52 @@ const TournamentEventCard: React.FC<{
         - Tipografia impactante e moderna para o valor monetário
         `;
 
+        // Use background job if userId is available AND we're not in dev mode
+        // In dev mode, QStash can't callback (no public URL), so use local generation
+        if (userId && !isDevMode) {
+            setIsGenerating(true);
+            setGeneratedFlyers(prev => ['loading', ...prev]);
+
+            try {
+                const config: GenerationJobConfig = {
+                    brandName: brandProfile.name,
+                    brandDescription: brandProfile.description,
+                    brandToneOfVoice: brandProfile.toneOfVoice,
+                    brandPrimaryColor: brandProfile.primaryColor,
+                    brandSecondaryColor: brandProfile.secondaryColor,
+                    aspectRatio,
+                    model,
+                    imageSize,
+                    logo: brandProfile.logo || undefined,
+                    collabLogo: collabLogo || undefined,
+                    styleReference: styleReference?.src || undefined,
+                    compositionAssets: compositionAssets.map(a => `data:${a.mimeType};base64,${a.base64}`),
+                    source: 'Flyer'
+                };
+
+                await queueJob(userId, 'flyer', prompt, config, jobContext);
+                // Job will complete via onJobComplete callback
+            } catch (err) {
+                console.error('[TournamentEventCard] Failed to queue job:', err);
+                setGeneratedFlyers(prev => prev.filter(f => f !== 'loading'));
+                setIsGenerating(false);
+            }
+            return;
+        }
+
+        // Local generation (dev mode or no userId)
+        setIsGenerating(true);
+        setGeneratedFlyers(prev => ['loading', ...prev]);
+
         try {
             let logoToUse = brandProfile.logo ? { base64: brandProfile.logo.split(',')[1], mimeType: 'image/png' } : null;
             let collabLogoToUse = collabLogo ? { base64: collabLogo.split(',')[1], mimeType: 'image/png' } : null;
+            let refData = styleReference ? { base64: styleReference.src.split(',')[1], mimeType: 'image/png' } : null;
             const assetsToUse = compositionAssets.map(a => ({ base64: a.base64, mimeType: a.mimeType }));
-            const imageUrl = await generateFlyer(prompt, brandProfile, logoToUse, null, aspectRatio, model, collabLogoToUse, imageSize, assetsToUse);
+            const imageUrl = await generateFlyer(prompt, brandProfile, logoToUse, refData, aspectRatio, model, collabLogoToUse, imageSize, assetsToUse);
             const newImage = onAddImageToGallery({ src: imageUrl, prompt, source: 'Flyer', model, aspectRatio, imageSize });
             setGeneratedFlyers(prev => prev.map(f => f === 'loading' ? newImage : f));
+            setIsExpanded(true); // Auto-expand when generation completes
         } catch (err) {
             setGeneratedFlyers(prev => prev.filter(f => f !== 'loading'));
         } finally {
@@ -332,20 +424,35 @@ const TournamentEventCard: React.FC<{
         }
     };
 
+    const gtdValue = event.gtd ? formatCurrencyValue(event.gtd, currency) : '---';
+    const buyInValue = event.buyIn ? formatCurrencyValue(event.buyIn, currency) : '---';
+
     return (
-        <div className="bg-[#111111] border border-white/5 rounded-2xl overflow-hidden transition-all hover:border-white/10 mb-3">
-            <div className="px-4 py-3 flex items-center justify-between cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-center text-left">
-                    <div className="md:col-span-2">
-                        <h3 className="text-[10px] font-black text-white uppercase tracking-wide">{event.name}</h3>
-                        <p className="text-[8px] font-bold text-white/30 uppercase">{event.game} • {event.structure}</p>
+        <div className={`bg-[#0d0d0d] border rounded-xl overflow-hidden transition-all mb-2 ${isGenerating ? 'border-primary/50 animate-pulse' : 'border-white/[0.06] hover:border-white/10'}`}>
+            <div className="px-5 py-4 flex items-center justify-between cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-6 items-center text-left">
+                    <div className="flex items-center gap-3">
+                        {isGenerating && <Loader className="w-4 h-4 flex-shrink-0" />}
+                        <div>
+                            <h3 className="text-xs font-bold text-white tracking-wide">{event.name}</h3>
+                            <p className="text-[10px] text-white/30 mt-0.5">
+                                {isGenerating ? 'Gerando flyer...' : `${event.game} • ${event.structure}`}
+                            </p>
+                        </div>
                     </div>
-                    <div><span className="text-[8px] font-black text-white/20 uppercase block">Time</span><span className="text-[10px] font-black text-white">{event.times?.['-3']}</span></div>
-                    <div><span className="text-[8px] font-black text-primary/40 uppercase block">Value</span><span className="text-[10px] font-black text-primary">GTD: {formatCurrencyValue(event.gtd, currency)}</span></div>
+                    <div>
+                        <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider block mb-1">Time</span>
+                        <span className="text-sm font-semibold text-white">{event.times?.['-3']} <span className="text-white/40 text-xs">(GMT-3)</span></span>
+                    </div>
+                    <div>
+                        <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider block mb-1">Value</span>
+                        <span className="text-sm font-bold text-primary">GTD: {gtdValue}</span>
+                        <span className="text-[10px] text-white/40 block mt-0.5">BI: {buyInValue}</span>
+                    </div>
                 </div>
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center gap-3 ml-4">
                     <Button size="small" variant="primary" onClick={(e) => { e.stopPropagation(); handleGenerate(); }} isLoading={isGenerating}>Gerar</Button>
-                    <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} className="w-4 h-4 text-white/10" />
+                    <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} className="w-4 h-4 text-white/20" />
                 </div>
             </div>
             {isExpanded && (
@@ -362,10 +469,251 @@ const TournamentEventCard: React.FC<{
                 </div>
             )}
             {editingFlyer && (
-                <ImagePreviewModal image={editingFlyer} onClose={() => setEditingFlyer(null)} onImageUpdate={(src) => { onUpdateGalleryImage(editingFlyer.id, src); setGeneratedFlyers(prev => prev.map(f => (f !== 'loading' && f.id === editingFlyer.id ? { ...f, src } : f))); }} onSetChatReference={onSetChatReference} />
+                <ImagePreviewModal
+                    image={editingFlyer}
+                    onClose={() => setEditingFlyer(null)}
+                    onImageUpdate={(src) => { onUpdateGalleryImage(editingFlyer.id, src); setGeneratedFlyers(prev => prev.map(f => (f !== 'loading' && f.id === editingFlyer.id ? { ...f, src } : f))); }}
+                    onSetChatReference={onSetChatReference}
+                    onQuickPost={setQuickPostFlyer}
+                    onPublish={(f) => onPublishToCampaign(`Divulgue o torneio ${event.name}`, f)}
+                    downloadFilename={`flyer-${event.id}.png`}
+                />
             )}
             {quickPostFlyer && (
                 <QuickPostModal isOpen={!!quickPostFlyer} onClose={() => setQuickPostFlyer(null)} flyer={quickPostFlyer} brandProfile={brandProfile} context={`Torneio: ${event.name}, ${event.times?.['-3']}, GTD: ${formatCurrencyValue(event.gtd, currency)}`} />
+            )}
+        </div>
+    );
+};
+
+const PeriodCardRow: React.FC<{
+    period: TimePeriod;
+    label: string;
+    events: TournamentEvent[];
+    brandProfile: BrandProfile;
+    aspectRatio: string;
+    currency: Currency;
+    model: ImageModel;
+    imageSize: ImageSize;
+    compositionAssets: ImageFile[];
+    language: 'pt' | 'en';
+    onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
+    onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
+    onSetChatReference: (image: GalleryImage | null) => void;
+    generatedFlyers: (GalleryImage | 'loading')[];
+    setGeneratedFlyers: (updater: (prev: (GalleryImage | 'loading')[]) => (GalleryImage | 'loading')[]) => void;
+    triggerBatch: boolean;
+    styleReference: GalleryImage | null;
+    onCloneStyle: (image: GalleryImage) => void;
+    collabLogo: string | null;
+    onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
+    userId?: string | null;
+}> = ({ period, label, events, brandProfile, aspectRatio, currency, model, imageSize, compositionAssets, language, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, generatedFlyers, setGeneratedFlyers, triggerBatch, styleReference, onCloneStyle, collabLogo, onPublishToCampaign, userId }) => {
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [editingFlyer, setEditingFlyer] = useState<GalleryImage | null>(null);
+    const [quickPostFlyer, setQuickPostFlyer] = useState<GalleryImage | null>(null);
+
+    const { queueJob, onJobComplete, onJobFailed, getJobByContext } = useBackgroundJobs();
+    const jobContext = `flyer-period-${period}`;
+    const pendingJob = getJobByContext(jobContext);
+
+    // Listen for job completion
+    useEffect(() => {
+        const unsubComplete = onJobComplete((job: ActiveJob) => {
+            if (job.context === jobContext && job.result_url) {
+                const newImage = onAddImageToGallery({
+                    src: job.result_url,
+                    prompt: '',
+                    source: 'Flyer Diário',
+                    model,
+                    aspectRatio,
+                    imageSize
+                });
+                setGeneratedFlyers(prev => prev.map(f => f === 'loading' ? newImage : f));
+                setIsGenerating(false);
+                setIsExpanded(true); // Auto-expand when generation completes
+            }
+        });
+
+        const unsubFailed = onJobFailed((job: ActiveJob) => {
+            if (job.context === jobContext) {
+                setGeneratedFlyers(prev => prev.filter(f => f !== 'loading'));
+                setIsGenerating(false);
+            }
+        });
+
+        return () => { unsubComplete(); unsubFailed(); };
+    }, [jobContext, onJobComplete, onJobFailed, onAddImageToGallery, model, aspectRatio, imageSize, setGeneratedFlyers]);
+
+    // Restore loading state from pending job
+    useEffect(() => {
+        if (pendingJob && (pendingJob.status === 'queued' || pendingJob.status === 'processing') && !isGenerating) {
+            setIsGenerating(true);
+            if (!generatedFlyers.includes('loading')) {
+                setGeneratedFlyers(prev => ['loading', ...prev]);
+            }
+        }
+    }, [pendingJob, isGenerating, generatedFlyers, setGeneratedFlyers]);
+
+    const parseGtd = (gtd: string): number => {
+        if (!gtd || gtd === '---') return 0;
+        return parseFloat(String(gtd).replace(/[^0-9.-]+/g, '')) || 0;
+    };
+
+    const getSortValue = (timeStr: string) => {
+        const [h, m] = (timeStr || '00:00').split(':').map(Number);
+        const virtualHour = h < 6 ? h + 24 : h;
+        return virtualHour * 60 + (m || 0);
+    };
+
+    const handleGenerate = useCallback(async (forced: boolean = false) => {
+        if (isGenerating || events.length === 0) return;
+        if (triggerBatch && !forced && generatedFlyers.length > 0) return;
+
+        const sortedByGtd = [...events].sort((a, b) => parseGtd(b.gtd) - parseGtd(a.gtd));
+        const topEvent = sortedByGtd[0];
+        const otherEvents = sortedByGtd.slice(1).sort((a, b) => getSortValue(a.times?.['-3'] || '') - getSortValue(b.times?.['-3'] || ''));
+
+        const topEventText = topEvent ? `${topEvent.name} - GTD: ${formatCurrencyValue(topEvent.gtd, currency)} - Horário: ${topEvent.times?.['-3']} - Buy-in: ${formatCurrencyValue(topEvent.buyIn, currency)}` : '';
+        const otherEventsList = otherEvents.map(e => `${e.times?.['-3']} | ${e.name} | Buy-in: ${formatCurrencyValue(e.buyIn, currency)} | GTD: ${formatCurrencyValue(e.gtd, currency)}`).join('\n');
+
+        const isHighlights = period === 'HIGHLIGHTS';
+
+        const prompt = isHighlights ? `
+        TIPO: Flyer de Destaques do Dia - TOP 3 TORNEIOS
+        TÍTULO: ${label.toUpperCase()}
+
+        ⚠️ REGRA CRÍTICA: Este flyer mostra EXATAMENTE 3 torneios.
+
+        OS 3 TORNEIOS DESTAQUES:
+        🥇 1º DESTAQUE: ${topEventText}
+        🥈 2º DESTAQUE: ${otherEvents[0] ? `${otherEvents[0].times?.['-3']} | ${otherEvents[0].name} | GTD: ${formatCurrencyValue(otherEvents[0].gtd, currency)}` : ''}
+        🥉 3º DESTAQUE: ${otherEvents[1] ? `${otherEvents[1].times?.['-3']} | ${otherEvents[1].name} | GTD: ${formatCurrencyValue(otherEvents[1].gtd, currency)}` : ''}
+
+        DESIGN: Logo no topo, GTD em cor ${brandProfile.secondaryColor}, fundo ${brandProfile.primaryColor}
+        ` : `
+        TIPO: Grade de Programação com Destaque Principal
+        TÍTULO: ${label.toUpperCase()} - ${events.length} torneios
+
+        DESTAQUE PRINCIPAL (maior GTD): ${topEventText}
+
+        LISTA DOS DEMAIS TORNEIOS:
+        ${otherEventsList}
+
+        DESIGN: Logo no topo, título "${label}", GTD em ${brandProfile.secondaryColor}, fundo ${brandProfile.primaryColor}
+        `;
+
+        // Use background job if userId is available AND we're not in dev mode
+        if (userId && !isDevMode) {
+            setIsGenerating(true);
+            setGeneratedFlyers(prev => ['loading', ...prev]);
+
+            try {
+                const config: GenerationJobConfig = {
+                    brandName: brandProfile.name,
+                    brandDescription: brandProfile.description,
+                    brandToneOfVoice: brandProfile.toneOfVoice,
+                    brandPrimaryColor: brandProfile.primaryColor,
+                    brandSecondaryColor: brandProfile.secondaryColor,
+                    aspectRatio,
+                    model,
+                    imageSize,
+                    logo: brandProfile.logo || undefined,
+                    collabLogo: collabLogo || undefined,
+                    styleReference: styleReference?.src || undefined,
+                    compositionAssets: compositionAssets.map(a => `data:${a.mimeType};base64,${a.base64}`),
+                    source: 'Flyer Diário'
+                };
+
+                await queueJob(userId, 'flyer_daily', prompt, config, jobContext);
+            } catch (err) {
+                console.error('[PeriodCardRow] Failed to queue job:', err);
+                setGeneratedFlyers(prev => prev.filter(f => f !== 'loading'));
+                setIsGenerating(false);
+            }
+            return;
+        }
+
+        // Local generation (dev mode or no userId)
+        setIsGenerating(true);
+        setGeneratedFlyers(prev => ['loading', ...prev]);
+
+        try {
+            let logoToUse = brandProfile.logo ? { base64: brandProfile.logo.split(',')[1], mimeType: 'image/png' } : null;
+            let collabLogoToUse = collabLogo ? { base64: collabLogo.split(',')[1], mimeType: 'image/png' } : null;
+            let refData = styleReference ? { base64: styleReference.src.split(',')[1], mimeType: 'image/png' } : null;
+            const assetsToUse = compositionAssets.map(a => ({ base64: a.base64, mimeType: a.mimeType }));
+            const imageUrl = await generateFlyer(prompt, brandProfile, logoToUse, refData, aspectRatio, model, collabLogoToUse, imageSize, assetsToUse);
+            const newImage = onAddImageToGallery({ src: imageUrl, prompt, source: 'Flyer Diário', model, aspectRatio, imageSize });
+            setGeneratedFlyers(prev => prev.map(f => f === 'loading' ? newImage : f));
+            setIsExpanded(true); // Auto-expand when generation completes
+        } catch (err) {
+            setGeneratedFlyers(prev => prev.filter(f => f !== 'loading'));
+        } finally {
+            setIsGenerating(false);
+        }
+    }, [isGenerating, events, triggerBatch, generatedFlyers.length, model, brandProfile, aspectRatio, currency, language, styleReference, onAddImageToGallery, setGeneratedFlyers, label, collabLogo, imageSize, compositionAssets, userId, queueJob, jobContext]);
+
+    useEffect(() => { if (triggerBatch && events.length > 0) handleGenerate(); }, [triggerBatch, events.length, handleGenerate]);
+
+    const totalGtd = events.reduce((sum, e) => sum + parseGtd(e.gtd), 0);
+
+    return (
+        <div className={`bg-[#0d0d0d] border rounded-xl overflow-hidden transition-all mb-2 ${isGenerating ? 'border-primary/50 animate-pulse' : 'border-white/[0.06] hover:border-white/10'}`}>
+            <div className="px-5 py-4 flex items-center justify-between cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-6 items-center text-left">
+                    <div className="flex items-center gap-3">
+                        {isGenerating && <Loader className="w-4 h-4 flex-shrink-0" />}
+                        <div>
+                            <h3 className="text-xs font-bold text-white tracking-wide">{label}</h3>
+                            <p className="text-[10px] text-white/30 mt-0.5">
+                                {isGenerating ? 'Gerando flyer...' : `${events.length} torneios neste período`}
+                            </p>
+                        </div>
+                    </div>
+                    <div>
+                        <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider block mb-1">Período</span>
+                        <span className="text-sm font-semibold text-white">{period === 'ALL' ? 'Dia Completo' : period === 'MORNING' ? '06h - 12h' : period === 'AFTERNOON' ? '12h - 18h' : period === 'NIGHT' ? '18h - 06h' : 'Top 3'}</span>
+                    </div>
+                    <div>
+                        <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider block mb-1">GTD Total</span>
+                        <span className="text-sm font-bold text-primary">{formatCurrencyValue(String(totalGtd), currency)}</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3 ml-4">
+                    <Button size="small" variant={events.length > 0 ? "primary" : "secondary"} onClick={(e) => { e.stopPropagation(); handleGenerate(true); }} isLoading={isGenerating} disabled={events.length === 0}>Gerar</Button>
+                    <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} className="w-4 h-4 text-white/20" />
+                </div>
+            </div>
+            {isExpanded && (
+                <div className="px-4 pb-4 pt-3 border-t border-white/5 animate-fade-in-up flex justify-center">
+                    <div className="w-full max-w-[200px] aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border border-white/5 relative">
+                        <ImageCarousel
+                            images={generatedFlyers}
+                            onEdit={setEditingFlyer}
+                            onQuickPost={setQuickPostFlyer}
+                            onPublish={(f) => onPublishToCampaign(`Campanha para grade ${label}`, f)}
+                            onDownload={(f) => handleDownloadFlyer(f.src, `period-${period}.png`)}
+                            onCloneStyle={onCloneStyle}
+                        />
+                    </div>
+                </div>
+            )}
+            {editingFlyer && (
+                <ImagePreviewModal
+                    image={editingFlyer}
+                    onClose={() => setEditingFlyer(null)}
+                    onImageUpdate={(src) => { onUpdateGalleryImage(editingFlyer.id, src); setGeneratedFlyers(prev => prev.map(f => (f !== 'loading' && f.id === editingFlyer.id ? { ...f, src } : f))); }}
+                    onSetChatReference={onSetChatReference}
+                    onQuickPost={setQuickPostFlyer}
+                    onPublish={(f) => onPublishToCampaign(`Campanha para grade ${label}`, f)}
+                    onCloneStyle={onCloneStyle}
+                    downloadFilename={`period-${period}.png`}
+                />
+            )}
+            {quickPostFlyer && (
+                <QuickPostModal isOpen={!!quickPostFlyer} onClose={() => setQuickPostFlyer(null)} flyer={quickPostFlyer} brandProfile={brandProfile} context={`Sessão: ${label}. Grade:\n${events.map(e => e.name).join(', ')}`} />
             )}
         </div>
     );
@@ -392,10 +740,52 @@ const PeriodCard: React.FC<{
     onCloneStyle: (image: GalleryImage) => void;
     collabLogo: string | null;
     onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
-}> = ({ period, label, events, brandProfile, aspectRatio, currency, model, imageSize, compositionAssets, language, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, generatedFlyers, setGeneratedFlyers, triggerBatch, styleReference, onCloneStyle, collabLogo, onPublishToCampaign }) => {
+    userId?: string | null;
+}> = ({ period, label, events, brandProfile, aspectRatio, currency, model, imageSize, compositionAssets, language, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, generatedFlyers, setGeneratedFlyers, triggerBatch, styleReference, onCloneStyle, collabLogo, onPublishToCampaign, userId }) => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [editingFlyer, setEditingFlyer] = useState<GalleryImage | null>(null);
     const [quickPostFlyer, setQuickPostFlyer] = useState<GalleryImage | null>(null);
+
+    const { queueJob, onJobComplete, onJobFailed, getJobByContext } = useBackgroundJobs();
+    const jobContext = `flyer-card-${period}`;
+    const pendingJob = getJobByContext(jobContext);
+
+    // Listen for job completion (PeriodCard doesn't have isExpanded, no need to auto-expand)
+    useEffect(() => {
+        const unsubComplete = onJobComplete((job: ActiveJob) => {
+            if (job.context === jobContext && job.result_url) {
+                const newImage = onAddImageToGallery({
+                    src: job.result_url,
+                    prompt: '',
+                    source: 'Flyer Diário',
+                    model,
+                    aspectRatio,
+                    imageSize
+                });
+                setGeneratedFlyers(prev => prev.map(f => f === 'loading' ? newImage : f));
+                setIsGenerating(false);
+            }
+        });
+
+        const unsubFailed = onJobFailed((job: ActiveJob) => {
+            if (job.context === jobContext) {
+                setGeneratedFlyers(prev => prev.filter(f => f !== 'loading'));
+                setIsGenerating(false);
+            }
+        });
+
+        return () => { unsubComplete(); unsubFailed(); };
+    }, [jobContext, onJobComplete, onJobFailed, onAddImageToGallery, model, aspectRatio, imageSize, setGeneratedFlyers]);
+
+    // Restore loading state from pending job
+    useEffect(() => {
+        if (pendingJob && (pendingJob.status === 'queued' || pendingJob.status === 'processing') && !isGenerating) {
+            setIsGenerating(true);
+            if (!generatedFlyers.includes('loading')) {
+                setGeneratedFlyers(prev => ['loading', ...prev]);
+            }
+        }
+    }, [pendingJob, isGenerating, generatedFlyers, setGeneratedFlyers]);
 
     const parseGtd = (gtd: string): number => {
         if (!gtd || gtd === '---') return 0;
@@ -411,8 +801,6 @@ const PeriodCard: React.FC<{
     const handleGenerate = useCallback(async (forced: boolean = false) => {
         if (isGenerating || events.length === 0) return;
         if (triggerBatch && !forced && generatedFlyers.length > 0) return;
-        setIsGenerating(true);
-        setGeneratedFlyers(prev => ['loading', ...prev]);
 
         // Ordenar eventos por GTD e separar o maior
         const sortedByGtd = [...events].sort((a, b) => parseGtd(b.gtd) - parseGtd(a.gtd));
@@ -422,14 +810,6 @@ const PeriodCard: React.FC<{
 
         const topEventText = topEvent ? `${topEvent.name} - GTD: ${formatCurrencyValue(topEvent.gtd, currency)} - Horário: ${topEvent.times?.['-3']} - Buy-in: ${formatCurrencyValue(topEvent.buyIn, currency)}` : '';
         const otherEventsList = otherEvents.map(e => `${e.times?.['-3']} | ${e.name} | Buy-in: ${formatCurrencyValue(e.buyIn, currency)} | GTD: ${formatCurrencyValue(e.gtd, currency)}`).join('\n');
-
-        // DEBUG: Ver dados enviados para IA
-        console.log(`\n===== DEBUG FLYER ${label} =====`);
-        console.log(`Total eventos recebidos: ${events.length}`);
-        console.log(`Eventos:`, events.map(e => `${e.times?.['-3']} | ${e.name} | ${e.id}`));
-        console.log(`Top Event: ${topEventText}`);
-        console.log(`Lista outros:\n${otherEventsList}`);
-        console.log(`================================\n`);
 
         // Prompt específico para HIGHLIGHTS (apenas 3 torneios)
         const isHighlights = period === 'HIGHLIGHTS';
@@ -517,6 +897,41 @@ const PeriodCard: React.FC<{
         - Visual profissional de sportsbook/cassino premium
         `;
 
+        // Use background job if userId is available AND we're not in dev mode
+        if (userId && !isDevMode) {
+            setIsGenerating(true);
+            setGeneratedFlyers(prev => ['loading', ...prev]);
+
+            try {
+                const config: GenerationJobConfig = {
+                    brandName: brandProfile.name,
+                    brandDescription: brandProfile.description,
+                    brandToneOfVoice: brandProfile.toneOfVoice,
+                    brandPrimaryColor: brandProfile.primaryColor,
+                    brandSecondaryColor: brandProfile.secondaryColor,
+                    aspectRatio,
+                    model,
+                    imageSize,
+                    logo: brandProfile.logo || undefined,
+                    collabLogo: collabLogo || undefined,
+                    styleReference: styleReference?.src || undefined,
+                    compositionAssets: compositionAssets.map(a => `data:${a.mimeType};base64,${a.base64}`),
+                    source: 'Flyer Diário'
+                };
+
+                await queueJob(userId, 'flyer_daily', prompt, config, jobContext);
+            } catch (err) {
+                console.error('[PeriodCard] Failed to queue job:', err);
+                setGeneratedFlyers(prev => prev.filter(f => f !== 'loading'));
+                setIsGenerating(false);
+            }
+            return;
+        }
+
+        // Local generation (dev mode or no userId)
+        setIsGenerating(true);
+        setGeneratedFlyers(prev => ['loading', ...prev]);
+
         try {
             let logoToUse = brandProfile.logo ? { base64: brandProfile.logo.split(',')[1], mimeType: 'image/png' } : null;
             let collabLogoToUse = collabLogo ? { base64: collabLogo.split(',')[1], mimeType: 'image/png' } : null;
@@ -530,7 +945,7 @@ const PeriodCard: React.FC<{
         } finally {
             setIsGenerating(false);
         }
-    }, [isGenerating, events, triggerBatch, generatedFlyers.length, model, brandProfile, aspectRatio, currency, language, styleReference, onAddImageToGallery, setGeneratedFlyers, label, collabLogo, imageSize, compositionAssets]);
+    }, [isGenerating, events, triggerBatch, generatedFlyers.length, model, brandProfile, aspectRatio, currency, language, styleReference, onAddImageToGallery, setGeneratedFlyers, label, collabLogo, imageSize, compositionAssets, userId, queueJob, jobContext]);
 
     useEffect(() => { if (triggerBatch && events.length > 0) handleGenerate(); }, [triggerBatch, events.length, handleGenerate]);
 
@@ -560,7 +975,18 @@ const PeriodCard: React.FC<{
                     onCloneStyle={onCloneStyle}
                 />
             </div>
-            {editingFlyer && <ImagePreviewModal image={editingFlyer} onClose={() => setEditingFlyer(null)} onImageUpdate={(src) => { onUpdateGalleryImage(editingFlyer.id, src); setGeneratedFlyers(prev => prev.map(f => (f !== 'loading' && f.id === editingFlyer.id ? { ...f, src } : f))); }} onSetChatReference={onSetChatReference} />}
+            {editingFlyer && (
+                <ImagePreviewModal
+                    image={editingFlyer}
+                    onClose={() => setEditingFlyer(null)}
+                    onImageUpdate={(src) => { onUpdateGalleryImage(editingFlyer.id, src); setGeneratedFlyers(prev => prev.map(f => (f !== 'loading' && f.id === editingFlyer.id ? { ...f, src } : f))); }}
+                    onSetChatReference={onSetChatReference}
+                    onQuickPost={setQuickPostFlyer}
+                    onPublish={(f) => onPublishToCampaign(`Campanha para grade ${label}`, f)}
+                    onCloneStyle={onCloneStyle}
+                    downloadFilename={`period-${period}.png`}
+                />
+            )}
             {quickPostFlyer && (
                 <QuickPostModal isOpen={!!quickPostFlyer} onClose={() => setQuickPostFlyer(null)} flyer={quickPostFlyer} brandProfile={brandProfile} context={`Sessão: ${label}. Grade:\n${events.map(e => e.name).join(', ')}`} />
             )}
@@ -703,46 +1129,132 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     brandProfile, events, weekScheduleInfo, onFileUpload, onAddEvent, onAddImageToGallery,
     flyerState, setFlyerState, dailyFlyerState, setDailyFlyerState, onUpdateGalleryImage, onSetChatReference, onPublishToCampaign,
     selectedStyleReference, onClearSelectedStyleReference, styleReferences = [], onSelectStyleReference,
-    isWeekExpired, onClearExpiredSchedule
+    isWeekExpired, onClearExpiredSchedule, userId,
+    allSchedules = [], currentScheduleId, onSelectSchedule
 }) => {
   const daysMap = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
   const currentDayName = daysMap[new Date().getDay()];
-  const [selectedDay, setSelectedDay] = useState(currentDayName);
-  const [selectedAspectRatio, setSelectedAspectRatio] = useState('9:16');
-  const [selectedImageSize, setSelectedImageSize] = useState<ImageSize>('1K');
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency>('BRL');
-  const [selectedLanguage, setSelectedLanguage] = useState<'pt' | 'en'>('pt');
-  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
+
+  // Estados com persistência em localStorage
+  const [selectedDay, setSelectedDay] = useState(() => {
+    return localStorage.getItem('flyer_selectedDay') || currentDayName;
+  });
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState(() => {
+    return localStorage.getItem('flyer_aspectRatio') || '9:16';
+  });
+  const [selectedImageSize, setSelectedImageSize] = useState<ImageSize>(() => {
+    return (localStorage.getItem('flyer_imageSize') as ImageSize) || '1K';
+  });
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>(() => {
+    return (localStorage.getItem('flyer_currency') as Currency) || 'BRL';
+  });
+  const [selectedLanguage, setSelectedLanguage] = useState<'pt' | 'en'>(() => {
+    return (localStorage.getItem('flyer_language') as 'pt' | 'en') || 'pt';
+  });
+  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>(() => {
+    return (localStorage.getItem('flyer_imageModel') as ImageModel) || 'gemini-3-pro-image-preview';
+  });
+  const [showIndividualTournaments, setShowIndividualTournaments] = useState(() => {
+    return localStorage.getItem('flyer_showIndividual') === 'true';
+  });
+  const [showOnlyWithGtd, setShowOnlyWithGtd] = useState(() => {
+    return localStorage.getItem('flyer_showOnlyWithGtd') === 'true';
+  });
+  const [sortBy, setSortBy] = useState<'time' | 'gtd'>(() => {
+    return (localStorage.getItem('flyer_sortBy') as 'time' | 'gtd') || 'time';
+  });
+  const [collabLogo, setCollabLogo] = useState<string | null>(() => {
+    return localStorage.getItem('flyer_collabLogo') || null;
+  });
+  const [manualStyleRef, setManualStyleRef] = useState<string | null>(() => {
+    return localStorage.getItem('flyer_manualStyleRef') || null;
+  });
+  const [isStylePanelOpen, setIsStylePanelOpen] = useState(() => {
+    return localStorage.getItem('stylePanel_isOpen') === 'true';
+  });
+
   const [batchTrigger, setBatchTrigger] = useState(false);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
   const [globalStyleReference, setGlobalStyleReference] = useState<GalleryImage | null>(null);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
-  const [collabLogo, setCollabLogo] = useState<string | null>(null);
-  const [manualStyleRef, setManualStyleRef] = useState<string | null>(null);
-  const [showIndividualTournaments, setShowIndividualTournaments] = useState(false);
-  const [isStylePanelOpen, setIsStylePanelOpen] = useState(() => {
-    const saved = localStorage.getItem('stylePanel_isOpen');
-    return saved === 'true';
-  });
-  const carouselRef = useRef<HTMLDivElement>(null);
+  const [isSchedulesPanelOpen, setIsSchedulesPanelOpen] = useState(false);
 
-  // Persistir estado do painel
+  // Persistir todos os estados em localStorage
+  useEffect(() => {
+    localStorage.setItem('flyer_selectedDay', selectedDay);
+  }, [selectedDay]);
+  useEffect(() => {
+    localStorage.setItem('flyer_aspectRatio', selectedAspectRatio);
+  }, [selectedAspectRatio]);
+  useEffect(() => {
+    localStorage.setItem('flyer_imageSize', selectedImageSize);
+  }, [selectedImageSize]);
+  useEffect(() => {
+    localStorage.setItem('flyer_currency', selectedCurrency);
+  }, [selectedCurrency]);
+  useEffect(() => {
+    localStorage.setItem('flyer_language', selectedLanguage);
+  }, [selectedLanguage]);
+  useEffect(() => {
+    localStorage.setItem('flyer_imageModel', selectedImageModel);
+  }, [selectedImageModel]);
+  useEffect(() => {
+    localStorage.setItem('flyer_showIndividual', String(showIndividualTournaments));
+  }, [showIndividualTournaments]);
+  useEffect(() => {
+    localStorage.setItem('flyer_showOnlyWithGtd', String(showOnlyWithGtd));
+  }, [showOnlyWithGtd]);
+  useEffect(() => {
+    localStorage.setItem('flyer_sortBy', sortBy);
+  }, [sortBy]);
+  useEffect(() => {
+    try {
+      if (collabLogo) {
+        localStorage.setItem('flyer_collabLogo', collabLogo);
+      } else {
+        localStorage.removeItem('flyer_collabLogo');
+      }
+    } catch (e) {
+      console.warn('[FlyerGenerator] Failed to save collabLogo to localStorage:', e);
+      // Clear old flyer data to make space
+      try {
+        localStorage.removeItem('flyer_manualStyleRef');
+        localStorage.removeItem('flyer_collabLogo');
+      } catch {}
+    }
+  }, [collabLogo]);
+  useEffect(() => {
+    try {
+      if (manualStyleRef) {
+        localStorage.setItem('flyer_manualStyleRef', manualStyleRef);
+      } else {
+        localStorage.removeItem('flyer_manualStyleRef');
+      }
+    } catch (e) {
+      console.warn('[FlyerGenerator] Failed to save manualStyleRef to localStorage:', e);
+      // Clear old flyer data to make space
+      try {
+        localStorage.removeItem('flyer_manualStyleRef');
+        localStorage.removeItem('flyer_collabLogo');
+      } catch {}
+    }
+  }, [manualStyleRef]);
   useEffect(() => {
     localStorage.setItem('stylePanel_isOpen', String(isStylePanelOpen));
   }, [isStylePanelOpen]);
 
-  const scrollCarousel = (direction: 'left' | 'right') => {
-    if (!carouselRef.current) return;
-    const scrollAmount = 340; // 320px card + 20px gap
-    const newScrollLeft = direction === 'left'
-      ? carouselRef.current.scrollLeft - scrollAmount
-      : carouselRef.current.scrollLeft + scrollAmount;
-
-    carouselRef.current.scrollTo({
-      left: newScrollLeft,
-      behavior: 'smooth'
-    });
-  };
+  // Restaurar globalStyleReference do manualStyleRef salvo no localStorage
+  useEffect(() => {
+    if (manualStyleRef && !globalStyleReference) {
+      setGlobalStyleReference({
+        id: 'restored-style',
+        src: manualStyleRef,
+        prompt: 'Referência restaurada',
+        source: 'Edição',
+        model: selectedImageModel
+      });
+    }
+  }, []); // Executar apenas na montagem
 
   // Aplicar referência selecionada da galeria
   useEffect(() => {
@@ -780,12 +1292,21 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     return parseFloat(String(gtd).replace(/[^0-9.-]+/g, '')) || 0;
   };
 
-  const currentEvents = events.filter(e => e.day === selectedDay).sort((a, b) => getSortValue(a.times?.['-3']) - getSortValue(b.times?.['-3']));
+  const currentEvents = events
+    .filter(e => e.day === selectedDay)
+    .filter(e => !showOnlyWithGtd || parseGtd(e.gtd) > 0)
+    .sort((a, b) => {
+      if (sortBy === 'gtd') {
+        return parseGtd(b.gtd) - parseGtd(a.gtd); // Maior GTD primeiro
+      }
+      return getSortValue(a.times?.['-3']) - getSortValue(b.times?.['-3']); // Por horário
+    });
 
-  // Estatísticas do dia selecionado
+  // Estatísticas do dia selecionado (baseado em TODOS os eventos do dia, não filtrados)
+  const allDayEvents = events.filter(e => e.day === selectedDay);
   const dayStats = {
-    count: currentEvents.length,
-    withGtd: currentEvents.filter(e => parseGtd(e.gtd) > 0).length,
+    count: allDayEvents.length,
+    withGtd: allDayEvents.filter(e => parseGtd(e.gtd) > 0).length,
     totalGtd: currentEvents.reduce((sum, e) => sum + parseGtd(e.gtd), 0),
     top3: [...currentEvents].sort((a, b) => parseGtd(b.gtd) - parseGtd(a.gtd)).slice(0, 3)
   };
@@ -912,17 +1433,40 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   }
 
   return (
-    <>
-    <div className="space-y-6 animate-fade-in-up flex-1 overflow-y-auto px-6 py-5">
+    <div className="flex h-full">
+    <div className="flex-1 overflow-y-auto">
+    <div className="space-y-6 animate-fade-in-up px-6 py-5">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="text-left"><h2 className="text-2xl font-black text-white uppercase tracking-tight">Daily Protocol</h2><p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">Agrupamento Inteligente • Ciclo Diário</p></div>
             <div className="flex flex-wrap items-center gap-2">
                 <Button onClick={() => setShowIndividualTournaments(!showIndividualTournaments)} variant={showIndividualTournaments ? "primary" : "secondary"} icon={showIndividualTournaments ? "zap" : "calendar"} size="small">
                     {showIndividualTournaments ? 'Grades de Período' : 'Torneios Individuais'}
                 </Button>
+                {showIndividualTournaments && (
+                    <>
+                        <button
+                            onClick={() => setShowOnlyWithGtd(!showOnlyWithGtd)}
+                            className={`px-3 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all ${
+                                showOnlyWithGtd
+                                    ? 'bg-primary/20 text-primary border border-primary/30'
+                                    : 'bg-[#0a0a0a] text-white/40 border border-white/10 hover:text-white/60'
+                            }`}
+                        >
+                            {showOnlyWithGtd ? `Com GTD (${dayStats.withGtd})` : 'Só c/ GTD'}
+                        </button>
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value as 'time' | 'gtd')}
+                            className="px-3 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider bg-[#0a0a0a] text-white/60 border border-white/10 outline-none cursor-pointer"
+                        >
+                            <option value="time">Por Horário</option>
+                            <option value="gtd">Por GTD ↓</option>
+                        </select>
+                    </>
+                )}
                 {currentEvents.length > 0 && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-[#0a0a0a] border border-white/10 rounded-lg">
-                        <span className="text-[9px] font-black text-white/40 uppercase tracking-wider">{dayStats.count} torneios</span>
+                        <span className="text-[9px] font-black text-white/40 uppercase tracking-wider">{showOnlyWithGtd ? currentEvents.length : dayStats.count} torneios</span>
                         <div className="h-3 w-px bg-white/20" />
                         <span className="text-[9px] font-black text-primary/70 uppercase tracking-wider">{formatCurrencyValue(String(dayStats.totalGtd), selectedCurrency)}</span>
                     </div>
@@ -953,15 +1497,102 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[#111111] border border-white/5 rounded-xl">
             <div className="flex items-center gap-4">
               {weekScheduleInfo && (
-                <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setIsSchedulesPanelOpen(!isSchedulesPanelOpen)}
+                  className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                >
                   <Icon name="calendar" className="w-3 h-3 text-white/20" />
                   <span className="text-[8px] font-bold text-white/40 uppercase">Semana {weekScheduleInfo.startDate} a {weekScheduleInfo.endDate}</span>
-                </div>
+                  <Icon name={isSchedulesPanelOpen ? 'chevron-up' : 'chevron-down'} className="w-3 h-3 text-white/20" />
+                </button>
               )}
               <div className="h-3 w-px bg-white/10" />
               <span className="text-[8px] font-black text-white/30 uppercase">{weekStats.totalTournaments} torneios</span>
               <div className="h-3 w-px bg-white/10" />
               <span className="text-[8px] font-black text-primary/60 uppercase">GTD Total: {formatCurrencyValue(String(weekStats.totalGtd), selectedCurrency)}</span>
+            </div>
+            {allSchedules.length > 1 && (
+              <span className="text-[8px] text-white/20">{allSchedules.length} planilhas salvas</span>
+            )}
+          </div>
+        )}
+
+        {/* Lista de planilhas salvas */}
+        {isSchedulesPanelOpen && allSchedules.length > 0 && (
+          <div className="bg-[#0a0a0a] border border-white/5 rounded-xl p-3 space-y-2 animate-fade-in-up">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-[10px] font-black text-white/50 uppercase tracking-wider">Planilhas Salvas</h4>
+              <button onClick={() => setIsSchedulesPanelOpen(false)} className="text-white/30 hover:text-white/50">
+                <Icon name="x" className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="grid gap-2 max-h-48 overflow-y-auto">
+              {allSchedules.map((schedule) => {
+                const startDate = new Date(schedule.start_date);
+                const endDate = new Date(schedule.end_date);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const isCurrentWeek = today >= startDate && today <= endDate;
+                const isExpired = today > endDate;
+                const isSelected = currentScheduleId === schedule.id;
+
+                const formatDate = (date: Date) => {
+                  const day = String(date.getDate()).padStart(2, '0');
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  return `${day}/${month}`;
+                };
+
+                return (
+                  <button
+                    key={schedule.id}
+                    onClick={() => onSelectSchedule?.(schedule)}
+                    className={`w-full flex items-center justify-between gap-3 p-3 rounded-lg border transition-all text-left ${
+                      isSelected
+                        ? 'bg-primary/10 border-primary/30'
+                        : isCurrentWeek
+                          ? 'bg-green-500/10 border-green-500/20 hover:border-green-500/40'
+                          : isExpired
+                            ? 'bg-white/[0.02] border-white/5 hover:border-white/10 opacity-60'
+                            : 'bg-white/[0.02] border-white/5 hover:border-white/10'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        isCurrentWeek ? 'bg-green-500/20' : isExpired ? 'bg-white/5' : 'bg-white/5'
+                      }`}>
+                        <Icon name="calendar" className={`w-4 h-4 ${
+                          isCurrentWeek ? 'text-green-500' : 'text-white/30'
+                        }`} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-[10px] font-bold truncate ${
+                          isSelected ? 'text-primary' : isCurrentWeek ? 'text-green-400' : 'text-white/70'
+                        }`}>
+                          {formatDate(startDate)} - {formatDate(endDate)}
+                        </p>
+                        <p className="text-[8px] text-white/30 truncate">
+                          {schedule.filename || 'Planilha'} • {schedule.event_count} torneios
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {isCurrentWeek && (
+                        <span className="text-[7px] font-black text-green-400 bg-green-500/20 px-1.5 py-0.5 rounded uppercase">
+                          Atual
+                        </span>
+                      )}
+                      {isExpired && !isCurrentWeek && (
+                        <span className="text-[7px] font-black text-white/30 bg-white/5 px-1.5 py-0.5 rounded uppercase">
+                          Expirada
+                        </span>
+                      )}
+                      {isSelected && (
+                        <Icon name="check" className="w-3 h-3 text-primary" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -979,81 +1610,85 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
             </div>
         </div>
 
+        {/* Opções de assets - linha simples igual aos selects */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 -mt-2">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">Logo Colab</label>
+              <label className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white flex items-center gap-2 cursor-pointer hover:border-white/20 transition-colors group">
+                {collabLogo ? (
+                  <>
+                    <img src={collabLogo} className="w-5 h-5 object-contain rounded" />
+                    <span className="flex-1 truncate text-white/60">Logo adicionado</span>
+                    <button onClick={(e) => { e.preventDefault(); setCollabLogo(null); }} className="text-white/30 hover:text-red-400 transition-colors"><Icon name="x" className="w-3.5 h-3.5" /></button>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="upload" className="w-4 h-4 text-white/20" />
+                    <span className="text-white/30">Adicionar logo</span>
+                  </>
+                )}
+                <input type="file" className="hidden" accept="image/*" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { dataUrl } = await fileToBase64(f); setCollabLogo(dataUrl); } }} />
+              </label>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">Referência</label>
+              <label className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white flex items-center gap-2 cursor-pointer hover:border-white/20 transition-colors group">
+                {manualStyleRef ? (
+                  <>
+                    <img src={manualStyleRef} className="w-5 h-5 object-cover rounded" />
+                    <span className="flex-1 truncate text-white/60">Referência ativa</span>
+                    <button onClick={(e) => { e.preventDefault(); setManualStyleRef(null); setGlobalStyleReference(null); }} className="text-white/30 hover:text-red-400 transition-colors"><Icon name="x" className="w-3.5 h-3.5" /></button>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="image" className="w-4 h-4 text-white/20" />
+                    <span className="text-white/30">Adicionar estilo</span>
+                  </>
+                )}
+                <input type="file" className="hidden" accept="image/*" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { dataUrl } = await fileToBase64(f); setManualStyleRef(dataUrl); setGlobalStyleReference({ id: 'manual-ref', src: dataUrl, prompt: 'Estilo Manual', source: 'Edição', model: selectedImageModel }); } }} />
+              </label>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">Ativos</label>
+              <label className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white flex items-center gap-2 cursor-pointer hover:border-white/20 transition-colors">
+                {compositionAssets.length > 0 ? (
+                  <>
+                    <div className="flex -space-x-1">
+                      {compositionAssets.slice(0, 3).map((asset, idx) => (
+                        <img key={idx} src={(asset as any).preview} className="w-5 h-5 object-cover rounded border border-black" />
+                      ))}
+                    </div>
+                    <span className="flex-1 text-white/60">{compositionAssets.length} ativo{compositionAssets.length > 1 ? 's' : ''}</span>
+                    <button onClick={(e) => { e.preventDefault(); setCompositionAssets([]); }} className="text-white/30 hover:text-red-400 transition-colors"><Icon name="x" className="w-3.5 h-3.5" /></button>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="upload" className="w-4 h-4 text-white/20" />
+                    <span className="text-white/30">Mockups, pessoas</span>
+                  </>
+                )}
+                <input type="file" className="hidden" accept="image/*" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { base64, mimeType, dataUrl } = await fileToBase64(f); setCompositionAssets(prev => [...prev, { base64, mimeType, preview: dataUrl } as any]); } }} />
+              </label>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">Favoritos</label>
+              <button onClick={() => setIsStylePanelOpen(!isStylePanelOpen)} className={`w-full bg-[#0a0a0a] border rounded-xl px-3 py-2.5 text-xs flex items-center gap-2 transition-colors ${isStylePanelOpen ? 'border-primary/50 text-primary' : 'border-white/10 text-white/30 hover:border-white/20'}`}>
+                <Icon name="layout" className="w-4 h-4" />
+                <span>{styleReferences.length} estilos salvos</span>
+              </button>
+            </div>
+        </div>
+
         {!showIndividualTournaments ? (
-            <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 -mt-2">
-                    <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl flex items-center space-x-4 text-left"><div className="w-12 h-12 rounded-xl bg-black/50 border border-dashed border-white/10 flex items-center justify-center relative overflow-hidden group">{collabLogo ? <><img src={collabLogo} className="w-full h-full object-contain p-1" /><button onClick={() => setCollabLogo(null)} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[8px] font-black uppercase">X</button></> : <label className="cursor-pointer w-full h-full flex items-center justify-center"><Icon name="upload" className="w-4 h-4 text-white/10" /><input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { dataUrl } = await fileToBase64(f); setCollabLogo(dataUrl); } }} /></label>}</div><div><h4 className="text-[9px] font-black text-white uppercase tracking-wide">Logo Colab</h4><p className="text-[8px] text-white/20 mt-0.5">Incluso em todos os flyers</p></div></div>
-                    <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl flex items-center gap-4 text-left">
-                        <div className="w-12 h-12 rounded-xl bg-black/50 border border-dashed border-white/10 flex items-center justify-center relative overflow-hidden group flex-shrink-0">
-                            {manualStyleRef ? (
-                                <>
-                                    <img src={manualStyleRef} className="w-full h-full object-cover" />
-                                    <button onClick={() => setManualStyleRef(null)} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[8px] font-black uppercase">X</button>
-                                </>
-                            ) : (
-                                <label className="cursor-pointer w-full h-full flex items-center justify-center">
-                                    <Icon name="image" className="w-4 h-4 text-white/10" />
-                                    <input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { dataUrl } = await fileToBase64(f); setManualStyleRef(dataUrl); setGlobalStyleReference({ id: 'manual-ref', src: dataUrl, prompt: 'Estilo Manual', source: 'Edição', model: selectedImageModel }); } }} />
-                                </label>
-                            )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h4 className="text-[9px] font-black text-white uppercase tracking-wide">Referência de Estilo</h4>
-                            <p className="text-[8px] text-white/20 mt-0.5">Layout Global</p>
-                        </div>
-                        <Button
-                            size="small"
-                            variant={isStylePanelOpen ? "primary" : "secondary"}
-                            onClick={() => setIsStylePanelOpen(!isStylePanelOpen)}
-                            icon="layout"
-                        >
-                            {isStylePanelOpen ? 'Fechar' : 'Favoritos'}
-                        </Button>
-                    </div>
-                    <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl flex items-center text-left gap-4"><div className="w-12 h-12 rounded-xl bg-black/50 border border-dashed border-white/10 flex items-center justify-center flex-shrink-0"><label className="cursor-pointer w-full h-full flex items-center justify-center"><Icon name="upload" className="w-4 h-4 text-white/10" /><input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const { base64, mimeType, dataUrl } = await fileToBase64(f); setCompositionAssets(prev => [...prev, { base64, mimeType, preview: dataUrl } as any]); } }} /></label></div><div className="flex-1 min-w-0"><h4 className="text-[9px] font-black text-white uppercase tracking-wide">Ativos Adicionais</h4><div className="flex gap-1.5 mt-1.5 overflow-x-auto">{compositionAssets.length > 0 ? compositionAssets.map((asset, idx) => (<div key={idx} className="w-8 h-8 flex-shrink-0 rounded-md bg-black border border-white/10 relative group overflow-hidden"><img src={(asset as any).preview} className="w-full h-full object-cover" /><button onClick={() => setCompositionAssets(prev => prev.filter((_, i) => i !== idx))} className="absolute inset-0 bg-red-500/80 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[7px] font-black">X</button></div>)) : <p className="text-[8px] text-white/20">Mockups e pessoas</p>}</div></div></div>
-                </div>
-                <div className="relative">
-                    {/* Botão Esquerda */}
-                    <button
-                        onClick={() => scrollCarousel('left')}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/90 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-primary hover:text-black hover:border-primary transition-all opacity-0 hover:opacity-100 peer-hover:opacity-100 shadow-2xl pointer-events-auto"
-                    >
-                        <Icon name="chevron-up" className="w-5 h-5 -rotate-90" />
-                    </button>
-
-                    {/* Carrossel */}
-                    <div
-                        ref={carouselRef}
-                        className="peer flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden group/carousel"
-                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                        onMouseEnter={(e) => {
-                            const buttons = e.currentTarget.parentElement?.querySelectorAll('button');
-                            buttons?.forEach(btn => btn.classList.add('!opacity-100'));
-                        }}
-                        onMouseLeave={(e) => {
-                            const buttons = e.currentTarget.parentElement?.querySelectorAll('button');
-                            buttons?.forEach(btn => btn.classList.remove('!opacity-100'));
-                        }}
-                    >
-                        {(['ALL', 'MORNING', 'AFTERNOON', 'NIGHT', 'HIGHLIGHTS'] as TimePeriod[]).map(p => (
-                            <div key={p} className="flex-shrink-0 w-[320px] snap-start">
-                                <PeriodCard
-                                    period={p} label={periodLabels[selectedLanguage][p]} events={getEventsByPeriod(p)} brandProfile={brandProfile} aspectRatio={selectedAspectRatio} currency={selectedCurrency} model={selectedImageModel} imageSize={selectedImageSize} language={selectedLanguage}
-                                    onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} generatedFlyers={dailyFlyerState[p]} setGeneratedFlyers={(u) => setDailyFlyerState(prev => ({...prev, [p]: u(prev[p])}))} triggerBatch={batchTrigger} styleReference={globalStyleReference} onCloneStyle={handleSetStyleReference} collabLogo={collabLogo} compositionAssets={compositionAssets} onPublishToCampaign={onPublishToCampaign}
-                                />
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Botão Direita */}
-                    <button
-                        onClick={() => scrollCarousel('right')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/90 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-primary hover:text-black hover:border-primary transition-all opacity-0 hover:opacity-100 peer-hover:opacity-100 shadow-2xl pointer-events-auto"
-                    >
-                        <Icon name="chevron-up" className="w-5 h-5 rotate-90" />
-                    </button>
-                </div>
-            </>
+            <div className="space-y-2">
+                {(['ALL', 'MORNING', 'AFTERNOON', 'NIGHT', 'HIGHLIGHTS'] as TimePeriod[]).map(p => (
+                    <PeriodCardRow
+                        key={p}
+                        period={p} label={periodLabels[selectedLanguage][p]} events={getEventsByPeriod(p)} brandProfile={brandProfile} aspectRatio={selectedAspectRatio} currency={selectedCurrency} model={selectedImageModel} imageSize={selectedImageSize} language={selectedLanguage}
+                        onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} generatedFlyers={dailyFlyerState[p]} setGeneratedFlyers={(u) => setDailyFlyerState(prev => ({...prev, [p]: u(prev[p])}))} triggerBatch={batchTrigger} styleReference={globalStyleReference} onCloneStyle={handleSetStyleReference} collabLogo={collabLogo} compositionAssets={compositionAssets} onPublishToCampaign={onPublishToCampaign} userId={userId}
+                    />
+                ))}
+            </div>
         ) : (
             <div className="space-y-2">
                 {currentEvents.length > 0 ? currentEvents.map(e => (
@@ -1061,12 +1696,13 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         key={e.id} event={e} brandProfile={brandProfile} aspectRatio={selectedAspectRatio} currency={selectedCurrency} language={selectedLanguage} model={selectedImageModel} imageSize={selectedImageSize}
                         onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference}
                         generatedFlyers={flyerState[e.id] || []} setGeneratedFlyers={(u) => setFlyerState(prev => ({...prev, [e.id]: u(prev[e.id] || [])}))}
-                        collabLogo={collabLogo} compositionAssets={compositionAssets} onPublishToCampaign={onPublishToCampaign}
+                        collabLogo={collabLogo} styleReference={globalStyleReference} compositionAssets={compositionAssets} onPublishToCampaign={onPublishToCampaign} userId={userId}
                     />
                 )) : <p className="text-white/20 text-xs font-bold uppercase tracking-wide text-center py-12">Nenhum torneio detectado para este dia.</p>}
             </div>
         )}
         <ManualEventModal isOpen={isManualModalOpen} onClose={() => setIsManualModalOpen(false)} onSave={(ev) => onAddEvent(ev)} day={selectedDay} />
+    </div>
     </div>
 
     {/* Painel Lateral Integrado de Favoritos */}
@@ -1180,6 +1816,6 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
         </>
       )}
     </div>
-    </>
+    </div>
   );
 };

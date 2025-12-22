@@ -92,23 +92,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const schedule = scheduleResult[0];
 
-      // Create events if provided
+      // Create events if provided - using batch insert for performance
       if (events && Array.isArray(events) && events.length > 0) {
-        for (const event of events) {
-          await sql`
-            INSERT INTO tournament_events (
-              user_id, week_schedule_id, day_of_week, name, game, gtd, buy_in,
-              rebuy, add_on, stack, players, late_reg, minutes, structure, times, event_date
+        console.log(`[Tournaments API] Inserting ${events.length} events in parallel batches...`);
+
+        // Process in batches - each batch runs concurrently, batches run sequentially
+        const batchSize = 50; // 50 concurrent inserts per batch
+
+        for (let i = 0; i < events.length; i += batchSize) {
+          const batch = events.slice(i, i + batchSize);
+
+          // Execute all inserts in this batch concurrently
+          await Promise.all(
+            batch.map((event: {
+              day?: string;
+              name?: string;
+              game?: string;
+              gtd?: string;
+              buyIn?: string;
+              rebuy?: string;
+              addOn?: string;
+              stack?: string;
+              players?: string;
+              lateReg?: string;
+              minutes?: string;
+              structure?: string;
+              times?: Record<string, string>;
+              eventDate?: string;
+            }) =>
+              sql`
+                INSERT INTO tournament_events (
+                  user_id, week_schedule_id, day_of_week, name, game, gtd, buy_in,
+                  rebuy, add_on, stack, players, late_reg, minutes, structure, times, event_date
+                )
+                VALUES (
+                  ${user_id}, ${schedule.id}, ${event.day || ''}, ${event.name || ''}, ${event.game || null},
+                  ${event.gtd || null}, ${event.buyIn || null}, ${event.rebuy || null},
+                  ${event.addOn || null}, ${event.stack || null}, ${event.players || null},
+                  ${event.lateReg || null}, ${event.minutes || null}, ${event.structure || null},
+                  ${JSON.stringify(event.times || {})}, ${event.eventDate || null}
+                )
+              `
             )
-            VALUES (
-              ${user_id}, ${schedule.id}, ${event.day}, ${event.name}, ${event.game || null},
-              ${event.gtd || null}, ${event.buyIn || null}, ${event.rebuy || null},
-              ${event.addOn || null}, ${event.stack || null}, ${event.players || null},
-              ${event.lateReg || null}, ${event.minutes || null}, ${event.structure || null},
-              ${JSON.stringify(event.times || {})}, ${event.eventDate || null}
-            )
-          `;
+          );
         }
+        console.log(`[Tournaments API] All ${events.length} events inserted successfully`);
       }
 
       // Return the created schedule with events count

@@ -19,6 +19,10 @@ export default defineConfig(({ mode }) => {
             target: 'http://localhost:3002',
             changeOrigin: true,
           },
+          '/api/generate': {
+            target: 'http://localhost:3002',
+            changeOrigin: true,
+          },
           '/api/rube': {
             target: 'https://rube.app',
             changeOrigin: true,

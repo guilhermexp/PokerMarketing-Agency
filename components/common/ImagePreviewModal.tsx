@@ -13,6 +13,11 @@ interface ImagePreviewModalProps {
   onImageUpdate: (newImageUrl: string) => void;
   onSetChatReference: (image: GalleryImage) => void;
   downloadFilename?: string;
+  // Action props
+  onQuickPost?: (image: GalleryImage) => void;
+  onPublish?: (image: GalleryImage) => void;
+  onCloneStyle?: (image: GalleryImage) => void;
+  onSchedulePost?: (image: GalleryImage) => void;
 }
 
 interface ImageFile {
@@ -56,33 +61,33 @@ const ImageUploader: React.FC<{
         accept: { 'image/*': [] },
         multiple: false,
     });
-    
+
     return (
-        <div className="mt-4">
-            <label className="block text-xs font-bold text-subtle uppercase tracking-wider mb-2">{title}</label>
+        <div>
+            <label className="block text-[10px] font-black text-white/50 uppercase tracking-[0.15em] mb-2.5">{title}</label>
             <div
                 {...getRootProps()}
-                className={`relative border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-all duration-200 h-28 flex flex-col justify-center items-center ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted/40 hover:border-primary/50 hover:bg-surface/30'}`}
+                className={`relative border border-dashed rounded-xl p-4 text-center cursor-pointer transition-all duration-200 h-24 flex flex-col justify-center items-center group ${isDragActive ? 'border-primary/60 bg-primary/5' : 'border-white/15 hover:border-white/30 hover:bg-white/[0.02]'}`}
             >
                 <input {...getInputProps()} />
                 {image ? (
                     <>
-                        <img src={image.preview} alt="Preview" className="max-h-24 max-w-full rounded-lg object-contain shadow-sm" onDragStart={(e) => e.preventDefault()} />
+                        <img src={image.preview} alt="Preview" className="max-h-20 max-w-full rounded-lg object-contain" onDragStart={(e) => e.preventDefault()} />
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onImageChange(null);
                             }}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 transition-colors"
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500/90 text-white rounded-full flex items-center justify-center hover:bg-red-500 transition-colors"
                             aria-label="Remove image"
                         >
-                            <Icon name="x" className="w-3 h-3" />
+                            <Icon name="x" className="w-2.5 h-2.5" />
                         </button>
                     </>
                 ) : (
-                    <div className="flex flex-col items-center justify-center text-text-muted transition-colors group">
-                        <Icon name="upload" className="w-6 h-6 mb-2 opacity-50 group-hover:opacity-100" />
-                        <p className="text-xs font-medium">Arraste ou clique para adicionar referência</p>
+                    <div className="flex flex-col items-center justify-center text-white/30 group-hover:text-white/50 transition-colors">
+                        <Icon name="upload" className="w-5 h-5 mb-1.5" />
+                        <p className="text-[10px] font-medium">Arraste ou clique para adicionar referência</p>
                     </div>
                 )}
             </div>
@@ -91,14 +96,24 @@ const ImageUploader: React.FC<{
 };
 
 
-export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onClose, onImageUpdate, onSetChatReference, downloadFilename }) => {
+export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
+  image,
+  onClose,
+  onImageUpdate,
+  onSetChatReference,
+  downloadFilename,
+  onQuickPost,
+  onPublish,
+  onCloneStyle,
+  onSchedulePost
+}) => {
   const [editPrompt, setEditPrompt] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isRemovingBackground, setIsRemovingBackground] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<ImageFile | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [hasPayedKey] = useState(true); // Chaves já configuradas no .env
+  const [hasPayedKey] = useState(true);
 
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -113,9 +128,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
         const maskCanvas = maskCanvasRef.current;
         const container = containerRef.current;
         if (!imageCanvas || !maskCanvas || !container) return;
-        
+
         const { naturalWidth, naturalHeight } = img;
-        
+
         imageCanvas.width = naturalWidth;
         imageCanvas.height = naturalHeight;
         maskCanvas.width = naturalWidth;
@@ -138,14 +153,14 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
-  
+
   const getCoords = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>): { x: number, y: number } => {
     const canvas = maskCanvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    
+
     let clientX, clientY;
     if ('touches' in e) {
         clientX = e.touches[0].clientX;
@@ -176,8 +191,8 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
     const ctx = maskCanvasRef.current?.getContext('2d');
     if (!ctx) return;
     ctx.lineTo(x, y);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'; 
-    ctx.lineWidth = 60; 
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 60;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
@@ -188,7 +203,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
     ctx?.closePath();
     setIsDrawing(false);
   };
-  
+
   const clearMask = () => {
     const canvas = maskCanvasRef.current;
     if (!canvas) return;
@@ -196,20 +211,8 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
     ctx?.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  const handleSelectKey = async () => {
-      if (window.aistudio?.openSelectKey) {
-          await window.aistudio.openSelectKey();
-          setHasPayedKey(true);
-      }
-  };
-
   const handleEdit = async () => {
     if (!editPrompt.trim()) return;
-    
-    if (!hasPayedKey) {
-        await handleSelectKey();
-        return;
-    }
 
     setIsEditing(true);
     setError(null);
@@ -224,28 +227,25 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
             const ctx = maskCanvas.getContext('2d');
             const data = ctx?.getImageData(0,0, maskCanvas.width, maskCanvas.height).data;
             const hasDrawing = data?.some(channel => channel !== 0);
-            
+
             if (hasDrawing) {
                const maskDataUrl = maskCanvas.toDataURL('image/png');
                const [maskHeader, maskBase64] = maskDataUrl.split(',');
                maskData = { base64: maskBase64, mimeType: 'image/png' };
             }
         }
-        
-        const refImageData = referenceImage 
+
+        const refImageData = referenceImage
             ? { base64: referenceImage.base64, mimeType: referenceImage.mimeType }
             : undefined;
 
         const newImageUrl = await editImage(imgBase64, imgMimeType, editPrompt, maskData, refImageData);
-        
+
         onImageUpdate(newImageUrl);
         setEditPrompt('');
         clearMask();
     } catch (err: any) {
         setError(err.message || 'Falha ao editar a imagem.');
-        if (err.message?.includes("chave de API paga")) {
-            setHasPayedKey(false);
-        }
     } finally {
         setIsEditing(false);
     }
@@ -275,12 +275,12 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
     link.click();
     document.body.removeChild(link);
   };
-  
+
   const handleUseInChat = () => {
     onSetChatReference(image);
     onClose();
   };
-  
+
   const isActionRunning = isEditing || isRemovingBackground;
 
   return (
@@ -304,6 +304,28 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
             </div>
 
             <div className="flex items-center gap-2">
+                {/* Action buttons */}
+                {onQuickPost && (
+                    <Button onClick={() => { onQuickPost(image); onClose(); }} variant="primary" size="small" icon="zap">
+                        QuickPost
+                    </Button>
+                )}
+                {onSchedulePost && (
+                    <Button onClick={() => { onSchedulePost(image); onClose(); }} variant="secondary" size="small" icon="calendar">
+                        Agendar
+                    </Button>
+                )}
+                {onPublish && (
+                    <Button onClick={() => { onPublish(image); onClose(); }} variant="secondary" size="small" icon="users">
+                        Campanha
+                    </Button>
+                )}
+                {onCloneStyle && (
+                    <Button onClick={() => { onCloneStyle(image); onClose(); }} variant="secondary" size="small" icon="copy">
+                        Modelo
+                    </Button>
+                )}
+                <div className="w-px h-6 bg-white/10 mx-1" />
                 <Button onClick={handleUseInChat} variant="secondary" size="small" icon="paperclip" className="hidden md:flex">
                     Assistente
                 </Button>
@@ -336,15 +358,15 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
                         onTouchMove={draw}
                         onTouchEnd={stopDrawing}
                     />
-                    
-                    {/* Brush UI indicator (Optional) */}
+
+                    {/* Brush UI indicator */}
                     {!isDrawing && !isActionRunning && (
-                         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-muted/30 flex items-center gap-3 text-xs text-white/80 pointer-events-none">
+                         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 flex items-center gap-3 text-xs text-white/80 pointer-events-none">
                             <Icon name="edit" className="w-4 h-4" />
                             <span>Pinte na imagem para marcar a área de edição</span>
                         </div>
                     )}
-                    
+
                     {isActionRunning && (
                         <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center z-20">
                             <Loader className="w-12 h-12 mb-4" />
@@ -353,84 +375,82 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onC
                     )}
                 </div>
             </div>
-            
+
             {/* Control Sidebar */}
-            <div className="w-full md:w-[320px] flex-shrink-0 bg-[#111111] p-5 flex flex-col border-t md:border-t-0 md:border-l border-white/5 overflow-y-auto">
-                <div className="flex-grow">
-                    <section className="mb-6">
-                        <div className="flex items-center justify-between mb-3">
-                            <label className="text-xs font-bold text-subtle uppercase tracking-wider">O que deseja alterar?</label>
+            <div className="w-full md:w-[320px] flex-shrink-0 bg-gradient-to-b from-[#111111] to-[#0d0d0d] p-5 flex flex-col border-t md:border-t-0 md:border-l border-white/5 overflow-y-auto">
+                <div className="flex-grow space-y-5">
+                    {/* Prompt Section */}
+                    <section>
+                        <div className="flex items-center justify-between mb-2.5">
+                            <label className="text-[10px] font-black text-white/50 uppercase tracking-[0.15em]">O que deseja alterar?</label>
                             {editPrompt && (
-                                <button onClick={() => setEditPrompt('')} className="text-[10px] text-primary hover:underline">Limpar</button>
+                                <button onClick={() => setEditPrompt('')} className="text-[9px] font-bold text-primary/70 hover:text-primary transition-colors uppercase tracking-wider">Limpar</button>
                             )}
                         </div>
                         <textarea
                             value={editPrompt}
                             onChange={(e) => setEditPrompt(e.target.value)}
-                            rows={5}
-                            className="w-full bg-background/50 border border-muted/30 rounded-xl p-4 text-sm text-text-main focus:ring-2 focus:ring-primary focus:border-primary transition-all resize-none shadow-inner placeholder:text-text-muted/40"
+                            rows={4}
+                            className="w-full bg-black/60 border border-white/10 rounded-xl p-3.5 text-sm text-white focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-all resize-none placeholder:text-white/25 leading-relaxed"
                             placeholder="Descreva as mudanças... Ex: 'Substitua o fundo por uma mesa de poker luxuosa' ou 'Mude a cor do letreiro para dourado'."
                         />
-                        <div className="mt-2 flex items-start gap-2 text-[11px] text-text-muted leading-tight">
-                            <Icon name="zap" className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
-                            <p>Dica: Pintar a área específica no canvas ajuda a IA a ser mais precisa.</p>
+                        <div className="mt-2.5 flex items-start gap-2 px-1">
+                            <Icon name="zap" className="w-3 h-3 text-primary/70 mt-0.5 flex-shrink-0" />
+                            <p className="text-[10px] text-white/35 leading-relaxed">Dica: Pintar a área específica no canvas ajuda a IA a ser mais precisa.</p>
                         </div>
                     </section>
-                    
-                    <div className="h-px bg-muted/20 my-6"></div>
 
-                    <ImageUploader image={referenceImage} onImageChange={setReferenceImage} title="Referência Visual" />
+                    {/* Reference Section */}
+                    <section>
+                        <ImageUploader image={referenceImage} onImageChange={setReferenceImage} title="Referência Visual" />
+                    </section>
 
                     {error && (
-                        <div className="mt-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex gap-3 animate-fade-in-up">
-                            <Icon name="x" className="w-4 h-4 text-red-400 mt-0.5" />
-                            <p className="text-xs text-red-400 font-medium leading-normal">{error}</p>
-                        </div>
-                    )}
-                    
-                    {!hasPayedKey && (
-                        <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Icon name="zap" className="w-4 h-4 text-yellow-400" />
-                                <p className="text-xs font-bold text-yellow-200 uppercase">Upgrade Necessário</p>
-                            </div>
-                            <p className="text-[11px] text-yellow-100/70 leading-relaxed mb-3">
-                                A edição de alta fidelidade utiliza o modelo Gemini 3 Pro e requer uma chave de API de um projeto com faturamento ativo.
-                            </p>
-                            <button 
-                                onClick={handleSelectKey} 
-                                className="w-full py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 text-xs font-bold rounded-lg transition-colors border border-yellow-500/40"
-                            >
-                                Selecionar Chave Paga
-                            </button>
+                        <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl flex gap-2.5">
+                            <Icon name="x" className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-red-400/90 font-medium leading-relaxed">{error}</p>
                         </div>
                     )}
                 </div>
 
-                <div className="mt-8 space-y-3 pt-6 border-t border-muted/20">
-                    <div className="grid grid-cols-2 gap-3">
-                        <Button onClick={clearMask} variant="secondary" className="w-full h-11" size="small" disabled={isActionRunning}>
+                {/* Actions */}
+                <div className="mt-6 space-y-2.5 pt-5 border-t border-white/5">
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            onClick={clearMask}
+                            disabled={isActionRunning}
+                            className="h-10 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-bold text-white/50 hover:text-white/80 uppercase tracking-wider transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
                             Limpar Pintura
-                        </Button>
-                        <Button onClick={handleRemoveBackground} variant="secondary" className="w-full h-11" icon="scissors" isLoading={isRemovingBackground} disabled={isActionRunning} size="small">
-                            Remover Fundo
-                        </Button>
+                        </button>
+                        <button
+                            onClick={handleRemoveBackground}
+                            disabled={isActionRunning}
+                            className="h-10 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-bold text-white/50 hover:text-white/80 uppercase tracking-wider transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                        >
+                            {isRemovingBackground ? <Loader className="w-3.5 h-3.5" /> : <Icon name="scissors" className="w-3.5 h-3.5" />}
+                            <span>Remover Fundo</span>
+                        </button>
                     </div>
-                    
-                    <Button 
-                        onClick={handleEdit} 
-                        disabled={!editPrompt.trim() || isActionRunning} 
-                        isLoading={isEditing} 
-                        icon="zap" 
-                        className="w-full h-12 text-sm" 
-                        variant="primary"
+
+                    <button
+                        onClick={handleEdit}
+                        disabled={!editPrompt.trim() || isActionRunning}
+                        className="w-full h-11 bg-primary hover:bg-primary/90 disabled:bg-white/5 disabled:text-white/20 rounded-xl text-xs font-black text-black disabled:cursor-not-allowed uppercase tracking-wider transition-all flex items-center justify-center gap-2"
                     >
-                        {!hasPayedKey ? 'Configurar Chave para Editar' : 'Processar Edição Mágica'}
-                    </Button>
-                    
-                    <button 
-                        onClick={onClose} 
-                        className="w-full py-2 text-[11px] font-bold text-text-muted hover:text-text-main transition-colors uppercase tracking-widest"
+                        {isEditing ? (
+                            <Loader className="w-4 h-4" />
+                        ) : (
+                            <>
+                                <Icon name="zap" className="w-4 h-4" />
+                                <span>Processar Edição Mágica</span>
+                            </>
+                        )}
+                    </button>
+
+                    <button
+                        onClick={onClose}
+                        className="w-full py-2.5 text-[10px] font-bold text-white/25 hover:text-white/50 transition-colors uppercase tracking-[0.2em]"
                     >
                         Cancelar e Voltar
                     </button>

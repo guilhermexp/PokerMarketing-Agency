@@ -59,7 +59,17 @@ export type IconName =
   | 'eye'
   | 'audio'
   | 'mic'
-  | 'mic-off';
+  | 'mic-off'
+  | 'layers'
+  | 'trash-2'
+  // Organization icons
+  | 'building'
+  | 'user'
+  | 'mail'
+  | 'user-plus'
+  | 'log-out'
+  | 'shield'
+  | 'palette';
 
 interface IconProps {
   name: IconName;
@@ -352,6 +362,75 @@ const iconPaths: Record<IconName, React.ReactNode> = {
       <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
       <line x1="12" y1="19" x2="12" y2="23"></line>
       <line x1="8" y1="23" x2="16" y2="23"></line>
+    </>
+  ),
+  layers: (
+    <>
+      <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+      <polyline points="2 17 12 22 22 17"></polyline>
+      <polyline points="2 12 12 17 22 12"></polyline>
+    </>
+  ),
+  'trash-2': (
+    <>
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      <line x1="10" y1="11" x2="10" y2="17"></line>
+      <line x1="14" y1="11" x2="14" y2="17"></line>
+    </>
+  ),
+  building: (
+    <>
+      <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+      <path d="M9 22v-4h6v4"></path>
+      <path d="M8 6h.01"></path>
+      <path d="M16 6h.01"></path>
+      <path d="M12 6h.01"></path>
+      <path d="M12 10h.01"></path>
+      <path d="M12 14h.01"></path>
+      <path d="M16 10h.01"></path>
+      <path d="M16 14h.01"></path>
+      <path d="M8 10h.01"></path>
+      <path d="M8 14h.01"></path>
+    </>
+  ),
+  user: (
+    <>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+      <circle cx="12" cy="7" r="4"></circle>
+    </>
+  ),
+  mail: (
+    <>
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+      <polyline points="22,6 12,13 2,6"></polyline>
+    </>
+  ),
+  'user-plus': (
+    <>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+      <circle cx="8.5" cy="7" r="4"></circle>
+      <line x1="20" y1="8" x2="20" y2="14"></line>
+      <line x1="23" y1="11" x2="17" y2="11"></line>
+    </>
+  ),
+  'log-out': (
+    <>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+      <polyline points="16 17 21 12 16 7"></polyline>
+      <line x1="21" y1="12" x2="9" y2="12"></line>
+    </>
+  ),
+  shield: (
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+  ),
+  palette: (
+    <>
+      <circle cx="13.5" cy="6.5" r=".5"></circle>
+      <circle cx="17.5" cy="10.5" r=".5"></circle>
+      <circle cx="8.5" cy="7.5" r=".5"></circle>
+      <circle cx="6.5" cy="12.5" r=".5"></circle>
+      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 6.012 17.461 2 12 2z"></path>
     </>
   ),
 };

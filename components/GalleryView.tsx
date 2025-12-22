@@ -8,11 +8,15 @@ import { ImagePreviewModal } from './common/ImagePreviewModal';
 interface GalleryViewProps {
   images: GalleryImage[];
   onUpdateImage: (imageId: string, newImageSrc: string) => void;
+  onDeleteImage?: (imageId: string) => void;
   onSetChatReference: (image: GalleryImage) => void;
   styleReferences: StyleReference[];
   onAddStyleReference: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
   onRemoveStyleReference: (id: string) => void;
   onSelectStyleReference: (ref: StyleReference) => void;
+  onQuickPost?: (image: GalleryImage) => void;
+  onPublishToCampaign?: (text: string, image: GalleryImage) => void;
+  onSchedulePost?: (image: GalleryImage) => void;
 }
 
 type ViewMode = 'gallery' | 'references';
@@ -28,11 +32,15 @@ const fileToBase64 = (file: File): Promise<string> =>
 export const GalleryView: React.FC<GalleryViewProps> = ({
   images,
   onUpdateImage,
+  onDeleteImage,
   onSetChatReference,
   styleReferences,
   onAddStyleReference,
   onRemoveStyleReference,
-  onSelectStyleReference
+  onSelectStyleReference,
+  onQuickPost,
+  onPublishToCampaign,
+  onSchedulePost
 }) => {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('gallery');
@@ -96,32 +104,32 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       </div>
 
       {viewMode === 'gallery' ? (
-        /* Gallery View */
+        /* Gallery View - Masonry Layout */
         images.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3 space-y-3">
             {[...images].reverse().map((image) => (
               <div
                   key={image.id}
                   onClick={() => setSelectedImage(image)}
-                  className="group relative aspect-square overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/10 cursor-pointer"
+                  className="group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 cursor-pointer break-inside-avoid mb-3"
               >
                 <img
                   src={image.src}
                   alt={image.prompt}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
                 />
 
                 {/* Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
-                  <p className="text-white text-[9px] font-bold leading-snug line-clamp-2 mb-1.5">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
+                  <p className="text-white text-[10px] font-bold leading-snug line-clamp-2 mb-2">
                       {image.prompt}
                   </p>
-                  <div className="flex flex-wrap gap-1">
-                      <span className="text-[8px] text-white/70 font-bold bg-white/10 px-1.5 py-0.5 rounded uppercase">
+                  <div className="flex flex-wrap gap-1.5">
+                      <span className="text-[8px] text-white/80 font-bold bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
                           {image.source}
                       </span>
                       {image.model && (
-                          <span className="text-[8px] text-primary font-bold bg-primary/20 px-1.5 py-0.5 rounded uppercase">
+                          <span className="text-[8px] text-primary font-bold bg-primary/20 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
                               {image.model === 'imagen-4.0-generate-001' ? 'Imagen' : 'Gemini'}
                           </span>
                       )}
@@ -129,18 +137,38 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 </div>
 
                 {/* Actions */}
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
                   <button
                     onClick={(e) => { e.stopPropagation(); handleToggleFavorite(image); }}
-                    className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${isFavorite(image) ? 'bg-primary text-black' : 'bg-black/50 text-white/70 hover:text-primary'}`}
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all backdrop-blur-sm ${isFavorite(image) ? 'bg-primary text-black shadow-lg shadow-primary/30' : 'bg-black/60 text-white/80 hover:bg-black/80 hover:text-primary'}`}
                     title={isFavorite(image) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
                   >
-                    <Icon name="heart" className="w-3 h-3" />
+                    <Icon name="heart" className="w-3.5 h-3.5" />
                   </button>
-                  <div className="w-6 h-6 rounded-md bg-black/50 flex items-center justify-center text-white">
-                    <Icon name="edit" className="w-3 h-3" />
-                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelectedImage(image); }}
+                    className="w-7 h-7 rounded-lg bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/80 hover:bg-black/80 transition-all"
+                    title="Editar imagem"
+                  >
+                    <Icon name="edit" className="w-3.5 h-3.5" />
+                  </button>
+                  {onDeleteImage && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); if (confirm('Tem certeza que deseja excluir esta imagem?')) onDeleteImage(image.id); }}
+                      className="w-7 h-7 rounded-lg bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/80 hover:bg-red-500/80 hover:text-white transition-all"
+                      title="Excluir imagem"
+                    >
+                      <Icon name="trash" className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
+
+                {/* Favorite indicator */}
+                {isFavorite(image) && (
+                  <div className="absolute top-2 left-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
+                    <Icon name="heart" className="w-3 h-3 text-black" />
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -213,6 +241,10 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             onImageUpdate={handleImageUpdate}
             onSetChatReference={onSetChatReference}
             downloadFilename={`directorai-${selectedImage.source.toLowerCase().replace(/ /g, '-')}-${selectedImage.id.substring(0, 5)}.png`}
+            onQuickPost={onQuickPost}
+            onPublish={onPublishToCampaign ? (img) => onPublishToCampaign('Publicar imagem da galeria', img) : undefined}
+            onCloneStyle={(img) => onAddStyleReference({ name: `Estilo ${new Date().toLocaleDateString('pt-BR')}`, src: img.src })}
+            onSchedulePost={onSchedulePost}
         />
       )}
       </div>

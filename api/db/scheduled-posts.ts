@@ -85,8 +85,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               scheduled_date, scheduled_time, scheduled_timestamp, timezone,
               platforms, instagram_content_type, created_from } = req.body;
 
-      if (!user_id || !content_type || !image_url || !caption || !scheduled_date ||
+      console.log('[Scheduled Posts] POST body:', JSON.stringify(req.body, null, 2));
+
+      if (!user_id || !content_type || !image_url || !scheduled_date ||
           !scheduled_time || !scheduled_timestamp || !timezone || !platforms) {
+        console.log('[Scheduled Posts] Missing fields:', {
+          user_id: !!user_id,
+          content_type: !!content_type,
+          image_url: !!image_url,
+          scheduled_date: !!scheduled_date,
+          scheduled_time: !!scheduled_time,
+          scheduled_timestamp: !!scheduled_timestamp,
+          timezone: !!timezone,
+          platforms: !!platforms
+        });
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
@@ -95,7 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                      scheduled_date, scheduled_time, scheduled_timestamp, timezone,
                                      platforms, instagram_content_type, created_from)
         VALUES (${user_id}, ${content_type}, ${content_id || null}, ${image_url},
-                ${caption}, ${hashtags || []}, ${scheduled_date}, ${scheduled_time},
+                ${caption || ''}, ${hashtags || []}, ${scheduled_date}, ${scheduled_time},
                 ${scheduled_timestamp}, ${timezone}, ${platforms},
                 ${instagram_content_type || 'photo'}, ${created_from || null})
         RETURNING *

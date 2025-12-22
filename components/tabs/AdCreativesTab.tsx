@@ -7,6 +7,11 @@ import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 import { generateImage } from '../../services/geminiService';
 import { ImagePreviewModal } from '../common/ImagePreviewModal';
+import { useBackgroundJobs, type ActiveJob } from '../../hooks/useBackgroundJobs';
+import type { GenerationJobConfig } from '../../services/apiClient';
+
+// Check if we're in development mode (QStash won't work locally)
+const isDevMode = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 
 interface AdCreativesTabProps {
   adCreatives: AdCreative[];
@@ -18,6 +23,7 @@ interface AdCreativesTabProps {
   styleReferences?: StyleReference[];
   onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
   onRemoveStyleReference?: (id: string) => void;
+  userId?: string | null;
 }
 
 const AdCard: React.FC<{
@@ -86,76 +92,68 @@ const AdCard: React.FC<{
 
     return (
         <>
-            <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 overflow-hidden">
+            <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 overflow-hidden h-full flex flex-col">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-white/5 bg-[#0d0d0d] flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-                            <Icon name="zap" className="w-4 h-4 text-primary" />
-                        </div>
-                        <h3 className="text-sm font-black text-white uppercase tracking-wide">{ad.platform} Ads</h3>
+                <div className="px-5 py-3 border-b border-white/5 bg-[#0d0d0d] flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center">
+                        <Icon name="zap" className="w-3 h-3 text-primary" />
                     </div>
-                    <span className="text-[9px] bg-white/5 text-white/40 px-2 py-1 rounded-full uppercase tracking-wider font-medium border border-white/10">1.91:1</span>
+                    <h3 className="text-xs font-black text-white uppercase tracking-wide">{ad.platform}</h3>
                 </div>
 
-                <div className="flex flex-col lg:flex-row">
-                    {/* Content Section */}
-                    <div className="flex-1 p-6 space-y-4">
-                        <div>
-                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Headline</h4>
-                            <p className="text-white font-bold text-lg">{ad.headline}</p>
-                        </div>
-                        <div>
-                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Corpo</h4>
-                            <p className="text-sm text-white/60 leading-relaxed bg-[#0a0a0a] p-4 rounded-xl border border-white/5">{ad.body}</p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <div>
-                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">CTA</h4>
-                                <span className="inline-block bg-primary text-black text-xs font-black py-2 px-4 rounded-lg uppercase tracking-wide">{ad.cta}</span>
-                            </div>
-                            {image && (
-                                <Button onClick={handleShare} size="small" variant="secondary" icon="share-alt" className="ml-auto">
-                                    {isCopied ? 'Copiado!' : 'Copiar'}
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Image Section */}
-                    <div className="lg:w-[400px] flex-shrink-0 p-6 lg:border-l border-t lg:border-t-0 border-white/5 bg-[#0d0d0d] space-y-4">
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Visual do Anúncio</h4>
-                        <div className="aspect-[1.91/1] bg-[#080808] rounded-xl flex items-center justify-center relative overflow-hidden border border-white/5">
-                            {isGenerating ? (
-                                <Loader />
-                            ) : image ? (
-                                <>
-                                    <img src={image.src} alt={`Visual for ${ad.headline}`} className="w-full h-full object-cover" />
-                                    <div className="absolute inset-0 bg-black/70 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleToggleFavorite(image); }}
-                                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isFavorite(image) ? 'bg-primary text-black' : 'bg-white/10 text-white/70 hover:text-primary'}`}
-                                            title={isFavorite(image) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-                                        >
-                                            <Icon name="heart" className="w-4 h-4" />
-                                        </button>
-                                        <Button size="small" onClick={handleEditClick}>Editar</Button>
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="text-center p-4">
-                                    <p className="text-[10px] text-white/30 italic line-clamp-4">"{ad.image_prompt}"</p>
+                <div className="flex-1 p-4 space-y-3">
+                    {/* Image */}
+                    <div className="aspect-[1.91/1] bg-[#080808] rounded-xl flex items-center justify-center relative overflow-hidden border border-white/5">
+                        {isGenerating ? (
+                            <Loader />
+                        ) : image ? (
+                            <>
+                                <img src={image.src} alt={`Visual for ${ad.headline}`} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/70 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleToggleFavorite(image); }}
+                                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isFavorite(image) ? 'bg-primary text-black' : 'bg-white/10 text-white/70 hover:text-primary'}`}
+                                        title={isFavorite(image) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                                    >
+                                        <Icon name="heart" className="w-4 h-4" />
+                                    </button>
+                                    <Button size="small" onClick={handleEditClick}>Editar</Button>
                                 </div>
-                            )}
-                        </div>
-                        {!image && (
-                            <Button onClick={onGenerate} isLoading={isGenerating} size="small" className="w-full" icon="image" variant="secondary">
-                                Gerar Visual
-                            </Button>
+                            </>
+                        ) : (
+                            <div className="text-center p-3">
+                                <Icon name="image" className="w-8 h-8 text-white/10 mx-auto mb-2" />
+                                <p className="text-[9px] text-white/20 italic line-clamp-3">"{ad.image_prompt}"</p>
+                            </div>
                         )}
-                        {error && <p className="text-red-400 text-[10px] mt-2">{error}</p>}
+                    </div>
+
+                    {/* Headline */}
+                    <p className="text-white font-bold text-sm line-clamp-2">{ad.headline}</p>
+
+                    {/* Body */}
+                    <p className="text-[11px] text-white/60 leading-relaxed line-clamp-3">{ad.body}</p>
+
+                    {/* CTA */}
+                    <div className="flex items-center gap-2">
+                        <span className="inline-block bg-primary text-black text-[9px] font-black py-1.5 px-3 rounded-lg uppercase tracking-wide">{ad.cta}</span>
                     </div>
                 </div>
+
+                {/* Actions */}
+                <div className="p-4 pt-0 flex gap-2">
+                    {!image && (
+                        <Button onClick={onGenerate} isLoading={isGenerating} size="small" className="flex-1" icon="image" variant="secondary">
+                            Gerar
+                        </Button>
+                    )}
+                    {image && (
+                        <Button onClick={handleShare} size="small" variant="secondary" className="flex-1" icon="share-alt">
+                            {isCopied ? 'Copiado!' : 'Copiar'}
+                        </Button>
+                    )}
+                </div>
+                {error && <p className="text-red-400 text-[9px] px-4 pb-3">{error}</p>}
             </div>
             {editingImage && (
                 <ImagePreviewModal
@@ -171,7 +169,7 @@ const AdCard: React.FC<{
 };
 
 
-export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, brandProfile, referenceImage, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference }) => {
+export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, brandProfile, referenceImage, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference, userId }) => {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
   const [generationState, setGenerationState] = useState<{ isGenerating: boolean[], errors: (string | null)[] }>({
     isGenerating: [],
@@ -179,6 +177,8 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
   });
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
+
+  const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
 
   useEffect(() => {
     const length = adCreatives.length;
@@ -188,6 +188,52 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
       errors: Array(length).fill(null),
     });
   }, [adCreatives]);
+
+  // Listen for job completions
+  useEffect(() => {
+    const unsubComplete = onJobComplete((job: ActiveJob) => {
+      if (job.context?.startsWith('ad-') && job.result_url) {
+        const indexMatch = job.context.match(/ad-(\d+)/);
+        if (indexMatch) {
+          const index = parseInt(indexMatch[1]);
+          const galleryImage = onAddImageToGallery({
+            src: job.result_url,
+            prompt: adCreatives[index]?.image_prompt || '',
+            source: 'Anúncio',
+            model: selectedImageModel
+          });
+          setImages(prev => {
+            const newImages = [...prev];
+            newImages[index] = galleryImage;
+            return newImages;
+          });
+          setGenerationState(prev => {
+            const newGenerating = [...prev.isGenerating];
+            newGenerating[index] = false;
+            return { ...prev, isGenerating: newGenerating };
+          });
+        }
+      }
+    });
+
+    const unsubFailed = onJobFailed((job: ActiveJob) => {
+      if (job.context?.startsWith('ad-')) {
+        const indexMatch = job.context.match(/ad-(\d+)/);
+        if (indexMatch) {
+          const index = parseInt(indexMatch[1]);
+          setGenerationState(prev => {
+            const newErrors = [...prev.errors];
+            const newGenerating = [...prev.isGenerating];
+            newErrors[index] = job.error_message || 'Falha ao gerar imagem.';
+            newGenerating[index] = false;
+            return { isGenerating: newGenerating, errors: newErrors };
+          });
+        }
+      }
+    });
+
+    return () => { unsubComplete(); unsubFailed(); };
+  }, [onJobComplete, onJobFailed, onAddImageToGallery, adCreatives, selectedImageModel]);
 
   const handleGenerate = async (index: number) => {
     if (selectedImageModel === 'gemini-3-pro-image-preview') {
@@ -207,6 +253,32 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
         newErrors[index] = null;
         return { isGenerating: newGenerating, errors: newErrors };
     });
+
+    // Use background job if userId is available AND we're not in dev mode
+    if (userId && !isDevMode) {
+      try {
+        const config: GenerationJobConfig = {
+          brandName: brandProfile.name,
+          brandDescription: brandProfile.description,
+          brandToneOfVoice: brandProfile.toneOfVoice,
+          brandPrimaryColor: brandProfile.primaryColor,
+          brandSecondaryColor: brandProfile.secondaryColor,
+          aspectRatio: '1.91:1',
+          model: selectedImageModel,
+          logo: brandProfile.logo || undefined,
+          source: 'Anúncio'
+        };
+
+        await queueJob(userId, 'ad', ad.image_prompt, config, `ad-${index}`);
+        // Job will complete via onJobComplete callback
+        return;
+      } catch (err) {
+        console.error('[AdCreativesTab] Failed to queue job:', err);
+        // Fall through to local generation
+      }
+    }
+
+    // Local generation (dev mode or no userId or queue failed)
     try {
         const productImages: { base64: string; mimeType: string }[] = [];
         if (referenceImage) {
@@ -217,7 +289,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
             const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
             productImages.push({ base64: base64Data, mimeType });
         }
-        
+
         const generatedImageUrl = await generateImage(ad.image_prompt, brandProfile, {
             aspectRatio: '1.91:1',
             model: selectedImageModel,
@@ -296,21 +368,23 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
             </select>
         </div>
       </div>
-      {adCreatives.map((ad, index) => (
-        <AdCard
-            key={index}
-            ad={ad}
-            image={images[index]}
-            isGenerating={generationState.isGenerating[index]}
-            error={generationState.errors[index]}
-            onGenerate={() => handleGenerate(index)}
-            onImageUpdate={(newSrc) => handleImageUpdate(index, newSrc)}
-            onSetChatReference={onSetChatReference}
-            styleReferences={styleReferences}
-            onAddStyleReference={onAddStyleReference}
-            onRemoveStyleReference={onRemoveStyleReference}
-        />
-      ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {adCreatives.map((ad, index) => (
+          <AdCard
+              key={index}
+              ad={ad}
+              image={images[index]}
+              isGenerating={generationState.isGenerating[index]}
+              error={generationState.errors[index]}
+              onGenerate={() => handleGenerate(index)}
+              onImageUpdate={(newSrc) => handleImageUpdate(index, newSrc)}
+              onSetChatReference={onSetChatReference}
+              styleReferences={styleReferences}
+              onAddStyleReference={onAddStyleReference}
+              onRemoveStyleReference={onRemoveStyleReference}
+          />
+        ))}
+      </div>
     </div>
   );
 };
