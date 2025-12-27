@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from './common/Button';
 import { Icon } from './common/Icon';
@@ -14,198 +13,272 @@ interface GenerationOptionsModalProps {
   mode?: 'generate' | 'edit';
 }
 
-const NumberStepper: React.FC<{
-    value: number;
-    onChange: (newValue: number) => void;
-    min?: number;
-    max?: number;
-    disabled?: boolean;
-}> = ({ value, onChange, min = 1, max = 5, disabled = false }) => {
-    const handleIncrement = () => onChange(Math.min(max, value + 1));
-    const handleDecrement = () => onChange(Math.max(min, value - 1));
+const ContentRow: React.FC<{
+  icon: string;
+  label: string;
+  enabled: boolean;
+  count: number;
+  onToggle: () => void;
+  onCountChange: (count: number) => void;
+}> = ({ icon, label, enabled, count, onToggle, onCountChange }) => {
+  return (
+    <div className="flex items-center justify-between py-3">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-3 group"
+      >
+        <div className={`
+          w-4 h-4 rounded border-2 flex items-center justify-center transition-all
+          ${enabled ? 'border-white bg-white' : 'border-white/20 group-hover:border-white/40'}
+        `}>
+          {enabled && <Icon name="check" className="w-2.5 h-2.5 text-black" />}
+        </div>
+        <Icon name={icon as any} className={`w-4 h-4 ${enabled ? 'text-white' : 'text-white/40'}`} />
+        <span className={`text-sm ${enabled ? 'text-white' : 'text-white/50'}`}>{label}</span>
+      </button>
 
-    return (
-        <div className={`flex items-center space-x-1.5 transition-opacity ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+      {enabled && (
+        <div className="flex items-center gap-0.5">
+          {[1, 2, 3].map((num) => (
             <button
-                type="button"
-                onClick={handleDecrement}
-                disabled={disabled || value <= min}
-                className="w-6 h-6 rounded-md bg-surface/50 border border-muted/50 text-text-muted hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Diminuir quantidade"
+              key={num}
+              onClick={() => onCountChange(num)}
+              className={`
+                w-7 h-7 rounded text-xs font-medium transition-all
+                ${count === num
+                  ? 'bg-white/10 text-white'
+                  : 'text-white/30 hover:text-white/60'
+                }
+              `}
             >
-                -
+              {num}
             </button>
-            <span className="font-medium text-text-main w-6 text-center">{value}</span>
-            <button
-                type="button"
-                onClick={handleIncrement}
-                disabled={disabled || value >= max}
-                className="w-6 h-6 rounded-md bg-surface/50 border border-muted/50 text-text-muted hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Aumentar quantidade"
-            >
-                +
-            </button>
+          ))}
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
-const GenerationItem: React.FC<{
-    label: string;
-    setting: GenerationSetting;
-    onSettingChange: (newSetting: GenerationSetting) => void;
-}> = ({ label, setting, onSettingChange }) => {
-    
-    const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        onSettingChange({ ...setting, generate: e.target.checked });
-    };
+const SubOption: React.FC<{
+  label: string;
+  enabled: boolean;
+  onToggle: () => void;
+}> = ({ label, enabled, onToggle }) => (
+  <button
+    onClick={onToggle}
+    className={`
+      px-3 py-1.5 rounded-full text-xs transition-all
+      ${enabled
+        ? 'bg-white/10 text-white'
+        : 'text-white/30 hover:text-white/50'
+      }
+    `}
+  >
+    {label}
+  </button>
+);
 
-    const handleCountChange = (newCount: number) => {
-        onSettingChange({ ...setting, count: newCount });
-    };
-
-    return (
-        <div className="flex justify-between items-center py-2">
-             <label className="flex items-center space-x-3 cursor-pointer text-sm text-text-main">
-                <input
-                  type="checkbox"
-                  checked={setting.generate}
-                  onChange={handleCheckboxChange}
-                  className="h-4 w-4 rounded border-muted/50 text-primary focus:ring-primary bg-surface/50 transition"
-                />
-                <span>{label}</span>
-            </label>
-            <NumberStepper
-                value={setting.count}
-                onChange={handleCountChange}
-                disabled={!setting.generate}
-            />
-        </div>
-    )
-};
-
-
-const GenerationCategory: React.FC<{
-    title: string;
-    items: { key: string; label: string }[];
-    categorySettings: Record<string, GenerationSetting>;
-    onCategorySettingsChange: (newSettings: Record<string, GenerationSetting>) => void;
-}> = ({ title, items, categorySettings, onCategorySettingsChange }) => {
-
-    // FIX: Explicitly type the argument 's' to 'GenerationSetting' to resolve 'unknown' type error.
-    const allChecked = Object.values(categorySettings).every((s: GenerationSetting) => s.generate);
-    // FIX: Explicitly type the argument 's' to 'GenerationSetting' to resolve 'unknown' type error.
-    const someChecked = Object.values(categorySettings).some((s: GenerationSetting) => s.generate);
-
-    const handleMasterCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { checked } = e.target;
-        const newSettings = { ...categorySettings };
-        for (const key in newSettings) {
-            newSettings[key] = { ...newSettings[key], generate: checked };
-        }
-        onCategorySettingsChange(newSettings);
-    };
-
-    const handleItemChange = (key: string, newSetting: GenerationSetting) => {
-        onCategorySettingsChange({ ...categorySettings, [key]: newSetting });
-    };
-
-    return (
-        <div className="bg-background/50 p-4 rounded-lg">
-            <div className="flex justify-between items-center pb-2 border-b border-muted/30">
-                <label className="flex items-center space-x-3 cursor-pointer font-bold text-text-main">
-                    <input
-                      type="checkbox"
-                      checked={allChecked}
-                      ref={input => { if (input) input.indeterminate = !allChecked && someChecked; }}
-                      onChange={handleMasterCheckboxChange}
-                      className="h-4 w-4 rounded border-muted/50 text-primary focus:ring-primary bg-surface"
-                    />
-                    <span>{title}</span>
-                </label>
-            </div>
-            <div className="pl-2 pt-2 space-y-1">
-                {items.map(item => (
-                    <GenerationItem
-                        key={item.key}
-                        label={item.label}
-                        setting={categorySettings[item.key]}
-                        onSettingChange={(newSetting) => handleItemChange(item.key, newSetting)}
-                    />
-                ))}
-            </div>
-        </div>
-    );
-};
-
-
-export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({ isOpen, onClose, options, setOptions, onConfirm, isGenerating, mode = 'generate' }) => {
+export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
+  isOpen,
+  onClose,
+  options,
+  setOptions,
+  onConfirm,
+  isGenerating,
+  mode = 'generate'
+}) => {
   if (!isOpen) return null;
-  
-  // FIX: Explicitly type the argument 'v' to 'GenerationSetting' to resolve 'unknown' type error.
-  const nothingSelected = !options.videoClipScripts.generate &&
-                         !Object.values(options.posts).some((v: GenerationSetting) => v.generate) &&
-                         !Object.values(options.adCreatives).some((v: GenerationSetting) => v.generate);
+
+  const postsEnabled = Object.values(options.posts).some((v: GenerationSetting) => v.generate);
+  const adsEnabled = Object.values(options.adCreatives).some((v: GenerationSetting) => v.generate);
+  const nothingSelected = !options.videoClipScripts.generate && !postsEnabled && !adsEnabled;
+
+  const totalCount = (options.videoClipScripts.generate ? options.videoClipScripts.count : 0) +
+    Object.entries(options.posts).reduce((sum, [, s]) => sum + (s.generate ? s.count : 0), 0) +
+    Object.entries(options.adCreatives).reduce((sum, [, s]) => sum + (s.generate ? s.count : 0), 0);
+
+  const togglePosts = () => {
+    const newEnabled = !postsEnabled;
+    setOptions(prev => ({
+      ...prev,
+      posts: {
+        instagram: { ...prev.posts.instagram, generate: newEnabled },
+        facebook: { ...prev.posts.facebook, generate: false },
+        twitter: { ...prev.posts.twitter, generate: false },
+        linkedin: { ...prev.posts.linkedin, generate: false },
+      }
+    }));
+  };
+
+  const toggleAds = () => {
+    const newEnabled = !adsEnabled;
+    setOptions(prev => ({
+      ...prev,
+      adCreatives: {
+        facebook: { ...prev.adCreatives.facebook, generate: newEnabled },
+        google: { ...prev.adCreatives.google, generate: false },
+      }
+    }));
+  };
+
+  const togglePostPlatform = (key: string) => {
+    setOptions(prev => ({
+      ...prev,
+      posts: {
+        ...prev.posts,
+        [key]: { ...prev.posts[key], generate: !prev.posts[key].generate }
+      }
+    }));
+  };
+
+  const toggleAdPlatform = (key: string) => {
+    setOptions(prev => ({
+      ...prev,
+      adCreatives: {
+        ...prev.adCreatives,
+        [key]: { ...prev.adCreatives[key], generate: !prev.adCreatives[key].generate }
+      }
+    }));
+  };
+
+  const setPostsCount = (count: number) => {
+    setOptions(prev => {
+      const newPosts = { ...prev.posts };
+      for (const key in newPosts) {
+        if (newPosts[key].generate) {
+          newPosts[key] = { ...newPosts[key], count };
+        }
+      }
+      return { ...prev, posts: newPosts };
+    });
+  };
+
+  const setAdsCount = (count: number) => {
+    setOptions(prev => {
+      const newAds = { ...prev.adCreatives };
+      for (const key in newAds) {
+        if (newAds[key].generate) {
+          newAds[key] = { ...newAds[key], count };
+        }
+      }
+      return { ...prev, adCreatives: newAds };
+    });
+  };
+
+  const getPostsCount = () => Object.values(options.posts).find(s => s.generate)?.count || 1;
+  const getAdsCount = () => Object.values(options.adCreatives).find(s => s.generate)?.count || 1;
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+    <div
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
-      <div 
-        className="bg-surface rounded-xl shadow-2xl w-full max-w-lg border border-muted/50"
+      <div
+        className="bg-[#111] rounded-xl w-full max-w-sm border border-white/[0.08]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6 border-b border-muted/30">
-            <h2 className="text-xl font-bold text-text-main">Selecione o que Gerar</h2>
-            <p className="text-sm text-text-muted mt-1">Escolha quais materiais de marketing e a quantidade que a IA deve criar.</p>
+        <div className="p-4 border-b border-white/[0.06]">
+          <h2 className="text-sm font-medium text-white">Gerar conteúdo</h2>
         </div>
-        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-            <div className="bg-background/50 p-4 rounded-lg">
-                <GenerationItem
-                    label="Clipes de Vídeo"
-                    setting={options.videoClipScripts}
-                    onSettingChange={(newSetting) => setOptions(prev => ({...prev, videoClipScripts: newSetting}))}
-                />
-            </div>
-            
-            <GenerationCategory
-                title="Posts para Redes Sociais"
-                items={[
-                    { key: 'instagram', label: 'Instagram' },
-                    { key: 'facebook', label: 'Facebook' },
-                    { key: 'twitter', label: 'Twitter (X)' },
-                    { key: 'linkedin', label: 'LinkedIn' },
-                ]}
-                categorySettings={options.posts}
-                onCategorySettingsChange={(newSettings) => setOptions(prev => ({...prev, posts: newSettings}))}
-            />
 
-            <GenerationCategory
-                title="Criativos de Anúncio"
-                items={[
-                    { key: 'facebook', label: 'Facebook Ads' },
-                    { key: 'google', label: 'Google Ads' },
-                ]}
-                categorySettings={options.adCreatives}
-                onCategorySettingsChange={(newSettings) => setOptions(prev => ({...prev, adCreatives: newSettings}))}
+        <div className="px-4 divide-y divide-white/[0.04]">
+          {/* Video Scripts */}
+          <ContentRow
+            icon="film"
+            label="Roteiros de vídeo"
+            enabled={options.videoClipScripts.generate}
+            count={options.videoClipScripts.count}
+            onToggle={() => setOptions(prev => ({
+              ...prev,
+              videoClipScripts: { ...prev.videoClipScripts, generate: !prev.videoClipScripts.generate }
+            }))}
+            onCountChange={(count) => setOptions(prev => ({
+              ...prev,
+              videoClipScripts: { ...prev.videoClipScripts, count }
+            }))}
+          />
+
+          {/* Posts */}
+          <div>
+            <ContentRow
+              icon="image"
+              label="Posts"
+              enabled={postsEnabled}
+              count={getPostsCount()}
+              onToggle={togglePosts}
+              onCountChange={setPostsCount}
             />
+            {postsEnabled && (
+              <div className="flex flex-wrap gap-2 pb-3 pl-7">
+                <SubOption
+                  label="Instagram"
+                  enabled={options.posts.instagram.generate}
+                  onToggle={() => togglePostPlatform('instagram')}
+                />
+                <SubOption
+                  label="Facebook"
+                  enabled={options.posts.facebook.generate}
+                  onToggle={() => togglePostPlatform('facebook')}
+                />
+                <SubOption
+                  label="Twitter"
+                  enabled={options.posts.twitter.generate}
+                  onToggle={() => togglePostPlatform('twitter')}
+                />
+                <SubOption
+                  label="LinkedIn"
+                  enabled={options.posts.linkedin.generate}
+                  onToggle={() => togglePostPlatform('linkedin')}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Ads */}
+          <div>
+            <ContentRow
+              icon="megaphone"
+              label="Anúncios"
+              enabled={adsEnabled}
+              count={getAdsCount()}
+              onToggle={toggleAds}
+              onCountChange={setAdsCount}
+            />
+            {adsEnabled && (
+              <div className="flex flex-wrap gap-2 pb-3 pl-7">
+                <SubOption
+                  label="Meta Ads"
+                  enabled={options.adCreatives.facebook.generate}
+                  onToggle={() => toggleAdPlatform('facebook')}
+                />
+                <SubOption
+                  label="Google Ads"
+                  enabled={options.adCreatives.google.generate}
+                  onToggle={() => toggleAdPlatform('google')}
+                />
+              </div>
+            )}
+          </div>
         </div>
-        <div className="p-6 bg-surface/50 border-t border-muted/30 flex justify-end items-center gap-3">
-          <Button variant="secondary" onClick={onClose} disabled={isGenerating}>Cancelar</Button>
-          {mode === 'edit' ? (
-            <Button onClick={onClose}>
-              Salvar
+
+        <div className="p-4 flex items-center justify-between border-t border-white/[0.06]">
+          <span className="text-xs text-white/30">
+            {totalCount > 0 && `${totalCount} ${totalCount === 1 ? 'item' : 'itens'}`}
+          </span>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={onClose} disabled={isGenerating} size="small">
+              Cancelar
             </Button>
-          ) : (
             <Button
-              onClick={onConfirm}
+              onClick={mode === 'edit' ? onClose : onConfirm}
               isLoading={isGenerating}
               disabled={isGenerating || nothingSelected}
-              icon="zap"
+              size="small"
             >
-              Gerar Campanha
+              {mode === 'edit' ? 'Salvar' : 'Gerar'}
             </Button>
-          )}
+          </div>
         </div>
       </div>
     </div>

@@ -652,6 +652,7 @@ function AppContent() {
           createdAt: fullCampaign.created_at,
           updatedAt: fullCampaign.updated_at,
           videoClipScripts: (fullCampaign.video_clip_scripts || []).map(v => ({
+            id: v.id,  // Include database ID for gallery image linking
             title: v.title,
             hook: v.hook,
             image_prompt: v.image_prompt || '',

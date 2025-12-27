@@ -1,8 +1,8 @@
-import React from 'react';
-import { Icon } from './common/Icon';
-import { Loader } from './common/Loader';
-import { EmptyState } from './common/EmptyState';
-import type { WeekScheduleWithCount } from '../services/apiClient';
+import React from "react";
+import { Icon } from "./common/Icon";
+import { EmptyState } from "./common/EmptyState";
+import { Loader } from "./common/Loader";
+import type { WeekScheduleWithCount } from "../services/apiClient";
 
 interface SchedulesListViewProps {
   schedules: WeekScheduleWithCount[];
@@ -19,23 +19,23 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
   onFileUpload,
   currentScheduleId,
   onEnterAfterUpload,
-  onDeleteSchedule
+  onDeleteSchedule,
 }) => {
   const [isUploading, setIsUploading] = React.useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    console.log('[SchedulesListView] File selected:', file?.name);
+    console.log("[SchedulesListView] File selected:", file?.name);
     if (!file) return;
 
     setIsUploading(true);
     try {
-      console.log('[SchedulesListView] Calling onFileUpload...');
+      console.log("[SchedulesListView] Calling onFileUpload...");
       await onFileUpload(file);
-      console.log('[SchedulesListView] Upload complete, entering schedule...');
+      console.log("[SchedulesListView] Upload complete, entering schedule...");
       onEnterAfterUpload?.();
     } catch (err) {
-      console.error('[SchedulesListView] Failed to upload file:', err);
+      console.error("[SchedulesListView] Failed to upload file:", err);
     } finally {
       setIsUploading(false);
     }
@@ -43,8 +43,8 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
     return `${day}/${month}`;
   };
 
@@ -55,11 +55,11 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
     today.setHours(0, 0, 0, 0);
 
     if (today >= startDate && today <= endDate) {
-      return 'current';
+      return "current";
     } else if (today > endDate) {
-      return 'expired';
+      return "expired";
     }
-    return 'future';
+    return "future";
   };
 
   // Sort schedules by date descending
@@ -69,30 +69,67 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
 
   if (schedules.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-2xl">
-          <EmptyState
-            icon="calendar"
-            title="Nenhuma Planilha"
-            description="Carregue sua primeira planilha de torneios para começar a gerar flyers."
-            subtitle="Formatos suportados: .xlsx, .xls"
-            size="large"
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 animate-fade-in-up">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="text-left">
+            <h2 className="text-2xl font-black text-white uppercase tracking-tight">
+              Lista de Torneios
+            </h2>
+            <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
+              0 semanas salvas
+            </p>
+          </div>
+          <label
+            className={`cursor-pointer group ${isUploading ? "pointer-events-none opacity-70" : ""}`}
           >
-            <label className={`cursor-pointer group inline-block ${isUploading ? 'pointer-events-none opacity-70' : ''}`}>
-              <div className="bg-primary text-black font-black px-6 py-3 rounded-xl flex items-center justify-center space-x-3 transition-all hover:bg-primary/90 active:scale-95">
-                {isUploading ? <Loader className="w-4 h-4" /> : <Icon name="upload" className="w-4 h-4" />}
-                <span className="text-sm uppercase tracking-wide">{isUploading ? 'Carregando...' : 'Carregar Planilha Excel'}</span>
-              </div>
-              <input
-                type="file"
-                className="hidden"
-                accept=".xlsx,.xls"
-                onChange={handleFileChange}
-                disabled={isUploading}
-              />
-            </label>
-          </EmptyState>
+            <div className="bg-white text-black font-black px-4 py-2.5 rounded-xl flex items-center space-x-2 transition-all active:scale-95 text-[10px] tracking-wide uppercase hover:bg-white/90">
+              {isUploading ? (
+                <Loader className="w-3.5 h-3.5" />
+              ) : (
+                <Icon name="upload" className="w-3.5 h-3.5" />
+              )}
+              <span>{isUploading ? "Carregando..." : "Nova Planilha"}</span>
+            </div>
+            <input
+              type="file"
+              className="hidden"
+              accept=".xlsx,.xls"
+              onChange={handleFileChange}
+              disabled={isUploading}
+            />
+          </label>
         </div>
+
+        <EmptyState
+          icon="calendar"
+          title="Nenhuma Planilha"
+          description="Carregue sua primeira planilha de torneios para começar a gerar flyers."
+          subtitle="Formatos suportados: .xlsx, .xls"
+          size="large"
+          className="w-full"
+        >
+          <label
+            className={`cursor-pointer group inline-block ${isUploading ? "pointer-events-none opacity-70" : ""}`}
+          >
+            <div className="bg-primary text-black font-black px-6 py-3 rounded-xl flex items-center justify-center space-x-3 transition-all hover:bg-primary/90 active:scale-95">
+              {isUploading ? (
+                <Loader className="w-4 h-4" />
+              ) : (
+                <Icon name="upload" className="w-4 h-4" />
+              )}
+              <span className="text-sm uppercase tracking-wide">
+                {isUploading ? "Carregando..." : "Carregar Planilha Excel"}
+              </span>
+            </div>
+            <input
+              type="file"
+              className="hidden"
+              accept=".xlsx,.xls"
+              onChange={handleFileChange}
+              disabled={isUploading}
+            />
+          </label>
+        </EmptyState>
       </div>
     );
   }
@@ -102,15 +139,24 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="text-left">
-          <h2 className="text-2xl font-black text-white uppercase tracking-tight">Lista de Torneios</h2>
+          <h2 className="text-2xl font-black text-white uppercase tracking-tight">
+            Lista de Torneios
+          </h2>
           <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
-            {schedules.length} semana{schedules.length !== 1 ? 's' : ''} salva{schedules.length !== 1 ? 's' : ''}
+            {schedules.length} semana{schedules.length !== 1 ? "s" : ""} salva
+            {schedules.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <label className={`cursor-pointer group ${isUploading ? 'pointer-events-none opacity-70' : ''}`}>
+        <label
+          className={`cursor-pointer group ${isUploading ? "pointer-events-none opacity-70" : ""}`}
+        >
           <div className="bg-white text-black font-black px-4 py-2.5 rounded-xl flex items-center space-x-2 transition-all active:scale-95 text-[10px] tracking-wide uppercase hover:bg-white/90">
-            {isUploading ? <Loader className="w-3.5 h-3.5" /> : <Icon name="upload" className="w-3.5 h-3.5" />}
-            <span>{isUploading ? 'Carregando...' : 'Nova Planilha'}</span>
+            {isUploading ? (
+              <Loader className="w-3.5 h-3.5" />
+            ) : (
+              <Icon name="upload" className="w-3.5 h-3.5" />
+            )}
+            <span>{isUploading ? "Carregando..." : "Nova Planilha"}</span>
           </div>
           <input
             type="file"
@@ -134,11 +180,11 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
               onClick={() => onSelectSchedule(schedule)}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && onSelectSchedule(schedule)}
+              onKeyDown={(e) => e.key === "Enter" && onSelectSchedule(schedule)}
               className={`w-full flex items-center justify-between gap-4 p-4 rounded-xl border transition-all hover:bg-white/[0.02] active:scale-[0.99] text-left cursor-pointer ${
                 isSelected
-                  ? 'bg-white/[0.04] border-white/10'
-                  : 'bg-[#0d0d0d] border-white/[0.06] hover:border-white/10'
+                  ? "bg-white/[0.04] border-white/10"
+                  : "bg-[#0d0d0d] border-white/[0.06] hover:border-white/10"
               }`}
             >
               <div className="flex items-center gap-4 min-w-0">
@@ -148,35 +194,40 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold text-white">
-                      {formatDate(schedule.start_date)} - {formatDate(schedule.end_date)}
+                      {formatDate(schedule.start_date)} -{" "}
+                      {formatDate(schedule.end_date)}
                     </p>
-                    {status === 'current' && (
+                    {status === "current" && (
                       <span className="text-[8px] font-bold text-white/40 bg-white/10 px-1.5 py-0.5 rounded uppercase">
                         Atual
                       </span>
                     )}
-                    {status === 'expired' && (
+                    {status === "expired" && (
                       <span className="text-[8px] font-bold text-white/20 bg-white/5 px-1.5 py-0.5 rounded uppercase">
                         Expirada
                       </span>
                     )}
                   </div>
                   <p className="text-[10px] text-white/30 truncate">
-                    {schedule.filename || 'Planilha sem nome'}
+                    {schedule.filename || "Planilha sem nome"}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-4 flex-shrink-0">
                 <div className="text-right">
-                  <p className="text-xs font-bold text-white">{schedule.event_count}</p>
+                  <p className="text-xs font-bold text-white">
+                    {schedule.event_count}
+                  </p>
                   <p className="text-[8px] text-white/30 uppercase">Torneios</p>
                 </div>
                 {onDeleteSchedule && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (confirm('Tem certeza que deseja excluir esta planilha?')) {
+                      if (
+                        confirm("Tem certeza que deseja excluir esta planilha?")
+                      ) {
                         onDeleteSchedule(schedule.id);
                       }
                     }}

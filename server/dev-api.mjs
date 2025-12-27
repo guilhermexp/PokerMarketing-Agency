@@ -379,7 +379,8 @@ app.post('/api/db/gallery', async (req, res) => {
   console.log('[Gallery API] POST request - user_id:', req.body.user_id, 'source:', req.body.source);
   try {
     const sql = getSql();
-    const { user_id, organization_id, src_url, prompt, source, model, aspect_ratio, image_size } = req.body;
+    const { user_id, organization_id, src_url, prompt, source, model, aspect_ratio, image_size,
+            post_id, ad_creative_id, video_script_id } = req.body;
 
     if (!user_id || !src_url || !source || !model) {
       console.log('[Gallery API] Missing fields - user_id:', user_id, 'src_url:', !!src_url, 'source:', source, 'model:', model);
@@ -400,9 +401,17 @@ app.post('/api/db/gallery', async (req, res) => {
       }
     }
 
+    // Log linking IDs for debugging
+    if (post_id || ad_creative_id || video_script_id) {
+      console.log('[Gallery API] Linking to campaign content - post_id:', post_id, 'ad_creative_id:', ad_creative_id, 'video_script_id:', video_script_id);
+    }
+
     const result = await sql`
-      INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, source, model, aspect_ratio, image_size)
-      VALUES (${resolvedUserId}, ${organization_id || null}, ${src_url}, ${prompt || null}, ${source}, ${model}, ${aspect_ratio || null}, ${image_size || null})
+      INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, source, model, aspect_ratio, image_size,
+                                  post_id, ad_creative_id, video_script_id)
+      VALUES (${resolvedUserId}, ${organization_id || null}, ${src_url}, ${prompt || null}, ${source}, ${model},
+              ${aspect_ratio || null}, ${image_size || null},
+              ${post_id || null}, ${ad_creative_id || null}, ${video_script_id || null})
       RETURNING *
     `;
 
@@ -836,12 +845,37 @@ app.get('/api/db/campaigns', async (req, res) => {
       `;
     }
 
-    // Get counts for each campaign
+    // Get counts and preview URLs for each campaign
     const result = await Promise.all(campaigns.map(async (c) => {
-      const [clips, posts, ads] = await Promise.all([
+      const [clips, posts, ads, clipPreview, postPreview, adPreview] = await Promise.all([
         sql`SELECT COUNT(*) as count FROM video_clip_scripts WHERE campaign_id = ${c.id}`,
         sql`SELECT platform, COUNT(*) as count FROM posts WHERE campaign_id = ${c.id} GROUP BY platform`,
-        sql`SELECT platform, COUNT(*) as count FROM ad_creatives WHERE campaign_id = ${c.id} GROUP BY platform`
+        sql`SELECT platform, COUNT(*) as count FROM ad_creatives WHERE campaign_id = ${c.id} GROUP BY platform`,
+        // Get clip preview: first from linked gallery, then from video_clip_scripts.thumbnail_url
+        sql`
+          SELECT COALESCE(
+            (SELECT gi.src_url FROM gallery_images gi
+             INNER JOIN video_clip_scripts vcs ON gi.video_script_id = vcs.id
+             WHERE vcs.campaign_id = ${c.id} AND gi.deleted_at IS NULL
+             ORDER BY gi.created_at DESC LIMIT 1),
+            (SELECT thumbnail_url FROM video_clip_scripts
+             WHERE campaign_id = ${c.id} AND thumbnail_url IS NOT NULL LIMIT 1)
+          ) as preview_url
+        `,
+        // Get post preview: from posts.image_url, linked gallery, or any post-like gallery image
+        sql`
+          SELECT COALESCE(
+            (SELECT image_url FROM posts WHERE campaign_id = ${c.id} AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
+            (SELECT gi.src_url FROM gallery_images gi INNER JOIN posts p ON gi.post_id = p.id WHERE p.campaign_id = ${c.id} AND gi.deleted_at IS NULL ORDER BY gi.created_at DESC LIMIT 1)
+          ) as preview_url
+        `,
+        // Get ad preview: from ad_creatives.image_url or linked gallery
+        sql`
+          SELECT COALESCE(
+            (SELECT image_url FROM ad_creatives WHERE campaign_id = ${c.id} AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
+            (SELECT gi.src_url FROM gallery_images gi INNER JOIN ad_creatives ac ON gi.ad_creative_id = ac.id WHERE ac.campaign_id = ${c.id} AND gi.deleted_at IS NULL ORDER BY gi.created_at DESC LIMIT 1)
+          ) as preview_url
+        `
       ]);
 
       // Build posts breakdown
@@ -859,6 +893,9 @@ app.get('/api/db/campaigns', async (req, res) => {
         ads_count: ads.reduce((sum, a) => sum + Number(a.count), 0),
         posts_breakdown: postsBreakdown,
         ads_breakdown: adsBreakdown,
+        clip_preview_url: clipPreview[0]?.preview_url || null,
+        post_preview_url: postPreview[0]?.preview_url || null,
+        ad_preview_url: adPreview[0]?.preview_url || null,
       };
     }));
 

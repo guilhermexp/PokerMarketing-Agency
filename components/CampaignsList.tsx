@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Icon } from './common/Icon';
-import { Button } from './common/Button';
-import { Loader } from './common/Loader';
-import { EmptyState } from './common/EmptyState';
-import { getCampaigns, deleteCampaign, type DbCampaign } from '../services/apiClient';
+import React, { useState, useEffect } from "react";
+import { Icon } from "./common/Icon";
+import { Button } from "./common/Button";
+import { Loader } from "./common/Loader";
+import { EmptyState } from "./common/EmptyState";
+import {
+  getCampaigns,
+  deleteCampaign,
+  type DbCampaign,
+} from "../services/apiClient";
 
 interface CampaignWithCounts {
   id: string;
@@ -29,7 +33,10 @@ interface CampaignsListProps {
 }
 
 // Animated counter for stats
-const AnimatedNumber: React.FC<{ value: number; delay?: number }> = ({ value, delay = 0 }) => {
+const AnimatedNumber: React.FC<{ value: number; delay?: number }> = ({
+  value,
+  delay = 0,
+}) => {
   const [displayValue, setDisplayValue] = useState(0);
 
   useEffect(() => {
@@ -62,36 +69,38 @@ const AnimatedNumber: React.FC<{ value: number; delay?: number }> = ({ value, de
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const config = {
     completed: {
-      bg: 'bg-emerald-500/10',
-      border: 'border-emerald-500/20',
-      text: 'text-emerald-400',
-      dot: 'bg-emerald-400',
-      label: 'Concluída'
+      bg: "bg-emerald-500/10",
+      border: "border-emerald-500/20",
+      text: "text-emerald-400",
+      dot: "bg-emerald-400",
+      label: "Concluída",
     },
     generating: {
-      bg: 'bg-amber-500/10',
-      border: 'border-amber-500/20',
-      text: 'text-amber-400',
-      dot: 'bg-amber-400 animate-pulse',
-      label: 'Gerando...'
+      bg: "bg-amber-500/10",
+      border: "border-amber-500/20",
+      text: "text-amber-400",
+      dot: "bg-amber-400 animate-pulse",
+      label: "Gerando...",
     },
     draft: {
-      bg: 'bg-white/5',
-      border: 'border-white/10',
-      text: 'text-white/50',
-      dot: 'bg-white/40',
-      label: 'Rascunho'
-    }
+      bg: "bg-white/5",
+      border: "border-white/10",
+      text: "text-white/50",
+      dot: "bg-white/40",
+      label: "Rascunho",
+    },
   }[status] || {
-    bg: 'bg-white/5',
-    border: 'border-white/10',
-    text: 'text-white/40',
-    dot: 'bg-white/30',
-    label: status
+    bg: "bg-white/5",
+    border: "border-white/10",
+    text: "text-white/40",
+    dot: "bg-white/30",
+    label: status,
   };
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wider ${config.bg} ${config.border} ${config.text} border`}>
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wider ${config.bg} ${config.border} ${config.text} border`}
+    >
       <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
       {config.label}
     </span>
@@ -107,25 +116,34 @@ const CampaignCard: React.FC<{
   onSelect: () => void;
   onDelete: (e: React.MouseEvent) => void;
   index: number;
-}> = ({ campaign, isSelected, isLoading, isDeleting, onSelect, onDelete, index }) => {
+}> = ({
+  campaign,
+  isSelected,
+  isLoading,
+  isDeleting,
+  onSelect,
+  onDelete,
+  index,
+}) => {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
+    return date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
   };
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
-  const totalAssets = campaign.clipsCount + campaign.postsCount + campaign.adsCount;
+  const totalAssets =
+    campaign.clipsCount + campaign.postsCount + campaign.adsCount;
 
   return (
     <div
@@ -134,16 +152,17 @@ const CampaignCard: React.FC<{
         bg-gradient-to-b from-[#0d0d0d] to-[#0a0a0a]
         rounded-2xl overflow-hidden
         border transition-all duration-500 ease-out
-        ${isSelected
-          ? 'border-primary/40 shadow-[0_0_40px_-10px_rgba(245,158,11,0.3)]'
-          : 'border-white/[0.06] hover:border-white/[0.12]'
+        ${
+          isSelected
+            ? "border-primary/40 shadow-[0_0_40px_-10px_rgba(245,158,11,0.3)]"
+            : "border-white/[0.06] hover:border-white/[0.12]"
         }
         hover:shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]
         hover:-translate-y-0.5
       `}
       style={{
         animationDelay: `${index * 80}ms`,
-        animation: 'fadeSlideIn 0.5s ease-out backwards'
+        animation: "fadeSlideIn 0.5s ease-out backwards",
       }}
     >
       {/* Ambient glow on hover */}
@@ -157,18 +176,23 @@ const CampaignCard: React.FC<{
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {/* Icon */}
-            <div className={`
+            <div
+              className={`
               w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
               transition-all duration-300
-              ${isSelected
-                ? 'bg-primary/20 shadow-[0_0_20px_rgba(245,158,11,0.2)]'
-                : 'bg-white/[0.04] group-hover:bg-white/[0.06]'
+              ${
+                isSelected
+                  ? "bg-primary/20 shadow-[0_0_20px_rgba(245,158,11,0.2)]"
+                  : "bg-white/[0.04] group-hover:bg-white/[0.06]"
               }
-            `}>
+            `}
+            >
               <Icon
                 name="zap"
                 className={`w-4 h-4 transition-colors duration-300 ${
-                  isSelected ? 'text-primary' : 'text-white/40 group-hover:text-white/60'
+                  isSelected
+                    ? "text-primary"
+                    : "text-white/40 group-hover:text-white/60"
                 }`}
               />
             </div>
@@ -176,10 +200,11 @@ const CampaignCard: React.FC<{
             {/* Title */}
             <div className="min-w-0 flex-1">
               <h3 className="text-sm font-bold text-white truncate leading-tight">
-                {campaign.name || 'Campanha sem título'}
+                {campaign.name || "Campanha sem título"}
               </h3>
               <p className="text-[10px] text-white/30 mt-0.5">
-                {formatDate(campaign.createdAt)} às {formatTime(campaign.createdAt)}
+                {formatDate(campaign.createdAt)} às{" "}
+                {formatTime(campaign.createdAt)}
               </p>
             </div>
           </div>
@@ -211,9 +236,14 @@ const CampaignCard: React.FC<{
                 )}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
                   <div className="text-xl font-black text-white tabular-nums drop-shadow-lg">
-                    <AnimatedNumber value={campaign.clipsCount} delay={index * 80} />
+                    <AnimatedNumber
+                      value={campaign.clipsCount}
+                      delay={index * 80}
+                    />
                   </div>
-                  <div className="text-[8px] text-white/60 uppercase tracking-wider font-semibold mt-0.5">Clips</div>
+                  <div className="text-[8px] text-white/60 uppercase tracking-wider font-semibold mt-0.5">
+                    Clips
+                  </div>
                 </div>
               </div>
             )}
@@ -235,9 +265,14 @@ const CampaignCard: React.FC<{
                 )}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
                   <div className="text-xl font-black text-white tabular-nums drop-shadow-lg">
-                    <AnimatedNumber value={campaign.postsCount} delay={index * 80 + 100} />
+                    <AnimatedNumber
+                      value={campaign.postsCount}
+                      delay={index * 80 + 100}
+                    />
                   </div>
-                  <div className="text-[8px] text-white/60 uppercase tracking-wider font-semibold mt-0.5">Posts</div>
+                  <div className="text-[8px] text-white/60 uppercase tracking-wider font-semibold mt-0.5">
+                    Posts
+                  </div>
                 </div>
               </div>
             )}
@@ -259,9 +294,14 @@ const CampaignCard: React.FC<{
                 )}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
                   <div className="text-xl font-black text-white tabular-nums drop-shadow-lg">
-                    <AnimatedNumber value={campaign.adsCount} delay={index * 80 + 200} />
+                    <AnimatedNumber
+                      value={campaign.adsCount}
+                      delay={index * 80 + 200}
+                    />
                   </div>
-                  <div className="text-[8px] text-white/60 uppercase tracking-wider font-semibold mt-0.5">Ads</div>
+                  <div className="text-[8px] text-white/60 uppercase tracking-wider font-semibold mt-0.5">
+                    Ads
+                  </div>
                 </div>
               </div>
             )}
@@ -276,17 +316,20 @@ const CampaignCard: React.FC<{
         )}
 
         {/* Platform breakdown */}
-        {(Object.keys(campaign.postsBreakdown).length > 0 || Object.keys(campaign.adsBreakdown).length > 0) && (
+        {(Object.keys(campaign.postsBreakdown).length > 0 ||
+          Object.keys(campaign.adsBreakdown).length > 0) && (
           <div className="flex flex-wrap gap-1.5">
-            {Object.entries(campaign.postsBreakdown).map(([platform, count]) => (
-              <span
-                key={`post-${platform}`}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.03] text-[9px] text-white/40"
-              >
-                <Icon name="image" className="w-2.5 h-2.5" />
-                {count} {platform}
-              </span>
-            ))}
+            {Object.entries(campaign.postsBreakdown).map(
+              ([platform, count]) => (
+                <span
+                  key={`post-${platform}`}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.03] text-[9px] text-white/40"
+                >
+                  <Icon name="image" className="w-2.5 h-2.5" />
+                  {count} {platform}
+                </span>
+              ),
+            )}
             {Object.entries(campaign.adsBreakdown).map(([platform, count]) => (
               <span
                 key={`ad-${platform}`}
@@ -310,9 +353,10 @@ const CampaignCard: React.FC<{
             px-4 py-2.5 rounded-xl
             text-[10px] font-bold uppercase tracking-wider
             transition-all duration-300
-            ${isSelected
-              ? 'bg-primary text-black'
-              : 'bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white border border-white/[0.06]'
+            ${
+              isSelected
+                ? "bg-primary text-black"
+                : "bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white border border-white/[0.06]"
             }
             disabled:opacity-50
           `}
@@ -322,7 +366,7 @@ const CampaignCard: React.FC<{
           ) : (
             <>
               <Icon name="eye" className="w-3.5 h-3.5" />
-              <span>{isSelected ? 'Aberta' : 'Abrir'}</span>
+              <span>{isSelected ? "Aberta" : "Abrir"}</span>
             </>
           )}
         </button>
@@ -358,7 +402,9 @@ const CampaignCard: React.FC<{
 };
 
 // Empty state component using reusable EmptyState
-const CampaignsEmptyState: React.FC<{ onNewCampaign: () => void }> = ({ onNewCampaign }) => (
+const CampaignsEmptyState: React.FC<{ onNewCampaign: () => void }> = ({
+  onNewCampaign,
+}) => (
   <EmptyState
     icon="layers"
     title="Nenhuma campanha ainda"
@@ -367,6 +413,7 @@ const CampaignsEmptyState: React.FC<{ onNewCampaign: () => void }> = ({ onNewCam
     actionIcon="plus"
     onAction={onNewCampaign}
     size="large"
+    className="w-full"
   />
 );
 
@@ -377,7 +424,10 @@ const LoadingSkeleton: React.FC = () => (
       <div
         key={i}
         className="bg-[#0a0a0a] rounded-2xl border border-white/[0.04] overflow-hidden"
-        style={{ animationDelay: `${i * 100}ms`, animation: 'pulse 1.5s ease-in-out infinite' }}
+        style={{
+          animationDelay: `${i * 100}ms`,
+          animation: "pulse 1.5s ease-in-out infinite",
+        }}
       >
         <div className="p-5 border-b border-white/[0.04]">
           <div className="flex items-center gap-3">
@@ -404,10 +454,18 @@ const LoadingSkeleton: React.FC = () => (
   </div>
 );
 
-export function CampaignsList({ userId, organizationId, onSelectCampaign, onNewCampaign, currentCampaignId }: CampaignsListProps) {
+export function CampaignsList({
+  userId,
+  organizationId,
+  onSelectCampaign,
+  onNewCampaign,
+  currentCampaignId,
+}: CampaignsListProps) {
   const [campaigns, setCampaigns] = useState<CampaignWithCounts[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingCampaignId, setLoadingCampaignId] = useState<string | null>(null);
+  const [loadingCampaignId, setLoadingCampaignId] = useState<string | null>(
+    null,
+  );
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -418,23 +476,25 @@ export function CampaignsList({ userId, organizationId, onSelectCampaign, onNewC
     try {
       setIsLoading(true);
       const dbCampaigns = await getCampaigns(userId, organizationId);
-      const summaries: CampaignWithCounts[] = dbCampaigns.map((c: DbCampaign) => ({
-        id: c.id,
-        name: c.name,
-        status: c.status,
-        createdAt: c.created_at,
-        clipsCount: Number(c.clips_count) || 0,
-        postsCount: Number(c.posts_count) || 0,
-        adsCount: Number(c.ads_count) || 0,
-        postsBreakdown: c.posts_breakdown || {},
-        adsBreakdown: c.ads_breakdown || {},
-        clipPreviewUrl: c.clip_preview_url || null,
-        postPreviewUrl: c.post_preview_url || null,
-        adPreviewUrl: c.ad_preview_url || null,
-      }));
+      const summaries: CampaignWithCounts[] = dbCampaigns.map(
+        (c: DbCampaign) => ({
+          id: c.id,
+          name: c.name,
+          status: c.status,
+          createdAt: c.created_at,
+          clipsCount: Number(c.clips_count) || 0,
+          postsCount: Number(c.posts_count) || 0,
+          adsCount: Number(c.ads_count) || 0,
+          postsBreakdown: c.posts_breakdown || {},
+          adsBreakdown: c.ads_breakdown || {},
+          clipPreviewUrl: c.clip_preview_url || null,
+          postPreviewUrl: c.post_preview_url || null,
+          adPreviewUrl: c.ad_preview_url || null,
+        }),
+      );
       setCampaigns(summaries);
     } catch (error) {
-      console.error('Failed to load campaigns:', error);
+      console.error("Failed to load campaigns:", error);
     } finally {
       setIsLoading(false);
     }
@@ -446,19 +506,22 @@ export function CampaignsList({ userId, organizationId, onSelectCampaign, onNewC
     setTimeout(() => setLoadingCampaignId(null), 2000);
   };
 
-  const handleDeleteCampaign = async (campaignId: string, e: React.MouseEvent) => {
+  const handleDeleteCampaign = async (
+    campaignId: string,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation();
 
-    if (!confirm('Tem certeza que deseja excluir esta campanha?')) {
+    if (!confirm("Tem certeza que deseja excluir esta campanha?")) {
       return;
     }
 
     try {
       setDeletingId(campaignId);
       await deleteCampaign(campaignId);
-      setCampaigns(prev => prev.filter(c => c.id !== campaignId));
+      setCampaigns((prev) => prev.filter((c) => c.id !== campaignId));
     } catch (error) {
-      console.error('Failed to delete campaign:', error);
+      console.error("Failed to delete campaign:", error);
     } finally {
       setDeletingId(null);
     }
@@ -483,7 +546,7 @@ export function CampaignsList({ userId, organizationId, onSelectCampaign, onNewC
       {/* Header */}
       <div
         className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2"
-        style={{ animation: 'fadeSlideIn 0.4s ease-out' }}
+        style={{ animation: "fadeSlideIn 0.4s ease-out" }}
       >
         <div>
           <h1 className="text-2xl font-black text-white uppercase tracking-tight">
@@ -491,11 +554,17 @@ export function CampaignsList({ userId, organizationId, onSelectCampaign, onNewC
           </h1>
           {!isLoading && (
             <p className="text-[11px] text-white/30 uppercase tracking-wider mt-1">
-              {campaigns.length} campanha{campaigns.length !== 1 ? 's' : ''} salva{campaigns.length !== 1 ? 's' : ''}
+              {campaigns.length} campanha{campaigns.length !== 1 ? "s" : ""}{" "}
+              salva{campaigns.length !== 1 ? "s" : ""}
             </p>
           )}
         </div>
-        <Button onClick={onNewCampaign} icon="plus" size="small" variant="primary">
+        <Button
+          onClick={onNewCampaign}
+          icon="plus"
+          size="small"
+          variant="primary"
+        >
           Nova Campanha
         </Button>
       </div>

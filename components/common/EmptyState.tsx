@@ -1,6 +1,6 @@
-import React from 'react';
-import { Icon, type IconName } from './Icon';
-import { Button } from './Button';
+import React from "react";
+import { Icon, type IconName } from "./Icon";
+import { Button } from "./Button";
 
 interface EmptyStateProps {
   icon: IconName;
@@ -13,8 +13,9 @@ interface EmptyStateProps {
   secondaryActionLabel?: string;
   secondaryActionIcon?: IconName;
   onSecondaryAction?: () => void;
-  size?: 'small' | 'medium' | 'large';
+  size?: "small" | "medium" | "large";
   children?: React.ReactNode;
+  className?: string;
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
@@ -23,38 +24,39 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   description,
   subtitle,
   actionLabel,
-  actionIcon = 'plus',
+  actionIcon = "plus",
   onAction,
   secondaryActionLabel,
   secondaryActionIcon,
   onSecondaryAction,
-  size = 'medium',
+  size = "medium",
   children,
+  className = "",
 }) => {
   const sizeClasses = {
     small: {
-      container: 'p-8 md:p-10',
-      iconWrapper: 'w-14 h-14 rounded-xl',
-      icon: 'w-6 h-6',
-      title: 'text-base',
-      description: 'text-xs',
-      blur: 'w-[300px] h-[300px]',
+      container: "p-8 md:p-10",
+      iconWrapper: "w-14 h-14 rounded-xl",
+      icon: "w-6 h-6",
+      title: "text-base",
+      description: "text-xs",
+      blur: "w-[300px] h-[300px]",
     },
     medium: {
-      container: 'p-10 md:p-14',
-      iconWrapper: 'w-16 h-16 rounded-2xl',
-      icon: 'w-7 h-7',
-      title: 'text-lg',
-      description: 'text-sm',
-      blur: 'w-[400px] h-[400px]',
+      container: "p-10 md:p-14",
+      iconWrapper: "w-16 h-16 rounded-2xl",
+      icon: "w-7 h-7",
+      title: "text-lg",
+      description: "text-sm",
+      blur: "w-[400px] h-[400px]",
     },
     large: {
-      container: 'p-12 md:p-16',
-      iconWrapper: 'w-20 h-20 rounded-2xl',
-      icon: 'w-8 h-8',
-      title: 'text-xl',
-      description: 'text-sm',
-      blur: 'w-[500px] h-[500px]',
+      container: "p-12 md:p-16",
+      iconWrapper: "w-20 h-20 rounded-2xl",
+      icon: "w-8 h-8",
+      title: "text-xl",
+      description: "text-sm",
+      blur: "w-[500px] h-[500px]",
     },
   };
 
@@ -68,12 +70,15 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         rounded-3xl border border-white/[0.04]
         ${classes.container}
         text-center
+        ${className}
       `}
-      style={{ animation: 'fadeSlideIn 0.6s ease-out' }}
+      style={{ animation: "fadeSlideIn 0.6s ease-out" }}
     >
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${classes.blur} bg-primary/[0.02] rounded-full blur-3xl`} />
+        <div
+          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${classes.blur} bg-primary/[0.02] rounded-full blur-3xl`}
+        />
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/[0.01] rounded-full blur-2xl" />
         {/* Grid pattern */}
         <div
@@ -83,15 +88,20 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
               linear-gradient(to right, white 1px, transparent 1px),
               linear-gradient(to bottom, white 1px, transparent 1px)
             `,
-            backgroundSize: '40px 40px'
+            backgroundSize: "40px 40px",
           }}
         />
       </div>
 
       {/* Icon */}
       <div className="relative inline-flex items-center justify-center mb-6">
-        <div className="absolute inset-0 bg-primary/10 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '3s' }} />
-        <div className={`relative ${classes.iconWrapper} bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] flex items-center justify-center`}>
+        <div
+          className="absolute inset-0 bg-primary/10 rounded-full blur-2xl animate-pulse"
+          style={{ animationDuration: "3s" }}
+        />
+        <div
+          className={`relative ${classes.iconWrapper} bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] flex items-center justify-center`}
+        >
           <Icon name={icon} className={`${classes.icon} text-white/20`} />
         </div>
       </div>
@@ -100,7 +110,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       <h3 className={`relative ${classes.title} font-bold text-white mb-2`}>
         {title}
       </h3>
-      <p className={`relative ${classes.description} text-white/30 max-w-sm mx-auto mb-8 leading-relaxed`}>
+      <p
+        className={`relative ${classes.description} text-white/30 max-w-sm mx-auto mb-8 leading-relaxed`}
+      >
         {description}
       </p>
 
@@ -109,19 +121,31 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         <div className="relative flex flex-col items-center gap-3">
           {children}
         </div>
-      ) : (onAction || onSecondaryAction) && (
-        <div className="relative flex flex-wrap items-center justify-center gap-3">
-          {onAction && actionLabel && (
-            <Button onClick={onAction} variant="primary" icon={actionIcon} size={size === 'small' ? 'small' : 'large'}>
-              {actionLabel}
-            </Button>
-          )}
-          {onSecondaryAction && secondaryActionLabel && (
-            <Button onClick={onSecondaryAction} variant="secondary" icon={secondaryActionIcon} size={size === 'small' ? 'small' : 'large'}>
-              {secondaryActionLabel}
-            </Button>
-          )}
-        </div>
+      ) : (
+        (onAction || onSecondaryAction) && (
+          <div className="relative flex flex-wrap items-center justify-center gap-3">
+            {onAction && actionLabel && (
+              <Button
+                onClick={onAction}
+                variant="primary"
+                icon={actionIcon}
+                size={size === "small" ? "small" : "large"}
+              >
+                {actionLabel}
+              </Button>
+            )}
+            {onSecondaryAction && secondaryActionLabel && (
+              <Button
+                onClick={onSecondaryAction}
+                variant="secondary"
+                icon={secondaryActionIcon}
+                size={size === "small" ? "small" : "large"}
+              >
+                {secondaryActionLabel}
+              </Button>
+            )}
+          </div>
+        )
       )}
 
       {/* Subtitle */}

@@ -26,6 +26,7 @@ export interface ContentInput {
 }
 
 export interface VideoClipScript {
+  id?: string;  // Database ID (for linking gallery images)
   title: string;
   hook: string;
   scenes: {
