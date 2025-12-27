@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon } from './common/Icon';
 import { Loader } from './common/Loader';
+import { EmptyState } from './common/EmptyState';
 import type { WeekScheduleWithCount } from '../services/apiClient';
 
 interface SchedulesListViewProps {
@@ -69,32 +70,28 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
   if (schedules.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="max-w-md text-center space-y-6 animate-fade-in-up">
-          <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center">
-            <Icon name="calendar" className="w-10 h-10 text-primary/60" />
-          </div>
-          <div>
-            <h3 className="text-xl font-black text-white uppercase tracking-tight">Nenhuma Planilha</h3>
-            <p className="text-sm text-white/40 mt-2">
-              Carregue sua primeira planilha de torneios para começar a gerar flyers.
-            </p>
-          </div>
-          <label className={`cursor-pointer group inline-block ${isUploading ? 'pointer-events-none opacity-70' : ''}`}>
-            <div className="bg-white text-black font-black px-6 py-3 rounded-xl flex items-center justify-center space-x-3 transition-all hover:bg-white/90 active:scale-95">
-              {isUploading ? <Loader className="w-4 h-4" /> : <Icon name="upload" className="w-4 h-4" />}
-              <span className="text-sm uppercase tracking-wide">{isUploading ? 'Carregando...' : 'Carregar Planilha Excel'}</span>
-            </div>
-            <input
-              type="file"
-              className="hidden"
-              accept=".xlsx,.xls"
-              onChange={handleFileChange}
-              disabled={isUploading}
-            />
-          </label>
-          <p className="text-[10px] text-white/20 uppercase tracking-wider">
-            Formatos suportados: .xlsx, .xls
-          </p>
+        <div className="w-full max-w-2xl">
+          <EmptyState
+            icon="calendar"
+            title="Nenhuma Planilha"
+            description="Carregue sua primeira planilha de torneios para começar a gerar flyers."
+            subtitle="Formatos suportados: .xlsx, .xls"
+            size="large"
+          >
+            <label className={`cursor-pointer group inline-block ${isUploading ? 'pointer-events-none opacity-70' : ''}`}>
+              <div className="bg-primary text-black font-black px-6 py-3 rounded-xl flex items-center justify-center space-x-3 transition-all hover:bg-primary/90 active:scale-95">
+                {isUploading ? <Loader className="w-4 h-4" /> : <Icon name="upload" className="w-4 h-4" />}
+                <span className="text-sm uppercase tracking-wide">{isUploading ? 'Carregando...' : 'Carregar Planilha Excel'}</span>
+              </div>
+              <input
+                type="file"
+                className="hidden"
+                accept=".xlsx,.xls"
+                onChange={handleFileChange}
+                disabled={isUploading}
+              />
+            </label>
+          </EmptyState>
         </div>
       </div>
     );

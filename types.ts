@@ -3,6 +3,11 @@ import type { IconName } from './components/common/Icon';
 
 export type ToneOfVoice = 'Profissional' | 'Espirituoso' | 'Casual' | 'Inspirador' | 'Técnico';
 
+export type ToneTarget = 'campaigns' | 'posts' | 'images' | 'flyers' | 'videos';
+
+// Modelos criativos para geração de texto (campanhas, posts, prompts)
+export type CreativeModel = 'gemini-3-pro' | 'gemini-3-flash' | 'openai/gpt-5.2' | 'x-ai/grok-4.1-fast';
+
 export interface BrandProfile {
   name: string;
   description: string;
@@ -10,6 +15,8 @@ export interface BrandProfile {
   primaryColor: string;
   secondaryColor: string;
   toneOfVoice: ToneOfVoice;
+  toneTargets?: ToneTarget[]; // Onde aplicar o tom (default: todos exceto videos)
+  creativeModel?: CreativeModel; // Modelo para geração criativa (default: gemini-3-pro)
 }
 
 export interface ContentInput {
@@ -32,18 +39,22 @@ export interface VideoClipScript {
 }
 
 export interface Post {
+  id?: string;  // Database ID (for updating image_url)
   platform: 'Instagram' | 'LinkedIn' | 'Twitter' | 'Facebook';
   content: string;
   hashtags: string[];
   image_prompt: string;
+  image_url?: string | null;  // Generated image URL (from database)
 }
 
 export interface AdCreative {
+  id?: string;  // Database ID (for updating image_url)
   platform: 'Facebook' | 'Google';
   headline: string;
   body: string;
   cta: string;
   image_prompt: string;
+  image_url?: string | null;  // Generated image URL (from database)
 }
 
 export interface MarketingCampaign {
@@ -127,6 +138,12 @@ export interface GalleryImage {
   imageSize?: ImageSize;
   mediaType?: GalleryMediaType;  // 'image' by default
   duration?: number;  // For videos, duration in seconds
+  // Database linking for campaign previews
+  post_id?: string;
+  ad_creative_id?: string;
+  video_script_id?: string;
+  // Publishing status
+  published_at?: string;  // ISO timestamp when published to Instagram
 }
 
 export interface StyleReference {

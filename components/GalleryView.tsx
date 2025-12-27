@@ -4,6 +4,7 @@ import type { GalleryImage, StyleReference } from '../types';
 import { Icon } from './common/Icon';
 import { Button } from './common/Button';
 import { ImagePreviewModal } from './common/ImagePreviewModal';
+import { EmptyState } from './common/EmptyState';
 
 interface GalleryViewProps {
   images: GalleryImage[];
@@ -77,6 +78,13 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     return styleReferences.find(ref => ref.src === image.src);
   };
 
+  // Check if gallery item is a video
+  const isVideo = (image: GalleryImage) => {
+    return image.src?.endsWith('.mp4') ||
+           image.src?.includes('video') ||
+           image.source?.startsWith('Video-');
+  };
+
   const handleToggleFavorite = (image: GalleryImage) => {
     const existingRef = getFavoriteRef(image);
     if (existingRef) {
@@ -113,11 +121,23 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                   onClick={() => setSelectedImage(image)}
                   className="group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 cursor-pointer break-inside-avoid mb-3"
               >
-                <img
-                  src={image.src}
-                  alt={image.prompt}
-                  className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                />
+                {isVideo(image) ? (
+                  <video
+                    src={image.src}
+                    className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                    muted
+                    playsInline
+                    preload="metadata"
+                    onMouseEnter={(e) => e.currentTarget.play()}
+                    onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                  />
+                ) : (
+                  <img
+                    src={image.src}
+                    alt={image.prompt}
+                    className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                  />
+                )}
 
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
@@ -131,6 +151,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       {image.model && (
                           <span className="text-[8px] text-primary font-bold bg-primary/20 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
                               {image.model === 'imagen-4.0-generate-001' ? 'Imagen' : 'Gemini'}
+                          </span>
+                      )}
+                      {image.published_at && (
+                          <span className="text-[8px] text-green-400 font-bold bg-green-500/20 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide flex items-center gap-1">
+                              <Icon name="check" className="w-2.5 h-2.5" />
+                              Publicado
                           </span>
                       )}
                   </div>
@@ -169,17 +195,24 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     <Icon name="heart" className="w-3 h-3 text-black" />
                   </div>
                 )}
+
+                {/* Video indicator */}
+                {isVideo(image) && (
+                  <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                    <Icon name="video" className="w-3 h-3 text-white" />
+                    <span className="text-[8px] font-bold text-white uppercase">Vídeo</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         ) : (
-          <div className="bg-[#111111] border border-dashed border-white/10 rounded-2xl p-12 text-center">
-              <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Icon name="image" className="w-6 h-6 text-white/20" />
-              </div>
-              <h3 className="text-sm font-black text-white uppercase tracking-wide mb-2">Galeria Vazia</h3>
-              <p className="text-[10px] text-white/30 max-w-xs mx-auto">As imagens geradas em Campanhas ou Flyers aparecerão aqui automaticamente.</p>
-          </div>
+          <EmptyState
+            icon="image"
+            title="Galeria Vazia"
+            description="As imagens geradas em Campanhas ou Flyers aparecerão aqui automaticamente."
+            size="medium"
+          />
         )
       ) : (
         /* References View */
@@ -223,13 +256,15 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               ))}
             </div>
           ) : (
-            <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl p-8 text-center">
-              <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Icon name="heart" className="w-6 h-6 text-white/20" />
-              </div>
-              <h3 className="text-sm font-black text-white uppercase tracking-wide mb-2">Nenhum Favorito</h3>
-              <p className="text-[10px] text-white/30 max-w-xs mx-auto">Clique em "Adicionar" para salvar imagens de referência.</p>
-            </div>
+            <EmptyState
+              icon="heart"
+              title="Nenhum Favorito"
+              description="Clique em 'Adicionar' para salvar imagens de referência ou favorite imagens da galeria."
+              actionLabel="Adicionar"
+              actionIcon="upload"
+              onAction={() => fileInputRef.current?.click()}
+              size="medium"
+            />
           )}
         </div>
       )}

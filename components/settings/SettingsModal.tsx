@@ -5,13 +5,12 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import type { BrandProfile, ToneOfVoice } from '../../types';
+import type { BrandProfile, ToneOfVoice, ToneTarget, CreativeModel } from '../../types';
 import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 import { extractColorsFromLogo } from '../../services/geminiService';
-import { TeamManagement } from '../team/TeamManagement';
-import { useOrganization } from '../../contexts/OrganizationContext';
+import { useOrganization, OrganizationProfile } from '@clerk/clerk-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -36,7 +35,25 @@ const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string; d
 
 const tones: ToneOfVoice[] = ['Profissional', 'Espirituoso', 'Casual', 'Inspirador', 'Tecnico'];
 
-// Color Widget similar to BrandProfileSetup
+const defaultToneTargets: ToneTarget[] = ['campaigns', 'posts', 'images', 'flyers'];
+
+const toneTargetLabels: Record<ToneTarget, string> = {
+  campaigns: 'Campanhas',
+  posts: 'Posts',
+  images: 'Imagens',
+  flyers: 'Flyers',
+  videos: 'Vídeos',
+};
+
+// Modelos criativos disponíveis
+const creativeModels: { id: CreativeModel; label: string; provider: string }[] = [
+  { id: 'gemini-3-pro', label: 'Gemini 3 Pro', provider: 'Google' },
+  { id: 'gemini-3-flash', label: 'Gemini 3 Flash', provider: 'Google' },
+  { id: 'openai/gpt-5.2', label: 'GPT-5.2', provider: 'OpenAI' },
+  { id: 'x-ai/grok-4.1-fast', label: 'Grok 4.1 Fast', provider: 'xAI' },
+];
+
+// Color Widget
 const ColorWidget: React.FC<{
   label: string;
   color: string;
@@ -44,32 +61,30 @@ const ColorWidget: React.FC<{
   name: string;
   isAnalyzing: boolean;
 }> = ({ label, color, onChange, name, isAnalyzing }) => (
-  <div className="bg-[#111111] border border-white/5 p-3 rounded-xl flex items-center justify-between group transition-all hover:border-white/10 w-full overflow-hidden">
-    <div className="flex flex-col min-w-0 flex-1 pr-1.5">
-      <label className="text-[7px] font-black text-white/30 uppercase tracking-[0.2em] mb-1 truncate">{label}</label>
-      <span className={`text-[8px] font-mono text-white/40 group-hover:text-white transition-colors truncate ${isAnalyzing ? 'animate-pulse' : ''}`}>
-        {isAnalyzing ? 'SYNC...' : color.toUpperCase()}
+  <div className="bg-[#111111] border border-white/10 p-3 rounded-xl flex items-center justify-between group transition-all hover:border-white/20 w-full overflow-hidden">
+    <div className="flex flex-col min-w-0 flex-1 pr-2">
+      <label className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-1 truncate">{label}</label>
+      <span className={`text-[10px] font-mono text-white/50 group-hover:text-white transition-colors truncate ${isAnalyzing ? 'animate-pulse' : ''}`}>
+        {isAnalyzing ? '...' : color.toUpperCase()}
       </span>
     </div>
-    <div className="relative w-6 h-6 flex items-center justify-center flex-shrink-0">
-      <div className="absolute inset-0 border border-white/5 rounded-full"></div>
-      <div className={`absolute inset-0.5 border border-white/10 rounded-full border-dashed ${isAnalyzing ? 'animate-spin' : 'animate-[spin_20s_linear_infinite]'}`}></div>
+    <div className="relative w-7 h-7 flex items-center justify-center flex-shrink-0">
       <input
         type="color"
         name={name}
         value={color}
         onChange={onChange}
-        className="w-full h-full rounded-sm cursor-pointer bg-transparent border-none p-0 overflow-hidden relative z-10 opacity-0"
+        className="w-full h-full rounded-lg cursor-pointer bg-transparent border-none p-0 overflow-hidden relative z-10 opacity-0"
       />
       <div
-        className="absolute w-3 h-3 rounded-sm pointer-events-none z-0 border border-white/20 shadow-lg transition-all duration-500"
+        className="absolute w-6 h-6 rounded-lg pointer-events-none z-0 border border-white/20 shadow-lg transition-all"
         style={{ backgroundColor: color }}
       ></div>
     </div>
   </div>
 );
 
-// Custom Select similar to BrandProfileSetup
+// Custom Select
 const CustomSelect: React.FC<{
   label: string;
   value: string;
@@ -91,27 +106,27 @@ const CustomSelect: React.FC<{
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      <label className="text-[7px] font-black text-white/30 uppercase tracking-[0.2em] mb-1.5 block">{label}</label>
+      <label className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2 block">{label}</label>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-[#111111] border border-white/5 rounded-xl p-3 flex items-center justify-between text-left transition-all hover:border-white/20 active:scale-[0.98] outline-none"
+        className="w-full bg-[#111111] border border-white/10 rounded-xl p-3 flex items-center justify-between text-left transition-all hover:border-white/20 outline-none"
       >
-        <span className="text-[9px] font-black text-white uppercase tracking-widest truncate">{value}</span>
-        <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} className="w-2.5 h-2.5 text-white/20 flex-shrink-0 ml-1.5" />
+        <span className="text-xs font-medium text-white truncate">{value}</span>
+        <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} className="w-3 h-3 text-white/30 flex-shrink-0 ml-2" />
       </button>
 
       {isOpen && (
-        <div className="absolute z-[100] bottom-full mb-2 w-full bg-[#111] border border-white/10 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-fade-in-up">
+        <div className="absolute z-[100] bottom-full mb-2 w-full bg-[#151515] border border-white/10 rounded-xl overflow-hidden shadow-xl">
           {options.map((opt) => (
             <button
               key={opt}
               type="button"
               onClick={() => { onChange(opt); setIsOpen(false); }}
-              className={`w-full px-4 py-2.5 text-left text-[8px] font-black uppercase tracking-widest transition-colors ${
+              className={`w-full px-4 py-2.5 text-left text-xs font-medium transition-colors ${
                 value === opt
                   ? 'bg-primary text-black'
-                  : 'text-white/40 hover:bg-white/5 hover:text-white'
+                  : 'text-white/60 hover:bg-white/5 hover:text-white'
               }`}
             >
               {opt}
@@ -124,7 +139,7 @@ const CustomSelect: React.FC<{
 };
 
 export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: SettingsModalProps) {
-  const { currentOrganization } = useOrganization();
+  const { organization } = useOrganization();
   const [activeTab, setActiveTab] = useState<Tab>('brand');
   const [profile, setProfile] = useState<Omit<BrandProfile, 'logo'> & { logo: string | null | File }>({
     name: brandProfile.name || '',
@@ -133,6 +148,8 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
     primaryColor: brandProfile.primaryColor || '#FFFFFF',
     secondaryColor: brandProfile.secondaryColor || '#737373',
     toneOfVoice: brandProfile.toneOfVoice || 'Casual',
+    toneTargets: brandProfile.toneTargets || defaultToneTargets,
+    creativeModel: brandProfile.creativeModel || 'gemini-3-pro',
   });
   const [isAnalyzingLogo, setIsAnalyzingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(brandProfile.logo || null);
@@ -147,6 +164,8 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
       primaryColor: brandProfile.primaryColor || '#FFFFFF',
       secondaryColor: brandProfile.secondaryColor || '#737373',
       toneOfVoice: brandProfile.toneOfVoice || 'Casual',
+      toneTargets: brandProfile.toneTargets || defaultToneTargets,
+      creativeModel: brandProfile.creativeModel || 'gemini-3-pro',
     });
     setLogoPreview(brandProfile.logo || null);
   }, [brandProfile]);
@@ -189,6 +208,19 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
     setProfile((prev) => ({ ...prev, toneOfVoice: val as ToneOfVoice }));
   };
 
+  const handleToneTargetToggle = (target: ToneTarget) => {
+    setProfile((prev) => {
+      const current = prev.toneTargets || defaultToneTargets;
+      const isActive = current.includes(target);
+      return {
+        ...prev,
+        toneTargets: isActive
+          ? current.filter(t => t !== target)
+          : [...current, target]
+      };
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -219,10 +251,6 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Animated Background Elements */}
-      <div className="glow-spot top-[-20%] left-[-10%] opacity-10 pointer-events-none"></div>
-      <div className="glow-spot bottom-[-20%] right-[-10%] opacity-10 pointer-events-none" style={{ animationDelay: '-5s' }}></div>
-
       {/* Modal */}
       <div className="relative w-full max-w-5xl max-h-[90vh] overflow-hidden">
         <div className="aura-card p-6 sm:p-8 shadow-[0_50px_100px_rgba(0,0,0,0.8)] border-white/10 bg-[#050505] relative overflow-hidden">
@@ -235,10 +263,10 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
           </button>
 
           {/* Header */}
-          <div className="flex items-center space-x-3 mb-8">
-            <div className="w-1 h-6 bg-primary rounded-full shadow-[0_0_15px_rgba(245,158,11,0.5)]"></div>
-            <h2 className="text-lg font-black text-white uppercase tracking-[0.2em]">
-              {currentOrganization ? currentOrganization.name : 'Configuracoes'}
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-1 h-5 bg-primary rounded-full"></div>
+            <h2 className="text-base font-bold text-white">
+              {organization?.name || 'Configurações'}
             </h2>
           </div>
 
@@ -261,15 +289,15 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
           </div>
 
           {/* Content */}
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div className="max-h-[60vh] overflow-y-auto overflow-x-hidden">
             {activeTab === 'brand' && (
               <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
                   {/* Left Column - Inputs */}
                   <div className="space-y-8">
                     <div className="group">
-                      <label className="block text-[8px] font-black text-white/30 uppercase tracking-[0.2em] mb-4 group-focus-within:text-white transition-colors">
-                        Label de Identidade
+                      <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2 group-focus-within:text-white transition-colors">
+                        Nome da Marca
                       </label>
                       <input
                         type="text"
@@ -277,13 +305,13 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                         value={profile.name}
                         onChange={handleChange}
                         required
-                        placeholder="EX: CPC POKER ONLINE"
-                        className="w-full bg-[#111111] border border-white/5 rounded-2xl p-4 text-white text-base font-bold focus:outline-none focus:border-primary/50 transition-all placeholder:text-white/5"
+                        placeholder="Ex: CPC Poker Online"
+                        className="w-full bg-[#111111] border border-white/10 rounded-xl p-3 text-white text-sm font-medium focus:outline-none focus:border-primary/50 transition-all placeholder:text-white/20"
                       />
                     </div>
                     <div className="group">
-                      <label className="block text-[8px] font-black text-white/30 uppercase tracking-[0.2em] mb-4 group-focus-within:text-white transition-colors">
-                        Manifesto Core
+                      <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2 group-focus-within:text-white transition-colors">
+                        Descrição
                       </label>
                       <textarea
                         name="description"
@@ -291,30 +319,30 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                         onChange={handleChange}
                         required
                         rows={4}
-                        placeholder="Defina a essencia da sua marca..."
-                        className="w-full bg-[#111111] border border-white/5 rounded-2xl p-4 text-white text-sm focus:outline-none focus:border-primary/50 transition-all resize-none placeholder:text-white/5"
+                        placeholder="Descreva sua marca..."
+                        className="w-full bg-[#111111] border border-white/10 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-primary/50 transition-all resize-none placeholder:text-white/20"
                       />
                     </div>
                   </div>
 
                   {/* Right Column - Assets */}
-                  <div className="space-y-8">
+                  <div className="space-y-6">
                     <div>
-                      <label className="block text-[8px] font-black text-white/30 uppercase tracking-[0.2em] mb-4">
-                        Master Logo Asset
+                      <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
+                        Logo
                       </label>
                       <div
                         {...getRootProps()}
-                        className={`group relative cursor-pointer bg-[#111111] border border-white/5 rounded-3xl p-6 h-[180px] flex flex-col items-center justify-center transition-all ${
-                          isDragActive ? 'border-primary' : 'hover:border-white/10'
+                        className={`group relative cursor-pointer bg-[#111111] border border-white/10 rounded-xl p-6 h-[160px] flex flex-col items-center justify-center transition-all ${
+                          isDragActive ? 'border-primary' : 'hover:border-white/20'
                         }`}
                       >
                         <input {...getInputProps()} />
                         {isAnalyzingLogo && (
-                          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/95 rounded-3xl backdrop-blur-xl">
-                            <Loader className="w-8 h-8 mb-4 text-primary" />
-                            <span className="text-[9px] font-black text-white uppercase tracking-[0.4em] animate-pulse">
-                              Syncing...
+                          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/95 rounded-xl backdrop-blur-xl">
+                            <Loader className="w-6 h-6 mb-3 text-primary" />
+                            <span className="text-[10px] font-medium text-white/60 animate-pulse">
+                              Analisando...
                             </span>
                           </div>
                         )}
@@ -322,61 +350,137 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                           <img
                             src={logoPreview}
                             alt="Logo"
-                            className="max-h-28 max-w-full object-contain filter group-hover:scale-105 transition-transform duration-700"
+                            className="max-h-24 max-w-full object-contain filter group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
                           <div className="text-center">
-                            <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10 group-hover:bg-primary/10 transition-all">
-                              <Icon name="upload" className="w-5 h-5 text-white/10 group-hover:text-primary" />
+                            <div className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center mx-auto mb-3 border border-white/10 group-hover:bg-primary/10 transition-all">
+                              <Icon name="upload" className="w-4 h-4 text-white/20 group-hover:text-primary" />
                             </div>
-                            <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Drop Asset</p>
+                            <p className="text-[10px] font-medium text-white/30">Arraste ou clique para enviar</p>
                           </div>
                         )}
                       </div>
                     </div>
 
                     {/* Technical Grid */}
-                    <div className="grid grid-cols-3 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <CustomSelect
-                        label="Tone"
+                        label="Tom"
                         value={profile.toneOfVoice}
                         options={tones}
                         onChange={handleToneChange}
                       />
                       <ColorWidget
-                        label="Primary"
+                        label="Cor Principal"
                         name="primaryColor"
                         color={profile.primaryColor}
                         onChange={handleChange}
                         isAnalyzing={isAnalyzingLogo}
                       />
                       <ColorWidget
-                        label="Accent"
+                        label="Cor Secundária"
                         name="secondaryColor"
                         color={profile.secondaryColor}
                         onChange={handleChange}
                         isAnalyzing={isAnalyzingLogo}
                       />
                     </div>
+
+                    {/* Tone Targets */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
+                        Aplicar Tom em
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {(Object.keys(toneTargetLabels) as ToneTarget[]).map((target) => {
+                          const isActive = (profile.toneTargets || defaultToneTargets).includes(target);
+                          return (
+                            <button
+                              key={target}
+                              type="button"
+                              onClick={() => handleToneTargetToggle(target)}
+                              className={`px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all ${
+                                isActive
+                                  ? 'bg-primary/20 text-primary border border-primary/30'
+                                  : 'bg-white/5 text-white/40 border border-white/10 hover:bg-white/10'
+                              }`}
+                            >
+                              {toneTargetLabels[target]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Creative Model Selector */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
+                        Modelo Criativo
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {creativeModels.map((model) => {
+                          const isActive = (profile.creativeModel || 'gemini-3-pro') === model.id;
+                          return (
+                            <button
+                              key={model.id}
+                              type="button"
+                              onClick={() => setProfile(p => ({ ...p, creativeModel: model.id }))}
+                              className={`px-3 py-2 rounded-lg text-[10px] font-medium transition-all flex flex-col items-start ${
+                                isActive
+                                  ? 'bg-primary/20 text-primary border border-primary/30'
+                                  : 'bg-white/5 text-white/40 border border-white/10 hover:bg-white/10'
+                              }`}
+                            >
+                              <span className="font-bold">{model.label}</span>
+                              <span className={`text-[8px] ${isActive ? 'text-primary/60' : 'text-white/30'}`}>
+                                {model.provider}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[9px] text-white/30 mt-2">
+                        Modelo usado para gerar campanhas, posts e prompts de vídeo.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
                 {/* Submit Button */}
-                <div className="pt-6 border-t border-white/5">
+                <div className="pt-4 flex justify-end">
                   <Button
                     type="submit"
                     disabled={isSaving || isAnalyzingLogo || !profile.name}
-                    size="large"
-                    className="w-full py-5 text-[10px] font-black tracking-[0.5em] bg-white text-black hover:bg-white active:scale-[0.99] rounded-2xl"
                     variant="primary"
                   >
-                    {isSaving ? 'SYNCING...' : 'SYNC_PROTOCOL'}
+                    {isSaving ? 'Salvando...' : 'Salvar'}
                   </Button>
                 </div>
               </form>
             )}
 
-            {activeTab === 'team' && <TeamManagement />}
+            {activeTab === 'team' && (
+              <OrganizationProfile
+                appearance={{
+                  elements: {
+                    rootBox: 'w-full',
+                    card: 'bg-transparent shadow-none border-none',
+                    navbar: 'hidden',
+                    pageScrollBox: 'p-0',
+                    profileSection: 'border-white/10',
+                    profileSectionTitle: 'text-white/60',
+                    profileSectionContent: 'text-white',
+                    formFieldLabel: 'text-white/60',
+                    formFieldInput: 'bg-white/5 border-white/10 text-white',
+                    formButtonPrimary: 'bg-primary text-black hover:bg-primary/90',
+                    membersPageInviteButton: 'bg-primary text-black hover:bg-primary/90',
+                    tableHead: 'text-white/40',
+                    tableCell: 'text-white/80',
+                  }
+                }}
+              />
+            )}
           </div>
         </div>
       </div>

@@ -102,13 +102,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
+      // Convert scheduled_timestamp to bigint (milliseconds) if it's a string
+      const timestampMs = typeof scheduled_timestamp === 'string'
+        ? new Date(scheduled_timestamp).getTime()
+        : scheduled_timestamp;
+
       const result = await sql`
         INSERT INTO scheduled_posts (user_id, content_type, content_id, image_url, caption, hashtags,
                                      scheduled_date, scheduled_time, scheduled_timestamp, timezone,
                                      platforms, instagram_content_type, created_from)
         VALUES (${user_id}, ${content_type}, ${content_id || null}, ${image_url},
                 ${caption || ''}, ${hashtags || []}, ${scheduled_date}, ${scheduled_time},
-                ${scheduled_timestamp}, ${timezone}, ${platforms},
+                ${timestampMs}, ${timezone}, ${platforms},
                 ${instagram_content_type || 'photo'}, ${created_from || null})
         RETURNING *
       `;

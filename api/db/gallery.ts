@@ -82,6 +82,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(201).json(result[0]);
     }
 
+    // PATCH - Update gallery image (e.g., mark as published)
+    if (req.method === 'PATCH') {
+      const { id } = req.query;
+      const { published_at } = req.body;
+
+      if (!id) {
+        return res.status(400).json({ error: 'id is required' });
+      }
+
+      const result = await sql`
+        UPDATE gallery_images
+        SET published_at = ${published_at || null},
+            updated_at = NOW()
+        WHERE id = ${id as string}
+        RETURNING *
+      `;
+
+      if (!result[0]) {
+        return res.status(404).json({ error: 'Gallery image not found' });
+      }
+
+      return res.status(200).json(result[0]);
+    }
+
     // DELETE - Soft delete gallery image
     if (req.method === 'DELETE') {
       const { id } = req.query;

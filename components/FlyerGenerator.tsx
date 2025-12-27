@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { BrandProfile, TournamentEvent, GalleryImage, ImageModel, ImageSize, ImageFile, Post, WeekScheduleInfo, StyleReference } from '../types';
+import type { BrandProfile, TournamentEvent, GalleryImage, ImageModel, ImageSize, ImageFile, WeekScheduleInfo, StyleReference } from '../types';
 import { Card } from './common/Card';
 import { Button } from './common/Button';
 import { Loader } from './common/Loader';
 import { Icon } from './common/Icon';
-import { generateFlyer, generateQuickPostText } from '../services/geminiService';
+import { EmptyState } from './common/EmptyState';
+import { generateFlyer } from '../services/geminiService';
 import { ImagePreviewModal } from './common/ImagePreviewModal';
+import { QuickPostModal } from './common/QuickPostModal';
 import { useBackgroundJobs, type ActiveJob } from '../hooks/useBackgroundJobs';
 import type { GenerationJobConfig, WeekScheduleWithCount } from '../services/apiClient';
 
@@ -72,137 +74,6 @@ const handleDownloadFlyer = (src: string, filename: string) => {
     document.body.removeChild(link);
 };
 
-const QuickPostModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    flyer: GalleryImage;
-    brandProfile: BrandProfile;
-    context: string;
-}> = ({ isOpen, onClose, flyer, brandProfile, context }) => {
-    const [post, setPost] = useState<Post | null>(null);
-    const [editedContent, setEditedContent] = useState('');
-    const [editedHashtags, setEditedHashtags] = useState('');
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [isCopied, setIsCopied] = useState(false);
-
-    useEffect(() => {
-        if (isOpen && !post) handleGenerate();
-    }, [isOpen]);
-
-    useEffect(() => {
-        if (post) {
-            setEditedContent(post.content);
-            setEditedHashtags(post.hashtags.map(h => `#${h}`).join(' '));
-        }
-    }, [post]);
-
-    const handleGenerate = async () => {
-        setIsGenerating(true);
-        try {
-            const result = await generateQuickPostText(brandProfile, context, flyer.src);
-            setPost(result);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setIsGenerating(false);
-        }
-    };
-
-    const handleShare = async () => {
-        if (!post) return;
-        const text = `${editedContent}\n\n${editedHashtags}`;
-
-        // Tenta usar Web Share API (funciona bem em mobile)
-        if (navigator.share && navigator.canShare) {
-            try {
-                // Converte a imagem base64 para File
-                const response = await fetch(flyer.src);
-                const blob = await response.blob();
-                const file = new File([blob], 'flyer.png', { type: 'image/png' });
-
-                const shareData = {
-                    files: [file],
-                    title: brandProfile.name,
-                    text: text,
-                };
-
-                if (navigator.canShare(shareData)) {
-                    await navigator.share(shareData);
-                    return;
-                }
-            } catch (err) {
-                // Se usuário cancelou ou erro, continua para fallback
-                if ((err as Error).name === 'AbortError') return;
-            }
-        }
-
-        // Fallback: copia texto e abre Instagram
-        navigator.clipboard.writeText(text).then(() => {
-            setIsCopied(true);
-            setTimeout(() => {
-                window.open('https://www.instagram.com/', '_blank');
-                setIsCopied(false);
-            }, 1000);
-        });
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
-            <Card className="w-full max-w-lg border-white/10 bg-[#080808] overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center bg-[#0d0d0d]">
-                    <div className="flex items-center space-x-2">
-                        <div className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center">
-                            <Icon name="image" className="w-3 h-3 text-primary" />
-                        </div>
-                        <h3 className="text-[10px] font-black text-white uppercase tracking-wide">QuickPost Forge</h3>
-                    </div>
-                    <button onClick={onClose} className="text-white/20 hover:text-white transition-colors"><Icon name="x" className="w-4 h-4" /></button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                    <div className="w-full max-w-xs mx-auto rounded-xl overflow-hidden border border-white/10 shadow-xl">
-                        <img src={flyer.src} className="w-full h-auto object-contain" />
-                    </div>
-                    {isGenerating ? (
-                        <div className="flex flex-col items-center justify-center py-8 space-y-3">
-                            <Loader className="w-8 h-8" />
-                            <p className="text-[9px] font-black text-white/30 uppercase tracking-widest animate-pulse">Forjando Copy...</p>
-                        </div>
-                    ) : post ? (
-                        <div className="space-y-3 animate-fade-in-up">
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-black text-white/30 uppercase tracking-wide">Legenda</label>
-                                <textarea
-                                    value={editedContent}
-                                    onChange={(e) => setEditedContent(e.target.value)}
-                                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs leading-relaxed text-white/90 resize-none outline-none focus:border-primary/50 transition-colors min-h-[120px]"
-                                    placeholder="Escreva sua legenda..."
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-black text-white/30 uppercase tracking-wide">Hashtags</label>
-                                <textarea
-                                    value={editedHashtags}
-                                    onChange={(e) => setEditedHashtags(e.target.value)}
-                                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs leading-relaxed text-primary resize-none outline-none focus:border-primary/50 transition-colors min-h-[50px]"
-                                    placeholder="#hashtag1 #hashtag2..."
-                                />
-                            </div>
-                        </div>
-                    ) : null}
-                </div>
-                <div className="p-5 border-t border-white/5 bg-[#0d0d0d] flex gap-3">
-                    <Button onClick={handleGenerate} variant="secondary" size="small" className="flex-1" icon="zap" disabled={isGenerating}>Refazer</Button>
-                    <Button onClick={handleShare} variant="primary" size="small" className="flex-1" icon="share-alt" disabled={isGenerating || !post}>
-                        {isCopied ? 'Copiado!' : 'Compartilhar'}
-                    </Button>
-                </div>
-            </Card>
-        </div>
-    );
-};
-
 const ImageCarousel: React.FC<{
     images: (GalleryImage | 'loading')[];
     onEdit: (image: GalleryImage) => void;
@@ -248,12 +119,55 @@ const ImageCarousel: React.FC<{
             ) : (
                 <>
                     <img src={currentItem.src} className="w-full h-full object-contain transition-transform duration-700 hover:scale-105 cursor-pointer" onClick={() => onEdit(currentItem)} />
-                    <div className={`absolute inset-0 bg-black/70 transition-all duration-300 flex flex-col items-center justify-center gap-1.5 backdrop-blur-sm z-20 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-                        <Button size="small" variant="primary" onClick={() => onQuickPost(currentItem)} icon="zap">QuickPost</Button>
-                        <Button size="small" onClick={() => onEdit(currentItem)} icon="edit">Editar</Button>
-                        <Button size="small" onClick={() => onPublish(currentItem)} icon="users">Campanha</Button>
-                        {onCloneStyle && <Button size="small" variant="secondary" onClick={() => onCloneStyle(currentItem)} icon="copy">Modelo</Button>}
-                        <Button size="small" variant="secondary" onClick={() => onDownload(currentItem)} icon="download">Download</Button>
+                    <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/40 transition-all duration-300 flex items-center justify-center backdrop-blur-[2px] z-20 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+                        <div className="grid grid-cols-2 gap-2 p-4 max-w-[280px]">
+                            {/* QuickPost - Primary Action */}
+                            <button
+                                onClick={() => onQuickPost(currentItem)}
+                                className="col-span-2 flex items-center justify-center gap-2.5 px-5 py-3 bg-primary hover:bg-primary/90 rounded-xl text-black font-black text-[11px] uppercase tracking-wide transition-all hover:scale-[1.02] shadow-lg shadow-primary/30"
+                            >
+                                <Icon name="zap" className="w-4 h-4" />
+                                QuickPost
+                            </button>
+
+                            {/* View */}
+                            <button
+                                onClick={() => onEdit(currentItem)}
+                                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-white font-bold text-[10px] uppercase tracking-wide transition-all"
+                            >
+                                <Icon name="eye" className="w-3.5 h-3.5" />
+                                View
+                            </button>
+
+                            {/* Campanha */}
+                            <button
+                                onClick={() => onPublish(currentItem)}
+                                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-white font-bold text-[10px] uppercase tracking-wide transition-all"
+                            >
+                                <Icon name="users" className="w-3.5 h-3.5" />
+                                Campanha
+                            </button>
+
+                            {/* Download */}
+                            <button
+                                onClick={() => onDownload(currentItem)}
+                                className={`flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-white/70 hover:text-white font-bold text-[10px] uppercase tracking-wide transition-all ${onCloneStyle ? '' : 'col-span-2'}`}
+                            >
+                                <Icon name="download" className="w-3.5 h-3.5" />
+                                Download
+                            </button>
+
+                            {/* Modelo (opcional) */}
+                            {onCloneStyle && (
+                                <button
+                                    onClick={() => onCloneStyle(currentItem)}
+                                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-white/70 hover:text-white font-bold text-[10px] uppercase tracking-wide transition-all"
+                                >
+                                    <Icon name="copy" className="w-3.5 h-3.5" />
+                                    Modelo
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </>
             )}
@@ -456,16 +370,65 @@ const TournamentEventCard: React.FC<{
                 </div>
             </div>
             {isExpanded && (
-                <div className="px-4 pb-4 pt-3 border-t border-white/5 animate-fade-in-up flex justify-center">
-                    <div className="w-full max-w-[200px] aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border border-white/5 relative">
-                        <ImageCarousel 
-                            images={generatedFlyers} 
-                            onEdit={setEditingFlyer} 
-                            onQuickPost={setQuickPostFlyer} 
-                            onPublish={(f) => onPublishToCampaign(`Divulgue o torneio ${event.name}`, f)} 
-                            onDownload={(f) => handleDownloadFlyer(f.src, `flyer-${event.id}.png`)} 
-                        />
-                    </div>
+                <div className="px-4 pb-4 pt-3 border-t border-white/5 animate-fade-in-up">
+                    {generatedFlyers.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-center">
+                            <Icon name="image" className="w-10 h-10 text-white/10 mb-3" />
+                            <p className="text-[10px] font-bold text-white/30 uppercase tracking-wide">Nenhum flyer gerado</p>
+                            <p className="text-[9px] text-white/20 mt-1">Clique em "Gerar" para criar um flyer</p>
+                        </div>
+                    ) : (
+                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                            {generatedFlyers.map((flyer, index) => (
+                                <div
+                                    key={flyer === 'loading' ? `loading-${index}` : flyer.id}
+                                    className="flex-shrink-0 w-[140px] group"
+                                >
+                                    <div className="aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border border-white/5 relative">
+                                        {flyer === 'loading' ? (
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
+                                                <Loader className="w-6 h-6 mb-2 text-primary" />
+                                                <p className="text-[8px] font-black text-white/40 uppercase tracking-widest animate-pulse">Gerando...</p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <img
+                                                    src={flyer.src}
+                                                    className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
+                                                    onClick={() => setEditingFlyer(flyer)}
+                                                />
+                                                {/* Hover overlay with actions */}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-2 gap-1.5">
+                                                    <button
+                                                        onClick={() => setQuickPostFlyer(flyer)}
+                                                        className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-primary hover:bg-primary/90 rounded-lg text-black font-bold text-[9px] uppercase tracking-wide transition-all"
+                                                    >
+                                                        <Icon name="zap" className="w-3 h-3" />
+                                                        QuickPost
+                                                    </button>
+                                                    <div className="flex gap-1.5">
+                                                        <button
+                                                            onClick={() => setEditingFlyer(flyer)}
+                                                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                                                        >
+                                                            <Icon name="eye" className="w-2.5 h-2.5" />
+                                                            View
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDownloadFlyer(flyer.src, `flyer-${event.id}-${index}.png`)}
+                                                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                                                        >
+                                                            <Icon name="download" className="w-2.5 h-2.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
             {editingFlyer && (
@@ -480,7 +443,7 @@ const TournamentEventCard: React.FC<{
                 />
             )}
             {quickPostFlyer && (
-                <QuickPostModal isOpen={!!quickPostFlyer} onClose={() => setQuickPostFlyer(null)} flyer={quickPostFlyer} brandProfile={brandProfile} context={`Torneio: ${event.name}, ${event.times?.['-3']}, GTD: ${formatCurrencyValue(event.gtd, currency)}`} />
+                <QuickPostModal isOpen={!!quickPostFlyer} onClose={() => setQuickPostFlyer(null)} image={quickPostFlyer} brandProfile={brandProfile} context={`Torneio: ${event.name}, ${event.times?.['-3']}, GTD: ${formatCurrencyValue(event.gtd, currency)}`} />
             )}
         </div>
     );
@@ -713,7 +676,7 @@ const PeriodCardRow: React.FC<{
                 />
             )}
             {quickPostFlyer && (
-                <QuickPostModal isOpen={!!quickPostFlyer} onClose={() => setQuickPostFlyer(null)} flyer={quickPostFlyer} brandProfile={brandProfile} context={`Sessão: ${label}. Grade:\n${events.map(e => e.name).join(', ')}`} />
+                <QuickPostModal isOpen={!!quickPostFlyer} onClose={() => setQuickPostFlyer(null)} image={quickPostFlyer} brandProfile={brandProfile} context={`Sessão: ${label}. Grade:\n${events.map(e => e.name).join(', ')}`} />
             )}
         </div>
     );
@@ -988,7 +951,7 @@ const PeriodCard: React.FC<{
                 />
             )}
             {quickPostFlyer && (
-                <QuickPostModal isOpen={!!quickPostFlyer} onClose={() => setQuickPostFlyer(null)} flyer={quickPostFlyer} brandProfile={brandProfile} context={`Sessão: ${label}. Grade:\n${events.map(e => e.name).join(', ')}`} />
+                <QuickPostModal isOpen={!!quickPostFlyer} onClose={() => setQuickPostFlyer(null)} image={quickPostFlyer} brandProfile={brandProfile} context={`Sessão: ${label}. Grade:\n${events.map(e => e.name).join(', ')}`} />
             )}
         </div>
     );
@@ -1356,73 +1319,56 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   if (showEmptyState) {
     return (
       <div className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="max-w-md text-center space-y-6 animate-fade-in-up">
-          <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center">
-            <Icon name="calendar" className="w-10 h-10 text-primary/60" />
-          </div>
-
+        <div className="w-full max-w-2xl">
           {isWeekExpired ? (
-            <>
-              <div>
-                <h3 className="text-xl font-black text-white uppercase tracking-tight">Semana Expirada</h3>
-                <p className="text-sm text-white/40 mt-2">
-                  A planilha de torneios da semana anterior venceu. Insira uma nova planilha para continuar gerando flyers.
-                </p>
-                {weekScheduleInfo && (
-                  <p className="text-xs text-white/30 mt-2">
-                    Última planilha: {weekScheduleInfo.startDate} a {weekScheduleInfo.endDate}
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-col gap-3">
-                <label className="cursor-pointer group inline-block">
-                  <div className="bg-white text-black font-black px-6 py-3 rounded-xl flex items-center justify-center space-x-3 transition-all hover:bg-white/90 active:scale-95">
-                    <Icon name="upload" className="w-4 h-4" />
-                    <span className="text-sm uppercase tracking-wide">Carregar Nova Planilha</span>
-                  </div>
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept=".xlsx,.xls"
-                    onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])}
-                  />
-                </label>
-                {onClearExpiredSchedule && (
-                  <Button variant="secondary" onClick={onClearExpiredSchedule} className="w-full">
-                    Limpar dados antigos
-                  </Button>
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              <div>
-                <h3 className="text-xl font-black text-white uppercase tracking-tight">Nenhuma Planilha</h3>
-                <p className="text-sm text-white/40 mt-2">
-                  Carregue a planilha de torneios da semana para começar a gerar flyers automaticamente.
-                </p>
-              </div>
-              <div className="flex flex-col gap-3">
-                <label className="cursor-pointer group inline-block">
-                  <div className="bg-white text-black font-black px-6 py-3 rounded-xl flex items-center justify-center space-x-3 transition-all hover:bg-white/90 active:scale-95">
-                    <Icon name="upload" className="w-4 h-4" />
-                    <span className="text-sm uppercase tracking-wide">Carregar Planilha Excel</span>
-                  </div>
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept=".xlsx,.xls"
-                    onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])}
-                  />
-                </label>
-                <Button variant="secondary" onClick={() => setIsManualModalOpen(true)} icon="edit" className="w-full">
-                  Adicionar Torneio Manual
+            <EmptyState
+              icon="calendar"
+              title="Semana Expirada"
+              description={`A planilha de torneios da semana anterior venceu. Insira uma nova planilha para continuar gerando flyers.${weekScheduleInfo ? ` Última planilha: ${weekScheduleInfo.startDate} a ${weekScheduleInfo.endDate}` : ''}`}
+              size="large"
+            >
+              <label className="cursor-pointer group inline-block">
+                <div className="bg-primary text-black font-black px-6 py-3 rounded-xl flex items-center justify-center space-x-3 transition-all hover:bg-primary/90 active:scale-95">
+                  <Icon name="upload" className="w-4 h-4" />
+                  <span className="text-sm uppercase tracking-wide">Carregar Nova Planilha</span>
+                </div>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])}
+                />
+              </label>
+              {onClearExpiredSchedule && (
+                <Button variant="secondary" onClick={onClearExpiredSchedule}>
+                  Limpar dados antigos
                 </Button>
-              </div>
-              <p className="text-[10px] text-white/20 uppercase tracking-wider">
-                Formatos suportados: .xlsx, .xls
-              </p>
-            </>
+              )}
+            </EmptyState>
+          ) : (
+            <EmptyState
+              icon="calendar"
+              title="Nenhuma Planilha"
+              description="Carregue a planilha de torneios da semana para começar a gerar flyers automaticamente."
+              subtitle="Formatos suportados: .xlsx, .xls"
+              size="large"
+            >
+              <label className="cursor-pointer group inline-block">
+                <div className="bg-primary text-black font-black px-6 py-3 rounded-xl flex items-center justify-center space-x-3 transition-all hover:bg-primary/90 active:scale-95">
+                  <Icon name="upload" className="w-4 h-4" />
+                  <span className="text-sm uppercase tracking-wide">Carregar Planilha Excel</span>
+                </div>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])}
+                />
+              </label>
+              <Button variant="secondary" onClick={() => setIsManualModalOpen(true)} icon="edit">
+                Adicionar Torneio Manual
+              </Button>
+            </EmptyState>
           )}
         </div>
 
@@ -1802,15 +1748,12 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 })}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-                  <Icon name="layout" className="w-8 h-8 text-white/10" />
-                </div>
-                <p className="text-[11px] font-black text-white/40 uppercase tracking-wider mb-1">Nenhum Favorito</p>
-                <p className="text-[9px] text-white/20 font-medium max-w-[200px]">
-                  Salve estilos de imagens na galeria para usar aqui
-                </p>
-              </div>
+              <EmptyState
+                icon="heart"
+                title="Nenhum Favorito"
+                description="Salve estilos de imagens na galeria para usar aqui como referência visual."
+                size="small"
+              />
             )}
           </div>
         </>

@@ -8,9 +8,10 @@ import { Loader } from './components/common/Loader';
 import { generateCampaign, editImage, generateLogo, generateImage } from './services/geminiService';
 import { runAssistantConversationStream } from './services/assistantService';
 import { publishToInstagram, uploadImageForInstagram, type InstagramContentType } from './services/rubeService';
-import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, ChatPart, GenerationOptions, WeekScheduleInfo, StyleReference, ScheduledPost, InstagramPublishState } from './types';
+import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, ChatPart, GenerationOptions, WeekScheduleInfo, StyleReference, ScheduledPost, InstagramPublishState, CreativeModel } from './types';
 import { Icon } from './components/common/Icon';
 import { AuthWrapper, UserProfileButton, useAuth, useCurrentUser } from './components/auth/AuthWrapper';
+import { useOrganization } from '@clerk/clerk-react';
 import { BackgroundJobsProvider } from './hooks/useBackgroundJobs';
 import { BackgroundJobsIndicator } from './components/common/BackgroundJobsIndicator';
 import {
@@ -93,6 +94,8 @@ const getTruncatedHistory = (history: ChatMessage[], maxLength: number = MAX_CHA
 
 function AppContent() {
   const { userId, isLoading: authLoading } = useAuth();
+  const { organization, isLoaded: orgLoaded } = useOrganization();
+  const organizationId = organization?.id || null;
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [campaign, setCampaign] = useState<MarketingCampaign | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -129,14 +132,14 @@ function AppContent() {
   // Load data from database when user is authenticated
   useEffect(() => {
     const initAppData = async () => {
-      if (!userId) {
-        setIsLoading(false);
+      if (!userId || !orgLoaded) {
+        if (!userId) setIsLoading(false);
         return;
       }
 
       try {
-        // Load brand profile from database
-        const dbBrandProfile = await getBrandProfile(userId);
+        // Load brand profile from database (org-scoped if in organization)
+        const dbBrandProfile = await getBrandProfile(userId, organizationId);
         if (dbBrandProfile) {
           setBrandProfile({
             name: dbBrandProfile.name,
@@ -145,6 +148,8 @@ function AppContent() {
             primaryColor: dbBrandProfile.primary_color,
             secondaryColor: dbBrandProfile.secondary_color,
             toneOfVoice: dbBrandProfile.tone_of_voice as BrandProfile['toneOfVoice'],
+            toneTargets: (dbBrandProfile.settings?.toneTargets as BrandProfile['toneTargets']) || undefined,
+            creativeModel: (dbBrandProfile.settings?.creativeModel as BrandProfile['creativeModel']) || undefined,
           });
         }
 
@@ -152,19 +157,21 @@ function AppContent() {
         const savedRefs = localStorage.getItem('styleReferences');
         if (savedRefs) setStyleReferences(JSON.parse(savedRefs));
 
-        // Load gallery images from database
-        const dbImages = await getGalleryImages(userId);
-        const mappedImages: GalleryImage[] = dbImages.map(img => ({
-          id: img.id,
-          src: img.src_url,
-          prompt: img.prompt || undefined,
-          source: img.source as GalleryImage['source'],
-          model: img.model as GalleryImage['model'],
-        }));
+        // Load gallery images from database (filter out invalid blob: URLs)
+        const dbImages = await getGalleryImages(userId, organizationId);
+        const mappedImages: GalleryImage[] = dbImages
+          .filter(img => !img.src_url.startsWith('blob:')) // Exclude temporary blob URLs
+          .map(img => ({
+            id: img.id,
+            src: img.src_url,
+            prompt: img.prompt || undefined,
+            source: img.source as GalleryImage['source'],
+            model: img.model as GalleryImage['model'],
+          }));
         setGalleryImages(mappedImages);
 
         // Load scheduled posts from database
-        const dbScheduled = await getScheduledPosts(userId);
+        const dbScheduled = await getScheduledPosts(userId, organizationId);
         console.log('[App] Loaded scheduled posts:', dbScheduled.length, dbScheduled.map(p => ({ id: p.id, date: p.scheduled_date, status: p.status })));
         const mappedPosts: ScheduledPost[] = dbScheduled.map(post => {
           // Normalize date to YYYY-MM-DD format (handles both "2025-12-21" and "2025-12-21T00:00:00.000Z")
@@ -193,7 +200,7 @@ function AppContent() {
         setScheduledPosts(mappedPosts.sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp));
 
         // Load campaigns list from database
-        const dbCampaigns = await getCampaigns(userId);
+        const dbCampaigns = await getCampaigns(userId, organizationId);
         const mappedCampaigns: CampaignSummary[] = dbCampaigns.map((c: DbCampaign) => ({
           id: c.id,
           name: c.name,
@@ -204,7 +211,7 @@ function AppContent() {
 
         // Load tournament data from database
         try {
-          const tournamentData = await getTournamentData(userId);
+          const tournamentData = await getTournamentData(userId, organizationId);
           if (tournamentData.schedule) {
             const schedule = tournamentData.schedule;
             setCurrentScheduleId(schedule.id);
@@ -215,48 +222,48 @@ function AppContent() {
             today.setHours(0, 0, 0, 0);
             endDate.setHours(23, 59, 59, 999);
 
-            if (today > endDate) {
-              setIsWeekExpired(true);
-              console.log('[Tournaments] Week schedule expired');
-            } else {
-              setIsWeekExpired(false);
+            const expired = today > endDate;
+            setIsWeekExpired(expired);
 
-              // Load events
-              const mappedEvents: TournamentEvent[] = tournamentData.events.map(e => ({
-                id: e.id,
-                day: e.day_of_week,
-                name: e.name,
-                game: e.game || '',
-                gtd: e.gtd || '',
-                buyIn: e.buy_in || '',
-                rebuy: e.rebuy || '',
-                addOn: e.add_on || '',
-                stack: e.stack || '',
-                players: e.players || '',
-                lateReg: e.late_reg || '',
-                minutes: e.minutes || '',
-                structure: e.structure || '',
-                times: e.times || {},
-              }));
-              setTournamentEvents(mappedEvents);
-
-              // Set week schedule info (handle ISO datetime strings)
-              const startDateOnly = schedule.start_date.split('T')[0];
-              const endDateOnly = schedule.end_date.split('T')[0];
-              const startParts = startDateOnly.split('-');
-              const endParts = endDateOnly.split('-');
-              setWeekScheduleInfo({
-                startDate: `${startParts[2]}/${startParts[1]}`,
-                endDate: `${endParts[2]}/${endParts[1]}`,
-                filename: schedule.filename || 'Planilha carregada',
-              });
-
-              console.log(`[Tournaments] Loaded ${mappedEvents.length} events for week ${schedule.start_date} to ${schedule.end_date}`);
+            if (expired) {
+              console.log('[Tournaments] Week schedule expired, but still loading data');
             }
+
+            // Always load events (even for expired schedules so user can see data)
+            const mappedEvents: TournamentEvent[] = tournamentData.events.map(e => ({
+              id: e.id,
+              day: e.day_of_week,
+              name: e.name,
+              game: e.game || '',
+              gtd: e.gtd || '',
+              buyIn: e.buy_in || '',
+              rebuy: e.rebuy || '',
+              addOn: e.add_on || '',
+              stack: e.stack || '',
+              players: e.players || '',
+              lateReg: e.late_reg || '',
+              minutes: e.minutes || '',
+              structure: e.structure || '',
+              times: e.times || {},
+            }));
+            setTournamentEvents(mappedEvents);
+
+            // Set week schedule info (handle ISO datetime strings)
+            const startDateOnly = schedule.start_date.split('T')[0];
+            const endDateOnly = schedule.end_date.split('T')[0];
+            const startParts = startDateOnly.split('-');
+            const endParts = endDateOnly.split('-');
+            setWeekScheduleInfo({
+              startDate: `${startParts[2]}/${startParts[1]}`,
+              endDate: `${endParts[2]}/${endParts[1]}`,
+              filename: schedule.filename || 'Planilha carregada',
+            });
+
+            console.log(`[Tournaments] Loaded ${mappedEvents.length} events for week ${schedule.start_date} to ${schedule.end_date}${expired ? ' (expired)' : ''}`);
           }
 
           // Load all schedules list
-          const schedulesData = await getWeekSchedulesList(userId);
+          const schedulesData = await getWeekSchedulesList(userId, organizationId);
           setAllSchedules(schedulesData.schedules);
           console.log(`[Tournaments] Loaded ${schedulesData.schedules.length} total schedules`);
         } catch (tournamentError) {
@@ -269,10 +276,10 @@ function AppContent() {
       }
     };
 
-    if (!authLoading) {
+    if (!authLoading && orgLoaded) {
       initAppData();
     }
-  }, [userId, authLoading]);
+  }, [userId, authLoading, organizationId, orgLoaded]);
   
   useEffect(() => {
     if (brandProfile && chatHistory.length === 0) {
@@ -298,6 +305,10 @@ function AppContent() {
         prompt: image.prompt,
         source: image.source,
         model: image.model,
+        post_id: image.post_id,
+        ad_creative_id: image.ad_creative_id,
+        video_script_id: image.video_script_id,
+        organization_id: organizationId,
       }).then(dbImage => {
         // Update the ID with the real database ID
         setGalleryImages(prev => prev.map(img =>
@@ -332,6 +343,13 @@ function AppContent() {
     } catch (e) {
       console.error('Failed to delete image from database:', e);
     }
+  };
+
+  const handleMarkGalleryImagePublished = (imageId: string) => {
+    // Update local state to mark image as published
+    setGalleryImages(prev => prev.map(img =>
+      img.id === imageId ? { ...img, published_at: new Date().toISOString() } : img
+    ));
   };
 
   const handleAddStyleReference = (ref: Omit<StyleReference, 'id' | 'createdAt'>) => {
@@ -390,6 +408,7 @@ function AppContent() {
         platforms: post.platforms,
         instagram_content_type: post.instagramContentType,
         created_from: post.createdFrom,
+        organization_id: organizationId,
       };
       console.log('[Schedule] Sending payload:', payload, isPublishNow ? '(PUBLISH NOW)' : '');
       const dbPost = await createScheduledPost(userId, payload);
@@ -563,6 +582,7 @@ function AppContent() {
                 input_transcript: input.transcript,
                 generation_options: options as unknown as Record<string, unknown>,
                 status: 'completed',
+                organization_id: organizationId,
                 video_clip_scripts: r.videoClipScripts.map(v => ({
                   title: v.title,
                   hook: v.hook,
@@ -621,7 +641,7 @@ function AppContent() {
     }
     try {
       console.log('[Campaign] Loading campaign:', campaignId);
-      const fullCampaign = await getCampaignById(campaignId, userId);
+      const fullCampaign = await getCampaignById(campaignId, userId, organizationId);
       console.log('[Campaign] API response:', fullCampaign);
 
       if (fullCampaign) {
@@ -639,17 +659,21 @@ function AppContent() {
             scenes: v.scenes || [],
           })),
           posts: (fullCampaign.posts || []).map(p => ({
+            id: p.id,  // Include database ID for image updates
             platform: p.platform as 'Instagram' | 'LinkedIn' | 'Twitter' | 'Facebook',
             content: p.content,
             hashtags: p.hashtags || [],
             image_prompt: p.image_prompt || '',
+            image_url: p.image_url || null,  // Include saved image URL
           })),
           adCreatives: (fullCampaign.ad_creatives || []).map(a => ({
+            id: a.id,  // Include database ID for image updates
             platform: a.platform as 'Facebook' | 'Google',
             headline: a.headline,
             body: a.body,
             cta: a.cta,
             image_prompt: a.image_prompt || '',
+            image_url: a.image_url || null,  // Include saved image URL
           })),
         };
         console.log('[Campaign] Loaded:', loadedCampaign.videoClipScripts.length, 'clips,', loadedCampaign.posts.length, 'posts,', loadedCampaign.adCreatives.length, 'ads');
@@ -687,7 +711,7 @@ function AppContent() {
     if (!userId) return;
     try {
       // Load events for selected schedule
-      const eventsData = await getScheduleEvents(userId, schedule.id);
+      const eventsData = await getScheduleEvents(userId, schedule.id, organizationId);
       const mappedEvents: TournamentEvent[] = eventsData.events.map(e => ({
         id: e.id,
         day: e.day_of_week,
@@ -927,6 +951,7 @@ function AppContent() {
                 start_date: startDateISO,
                 end_date: endDateISO,
                 filename: file.name,
+                organization_id: organizationId,
                 events: events.map(ev => ({
                   day: ev.day,
                   name: ev.name,
@@ -949,7 +974,7 @@ function AppContent() {
               console.log(`[Tournaments] Saved ${result.eventsCount} events to database`);
 
               // Refresh schedules list
-              const schedulesData = await getWeekSchedulesList(userId);
+              const schedulesData = await getWeekSchedulesList(userId, organizationId);
               setAllSchedules(schedulesData.schedules);
             } catch (dbErr) {
               console.error('[Tournaments] Failed to save to database:', dbErr);
@@ -968,7 +993,7 @@ function AppContent() {
     });
   };
 
-  if (isLoading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader className="h-16 w-16" /></div>;
+  if (isLoading || !orgLoaded) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader className="h-16 w-16" /></div>;
 
   return (
     <>
@@ -980,11 +1005,11 @@ function AppContent() {
       )}
       {!brandProfile ? (
         <BrandProfileSetup onProfileSubmit={async (p) => {
-          console.log('[BrandProfile] onProfileSubmit called, userId:', userId);
+          console.log('[BrandProfile] onProfileSubmit called, userId:', userId, 'orgId:', organizationId);
           setBrandProfile(p);
           // Save to database if authenticated
           if (userId) {
-            console.log('[BrandProfile] Saving to database with userId:', userId);
+            console.log('[BrandProfile] Saving to database with userId:', userId, 'orgId:', organizationId);
             try {
               console.log('[BrandProfile] Creating new profile...');
               const created = await createBrandProfile(userId, {
@@ -994,6 +1019,7 @@ function AppContent() {
                 primary_color: p.primaryColor,
                 secondary_color: p.secondaryColor,
                 tone_of_voice: p.toneOfVoice,
+                organization_id: organizationId,
               });
               console.log('[BrandProfile] Created:', created);
             } catch (e) {
@@ -1010,11 +1036,11 @@ function AppContent() {
           onClose={() => setIsEditingProfile(false)}
           brandProfile={brandProfile}
           onSaveProfile={async (p) => {
-            console.log('[BrandProfile] Updating profile, userId:', userId);
+            console.log('[BrandProfile] Updating profile, userId:', userId, 'orgId:', organizationId);
             setBrandProfile(p);
             if (userId) {
               try {
-                const existingProfile = await getBrandProfile(userId);
+                const existingProfile = await getBrandProfile(userId, organizationId);
                 if (existingProfile) {
                   await updateBrandProfile(existingProfile.id, {
                     name: p.name,
@@ -1023,6 +1049,11 @@ function AppContent() {
                     primary_color: p.primaryColor,
                     secondary_color: p.secondaryColor,
                     tone_of_voice: p.toneOfVoice,
+                    settings: {
+                      ...existingProfile.settings,
+                      toneTargets: p.toneTargets,
+                      creativeModel: p.creativeModel,
+                    },
                   });
                   console.log('[BrandProfile] Updated successfully');
                 }
@@ -1052,6 +1083,7 @@ function AppContent() {
           onAddImageToGallery={handleAddImageToGallery}
           onUpdateGalleryImage={handleUpdateGalleryImage}
           onDeleteGalleryImage={handleDeleteGalleryImage}
+          onMarkGalleryImagePublished={handleMarkGalleryImagePublished}
           tournamentEvents={tournamentEvents}
           weekScheduleInfo={weekScheduleInfo}
           onTournamentFileUpload={handleTournamentFileUpload}
@@ -1062,7 +1094,7 @@ function AppContent() {
           onDeleteSchedule={async (scheduleId) => {
             if (!userId) return;
             try {
-              await deleteWeekSchedule(userId, scheduleId);
+              await deleteWeekSchedule(userId, scheduleId, organizationId);
               // Update local state
               setAllSchedules(prev => prev.filter(s => s.id !== scheduleId));
               // If deleted the current schedule, clear it
@@ -1099,17 +1131,39 @@ function AppContent() {
           campaignsList={campaignsList}
           onLoadCampaign={handleLoadCampaign}
           userId={userId}
+          organizationId={organizationId}
           isWeekExpired={isWeekExpired}
           onClearExpiredSchedule={async () => {
             if (userId && currentScheduleId) {
               try {
-                await deleteWeekSchedule(userId, currentScheduleId);
+                await deleteWeekSchedule(userId, currentScheduleId, organizationId);
                 setCurrentScheduleId(null);
                 setTournamentEvents([]);
                 setWeekScheduleInfo(null);
                 setIsWeekExpired(false);
               } catch (e) {
                 console.error('[Tournaments] Failed to clear expired schedule:', e);
+              }
+            }
+          }}
+          onUpdateCreativeModel={async (model: CreativeModel) => {
+            // Update local state immediately
+            setBrandProfile(prev => prev ? { ...prev, creativeModel: model } : prev);
+            // Save to database in background
+            if (userId) {
+              try {
+                const existingProfile = await getBrandProfile(userId, organizationId);
+                if (existingProfile) {
+                  await updateBrandProfile(existingProfile.id, {
+                    settings: {
+                      ...existingProfile.settings,
+                      creativeModel: model,
+                    },
+                  });
+                  console.log('[BrandProfile] Creative model updated to:', model);
+                }
+              } catch (e) {
+                console.error('Failed to update creative model:', e);
               }
             }
           }}

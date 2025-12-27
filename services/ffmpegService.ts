@@ -23,6 +23,7 @@ export interface ExportOptions {
   outputFormat?: 'mp4' | 'webm';
   onProgress?: (progress: ExportProgress) => void;
   audioTrack?: AudioInput;  // Optional separate audio track to mix
+  removeSilence?: boolean;  // Remove leading/trailing silence from clip audio
 }
 
 export interface VideoInput {
@@ -31,6 +32,7 @@ export interface VideoInput {
   duration: number;
   trimStart?: number;  // Start time in seconds (optional)
   trimEnd?: number;    // End time in seconds (optional)
+  mute?: boolean;      // Mute original audio for this clip
 }
 
 // Singleton FFmpeg instance
@@ -141,7 +143,8 @@ const buildSimpleConcatFilter = (
  * Applies trim to each video before concatenation
  */
 const buildTrimConcatFilter = (
-  videos: VideoInput[]
+  videos: VideoInput[],
+  options: { removeSilence?: boolean } = {}
 ): { filterComplex: string; videoOutput: string; audioOutput: string } => {
   if (videos.length === 0) {
     return { filterComplex: '', videoOutput: '', audioOutput: '' };
@@ -150,13 +153,19 @@ const buildTrimConcatFilter = (
   if (videos.length === 1) {
     const v = videos[0];
     const hasTrim = v.trimStart !== undefined || v.trimEnd !== undefined;
-    if (!hasTrim) {
+    const isMuted = !!v.mute;
+    const removeSilence = !!options.removeSilence;
+    if (!hasTrim && !isMuted && !removeSilence) {
       return { filterComplex: '', videoOutput: '[0:v]', audioOutput: '[0:a]' };
     }
     const start = v.trimStart ?? 0;
     const end = v.trimEnd ?? v.duration;
+    const volumeFilter = isMuted ? ',volume=0' : '';
+    const silenceFilter = removeSilence
+      ? ',silenceremove=start_periods=1:start_duration=0.2:start_threshold=-45dB:stop_periods=1:stop_duration=0.2:stop_threshold=-45dB'
+      : '';
     return {
-      filterComplex: `[0:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[vfinal];[0:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS[afinal]`,
+      filterComplex: `[0:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[vfinal];[0:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS${volumeFilter}${silenceFilter}[afinal]`,
       videoOutput: '[vfinal]',
       audioOutput: '[afinal]',
     };
@@ -169,14 +178,18 @@ const buildTrimConcatFilter = (
     const start = video.trimStart ?? 0;
     const end = video.trimEnd ?? video.duration;
     const hasTrim = start > 0 || end < video.duration;
+    const isMuted = !!video.mute;
+    const silenceFilter = options.removeSilence
+      ? ',silenceremove=start_periods=1:start_duration=0.2:start_threshold=-45dB:stop_periods=1:stop_duration=0.2:stop_threshold=-45dB'
+      : '';
 
     if (hasTrim) {
       parts.push(`[${i}:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[v${i}]`);
-      parts.push(`[${i}:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS[a${i}]`);
+      parts.push(`[${i}:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS${isMuted ? ',volume=0' : ''}${silenceFilter}[a${i}]`);
     } else {
-      // No trim needed, just copy
-      parts.push(`[${i}:v]copy[v${i}]`);
-      parts.push(`[${i}:a]acopy[a${i}]`);
+      // No trim needed, just reset timestamps
+      parts.push(`[${i}:v]setpts=PTS-STARTPTS[v${i}]`);
+      parts.push(`[${i}:a]asetpts=PTS-STARTPTS${isMuted ? ',volume=0' : ''}${silenceFilter}[a${i}]`);
     }
   });
 
@@ -192,12 +205,13 @@ const buildTrimConcatFilter = (
 };
 
 /**
- * Check if any video has trim applied
+ * Check if any video has trim or mute applied
  */
 const hasTrimApplied = (videos: VideoInput[]): boolean => {
   return videos.some(v =>
     (v.trimStart !== undefined && v.trimStart > 0) ||
-    (v.trimEnd !== undefined && v.trimEnd < v.duration)
+    (v.trimEnd !== undefined && v.trimEnd < v.duration) ||
+    v.mute
   );
 };
 
@@ -208,7 +222,7 @@ export const concatenateVideos = async (
   videos: VideoInput[],
   options: ExportOptions = {}
 ): Promise<Blob> => {
-  const { outputFormat = 'mp4', onProgress, audioTrack } = options;
+  const { outputFormat = 'mp4', onProgress, audioTrack, removeSilence } = options;
 
   if (!videos || videos.length === 0) {
     throw new Error('Nenhum video fornecido');
@@ -269,7 +283,7 @@ export const concatenateVideos = async (
     const outputFilename = `output.${outputFormat}`;
 
     // Check if any trim is applied
-    const useTrim = hasTrimApplied(sortedVideos);
+    const useTrim = hasTrimApplied(sortedVideos) || !!removeSilence;
 
     if (sortedVideos.length === 1 && !useTrim) {
       // Single video without trim: just copy
@@ -281,7 +295,7 @@ export const concatenateVideos = async (
     } else {
       // Use trim filter if trim is applied, otherwise use simple concat
       const { filterComplex, videoOutput, audioOutput } = useTrim
-        ? buildTrimConcatFilter(sortedVideos)
+        ? buildTrimConcatFilter(sortedVideos, { removeSilence })
         : buildSimpleConcatFilter(sortedVideos.length);
 
       // Build input arguments

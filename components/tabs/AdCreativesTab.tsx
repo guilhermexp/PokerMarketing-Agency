@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { AdCreative, BrandProfile, ContentInput, GalleryImage, ImageModel, StyleReference } from '../../types';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
@@ -9,6 +9,7 @@ import { generateImage } from '../../services/geminiService';
 import { ImagePreviewModal } from '../common/ImagePreviewModal';
 import { useBackgroundJobs, type ActiveJob } from '../../hooks/useBackgroundJobs';
 import type { GenerationJobConfig } from '../../services/apiClient';
+import { updateAdCreativeImage } from '../../services/apiClient';
 
 // Check if we're in development mode (QStash won't work locally)
 const isDevMode = typeof window !== 'undefined' && window.location.hostname === 'localhost';
@@ -24,6 +25,7 @@ interface AdCreativesTabProps {
   onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
   onRemoveStyleReference?: (id: string) => void;
   userId?: string | null;
+  galleryImages?: GalleryImage[];
 }
 
 const AdCard: React.FC<{
@@ -169,7 +171,7 @@ const AdCard: React.FC<{
 };
 
 
-export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, brandProfile, referenceImage, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference, userId }) => {
+export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, brandProfile, referenceImage, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference, userId, galleryImages }) => {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
   const [generationState, setGenerationState] = useState<{ isGenerating: boolean[], errors: (string | null)[] }>({
     isGenerating: [],
@@ -177,12 +179,36 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
   });
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
+  const galleryImagesRef = useRef(galleryImages);
+
+  // Keep ref updated
+  useEffect(() => {
+    galleryImagesRef.current = galleryImages;
+  }, [galleryImages]);
 
   const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
 
+  // Helper to generate unique source for an ad
+  const getAdSource = (index: number, platform: string) => `Ad-${platform}-${index}`;
+
+  // Initialize images from adCreatives data (only from saved image_url in database)
   useEffect(() => {
     const length = adCreatives.length;
-    setImages(Array(length).fill(null));
+    const initialImages = adCreatives.map((ad, index) => {
+      // Only use saved image_url from database - don't recover from gallery
+      // (gallery recovery caused images from other campaigns to appear)
+      if (ad.image_url) {
+        return {
+          id: `saved-${ad.id || Date.now()}`,
+          src: ad.image_url,
+          prompt: ad.image_prompt || '',
+          source: getAdSource(index, ad.platform) as any,
+          model: 'gemini-3-pro-image-preview' as const,
+        };
+      }
+      return null;
+    });
+    setImages(initialImages);
     setGenerationState({
       isGenerating: Array(length).fill(false),
       errors: Array(length).fill(null),
@@ -191,16 +217,18 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
 
   // Listen for job completions
   useEffect(() => {
-    const unsubComplete = onJobComplete((job: ActiveJob) => {
+    const unsubComplete = onJobComplete(async (job: ActiveJob) => {
       if (job.context?.startsWith('ad-') && job.result_url) {
         const indexMatch = job.context.match(/ad-(\d+)/);
         if (indexMatch) {
           const index = parseInt(indexMatch[1]);
+          const ad = adCreatives[index];
           const galleryImage = onAddImageToGallery({
             src: job.result_url,
-            prompt: adCreatives[index]?.image_prompt || '',
-            source: 'Anúncio',
-            model: selectedImageModel
+            prompt: ad?.image_prompt || '',
+            source: getAdSource(index, ad?.platform || 'Unknown') as any,
+            model: selectedImageModel,
+            ad_creative_id: ad?.id,  // Link to ad for campaign previews
           });
           setImages(prev => {
             const newImages = [...prev];
@@ -212,6 +240,14 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
             newGenerating[index] = false;
             return { ...prev, isGenerating: newGenerating };
           });
+          // Update ad creative image_url in database
+          if (ad?.id) {
+            try {
+              await updateAdCreativeImage(ad.id, job.result_url);
+            } catch (err) {
+              console.error('[AdCreativesTab] Failed to update ad image in database:', err);
+            }
+          }
         }
       }
     });
@@ -299,14 +335,24 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({ adCreatives, bra
         const galleryImage = onAddImageToGallery({
             src: generatedImageUrl,
             prompt: ad.image_prompt,
-            source: 'Anúncio',
-            model: selectedImageModel
+            source: getAdSource(index, ad.platform) as any,
+            model: selectedImageModel,
+            ad_creative_id: ad.id,  // Link to ad for campaign previews
         });
         setImages(prev => {
             const newImages = [...prev];
             newImages[index] = galleryImage;
             return newImages;
         });
+
+        // Update ad creative image_url in database
+        if (ad.id) {
+            try {
+                await updateAdCreativeImage(ad.id, generatedImageUrl);
+            } catch (err) {
+                console.error('[AdCreativesTab] Failed to update ad image in database:', err);
+            }
+        }
     } catch (err: any) {
         setGenerationState(prev => {
             const newErrors = [...prev.errors];

@@ -1,5 +1,6 @@
 import { fal } from "@fal-ai/client";
 import type { FalVideoModel } from '../types';
+import { uploadVideo } from './apiClient';
 
 // Configure fal client with API key from environment
 fal.config({
@@ -158,14 +159,17 @@ export const generateFalVideo = async (
 
         console.log(`[fal.ai] Video URL from fal.ai: ${videoUrl}`);
 
-        // Download video as blob to avoid COEP/CORS issues
-        console.log(`[fal.ai] Downloading video as blob...`);
+        // Download video and upload to Vercel Blob for persistence
+        console.log(`[fal.ai] Downloading video for upload to Vercel Blob...`);
         const videoResponse = await fetch(videoUrl);
         const videoBlob = await videoResponse.blob();
-        const blobUrl = URL.createObjectURL(videoBlob);
 
-        console.log(`[fal.ai] Video blob URL created: ${blobUrl}`);
-        return blobUrl;
+        // Upload to Vercel Blob for permanent storage
+        const filename = `sora2-video-${Date.now()}.mp4`;
+        const permanentUrl = await uploadVideo(videoBlob, filename);
+        console.log(`[fal.ai] Video uploaded to Vercel Blob: ${permanentUrl}`);
+
+        return permanentUrl;
       }
 
       case 'fal-ai/veo3.1/fast': {
@@ -237,14 +241,17 @@ export const generateFalVideo = async (
 
         console.log(`[fal.ai] Video URL from fal.ai: ${videoUrl}`);
 
-        // Download video as blob to avoid COEP/CORS issues
-        console.log(`[fal.ai] Downloading video as blob...`);
+        // Download video and upload to Vercel Blob for persistence
+        console.log(`[fal.ai] Downloading video for upload to Vercel Blob...`);
         const veoResponse = await fetch(videoUrl);
         const veoBlob = await veoResponse.blob();
-        const veoBlobUrl = URL.createObjectURL(veoBlob);
 
-        console.log(`[fal.ai] Video blob URL created: ${veoBlobUrl}`);
-        return veoBlobUrl;
+        // Upload to Vercel Blob for permanent storage
+        const veoFilename = `veo31-video-${Date.now()}.mp4`;
+        const veoPermanentUrl = await uploadVideo(veoBlob, veoFilename);
+        console.log(`[fal.ai] Video uploaded to Vercel Blob: ${veoPermanentUrl}`);
+
+        return veoPermanentUrl;
       }
 
       default:

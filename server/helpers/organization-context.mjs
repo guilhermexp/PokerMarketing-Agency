@@ -1,6 +1,10 @@
 /**
- * Organization Context Helper
- * Handles permission checking and context resolution for multi-tenant access
+ * Organization Context Helper - Clerk Integration
+ * Uses Clerk's orgId and orgRole from JWT for multi-tenant access
+ *
+ * Clerk free tier provides only 2 roles:
+ * - org:admin: Full access to organization
+ * - org:member: Limited access to organization
  */
 
 // Available permissions
@@ -20,143 +24,79 @@ export const PERMISSIONS = {
   VIEW_ANALYTICS: 'view_analytics',
 };
 
-// All permissions (for personal context)
+// All permissions (for personal context and admins)
 export const ALL_PERMISSIONS = Object.values(PERMISSIONS);
 
-/**
- * @typedef {Object} OrganizationContext
- * @property {string} userId - The user's UUID
- * @property {string|null} organizationId - The organization ID or null for personal context
- * @property {string[]} permissions - Array of permission strings
- * @property {boolean} isPersonal - Whether this is personal context
- * @property {string|null} roleName - The role name (null for personal)
- */
+// Permissions granted to org:member (limited set)
+export const MEMBER_PERMISSIONS = [
+  PERMISSIONS.CREATE_CAMPAIGN,
+  PERMISSIONS.EDIT_CAMPAIGN,
+  PERMISSIONS.CREATE_FLYER,
+  PERMISSIONS.SCHEDULE_POST,
+  PERMISSIONS.PUBLISH_POST,
+  PERMISSIONS.VIEW_GALLERY,
+  PERMISSIONS.VIEW_ANALYTICS,
+];
 
 /**
- * Resolve the organization context for a request
- * @param {Function} sql - Neon SQL function
- * @param {string} userId - The resolved user UUID
- * @param {string|null} organizationId - The organization ID or null/undefined for personal
- * @returns {Promise<OrganizationContext>}
+ * Get permissions for a Clerk role
+ * @param {string|null|undefined} orgRole - Clerk role (org:admin, org:member)
+ * @returns {string[]}
  */
-export async function resolveOrganizationContext(sql, userId, organizationId) {
-  // If no organization, return personal context with all permissions
-  if (!organizationId) {
-    return {
-      userId,
-      organizationId: null,
-      permissions: ALL_PERMISSIONS,
-      isPersonal: true,
-      roleName: null,
-    };
-  }
+export function getPermissionsForRole(orgRole) {
+  // Personal context (no org) = all permissions
+  if (!orgRole) return ALL_PERMISSIONS;
 
-  // Get user's membership and permissions for this organization
-  const result = await sql`
-    SELECT
-      om.id as member_id,
-      om.status,
-      r.name as role_name,
-      r.permissions
-    FROM organization_members om
-    JOIN organization_roles r ON om.role_id = r.id
-    WHERE om.organization_id = ${organizationId}
-      AND om.user_id = ${userId}
-      AND om.status = 'active'
-    LIMIT 1
-  `;
+  // Admin has all permissions
+  if (orgRole === 'org:admin') return ALL_PERMISSIONS;
 
-  if (result.length === 0) {
-    throw new OrganizationAccessError('User is not a member of this organization');
-  }
+  // Member has limited permissions
+  if (orgRole === 'org:member') return MEMBER_PERMISSIONS;
 
-  const member = result[0];
-
-  return {
-    userId,
-    organizationId,
-    permissions: member.permissions || [],
-    isPersonal: false,
-    roleName: member.role_name,
-  };
+  // Unknown role - no permissions
+  return [];
 }
 
 /**
- * Check if context has a specific permission
- * @param {OrganizationContext} context
+ * Check if a role has a specific permission
+ * @param {string|null|undefined} orgRole - Clerk role
  * @param {string} permission
  * @returns {boolean}
  */
-export function hasPermission(context, permission) {
-  // Personal context has all permissions
-  if (context.isPersonal) return true;
-
-  // Check if permission exists in array
-  return Array.isArray(context.permissions) && context.permissions.includes(permission);
+export function hasPermission(orgRole, permission) {
+  const permissions = getPermissionsForRole(orgRole);
+  return permissions.includes(permission);
 }
 
 /**
- * Check if context has any of the specified permissions
- * @param {OrganizationContext} context
+ * Check if a role has any of the specified permissions
+ * @param {string|null|undefined} orgRole
  * @param {string[]} permissions
  * @returns {boolean}
  */
-export function hasAnyPermission(context, permissions) {
-  return permissions.some(p => hasPermission(context, p));
+export function hasAnyPermission(orgRole, permissions) {
+  return permissions.some(p => hasPermission(orgRole, p));
 }
 
 /**
- * Check if context has all of the specified permissions
- * @param {OrganizationContext} context
+ * Check if a role has all of the specified permissions
+ * @param {string|null|undefined} orgRole
  * @param {string[]} permissions
  * @returns {boolean}
  */
-export function hasAllPermissions(context, permissions) {
-  return permissions.every(p => hasPermission(context, p));
+export function hasAllPermissions(orgRole, permissions) {
+  return permissions.every(p => hasPermission(orgRole, p));
 }
 
 /**
  * Require a specific permission, throwing an error if not present
- * @param {OrganizationContext} context
+ * @param {string|null|undefined} orgRole
  * @param {string} permission
  * @throws {PermissionDeniedError}
  */
-export function requirePermission(context, permission) {
-  if (!hasPermission(context, permission)) {
+export function requirePermission(orgRole, permission) {
+  if (!hasPermission(orgRole, permission)) {
     throw new PermissionDeniedError(permission);
-  }
-}
-
-/**
- * Get the SQL filter clause for data isolation
- * Returns either organization_id filter or user_id + null organization filter
- * @param {OrganizationContext} context
- * @returns {{ field: string, value: string }}
- */
-export function getDataFilter(context) {
-  if (context.isPersonal) {
-    // Personal context: filter by user_id AND organization_id IS NULL
-    return {
-      useOrganization: false,
-      userId: context.userId,
-    };
-  }
-
-  // Organization context: filter by organization_id
-  return {
-    useOrganization: true,
-    organizationId: context.organizationId,
-  };
-}
-
-/**
- * Custom error for organization access denied
- */
-export class OrganizationAccessError extends Error {
-  constructor(message = 'Access denied to organization') {
-    super(message);
-    this.name = 'OrganizationAccessError';
-    this.statusCode = 403;
   }
 }
 
@@ -173,57 +113,47 @@ export class PermissionDeniedError extends Error {
 }
 
 /**
- * Express middleware to resolve organization context
- * Adds ctx.orgContext to the request
- * @param {Function} sql - Neon SQL function
+ * Custom error for organization access denied
  */
-export function organizationContextMiddleware(getSql) {
-  return async (req, res, next) => {
-    try {
-      const sql = getSql();
-      const userId = req.resolvedUserId; // Set by previous middleware
-      const organizationId = req.query.organization_id || req.body?.organization_id || null;
+export class OrganizationAccessError extends Error {
+  constructor(message = 'Organization access denied') {
+    super(message);
+    this.name = 'OrganizationAccessError';
+    this.statusCode = 403;
+  }
+}
 
-      if (!userId) {
-        return next(); // Let the route handle missing user
-      }
+/**
+ * Create organization context from Clerk auth
+ * @param {Object} auth - Clerk auth object from getAuth(req)
+ * @returns {Object} Organization context
+ */
+export function createOrgContext(auth) {
+  const { userId, orgId, orgRole } = auth || {};
 
-      req.orgContext = await resolveOrganizationContext(sql, userId, organizationId);
-      next();
-    } catch (error) {
-      if (error instanceof OrganizationAccessError || error instanceof PermissionDeniedError) {
-        return res.status(error.statusCode).json({ error: error.message });
-      }
-      next(error);
-    }
+  return {
+    userId,
+    organizationId: orgId || null,
+    isPersonal: !orgId,
+    orgRole: orgRole || null,
+    permissions: getPermissionsForRole(orgRole),
   };
 }
 
 /**
- * Generate random token for invites
- * @param {number} length - Token length (default 32)
- * @returns {string}
+ * Check if user is admin of current organization
+ * @param {string|null|undefined} orgRole
+ * @returns {boolean}
  */
-export function generateInviteToken(length = 32) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
-  for (let i = 0; i < length; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
+export function isAdmin(orgRole) {
+  return !orgRole || orgRole === 'org:admin'; // Personal context or admin
 }
 
 /**
- * Generate slug from organization name
- * @param {string} name
- * @returns {string}
+ * Check if this is personal context (no organization)
+ * @param {string|null|undefined} orgId
+ * @returns {boolean}
  */
-export function generateSlug(name) {
-  return name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove accents
-    .replace(/[^a-z0-9]+/g, '-')      // Replace non-alphanumeric with dash
-    .replace(/^-+|-+$/g, '')          // Remove leading/trailing dashes
-    .substring(0, 100);               // Limit length
+export function isPersonalContext(orgId) {
+  return !orgId;
 }

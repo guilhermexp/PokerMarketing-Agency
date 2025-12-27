@@ -11,7 +11,9 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
         headers: {
-          'Cross-Origin-Embedder-Policy': 'require-corp',
+          // Use 'credentialless' instead of 'require-corp' to allow cross-origin resources
+          // This still enables SharedArrayBuffer for FFmpeg WASM but doesn't require CORP headers
+          'Cross-Origin-Embedder-Policy': 'credentialless',
           'Cross-Origin-Opener-Policy': 'same-origin',
         },
         proxy: {
@@ -20,6 +22,14 @@ export default defineConfig(({ mode }) => {
             changeOrigin: true,
           },
           '/api/generate': {
+            target: 'http://localhost:3002',
+            changeOrigin: true,
+          },
+          '/api/upload': {
+            target: 'http://localhost:3002',
+            changeOrigin: true,
+          },
+          '/api/proxy-video': {
             target: 'http://localhost:3002',
             changeOrigin: true,
           },
@@ -53,6 +63,7 @@ export default defineConfig(({ mode }) => {
         'process.env.DATABASE_URL': JSON.stringify(env.DATABASE_URL),
         'import.meta.env.VITE_DATABASE_URL': JSON.stringify(env.DATABASE_URL),
         'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify(env.VITE_CLERK_PUBLISHABLE_KEY),
+        'process.env.OPENROUTER_API_KEY': JSON.stringify(env.OPENROUTER_API_KEY),
       },
       resolve: {
         alias: {

@@ -1,11 +1,26 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import type { BrandProfile, ContentInput, MarketingCampaign, ImageFile, ImageModel, VideoModel, GenerationOptions, ImageSize, Post, FalVideoModel } from '../types';
+import type { BrandProfile, ContentInput, MarketingCampaign, ImageFile, ImageModel, VideoModel, GenerationOptions, ImageSize, Post, FalVideoModel, ToneTarget } from '../types';
 import { isFalModel } from '../types';
 import { generateFalVideo } from './falService';
+import { generateCreativeText } from './llmService';
 
 // Helper to ensure fresh GoogleGenAI instance with latest API key
 const getAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+// Default targets that use tone (backwards compatible)
+const defaultToneTargets: ToneTarget[] = ['campaigns', 'posts', 'images', 'flyers'];
+
+// Check if a specific target should use the tone
+const shouldUseTone = (brandProfile: BrandProfile, target: ToneTarget): boolean => {
+  const targets = brandProfile.toneTargets || defaultToneTargets;
+  return targets.includes(target);
+};
+
+// Get tone text for prompts (returns empty string if tone should not be used)
+const getToneText = (brandProfile: BrandProfile, target: ToneTarget): string => {
+  return shouldUseTone(brandProfile, target) ? brandProfile.toneOfVoice : '';
+};
 
 // Mapeia proporções comuns de marketing para formatos aceitos pelo Gemini 3 Pro
 const mapAspectRatio = (ratio: string): string => {
@@ -85,12 +100,12 @@ const campaignSchema = {
 };
 
 export const generateCampaign = async (brandProfile: BrandProfile, input: ContentInput, options: GenerationOptions): Promise<MarketingCampaign> => {
-    const ai = getAi();
+    const toneText = getToneText(brandProfile, 'campaigns');
     const parts: any[] = [{ text: `
     **PERFIL DA MARCA:**
     - Nome: ${brandProfile.name}
     - Descrição: ${brandProfile.description}
-    - Tom de Voz: ${brandProfile.toneOfVoice}
+    ${toneText ? `- Tom de Voz: ${toneText}` : ''}
     - Cores Oficiais: Primária ${brandProfile.primaryColor}, Secundária ${brandProfile.secondaryColor}
 
     **CONTEÚDO PARA ESTRUTURAR:**
@@ -105,29 +120,21 @@ export const generateCampaign = async (brandProfile: BrandProfile, input: Conten
         });
     }
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview', 
-        contents: { parts },
-        config: {
-            responseMimeType: 'application/json',
-            responseSchema: campaignSchema,
-            temperature: 0.7,
-        },
-    });
-    
-    return JSON.parse(response.text.trim());
+    // Usa wrapper que escolhe o modelo baseado no brandProfile.creativeModel
+    const result = await generateCreativeText(brandProfile, parts, campaignSchema, 0.7);
+    return JSON.parse(result);
 };
 
 export const generateQuickPostText = async (brandProfile: BrandProfile, context: string, imageBase64?: string): Promise<Post> => {
-    const ai = getAi();
+    const toneText = getToneText(brandProfile, 'posts');
     const parts: any[] = [{ text: `
     Você é Social Media Manager de elite. Crie um post de INSTAGRAM de alta performance para um clube de poker.
-    
+
     **CONTEXTO DO EVENTO:**
     ${context}
 
-    **MARCA:** ${brandProfile.name} | **TOM:** ${brandProfile.toneOfVoice}
-    
+    **MARCA:** ${brandProfile.name}${toneText ? ` | **TOM:** ${toneText}` : ''}
+
     **REGRAS DE OURO:**
     1. GANCHO EXPLOSIVO com emojis de poker.
     2. DESTAQUE O GARANTIDO (GTD) se houver.
@@ -143,12 +150,21 @@ export const generateQuickPostText = async (brandProfile: BrandProfile, context:
         parts.push({ inlineData: { mimeType: header.match(/:(.*?);/)?.[1] || 'image/png', data } });
     }
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: { parts },
-        config: { responseMimeType: 'application/json', temperature: 0.8 },
-    });
-    return JSON.parse(response.text.trim());
+    // Schema para QuickPost
+    const quickPostSchema = {
+        type: Type.OBJECT,
+        properties: {
+            platform: { type: Type.STRING },
+            content: { type: Type.STRING },
+            hashtags: { type: Type.ARRAY, items: { type: Type.STRING } },
+            image_prompt: { type: Type.STRING }
+        },
+        required: ["platform", "content", "hashtags", "image_prompt"]
+    };
+
+    // Usa wrapper que escolhe o modelo baseado no brandProfile.creativeModel
+    const result = await generateCreativeText(brandProfile, parts, quickPostSchema, 0.8);
+    return JSON.parse(result);
 };
 
 export const generateImage = async (
@@ -163,9 +179,10 @@ export const generateImage = async (
     }
 ): Promise<string> => {
     const ai = getAi();
+    const toneText = getToneText(brandProfile, 'images');
 
     // Build prompt with style reference instruction if provided
-    let fullPrompt = `PROMPT TÉCNICO: ${prompt}\nESTILO VISUAL: ${brandProfile.toneOfVoice}, Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
+    let fullPrompt = `PROMPT TÉCNICO: ${prompt}\nESTILO VISUAL: ${toneText ? `${toneText}, ` : ''}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
 
     if (options.styleReferenceImage) {
         fullPrompt = `${fullPrompt}
@@ -424,7 +441,14 @@ export const generateVideo = async (
         const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
         const videoBlob = await videoResponse.blob();
         console.log('[Gemini] Video generated successfully via Gemini');
-        return { videoUrl: URL.createObjectURL(videoBlob), usedFallback: false };
+
+        // Upload to Vercel Blob for persistence (blob: URLs are temporary)
+        const { uploadVideo } = await import('./apiClient');
+        const filename = `gemini-video-${Date.now()}.mp4`;
+        const permanentUrl = await uploadVideo(videoBlob, filename);
+        console.log('[Gemini] Video uploaded to Vercel Blob:', permanentUrl);
+
+        return { videoUrl: permanentUrl, usedFallback: false };
     } catch (geminiError) {
         // Fallback to fal.ai Veo 3.1 on Gemini failure (429 rate limit, etc.)
         console.warn('[Gemini] Video generation failed, falling back to fal.ai Veo 3.1...', geminiError);
@@ -447,7 +471,7 @@ export const generateSpeech = async (script: string): Promise<string> => {
         contents: [{ parts: [{ text: script }] }],
         config: {
             responseModalities: [Modality.AUDIO],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Orus' } } },
         },
     });
     return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
@@ -489,18 +513,19 @@ export const extractColorsFromLogo = async (logo: ImageFile): Promise<{ primaryC
 };
 
 export const generateFlyer = async (
-    prompt: string, 
-    brandProfile: BrandProfile, 
-    logo: { base64: string, mimeType: string } | null, 
-    referenceImage: { base64: string, mimeType: string } | null, 
-    aspectRatio: string, 
+    prompt: string,
+    brandProfile: BrandProfile,
+    logo: { base64: string, mimeType: string } | null,
+    referenceImage: { base64: string, mimeType: string } | null,
+    aspectRatio: string,
     model: ImageModel,
     collabLogo?: { base64: string, mimeType: string } | null,
     imageSize?: ImageSize,
     compositionAssets?: { base64: string, mimeType: string }[]
 ): Promise<string> => {
     const ai = getAi();
-    
+    const toneText = getToneText(brandProfile, 'flyers');
+
     const brandingInstruction = `
     **PERSONA:** Você é Diretor de Arte Sênior de uma agência de publicidade internacional de elite especializada em iGaming e Poker.
 
@@ -515,7 +540,7 @@ export const generateFlyer = async (
     3. Use a marca ${brandProfile.name}.
 
     **IDENTIDADE DA MARCA - ${brandProfile.name}:**
-    - Tom de Comunicação: ${brandProfile.toneOfVoice}
+    ${toneText ? `- Tom de Comunicação: ${toneText}` : ''}
     - Cor Primária (dominante): ${brandProfile.primaryColor}
     - Cor de Acento (destaques, GTD, CTAs): ${brandProfile.secondaryColor}
 
@@ -555,7 +580,7 @@ export const generateFlyer = async (
     6. PERSONALIZAÇÃO DA MARCA:
        - O flyer deve parecer EXCLUSIVAMENTE da marca ${brandProfile.name}
        - Se houver logo, integre-o de forma orgânica (não apenas colado)
-       - O estilo visual deve refletir o tom: ${brandProfile.toneOfVoice}
+       ${toneText ? `- O estilo visual deve refletir o tom: ${toneText}` : ''}
        - Seja consistente: todos os flyers desta marca devem ter DNA visual comum
 
     **ATMOSFERA FINAL:**

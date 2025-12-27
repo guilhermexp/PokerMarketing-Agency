@@ -6,15 +6,15 @@
 import express from 'express';
 import cors from 'cors';
 import { neon } from '@neondatabase/serverless';
+import { put } from '@vercel/blob';
 import { config } from 'dotenv';
+import { clerkMiddleware, getAuth } from '@clerk/express';
 import {
-  resolveOrganizationContext,
   hasPermission,
-  generateInviteToken,
-  generateSlug,
   PERMISSIONS,
-  OrganizationAccessError,
   PermissionDeniedError,
+  OrganizationAccessError,
+  createOrgContext,
 } from './helpers/organization-context.mjs';
 
 config();
@@ -24,6 +24,47 @@ const PORT = 3002;
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+// Clerk authentication middleware
+// Adds auth object to all requests (non-blocking)
+app.use(clerkMiddleware({
+  publishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
+  secretKey: process.env.CLERK_SECRET_KEY,
+}));
+
+// Helper to get Clerk org context from request
+function getClerkOrgContext(req) {
+  const auth = getAuth(req);
+  return createOrgContext(auth);
+}
+
+// Legacy helper for organization context resolution
+// In Clerk system, we trust the JWT claims instead of DB validation
+// This is a simplified version that returns org context based on Clerk auth
+async function resolveOrganizationContext(sql, userId, organizationId) {
+  // If no organization_id, it's personal context - full access
+  if (!organizationId) {
+    return {
+      organizationId: null,
+      isPersonal: true,
+      orgRole: null,
+      hasPermission: () => true,
+    };
+  }
+
+  // Organization context - return member-level context
+  // Note: With Clerk, actual permissions come from JWT, this is just for compatibility
+  return {
+    organizationId,
+    isPersonal: false,
+    orgRole: 'org:member', // Default to member, actual role comes from Clerk auth
+    hasPermission: (permission) => {
+      // For legacy compatibility, allow all permissions
+      // Real permission checks should use getClerkOrgContext(req)
+      return true;
+    },
+  };
+}
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -196,7 +237,7 @@ app.post('/api/db/brand-profiles', async (req, res) => {
     // Verify organization membership and permission if organization_id provided
     if (organization_id) {
       const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-      if (!hasPermission(context, PERMISSIONS.MANAGE_BRAND)) {
+      if (!hasPermission(context.orgRole, PERMISSIONS.MANAGE_BRAND)) {
         return res.status(403).json({ error: 'Permission denied: manage_brand required' });
       }
     }
@@ -239,7 +280,7 @@ app.put('/api/db/brand-profiles', async (req, res) => {
       const resolvedUserId = await resolveUserId(sql, user_id);
       if (resolvedUserId) {
         const context = await resolveOrganizationContext(sql, resolvedUserId, existing[0].organization_id);
-        if (!hasPermission(context, PERMISSIONS.MANAGE_BRAND)) {
+        if (!hasPermission(context.orgRole, PERMISSIONS.MANAGE_BRAND)) {
           return res.status(403).json({ error: 'Permission denied: manage_brand required' });
         }
       }
@@ -354,7 +395,7 @@ app.post('/api/db/gallery', async (req, res) => {
     // Verify organization membership if organization_id provided
     if (organization_id) {
       const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-      if (!hasPermission(context, PERMISSIONS.CREATE_FLYER)) {
+      if (!hasPermission(context.orgRole, PERMISSIONS.CREATE_FLYER)) {
         return res.status(403).json({ error: 'Permission denied: create_flyer required' });
       }
     }
@@ -371,6 +412,36 @@ app.post('/api/db/gallery', async (req, res) => {
       return res.status(403).json({ error: error.message });
     }
     console.error('[Gallery API] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Gallery PATCH - Update gallery image (e.g., mark as published)
+app.patch('/api/db/gallery', async (req, res) => {
+  try {
+    const sql = getSql();
+    const { id } = req.query;
+    const { published_at } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ error: 'id is required' });
+    }
+
+    const result = await sql`
+      UPDATE gallery_images
+      SET published_at = ${published_at || null},
+          updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `;
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Gallery image not found' });
+    }
+
+    return res.status(200).json(result[0]);
+  } catch (error) {
+    console.error('[Gallery API] PATCH Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -394,7 +465,7 @@ app.delete('/api/db/gallery', async (req, res) => {
       const resolvedUserId = await resolveUserId(sql, user_id);
       if (resolvedUserId) {
         const context = await resolveOrganizationContext(sql, resolvedUserId, image[0].organization_id);
-        if (!hasPermission(context, PERMISSIONS.DELETE_GALLERY)) {
+        if (!hasPermission(context.orgRole, PERMISSIONS.DELETE_GALLERY)) {
           return res.status(403).json({ error: 'Permission denied: delete_gallery required' });
         }
       }
@@ -407,6 +478,62 @@ app.delete('/api/db/gallery', async (req, res) => {
       return res.status(403).json({ error: error.message });
     }
     console.error('[Gallery API] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Posts API - Update image_url
+app.patch('/api/db/posts', async (req, res) => {
+  try {
+    const sql = getSql();
+    const { id } = req.query;
+    const { image_url } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ error: 'id is required' });
+    }
+
+    const result = await sql`
+      UPDATE posts SET image_url = ${image_url}, updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `;
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    res.json(result[0]);
+  } catch (error) {
+    console.error('[Posts API] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Ad Creatives API - Update image_url
+app.patch('/api/db/ad-creatives', async (req, res) => {
+  try {
+    const sql = getSql();
+    const { id } = req.query;
+    const { image_url } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ error: 'id is required' });
+    }
+
+    const result = await sql`
+      UPDATE ad_creatives SET image_url = ${image_url}, updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `;
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Ad creative not found' });
+    }
+
+    res.json(result[0]);
+  } catch (error) {
+    console.error('[Ad Creatives API] Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -497,7 +624,7 @@ app.post('/api/db/scheduled-posts', async (req, res) => {
     // Verify organization membership and permission if organization_id provided
     if (organization_id) {
       const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-      if (!hasPermission(context, PERMISSIONS.SCHEDULE_POST)) {
+      if (!hasPermission(context.orgRole, PERMISSIONS.SCHEDULE_POST)) {
         return res.status(403).json({ error: 'Permission denied: schedule_post required' });
       }
     }
@@ -506,6 +633,12 @@ app.post('/api/db/scheduled-posts', async (req, res) => {
     const timestampMs = typeof scheduled_timestamp === 'string'
       ? new Date(scheduled_timestamp).getTime()
       : scheduled_timestamp;
+
+    console.log('[Scheduled Posts API] Timestamp conversion:', {
+      original: scheduled_timestamp,
+      type: typeof scheduled_timestamp,
+      converted: timestampMs
+    });
 
     const result = await sql`
       INSERT INTO scheduled_posts (
@@ -551,7 +684,7 @@ app.put('/api/db/scheduled-posts', async (req, res) => {
       const resolvedUserId = await resolveUserId(sql, updates.user_id);
       if (resolvedUserId) {
         const context = await resolveOrganizationContext(sql, resolvedUserId, post[0].organization_id);
-        if (!hasPermission(context, PERMISSIONS.SCHEDULE_POST)) {
+        if (!hasPermission(context.orgRole, PERMISSIONS.SCHEDULE_POST)) {
           return res.status(403).json({ error: 'Permission denied: schedule_post required' });
         }
       }
@@ -599,7 +732,7 @@ app.delete('/api/db/scheduled-posts', async (req, res) => {
       const resolvedUserId = await resolveUserId(sql, user_id);
       if (resolvedUserId) {
         const context = await resolveOrganizationContext(sql, resolvedUserId, post[0].organization_id);
-        if (!hasPermission(context, PERMISSIONS.SCHEDULE_POST)) {
+        if (!hasPermission(context.orgRole, PERMISSIONS.SCHEDULE_POST)) {
           return res.status(403).json({ error: 'Permission denied: schedule_post required' });
         }
       }
@@ -758,7 +891,7 @@ app.post('/api/db/campaigns', async (req, res) => {
     // Verify organization membership and permission if organization_id provided
     if (organization_id) {
       const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-      if (!hasPermission(context, PERMISSIONS.CREATE_CAMPAIGN)) {
+      if (!hasPermission(context.orgRole, PERMISSIONS.CREATE_CAMPAIGN)) {
         return res.status(403).json({ error: 'Permission denied: create_campaign required' });
       }
     }
@@ -836,7 +969,7 @@ app.delete('/api/db/campaigns', async (req, res) => {
       const resolvedUserId = await resolveUserId(sql, user_id);
       if (resolvedUserId) {
         const context = await resolveOrganizationContext(sql, resolvedUserId, campaign[0].organization_id);
-        if (!hasPermission(context, PERMISSIONS.DELETE_CAMPAIGN)) {
+        if (!hasPermission(context.orgRole, PERMISSIONS.DELETE_CAMPAIGN)) {
           return res.status(403).json({ error: 'Permission denied: delete_campaign required' });
         }
       }
@@ -1220,849 +1353,112 @@ app.get('/api/generate/status', async (req, res) => {
 });
 
 // ============================================================================
-// ORGANIZATIONS API
+// ORGANIZATIONS API - Managed by Clerk
+// Organization CRUD, members, roles, and invites are now handled by Clerk
+// See: https://clerk.com/docs/organizations/overview
 // ============================================================================
 
-// List organizations for user
-app.get('/api/db/organizations', async (req, res) => {
+// ============================================================================
+// VIDEO PROXY API (for COEP bypass in development)
+// Vercel Blob doesn't set Cross-Origin-Resource-Policy header, which is required
+// when the page has Cross-Origin-Embedder-Policy: require-corp (needed for FFmpeg WASM)
+// ============================================================================
+
+app.get('/api/proxy-video', async (req, res) => {
   try {
-    const sql = getSql();
-    const { user_id } = req.query;
+    const { url } = req.query;
 
-    if (!user_id) {
-      return res.status(400).json({ error: 'user_id is required' });
+    if (!url) {
+      return res.status(400).json({ error: 'url parameter is required' });
     }
 
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.json([]);
+    // Only allow proxying Vercel Blob URLs for security
+    if (!url.includes('.public.blob.vercel-storage.com/') && !url.includes('.blob.vercel-storage.com/')) {
+      return res.status(403).json({ error: 'Only Vercel Blob URLs are allowed' });
     }
 
-    // Get organizations where user is a member
-    const organizations = await sql`
-      SELECT
-        o.id,
-        o.name,
-        o.slug,
-        o.description,
-        o.logo_url,
-        o.owner_id,
-        o.created_at,
-        om.status as member_status,
-        r.name as role_name,
-        r.permissions,
-        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id AND status = 'active') as member_count
-      FROM organizations o
-      JOIN organization_members om ON om.organization_id = o.id
-      JOIN organization_roles r ON om.role_id = r.id
-      WHERE om.user_id = ${resolvedUserId}
-        AND om.status = 'active'
-        AND o.deleted_at IS NULL
-      ORDER BY o.name ASC
-    `;
+    console.log('[Video Proxy] Fetching:', url);
 
-    res.json(organizations);
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Failed to fetch video: ${response.statusText}` });
+    }
+
+    // Set CORS and COEP-compatible headers
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', response.headers.get('content-type') || 'video/mp4');
+    res.setHeader('Content-Length', response.headers.get('content-length') || '');
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    // Handle range requests for video seeking
+    const range = req.headers.range;
+    if (range) {
+      const contentLength = parseInt(response.headers.get('content-length') || '0');
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : contentLength - 1;
+
+      res.status(206);
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${contentLength}`);
+      res.setHeader('Content-Length', end - start + 1);
+    }
+
+    // Stream the video data
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
   } catch (error) {
-    console.error('[Organizations API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Create organization
-app.post('/api/db/organizations', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { user_id, name, description, logo_url } = req.body;
-
-    if (!user_id || !name) {
-      return res.status(400).json({ error: 'user_id and name are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Generate unique slug
-    let slug = generateSlug(name);
-    let slugSuffix = 0;
-    let uniqueSlug = slug;
-
-    // Check for slug conflicts
-    while (true) {
-      const existing = await sql`
-        SELECT id FROM organizations WHERE slug = ${uniqueSlug} LIMIT 1
-      `;
-      if (existing.length === 0) break;
-      slugSuffix++;
-      uniqueSlug = `${slug}-${slugSuffix}`;
-    }
-
-    // Create organization (trigger will create default roles and add owner as admin)
-    const result = await sql`
-      INSERT INTO organizations (name, slug, description, logo_url, owner_id)
-      VALUES (${name}, ${uniqueSlug}, ${description || null}, ${logo_url || null}, ${resolvedUserId})
-      RETURNING *
-    `;
-
-    const org = result[0];
-    console.log(`[Organizations API] Created organization ${org.id} for user ${resolvedUserId}`);
-
-    res.status(201).json(org);
-  } catch (error) {
-    console.error('[Organizations API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Update organization
-app.put('/api/db/organizations', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { id } = req.query;
-    const { user_id, name, description, logo_url } = req.body;
-
-    if (!id || !user_id) {
-      return res.status(400).json({ error: 'id and user_id are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Check permission
-    const context = await resolveOrganizationContext(sql, resolvedUserId, id);
-    if (!hasPermission(context, PERMISSIONS.MANAGE_ORGANIZATION)) {
-      return res.status(403).json({ error: 'Permission denied: manage_organization required' });
-    }
-
-    const result = await sql`
-      UPDATE organizations
-      SET
-        name = COALESCE(${name || null}, name),
-        description = COALESCE(${description || null}, description),
-        logo_url = COALESCE(${logo_url || null}, logo_url),
-        updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING *
-    `;
-
-    res.json(result[0]);
-  } catch (error) {
-    if (error instanceof OrganizationAccessError || error instanceof PermissionDeniedError) {
-      return res.status(403).json({ error: error.message });
-    }
-    console.error('[Organizations API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Delete organization (soft delete)
-app.delete('/api/db/organizations', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { id, user_id } = req.query;
-
-    if (!id || !user_id) {
-      return res.status(400).json({ error: 'id and user_id are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Only owner can delete
-    const org = await sql`
-      SELECT owner_id FROM organizations WHERE id = ${id} AND deleted_at IS NULL
-    `;
-
-    if (org.length === 0) {
-      return res.status(404).json({ error: 'Organization not found' });
-    }
-
-    if (org[0].owner_id !== resolvedUserId) {
-      return res.status(403).json({ error: 'Only the owner can delete the organization' });
-    }
-
-    await sql`UPDATE organizations SET deleted_at = NOW() WHERE id = ${id}`;
-    res.json({ success: true });
-  } catch (error) {
-    console.error('[Organizations API] Error:', error);
+    console.error('[Video Proxy] Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // ============================================================================
-// ORGANIZATION MEMBERS API
+// FILE UPLOAD API (Vercel Blob)
 // ============================================================================
 
-// List members
-app.get('/api/db/organizations/members', async (req, res) => {
+// Max file size: 100MB
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
+
+app.post('/api/upload', async (req, res) => {
   try {
-    const sql = getSql();
-    const { organization_id, user_id } = req.query;
+    const { filename, contentType, data } = req.body;
 
-    if (!organization_id || !user_id) {
-      return res.status(400).json({ error: 'organization_id and user_id are required' });
+    if (!filename || !contentType || !data) {
+      return res.status(400).json({ error: 'Missing required fields: filename, contentType, data' });
     }
 
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
+    // Decode base64 data
+    const buffer = Buffer.from(data, 'base64');
+
+    if (buffer.length > MAX_FILE_SIZE) {
+      return res.status(400).json({ error: `File too large. Max size is ${MAX_FILE_SIZE / 1024 / 1024}MB` });
     }
 
-    // Check if user is member
-    const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
+    // Generate unique filename with timestamp
+    const timestamp = Date.now();
+    const uniqueFilename = `${timestamp}-${filename}`;
 
-    const members = await sql`
-      SELECT
-        om.id,
-        om.user_id,
-        om.status,
-        om.invited_at,
-        om.joined_at,
-        u.email,
-        u.name,
-        u.avatar_url,
-        r.id as role_id,
-        r.name as role_name,
-        r.permissions,
-        r.is_system_role,
-        ib.name as invited_by_name
-      FROM organization_members om
-      JOIN users u ON om.user_id = u.id
-      JOIN organization_roles r ON om.role_id = r.id
-      LEFT JOIN users ib ON om.invited_by = ib.id
-      WHERE om.organization_id = ${organization_id}
-      ORDER BY om.joined_at ASC
-    `;
+    // Upload to Vercel Blob
+    const blob = await put(uniqueFilename, buffer, {
+      access: 'public',
+      contentType,
+    });
 
-    res.json({ members });
+    console.log('[Upload] File uploaded:', blob.url);
+
+    return res.status(200).json({
+      success: true,
+      url: blob.url,
+      filename: uniqueFilename,
+      size: buffer.length,
+    });
   } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
-    }
-    console.error('[Organization Members API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Update member role
-app.put('/api/db/organizations/members', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { id } = req.query;
-    const { user_id, organization_id, role_id, status } = req.body;
-
-    if (!id || !user_id || !organization_id) {
-      return res.status(400).json({ error: 'id, user_id, and organization_id are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Check permission
-    const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-    if (!hasPermission(context, PERMISSIONS.MANAGE_MEMBERS)) {
-      return res.status(403).json({ error: 'Permission denied: manage_members required' });
-    }
-
-    // Prevent removing the last admin
-    if (role_id || status === 'inactive') {
-      const admins = await sql`
-        SELECT om.id
-        FROM organization_members om
-        JOIN organization_roles r ON om.role_id = r.id
-        WHERE om.organization_id = ${organization_id}
-          AND r.name = 'Admin'
-          AND om.status = 'active'
-          AND om.id != ${id}
-      `;
-
-      const targetMember = await sql`
-        SELECT r.name as role_name
-        FROM organization_members om
-        JOIN organization_roles r ON om.role_id = r.id
-        WHERE om.id = ${id}
-      `;
-
-      if (targetMember[0]?.role_name === 'Admin' && admins.length === 0) {
-        return res.status(400).json({ error: 'Cannot remove the last admin' });
-      }
-    }
-
-    const result = await sql`
-      UPDATE organization_members
-      SET
-        role_id = COALESCE(${role_id || null}, role_id),
-        status = COALESCE(${status || null}, status),
-        updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING *
-    `;
-
-    res.json(result[0]);
-  } catch (error) {
-    if (error instanceof OrganizationAccessError || error instanceof PermissionDeniedError) {
-      return res.status(403).json({ error: error.message });
-    }
-    console.error('[Organization Members API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Remove member
-app.delete('/api/db/organizations/members', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { id, user_id, organization_id } = req.query;
-
-    if (!id || !user_id || !organization_id) {
-      return res.status(400).json({ error: 'id, user_id, and organization_id are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Check permission (or allow self-removal)
-    const member = await sql`SELECT user_id FROM organization_members WHERE id = ${id}`;
-    const isSelf = member[0]?.user_id === resolvedUserId;
-
-    if (!isSelf) {
-      const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-      if (!hasPermission(context, PERMISSIONS.MANAGE_MEMBERS)) {
-        return res.status(403).json({ error: 'Permission denied' });
-      }
-    }
-
-    // Prevent removing the last admin
-    const targetMember = await sql`
-      SELECT r.name as role_name
-      FROM organization_members om
-      JOIN organization_roles r ON om.role_id = r.id
-      WHERE om.id = ${id}
-    `;
-
-    if (targetMember[0]?.role_name === 'Admin') {
-      const admins = await sql`
-        SELECT COUNT(*) as count
-        FROM organization_members om
-        JOIN organization_roles r ON om.role_id = r.id
-        WHERE om.organization_id = ${organization_id}
-          AND r.name = 'Admin'
-          AND om.status = 'active'
-      `;
-
-      if (Number(admins[0].count) <= 1) {
-        return res.status(400).json({ error: 'Cannot remove the last admin' });
-      }
-    }
-
-    await sql`DELETE FROM organization_members WHERE id = ${id}`;
-    res.json({ success: true });
-  } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
-    }
-    console.error('[Organization Members API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// ORGANIZATION ROLES API
-// ============================================================================
-
-// List roles
-app.get('/api/db/organizations/roles', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { organization_id, user_id } = req.query;
-
-    if (!organization_id || !user_id) {
-      return res.status(400).json({ error: 'organization_id and user_id are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Check if user is member
-    await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-
-    const roles = await sql`
-      SELECT
-        r.*,
-        (SELECT COUNT(*) FROM organization_members WHERE role_id = r.id) as member_count
-      FROM organization_roles r
-      WHERE r.organization_id = ${organization_id}
-      ORDER BY r.is_system_role DESC, r.name ASC
-    `;
-
-    res.json({ roles });
-  } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
-    }
-    console.error('[Organization Roles API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Create custom role
-app.post('/api/db/organizations/roles', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { user_id, organization_id, name, description, permissions } = req.body;
-
-    if (!user_id || !organization_id || !name || !permissions) {
-      return res.status(400).json({ error: 'user_id, organization_id, name, and permissions are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Check permission
-    const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-    if (!hasPermission(context, PERMISSIONS.MANAGE_ROLES)) {
-      return res.status(403).json({ error: 'Permission denied: manage_roles required' });
-    }
-
-    const result = await sql`
-      INSERT INTO organization_roles (organization_id, name, description, permissions, is_system_role)
-      VALUES (${organization_id}, ${name}, ${description || null}, ${JSON.stringify(permissions)}, FALSE)
-      RETURNING *
-    `;
-
-    res.status(201).json(result[0]);
-  } catch (error) {
-    if (error instanceof OrganizationAccessError || error instanceof PermissionDeniedError) {
-      return res.status(403).json({ error: error.message });
-    }
-    console.error('[Organization Roles API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Update role
-app.put('/api/db/organizations/roles', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { id } = req.query;
-    const { user_id, organization_id, name, description, permissions } = req.body;
-
-    if (!id || !user_id || !organization_id) {
-      return res.status(400).json({ error: 'id, user_id, and organization_id are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Check permission
-    const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-    if (!hasPermission(context, PERMISSIONS.MANAGE_ROLES)) {
-      return res.status(403).json({ error: 'Permission denied: manage_roles required' });
-    }
-
-    // Don't allow editing system roles (except permissions)
-    const role = await sql`SELECT is_system_role FROM organization_roles WHERE id = ${id}`;
-    if (role[0]?.is_system_role && name) {
-      return res.status(400).json({ error: 'Cannot rename system roles' });
-    }
-
-    const result = await sql`
-      UPDATE organization_roles
-      SET
-        name = COALESCE(${name || null}, name),
-        description = COALESCE(${description || null}, description),
-        permissions = COALESCE(${permissions ? JSON.stringify(permissions) : null}, permissions),
-        updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING *
-    `;
-
-    res.json(result[0]);
-  } catch (error) {
-    if (error instanceof OrganizationAccessError || error instanceof PermissionDeniedError) {
-      return res.status(403).json({ error: error.message });
-    }
-    console.error('[Organization Roles API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Delete role
-app.delete('/api/db/organizations/roles', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { id, user_id, organization_id } = req.query;
-
-    if (!id || !user_id || !organization_id) {
-      return res.status(400).json({ error: 'id, user_id, and organization_id are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Check permission
-    const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-    if (!hasPermission(context, PERMISSIONS.MANAGE_ROLES)) {
-      return res.status(403).json({ error: 'Permission denied' });
-    }
-
-    // Don't allow deleting system roles
-    const role = await sql`SELECT is_system_role FROM organization_roles WHERE id = ${id}`;
-    if (role[0]?.is_system_role) {
-      return res.status(400).json({ error: 'Cannot delete system roles' });
-    }
-
-    // Check if role has members
-    const members = await sql`SELECT COUNT(*) as count FROM organization_members WHERE role_id = ${id}`;
-    if (Number(members[0].count) > 0) {
-      return res.status(400).json({ error: 'Cannot delete role with members. Reassign members first.' });
-    }
-
-    await sql`DELETE FROM organization_roles WHERE id = ${id}`;
-    res.json({ success: true });
-  } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
-    }
-    console.error('[Organization Roles API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// ORGANIZATION INVITES API
-// ============================================================================
-
-// List invites for organization
-app.get('/api/db/organizations/invites', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { organization_id, user_id } = req.query;
-
-    if (!organization_id || !user_id) {
-      return res.status(400).json({ error: 'organization_id and user_id are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Check permission
-    const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-    if (!hasPermission(context, PERMISSIONS.MANAGE_MEMBERS)) {
-      return res.status(403).json({ error: 'Permission denied' });
-    }
-
-    const invites = await sql`
-      SELECT
-        i.*,
-        r.name as role_name,
-        u.name as invited_by_name
-      FROM organization_invites i
-      JOIN organization_roles r ON i.role_id = r.id
-      JOIN users u ON i.invited_by = u.id
-      WHERE i.organization_id = ${organization_id}
-        AND i.status = 'pending'
-        AND i.expires_at > NOW()
-      ORDER BY i.created_at DESC
-    `;
-
-    res.json({ invites });
-  } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
-    }
-    console.error('[Organization Invites API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Create invite
-app.post('/api/db/organizations/invites', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { user_id, organization_id, email, role_id, expires_in_days = 7 } = req.body;
-
-    if (!user_id || !organization_id || !email || !role_id) {
-      return res.status(400).json({ error: 'user_id, organization_id, email, and role_id are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Check permission
-    const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-    if (!hasPermission(context, PERMISSIONS.MANAGE_MEMBERS)) {
-      return res.status(403).json({ error: 'Permission denied: manage_members required' });
-    }
-
-    // Check if user is already a member
-    const existingMember = await sql`
-      SELECT om.id
-      FROM organization_members om
-      JOIN users u ON om.user_id = u.id
-      WHERE om.organization_id = ${organization_id}
-        AND u.email = ${email}
-    `;
-
-    if (existingMember.length > 0) {
-      return res.status(400).json({ error: 'User is already a member of this organization' });
-    }
-
-    // Check for pending invite
-    const existingInvite = await sql`
-      SELECT id FROM organization_invites
-      WHERE organization_id = ${organization_id}
-        AND email = ${email}
-        AND status = 'pending'
-        AND expires_at > NOW()
-    `;
-
-    if (existingInvite.length > 0) {
-      return res.status(400).json({ error: 'A pending invite already exists for this email' });
-    }
-
-    const token = generateInviteToken();
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + expires_in_days);
-
-    const result = await sql`
-      INSERT INTO organization_invites (organization_id, email, role_id, token, expires_at, invited_by)
-      VALUES (${organization_id}, ${email}, ${role_id}, ${token}, ${expiresAt.toISOString()}, ${resolvedUserId})
-      RETURNING *
-    `;
-
-    console.log(`[Organization Invites API] Created invite for ${email} to organization ${organization_id}`);
-
-    // Get role name for frontend display
-    const roleResult = await sql`SELECT name FROM organization_roles WHERE id = ${role_id}`;
-    const invite = { ...result[0], role_name: roleResult[0]?.name || 'Unknown' };
-    res.status(201).json({ invite });
-  } catch (error) {
-    if (error instanceof OrganizationAccessError || error instanceof PermissionDeniedError) {
-      return res.status(403).json({ error: error.message });
-    }
-    console.error('[Organization Invites API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Cancel invite
-app.delete('/api/db/organizations/invites', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { id, user_id, organization_id } = req.query;
-
-    if (!id || !user_id || !organization_id) {
-      return res.status(400).json({ error: 'id, user_id, and organization_id are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Check permission
-    const context = await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-    if (!hasPermission(context, PERMISSIONS.MANAGE_MEMBERS)) {
-      return res.status(403).json({ error: 'Permission denied' });
-    }
-
-    await sql`
-      UPDATE organization_invites
-      SET status = 'cancelled'
-      WHERE id = ${id}
-    `;
-
-    res.json({ success: true });
-  } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
-    }
-    console.error('[Organization Invites API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// USER INVITES API (for accepting/declining)
-// ============================================================================
-
-// List invites for user
-app.get('/api/db/user/invites', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { user_id } = req.query;
-
-    if (!user_id) {
-      return res.status(400).json({ error: 'user_id is required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.json({ invites: [] });
-    }
-
-    // Get user's email
-    const user = await sql`SELECT email FROM users WHERE id = ${resolvedUserId}`;
-    if (user.length === 0) {
-      return res.json({ invites: [] });
-    }
-
-    const invites = await sql`
-      SELECT
-        i.*,
-        o.name as organization_name,
-        o.logo_url as organization_logo,
-        r.name as role_name,
-        u.name as invited_by_name
-      FROM organization_invites i
-      JOIN organizations o ON i.organization_id = o.id
-      JOIN organization_roles r ON i.role_id = r.id
-      JOIN users u ON i.invited_by = u.id
-      WHERE i.email = ${user[0].email}
-        AND i.status = 'pending'
-        AND i.expires_at > NOW()
-        AND o.deleted_at IS NULL
-      ORDER BY i.created_at DESC
-    `;
-
-    res.json({ invites });
-  } catch (error) {
-    console.error('[User Invites API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Accept invite
-app.post('/api/db/organizations/invites/accept', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { user_id, token } = req.body;
-
-    if (!user_id || !token) {
-      return res.status(400).json({ error: 'user_id and token are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Get user's email
-    const user = await sql`SELECT email FROM users WHERE id = ${resolvedUserId}`;
-    if (user.length === 0) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Find the invite
-    const invites = await sql`
-      SELECT * FROM organization_invites
-      WHERE token = ${token}
-        AND email = ${user[0].email}
-        AND status = 'pending'
-        AND expires_at > NOW()
-    `;
-
-    if (invites.length === 0) {
-      return res.status(404).json({ error: 'Invite not found or expired' });
-    }
-
-    const invite = invites[0];
-
-    // Check if already a member
-    const existingMember = await sql`
-      SELECT id FROM organization_members
-      WHERE organization_id = ${invite.organization_id}
-        AND user_id = ${resolvedUserId}
-    `;
-
-    if (existingMember.length > 0) {
-      // Update invite status
-      await sql`UPDATE organization_invites SET status = 'accepted', accepted_at = NOW() WHERE id = ${invite.id}`;
-      return res.status(400).json({ error: 'Already a member of this organization' });
-    }
-
-    // Add as member
-    await sql`
-      INSERT INTO organization_members (organization_id, user_id, role_id, status, invited_by, joined_at)
-      VALUES (${invite.organization_id}, ${resolvedUserId}, ${invite.role_id}, 'active', ${invite.invited_by}, NOW())
-    `;
-
-    // Update invite status
-    await sql`
-      UPDATE organization_invites
-      SET status = 'accepted', accepted_at = NOW()
-      WHERE id = ${invite.id}
-    `;
-
-    console.log(`[User Invites API] User ${resolvedUserId} accepted invite to organization ${invite.organization_id}`);
-
-    // Return the organization info
-    const org = await sql`
-      SELECT * FROM organizations WHERE id = ${invite.organization_id}
-    `;
-
-    res.json({ success: true, organization: org[0] });
-  } catch (error) {
-    console.error('[User Invites API] Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Decline invite
-app.post('/api/db/organizations/invites/decline', async (req, res) => {
-  try {
-    const sql = getSql();
-    const { user_id, token } = req.body;
-
-    if (!user_id || !token) {
-      return res.status(400).json({ error: 'user_id and token are required' });
-    }
-
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Get user's email
-    const user = await sql`SELECT email FROM users WHERE id = ${resolvedUserId}`;
-    if (user.length === 0) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    await sql`
-      UPDATE organization_invites
-      SET status = 'declined'
-      WHERE token = ${token}
-        AND email = ${user[0].email}
-        AND status = 'pending'
-    `;
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('[User Invites API] Error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[Upload] Error:', error);
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 });
 

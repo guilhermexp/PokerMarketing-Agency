@@ -7,7 +7,6 @@ import {
   useUser,
 } from '@clerk/clerk-react';
 import { getOrCreateUser, type DbUser } from '../../services/apiClient';
-import { OrganizationProvider } from '../../contexts/OrganizationContext';
 
 interface AuthContextType {
   dbUser: DbUser | null;
@@ -118,9 +117,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
         </div>
       </SignedOut>
       <SignedIn>
-        <OrganizationProvider>
-          {children}
-        </OrganizationProvider>
+        {children}
       </SignedIn>
     </AuthContext.Provider>
   );

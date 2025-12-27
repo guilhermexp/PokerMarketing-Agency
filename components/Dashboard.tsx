@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useClerk } from '@clerk/clerk-react';
-import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, GenerationOptions, WeekScheduleInfo, StyleReference, InstagramPublishState, CampaignSummary } from '../types';
+import type { BrandProfile, MarketingCampaign, ContentInput, IconName, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, GenerationOptions, WeekScheduleInfo, StyleReference, InstagramPublishState, CampaignSummary, CreativeModel } from '../types';
 import type { WeekScheduleWithCount } from '../services/apiClient';
 import { UploadForm } from './UploadForm';
 import { ClipsTab } from './tabs/ClipsTab';
@@ -16,7 +16,8 @@ import { GalleryView } from './GalleryView';
 import { CalendarView } from './calendar/CalendarView';
 import { CampaignsList } from './CampaignsList';
 import { SchedulesListView } from './SchedulesListView';
-import { OrganizationSwitcher } from './organization/OrganizationSwitcher';
+import { OrganizationSwitcher } from '@clerk/clerk-react';
+import { QuickPostModal } from './common/QuickPostModal';
 import type { ScheduledPost } from '../types';
 
 type View = 'campaign' | 'campaigns' | 'flyer' | 'gallery' | 'calendar';
@@ -41,6 +42,7 @@ interface DashboardProps {
   onAddImageToGallery: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onDeleteGalleryImage?: (imageId: string) => void;
+  onMarkGalleryImagePublished?: (imageId: string) => void;
   tournamentEvents: TournamentEvent[];
   weekScheduleInfo: WeekScheduleInfo | null;
   onTournamentFileUpload: (file: File) => Promise<void>;
@@ -72,6 +74,7 @@ interface DashboardProps {
   campaignsList: CampaignSummary[];
   onLoadCampaign: (campaignId: string) => void;
   userId?: string;
+  organizationId?: string | null;
   // Week Schedule
   isWeekExpired?: boolean;
   onClearExpiredSchedule?: () => void;
@@ -80,6 +83,8 @@ interface DashboardProps {
   currentScheduleId?: string | null;
   onSelectSchedule?: (schedule: WeekScheduleWithCount) => void;
   onDeleteSchedule?: (scheduleId: string) => void;
+  // Creative Model
+  onUpdateCreativeModel?: (model: CreativeModel) => void;
 }
 
 type Tab = 'clips' | 'posts' | 'ads';
@@ -118,15 +123,17 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     styleReferences, onAddStyleReference, onRemoveStyleReference, onSelectStyleReference, selectedStyleReference, onClearSelectedStyleReference,
     scheduledPosts, onSchedulePost, onUpdateScheduledPost, onDeleteScheduledPost,
     onPublishToInstagram, publishingStates,
-    campaignsList, onLoadCampaign, userId,
+    campaignsList, onLoadCampaign, userId, organizationId,
     isWeekExpired, onClearExpiredSchedule,
-    allSchedules, currentScheduleId, onSelectSchedule, onDeleteSchedule
+    allSchedules, currentScheduleId, onSelectSchedule, onDeleteSchedule,
+    onMarkGalleryImagePublished
   } = props;
 
   const { signOut } = useClerk();
   const [activeTab, setActiveTab] = useState<Tab>('clips');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [isInsideSchedule, setIsInsideSchedule] = useState(false);
+  const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(null);
 
   // Format date string (handles both ISO and DD/MM formats)
   const formatDateDisplay = (dateStr: string) => {
@@ -191,7 +198,23 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         {/* Organization Switcher */}
         {!sidebarCollapsed && (
           <div className="px-2 py-2 border-b border-white/[0.04]">
-            <OrganizationSwitcher />
+            <OrganizationSwitcher
+              hidePersonal={false}
+              afterCreateOrganizationUrl="/"
+              afterLeaveOrganizationUrl="/"
+              afterSelectOrganizationUrl="/"
+              appearance={{
+                elements: {
+                  rootBox: 'w-full',
+                  organizationSwitcherTrigger: 'w-full flex items-center gap-2 px-2 py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors text-white/70 text-xs',
+                  organizationSwitcherPopoverCard: 'bg-[#0a0a0a] border border-white/10 rounded-xl shadow-2xl',
+                  organizationSwitcherPopoverActions: 'bg-[#0a0a0a]',
+                  organizationSwitcherPopoverActionButton: 'text-white/70 hover:bg-white/5',
+                  organizationPreview: 'text-white',
+                  organizationSwitcherPopoverFooter: 'border-white/10',
+                }
+              }}
+            />
           </div>
         )}
 
@@ -260,7 +283,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
       <main className="flex-1 overflow-y-auto relative z-10 bg-[#070707]">
             {activeView === 'campaign' && (
                 <div className="px-6 py-5">
-                    {showUploadForm && <UploadForm onGenerate={onGenerate} isGenerating={isGenerating} />}
+                    {showUploadForm && <UploadForm onGenerate={onGenerate} isGenerating={isGenerating} brandProfile={brandProfile} onUpdateCreativeModel={props.onUpdateCreativeModel || (() => {})} />}
                     {isGenerating && (
                         <div className="flex flex-col items-center justify-center text-center p-32 aura-card border-white/5 bg-white/[0.01]">
                             <Loader className="h-12 w-12" />
@@ -300,9 +323,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
                             {/* Content */}
                             <div className="space-y-4">
-                                {activeTab === 'clips' && <ClipsTab brandProfile={brandProfile} videoClipScripts={campaign.videoClipScripts} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} userId={userId} />}
-                                {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} userId={userId} />}
-                                {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} userId={userId} />}
+                                {activeTab === 'clips' && <ClipsTab brandProfile={brandProfile} videoClipScripts={campaign.videoClipScripts} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} userId={userId} galleryImages={galleryImages} />}
+                                {activeTab === 'posts' && <PostsTab posts={campaign.posts} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} userId={userId} galleryImages={galleryImages} />}
+                                {activeTab === 'ads' && <AdCreativesTab adCreatives={campaign.adCreatives} brandProfile={brandProfile} referenceImage={null} onAddImageToGallery={onAddImageToGallery} onUpdateGalleryImage={onUpdateGalleryImage} onSetChatReference={onSetChatReference} styleReferences={styleReferences} onAddStyleReference={onAddStyleReference} onRemoveStyleReference={onRemoveStyleReference} userId={userId} galleryImages={galleryImages} />}
                             </div>
                         </div>
                     )}
@@ -368,6 +391,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                         onRemoveStyleReference={onRemoveStyleReference}
                         onSelectStyleReference={onSelectStyleReference}
                         onPublishToCampaign={onPublishToCampaign}
+                        onQuickPost={setQuickPostImage}
                         onSchedulePost={(image) => {
                             // Create scheduled post for tomorrow at noon
                             const tomorrow = new Date();
@@ -409,6 +433,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 <div className="px-6 py-5">
                     <CampaignsList
                       userId={userId}
+                      organizationId={organizationId}
                       onSelectCampaign={onLoadCampaign}
                       onNewCampaign={() => onViewChange('campaign')}
                       currentCampaignId={campaign?.id}
@@ -423,6 +448,18 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             <Icon name={isAssistantOpen ? 'x' : 'zap'} className="w-5 h-5" />
           </button>
        </div>
+
+       {/* QuickPost Modal for Gallery */}
+       {quickPostImage && (
+         <QuickPostModal
+           isOpen={!!quickPostImage}
+           onClose={() => setQuickPostImage(null)}
+           image={quickPostImage}
+           brandProfile={brandProfile}
+           context={quickPostImage.prompt || 'Imagem da galeria'}
+           onImagePublished={onMarkGalleryImagePublished}
+         />
+       )}
     </div>
   );
 };

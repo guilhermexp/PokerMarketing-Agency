@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Post, BrandProfile, ContentInput, GalleryImage, IconName, ImageModel, StyleReference } from '../../types';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
@@ -9,6 +9,7 @@ import { generateImage } from '../../services/geminiService';
 import { ImagePreviewModal } from '../common/ImagePreviewModal';
 import { useBackgroundJobs, type ActiveJob } from '../../hooks/useBackgroundJobs';
 import type { GenerationJobConfig } from '../../services/apiClient';
+import { updatePostImage } from '../../services/apiClient';
 
 // Check if we're in development mode (QStash won't work locally)
 const isDevMode = typeof window !== 'undefined' && window.location.hostname === 'localhost';
@@ -24,6 +25,7 @@ interface PostsTabProps {
   onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
   onRemoveStyleReference?: (id: string) => void;
   userId?: string | null;
+  galleryImages?: GalleryImage[];
 }
 
 const socialIcons: Record<string, IconName> = {
@@ -180,7 +182,7 @@ const PostCard: React.FC<{
 };
 
 
-export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referenceImage, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference, userId }) => {
+export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referenceImage, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference, userId, galleryImages }) => {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
   const [generationState, setGenerationState] = useState<{ isGenerating: boolean[], errors: (string | null)[] }>({
     isGenerating: [],
@@ -188,12 +190,36 @@ export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referen
   });
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
+  const galleryImagesRef = useRef(galleryImages);
+
+  // Keep ref updated
+  useEffect(() => {
+    galleryImagesRef.current = galleryImages;
+  }, [galleryImages]);
 
   const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
 
+  // Helper to generate unique source for a post
+  const getPostSource = (index: number, platform: string) => `Post-${platform}-${index}`;
+
+  // Initialize images from posts data (only from saved image_url in database)
   useEffect(() => {
     const length = posts.length;
-    setImages(Array(length).fill(null));
+    const initialImages = posts.map((post, index) => {
+      // Only use saved image_url from database - don't recover from gallery
+      // (gallery recovery caused images from other campaigns to appear)
+      if (post.image_url) {
+        return {
+          id: `saved-${post.id || Date.now()}`,
+          src: post.image_url,
+          prompt: post.image_prompt || '',
+          source: getPostSource(index, post.platform) as any,
+          model: 'gemini-3-pro-image-preview' as const,
+        };
+      }
+      return null;
+    });
+    setImages(initialImages);
     setGenerationState({
       isGenerating: Array(length).fill(false),
       errors: Array(length).fill(null),
@@ -202,16 +228,18 @@ export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referen
 
   // Listen for job completions
   useEffect(() => {
-    const unsubComplete = onJobComplete((job: ActiveJob) => {
+    const unsubComplete = onJobComplete(async (job: ActiveJob) => {
       if (job.context?.startsWith('post-') && job.result_url) {
         const indexMatch = job.context.match(/post-(\d+)/);
         if (indexMatch) {
           const index = parseInt(indexMatch[1]);
+          const post = posts[index];
           const galleryImage = onAddImageToGallery({
             src: job.result_url,
-            prompt: posts[index]?.image_prompt || '',
-            source: 'Post',
-            model: selectedImageModel
+            prompt: post?.image_prompt || '',
+            source: getPostSource(index, post?.platform || 'Unknown') as any,
+            model: selectedImageModel,
+            post_id: post?.id,  // Link to post for campaign previews
           });
           setImages(prev => {
             const newImages = [...prev];
@@ -223,6 +251,14 @@ export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referen
             newGenerating[index] = false;
             return { ...prev, isGenerating: newGenerating };
           });
+          // Update post image_url in database
+          if (post?.id) {
+            try {
+              await updatePostImage(post.id, job.result_url);
+            } catch (err) {
+              console.error('[PostsTab] Failed to update post image in database:', err);
+            }
+          }
         }
       }
     });
@@ -309,17 +345,29 @@ export const PostsTab: React.FC<PostsTabProps> = ({ posts, brandProfile, referen
             productImages: productImages.length > 0 ? productImages : undefined,
         });
 
+        const source = getPostSource(index, post.platform);
+        console.log('[PostsTab] Saving image to gallery with source:', source);
         const galleryImage = onAddImageToGallery({
             src: generatedImageUrl,
             prompt: post.image_prompt,
-            source: 'Post',
-            model: selectedImageModel
+            source: source as any,
+            model: selectedImageModel,
+            post_id: post.id,  // Link to post for campaign previews
         });
         setImages(prev => {
             const newImages = [...prev];
             newImages[index] = galleryImage;
             return newImages;
         });
+
+        // Update post image_url in database
+        if (post.id) {
+            try {
+                await updatePostImage(post.id, generatedImageUrl);
+            } catch (err) {
+                console.error('[PostsTab] Failed to update post image in database:', err);
+            }
+        }
     } catch (err: any) {
          setGenerationState(prev => {
             const newErrors = [...prev.errors];

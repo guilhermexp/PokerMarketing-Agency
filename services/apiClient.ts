@@ -5,6 +5,15 @@
 
 const API_BASE = '/api/db';
 
+/**
+ * Convert a video URL to a display-safe URL
+ * With COEP: credentialless, we can use the original URL directly
+ */
+export function getVideoDisplayUrl(url: string): string {
+  // With COEP: credentialless, we don't need to proxy anymore
+  return url;
+}
+
 interface ApiResponse<T> {
   data?: T;
   error?: string;
@@ -76,8 +85,10 @@ export interface DbBrandProfile {
   created_at: string;
 }
 
-export async function getBrandProfile(userId: string): Promise<DbBrandProfile | null> {
-  return fetchApi<DbBrandProfile | null>(`/brand-profiles?user_id=${userId}`);
+export async function getBrandProfile(userId: string, organizationId?: string | null): Promise<DbBrandProfile | null> {
+  const params = new URLSearchParams({ user_id: userId });
+  if (organizationId) params.append('organization_id', organizationId);
+  return fetchApi<DbBrandProfile | null>(`/brand-profiles?${params}`);
 }
 
 export async function createBrandProfile(userId: string, data: {
@@ -87,6 +98,7 @@ export async function createBrandProfile(userId: string, data: {
   primary_color: string;
   secondary_color: string;
   tone_of_voice: string;
+  organization_id?: string | null;
 }): Promise<DbBrandProfile> {
   return fetchApi<DbBrandProfile>('/brand-profiles', {
     method: 'POST',
@@ -117,11 +129,12 @@ export interface DbGalleryImage {
   created_at: string;
 }
 
-export async function getGalleryImages(userId: string, options?: {
+export async function getGalleryImages(userId: string, organizationId?: string | null, options?: {
   source?: string;
   limit?: number;
 }): Promise<DbGalleryImage[]> {
   const params = new URLSearchParams({ user_id: userId });
+  if (organizationId) params.append('organization_id', organizationId);
   if (options?.source) params.append('source', options.source);
   if (options?.limit) params.append('limit', options.limit.toString());
 
@@ -135,6 +148,10 @@ export async function createGalleryImage(userId: string, data: {
   model: string;
   aspect_ratio?: string;
   image_size?: string;
+  post_id?: string;
+  ad_creative_id?: string;
+  video_script_id?: string;
+  organization_id?: string | null;
 }): Promise<DbGalleryImage> {
   return fetchApi<DbGalleryImage>('/gallery', {
     method: 'POST',
@@ -150,6 +167,13 @@ export async function deleteGalleryImage(id: string): Promise<void> {
   if (!response.ok) {
     throw new Error(`Failed to delete image: HTTP ${response.status}`);
   }
+}
+
+export async function markGalleryImagePublished(id: string): Promise<DbGalleryImage> {
+  return fetchApi<DbGalleryImage>(`/gallery?id=${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ published_at: new Date().toISOString() }),
+  });
 }
 
 // ============================================================================
@@ -182,12 +206,13 @@ export interface DbScheduledPost {
   last_publish_attempt?: string;
 }
 
-export async function getScheduledPosts(userId: string, options?: {
+export async function getScheduledPosts(userId: string, organizationId?: string | null, options?: {
   status?: string;
   startDate?: string;
   endDate?: string;
 }): Promise<DbScheduledPost[]> {
   const params = new URLSearchParams({ user_id: userId });
+  if (organizationId) params.append('organization_id', organizationId);
   if (options?.status) params.append('status', options.status);
   if (options?.startDate) params.append('start_date', options.startDate);
   if (options?.endDate) params.append('end_date', options.endDate);
@@ -208,6 +233,7 @@ export async function createScheduledPost(userId: string, data: {
   platforms: string;
   instagram_content_type?: string;
   created_from?: string;
+  organization_id?: string | null;
 }): Promise<DbScheduledPost> {
   return fetchApi<DbScheduledPost>('/scheduled-posts', {
     method: 'POST',
@@ -282,6 +308,15 @@ export interface DbCampaign {
   status: string;
   created_at: string;
   updated_at: string;
+  // Counts and previews from list query
+  clips_count?: number;
+  posts_count?: number;
+  ads_count?: number;
+  clip_preview_url?: string | null;
+  post_preview_url?: string | null;
+  ad_preview_url?: string | null;
+  posts_breakdown?: Record<string, number>;
+  ads_breakdown?: Record<string, number>;
 }
 
 export interface DbCampaignFull extends DbCampaign {
@@ -290,12 +325,16 @@ export interface DbCampaignFull extends DbCampaign {
   ad_creatives: DbAdCreative[];
 }
 
-export async function getCampaigns(userId: string): Promise<DbCampaign[]> {
-  return fetchApi<DbCampaign[]>(`/campaigns?user_id=${userId}`);
+export async function getCampaigns(userId: string, organizationId?: string | null): Promise<DbCampaign[]> {
+  const params = new URLSearchParams({ user_id: userId });
+  if (organizationId) params.append('organization_id', organizationId);
+  return fetchApi<DbCampaign[]>(`/campaigns?${params}`);
 }
 
-export async function getCampaignById(id: string, userId: string): Promise<DbCampaignFull | null> {
-  return fetchApi<DbCampaignFull | null>(`/campaigns?id=${id}&user_id=${userId}&include_content=true`);
+export async function getCampaignById(id: string, userId: string, organizationId?: string | null): Promise<DbCampaignFull | null> {
+  const params = new URLSearchParams({ id, user_id: userId, include_content: 'true' });
+  if (organizationId) params.append('organization_id', organizationId);
+  return fetchApi<DbCampaignFull | null>(`/campaigns?${params}`);
 }
 
 export async function createCampaign(userId: string, data: {
@@ -305,6 +344,7 @@ export async function createCampaign(userId: string, data: {
   input_transcript?: string;
   generation_options?: Record<string, unknown>;
   status?: string;
+  organization_id?: string | null;
   video_clip_scripts?: Array<{
     title: string;
     hook: string;
@@ -346,6 +386,24 @@ export async function updateCampaign(id: string, data: Partial<DbCampaign>): Pro
 
 export async function deleteCampaign(id: string): Promise<void> {
   await fetchApi(`/campaigns?id=${id}`, { method: 'DELETE' });
+}
+
+// ============================================================================
+// Posts & Ad Creatives Updates
+// ============================================================================
+
+export async function updatePostImage(postId: string, imageUrl: string): Promise<DbPost> {
+  return fetchApi<DbPost>(`/posts?id=${postId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ image_url: imageUrl }),
+  });
+}
+
+export async function updateAdCreativeImage(adId: string, imageUrl: string): Promise<DbAdCreative> {
+  return fetchApi<DbAdCreative>(`/ad-creatives?id=${adId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ image_url: imageUrl }),
+  });
 }
 
 // ============================================================================
@@ -474,8 +532,10 @@ export interface TournamentData {
 /**
  * Get current week schedule and events
  */
-export async function getTournamentData(userId: string): Promise<TournamentData> {
-  return fetchApi<TournamentData>(`/tournaments?user_id=${userId}`);
+export async function getTournamentData(userId: string, organizationId?: string | null): Promise<TournamentData> {
+  const params = new URLSearchParams({ user_id: userId });
+  if (organizationId) params.append('organization_id', organizationId);
+  return fetchApi<TournamentData>(`/tournaments?${params}`);
 }
 
 /**
@@ -485,15 +545,19 @@ export interface WeekScheduleWithCount extends DbWeekSchedule {
   event_count: number;
 }
 
-export async function getWeekSchedulesList(userId: string): Promise<{ schedules: WeekScheduleWithCount[] }> {
-  return fetchApi<{ schedules: WeekScheduleWithCount[] }>(`/tournaments/list?user_id=${userId}`);
+export async function getWeekSchedulesList(userId: string, organizationId?: string | null): Promise<{ schedules: WeekScheduleWithCount[] }> {
+  const params = new URLSearchParams({ user_id: userId });
+  if (organizationId) params.append('organization_id', organizationId);
+  return fetchApi<{ schedules: WeekScheduleWithCount[] }>(`/tournaments/list?${params}`);
 }
 
 /**
  * Load events for a specific schedule
  */
-export async function getScheduleEvents(userId: string, scheduleId: string): Promise<{ events: DbTournamentEvent[] }> {
-  return fetchApi<{ events: DbTournamentEvent[] }>(`/tournaments?user_id=${userId}&week_schedule_id=${scheduleId}`);
+export async function getScheduleEvents(userId: string, scheduleId: string, organizationId?: string | null): Promise<{ events: DbTournamentEvent[] }> {
+  const params = new URLSearchParams({ user_id: userId, week_schedule_id: scheduleId });
+  if (organizationId) params.append('organization_id', organizationId);
+  return fetchApi<{ events: DbTournamentEvent[] }>(`/tournaments?${params}`);
 }
 
 /**
@@ -505,6 +569,7 @@ export async function createWeekSchedule(
     start_date: string;
     end_date: string;
     filename?: string;
+    organization_id?: string | null;
     events: Array<{
       day: string;
       name: string;
@@ -532,8 +597,10 @@ export async function createWeekSchedule(
 /**
  * Delete week schedule and its events
  */
-export async function deleteWeekSchedule(userId: string, scheduleId: string): Promise<void> {
-  await fetchApi(`/tournaments?id=${scheduleId}&user_id=${userId}`, { method: 'DELETE' });
+export async function deleteWeekSchedule(userId: string, scheduleId: string, organizationId?: string | null): Promise<void> {
+  const params = new URLSearchParams({ id: scheduleId, user_id: userId });
+  if (organizationId) params.append('organization_id', organizationId);
+  await fetchApi(`/tournaments?${params}`, { method: 'DELETE' });
 }
 
 // ============================================================================
@@ -683,215 +750,6 @@ export async function getGenerationJobs(
   }
 
   return response.json();
-}
-
-// ============================================================================
-// Organizations API
-// ============================================================================
-
-export interface DbOrganization {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  logo_url: string | null;
-  owner_id: string;
-  created_at: string;
-  member_status?: string;
-  role_name?: string;
-  permissions?: string[];
-  member_count?: number;
-}
-
-export interface DbOrganizationRole {
-  id: string;
-  organization_id: string;
-  name: string;
-  description: string | null;
-  is_system_role: boolean;
-  permissions: string[];
-  member_count?: number;
-}
-
-export interface DbOrganizationMember {
-  id: string;
-  user_id: string;
-  organization_id: string;
-  role_id: string;
-  status: string;
-  email: string;
-  name: string;
-  avatar_url: string | null;
-  role_name: string;
-  permissions: string[];
-  is_system_role: boolean;
-  invited_by_name: string | null;
-  invited_at: string;
-  joined_at: string | null;
-}
-
-export interface DbOrganizationInvite {
-  id: string;
-  organization_id: string;
-  email: string;
-  role_id: string;
-  token: string;
-  expires_at: string;
-  status: string;
-  invited_by: string;
-  created_at: string;
-  role_name?: string;
-  invited_by_name?: string;
-  organization_name?: string;
-  organization_logo?: string;
-}
-
-// Get organizations for user
-export async function getOrganizations(userId: string): Promise<DbOrganization[]> {
-  return fetchApi<DbOrganization[]>(`/organizations?user_id=${userId}`);
-}
-
-// Create organization
-export async function createOrganization(userId: string, data: {
-  name: string;
-  description?: string;
-  logo_url?: string;
-}): Promise<DbOrganization> {
-  return fetchApi<DbOrganization>('/organizations', {
-    method: 'POST',
-    body: JSON.stringify({ user_id: userId, ...data }),
-  });
-}
-
-// Update organization
-export async function updateOrganization(id: string, userId: string, data: {
-  name?: string;
-  description?: string;
-  logo_url?: string;
-}): Promise<DbOrganization> {
-  return fetchApi<DbOrganization>(`/organizations?id=${id}`, {
-    method: 'PUT',
-    body: JSON.stringify({ user_id: userId, ...data }),
-  });
-}
-
-// Delete organization
-export async function deleteOrganization(id: string, userId: string): Promise<{ success: boolean }> {
-  return fetchApi<{ success: boolean }>(`/organizations?id=${id}&user_id=${userId}`, {
-    method: 'DELETE',
-  });
-}
-
-// Get organization members
-export async function getOrganizationMembers(organizationId: string, userId: string): Promise<DbOrganizationMember[]> {
-  return fetchApi<DbOrganizationMember[]>(`/organizations/members?organization_id=${organizationId}&user_id=${userId}`);
-}
-
-// Update member role
-export async function updateOrganizationMember(id: string, data: {
-  user_id: string;
-  organization_id: string;
-  role_id?: string;
-  status?: string;
-}): Promise<DbOrganizationMember> {
-  return fetchApi<DbOrganizationMember>(`/organizations/members?id=${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  });
-}
-
-// Remove member
-export async function removeOrganizationMember(id: string, userId: string, organizationId: string): Promise<{ success: boolean }> {
-  return fetchApi<{ success: boolean }>(`/organizations/members?id=${id}&user_id=${userId}&organization_id=${organizationId}`, {
-    method: 'DELETE',
-  });
-}
-
-// Get organization roles
-export async function getOrganizationRoles(organizationId: string, userId: string): Promise<DbOrganizationRole[]> {
-  return fetchApi<DbOrganizationRole[]>(`/organizations/roles?organization_id=${organizationId}&user_id=${userId}`);
-}
-
-// Create role
-export async function createOrganizationRole(data: {
-  user_id: string;
-  organization_id: string;
-  name: string;
-  description?: string;
-  permissions: string[];
-}): Promise<DbOrganizationRole> {
-  return fetchApi<DbOrganizationRole>('/organizations/roles', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-}
-
-// Update role
-export async function updateOrganizationRole(id: string, data: {
-  user_id: string;
-  organization_id: string;
-  name?: string;
-  description?: string;
-  permissions?: string[];
-}): Promise<DbOrganizationRole> {
-  return fetchApi<DbOrganizationRole>(`/organizations/roles?id=${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  });
-}
-
-// Delete role
-export async function deleteOrganizationRole(id: string, userId: string, organizationId: string): Promise<{ success: boolean }> {
-  return fetchApi<{ success: boolean }>(`/organizations/roles?id=${id}&user_id=${userId}&organization_id=${organizationId}`, {
-    method: 'DELETE',
-  });
-}
-
-// Get organization invites
-export async function getOrganizationInvites(organizationId: string, userId: string): Promise<DbOrganizationInvite[]> {
-  return fetchApi<DbOrganizationInvite[]>(`/organizations/invites?organization_id=${organizationId}&user_id=${userId}`);
-}
-
-// Create invite
-export async function createOrganizationInvite(data: {
-  user_id: string;
-  organization_id: string;
-  email: string;
-  role_id: string;
-  expires_in_days?: number;
-}): Promise<DbOrganizationInvite> {
-  return fetchApi<DbOrganizationInvite>('/organizations/invites', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-}
-
-// Cancel invite
-export async function cancelOrganizationInvite(id: string, userId: string, organizationId: string): Promise<{ success: boolean }> {
-  return fetchApi<{ success: boolean }>(`/organizations/invites?id=${id}&user_id=${userId}&organization_id=${organizationId}`, {
-    method: 'DELETE',
-  });
-}
-
-// Get user's pending invites
-export async function getUserInvites(userId: string): Promise<DbOrganizationInvite[]> {
-  return fetchApi<DbOrganizationInvite[]>(`/user/invites?user_id=${userId}`);
-}
-
-// Accept invite
-export async function acceptOrganizationInvite(userId: string, token: string): Promise<{ success: boolean; organization: DbOrganization }> {
-  return fetchApi<{ success: boolean; organization: DbOrganization }>('/organizations/invites/accept', {
-    method: 'POST',
-    body: JSON.stringify({ user_id: userId, token }),
-  });
-}
-
-// Decline invite
-export async function declineOrganizationInvite(userId: string, token: string): Promise<{ success: boolean }> {
-  return fetchApi<{ success: boolean }>('/organizations/invites/decline', {
-    method: 'POST',
-    body: JSON.stringify({ user_id: userId, token }),
-  });
 }
 
 /**

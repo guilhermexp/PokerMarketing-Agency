@@ -10,7 +10,7 @@ import { generateFalVideo, uploadImageToFal } from '../../services/falService';
 import { ImagePreviewModal } from '../common/ImagePreviewModal';
 import { ExportVideoModal } from '../common/ExportVideoModal';
 import { concatenateVideos, downloadBlob, type ExportProgress, type VideoInput, type AudioInput } from '../../services/ffmpegService';
-import { uploadVideo } from '../../services/apiClient';
+import { uploadVideo, getVideoDisplayUrl } from '../../services/apiClient';
 import { useBackgroundJobs, type ActiveJob } from '../../hooks/useBackgroundJobs';
 import type { GenerationJobConfig } from '../../services/apiClient';
 
@@ -74,6 +74,7 @@ interface ClipsTabProps {
   onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
   onRemoveStyleReference?: (id: string) => void;
   userId?: string | null;
+  galleryImages?: GalleryImage[];
 }
 
 interface Scene {
@@ -114,6 +115,7 @@ interface EditableClip {
   trimStart: number;
   trimEnd: number;
   model?: string;
+  muted?: boolean;
 }
 
 interface AudioTrack {
@@ -142,6 +144,27 @@ const formatTime = (seconds: number): string => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
+const TIMELINE_PX_PER_SEC = 10;
+const MIN_CLIP_WIDTH = 80;
+const MIN_CLIP_DURATION = 0.5;
+
+const getClipDuration = (clip: EditableClip): number => {
+  return Math.max(0, clip.trimEnd - clip.trimStart);
+};
+
+const getClipWidth = (duration: number): number => {
+  return Math.max(MIN_CLIP_WIDTH, duration * TIMELINE_PX_PER_SEC);
+};
+
+const getTimelineOffset = (clips: EditableClip[], clipIndex: number): number => {
+  let offset = 0;
+  for (let i = 0; i < clipIndex; i++) {
+    const c = clips[i];
+    offset += getClipDuration(c);
+  }
+  return offset;
+};
+
 // --- Clip Card (Inline with Scenes) ---
 
 interface ClipCardProps {
@@ -149,19 +172,25 @@ interface ClipCardProps {
   brandProfile: BrandProfile;
   thumbnail: GalleryImage | null;
   onGenerateThumbnail: () => void;
+  onRegenerateThumbnail: () => void;
   isGeneratingThumbnail: boolean;
+  extraInstruction: string;
+  onExtraInstructionChange: (value: string) => void;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
   styleReferences?: StyleReference[];
   onAddStyleReference?: (ref: Omit<StyleReference, 'id' | 'createdAt'>) => void;
   onRemoveStyleReference?: (id: string) => void;
   triggerSceneImageGeneration?: number; // Increment to trigger auto-generation of scene images
+  onAddImageToGallery?: (image: Omit<GalleryImage, 'id'>) => GalleryImage;
+  galleryImages?: GalleryImage[];
 }
 
 const ClipCard: React.FC<ClipCardProps> = ({
-    clip, brandProfile, thumbnail, onGenerateThumbnail, isGeneratingThumbnail,
+    clip, brandProfile, thumbnail, onGenerateThumbnail, onRegenerateThumbnail, isGeneratingThumbnail,
+    extraInstruction, onExtraInstructionChange,
     onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference,
-    triggerSceneImageGeneration
+    triggerSceneImageGeneration, onAddImageToGallery, galleryImages
 }) => {
     const [scenes, setScenes] = useState<Scene[]>([]);
     const [videoStates, setVideoStates] = useState<Record<number, VideoState[]>>({}); // Multiple videos per scene
@@ -170,8 +199,9 @@ const ClipCard: React.FC<ClipCardProps> = ({
     const [sceneImages, setSceneImages] = useState<Record<number, SceneReferenceImage>>({});
     const [isGeneratingImages, setIsGeneratingImages] = useState(false);
     const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>('gemini-3-pro-image-preview');
-    const [selectedVideoModel, setSelectedVideoModel] = useState<VideoModel>('fal-ai/sora-2/text-to-video');
-    const [includeNarration, setIncludeNarration] = useState(true); // Generate audio with videos
+    const [selectedVideoModel, setSelectedVideoModel] = useState<VideoModel>('veo-3.1-fast-generate-preview');
+    const [includeNarration, setIncludeNarration] = useState(true); // Include narration in prompts
+    const [removeSilence, setRemoveSilence] = useState(true); // Trim silence between clips when exporting
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [editingThumbnail, setEditingThumbnail] = useState<GalleryImage | null>(null);
     const [audioState, setAudioState] = useState<{ url?: string; isLoading: boolean; error?: string | null }>({ isLoading: false });
@@ -189,6 +219,73 @@ const ClipCard: React.FC<ClipCardProps> = ({
     const [draggedClipId, setDraggedClipId] = useState<string | null>(null);
     const editorVideoRef = useRef<HTMLVideoElement>(null);
     const [showAddClipModal, setShowAddClipModal] = useState(false);
+    const editorStateRef = useRef<EditorState | null>(null);
+    const trimDragRef = useRef<{
+        clipId: string;
+        side: 'start' | 'end';
+        startX: number;
+        startTrimStart: number;
+        startTrimEnd: number;
+        pxPerSec: number;
+    } | null>(null);
+
+    useEffect(() => {
+        editorStateRef.current = editorState;
+    }, [editorState]);
+
+    useEffect(() => {
+        const handleMouseMove = (event: MouseEvent) => {
+            if (!trimDragRef.current) return;
+            const dragState = trimDragRef.current;
+            const deltaX = event.clientX - dragState.startX;
+            const deltaSeconds = deltaX / dragState.pxPerSec;
+
+            setEditorState(prev => {
+                if (!prev) return prev;
+                const clipIndex = prev.clips.findIndex(c => c.id === dragState.clipId);
+                if (clipIndex === -1) return prev;
+                const clip = prev.clips[clipIndex];
+                let newTrimStart = clip.trimStart;
+                let newTrimEnd = clip.trimEnd;
+
+                if (dragState.side === 'start') {
+                    newTrimStart = Math.min(
+                        Math.max(dragState.startTrimStart + deltaSeconds, 0),
+                        dragState.startTrimEnd - MIN_CLIP_DURATION
+                    );
+                } else {
+                    newTrimEnd = Math.max(
+                        Math.min(dragState.startTrimEnd + deltaSeconds, clip.originalDuration),
+                        dragState.startTrimStart + MIN_CLIP_DURATION
+                    );
+                }
+
+                const updatedClip = { ...clip, trimStart: newTrimStart, trimEnd: newTrimEnd };
+                const newClips = [...prev.clips];
+                newClips[clipIndex] = updatedClip;
+                const totalDuration = newClips.reduce((acc, c) => acc + getClipDuration(c), 0);
+                const currentTime = Math.min(prev.currentTime, totalDuration);
+                return {
+                    ...prev,
+                    clips: newClips,
+                    totalDuration,
+                    currentTime,
+                };
+            });
+        };
+
+        const handleMouseUp = () => {
+            trimDragRef.current = null;
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, []);
 
     // Auto-switch to video when merged video is ready
     useEffect(() => {
@@ -202,6 +299,23 @@ const ClipCard: React.FC<ClipCardProps> = ({
         setScenePreviewSlides(prev => ({ ...prev, [sceneNumber]: slide }));
     };
 
+    // Track if we've already initialized from gallery
+    const hasInitializedSceneImages = useRef(false);
+    const hasInitializedVideos = useRef(false);
+
+    // Helper: truncate title to fit DB VARCHAR(50) constraint
+    const getTruncatedTitle = () => clip.title.substring(0, 35);
+
+    // Helper to generate video source identifier (max 50 chars for DB VARCHAR(50))
+    const getVideoSource = (sceneNumber: number, _model: string) => {
+        return `Video-${getTruncatedTitle()}-${sceneNumber}`;
+    };
+
+    // Helper to generate scene image source identifier (max 50 chars for DB VARCHAR(50))
+    const getSceneSource = (sceneNumber: number) => {
+        return `Cena-${getTruncatedTitle()}-${sceneNumber}`;
+    };
+
     useEffect(() => {
         if (!clip.scenes) return;
         const parsedScenes = clip.scenes.map(s => ({
@@ -211,61 +325,182 @@ const ClipCard: React.FC<ClipCardProps> = ({
             duration: s.duration_seconds
         }));
         setScenes(parsedScenes);
-        // Initialize with empty arrays for each scene
+
+        // Initialize with empty arrays for each scene, then try to recover from gallery
         const initialVideoStates: Record<number, VideoState[]> = {};
         parsedScenes.forEach(scene => {
             initialVideoStates[scene.sceneNumber] = [];
         });
+
+        // Try to recover existing videos from gallery (only once on mount)
+        if (!hasInitializedVideos.current && galleryImages && galleryImages.length > 0) {
+            hasInitializedVideos.current = true;
+            const truncatedTitle = getTruncatedTitle();
+            console.log(`[ClipCard] Checking gallery for videos. Title: "${clip.title}", Truncated: "${truncatedTitle}"`);
+            console.log(`[ClipCard] Gallery sources:`, galleryImages.map(img => img.source));
+            parsedScenes.forEach(scene => {
+                // Look for videos that match this clip's scene (multiple formats for compatibility)
+                const newSource = `Video-${truncatedTitle}-${scene.sceneNumber}`;
+                const oldSourceFull = `Video-${clip.title}-${scene.sceneNumber}`;
+                const sceneVideos = galleryImages.filter(img =>
+                    img.source === newSource ||
+                    img.source === oldSourceFull ||
+                    img.source?.startsWith(`Video-${clip.title}-${scene.sceneNumber}-`) ||
+                    img.source?.startsWith(`Video-${truncatedTitle}-${scene.sceneNumber}-`)
+                );
+                if (sceneVideos.length > 0) {
+                    console.log(`[ClipCard] Recovered ${sceneVideos.length} videos for scene ${scene.sceneNumber}:`, sceneVideos.map(v => v.source));
+                    initialVideoStates[scene.sceneNumber] = sceneVideos.map(v => ({
+                        url: v.src,
+                        isLoading: false,
+                        model: v.model || 'unknown'
+                    }));
+                }
+            });
+        }
         setVideoStates(initialVideoStates);
-    }, [clip]);
+    }, [clip, galleryImages]);
+
+    // Separate effect to sync new videos from gallery (after initial load)
+    useEffect(() => {
+        if (!hasInitializedVideos.current || !galleryImages || galleryImages.length === 0 || scenes.length === 0) return;
+
+        const truncatedTitle = getTruncatedTitle();
+        let hasNewVideos = false;
+
+        scenes.forEach(scene => {
+            const newSource = `Video-${truncatedTitle}-${scene.sceneNumber}`;
+            const oldSourceFull = `Video-${clip.title}-${scene.sceneNumber}`;
+            const galleryVideos = galleryImages.filter(img =>
+                img.source === newSource ||
+                img.source === oldSourceFull ||
+                img.source?.startsWith(`Video-${clip.title}-${scene.sceneNumber}-`) ||
+                img.source?.startsWith(`Video-${truncatedTitle}-${scene.sceneNumber}-`)
+            );
+
+            const currentVideos = videoStates[scene.sceneNumber] || [];
+
+            // Check if there are videos in gallery that aren't in state
+            galleryVideos.forEach(gv => {
+                const alreadyInState = currentVideos.some(cv => cv.url === gv.src);
+                if (!alreadyInState) {
+                    hasNewVideos = true;
+                    console.log(`[ClipCard] Found new video in gallery for scene ${scene.sceneNumber}:`, gv.source);
+                    setVideoStates(prev => ({
+                        ...prev,
+                        [scene.sceneNumber]: [...(prev[scene.sceneNumber] || []), {
+                            url: gv.src,
+                            isLoading: false,
+                            model: gv.model || 'unknown'
+                        }]
+                    }));
+                }
+            });
+        });
+
+        if (hasNewVideos) {
+            console.log('[ClipCard] Synced new videos from gallery');
+        }
+    }, [galleryImages, scenes, clip.title, videoStates]);
+
+    // Initial scene images recovery
+    useEffect(() => {
+        if (scenes.length === 0 || !galleryImages || galleryImages.length === 0) return;
+
+        // Try to recover existing scene images from gallery (only once on mount)
+        if (!hasInitializedSceneImages.current) {
+            hasInitializedSceneImages.current = true;
+            const recoveredSceneImages: Record<number, SceneReferenceImage> = {};
+            scenes.forEach(scene => {
+                // Look for an image that matches this clip's scene (both new truncated and old full format)
+                const newSource = getSceneSource(scene.sceneNumber);
+                const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
+                const existingImage = galleryImages.find(img =>
+                    img.source === newSource || img.source === oldSource
+                );
+                if (existingImage) {
+                    recoveredSceneImages[scene.sceneNumber] = {
+                        dataUrl: existingImage.src,
+                        isUploading: false
+                    };
+                }
+            });
+            if (Object.keys(recoveredSceneImages).length > 0) {
+                console.log('[ClipCard] Recovered scene images:', Object.keys(recoveredSceneImages));
+                setSceneImages(recoveredSceneImages);
+            }
+        }
+    }, [scenes, galleryImages, clip.title]);
 
     // Track trigger changes and auto-generate scene images
-    const prevTriggerRef = useRef(triggerSceneImageGeneration);
+    // Initialize to 0 to prevent initial trigger (0 !== undefined would trigger)
+    const prevTriggerRef = useRef<number>(0);
     useEffect(() => {
+        // Only trigger when value INCREASES (not just changes from undefined to 0)
         if (
             triggerSceneImageGeneration !== undefined &&
-            triggerSceneImageGeneration !== prevTriggerRef.current &&
+            triggerSceneImageGeneration > prevTriggerRef.current &&
             thumbnail &&
             scenes.length > 0 &&
             !isGeneratingImages
         ) {
             prevTriggerRef.current = triggerSceneImageGeneration;
-            // Auto-trigger scene image generation
-            handleGenerateSceneImages();
-        }
-    }, [triggerSceneImageGeneration, thumbnail, scenes.length, isGeneratingImages]);
 
-    // Build prompt for Sora (includes narration for context, even though no audio)
+            // Check if all scenes already have images (either in state or in gallery)
+            const allScenesHaveImages = scenes.every(scene => {
+                // Check state first
+                if (sceneImages[scene.sceneNumber]?.dataUrl) return true;
+                // Then check gallery (both new truncated and old full format)
+                if (galleryImages && galleryImages.length > 0) {
+                    const newSource = getSceneSource(scene.sceneNumber);
+                    const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
+                    return galleryImages.some(img => img.source === newSource || img.source === oldSource);
+                }
+                return false;
+            });
+
+            // Only trigger generation if there are scenes without images
+            if (!allScenesHaveImages) {
+                handleGenerateSceneImages();
+            }
+        }
+    }, [triggerSceneImageGeneration, thumbnail, scenes.length, isGeneratingImages, sceneImages, galleryImages, clip.title]);
+
+    // Build prompt for Sora (optionally includes narration context)
     const buildPromptForSora = useCallback((sceneNumber: number): string => {
         const currentScene = scenes.find(s => s.sceneNumber === sceneNumber);
         if (!currentScene) return '';
 
-        // Sora: Include narration context for better visual storytelling
+        const narrationBlock = includeNarration
+            ? `\n\nCONTEXTO DA NARRAÇÃO: "${currentScene.narration}"`
+            : '';
+
         return `Cena de vídeo promocional de poker:
 
 VISUAL: ${currentScene.visual}
-
-CONTEXTO DA NARRAÇÃO: "${currentScene.narration}"
+${narrationBlock}
 
 Estilo: ${brandProfile.toneOfVoice}, cinematográfico, cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.
 Movimento de câmera suave, iluminação dramática de cassino. Criar visual que combine com o contexto da narração.`;
-    }, [scenes, brandProfile]);
+    }, [scenes, brandProfile, includeNarration]);
 
-    // Build prompt for Veo 3.1 (visual + narration for audio generation)
+    // Build prompt for Veo 3.1 (visual + optional narration)
     const buildPromptForVeo = useCallback((sceneNumber: number): string => {
         const currentScene = scenes.find(s => s.sceneNumber === sceneNumber);
         if (!currentScene) return '';
 
-        // Veo 3.1: Inclui narração para gerar áudio/voz
+        const narrationBlock = includeNarration
+            ? `\n\nNARRAÇÃO (falar em português brasileiro, voz empolgante e profissional): "${currentScene.narration}"`
+            : '';
+
         return `Cena de vídeo promocional de poker:
 
 VISUAL: ${currentScene.visual}
-
-NARRAÇÃO (falar em português brasileiro, voz empolgante e profissional): "${currentScene.narration}"
+${narrationBlock}
 
 Estilo: ${brandProfile.toneOfVoice}, cinematográfico, cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.
 Movimento de câmera suave, iluminação dramática de cassino.`;
-    }, [scenes, brandProfile]);
+    }, [scenes, brandProfile, includeNarration]);
 
     const handleShowPrompt = (sceneNumber: number) => {
         // Show Veo prompt by default (more complete)
@@ -350,40 +585,30 @@ Movimento de câmera suave, iluminação dramática de cassino.`;
                 [sceneNumber]: (videoStates[sceneNumber]?.length || 0) // Will be the last index
             }));
             setIsGeneratingVideo(prev => ({ ...prev, [sceneNumber]: false }));
+
+            // Save video to gallery for persistence
+            // Note: Use 'gemini-3-pro-image-preview' as model since DB enum doesn't support video models
+            if (onAddImageToGallery) {
+                const videoSource = getVideoSource(sceneNumber, modelUsed);
+                console.log('[ClipCard] Saving video to gallery with source:', videoSource, 'model:', modelUsed);
+                onAddImageToGallery({
+                    src: videoUrl,
+                    prompt: `[VIDEO:${modelUsed}] ${currentScene.visual}`,
+                    source: videoSource as any,
+                    model: 'gemini-3-pro-image-preview' // Fallback - DB enum doesn't support video models
+                });
+            }
+
             return usedFallback;
         } catch (err: any) {
             setIsGeneratingVideo(prev => ({ ...prev, [sceneNumber]: false }));
             return usedFallback;
         }
-    }, [scenes, brandProfile, buildPromptForSora, buildPromptForVeo, selectedVideoModel, sceneImages]);
+    }, [scenes, brandProfile, buildPromptForSora, buildPromptForVeo, selectedVideoModel, sceneImages, onAddImageToGallery, clip.title]);
 
     const handleGenerateAllVideos = async () => {
         setIsGeneratingAll(true);
         let useFallback = false; // Track if we should skip Gemini for remaining scenes
-
-        // Generate audio first if narration is enabled and not already generated
-        if (includeNarration && !audioState.url && clip.audio_script) {
-            console.log('[ClipsTab] Generating narration audio first...');
-            setAudioState({ isLoading: true, error: null });
-            try {
-                const narrationRegex = /narra[çc][ãa]o:\s*(.*?)(?=\s*\[|narra[çc][ãa]o:|$)/gi;
-                let match;
-                const narrations: string[] = [];
-                while ((match = narrationRegex.exec(clip.audio_script)) !== null) {
-                    if (match[1]) narrations.push(match[1].trim());
-                }
-                let narrationOnlyScript = narrations.join(' ');
-                if (!narrationOnlyScript) narrationOnlyScript = clip.audio_script;
-                const base64Audio = await generateSpeech(narrationOnlyScript);
-                const pcmData = decode(base64Audio);
-                const wavUrl = pcmToWavDataUrl(pcmData);
-                setAudioState({ url: wavUrl, isLoading: false });
-                console.log('[ClipsTab] Narration audio generated successfully');
-            } catch (err: any) {
-                console.error('[ClipsTab] Failed to generate narration:', err);
-                setAudioState({ isLoading: false, error: err.message || 'Falha ao gerar áudio.' });
-            }
-        }
 
         for (const scene of scenes) {
             // Only generate if scene has no videos yet
@@ -442,8 +667,26 @@ Movimento de câmera suave, iluminação dramática de cassino.`;
 
         // Generate image for each scene sequentially
         for (const scene of scenes) {
-            // Skip if scene already has an image
+            // Skip if scene already has an image in state
             if (sceneImages[scene.sceneNumber]?.dataUrl) continue;
+
+            // Skip if scene already has an image in gallery (both new truncated and old full format)
+            if (galleryImages && galleryImages.length > 0) {
+                const newSource = getSceneSource(scene.sceneNumber);
+                const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
+                const existingInGallery = galleryImages.find(img => img.source === newSource || img.source === oldSource);
+                if (existingInGallery) {
+                    // Recover from gallery instead of generating
+                    setSceneImages(prev => ({
+                        ...prev,
+                        [scene.sceneNumber]: {
+                            dataUrl: existingInGallery.src,
+                            isUploading: false
+                        }
+                    }));
+                    continue;
+                }
+            }
 
             try {
                 // Mark as loading
@@ -480,6 +723,16 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                         isUploading: false
                     }
                 }));
+
+                // Save to gallery for persistence
+                if (onAddImageToGallery) {
+                    onAddImageToGallery({
+                        src: imageDataUrl,
+                        prompt: scene.visual,
+                        source: getSceneSource(scene.sceneNumber),
+                        model: 'gemini-3-pro-image-preview'
+                    });
+                }
 
             } catch (err: any) {
                 console.error(`Error generating image for scene ${scene.sceneNumber}:`, err);
@@ -537,6 +790,16 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 ...prev,
                 [sceneNumber]: { dataUrl: imageDataUrl, httpUrl, isUploading: false }
             }));
+
+            // Save to gallery for persistence
+            if (onAddImageToGallery) {
+                onAddImageToGallery({
+                    src: imageDataUrl,
+                    prompt: scene.visual,
+                    source: getSceneSource(sceneNumber),
+                    model: 'gemini-3-pro-image-preview'
+                });
+            }
         } catch (err: any) {
             setSceneImages(prev => ({
                 ...prev,
@@ -549,20 +812,11 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         if (!clip.audio_script) return;
         setAudioState({ isLoading: true, error: null });
         try {
-            const narrationRegex = /narra[çc][ãa]o:\s*(.*?)(?=\s*\[|narra[çc][ãa]o:|$)/gi;
-            let match;
-            const narrations: string[] = [];
-            while ((match = narrationRegex.exec(clip.audio_script)) !== null) {
-                if (match[1]) narrations.push(match[1].trim());
-            }
-            let narrationOnlyScript = narrations.join(' ');
-            if (!narrationOnlyScript.trim()) {
-                narrationOnlyScript = clip.audio_script.replace(/\[.*?\]/g, '').trim();
-            }
-            if (!narrationOnlyScript) {
+            const sceneNarration = scenes.map(scene => scene.narration).filter(Boolean).join(' ').trim();
+            if (!sceneNarration) {
                 throw new Error("O roteiro de áudio está vazio ou em formato inválido.");
             }
-            const base64Audio = await generateSpeech(narrationOnlyScript);
+            const base64Audio = await generateSpeech(sceneNarration);
             const pcmData = decode(base64Audio);
             const wavUrl = pcmToWavDataUrl(pcmData);
             setAudioState({ url: wavUrl, isLoading: false });
@@ -615,6 +869,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             const outputBlob = await concatenateVideos(generatedVideos, {
                 outputFormat: 'mp4',
                 onProgress: setExportProgress,
+                removeSilence,
             });
 
             const timestamp = new Date().toISOString().slice(0, 10);
@@ -669,6 +924,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             const outputBlob = await concatenateVideos(generatedVideos, {
                 outputFormat: 'mp4',
                 onProgress: setExportProgress,
+                removeSilence,
             });
 
             // Revoke old URL if exists
@@ -753,10 +1009,11 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             trimStart: 0,
             trimEnd: duration,
             model: video.model,
+            muted: false,
         };
 
         const newClips = [...editorState.clips, newClip];
-        const totalDuration = newClips.reduce((acc, c) => acc + (c.trimEnd - c.trimStart), 0);
+        const totalDuration = newClips.reduce((acc, c) => acc + getClipDuration(c), 0);
 
         setEditorState({
             ...editorState,
@@ -778,9 +1035,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         const videoInputs: VideoInput[] = editorState.clips.map((clip, idx) => ({
             url: clip.videoUrl,
             sceneNumber: idx + 1, // Use index for ordering
-            duration: clip.trimEnd - clip.trimStart,
+            duration: getClipDuration(clip),
             trimStart: clip.trimStart,
             trimEnd: clip.trimEnd,
+            mute: clip.muted,
         }));
 
         // Clear merged video if exists
@@ -809,6 +1067,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 outputFormat: 'mp4',
                 onProgress: setExportProgress,
                 audioTrack,
+                removeSilence,
             });
 
             const previewUrl = URL.createObjectURL(outputBlob);
@@ -817,7 +1076,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             // Upload to Vercel Blob and save to gallery
             setExportProgress({ phase: 'finalizing', progress: 95, message: 'Salvando na galeria...' });
             try {
-                const totalDuration = editorState.clips.reduce((acc, c) => acc + (c.trimEnd - c.trimStart), 0);
+                const totalDuration = editorState.clips.reduce((acc, c) => acc + getClipDuration(c), 0);
                 const videoUrl = await uploadVideo(outputBlob, `video-final-${Date.now()}.mp4`);
 
                 // Add to gallery as a video
@@ -854,11 +1113,13 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
     const updateEditorClips = (newClips: EditableClip[]) => {
         if (!editorState) return;
-        const totalDuration = newClips.reduce((acc, c) => acc + (c.trimEnd - c.trimStart), 0);
+        const totalDuration = newClips.reduce((acc, c) => acc + getClipDuration(c), 0);
+        const currentTime = Math.min(editorState.currentTime, totalDuration);
         setEditorState({
             ...editorState,
             clips: newClips,
             totalDuration,
+            currentTime,
         });
     };
 
@@ -897,18 +1158,15 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         // Find clip and set video to that time
         const clipIndex = editorState.clips.findIndex(c => c.id === clipId);
         if (clipIndex !== -1) {
-            let timeOffset = 0;
-            for (let i = 0; i < clipIndex; i++) {
-                const c = editorState.clips[i];
-                timeOffset += c.trimEnd - c.trimStart;
-            }
+            const timeOffset = getTimelineOffset(editorState.clips, clipIndex);
             setEditorState(prev => prev ? { ...prev, currentTime: timeOffset } : null);
 
             // Load that clip's video in the preview
             const clip = editorState.clips[clipIndex];
             if (editorVideoRef.current && clip) {
-                editorVideoRef.current.src = clip.videoUrl;
+                editorVideoRef.current.src = getVideoDisplayUrl(clip.videoUrl);
                 editorVideoRef.current.currentTime = clip.trimStart;
+                editorVideoRef.current.muted = !!clip.muted;
             }
         }
     };
@@ -920,10 +1178,34 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
         if (editorState.isPlaying) {
             video.pause();
-        } else {
-            video.play();
+            setEditorState(prev => prev ? { ...prev, isPlaying: false } : null);
+            return;
         }
-        setEditorState(prev => prev ? { ...prev, isPlaying: !prev.isPlaying } : null);
+
+        if (editorState.clips.length === 0) return;
+        let activeClipId = editorState.selectedClipId;
+        let activeIndex = activeClipId
+            ? editorState.clips.findIndex(c => c.id === activeClipId)
+            : 0;
+        if (activeIndex < 0) activeIndex = 0;
+
+        const activeClip = editorState.clips[activeIndex];
+        const clipOffset = getTimelineOffset(editorState.clips, activeIndex);
+        const clipDuration = getClipDuration(activeClip);
+        let localTime = editorState.currentTime - clipOffset;
+        if (localTime < 0 || localTime > clipDuration) {
+            localTime = 0;
+        }
+
+        const displayUrl = getVideoDisplayUrl(activeClip.videoUrl);
+        if (video.src !== displayUrl) {
+            video.src = displayUrl;
+        }
+        const safeTrimEnd = Math.max(activeClip.trimStart, activeClip.trimEnd - 0.05);
+        video.currentTime = Math.min(safeTrimEnd, activeClip.trimStart + localTime);
+        video.muted = !!activeClip.muted;
+        void video.play();
+        setEditorState(prev => prev ? { ...prev, isPlaying: true, selectedClipId: activeClip.id } : null);
     };
 
     const handleDeleteClip = (clipId: string) => {
@@ -934,6 +1216,84 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             setEditorState(prev => prev ? { ...prev, selectedClipId: null } : null);
         }
     };
+
+    const handleToggleClipMute = (clipId: string) => {
+        if (!editorState) return;
+        setEditorState(prev => {
+            if (!prev) return prev;
+            const clipIndex = prev.clips.findIndex(c => c.id === clipId);
+            if (clipIndex === -1) return prev;
+            const clip = prev.clips[clipIndex];
+            const updatedClip = { ...clip, muted: !clip.muted };
+            const newClips = [...prev.clips];
+            newClips[clipIndex] = updatedClip;
+            return { ...prev, clips: newClips };
+        });
+    };
+
+    const handleStartTrim = (event: React.MouseEvent, clipId: string, side: 'start' | 'end') => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!editorState) return;
+        const clip = editorState.clips.find(c => c.id === clipId);
+        if (!clip) return;
+        const duration = getClipDuration(clip);
+        const pxPerSec = getClipWidth(duration) / Math.max(duration, 0.01);
+        trimDragRef.current = {
+            clipId,
+            side,
+            startX: event.clientX,
+            startTrimStart: clip.trimStart,
+            startTrimEnd: clip.trimEnd,
+            pxPerSec,
+        };
+        setEditorState(prev => prev ? { ...prev, selectedClipId: clipId } : null);
+    };
+
+    useEffect(() => {
+        const video = editorVideoRef.current;
+        if (!video) return;
+
+        const handleTimeUpdate = () => {
+            const state = editorStateRef.current;
+            if (!state || state.clips.length === 0) return;
+            const activeIndex = state.selectedClipId
+                ? state.clips.findIndex(c => c.id === state.selectedClipId)
+                : 0;
+            if (activeIndex < 0) return;
+            const activeClip = state.clips[activeIndex];
+            const clipOffset = getTimelineOffset(state.clips, activeIndex);
+            const localTime = Math.max(0, video.currentTime - activeClip.trimStart);
+            const timelineTime = clipOffset + localTime;
+
+            setEditorState(prev => {
+                if (!prev) return prev;
+                return { ...prev, currentTime: Math.min(timelineTime, prev.totalDuration) };
+            });
+
+            if (video.currentTime >= activeClip.trimEnd - 0.05) {
+                const nextIndex = activeIndex + 1;
+                if (nextIndex < state.clips.length) {
+                    const nextClip = state.clips[nextIndex];
+                    video.src = getVideoDisplayUrl(nextClip.videoUrl);
+                    video.currentTime = nextClip.trimStart;
+                    video.muted = !!nextClip.muted;
+                    if (state.isPlaying) {
+                        void video.play();
+                    }
+                    setEditorState(prev => prev ? { ...prev, selectedClipId: nextClip.id } : null);
+                } else {
+                    video.pause();
+                    setEditorState(prev => prev ? { ...prev, isPlaying: false, currentTime: prev.totalDuration } : null);
+                }
+            }
+        };
+
+        video.addEventListener('timeupdate', handleTimeUpdate);
+        return () => {
+            video.removeEventListener('timeupdate', handleTimeUpdate);
+        };
+    }, []);
 
     // --- Audio Track Functions ---
 
@@ -1027,6 +1387,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     const generatedImagesCount = Object.values(sceneImages).filter(img => img.dataUrl).length;
     const hasAllImages = generatedImagesCount === scenes.length && scenes.length > 0;
     const totalDuration = scenes.reduce((acc, s) => acc + s.duration, 0);
+    const selectedEditorClip = editorState?.clips.find(c => c.id === editorState.selectedClipId) || editorState?.clips[0];
 
     return (
         <>
@@ -1034,12 +1395,12 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 {/* Header */}
                 <div className="px-5 py-4 border-b border-white/5 bg-[#0d0d0d] flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                             <Icon name="play" className="w-4 h-4 text-primary" />
                         </div>
                         <div>
                             <h3 className="text-sm font-black text-white uppercase tracking-wide">{clip.title}</h3>
-                            <p className="text-[10px] text-white/40">{scenes.length} cenas • {totalDuration}s • {clip.hook}</p>
+                            <p className="text-[10px] text-white/40">{scenes.length} cenas • {totalDuration}s • <span className="text-white/50 italic">"{clip.hook}"</span></p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -1072,10 +1433,23 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                     ? 'bg-green-500/10 border-green-500/30 text-green-400'
                                     : 'bg-[#080808] border-white/10 text-white/40 hover:text-white/60'
                             }`}
-                            title={includeNarration ? 'Narração será gerada junto com os vídeos' : 'Vídeos sem narração'}
+                            title={includeNarration ? 'Incluir narração no prompt' : 'Gerar vídeos sem narração no prompt'}
                         >
                             <Icon name={includeNarration ? 'mic' : 'mic-off'} className="w-3 h-3" />
-                            <span className="uppercase tracking-wide">{includeNarration ? 'Com Voz' : 'Sem Voz'}</span>
+                            <span className="uppercase tracking-wide">{includeNarration ? 'Com Narração' : 'Sem Narração'}</span>
+                        </button>
+                        {/* Remove Silence Toggle */}
+                        <button
+                            onClick={() => setRemoveSilence(!removeSilence)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all text-[9px] font-bold ${
+                                removeSilence
+                                    ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                                    : 'bg-[#080808] border-white/10 text-white/40 hover:text-white/60'
+                            }`}
+                            title={removeSilence ? 'Remover silencios entre clips ao juntar/exportar' : 'Manter silencios originais'}
+                        >
+                            <Icon name="audio" className="w-3 h-3" />
+                            <span className="uppercase tracking-wide">{removeSilence ? 'Sem Silencio' : 'Com Silencio'}</span>
                         </button>
                         {/* Action Buttons */}
                         <Button
@@ -1183,9 +1557,11 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                     {editorState.clips.length > 0 && (
                                         <video
                                             ref={editorVideoRef}
-                                            src={editorState.clips[0]?.videoUrl}
+                                            src={selectedEditorClip?.videoUrl ? getVideoDisplayUrl(selectedEditorClip.videoUrl) : undefined}
                                             className="w-full h-full object-cover"
                                             controls
+                                            crossOrigin="anonymous"
+                                            muted={!!selectedEditorClip?.muted}
                                             onPlay={() => setEditorState(prev => prev ? { ...prev, isPlaying: true } : null)}
                                             onPause={() => setEditorState(prev => prev ? { ...prev, isPlaying: false } : null)}
                                         />
@@ -1228,7 +1604,8 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                         <div className="flex relative border-2 border-white/20 rounded-lg overflow-hidden">
                                             {editorState.clips.map((clip, idx) => {
                                                 const isSelected = editorState.selectedClipId === clip.id;
-                                                const clipWidth = Math.max(80, (clip.trimEnd - clip.trimStart) * 10);
+                                                const clipDuration = getClipDuration(clip);
+                                                const clipWidth = getClipWidth(clipDuration);
 
                                                 return (
                                                     <div
@@ -1240,23 +1617,30 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                                         onClick={() => handleSelectClip(clip.id)}
                                                         className={`relative h-16 cursor-move transition-all ${
                                                             isSelected ? 'ring-2 ring-white z-10' : ''
-                                                        } ${draggedClipId === clip.id ? 'opacity-50' : ''}`}
+                                                        } ${draggedClipId === clip.id ? 'opacity-50' : ''} ${clip.muted ? 'opacity-80' : ''}`}
                                                         style={{ width: `${clipWidth}px` }}
                                                     >
                                                         {/* Video thumbnail */}
                                                         <video
-                                                            src={clip.videoUrl}
+                                                            src={getVideoDisplayUrl(clip.videoUrl)}
                                                             className="w-full h-full object-cover pointer-events-none"
+                                                            crossOrigin="anonymous"
                                                             muted
                                                         />
 
                                                         {/* Trim Handles - Only show on selected clip */}
                                                         {isSelected && (
                                                             <>
-                                                                <div className="absolute left-0 top-0 bottom-0 w-2 bg-white cursor-ew-resize flex items-center justify-center hover:bg-white/90">
+                                                                <div
+                                                                    className="absolute left-0 top-0 bottom-0 w-2 bg-white cursor-ew-resize flex items-center justify-center hover:bg-white/90"
+                                                                    onMouseDown={(e) => handleStartTrim(e, clip.id, 'start')}
+                                                                >
                                                                     <div className="w-0.5 h-6 bg-black/30 rounded-full" />
                                                                 </div>
-                                                                <div className="absolute right-0 top-0 bottom-0 w-2 bg-white cursor-ew-resize flex items-center justify-center hover:bg-white/90">
+                                                                <div
+                                                                    className="absolute right-0 top-0 bottom-0 w-2 bg-white cursor-ew-resize flex items-center justify-center hover:bg-white/90"
+                                                                    onMouseDown={(e) => handleStartTrim(e, clip.id, 'end')}
+                                                                >
                                                                     <div className="w-0.5 h-6 bg-black/30 rounded-full" />
                                                                 </div>
                                                             </>
@@ -1270,7 +1654,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                                         {/* Duration badge */}
                                                         <div className="absolute bottom-1 left-1/2 -translate-x-1/2">
                                                             <span className="text-[8px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
-                                                                {Math.round(clip.trimEnd - clip.trimStart)}s
+                                                                {Math.round(clipDuration)}s
                                                             </span>
                                                         </div>
 
@@ -1281,6 +1665,23 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                                                     {getModelShortName(clip.model)}
                                                                 </span>
                                                             </div>
+                                                        )}
+
+                                                        {/* Mute toggle */}
+                                                        {isSelected && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleToggleClipMute(clip.id);
+                                                                }}
+                                                                className={`absolute top-1 left-2 rounded-full px-1.5 py-1 text-[6px] font-bold flex items-center gap-1 ${
+                                                                    clip.muted ? 'bg-red-500/80 text-white' : 'bg-black/60 text-white/80'
+                                                                }`}
+                                                                title={clip.muted ? 'Clip sem audio' : 'Mutar clip'}
+                                                            >
+                                                                <Icon name={clip.muted ? 'mic-off' : 'audio'} className="w-3 h-3" />
+                                                                {clip.muted ? 'MUDO' : 'AUDIO'}
+                                                            </button>
                                                         )}
                                                     </div>
                                                 );
@@ -1443,8 +1844,8 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                     /* Normal View */
                     <div className="flex flex-col lg:flex-row">
                     {/* Preview Carousel - Thumbnail / Merged Video */}
-                    <div className="lg:w-64 flex-shrink-0 p-4 bg-[#0d0d0d] border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col justify-center">
-                        <div className="aspect-[9/16] bg-[#080808] rounded-xl overflow-hidden relative border border-white/5">
+                    <div className="flex-shrink-0 p-4 bg-[#0d0d0d] border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col">
+                        <div className="w-64 aspect-[9/16] bg-[#080808] rounded-xl overflow-hidden relative border border-white/5">
                             {/* Merged Video Slide */}
                             {previewSlide === 'video' && (mergedVideoUrl || isMerging) && (
                                 <>
@@ -1470,8 +1871,9 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                         </div>
                                     ) : mergedVideoUrl ? (
                                         <video
-                                            src={mergedVideoUrl}
+                                            src={getVideoDisplayUrl(mergedVideoUrl)}
                                             controls
+                                            crossOrigin="anonymous"
                                             className="w-full h-full object-cover"
                                             autoPlay
                                         />
@@ -1560,6 +1962,28 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                 Gerar Capa
                             </Button>
                         )}
+                        {clip.image_prompt && (
+                            <div className="mt-3">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        value={extraInstruction}
+                                        onChange={(e) => onExtraInstructionChange(e.target.value)}
+                                        placeholder="Instrucao extra (opcional)"
+                                        className="flex-1 bg-[#080808] border border-white/10 rounded-lg px-2 py-1.5 text-[9px] text-white/70 focus:border-primary/50 outline-none transition-all"
+                                    />
+                                    <button
+                                        onClick={onRegenerateThumbnail}
+                                        disabled={isGeneratingThumbnail}
+                                        className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                                        title="Regenerar capa com instrucao extra"
+                                    >
+                                        <Icon name="refresh" className="w-3 h-3" />
+                                    </button>
+                                </div>
+                                <p className="text-[8px] text-white/30 mt-1">Adiciona texto ao prompt da capa e regenera.</p>
+                            </div>
+                        )}
 
                         {/* Audio */}
                         <div className="mt-4 pt-4 border-t border-white/5">
@@ -1591,18 +2015,18 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                         const container = document.getElementById(`scenes-carousel-${clip.title}`);
                                         if (container) container.scrollBy({ left: -280, behavior: 'smooth' });
                                     }}
-                                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/80 hover:bg-primary/20 border border-white/10 flex items-center justify-center text-white/70 hover:text-primary transition-all shadow-lg"
+                                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-xl bg-black/80 hover:bg-primary/20 border border-white/10 hover:border-primary/20 flex items-center justify-center text-white/50 hover:text-primary transition-all shadow-lg"
                                 >
-                                    <Icon name="chevron-left" className="w-5 h-5" />
+                                    <Icon name="chevron-left" className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={() => {
                                         const container = document.getElementById(`scenes-carousel-${clip.title}`);
                                         if (container) container.scrollBy({ left: 280, behavior: 'smooth' });
                                     }}
-                                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/80 hover:bg-primary/20 border border-white/10 flex items-center justify-center text-white/70 hover:text-primary transition-all shadow-lg"
+                                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-xl bg-black/80 hover:bg-primary/20 border border-white/10 hover:border-primary/20 flex items-center justify-center text-white/50 hover:text-primary transition-all shadow-lg"
                                 >
-                                    <Icon name="chevron-right" className="w-5 h-5" />
+                                    <Icon name="chevron-right" className="w-4 h-4" />
                                 </button>
                             </>
                         )}
@@ -1638,9 +2062,9 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                 };
 
                                 return (
-                                <div key={scene.sceneNumber} className={`bg-[#0a0a0a] rounded-xl border overflow-hidden flex flex-col flex-shrink-0 w-64 ${hasVideo ? 'border-blue-500/30' : hasImage ? 'border-green-500/30' : 'border-white/5'}`}>
+                                <div key={scene.sceneNumber} className={`bg-[#0a0a0a] rounded-xl border overflow-hidden flex flex-col flex-shrink-0 w-64 ${hasVideo ? 'border-blue-500/20' : hasImage ? 'border-green-500/20' : 'border-white/5'}`}>
                                     {/* Scene Preview - Carousel */}
-                                    <div className="aspect-[9/16] bg-[#080808] relative">
+                                    <div className="aspect-[9/16] bg-black relative">
                                         {/* Loading States */}
                                         {isLoadingVideo ? (
                                             <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -1657,10 +2081,14 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                                 {/* Video Slide */}
                                                 {currentSlide === 'video' && hasVideo && currentVideo?.url && (
                                                     <>
+                                                        {console.log('[ClipsTab] Video display URL:', getVideoDisplayUrl(currentVideo.url), 'Original:', currentVideo.url)}
                                                         <video
-                                                            src={currentVideo.url}
+                                                            src={getVideoDisplayUrl(currentVideo.url)}
                                                             controls
+                                                            crossOrigin="anonymous"
                                                             className="w-full h-full object-cover"
+                                                            onError={(e) => console.error('[ClipsTab] Video load error:', e, 'src:', (e.target as HTMLVideoElement).src)}
+                                                            onLoadedData={() => console.log('[ClipsTab] Video loaded successfully')}
                                                         />
                                                         {/* Model tag */}
                                                         {currentVideo.model && (
@@ -1783,19 +2211,19 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                         {/* Badge */}
                                         <div className="absolute top-1.5 left-1.5 right-1.5 flex justify-between items-center pointer-events-none">
                                             <div className="flex items-center gap-1">
-                                                <span className="text-[7px] font-black bg-primary/90 text-black px-1.5 py-0.5 rounded-full">
+                                                <span className="text-[7px] font-black bg-primary text-black px-1.5 py-0.5 rounded-md">
                                                     {scene.sceneNumber}
                                                 </span>
                                                 {hasImage && !hasVideo && (
-                                                    <span className="text-[6px] font-bold bg-green-500/80 text-white px-1 py-0.5 rounded-full">IMG</span>
+                                                    <span className="text-[6px] font-bold bg-green-500/80 text-white px-1 py-0.5 rounded-md">IMG</span>
                                                 )}
                                                 {hasVideo && !hasImage && (
-                                                    <span className="text-[6px] font-bold bg-blue-500/80 text-white px-1 py-0.5 rounded-full">
+                                                    <span className="text-[6px] font-bold bg-blue-500/80 text-white px-1 py-0.5 rounded-md">
                                                         VID{hasMultipleVideos ? ` (${videosWithUrl.length})` : ''}
                                                     </span>
                                                 )}
                                                 {showCarousel && (
-                                                    <span className={`text-[6px] font-bold px-1 py-0.5 rounded-full ${currentSlide === 'video' ? 'bg-blue-500/80 text-white' : 'bg-green-500/80 text-white'}`}>
+                                                    <span className={`text-[6px] font-bold px-1 py-0.5 rounded-md ${currentSlide === 'video' ? 'bg-blue-500/80 text-white' : 'bg-green-500/80 text-white'}`}>
                                                         {currentSlide === 'video' ? `VID${hasMultipleVideos ? ` ${currentVideoIdx + 1}/${videosWithUrl.length}` : ''}` : 'IMG'}
                                                     </span>
                                                 )}
@@ -1803,12 +2231,12 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                             <div className="flex items-center gap-1 pointer-events-auto">
                                                 <button
                                                     onClick={() => handleShowPrompt(scene.sceneNumber)}
-                                                    className="w-5 h-5 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white/40 hover:text-white hover:bg-black/70 transition-colors"
+                                                    className="w-5 h-5 rounded-md bg-black/50 backdrop-blur-sm flex items-center justify-center text-white/40 hover:text-white hover:bg-black/70 transition-colors"
                                                     title="Ver prompt"
                                                 >
                                                     <Icon name="eye" className="w-2.5 h-2.5" />
                                                 </button>
-                                                <span className="text-[7px] font-bold text-white/60 bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
+                                                <span className="text-[7px] font-bold text-white/70 bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded-md">
                                                     {scene.duration}s
                                                 </span>
                                             </div>
@@ -1816,25 +2244,27 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                     </div>
 
                                     {/* Scene Action */}
-                                    <div className="p-2">
-                                        <p className="text-[8px] text-white/40 line-clamp-2 mb-2">{scene.narration}</p>
-                                        <div className="flex gap-1">
+                                    <div className="p-2 flex flex-col">
+                                        <p className="text-[8px] text-white/40 line-clamp-2 min-h-[28px] mb-2">{scene.narration}</p>
+                                        <div className="flex gap-1 mt-auto">
                                             {/* Generate Image button - show when no image and not loading */}
                                             {!hasImage && !isLoadingImage && !hasVideo && (
-                                                <button
+                                                <Button
                                                     onClick={() => handleGenerateSingleSceneImage(scene.sceneNumber)}
+                                                    size="small"
+                                                    variant="secondary"
+                                                    className="flex-1 text-[8px]"
+                                                    icon="image"
                                                     disabled={!thumbnail}
-                                                    className="flex-1 h-6 rounded-lg bg-green-500/10 hover:bg-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 text-green-400 text-[8px] font-medium transition-colors"
                                                     title={!thumbnail ? 'Gere a capa primeiro' : 'Gerar imagem de referência'}
                                                 >
-                                                    <Icon name="image" className="w-3 h-3" />
                                                     Img
-                                                </button>
+                                                </Button>
                                             )}
                                             {/* Generate Video button - always show if not loading */}
                                             {!isLoadingVideo && (
                                                 <Button onClick={() => handleGenerateVideo(scene.sceneNumber)} size="small" variant="secondary" className="flex-1 text-[8px]" icon="play">
-                                                    {hasVideo ? '+Vídeo' : hasImage ? 'Vídeo' : 'Gerar'}
+                                                    Gerar
                                                 </Button>
                                             )}
                                         </div>
@@ -1943,8 +2373,9 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                         className="group relative aspect-[9/16] bg-[#080808] rounded-lg overflow-hidden border border-white/10 hover:border-primary/50 transition-all hover:scale-105"
                                     >
                                         <video
-                                            src={item.video.url}
+                                            src={item.video.url ? getVideoDisplayUrl(item.video.url) : undefined}
                                             className="w-full h-full object-cover"
+                                            crossOrigin="anonymous"
                                             muted
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
@@ -1997,8 +2428,9 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
 // --- ClipsTab Component ---
 
-export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfile, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference, userId }) => {
+export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfile, onAddImageToGallery, onUpdateGalleryImage, onSetChatReference, styleReferences, onAddStyleReference, onRemoveStyleReference, userId, galleryImages }) => {
     const [thumbnails, setThumbnails] = useState<(GalleryImage | null)[]>([]);
+    const [extraInstructions, setExtraInstructions] = useState<string[]>([]);
     const [generationState, setGenerationState] = useState<{ isGenerating: boolean[], errors: (string | null)[] }>({
         isGenerating: [],
         errors: [],
@@ -2009,15 +2441,31 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
 
     const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
 
+    // Initialize thumbnails - try to recover existing ones from gallery
     useEffect(() => {
         const length = videoClipScripts.length;
-        setThumbnails(Array(length).fill(null));
+
+        // Try to find existing thumbnails from gallery
+        const recoveredThumbnails: (GalleryImage | null)[] = videoClipScripts.map((clip) => {
+            if (!galleryImages || galleryImages.length === 0) return null;
+
+            // Look for an image that matches this clip's prompt (source: 'Clipe')
+            const existingImage = galleryImages.find(img =>
+                img.source === 'Clipe' &&
+                img.prompt === clip.image_prompt
+            );
+
+            return existingImage || null;
+        });
+
+        setThumbnails(recoveredThumbnails);
+        setExtraInstructions(Array(length).fill(''));
         setGenerationState({
             isGenerating: Array(length).fill(false),
             errors: Array(length).fill(null),
         });
         setSceneImageTriggers(Array(length).fill(0));
-    }, [videoClipScripts]);
+    }, [videoClipScripts, galleryImages]);
 
     // Listen for job completions
     useEffect(() => {
@@ -2065,7 +2513,13 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
         return () => { unsubComplete(); unsubFailed(); };
     }, [onJobComplete, onJobFailed, onAddImageToGallery, videoClipScripts, selectedImageModel]);
 
-    const handleGenerateThumbnail = async (index: number) => {
+    const buildThumbnailPrompt = (basePrompt: string, extraInstruction?: string) => {
+        const extra = extraInstruction?.trim();
+        if (!extra) return basePrompt;
+        return `${basePrompt}\n\nInstrucoes extras: ${extra}`;
+    };
+
+    const handleGenerateThumbnail = async (index: number, extraInstruction?: string) => {
         if (selectedImageModel === 'gemini-3-pro-image-preview') {
              if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
                 const hasKey = await window.aistudio.hasSelectedApiKey();
@@ -2077,6 +2531,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
 
         const clip = videoClipScripts[index];
         if (!clip.image_prompt) return;
+        const prompt = buildThumbnailPrompt(clip.image_prompt, extraInstruction);
 
         setGenerationState(prev => {
             const newGenerating = [...prev.isGenerating];
@@ -2101,7 +2556,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
                     source: 'Clipe'
                 };
 
-                await queueJob(userId, 'clip', clip.image_prompt, config, `clip-${index}`);
+                await queueJob(userId, 'clip', prompt, config, `clip-${index}`);
                 // Job will complete via onJobComplete callback
                 return;
             } catch (err) {
@@ -2120,7 +2575,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
                 });
             }
 
-            const generatedImageUrl = await generateImage(clip.image_prompt, brandProfile, {
+            const generatedImageUrl = await generateImage(prompt, brandProfile, {
                 aspectRatio: '9:16',
                 model: selectedImageModel,
                 productImages: productImages.length > 0 ? productImages : undefined,
@@ -2158,7 +2613,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
         // Generate thumbnails and trigger scene images for each clip sequentially
         for (let index = 0; index < videoClipScripts.length; index++) {
             if (!thumbnails[index]) {
-                await handleGenerateThumbnail(index);
+                await handleGenerateThumbnail(index, extraInstructions[index]);
             }
             // Trigger scene image generation for this clip after its thumbnail is ready
             // Small delay to ensure thumbnail state is updated
@@ -2191,13 +2646,24 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({ videoClipScripts, brandProfi
                     brandProfile={brandProfile}
                     thumbnail={thumbnails[index]}
                     isGeneratingThumbnail={generationState.isGenerating[index]}
-                    onGenerateThumbnail={() => handleGenerateThumbnail(index)}
+                    onGenerateThumbnail={() => handleGenerateThumbnail(index, extraInstructions[index])}
+                    onRegenerateThumbnail={() => handleGenerateThumbnail(index, extraInstructions[index])}
+                    extraInstruction={extraInstructions[index] || ''}
+                    onExtraInstructionChange={(value) => {
+                        setExtraInstructions(prev => {
+                            const next = [...prev];
+                            next[index] = value;
+                            return next;
+                        });
+                    }}
                     onUpdateGalleryImage={onUpdateGalleryImage}
                     onSetChatReference={onSetChatReference}
                     styleReferences={styleReferences}
                     onAddStyleReference={onAddStyleReference}
                     onRemoveStyleReference={onRemoveStyleReference}
                     triggerSceneImageGeneration={sceneImageTriggers[index]}
+                    onAddImageToGallery={onAddImageToGallery}
+                    galleryImages={galleryImages}
                 />
             ))}
         </div>

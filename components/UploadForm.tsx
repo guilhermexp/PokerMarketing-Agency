@@ -1,9 +1,12 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import type { ContentInput, GenerationOptions } from '../types';
+import type { ContentInput, GenerationOptions, BrandProfile, CreativeModel } from '../types';
 import { Icon } from './common/Icon';
 import { Button } from './common/Button';
 import { GenerationOptionsModal } from './GenerationOptionsModal';
+import { creativeModelLabels } from '../services/llmService';
+
+const creativeModelOptions: CreativeModel[] = ['gemini-3-pro', 'gemini-3-flash', 'openai/gpt-5.2', 'x-ai/grok-4.1-fast'];
 
 interface ImageFile {
   base64: string;
@@ -26,16 +29,31 @@ const toBase64 = (file: File): Promise<{ base64: string, mimeType: string }> =>
 interface UploadFormProps {
   onGenerate: (input: ContentInput, options: GenerationOptions) => void;
   isGenerating: boolean;
+  brandProfile: BrandProfile;
+  onUpdateCreativeModel: (model: CreativeModel) => void;
 }
 
-export const UploadForm: React.FC<UploadFormProps> = ({ onGenerate, isGenerating }) => {
+export const UploadForm: React.FC<UploadFormProps> = ({ onGenerate, isGenerating, brandProfile, onUpdateCreativeModel }) => {
   const [transcript, setTranscript] = useState<string>('');
   const [productImages, setProductImages] = useState<ImageFile[]>([]);
   const [inspirationImages, setInspirationImages] = useState<ImageFile[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
   const inspirationInputRef = useRef<HTMLInputElement>(null);
+  const modelSelectorRef = useRef<HTMLDivElement>(null);
+
+  // Close model selector when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modelSelectorRef.current && !modelSelectorRef.current.contains(e.target as Node)) {
+        setIsModelSelectorOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [generationOptions, setGenerationOptions] = useState<GenerationOptions>({
@@ -135,25 +153,57 @@ export const UploadForm: React.FC<UploadFormProps> = ({ onGenerate, isGenerating
         </h1>
 
         {/* Main Input Box */}
-        <div className="w-full max-w-3xl">
-          <div className="bg-[#111111] border border-white/10 rounded-2xl overflow-hidden transition-all focus-within:border-white/20">
+        <div className="w-full max-w-3xl relative">
+          <div className="bg-[#111111] border border-white/10 rounded-2xl transition-all focus-within:border-white/20">
             {/* Textarea */}
             <textarea
               ref={textareaRef}
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="w-full bg-transparent px-5 pt-5 pb-3 text-white text-sm placeholder:text-white/30 outline-none resize-none min-h-[100px]"
+              className="w-full bg-transparent px-5 pt-5 pb-3 text-white text-sm placeholder:text-white/30 outline-none resize-none min-h-[100px] rounded-t-2xl"
               placeholder="Cole a transcrição do seu vídeo, post de blog ou descreva sua campanha..."
               rows={3}
             />
 
             {/* Bottom Bar */}
-            <div className="px-4 py-3 flex items-center justify-between border-t border-white/5">
+            <div className="px-4 py-3 flex items-center justify-between border-t border-white/5 rounded-b-2xl">
               {/* Model Selector */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-white/40">
-                <Icon name="zap" className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-bold uppercase">Gemini 3 Pro</span>
+              <div className="relative" ref={modelSelectorRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsModelSelectorOpen(!isModelSelectorOpen)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60 transition-all cursor-pointer"
+                >
+                  <Icon name="zap" className="w-3.5 h-3.5" />
+                  <span className="text-[10px] font-bold uppercase">
+                    {creativeModelLabels[brandProfile.creativeModel || 'gemini-3-pro']?.label || 'Gemini 3 Pro'}
+                  </span>
+                  <Icon name="chevron-down" className="w-3 h-3 ml-1" />
+                </button>
+
+                {/* Model Dropdown */}
+                {isModelSelectorOpen && (
+                  <div className="absolute top-full left-0 mt-1 py-1 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl z-50 min-w-[180px]">
+                    {creativeModelOptions.map((model) => (
+                      <button
+                        key={model}
+                        onClick={() => {
+                          onUpdateCreativeModel(model);
+                          setIsModelSelectorOpen(false);
+                        }}
+                        className={`w-full px-3 py-2 text-left text-xs transition-colors flex items-center justify-between ${
+                          brandProfile.creativeModel === model || (!brandProfile.creativeModel && model === 'gemini-3-pro')
+                            ? 'bg-white/10 text-white'
+                            : 'text-white/60 hover:bg-white/5 hover:text-white/80'
+                        }`}
+                      >
+                        <span>{creativeModelLabels[model]?.label}</span>
+                        <span className="text-[9px] text-white/30">{creativeModelLabels[model]?.provider}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Submit Button */}
@@ -175,6 +225,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({ onGenerate, isGenerating
             </div>
           </div>
 
+          
           {error && <p className="text-red-400 text-xs mt-3 text-center">{error}</p>}
 
           {/* Attachments Preview - Below Input */}

@@ -50,13 +50,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ events });
       }
 
-      // Get the most recent week schedule
-      const schedules = await sql`
+      // Get the most relevant week schedule
+      // First try to find a valid (non-expired) schedule
+      let schedules = await sql`
         SELECT * FROM week_schedules
         WHERE user_id = ${user_id as string}
-        ORDER BY created_at DESC
+          AND end_date >= CURRENT_DATE
+        ORDER BY start_date ASC
         LIMIT 1
       `;
+
+      // If no valid schedule, get the most recent one (even if expired)
+      if (schedules.length === 0) {
+        schedules = await sql`
+          SELECT * FROM week_schedules
+          WHERE user_id = ${user_id as string}
+          ORDER BY end_date DESC
+          LIMIT 1
+        `;
+      }
 
       if (schedules.length === 0) {
         return res.status(200).json({ schedule: null, events: [] });
