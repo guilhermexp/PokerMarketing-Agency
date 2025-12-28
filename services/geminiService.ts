@@ -21,6 +21,37 @@ const getApiKey = () => getEnv("VITE_API_KEY") || getEnv("API_KEY");
 // Helper to ensure fresh GoogleGenAI instance with latest API key
 const getAi = () => new GoogleGenAI({ apiKey: getApiKey() });
 
+// Retry helper for handling 503 (overloaded) errors
+const withRetry = async <T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000,
+): Promise<T> => {
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      const isRetryable =
+        error?.message?.includes("503") ||
+        error?.message?.includes("overloaded") ||
+        error?.message?.includes("UNAVAILABLE") ||
+        error?.status === 503;
+
+      if (isRetryable && attempt < maxRetries) {
+        console.log(
+          `[Gemini] Retry ${attempt}/${maxRetries} after ${delayMs}ms (503 overloaded)...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+};
+
 // Default targets that use tone (backwards compatible)
 const defaultToneTargets: ToneTarget[] = [
   "campaigns",
@@ -330,15 +361,17 @@ REGRA DE OURO: Se a imagem de referência usa fonte BOLD VERMELHA com efeito de 
   }
 
   if (options.model === "imagen-4.0-generate-001") {
-    const response = await ai.models.generateImages({
-      model: "imagen-4.0-generate-001",
-      prompt: fullPrompt,
-      config: {
-        numberOfImages: 1,
-        outputMimeType: "image/png",
-        aspectRatio: options.aspectRatio as any,
-      },
-    });
+    const response = await withRetry(() =>
+      ai.models.generateImages({
+        model: "imagen-4.0-generate-001",
+        prompt: fullPrompt,
+        config: {
+          numberOfImages: 1,
+          outputMimeType: "image/png",
+          aspectRatio: options.aspectRatio as any,
+        },
+      }),
+    );
     return `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
   } else {
     const modelName = "gemini-3-pro-image-preview"; // Força Gemini 3 Pro Image
@@ -363,16 +396,18 @@ REGRA DE OURO: Se a imagem de referência usa fonte BOLD VERMELHA com efeito de 
       });
     }
 
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: { parts },
-      config: {
-        imageConfig: {
-          aspectRatio: mapAspectRatio(options.aspectRatio) as any,
-          imageSize: options.imageSize || "1K",
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: modelName,
+        contents: { parts },
+        config: {
+          imageConfig: {
+            aspectRatio: mapAspectRatio(options.aspectRatio) as any,
+            imageSize: options.imageSize || "1K",
+          },
         },
-      },
-    });
+      }),
+    );
 
     for (const part of response.candidates[0].content.parts) {
       if (part.inlineData)
@@ -673,15 +708,17 @@ export const generateSpeech = async (script: string): Promise<string> => {
 
 export const generateLogo = async (prompt: string): Promise<string> => {
   const ai = getAi();
-  const response = await ai.models.generateImages({
-    model: "imagen-4.0-generate-001",
-    prompt: `Logo vetorial moderno e minimalista: ${prompt}`,
-    config: {
-      numberOfImages: 1,
-      outputMimeType: "image/png",
-      aspectRatio: "1:1",
-    },
-  });
+  const response = await withRetry(() =>
+    ai.models.generateImages({
+      model: "imagen-4.0-generate-001",
+      prompt: `Logo vetorial moderno e minimalista: ${prompt}`,
+      config: {
+        numberOfImages: 1,
+        outputMimeType: "image/png",
+        aspectRatio: "1:1",
+      },
+    }),
+  );
   return `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
 };
 
