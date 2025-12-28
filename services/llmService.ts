@@ -2,9 +2,11 @@
 import { GoogleGenAI } from "@google/genai";
 import type { CreativeModel, BrandProfile } from '../types';
 import { generateTextWithOpenRouter, generateTextWithOpenRouterVision } from './openRouterService';
+import { getEnv } from "../utils/env";
 
 // Helper para criar instância fresh do Gemini
-const getGeminiAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getGeminiAi = () =>
+  new GoogleGenAI({ apiKey: getEnv("VITE_API_KEY") || getEnv("API_KEY") });
 
 /**
  * Interface para partes do prompt (compatível com formato Gemini)

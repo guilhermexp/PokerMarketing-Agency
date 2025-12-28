@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import type { BrandProfile, ChatMessage } from '../types';
+import { getEnv } from "../utils/env";
 
 const assistantTools = {
   functionDeclarations: [
@@ -69,7 +70,8 @@ export const runAssistantConversationStream = async (
     history: ChatMessage[],
     brandProfile: BrandProfile | null
 ) => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getEnv("VITE_API_KEY") || getEnv("API_KEY");
+    const ai = new GoogleGenAI({ apiKey });
     
     // Excluir logo do brandProfile para não estourar limite de tokens
     const brandInfo = brandProfile ? {

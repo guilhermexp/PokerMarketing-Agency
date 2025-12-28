@@ -15,9 +15,11 @@ import type {
 import { isFalModel } from "../types";
 import { generateFalVideo } from "./falService";
 import { generateCreativeText } from "./llmService";
+import { getEnv } from "../utils/env";
 
+const getApiKey = () => getEnv("VITE_API_KEY") || getEnv("API_KEY");
 // Helper to ensure fresh GoogleGenAI instance with latest API key
-const getAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getAi = () => new GoogleGenAI({ apiKey: getApiKey() });
 
 // Default targets that use tone (backwards compatible)
 const defaultToneTargets: ToneTarget[] = [
@@ -570,7 +572,7 @@ export const generateVideo = async (
 
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
     const videoResponse = await fetch(
-      `${downloadLink}&key=${process.env.API_KEY}`,
+      `${downloadLink}&key=${getApiKey()}`,
     );
     const videoBlob = await videoResponse.blob();
     console.log("[Gemini] Video generated successfully via Gemini");

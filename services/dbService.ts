@@ -1,10 +1,11 @@
 import { neon, neonConfig } from '@neondatabase/serverless';
+import { getEnv } from "../utils/env";
 
 // Configure for serverless environment
 neonConfig.fetchConnectionCache = true;
 
 // Database URL from environment
-const DATABASE_URL = import.meta.env.VITE_DATABASE_URL || process.env.DATABASE_URL;
+const DATABASE_URL = getEnv("VITE_DATABASE_URL") || getEnv("DATABASE_URL");
 
 // Create SQL query function
 const sql = DATABASE_URL ? neon(DATABASE_URL) : null;

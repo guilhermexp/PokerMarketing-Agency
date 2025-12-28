@@ -1,10 +1,11 @@
 
 import { OpenRouter } from "@openrouter/sdk";
 import type { CreativeModel } from '../types';
+import { getEnv } from "../utils/env";
 
 // Helper para criar instância fresh do OpenRouter
 const getOpenRouter = () => {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = getEnv("VITE_OPENROUTER_API_KEY") || getEnv("OPENROUTER_API_KEY");
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY não configurada. Configure no arquivo .env para usar modelos GPT e Grok.');
   }

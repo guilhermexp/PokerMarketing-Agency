@@ -14,6 +14,7 @@
 
 import { uploadDataUrlToBlob } from './blobService';
 import type { InstagramPublishState } from '../types';
+import { getEnv } from "../utils/env";
 
 // MCP Configuration
 // Use proxy in dev/browser to avoid CORS, direct URL in prod/serverless
@@ -21,7 +22,7 @@ const MCP_URL = '/api/rube';
 const INSTAGRAM_USER_ID = '25281402468195799'; // cpcpokeronline
 
 // Get token - only needed for serverless function, browser uses proxy
-const getToken = () => import.meta.env.VITE_RUBE_TOKEN || process.env.RUBE_TOKEN;
+const getToken = () => getEnv("VITE_RUBE_TOKEN") || getEnv("RUBE_TOKEN");
 
 // Generate unique JSON-RPC ID
 const generateId = () => `rube_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

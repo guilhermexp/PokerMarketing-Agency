@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:api\" \"npm run dev:vite\"",
+    "dev": "concurrently \"bun run dev:api\" \"bun run dev:vite\"",
     "dev:api": "node server/dev-api.mjs",
     "dev:vite": "vite",
     "build": "vite build",

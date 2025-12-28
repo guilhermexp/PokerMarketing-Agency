@@ -60,3 +60,10 @@ Para rodar esta aplicação, o ambiente de execução precisa ter a seguinte var
 A chave da API da Fal.ai para o modelo Bytedance está atualmente hardcoded em `services/geminiService.ts`, mas idealmente também seria gerenciada via variáveis de ambiente.
 
 A aplicação utiliza um `importmap` em `index.html` para carregar as dependências (React, @google/genai, etc.) diretamente de um CDN, simplificando o processo de build.
+
+### Dev com Bun
+
+```sh
+bun install
+bun run dev
+```

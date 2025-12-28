@@ -1,10 +1,11 @@
 import { fal } from "@fal-ai/client";
 import type { FalVideoModel } from '../types';
 import { uploadVideo } from './apiClient';
+import { getEnv } from "../utils/env";
 
 // Configure fal client with API key from environment
 fal.config({
-  credentials: import.meta.env.VITE_FAL_KEY || process.env.FAL_KEY,
+  credentials: getEnv("VITE_FAL_KEY") || getEnv("FAL_KEY"),
 });
 
 /**

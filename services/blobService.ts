@@ -4,9 +4,11 @@
  */
 
 import { put } from '@vercel/blob';
+import { getEnv } from "../utils/env";
 
 // Get token with fresh read pattern
-const getToken = () => import.meta.env.VITE_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
+const getToken = () =>
+  getEnv("VITE_BLOB_READ_WRITE_TOKEN") || getEnv("BLOB_READ_WRITE_TOKEN");
 
 /**
  * Check if Vercel Blob is configured

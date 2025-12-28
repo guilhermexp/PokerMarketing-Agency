@@ -157,6 +157,10 @@ function AppContent() {
 
   // Track if initial data load has happened (prevents hot reload re-fetches)
   const hasInitializedRef = useRef(false);
+  const initScopeRef = useRef<{
+    userId: string | null;
+    orgId: string | null;
+  }>({ userId: null, orgId: null });
 
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [campaign, setCampaign] = useState<MarketingCampaign | null>(null);
@@ -305,6 +309,15 @@ function AppContent() {
     Record<string, InstagramPublishState>
   >({});
 
+  useEffect(() => {
+    const previous = initScopeRef.current;
+    const nextScope = { userId, orgId: organizationId };
+    if (previous.userId !== userId || previous.orgId !== organizationId) {
+      hasInitializedRef.current = false;
+      initScopeRef.current = nextScope;
+    }
+  }, [userId, organizationId]);
+
   // Load ONLY brand profile and style refs on init (other data comes from SWR hooks)
   // This effect only runs ONCE per userId thanks to hasInitializedRef
   useEffect(() => {
@@ -406,11 +419,22 @@ function AppContent() {
     image: Omit<GalleryImage, "id">,
   ): GalleryImage => {
     // Create image with temporary ID immediately for UI responsiveness
-    const tempId = Date.now().toString();
+    const tempId = `temp-${Date.now()}`;
     const newImage: GalleryImage = { ...image, id: tempId };
 
     // Save to database in background (don't block UI)
     if (userId) {
+      swrAddGalleryImage({
+        id: tempId,
+        user_id: userId,
+        src_url: image.src,
+        prompt: image.prompt || null,
+        source: image.source,
+        model: image.model,
+        aspect_ratio: null,
+        image_size: null,
+        created_at: new Date().toISOString(),
+      });
       createGalleryImage(userId, {
         src_url: image.src,
         prompt: image.prompt,
@@ -422,8 +446,12 @@ function AppContent() {
         organization_id: organizationId,
       })
         .then((dbImage) => {
-          // Update SWR cache with the real database image
+          // Replace temp image with the real database image
+          swrRemoveGalleryImage(tempId);
           swrAddGalleryImage(dbImage);
+          if (toolImageReference?.id === tempId) {
+            setToolImageReference({ id: dbImage.id, src: dbImage.src_url });
+          }
         })
         .catch((e) => {
           console.error("Failed to save image to database:", e);
@@ -444,6 +472,8 @@ function AppContent() {
   const handleDeleteGalleryImage = async (imageId: string) => {
     // Remove from SWR cache immediately (optimistic update)
     swrRemoveGalleryImage(imageId);
+
+    if (imageId.startsWith("temp-")) return;
 
     // Also remove from database
     try {
