@@ -196,6 +196,27 @@ async function resolveUserId(sql, userId, requestId = 0) {
 }
 
 // ============================================================================
+// RLS: Set session variables for Row Level Security
+// This MUST be called before any queries that should be protected by RLS
+// ============================================================================
+async function setRLSContext(sql, userId, organizationId = null) {
+  if (!userId) return;
+
+  try {
+    // Set both variables in a single query for efficiency
+    await sql`
+      SELECT
+        set_config('app.user_id', ${userId}, true),
+        set_config('app.organization_id', ${organizationId || ''}, true)
+    `;
+  } catch (error) {
+    // Don't fail the request if RLS context can't be set
+    // The application-level security (WHERE clauses) will still work
+    console.warn('[RLS] Failed to set context:', error.message);
+  }
+}
+
+// ============================================================================
 // Request logging middleware - tracks all API calls
 // ============================================================================
 app.use("/api/db", (req, res, next) => {
@@ -288,6 +309,10 @@ app.get("/api/db/init", async (req, res) => {
         schedulesList: [],
       });
     }
+
+    // Note: RLS context via session vars doesn't work with Neon serverless pooler
+    // Security is enforced via WHERE clauses in each query (application-level)
+    // RLS policies protect direct database access (psql, DB clients)
 
     // Run ALL queries in parallel - this is the key optimization!
     const isOrgContext = !!organization_id;
