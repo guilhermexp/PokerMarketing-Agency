@@ -1,135 +1,312 @@
-
-import React, { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
-import { BrandProfileSetup } from './components/BrandProfileSetup';
-import { Dashboard } from './components/Dashboard';
-import { SettingsModal } from './components/settings/SettingsModal';
-import { Loader } from './components/common/Loader';
-import { generateCampaign, editImage, generateLogo, generateImage } from './services/geminiService';
-import { runAssistantConversationStream } from './services/assistantService';
-import { publishToInstagram, uploadImageForInstagram, type InstagramContentType } from './services/rubeService';
-import type { BrandProfile, MarketingCampaign, ContentInput, ChatMessage, Theme, TournamentEvent, GalleryImage, ChatReferenceImage, ChatPart, GenerationOptions, WeekScheduleInfo, StyleReference, ScheduledPost, InstagramPublishState, CreativeModel } from './types';
-import { Icon } from './components/common/Icon';
-import { AuthWrapper, UserProfileButton, useAuth, useCurrentUser } from './components/auth/AuthWrapper';
-import { useOrganization } from '@clerk/clerk-react';
-import { BackgroundJobsProvider } from './hooks/useBackgroundJobs';
-import { BackgroundJobsIndicator } from './components/common/BackgroundJobsIndicator';
+import React, { useState, useEffect, useRef } from "react";
+import * as XLSX from "xlsx";
+import { BrandProfileSetup } from "./components/BrandProfileSetup";
+import { Dashboard } from "./components/Dashboard";
+import { SettingsModal } from "./components/settings/SettingsModal";
+import { Loader } from "./components/common/Loader";
+import {
+  generateCampaign,
+  editImage,
+  generateLogo,
+  generateImage,
+} from "./services/geminiService";
+import { runAssistantConversationStream } from "./services/assistantService";
+import {
+  publishToInstagram,
+  uploadImageForInstagram,
+  type InstagramContentType,
+} from "./services/rubeService";
+import type {
+  BrandProfile,
+  MarketingCampaign,
+  ContentInput,
+  ChatMessage,
+  Theme,
+  TournamentEvent,
+  GalleryImage,
+  ChatReferenceImage,
+  ChatPart,
+  GenerationOptions,
+  WeekScheduleInfo,
+  StyleReference,
+  ScheduledPost,
+  InstagramPublishState,
+  CreativeModel,
+} from "./types";
+import { Icon } from "./components/common/Icon";
+import {
+  AuthWrapper,
+  UserProfileButton,
+  useAuth,
+  useCurrentUser,
+} from "./components/auth/AuthWrapper";
+import { useOrganization } from "@clerk/clerk-react";
+import { BackgroundJobsProvider } from "./hooks/useBackgroundJobs";
+import { BackgroundJobsIndicator } from "./components/common/BackgroundJobsIndicator";
 import {
   getBrandProfile,
   createBrandProfile,
   updateBrandProfile,
-  getGalleryImages,
   createGalleryImage,
-  getScheduledPosts,
   createScheduledPost,
   updateScheduledPost as updateScheduledPostApi,
   deleteScheduledPost as deleteScheduledPostApi,
-  getCampaigns,
   getCampaignById,
   createCampaign as createCampaignApi,
-  getTournamentData,
   createWeekSchedule,
   deleteWeekSchedule,
-  getWeekSchedulesList,
   getScheduleEvents,
   schedulePostWithQStash,
   deleteGalleryImage,
   type DbCampaign,
   type DbWeekSchedule,
   type WeekScheduleWithCount,
-} from './services/apiClient';
-import type { CampaignSummary } from './types';
+} from "./services/apiClient";
+import {
+  useGalleryImages,
+  useScheduledPosts,
+  useCampaigns,
+  useTournamentData,
+  useSchedulesList,
+} from "./hooks/useAppData";
+import type { CampaignSummary } from "./types";
 
-export type TimePeriod = 'ALL' | 'MORNING' | 'AFTERNOON' | 'NIGHT' | 'HIGHLIGHTS';
-export type ViewType = 'campaign' | 'campaigns' | 'flyer' | 'gallery' | 'calendar';
+export type TimePeriod =
+  | "ALL"
+  | "MORNING"
+  | "AFTERNOON"
+  | "NIGHT"
+  | "HIGHLIGHTS";
+export type ViewType =
+  | "campaign"
+  | "campaigns"
+  | "flyer"
+  | "gallery"
+  | "calendar";
 
-const MAX_GALLERY_SIZE = 12; 
+const MAX_GALLERY_SIZE = 12;
 const MAX_CHAT_HISTORY_MESSAGES = 10;
 
 const excelTimeToStr = (val: any): string => {
-  if (typeof val === 'number') {
+  if (typeof val === "number") {
     const totalMinutes = Math.round(val * 24 * 60);
     const hours = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
-    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
   }
-  return String(val || '');
+  return String(val || "");
 };
 
-const resizeImageForChat = (dataUrl: string, maxWidth: number, maxHeight: number): Promise<{ base64: string; mimeType: 'image/jpeg' }> => {
+const resizeImageForChat = (
+  dataUrl: string,
+  maxWidth: number,
+  maxHeight: number,
+): Promise<{ base64: string; mimeType: "image/jpeg" }> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const canvas = document.createElement('canvas');
+      const canvas = document.createElement("canvas");
       let { width, height } = img;
       if (width > height) {
-        if (width > maxWidth) { height = Math.round(height * (maxWidth / width)); width = maxWidth; }
+        if (width > maxWidth) {
+          height = Math.round(height * (maxWidth / width));
+          width = maxWidth;
+        }
       } else {
-        if (height > maxHeight) { width = Math.round(width * (maxHeight / height)); height = maxHeight; }
+        if (height > maxHeight) {
+          width = Math.round(width * (maxHeight / height));
+          height = maxHeight;
+        }
       }
-      canvas.width = width; canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return reject(new Error('Canvas context error'));
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas context error"));
       ctx.drawImage(img, 0, 0, width, height);
-      const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.6); 
-      resolve({ base64: resizedDataUrl.split(',')[1], mimeType: 'image/jpeg' });
+      const resizedDataUrl = canvas.toDataURL("image/jpeg", 0.6);
+      resolve({ base64: resizedDataUrl.split(",")[1], mimeType: "image/jpeg" });
     };
     img.onerror = (err) => reject(err);
     img.src = dataUrl;
   });
 };
 
-const getTruncatedHistory = (history: ChatMessage[], maxLength: number = MAX_CHAT_HISTORY_MESSAGES): ChatMessage[] => {
-    const truncated = history.length <= maxLength ? [...history] : history.slice(-maxLength);
-    return truncated.map((msg, index) => {
-        if (index < truncated.length - 2) {
-            return {
-                ...msg,
-                parts: msg.parts.map(part => part.inlineData ? { text: "[Imagem de referência anterior]" } : part)
-            };
-        }
-        return msg;
-    });
+const getTruncatedHistory = (
+  history: ChatMessage[],
+  maxLength: number = MAX_CHAT_HISTORY_MESSAGES,
+): ChatMessage[] => {
+  const truncated =
+    history.length <= maxLength ? [...history] : history.slice(-maxLength);
+  return truncated.map((msg, index) => {
+    if (index < truncated.length - 2) {
+      return {
+        ...msg,
+        parts: msg.parts.map((part) =>
+          part.inlineData ? { text: "[Imagem de referência anterior]" } : part,
+        ),
+      };
+    }
+    return msg;
+  });
 };
 
 function AppContent() {
   const { userId, isLoading: authLoading } = useAuth();
   const { organization, isLoaded: orgLoaded } = useOrganization();
   const organizationId = organization?.id || null;
+
+  // Track if initial data load has happened (prevents hot reload re-fetches)
+  const hasInitializedRef = useRef(false);
+
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [campaign, setCampaign] = useState<MarketingCampaign | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [activeView, setActiveView] = useState<ViewType>('campaign');
+  const [activeView, setActiveView] = useState<ViewType>("campaign");
 
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isAssistantLoading, setIsAssistantLoading] = useState(false);
-  const [chatReferenceImage, setChatReferenceImage] = useState<ChatReferenceImage | null>(null);
-  const [toolImageReference, setToolImageReference] = useState<ChatReferenceImage | null>(null);
-  const [lastUploadedImage, setLastUploadedImage] = useState<ChatReferenceImage | null>(null);
+  const [chatReferenceImage, setChatReferenceImage] =
+    useState<ChatReferenceImage | null>(null);
+  const [toolImageReference, setToolImageReference] =
+    useState<ChatReferenceImage | null>(null);
+  const [lastUploadedImage, setLastUploadedImage] =
+    useState<ChatReferenceImage | null>(null);
 
-  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
-  const [tournamentEvents, setTournamentEvents] = useState<TournamentEvent[]>([]);
-  const [weekScheduleInfo, setWeekScheduleInfo] = useState<WeekScheduleInfo | null>(null);
-  const [currentScheduleId, setCurrentScheduleId] = useState<string | null>(null);
+  // === SWR CACHED DATA HOOKS (prevents duplicate fetches!) ===
+  const {
+    images: swrGalleryImages,
+    addImage: swrAddGalleryImage,
+    removeImage: swrRemoveGalleryImage,
+    updateImage: swrUpdateGalleryImage,
+  } = useGalleryImages(userId, organizationId);
+
+  const {
+    posts: swrScheduledPosts,
+    addPost: swrAddScheduledPost,
+    updatePost: swrUpdateScheduledPost,
+    removePost: swrRemoveScheduledPost,
+  } = useScheduledPosts(userId, organizationId);
+
+  const { campaigns: swrCampaigns, addCampaign: swrAddCampaign } = useCampaigns(
+    userId,
+    organizationId,
+  );
+
+  const {
+    schedule: swrTournamentSchedule,
+    events: swrTournamentEvents,
+    setData: swrSetTournamentData,
+  } = useTournamentData(userId, organizationId);
+
+  const { schedules: swrAllSchedules, setSchedules: swrSetAllSchedules } =
+    useSchedulesList(userId, organizationId);
+
+  // Transform SWR data to local format
+  const galleryImages: GalleryImage[] = (swrGalleryImages || [])
+    .filter((img) => !img.src_url.startsWith("blob:"))
+    .map((img) => ({
+      id: img.id,
+      src: img.src_url,
+      prompt: img.prompt || undefined,
+      source: img.source as GalleryImage["source"],
+      model: img.model as GalleryImage["model"],
+    }));
+
+  const scheduledPosts: ScheduledPost[] = (swrScheduledPosts || [])
+    .map((post) => {
+      const normalizedDate =
+        post.scheduled_date?.split("T")[0] || post.scheduled_date;
+      return {
+        id: post.id,
+        type: post.content_type as ScheduledPost["type"],
+        contentId: post.content_id || "",
+        imageUrl: post.image_url,
+        caption: post.caption,
+        hashtags: post.hashtags || [],
+        scheduledDate: normalizedDate,
+        scheduledTime: post.scheduled_time,
+        scheduledTimestamp: new Date(post.scheduled_timestamp).getTime(),
+        timezone: post.timezone,
+        platforms: post.platforms as ScheduledPost["platforms"],
+        instagramContentType:
+          post.instagram_content_type as ScheduledPost["instagramContentType"],
+        status: post.status as ScheduledPost["status"],
+        publishedAt: post.published_at
+          ? new Date(post.published_at).getTime()
+          : undefined,
+        errorMessage: post.error_message || undefined,
+        createdAt: new Date(post.created_at).getTime(),
+        updatedAt: new Date(post.updated_at || post.created_at).getTime(),
+        createdFrom: (post.created_from ||
+          "gallery") as ScheduledPost["createdFrom"],
+      };
+    })
+    .sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp);
+
+  const campaignsList: CampaignSummary[] = (swrCampaigns || []).map(
+    (c: DbCampaign) => ({
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      createdAt: c.created_at,
+    }),
+  );
+
+  const tournamentEvents: TournamentEvent[] = (swrTournamentEvents || []).map(
+    (e) => ({
+      id: e.id,
+      day: e.day_of_week,
+      name: e.name,
+      game: e.game || "",
+      gtd: e.gtd || "",
+      buyIn: e.buy_in || "",
+      rebuy: e.rebuy || "",
+      addOn: e.add_on || "",
+      stack: e.stack || "",
+      players: e.players || "",
+      lateReg: e.late_reg || "",
+      minutes: e.minutes || "",
+      structure: e.structure || "",
+      times: e.times || {},
+    }),
+  );
+
+  const allSchedules = swrAllSchedules || [];
+
+  // Local state for non-cached data
+  const [weekScheduleInfo, setWeekScheduleInfo] =
+    useState<WeekScheduleInfo | null>(null);
+  const [currentScheduleId, setCurrentScheduleId] = useState<string | null>(
+    null,
+  );
   const [isWeekExpired, setIsWeekExpired] = useState(false);
-  const [allSchedules, setAllSchedules] = useState<WeekScheduleWithCount[]>([]);
-  const [flyerState, setFlyerState] = useState<Record<string, (GalleryImage | 'loading')[]>>({});
-  const [dailyFlyerState, setDailyFlyerState] = useState<Record<TimePeriod, (GalleryImage | 'loading')[]>>({
-    ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: []
+  const [flyerState, setFlyerState] = useState<
+    Record<string, (GalleryImage | "loading")[]>
+  >({});
+  const [dailyFlyerState, setDailyFlyerState] = useState<
+    Record<TimePeriod, (GalleryImage | "loading")[]>
+  >({
+    ALL: [],
+    MORNING: [],
+    AFTERNOON: [],
+    NIGHT: [],
+    HIGHLIGHTS: [],
   });
 
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>("dark");
   const [styleReferences, setStyleReferences] = useState<StyleReference[]>([]);
-  const [selectedStyleReference, setSelectedStyleReference] = useState<StyleReference | null>(null);
-  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
-  const [publishingStates, setPublishingStates] = useState<Record<string, InstagramPublishState>>({});
-  const [campaignsList, setCampaignsList] = useState<CampaignSummary[]>([]);
+  const [selectedStyleReference, setSelectedStyleReference] =
+    useState<StyleReference | null>(null);
+  const [publishingStates, setPublishingStates] = useState<
+    Record<string, InstagramPublishState>
+  >({});
 
-  // Load data from database when user is authenticated
+  // Load ONLY brand profile and style refs on init (other data comes from SWR hooks)
+  // This effect only runs ONCE per userId thanks to hasInitializedRef
   useEffect(() => {
     const initAppData = async () => {
       if (!userId || !orgLoaded) {
@@ -137,140 +314,43 @@ function AppContent() {
         return;
       }
 
+      // Prevent re-fetch on hot reload during development
+      if (hasInitializedRef.current) {
+        setIsLoading(false);
+        return;
+      }
+      hasInitializedRef.current = true;
+
       try {
         // Load brand profile from database (org-scoped if in organization)
         const dbBrandProfile = await getBrandProfile(userId, organizationId);
         if (dbBrandProfile) {
           setBrandProfile({
             name: dbBrandProfile.name,
-            description: dbBrandProfile.description || '',
+            description: dbBrandProfile.description || "",
             logo: dbBrandProfile.logo_url || null,
             primaryColor: dbBrandProfile.primary_color,
             secondaryColor: dbBrandProfile.secondary_color,
-            toneOfVoice: dbBrandProfile.tone_of_voice as BrandProfile['toneOfVoice'],
-            toneTargets: (dbBrandProfile.settings?.toneTargets as BrandProfile['toneTargets']) || undefined,
-            creativeModel: (dbBrandProfile.settings?.creativeModel as BrandProfile['creativeModel']) || undefined,
+            toneOfVoice:
+              dbBrandProfile.tone_of_voice as BrandProfile["toneOfVoice"],
+            toneTargets:
+              (dbBrandProfile.settings
+                ?.toneTargets as BrandProfile["toneTargets"]) || undefined,
+            creativeModel:
+              (dbBrandProfile.settings
+                ?.creativeModel as BrandProfile["creativeModel"]) || undefined,
           });
         }
 
         // Load style references from localStorage (will migrate later)
-        const savedRefs = localStorage.getItem('styleReferences');
+        const savedRefs = localStorage.getItem("styleReferences");
         if (savedRefs) setStyleReferences(JSON.parse(savedRefs));
 
-        // Load gallery images from database (filter out invalid blob: URLs)
-        const dbImages = await getGalleryImages(userId, organizationId);
-        const mappedImages: GalleryImage[] = dbImages
-          .filter(img => !img.src_url.startsWith('blob:')) // Exclude temporary blob URLs
-          .map(img => ({
-            id: img.id,
-            src: img.src_url,
-            prompt: img.prompt || undefined,
-            source: img.source as GalleryImage['source'],
-            model: img.model as GalleryImage['model'],
-          }));
-        setGalleryImages(mappedImages);
-
-        // Load scheduled posts from database
-        const dbScheduled = await getScheduledPosts(userId, organizationId);
-        console.log('[App] Loaded scheduled posts:', dbScheduled.length, dbScheduled.map(p => ({ id: p.id, date: p.scheduled_date, status: p.status })));
-        const mappedPosts: ScheduledPost[] = dbScheduled.map(post => {
-          // Normalize date to YYYY-MM-DD format (handles both "2025-12-21" and "2025-12-21T00:00:00.000Z")
-          const normalizedDate = post.scheduled_date?.split('T')[0] || post.scheduled_date;
-          return {
-          id: post.id,
-          type: post.content_type as ScheduledPost['type'],
-          contentId: post.content_id || '',
-          imageUrl: post.image_url,
-          caption: post.caption,
-          hashtags: post.hashtags || [],
-          scheduledDate: normalizedDate,
-          scheduledTime: post.scheduled_time,
-          scheduledTimestamp: new Date(post.scheduled_timestamp).getTime(),
-          timezone: post.timezone,
-          platforms: post.platforms as ScheduledPost['platforms'],
-          instagramContentType: post.instagram_content_type as ScheduledPost['instagramContentType'],
-          status: post.status as ScheduledPost['status'],
-          publishedAt: post.published_at ? new Date(post.published_at).getTime() : undefined,
-          errorMessage: post.error_message || undefined,
-          createdAt: new Date(post.created_at).getTime(),
-          updatedAt: new Date(post.updated_at || post.created_at).getTime(),
-          createdFrom: (post.created_from || 'gallery') as ScheduledPost['createdFrom'],
-        };
-        });
-        setScheduledPosts(mappedPosts.sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp));
-
-        // Load campaigns list from database
-        const dbCampaigns = await getCampaigns(userId, organizationId);
-        const mappedCampaigns: CampaignSummary[] = dbCampaigns.map((c: DbCampaign) => ({
-          id: c.id,
-          name: c.name,
-          status: c.status,
-          createdAt: c.created_at,
-        }));
-        setCampaignsList(mappedCampaigns);
-
-        // Load tournament data from database
-        try {
-          const tournamentData = await getTournamentData(userId, organizationId);
-          if (tournamentData.schedule) {
-            const schedule = tournamentData.schedule;
-            setCurrentScheduleId(schedule.id);
-
-            // Check if week is expired
-            const endDate = new Date(schedule.end_date);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            endDate.setHours(23, 59, 59, 999);
-
-            const expired = today > endDate;
-            setIsWeekExpired(expired);
-
-            if (expired) {
-              console.log('[Tournaments] Week schedule expired, but still loading data');
-            }
-
-            // Always load events (even for expired schedules so user can see data)
-            const mappedEvents: TournamentEvent[] = tournamentData.events.map(e => ({
-              id: e.id,
-              day: e.day_of_week,
-              name: e.name,
-              game: e.game || '',
-              gtd: e.gtd || '',
-              buyIn: e.buy_in || '',
-              rebuy: e.rebuy || '',
-              addOn: e.add_on || '',
-              stack: e.stack || '',
-              players: e.players || '',
-              lateReg: e.late_reg || '',
-              minutes: e.minutes || '',
-              structure: e.structure || '',
-              times: e.times || {},
-            }));
-            setTournamentEvents(mappedEvents);
-
-            // Set week schedule info (handle ISO datetime strings)
-            const startDateOnly = schedule.start_date.split('T')[0];
-            const endDateOnly = schedule.end_date.split('T')[0];
-            const startParts = startDateOnly.split('-');
-            const endParts = endDateOnly.split('-');
-            setWeekScheduleInfo({
-              startDate: `${startParts[2]}/${startParts[1]}`,
-              endDate: `${endParts[2]}/${endParts[1]}`,
-              filename: schedule.filename || 'Planilha carregada',
-            });
-
-            console.log(`[Tournaments] Loaded ${mappedEvents.length} events for week ${schedule.start_date} to ${schedule.end_date}${expired ? ' (expired)' : ''}`);
-          }
-
-          // Load all schedules list
-          const schedulesData = await getWeekSchedulesList(userId, organizationId);
-          setAllSchedules(schedulesData.schedules);
-          console.log(`[Tournaments] Loaded ${schedulesData.schedules.length} total schedules`);
-        } catch (tournamentError) {
-          console.error('[Tournaments] Failed to load tournament data:', tournamentError);
-        }
+        // NOTE: Gallery images, scheduled posts, campaigns, and tournament data
+        // are now loaded via SWR hooks (useGalleryImages, useScheduledPosts, etc.)
+        // This eliminates duplicate fetches and provides automatic caching!
       } catch (e) {
-        console.error('Failed to load data from database:', e);
+        console.error("Failed to load data from database:", e);
       } finally {
         setIsLoading(false);
       }
@@ -280,23 +360,54 @@ function AppContent() {
       initAppData();
     }
   }, [userId, authLoading, organizationId, orgLoaded]);
-  
+
+  // Process tournament schedule info when SWR data loads
+  useEffect(() => {
+    if (swrTournamentSchedule) {
+      const schedule = swrTournamentSchedule;
+      setCurrentScheduleId(schedule.id);
+
+      // Check if week is expired
+      const endDate = new Date(schedule.end_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+      setIsWeekExpired(today > endDate);
+
+      // Set week schedule info (handle ISO datetime strings)
+      const startDateOnly = schedule.start_date.split("T")[0];
+      const endDateOnly = schedule.end_date.split("T")[0];
+      const startParts = startDateOnly.split("-");
+      const endParts = endDateOnly.split("-");
+      setWeekScheduleInfo({
+        startDate: `${startParts[2]}/${startParts[1]}`,
+        endDate: `${endParts[2]}/${endParts[1]}`,
+        filename: schedule.filename || "Planilha carregada",
+      });
+    }
+  }, [swrTournamentSchedule]);
+
   useEffect(() => {
     if (brandProfile && chatHistory.length === 0) {
-      setChatHistory([{
-        role: 'model',
-        parts: [{ text: `Sistema Online. Olá Diretor! Sou o seu Agente Criativo de Elite. O que vamos forjar hoje?` }]
-      }]);
+      setChatHistory([
+        {
+          role: "model",
+          parts: [
+            {
+              text: `Sistema Online. Olá Diretor! Sou o seu Agente Criativo de Elite. O que vamos forjar hoje?`,
+            },
+          ],
+        },
+      ]);
     }
   }, [brandProfile]);
 
-  const handleAddImageToGallery = (image: Omit<GalleryImage, 'id'>): GalleryImage => {
+  const handleAddImageToGallery = (
+    image: Omit<GalleryImage, "id">,
+  ): GalleryImage => {
     // Create image with temporary ID immediately for UI responsiveness
     const tempId = Date.now().toString();
     const newImage: GalleryImage = { ...image, id: tempId };
-
-    // Update state immediately
-    setGalleryImages(prev => [newImage, ...prev].slice(0, MAX_GALLERY_SIZE));
 
     // Save to database in background (don't block UI)
     if (userId) {
@@ -309,69 +420,74 @@ function AppContent() {
         ad_creative_id: image.ad_creative_id,
         video_script_id: image.video_script_id,
         organization_id: organizationId,
-      }).then(dbImage => {
-        // Update the ID with the real database ID
-        setGalleryImages(prev => prev.map(img =>
-          img.id === tempId
-            ? { ...img, id: dbImage.id }
-            : img
-        ));
-      }).catch(e => {
-        console.error('Failed to save image to database:', e);
-      });
+      })
+        .then((dbImage) => {
+          // Update SWR cache with the real database image
+          swrAddGalleryImage(dbImage);
+        })
+        .catch((e) => {
+          console.error("Failed to save image to database:", e);
+        });
     }
 
     return newImage;
   };
 
   const handleUpdateGalleryImage = (imageId: string, newImageSrc: string) => {
-    setGalleryImages(prev => {
-      const updatedGallery = prev.map(img => img.id === imageId ? { ...img, src: newImageSrc } : img);
-      return updatedGallery;
-    });
-    if (toolImageReference?.id === imageId) setToolImageReference({ id: imageId, src: newImageSrc });
+    // Update SWR cache
+    swrUpdateGalleryImage(imageId, { src_url: newImageSrc });
+    if (toolImageReference?.id === imageId)
+      setToolImageReference({ id: imageId, src: newImageSrc });
     // TODO: Add API call to update image in database when endpoint is available
   };
 
   const handleDeleteGalleryImage = async (imageId: string) => {
-    // Remove from local state immediately
-    setGalleryImages(prev => prev.filter(img => img.id !== imageId));
+    // Remove from SWR cache immediately (optimistic update)
+    swrRemoveGalleryImage(imageId);
 
     // Also remove from database
     try {
       await deleteGalleryImage(imageId);
     } catch (e) {
-      console.error('Failed to delete image from database:', e);
+      console.error("Failed to delete image from database:", e);
     }
   };
 
   const handleMarkGalleryImagePublished = (imageId: string) => {
-    // Update local state to mark image as published
-    setGalleryImages(prev => prev.map(img =>
-      img.id === imageId ? { ...img, published_at: new Date().toISOString() } : img
-    ));
+    // Update SWR cache to mark image as published
+    swrUpdateGalleryImage(imageId, {
+      published_at: new Date().toISOString(),
+    } as any);
   };
 
-  const handleAddStyleReference = (ref: Omit<StyleReference, 'id' | 'createdAt'>) => {
-    const newRef: StyleReference = { ...ref, id: Date.now().toString(), createdAt: Date.now() };
-    setStyleReferences(prev => {
+  const handleAddStyleReference = (
+    ref: Omit<StyleReference, "id" | "createdAt">,
+  ) => {
+    const newRef: StyleReference = {
+      ...ref,
+      id: Date.now().toString(),
+      createdAt: Date.now(),
+    };
+    setStyleReferences((prev) => {
       const updated = [newRef, ...prev];
       try {
-        localStorage.setItem('styleReferences', JSON.stringify(updated));
+        localStorage.setItem("styleReferences", JSON.stringify(updated));
       } catch (e) {
-        console.warn('Não foi possível salvar no localStorage (limite excedido)');
+        console.warn(
+          "Não foi possível salvar no localStorage (limite excedido)",
+        );
       }
       return updated;
     });
   };
 
   const handleRemoveStyleReference = (id: string) => {
-    setStyleReferences(prev => {
-      const updated = prev.filter(r => r.id !== id);
+    setStyleReferences((prev) => {
+      const updated = prev.filter((r) => r.id !== id);
       try {
-        localStorage.setItem('styleReferences', JSON.stringify(updated));
+        localStorage.setItem("styleReferences", JSON.stringify(updated));
       } catch (e) {
-        console.warn('Não foi possível salvar no localStorage');
+        console.warn("Não foi possível salvar no localStorage");
       }
       return updated;
     });
@@ -380,13 +496,15 @@ function AppContent() {
 
   const handleSelectStyleReference = (ref: StyleReference) => {
     setSelectedStyleReference(ref);
-    setActiveView('flyer');
+    setActiveView("flyer");
   };
 
   // Scheduled Posts Handlers
-  const handleSchedulePost = async (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleSchedulePost = async (
+    post: Omit<ScheduledPost, "id" | "createdAt" | "updatedAt">,
+  ) => {
     if (!userId) {
-      console.error('Cannot schedule post without userId');
+      console.error("Cannot schedule post without userId");
       return;
     }
 
@@ -410,13 +528,20 @@ function AppContent() {
         created_from: post.createdFrom,
         organization_id: organizationId,
       };
-      console.log('[Schedule] Sending payload:', payload, isPublishNow ? '(PUBLISH NOW)' : '');
+      console.log(
+        "[Schedule] Sending payload:",
+        payload,
+        isPublishNow ? "(PUBLISH NOW)" : "",
+      );
       const dbPost = await createScheduledPost(userId, payload);
+
+      // Add to SWR cache (optimistic update)
+      swrAddScheduledPost(dbPost);
 
       const newPost: ScheduledPost = {
         id: dbPost.id,
-        type: dbPost.content_type as ScheduledPost['type'],
-        contentId: dbPost.content_id || '',
+        type: dbPost.content_type as ScheduledPost["type"],
+        contentId: dbPost.content_id || "",
         imageUrl: dbPost.image_url,
         caption: dbPost.caption,
         hashtags: dbPost.hashtags || [],
@@ -424,19 +549,22 @@ function AppContent() {
         scheduledTime: dbPost.scheduled_time,
         scheduledTimestamp: new Date(dbPost.scheduled_timestamp).getTime(),
         timezone: dbPost.timezone,
-        platforms: dbPost.platforms as ScheduledPost['platforms'],
-        instagramContentType: dbPost.instagram_content_type as ScheduledPost['instagramContentType'],
-        status: dbPost.status as ScheduledPost['status'],
+        platforms: dbPost.platforms as ScheduledPost["platforms"],
+        instagramContentType:
+          dbPost.instagram_content_type as ScheduledPost["instagramContentType"],
+        status: dbPost.status as ScheduledPost["status"],
         createdAt: new Date(dbPost.created_at).getTime(),
         updatedAt: Date.now(),
-        createdFrom: (dbPost.created_from || 'gallery') as ScheduledPost['createdFrom'],
+        createdFrom: (dbPost.created_from ||
+          "gallery") as ScheduledPost["createdFrom"],
       };
 
-      setScheduledPosts(prev => [...prev, newPost].sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp));
-
       // 2. If "Publish Now", immediately publish to Instagram
-      if (isPublishNow && (post.platforms === 'instagram' || post.platforms === 'both')) {
-        console.log('[Schedule] Publishing immediately...');
+      if (
+        isPublishNow &&
+        (post.platforms === "instagram" || post.platforms === "both")
+      ) {
+        console.log("[Schedule] Publishing immediately...");
         // Use setTimeout to ensure state is updated before publishing
         setTimeout(() => {
           handlePublishToInstagram(newPost);
@@ -447,43 +575,60 @@ function AppContent() {
           const qstashResult = await schedulePostWithQStash(
             dbPost.id,
             userId,
-            post.scheduledTimestamp
+            post.scheduledTimestamp,
           );
-          console.log(`[QStash] Post ${dbPost.id} scheduled for ${qstashResult.scheduledFor}`);
+          console.log(
+            `[QStash] Post ${dbPost.id} scheduled for ${qstashResult.scheduledFor}`,
+          );
         } catch (qstashError) {
-          console.warn('[QStash] Failed to schedule, will rely on manual publish:', qstashError);
+          console.warn(
+            "[QStash] Failed to schedule, will rely on manual publish:",
+            qstashError,
+          );
           // Don't fail the whole operation - post is saved, just won't auto-publish
         }
       }
     } catch (e) {
-      console.error('Failed to schedule post:', e);
+      console.error("Failed to schedule post:", e);
     }
   };
 
-  const handleUpdateScheduledPost = async (postId: string, updates: Partial<ScheduledPost>) => {
+  const handleUpdateScheduledPost = async (
+    postId: string,
+    updates: Partial<ScheduledPost>,
+  ) => {
     try {
       // Map frontend field names to database field names
       const dbUpdates: Record<string, unknown> = {};
       if (updates.status !== undefined) dbUpdates.status = updates.status;
-      if (updates.publishedAt !== undefined) dbUpdates.published_at = new Date(updates.publishedAt).toISOString();
-      if (updates.errorMessage !== undefined) dbUpdates.error_message = updates.errorMessage;
-      if (updates.instagramMediaId !== undefined) dbUpdates.instagram_media_id = updates.instagramMediaId;
-      if (updates.publishAttempts !== undefined) dbUpdates.publish_attempts = updates.publishAttempts;
-      if (updates.lastPublishAttempt !== undefined) dbUpdates.last_publish_attempt = new Date(updates.lastPublishAttempt).toISOString();
+      if (updates.publishedAt !== undefined)
+        dbUpdates.published_at = new Date(updates.publishedAt).toISOString();
+      if (updates.errorMessage !== undefined)
+        dbUpdates.error_message = updates.errorMessage;
+      if (updates.instagramMediaId !== undefined)
+        dbUpdates.instagram_media_id = updates.instagramMediaId;
+      if (updates.publishAttempts !== undefined)
+        dbUpdates.publish_attempts = updates.publishAttempts;
+      if (updates.lastPublishAttempt !== undefined)
+        dbUpdates.last_publish_attempt = new Date(
+          updates.lastPublishAttempt,
+        ).toISOString();
 
       await updateScheduledPostApi(postId, dbUpdates);
-      setScheduledPosts(prev => prev.map(p => p.id === postId ? { ...p, ...updates } : p));
+      // Update SWR cache
+      swrUpdateScheduledPost(postId, dbUpdates);
     } catch (e) {
-      console.error('Failed to update scheduled post:', e);
+      console.error("Failed to update scheduled post:", e);
     }
   };
 
   const handleDeleteScheduledPost = async (postId: string) => {
     try {
+      // Remove from SWR cache immediately (optimistic update)
+      swrRemoveScheduledPost(postId);
       await deleteScheduledPostApi(postId);
-      setScheduledPosts(prev => prev.filter(p => p.id !== postId));
     } catch (e) {
-      console.error('Failed to delete scheduled post:', e);
+      console.error("Failed to delete scheduled post:", e);
     }
   };
 
@@ -491,158 +636,180 @@ function AppContent() {
     const postId = post.id;
 
     // Initialize publishing state
-    setPublishingStates(prev => ({
+    setPublishingStates((prev) => ({
       ...prev,
-      [postId]: { step: 'uploading_image', message: 'Preparando imagem...', progress: 10 }
+      [postId]: {
+        step: "uploading_image",
+        message: "Preparando imagem...",
+        progress: 10,
+      },
     }));
 
     try {
       // Update post status to publishing
-      await handleUpdateScheduledPost(postId, { status: 'publishing' });
+      await handleUpdateScheduledPost(postId, { status: "publishing" });
 
       // Step 1: Upload image to get HTTP URL (Instagram requires HTTP URLs, not data URLs)
-      setPublishingStates(prev => ({
+      setPublishingStates((prev) => ({
         ...prev,
-        [postId]: { step: 'uploading_image', message: 'Fazendo upload da imagem...', progress: 15 }
+        [postId]: {
+          step: "uploading_image",
+          message: "Fazendo upload da imagem...",
+          progress: 15,
+        },
       }));
 
       const imageUrl = await uploadImageForInstagram(post.imageUrl);
 
       // Step 2: Prepare caption with hashtags
-      const fullCaption = `${post.caption}\n\n${post.hashtags.join(' ')}`;
+      const fullCaption = `${post.caption}\n\n${post.hashtags.join(" ")}`;
 
       // Step 3: Determine content type (default to photo)
-      const contentType: InstagramContentType = post.instagramContentType || 'photo';
+      const contentType: InstagramContentType =
+        post.instagramContentType || "photo";
 
       // Step 4: Publish to Instagram with progress tracking
-      const result = await publishToInstagram(imageUrl, fullCaption, contentType, (progress) => {
-        setPublishingStates(prev => ({
-          ...prev,
-          [postId]: progress
-        }));
-      });
+      const result = await publishToInstagram(
+        imageUrl,
+        fullCaption,
+        contentType,
+        (progress) => {
+          setPublishingStates((prev) => ({
+            ...prev,
+            [postId]: progress,
+          }));
+        },
+      );
 
       if (result.success) {
         await handleUpdateScheduledPost(postId, {
-          status: 'published',
+          status: "published",
           publishedAt: Date.now(),
-          instagramMediaId: result.mediaId
+          instagramMediaId: result.mediaId,
         });
 
-        setPublishingStates(prev => ({
+        setPublishingStates((prev) => ({
           ...prev,
-          [postId]: { step: 'completed', message: 'Publicado!', progress: 100, postId: result.mediaId }
+          [postId]: {
+            step: "completed",
+            message: "Publicado!",
+            progress: 100,
+            postId: result.mediaId,
+          },
         }));
 
         // Clear state after 3 seconds
         setTimeout(() => {
-          setPublishingStates(prev => {
+          setPublishingStates((prev) => {
             const { [postId]: _, ...rest } = prev;
             return rest;
           });
         }, 3000);
       } else {
-        throw new Error(result.errorMessage || 'Falha na publicacao');
+        throw new Error(result.errorMessage || "Falha na publicacao");
       }
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
 
       await handleUpdateScheduledPost(postId, {
-        status: 'failed',
+        status: "failed",
         errorMessage,
         publishAttempts: (post.publishAttempts || 0) + 1,
-        lastPublishAttempt: Date.now()
+        lastPublishAttempt: Date.now(),
       });
 
-      setPublishingStates(prev => ({
+      setPublishingStates((prev) => ({
         ...prev,
-        [postId]: { step: 'failed', message: errorMessage, progress: 0 }
+        [postId]: { step: "failed", message: errorMessage, progress: 0 },
       }));
     }
   };
 
-  const handleGenerateCampaign = async (input: ContentInput, options: GenerationOptions) => {
-      setIsGenerating(true);
-      setError(null);
-      setActiveView('campaign');
-      try {
-          const r = await generateCampaign(brandProfile!, input, options);
+  const handleGenerateCampaign = async (
+    input: ContentInput,
+    options: GenerationOptions,
+  ) => {
+    setIsGenerating(true);
+    setError(null);
+    setActiveView("campaign");
+    try {
+      const r = await generateCampaign(brandProfile!, input, options);
 
-          // Save campaign to database if authenticated
-          if (userId) {
-            try {
-              // Generate a name from the transcript (first 50 chars)
-              const campaignName = input.transcript
-                ? input.transcript.substring(0, 50) + (input.transcript.length > 50 ? '...' : '')
-                : `Campanha ${new Date().toLocaleDateString('pt-BR')}`;
+      // Save campaign to database if authenticated
+      if (userId) {
+        try {
+          // Generate a name from the transcript (first 50 chars)
+          const campaignName = input.transcript
+            ? input.transcript.substring(0, 50) +
+              (input.transcript.length > 50 ? "..." : "")
+            : `Campanha ${new Date().toLocaleDateString("pt-BR")}`;
 
-              const savedCampaign = await createCampaignApi(userId, {
-                name: campaignName,
-                input_transcript: input.transcript,
-                generation_options: options as unknown as Record<string, unknown>,
-                status: 'completed',
-                organization_id: organizationId,
-                video_clip_scripts: r.videoClipScripts.map(v => ({
-                  title: v.title,
-                  hook: v.hook,
-                  image_prompt: v.image_prompt,
-                  audio_script: v.audio_script,
-                  scenes: v.scenes,
-                })),
-                posts: r.posts.map(p => ({
-                  platform: p.platform,
-                  content: p.content,
-                  hashtags: p.hashtags,
-                  image_prompt: p.image_prompt,
-                })),
-                ad_creatives: r.adCreatives.map(a => ({
-                  platform: a.platform,
-                  headline: a.headline,
-                  body: a.body,
-                  cta: a.cta,
-                  image_prompt: a.image_prompt,
-                })),
-              });
+          const savedCampaign = await createCampaignApi(userId, {
+            name: campaignName,
+            input_transcript: input.transcript,
+            generation_options: options as unknown as Record<string, unknown>,
+            status: "completed",
+            organization_id: organizationId,
+            video_clip_scripts: r.videoClipScripts.map((v) => ({
+              title: v.title,
+              hook: v.hook,
+              image_prompt: v.image_prompt,
+              audio_script: v.audio_script,
+              scenes: v.scenes,
+            })),
+            posts: r.posts.map((p) => ({
+              platform: p.platform,
+              content: p.content,
+              hashtags: p.hashtags,
+              image_prompt: p.image_prompt,
+            })),
+            ad_creatives: r.adCreatives.map((a) => ({
+              platform: a.platform,
+              headline: a.headline,
+              body: a.body,
+              cta: a.cta,
+              image_prompt: a.image_prompt,
+            })),
+          });
 
-              // Update campaign with database ID
-              r.id = savedCampaign.id;
-              r.name = campaignName;
-              r.inputTranscript = input.transcript;
-              r.createdAt = savedCampaign.created_at;
+          // Update campaign with database ID
+          r.id = savedCampaign.id;
+          r.name = campaignName;
+          r.inputTranscript = input.transcript;
+          r.createdAt = savedCampaign.created_at;
 
-              // Update campaigns list
-              setCampaignsList(prev => [{
-                id: savedCampaign.id,
-                name: campaignName,
-                status: 'completed',
-                createdAt: savedCampaign.created_at,
-              }, ...prev]);
+          // Update SWR cache for campaigns list
+          swrAddCampaign(savedCampaign);
 
-              console.log('[Campaign] Saved to database:', savedCampaign.id);
-            } catch (saveError) {
-              console.error('[Campaign] Failed to save to database:', saveError);
-              // Continue even if save fails - campaign is still in memory
-            }
-          }
-
-          setCampaign(r);
-      } catch (e: any) {
-          setError(e.message);
-      } finally {
-          setIsGenerating(false);
+          console.log("[Campaign] Saved to database:", savedCampaign.id);
+        } catch (saveError) {
+          console.error("[Campaign] Failed to save to database:", saveError);
+          // Continue even if save fails - campaign is still in memory
+        }
       }
+
+      setCampaign(r);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleLoadCampaign = async (campaignId: string) => {
     if (!userId) {
-      console.error('Cannot load campaign: user not authenticated');
+      console.error("Cannot load campaign: user not authenticated");
       return;
     }
     try {
-      console.log('[Campaign] Loading campaign:', campaignId);
-      const fullCampaign = await getCampaignById(campaignId, userId, organizationId);
-      console.log('[Campaign] API response:', fullCampaign);
+      console.log("[Campaign] Loading campaign:", campaignId);
+      const fullCampaign = await getCampaignById(
+        campaignId,
+        userId,
+        organizationId,
+      );
+      console.log("[Campaign] API response:", fullCampaign);
 
       if (fullCampaign) {
         const loadedCampaign: MarketingCampaign = {
@@ -651,82 +818,110 @@ function AppContent() {
           inputTranscript: fullCampaign.input_transcript || undefined,
           createdAt: fullCampaign.created_at,
           updatedAt: fullCampaign.updated_at,
-          videoClipScripts: (fullCampaign.video_clip_scripts || []).map(v => ({
-            id: v.id,  // Include database ID for gallery image linking
-            title: v.title,
-            hook: v.hook,
-            image_prompt: v.image_prompt || '',
-            audio_script: v.audio_script || '',
-            scenes: v.scenes || [],
-          })),
-          posts: (fullCampaign.posts || []).map(p => ({
-            id: p.id,  // Include database ID for image updates
-            platform: p.platform as 'Instagram' | 'LinkedIn' | 'Twitter' | 'Facebook',
+          videoClipScripts: (fullCampaign.video_clip_scripts || []).map(
+            (v) => ({
+              id: v.id, // Include database ID for gallery image linking
+              title: v.title,
+              hook: v.hook,
+              image_prompt: v.image_prompt || "",
+              audio_script: v.audio_script || "",
+              scenes: v.scenes || [],
+            }),
+          ),
+          posts: (fullCampaign.posts || []).map((p) => ({
+            id: p.id, // Include database ID for image updates
+            platform: p.platform as
+              | "Instagram"
+              | "LinkedIn"
+              | "Twitter"
+              | "Facebook",
             content: p.content,
             hashtags: p.hashtags || [],
-            image_prompt: p.image_prompt || '',
-            image_url: p.image_url || null,  // Include saved image URL
+            image_prompt: p.image_prompt || "",
+            image_url: p.image_url || null, // Include saved image URL
           })),
-          adCreatives: (fullCampaign.ad_creatives || []).map(a => ({
-            id: a.id,  // Include database ID for image updates
-            platform: a.platform as 'Facebook' | 'Google',
+          adCreatives: (fullCampaign.ad_creatives || []).map((a) => ({
+            id: a.id, // Include database ID for image updates
+            platform: a.platform as "Facebook" | "Google",
             headline: a.headline,
             body: a.body,
             cta: a.cta,
-            image_prompt: a.image_prompt || '',
-            image_url: a.image_url || null,  // Include saved image URL
+            image_prompt: a.image_prompt || "",
+            image_url: a.image_url || null, // Include saved image URL
           })),
         };
-        console.log('[Campaign] Loaded:', loadedCampaign.videoClipScripts.length, 'clips,', loadedCampaign.posts.length, 'posts,', loadedCampaign.adCreatives.length, 'ads');
+        console.log(
+          "[Campaign] Loaded:",
+          loadedCampaign.videoClipScripts.length,
+          "clips,",
+          loadedCampaign.posts.length,
+          "posts,",
+          loadedCampaign.adCreatives.length,
+          "ads",
+        );
         setCampaign(loadedCampaign);
-        setActiveView('campaign');
+        setActiveView("campaign");
       } else {
-        console.error('[Campaign] API returned null for campaign:', campaignId);
-        setError('Campanha não encontrada');
+        console.error("[Campaign] API returned null for campaign:", campaignId);
+        setError("Campanha não encontrada");
       }
     } catch (error) {
-      console.error('Failed to load campaign:', error);
-      setError('Falha ao carregar campanha');
+      console.error("Failed to load campaign:", error);
+      setError("Falha ao carregar campanha");
     }
   };
 
   const handlePublishFlyerToCampaign = (text: string, flyer: GalleryImage) => {
-      const input: ContentInput = {
-          transcript: text,
-          productImages: [{
-              base64: flyer.src.split(',')[1],
-              mimeType: flyer.src.match(/:(.*?);/)?.[1] || 'image/png'
-          }],
-          inspirationImages: null
-      };
-      const options: GenerationOptions = {
-          videoClipScripts: { generate: true, count: 1 },
-          posts: { instagram: { generate: true, count: 1 }, facebook: { generate: true, count: 1 }, twitter: { generate: true, count: 1 }, linkedin: { generate: false, count: 0 } },
-          adCreatives: { facebook: { generate: true, count: 1 }, google: { generate: false, count: 0 } }
-      };
-      setCampaign(null);
-      handleGenerateCampaign(input, options);
+    const input: ContentInput = {
+      transcript: text,
+      productImages: [
+        {
+          base64: flyer.src.split(",")[1],
+          mimeType: flyer.src.match(/:(.*?);/)?.[1] || "image/png",
+        },
+      ],
+      inspirationImages: null,
+    };
+    const options: GenerationOptions = {
+      videoClipScripts: { generate: true, count: 1 },
+      posts: {
+        instagram: { generate: true, count: 1 },
+        facebook: { generate: true, count: 1 },
+        twitter: { generate: true, count: 1 },
+        linkedin: { generate: false, count: 0 },
+      },
+      adCreatives: {
+        facebook: { generate: true, count: 1 },
+        google: { generate: false, count: 0 },
+      },
+    };
+    setCampaign(null);
+    handleGenerateCampaign(input, options);
   };
 
   const handleSelectSchedule = async (schedule: WeekScheduleWithCount) => {
     if (!userId) return;
     try {
       // Load events for selected schedule
-      const eventsData = await getScheduleEvents(userId, schedule.id, organizationId);
-      const mappedEvents: TournamentEvent[] = eventsData.events.map(e => ({
+      const eventsData = await getScheduleEvents(
+        userId,
+        schedule.id,
+        organizationId,
+      );
+      const mappedEvents: TournamentEvent[] = eventsData.events.map((e) => ({
         id: e.id,
         day: e.day_of_week,
         name: e.name,
-        game: e.game || '',
-        gtd: e.gtd || '',
-        buyIn: e.buy_in || '',
-        rebuy: e.rebuy || '',
-        addOn: e.add_on || '',
-        stack: e.stack || '',
-        players: e.players || '',
-        lateReg: e.late_reg || '',
-        minutes: e.minutes || '',
-        structure: e.structure || '',
+        game: e.game || "",
+        gtd: e.gtd || "",
+        buyIn: e.buy_in || "",
+        rebuy: e.rebuy || "",
+        addOn: e.add_on || "",
+        stack: e.stack || "",
+        players: e.players || "",
+        lateReg: e.late_reg || "",
+        minutes: e.minutes || "",
+        structure: e.structure || "",
         times: e.times || {},
       }));
       setTournamentEvents(mappedEvents);
@@ -740,195 +935,350 @@ function AppContent() {
       setIsWeekExpired(today > endDate);
 
       // Set week schedule info (handle ISO datetime strings)
-      const startDateOnly = schedule.start_date.split('T')[0];
-      const endDateOnly = schedule.end_date.split('T')[0];
-      const startParts = startDateOnly.split('-');
-      const endParts = endDateOnly.split('-');
+      const startDateOnly = schedule.start_date.split("T")[0];
+      const endDateOnly = schedule.end_date.split("T")[0];
+      const startParts = startDateOnly.split("-");
+      const endParts = endDateOnly.split("-");
       setWeekScheduleInfo({
         startDate: `${startParts[2]}/${startParts[1]}`,
         endDate: `${endParts[2]}/${endParts[1]}`,
-        filename: schedule.filename || 'Planilha carregada',
+        filename: schedule.filename || "Planilha carregada",
       });
 
-      console.log(`[Tournaments] Selected schedule ${schedule.id} with ${mappedEvents.length} events`);
+      console.log(
+        `[Tournaments] Selected schedule ${schedule.id} with ${mappedEvents.length} events`,
+      );
     } catch (error) {
-      console.error('[Tournaments] Failed to load schedule events:', error);
+      console.error("[Tournaments] Failed to load schedule events:", error);
     }
   };
 
   const executeTool = async (toolCall: any): Promise<any> => {
-      const { name, args } = toolCall;
-      if (name === 'create_image') {
-          try {
-              const productImages = lastUploadedImage ? [{ base64: lastUploadedImage.src.split(',')[1], mimeType: lastUploadedImage.src.match(/:(.*?);/)?.[1] || 'image/png' }] : undefined;
-              const imageUrl = await generateImage(args.description, brandProfile!, { aspectRatio: args.aspect_ratio || '1:1', model: 'gemini-3-pro-image-preview', productImages });
-              const newImg = handleAddImageToGallery({ src: imageUrl, prompt: args.description, source: 'Edição', model: 'gemini-3-pro-image-preview' });
-              setToolImageReference({ id: newImg.id, src: newImg.src });
-              return { success: true, image_data: imageUrl, message: "Asset visual forjado com sucesso." };
-          } catch (e: any) { return { error: e.message }; }
+    const { name, args } = toolCall;
+    if (name === "create_image") {
+      try {
+        const productImages = lastUploadedImage
+          ? [
+              {
+                base64: lastUploadedImage.src.split(",")[1],
+                mimeType:
+                  lastUploadedImage.src.match(/:(.*?);/)?.[1] || "image/png",
+              },
+            ]
+          : undefined;
+        const imageUrl = await generateImage(args.description, brandProfile!, {
+          aspectRatio: args.aspect_ratio || "1:1",
+          model: "gemini-3-pro-image-preview",
+          productImages,
+        });
+        const newImg = handleAddImageToGallery({
+          src: imageUrl,
+          prompt: args.description,
+          source: "Edição",
+          model: "gemini-3-pro-image-preview",
+        });
+        setToolImageReference({ id: newImg.id, src: newImg.src });
+        return {
+          success: true,
+          image_data: imageUrl,
+          message: "Asset visual forjado com sucesso.",
+        };
+      } catch (e: any) {
+        return { error: e.message };
       }
-      if (name === 'edit_referenced_image') {
-        if (!toolImageReference) return { error: "Nenhuma imagem em foco." };
-        try {
-          const [h, b64] = toolImageReference.src.split(',');
-          const m = h.match(/:(.*?);/)?.[1] || 'image/png';
-          const newUrl = await editImage(b64, m, args.prompt);
-          handleUpdateGalleryImage(toolImageReference.id, newUrl);
-          return { success: true, image_data: newUrl, message: "Ajuste aplicado." };
-        } catch (e: any) { return { error: e.message }; }
+    }
+    if (name === "edit_referenced_image") {
+      if (!toolImageReference) return { error: "Nenhuma imagem em foco." };
+      try {
+        const [h, b64] = toolImageReference.src.split(",");
+        const m = h.match(/:(.*?);/)?.[1] || "image/png";
+        const newUrl = await editImage(b64, m, args.prompt);
+        handleUpdateGalleryImage(toolImageReference.id, newUrl);
+        return {
+          success: true,
+          image_data: newUrl,
+          message: "Ajuste aplicado.",
+        };
+      } catch (e: any) {
+        return { error: e.message };
       }
-      if (name === 'add_collab_logo_to_image') {
-        if (!toolImageReference) return { error: "Nenhuma imagem de arte em foco para adicionar o logo." };
-        if (!lastUploadedImage) return { error: "Nenhum logo foi enviado no chat. Peça ao usuário para anexar o logo." };
-        try {
-          const [h, b64] = toolImageReference.src.split(',');
-          const m = h.match(/:(.*?);/)?.[1] || 'image/png';
-          const editPrompt = `Adicione um logotipo de parceiro na imagem. ${args.style_instruction || 'Posicione no canto inferior direito de forma harmoniosa.'}`;
-          const newUrl = await editImage(b64, m, editPrompt);
-          handleUpdateGalleryImage(toolImageReference.id, newUrl);
-          return { success: true, image_data: newUrl, message: "Logo de parceria adicionado com sucesso." };
-        } catch (e: any) { return { error: e.message }; }
+    }
+    if (name === "add_collab_logo_to_image") {
+      if (!toolImageReference)
+        return {
+          error: "Nenhuma imagem de arte em foco para adicionar o logo.",
+        };
+      if (!lastUploadedImage)
+        return {
+          error:
+            "Nenhum logo foi enviado no chat. Peça ao usuário para anexar o logo.",
+        };
+      try {
+        const [h, b64] = toolImageReference.src.split(",");
+        const m = h.match(/:(.*?);/)?.[1] || "image/png";
+        const editPrompt = `Adicione um logotipo de parceiro na imagem. ${args.style_instruction || "Posicione no canto inferior direito de forma harmoniosa."}`;
+        const newUrl = await editImage(b64, m, editPrompt);
+        handleUpdateGalleryImage(toolImageReference.id, newUrl);
+        return {
+          success: true,
+          image_data: newUrl,
+          message: "Logo de parceria adicionado com sucesso.",
+        };
+      } catch (e: any) {
+        return { error: e.message };
       }
-      if (name === 'create_brand_logo') {
-        try {
-          const logoUrl = await generateLogo(args.prompt);
-          const newImg = handleAddImageToGallery({ src: logoUrl, prompt: args.prompt, source: 'Logo', model: 'imagen-3.0-generate-002' });
-          setToolImageReference({ id: newImg.id, src: newImg.src });
-          return { success: true, image_data: logoUrl, message: "Logo criado com sucesso." };
-        } catch (e: any) { return { error: e.message }; }
+    }
+    if (name === "create_brand_logo") {
+      try {
+        const logoUrl = await generateLogo(args.prompt);
+        const newImg = handleAddImageToGallery({
+          src: logoUrl,
+          prompt: args.prompt,
+          source: "Logo",
+          model: "imagen-3.0-generate-002",
+        });
+        setToolImageReference({ id: newImg.id, src: newImg.src });
+        return {
+          success: true,
+          image_data: logoUrl,
+          message: "Logo criado com sucesso.",
+        };
+      } catch (e: any) {
+        return { error: e.message };
       }
-      return { error: `Comando não reconhecido: ${name}` };
+    }
+    return { error: `Comando não reconhecido: ${name}` };
   };
 
-  const handleAssistantSendMessage = async (message: string, image: ChatReferenceImage | null) => {
-      setIsAssistantLoading(true);
-      const userMessageParts: ChatPart[] = [];
-      if (image) {
-        setLastUploadedImage(image);
-        if (!image.id.startsWith('local-')) setToolImageReference(image);
-        const { base64, mimeType } = await resizeImageForChat(image.src, 384, 384);
-        userMessageParts.push({ inlineData: { data: base64, mimeType } });
+  const handleAssistantSendMessage = async (
+    message: string,
+    image: ChatReferenceImage | null,
+  ) => {
+    setIsAssistantLoading(true);
+    const userMessageParts: ChatPart[] = [];
+    if (image) {
+      setLastUploadedImage(image);
+      if (!image.id.startsWith("local-")) setToolImageReference(image);
+      const { base64, mimeType } = await resizeImageForChat(
+        image.src,
+        384,
+        384,
+      );
+      userMessageParts.push({ inlineData: { data: base64, mimeType } });
+    }
+    if (message.trim()) userMessageParts.push({ text: message });
+    const userMessage: ChatMessage = { role: "user", parts: userMessageParts };
+    setChatReferenceImage(null);
+    const history = [...chatHistory, userMessage];
+    setChatHistory(history);
+    try {
+      setChatHistory((prev) => [
+        ...prev,
+        { role: "model", parts: [{ text: "" }] },
+      ]);
+      const streamResponse = await runAssistantConversationStream(
+        getTruncatedHistory(history),
+        brandProfile,
+      );
+      let accumulatedText = "";
+      let functionCall: any;
+      for await (const chunk of streamResponse) {
+        if (chunk.text) {
+          accumulatedText += chunk.text;
+          setChatHistory((prev) => {
+            const next = [...prev];
+            if (next[next.length - 1].role === "model")
+              next[next.length - 1] = {
+                ...next[next.length - 1],
+                parts: [{ text: accumulatedText }],
+              };
+            return next;
+          });
+        }
+        const fc = chunk.candidates?.[0]?.content?.parts?.find(
+          (p) => p.functionCall,
+        )?.functionCall;
+        if (fc) functionCall = fc;
       }
-      if (message.trim()) userMessageParts.push({ text: message });
-      const userMessage: ChatMessage = { role: 'user', parts: userMessageParts };
-      setChatReferenceImage(null);
-      const history = [...chatHistory, userMessage];
-      setChatHistory(history);
-      try {
-          setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: '' }] }]);
-          const streamResponse = await runAssistantConversationStream(getTruncatedHistory(history), brandProfile);
-          let accumulatedText = '';
-          let functionCall: any;
-          for await (const chunk of streamResponse) {
-              if (chunk.text) {
-                  accumulatedText += chunk.text;
-                  setChatHistory(prev => {
-                      const next = [...prev];
-                      if (next[next.length - 1].role === 'model') next[next.length - 1] = { ...next[next.length - 1], parts: [{ text: accumulatedText }] };
-                      return next;
-                  });
-              }
-              const fc = chunk.candidates?.[0]?.content?.parts?.find(p => p.functionCall)?.functionCall;
-              if (fc) functionCall = fc;
-          }
-          if (functionCall) {
-              const modelMsg: ChatMessage = { role: 'model', parts: [{ functionCall }] };
-              setChatHistory(prev => { const next = [...prev]; next[next.length - 1] = modelMsg; return next; });
-              const result = await executeTool(functionCall);
-              const toolMsg: ChatMessage = { role: 'user', parts: [{ functionResponse: { name: functionCall.name, response: result } }] };
-              setChatHistory(prev => [...prev, toolMsg]);
-              if (result.image_data) {
-                  const [header, base64] = result.image_data.split(',');
-                  setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: "Gerei uma prévia:", inlineData: { data: base64, mimeType: header.match(/:(.*?);/)?.[1] || 'image/png' } }] }]);
-              }
-              setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: '' }] }]);
-              const finalStream = await runAssistantConversationStream(getTruncatedHistory([...history, modelMsg, toolMsg]), brandProfile);
-              let finalAcc = '';
-              for await (const chunk of finalStream) {
-                   if (chunk.text) {
-                      finalAcc += chunk.text;
-                      setChatHistory(prev => {
-                          const next = [...prev];
-                          if (next[next.length - 1].role === 'model') next[next.length - 1] = { ...next[next.length - 1], parts: [{ text: finalAcc }] };
-                          return next;
-                      });
-                  }
-              }
-          } 
-      } catch (err: any) {
-           setChatHistory(prev => {
+      if (functionCall) {
+        const modelMsg: ChatMessage = {
+          role: "model",
+          parts: [{ functionCall }],
+        };
+        setChatHistory((prev) => {
+          const next = [...prev];
+          next[next.length - 1] = modelMsg;
+          return next;
+        });
+        const result = await executeTool(functionCall);
+        const toolMsg: ChatMessage = {
+          role: "user",
+          parts: [
+            { functionResponse: { name: functionCall.name, response: result } },
+          ],
+        };
+        setChatHistory((prev) => [...prev, toolMsg]);
+        if (result.image_data) {
+          const [header, base64] = result.image_data.split(",");
+          setChatHistory((prev) => [
+            ...prev,
+            {
+              role: "model",
+              parts: [
+                {
+                  text: "Gerei uma prévia:",
+                  inlineData: {
+                    data: base64,
+                    mimeType: header.match(/:(.*?);/)?.[1] || "image/png",
+                  },
+                },
+              ],
+            },
+          ]);
+        }
+        setChatHistory((prev) => [
+          ...prev,
+          { role: "model", parts: [{ text: "" }] },
+        ]);
+        const finalStream = await runAssistantConversationStream(
+          getTruncatedHistory([...history, modelMsg, toolMsg]),
+          brandProfile,
+        );
+        let finalAcc = "";
+        for await (const chunk of finalStream) {
+          if (chunk.text) {
+            finalAcc += chunk.text;
+            setChatHistory((prev) => {
               const next = [...prev];
-              if (next[next.length - 1].role === 'model') next[next.length - 1] = { ...next[next.length - 1], parts: [{ text: `Erro: ${err.message}` }] };
+              if (next[next.length - 1].role === "model")
+                next[next.length - 1] = {
+                  ...next[next.length - 1],
+                  parts: [{ text: finalAcc }],
+                };
               return next;
-           });
-      } finally { setIsAssistantLoading(false); }
+            });
+          }
+        }
+      }
+    } catch (err: any) {
+      setChatHistory((prev) => {
+        const next = [...prev];
+        if (next[next.length - 1].role === "model")
+          next[next.length - 1] = {
+            ...next[next.length - 1],
+            parts: [{ text: `Erro: ${err.message}` }],
+          };
+        return next;
+      });
+    } finally {
+      setIsAssistantLoading(false);
+    }
   };
 
   const parseWeekFromFilename = (filename: string): WeekScheduleInfo | null => {
     // Padrão: "PPST 16 18 al 21 18" ou "PPST_16_18_al_21_18" ou "PPST 22-12 al 28-12"
     // Aceita espaços, underscores ou hífens como separadores
-    const match = filename.match(/(\d{1,2})[\s_-](\d{1,2})[\s_-]al[\s_-](\d{1,2})[\s_-](\d{1,2})/i);
+    const match = filename.match(
+      /(\d{1,2})[\s_-](\d{1,2})[\s_-]al[\s_-](\d{1,2})[\s_-](\d{1,2})/i,
+    );
     if (match) {
       const [, startDay, startMonth, endDay, endMonth] = match;
       return {
-        startDate: `${startDay.padStart(2, '0')}/${startMonth.padStart(2, '0')}`,
-        endDate: `${endDay.padStart(2, '0')}/${endMonth.padStart(2, '0')}`,
-        filename
+        startDate: `${startDay.padStart(2, "0")}/${startMonth.padStart(2, "0")}`,
+        endDate: `${endDay.padStart(2, "0")}/${endMonth.padStart(2, "0")}`,
+        filename,
       };
     }
     return null;
   };
 
   const handleTournamentFileUpload = (file: File) => {
-    console.log('[Upload] Starting file upload:', file.name);
+    console.log("[Upload] Starting file upload:", file.name);
     return new Promise<void>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          console.log('[Upload] File read complete, parsing...');
+          console.log("[Upload] File read complete, parsing...");
           const data = new Uint8Array(e.target!.result as ArrayBuffer);
-          const wb = XLSX.read(data, { type: 'array' });
+          const wb = XLSX.read(data, { type: "array" });
           const sheet = wb.Sheets[wb.SheetNames[0]];
-          const json: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+          const json: any[][] = XLSX.utils.sheet_to_json(sheet, {
+            header: 1,
+            defval: "",
+          });
           const events: TournamentEvent[] = [];
           let currentDay = "";
-          const dayMap: any = { 'MONDAY': 'MONDAY', 'SEGUNDA': 'MONDAY', 'TUESDAY': 'TUESDAY', 'TERÇA': 'TUESDAY', 'WEDNESDAY': 'WEDNESDAY', 'QUARTA': 'WEDNESDAY', 'THURSDAY': 'THURSDAY', 'QUINTA': 'THURSDAY', 'FRIDAY': 'FRIDAY', 'SEXTA': 'FRIDAY', 'SATURDAY': 'SATURDAY', 'SÁBADO': 'SATURDAY', 'SUNDAY': 'SUNDAY', 'DOMINGO': 'SUNDAY' };
+          const dayMap: any = {
+            MONDAY: "MONDAY",
+            SEGUNDA: "MONDAY",
+            TUESDAY: "TUESDAY",
+            TERÇA: "TUESDAY",
+            WEDNESDAY: "WEDNESDAY",
+            QUARTA: "WEDNESDAY",
+            THURSDAY: "THURSDAY",
+            QUINTA: "THURSDAY",
+            FRIDAY: "FRIDAY",
+            SEXTA: "FRIDAY",
+            SATURDAY: "SATURDAY",
+            SÁBADO: "SATURDAY",
+            SUNDAY: "SUNDAY",
+            DOMINGO: "SUNDAY",
+          };
           json.forEach((row, i) => {
-            const raw = String(row[1] || '').trim().toUpperCase();
+            const raw = String(row[1] || "")
+              .trim()
+              .toUpperCase();
             if (dayMap[raw]) currentDay = dayMap[raw];
             else if (row[9] && i > 2 && row[9] !== "NAME" && currentDay) {
               events.push({
-                id: `${currentDay}-${i}`, day: currentDay, name: String(row[9]), game: String(row[10]), gtd: String(row[8]), buyIn: String(row[11]), rebuy: String(row[12]), addOn: String(row[13]), stack: String(row[15]), players: String(row[16]), lateReg: String(row[17]), minutes: String(row[18]), structure: String(row[19]), times: { '-3': excelTimeToStr(row[2]) }
+                id: `${currentDay}-${i}`,
+                day: currentDay,
+                name: String(row[9]),
+                game: String(row[10]),
+                gtd: String(row[8]),
+                buyIn: String(row[11]),
+                rebuy: String(row[12]),
+                addOn: String(row[13]),
+                stack: String(row[15]),
+                players: String(row[16]),
+                lateReg: String(row[17]),
+                minutes: String(row[18]),
+                structure: String(row[19]),
+                times: { "-3": excelTimeToStr(row[2]) },
               });
             }
           });
-          console.log('[Upload] Parsed', events.length, 'events from file');
+          console.log("[Upload] Parsed", events.length, "events from file");
           setTournamentEvents(events);
 
           // Extrair info da semana do nome do arquivo ou da aba
-          let weekInfo = parseWeekFromFilename(file.name) || parseWeekFromFilename(wb.SheetNames[0]);
+          let weekInfo =
+            parseWeekFromFilename(file.name) ||
+            parseWeekFromFilename(wb.SheetNames[0]);
 
           // Se não conseguir extrair do nome, usar semana atual
           if (!weekInfo) {
             const today = new Date();
             const dayOfWeek = today.getDay();
             const monday = new Date(today);
-            monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+            monday.setDate(
+              today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1),
+            );
             const sunday = new Date(monday);
             sunday.setDate(monday.getDate() + 6);
 
             weekInfo = {
-              startDate: `${String(monday.getDate()).padStart(2, '0')}/${String(monday.getMonth() + 1).padStart(2, '0')}`,
-              endDate: `${String(sunday.getDate()).padStart(2, '0')}/${String(sunday.getMonth() + 1).padStart(2, '0')}`,
-              filename: file.name
+              startDate: `${String(monday.getDate()).padStart(2, "0")}/${String(monday.getMonth() + 1).padStart(2, "0")}`,
+              endDate: `${String(sunday.getDate()).padStart(2, "0")}/${String(sunday.getMonth() + 1).padStart(2, "0")}`,
+              filename: file.name,
             };
           }
 
-          console.log('[Upload] WeekInfo:', weekInfo);
+          console.log("[Upload] WeekInfo:", weekInfo);
           setWeekScheduleInfo(weekInfo);
 
           // Save to database if authenticated
-          console.log('[Upload] userId:', userId);
+          console.log("[Upload] userId:", userId);
           if (userId) {
             try {
               // NOTE: We no longer delete existing schedules - we keep all of them
@@ -936,8 +1286,8 @@ function AppContent() {
 
               // Parse dates for database (convert DD/MM to YYYY-MM-DD)
               const year = new Date().getFullYear();
-              const [startDay, startMonth] = weekInfo.startDate.split('/');
-              const [endDay, endMonth] = weekInfo.endDate.split('/');
+              const [startDay, startMonth] = weekInfo.startDate.split("/");
+              const [endDay, endMonth] = weekInfo.endDate.split("/");
 
               // Handle year rollover (if end month < start month, end is next year)
               let endYear = year;
@@ -945,15 +1295,15 @@ function AppContent() {
                 endYear = year + 1;
               }
 
-              const startDateISO = `${year}-${startMonth.padStart(2, '0')}-${startDay.padStart(2, '0')}`;
-              const endDateISO = `${endYear}-${endMonth.padStart(2, '0')}-${endDay.padStart(2, '0')}`;
+              const startDateISO = `${year}-${startMonth.padStart(2, "0")}-${startDay.padStart(2, "0")}`;
+              const endDateISO = `${endYear}-${endMonth.padStart(2, "0")}-${endDay.padStart(2, "0")}`;
 
               const result = await createWeekSchedule(userId, {
                 start_date: startDateISO,
                 end_date: endDateISO,
                 filename: file.name,
                 organization_id: organizationId,
-                events: events.map(ev => ({
+                events: events.map((ev) => ({
                   day: ev.day,
                   name: ev.name,
                   game: ev.game,
@@ -972,21 +1322,33 @@ function AppContent() {
 
               setCurrentScheduleId(result.schedule.id);
               setIsWeekExpired(false);
-              console.log(`[Tournaments] Saved ${result.eventsCount} events to database`);
+              console.log(
+                `[Tournaments] Saved ${result.eventsCount} events to database`,
+              );
 
               // Refresh schedules list
-              const schedulesData = await getWeekSchedulesList(userId, organizationId);
+              const schedulesData = await getWeekSchedulesList(
+                userId,
+                organizationId,
+              );
               setAllSchedules(schedulesData.schedules);
             } catch (dbErr) {
-              console.error('[Tournaments] Failed to save to database:', dbErr);
+              console.error("[Tournaments] Failed to save to database:", dbErr);
               // Continue anyway - data is still in local state
             }
           }
 
-          console.log('[Upload] Complete! Events:', events.length, 'WeekInfo:', weekInfo.startDate, '-', weekInfo.endDate);
+          console.log(
+            "[Upload] Complete! Events:",
+            events.length,
+            "WeekInfo:",
+            weekInfo.startDate,
+            "-",
+            weekInfo.endDate,
+          );
           resolve();
         } catch (err) {
-          console.error('[Upload] Error:', err);
+          console.error("[Upload] Error:", err);
           reject(err);
         }
       };
@@ -994,181 +1356,238 @@ function AppContent() {
     });
   };
 
-  if (isLoading || !orgLoaded) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader className="h-16 w-16" /></div>;
+  if (isLoading || !orgLoaded)
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <Loader className="h-16 w-16" />
+      </div>
+    );
 
   return (
     <>
       {error && (
         <div className="fixed bottom-6 right-6 bg-surface border border-red-500/50 rounded-xl z-[100] max-w-sm p-4 flex items-start space-x-4 animate-fade-in-up">
-            <Icon name="x" className="w-4 h-4 text-red-400" />
-            <div className="flex-1"><p className="font-bold text-sm">Erro</p><p className="text-sm opacity-50">{error}</p></div>
+          <Icon name="x" className="w-4 h-4 text-red-400" />
+          <div className="flex-1">
+            <p className="font-bold text-sm">Erro</p>
+            <p className="text-sm opacity-50">{error}</p>
+          </div>
         </div>
       )}
       {!brandProfile ? (
-        <BrandProfileSetup onProfileSubmit={async (p) => {
-          console.log('[BrandProfile] onProfileSubmit called, userId:', userId, 'orgId:', organizationId);
-          setBrandProfile(p);
-          // Save to database if authenticated
-          if (userId) {
-            console.log('[BrandProfile] Saving to database with userId:', userId, 'orgId:', organizationId);
-            try {
-              console.log('[BrandProfile] Creating new profile...');
-              const created = await createBrandProfile(userId, {
-                name: p.name,
-                description: p.description,
-                logo_url: p.logo || undefined,
-                primary_color: p.primaryColor,
-                secondary_color: p.secondaryColor,
-                tone_of_voice: p.toneOfVoice,
-                organization_id: organizationId,
-              });
-              console.log('[BrandProfile] Created:', created);
-            } catch (e) {
-              console.error('Failed to save brand profile:', e);
+        <BrandProfileSetup
+          onProfileSubmit={async (p) => {
+            console.log(
+              "[BrandProfile] onProfileSubmit called, userId:",
+              userId,
+              "orgId:",
+              organizationId,
+            );
+            setBrandProfile(p);
+            // Save to database if authenticated
+            if (userId) {
+              console.log(
+                "[BrandProfile] Saving to database with userId:",
+                userId,
+                "orgId:",
+                organizationId,
+              );
+              try {
+                console.log("[BrandProfile] Creating new profile...");
+                const created = await createBrandProfile(userId, {
+                  name: p.name,
+                  description: p.description,
+                  logo_url: p.logo || undefined,
+                  primary_color: p.primaryColor,
+                  secondary_color: p.secondaryColor,
+                  tone_of_voice: p.toneOfVoice,
+                  organization_id: organizationId,
+                });
+                console.log("[BrandProfile] Created:", created);
+              } catch (e) {
+                console.error("Failed to save brand profile:", e);
+              }
+            } else {
+              console.log(
+                "[BrandProfile] userId is null/undefined, skipping save",
+              );
             }
-          } else {
-            console.log('[BrandProfile] userId is null/undefined, skipping save');
-          }
-        }} existingProfile={null} />
+          }}
+          existingProfile={null}
+        />
       ) : (
         <>
-        <SettingsModal
-          isOpen={isEditingProfile}
-          onClose={() => setIsEditingProfile(false)}
-          brandProfile={brandProfile}
-          onSaveProfile={async (p) => {
-            console.log('[BrandProfile] Updating profile, userId:', userId, 'orgId:', organizationId);
-            setBrandProfile(p);
-            if (userId) {
-              try {
-                const existingProfile = await getBrandProfile(userId, organizationId);
-                if (existingProfile) {
-                  await updateBrandProfile(existingProfile.id, {
-                    name: p.name,
-                    description: p.description,
-                    logo_url: p.logo || undefined,
-                    primary_color: p.primaryColor,
-                    secondary_color: p.secondaryColor,
-                    tone_of_voice: p.toneOfVoice,
-                    settings: {
-                      ...existingProfile.settings,
-                      toneTargets: p.toneTargets,
-                      creativeModel: p.creativeModel,
-                    },
-                  });
-                  console.log('[BrandProfile] Updated successfully');
+          <SettingsModal
+            isOpen={isEditingProfile}
+            onClose={() => setIsEditingProfile(false)}
+            brandProfile={brandProfile}
+            onSaveProfile={async (p) => {
+              console.log(
+                "[BrandProfile] Updating profile, userId:",
+                userId,
+                "orgId:",
+                organizationId,
+              );
+              setBrandProfile(p);
+              if (userId) {
+                try {
+                  const existingProfile = await getBrandProfile(
+                    userId,
+                    organizationId,
+                  );
+                  if (existingProfile) {
+                    await updateBrandProfile(existingProfile.id, {
+                      name: p.name,
+                      description: p.description,
+                      logo_url: p.logo || undefined,
+                      primary_color: p.primaryColor,
+                      secondary_color: p.secondaryColor,
+                      tone_of_voice: p.toneOfVoice,
+                      settings: {
+                        ...existingProfile.settings,
+                        toneTargets: p.toneTargets,
+                        creativeModel: p.creativeModel,
+                      },
+                    });
+                    console.log("[BrandProfile] Updated successfully");
+                  }
+                } catch (e) {
+                  console.error("Failed to update brand profile:", e);
                 }
-              } catch (e) {
-                console.error('Failed to update brand profile:', e);
               }
+            }}
+          />
+          <Dashboard
+            brandProfile={brandProfile!}
+            campaign={campaign}
+            onGenerate={handleGenerateCampaign}
+            isGenerating={isGenerating}
+            onEditProfile={() => setIsEditingProfile(true)}
+            onResetCampaign={() => setCampaign(null)}
+            isAssistantOpen={isAssistantOpen}
+            onToggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
+            assistantHistory={chatHistory}
+            isAssistantLoading={isAssistantLoading}
+            onAssistantSendMessage={handleAssistantSendMessage}
+            chatReferenceImage={chatReferenceImage}
+            onSetChatReference={(img) => {
+              setChatReferenceImage(img ? { id: img.id, src: img.src } : null);
+              if (img && !isAssistantOpen) setIsAssistantOpen(true);
+            }}
+            theme={theme}
+            onThemeToggle={() =>
+              setTheme((t) => (t === "light" ? "dark" : "light"))
             }
-          }}
-        />
-        <Dashboard
-          brandProfile={brandProfile!}
-          campaign={campaign}
-          onGenerate={handleGenerateCampaign}
-          isGenerating={isGenerating}
-          onEditProfile={() => setIsEditingProfile(true)}
-          onResetCampaign={() => setCampaign(null)}
-          isAssistantOpen={isAssistantOpen}
-          onToggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
-          assistantHistory={chatHistory}
-          isAssistantLoading={isAssistantLoading}
-          onAssistantSendMessage={handleAssistantSendMessage}
-          chatReferenceImage={chatReferenceImage}
-          onSetChatReference={(img) => { setChatReferenceImage(img ? { id: img.id, src: img.src } : null); if (img && !isAssistantOpen) setIsAssistantOpen(true); }}
-          theme={theme}
-          onThemeToggle={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
-          galleryImages={galleryImages}
-          onAddImageToGallery={handleAddImageToGallery}
-          onUpdateGalleryImage={handleUpdateGalleryImage}
-          onDeleteGalleryImage={handleDeleteGalleryImage}
-          onMarkGalleryImagePublished={handleMarkGalleryImagePublished}
-          tournamentEvents={tournamentEvents}
-          weekScheduleInfo={weekScheduleInfo}
-          onTournamentFileUpload={handleTournamentFileUpload}
-          onAddTournamentEvent={(ev) => setTournamentEvents(p => [ev, ...p])}
-          allSchedules={allSchedules}
-          currentScheduleId={currentScheduleId}
-          onSelectSchedule={handleSelectSchedule}
-          onDeleteSchedule={async (scheduleId) => {
-            if (!userId) return;
-            try {
-              await deleteWeekSchedule(userId, scheduleId, organizationId);
-              // Update local state
-              setAllSchedules(prev => prev.filter(s => s.id !== scheduleId));
-              // If deleted the current schedule, clear it
-              if (currentScheduleId === scheduleId) {
-                setCurrentScheduleId(null);
-                setTournamentEvents([]);
-                setWeekScheduleInfo(null);
-                setIsWeekExpired(false);
-              }
-              console.log('[Tournaments] Deleted schedule:', scheduleId);
-            } catch (e) {
-              console.error('[Tournaments] Failed to delete schedule:', e);
+            galleryImages={galleryImages}
+            onAddImageToGallery={handleAddImageToGallery}
+            onUpdateGalleryImage={handleUpdateGalleryImage}
+            onDeleteGalleryImage={handleDeleteGalleryImage}
+            onMarkGalleryImagePublished={handleMarkGalleryImagePublished}
+            tournamentEvents={tournamentEvents}
+            weekScheduleInfo={weekScheduleInfo}
+            onTournamentFileUpload={handleTournamentFileUpload}
+            onAddTournamentEvent={(ev) =>
+              setTournamentEvents((p) => [ev, ...p])
             }
-          }}
-          flyerState={flyerState}
-          setFlyerState={setFlyerState}
-          dailyFlyerState={dailyFlyerState}
-          setDailyFlyerState={setDailyFlyerState}
-          activeView={activeView}
-          onViewChange={setActiveView}
-          onPublishToCampaign={handlePublishFlyerToCampaign}
-          styleReferences={styleReferences}
-          onAddStyleReference={handleAddStyleReference}
-          onRemoveStyleReference={handleRemoveStyleReference}
-          onSelectStyleReference={handleSelectStyleReference}
-          selectedStyleReference={selectedStyleReference}
-          onClearSelectedStyleReference={() => setSelectedStyleReference(null)}
-          scheduledPosts={scheduledPosts}
-          onSchedulePost={handleSchedulePost}
-          onUpdateScheduledPost={handleUpdateScheduledPost}
-          onDeleteScheduledPost={handleDeleteScheduledPost}
-          onPublishToInstagram={handlePublishToInstagram}
-          publishingStates={publishingStates}
-          campaignsList={campaignsList}
-          onLoadCampaign={handleLoadCampaign}
-          userId={userId}
-          organizationId={organizationId}
-          isWeekExpired={isWeekExpired}
-          onClearExpiredSchedule={async () => {
-            if (userId && currentScheduleId) {
+            allSchedules={allSchedules}
+            currentScheduleId={currentScheduleId}
+            onSelectSchedule={handleSelectSchedule}
+            onDeleteSchedule={async (scheduleId) => {
+              if (!userId) return;
               try {
-                await deleteWeekSchedule(userId, currentScheduleId, organizationId);
-                setCurrentScheduleId(null);
-                setTournamentEvents([]);
-                setWeekScheduleInfo(null);
-                setIsWeekExpired(false);
-              } catch (e) {
-                console.error('[Tournaments] Failed to clear expired schedule:', e);
-              }
-            }
-          }}
-          onUpdateCreativeModel={async (model: CreativeModel) => {
-            // Update local state immediately
-            setBrandProfile(prev => prev ? { ...prev, creativeModel: model } : prev);
-            // Save to database in background
-            if (userId) {
-              try {
-                const existingProfile = await getBrandProfile(userId, organizationId);
-                if (existingProfile) {
-                  await updateBrandProfile(existingProfile.id, {
-                    settings: {
-                      ...existingProfile.settings,
-                      creativeModel: model,
-                    },
-                  });
-                  console.log('[BrandProfile] Creative model updated to:', model);
+                await deleteWeekSchedule(userId, scheduleId, organizationId);
+                // Update local state
+                setAllSchedules((prev) =>
+                  prev.filter((s) => s.id !== scheduleId),
+                );
+                // If deleted the current schedule, clear it
+                if (currentScheduleId === scheduleId) {
+                  setCurrentScheduleId(null);
+                  setTournamentEvents([]);
+                  setWeekScheduleInfo(null);
+                  setIsWeekExpired(false);
                 }
+                console.log("[Tournaments] Deleted schedule:", scheduleId);
               } catch (e) {
-                console.error('Failed to update creative model:', e);
+                console.error("[Tournaments] Failed to delete schedule:", e);
               }
+            }}
+            flyerState={flyerState}
+            setFlyerState={setFlyerState}
+            dailyFlyerState={dailyFlyerState}
+            setDailyFlyerState={setDailyFlyerState}
+            activeView={activeView}
+            onViewChange={setActiveView}
+            onPublishToCampaign={handlePublishFlyerToCampaign}
+            styleReferences={styleReferences}
+            onAddStyleReference={handleAddStyleReference}
+            onRemoveStyleReference={handleRemoveStyleReference}
+            onSelectStyleReference={handleSelectStyleReference}
+            selectedStyleReference={selectedStyleReference}
+            onClearSelectedStyleReference={() =>
+              setSelectedStyleReference(null)
             }
-          }}
-        />
+            scheduledPosts={scheduledPosts}
+            onSchedulePost={handleSchedulePost}
+            onUpdateScheduledPost={handleUpdateScheduledPost}
+            onDeleteScheduledPost={handleDeleteScheduledPost}
+            onPublishToInstagram={handlePublishToInstagram}
+            publishingStates={publishingStates}
+            campaignsList={campaignsList}
+            onLoadCampaign={handleLoadCampaign}
+            userId={userId}
+            organizationId={organizationId}
+            isWeekExpired={isWeekExpired}
+            onClearExpiredSchedule={async () => {
+              if (userId && currentScheduleId) {
+                try {
+                  await deleteWeekSchedule(
+                    userId,
+                    currentScheduleId,
+                    organizationId,
+                  );
+                  setCurrentScheduleId(null);
+                  setTournamentEvents([]);
+                  setWeekScheduleInfo(null);
+                  setIsWeekExpired(false);
+                } catch (e) {
+                  console.error(
+                    "[Tournaments] Failed to clear expired schedule:",
+                    e,
+                  );
+                }
+              }
+            }}
+            onUpdateCreativeModel={async (model: CreativeModel) => {
+              // Update local state immediately
+              setBrandProfile((prev) =>
+                prev ? { ...prev, creativeModel: model } : prev,
+              );
+              // Save to database in background
+              if (userId) {
+                try {
+                  const existingProfile = await getBrandProfile(
+                    userId,
+                    organizationId,
+                  );
+                  if (existingProfile) {
+                    await updateBrandProfile(existingProfile.id, {
+                      settings: {
+                        ...existingProfile.settings,
+                        creativeModel: model,
+                      },
+                    });
+                    console.log(
+                      "[BrandProfile] Creative model updated to:",
+                      model,
+                    );
+                  }
+                } catch (e) {
+                  console.error("Failed to update creative model:", e);
+                }
+              }
+            }}
+          />
         </>
       )}
     </>

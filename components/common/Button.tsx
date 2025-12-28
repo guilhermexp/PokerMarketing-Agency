@@ -9,6 +9,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: "normal" | "large" | "small";
   icon?: IconName;
   isLoading?: boolean;
+  as?: "button" | "span" | "div";
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -18,22 +19,21 @@ export const Button: React.FC<ButtonProps> = ({
   icon,
   className = "",
   isLoading = false,
+  as = "button",
   ...props
 }) => {
   const baseClasses =
-    "font-bold rounded-xl transition-all duration-300 focus:outline-none flex items-center justify-center space-x-2 disabled:opacity-30 disabled:cursor-not-allowed tracking-tight antialiased";
+    "font-black rounded-xl transition-all focus:outline-none flex items-center justify-center space-x-2 disabled:opacity-30 disabled:cursor-not-allowed uppercase tracking-wide antialiased";
 
   const variantClasses = {
-    primary:
-      "bg-gradient-to-r from-[#f59e0b] to-[#d97706] text-black hover:scale-[1.02] active:scale-[0.98]",
-    secondary:
-      "bg-[#1A1A1A] text-white border border-[#2A2A2A] hover:bg-[#222] hover:border-[#333] active:scale-[0.98]",
+    primary: "bg-primary text-black hover:bg-primary/90 active:scale-95",
+    secondary: "bg-white text-black hover:bg-white/90 active:scale-95",
   };
 
   const sizeClasses = {
-    normal: "px-5 py-2 text-[11px]",
-    large: "px-8 py-3 text-xs",
-    small: "px-3.5 py-1.5 text-[10px]",
+    normal: "px-5 py-2.5 text-[10px]",
+    large: "px-6 py-3 text-sm",
+    small: "px-4 py-2.5 text-[10px]",
   };
 
   const iconSizeClasses = {
@@ -43,11 +43,12 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const finalProps = { ...props, disabled: props.disabled || isLoading };
+  const Component = as as React.ElementType;
 
   return (
-    <button
+    <Component
       className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
-      {...finalProps}
+      {...(as === "button" ? finalProps : {})}
     >
       {isLoading ? (
         <Loader className={iconSizeClasses[size]} />
@@ -55,6 +56,6 @@ export const Button: React.FC<ButtonProps> = ({
         icon && <Icon name={icon} className={iconSizeClasses[size]} />
       )}
       <span>{children}</span>
-    </button>
+    </Component>
   );
 };

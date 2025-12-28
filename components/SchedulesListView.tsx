@@ -1,5 +1,6 @@
 import React from "react";
 import { Icon } from "./common/Icon";
+import { Button } from "./common/Button";
 import { EmptyState } from "./common/EmptyState";
 import { Loader } from "./common/Loader";
 import type { WeekScheduleWithCount } from "../services/apiClient";
@@ -80,16 +81,17 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
             </p>
           </div>
           <label
-            className={`cursor-pointer group ${isUploading ? "pointer-events-none opacity-70" : ""}`}
+            className={`cursor-pointer ${isUploading ? "pointer-events-none opacity-70" : ""}`}
           >
-            <div className="bg-white text-black font-black px-4 py-2.5 rounded-xl flex items-center space-x-2 transition-all active:scale-95 text-[10px] tracking-wide uppercase hover:bg-white/90">
-              {isUploading ? (
-                <Loader className="w-3.5 h-3.5" />
-              ) : (
-                <Icon name="upload" className="w-3.5 h-3.5" />
-              )}
-              <span>{isUploading ? "Carregando..." : "Nova Planilha"}</span>
-            </div>
+            <Button
+              as="span"
+              variant="secondary"
+              size="small"
+              icon="upload"
+              isLoading={isUploading}
+            >
+              {isUploading ? "Carregando..." : "Nova Planilha"}
+            </Button>
             <input
               type="file"
               className="hidden"
@@ -148,16 +150,17 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
           </p>
         </div>
         <label
-          className={`cursor-pointer group ${isUploading ? "pointer-events-none opacity-70" : ""}`}
+          className={`cursor-pointer ${isUploading ? "pointer-events-none opacity-70" : ""}`}
         >
-          <div className="bg-white text-black font-black px-4 py-2.5 rounded-xl flex items-center space-x-2 transition-all active:scale-95 text-[10px] tracking-wide uppercase hover:bg-white/90">
-            {isUploading ? (
-              <Loader className="w-3.5 h-3.5" />
-            ) : (
-              <Icon name="upload" className="w-3.5 h-3.5" />
-            )}
-            <span>{isUploading ? "Carregando..." : "Nova Planilha"}</span>
-          </div>
+          <Button
+            as="span"
+            variant="secondary"
+            size="small"
+            icon="upload"
+            isLoading={isUploading}
+          >
+            {isUploading ? "Carregando..." : "Nova Planilha"}
+          </Button>
           <input
             type="file"
             className="hidden"

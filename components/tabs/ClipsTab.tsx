@@ -546,8 +546,11 @@ const ClipCard: React.FC<ClipCardProps> = ({
           (img) => img.source === newSource || img.source === oldSource,
         );
         if (existingImage) {
+          // Check if src is HTTP URL or data URL
+          const isHttpUrl = existingImage.src.startsWith("http");
           recoveredSceneImages[scene.sceneNumber] = {
-            dataUrl: existingImage.src,
+            dataUrl: existingImage.src, // Works for display (both HTTP and data URL)
+            httpUrl: isHttpUrl ? existingImage.src : undefined, // HTTP URL for fal.ai
             isUploading: false,
           };
         }
@@ -622,7 +625,9 @@ VISUAL: ${currentScene.visual}
 ${narrationBlock}
 
 Estilo: ${brandProfile.toneOfVoice}, cinematográfico, cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.
-Movimento de câmera suave, iluminação dramática de cassino. Criar visual que combine com o contexto da narração.`;
+Movimento de câmera suave, iluminação dramática de cassino. Criar visual que combine com o contexto da narração.
+
+TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF (Bebas Neue/Oswald), MAIÚSCULAS, impactante.`;
     },
     [scenes, brandProfile, includeNarration],
   );
@@ -643,7 +648,9 @@ VISUAL: ${currentScene.visual}
 ${narrationBlock}
 
 Estilo: ${brandProfile.toneOfVoice}, cinematográfico, cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.
-Movimento de câmera suave, iluminação dramática de cassino.`;
+Movimento de câmera suave, iluminação dramática de cassino.
+
+TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF (Bebas Neue/Oswald), MAIÚSCULAS, impactante.`;
     },
     [scenes, brandProfile, includeNarration],
   );
@@ -735,13 +742,45 @@ Movimento de câmera suave, iluminação dramática de cassino.`;
           let referenceImage: ImageFile | null = null;
 
           if (hasReferenceImage && sceneImage.dataUrl) {
-            // Use scene reference image
-            const base64Data = sceneImage.dataUrl.split(",")[1];
-            const mimeType =
-              sceneImage.dataUrl.match(/data:(.*?);/)?.[1] || "image/png";
-            referenceImage = { base64: base64Data, mimeType };
-          } else if (brandProfile.logo) {
-            // Fallback to logo
+            // Check if it's a data URL or HTTP URL
+            const isDataUrl = sceneImage.dataUrl.startsWith("data:");
+            if (isDataUrl) {
+              // Use scene reference image (data URL)
+              const base64Data = sceneImage.dataUrl.split(",")[1];
+              const mimeType =
+                sceneImage.dataUrl.match(/data:(.*?);/)?.[1] || "image/png";
+              referenceImage = { base64: base64Data, mimeType };
+            } else {
+              // HTTP URL - need to fetch and convert to base64
+              console.log(
+                `[ClipsTab] Scene image is HTTP URL, fetching for Veo...`,
+              );
+              try {
+                const response = await fetch(sceneImage.dataUrl);
+                const blob = await response.blob();
+                const base64 = await new Promise<string>((resolve) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const result = reader.result as string;
+                    resolve(result.split(",")[1]);
+                  };
+                  reader.readAsDataURL(blob);
+                });
+                referenceImage = {
+                  base64,
+                  mimeType: blob.type || "image/png",
+                };
+              } catch (fetchErr) {
+                console.warn(
+                  "[ClipsTab] Failed to fetch scene image, falling back to logo",
+                  fetchErr,
+                );
+              }
+            }
+          }
+
+          // Fallback to logo if no reference image
+          if (!referenceImage && brandProfile.logo) {
             referenceImage = {
               base64: brandProfile.logo.split(",")[1],
               mimeType: brandProfile.logo.match(/:(.*?);/)?.[1] || "image/png",
@@ -902,10 +941,12 @@ Movimento de câmera suave, iluminação dramática de cassino.`;
         );
         if (existingInGallery) {
           // Recover from gallery instead of generating
+          const isHttpUrl = existingInGallery.src.startsWith("http");
           setSceneImages((prev) => ({
             ...prev,
             [scene.sceneNumber]: {
               dataUrl: existingInGallery.src,
+              httpUrl: isHttpUrl ? existingInGallery.src : undefined,
               isUploading: false,
             },
           }));
@@ -1240,7 +1281,11 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       video: VideoState;
       duration: number;
       videoIndex: number;
+      isFinalVideo?: boolean;
+      label?: string;
     }[] = [];
+
+    // Add scene videos
     scenes.forEach((scene) => {
       const videos = videoStates[scene.sceneNumber] || [];
       videos.forEach((video, idx) => {
@@ -1250,10 +1295,32 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             video,
             duration: scene.duration,
             videoIndex: idx,
+            label: `Cena ${scene.sceneNumber}`,
           });
         }
       });
     });
+
+    // Add "Video Final" from gallery (exported/concatenated videos)
+    if (galleryImages && galleryImages.length > 0) {
+      const finalVideos = galleryImages.filter(
+        (img) => img.source === "Video Final" && img.src,
+      );
+      finalVideos.forEach((finalVideo, idx) => {
+        available.push({
+          sceneNumber: 0, // Special marker for final video
+          video: {
+            url: finalVideo.src,
+            model: "video-export",
+          },
+          duration: finalVideo.duration || 10, // Use saved duration or fallback
+          videoIndex: idx,
+          isFinalVideo: true,
+          label: `Video Final${finalVideos.length > 1 ? ` ${idx + 1}` : ""}`,
+        });
+      });
+    }
+
     return available;
   };
 
@@ -1770,10 +1837,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             {/* Narration Toggle */}
             <button
               onClick={() => setIncludeNarration(!includeNarration)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-md border transition-all text-[9px] font-black uppercase tracking-wider whitespace-nowrap leading-none ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[9px] font-black uppercase tracking-wider whitespace-nowrap ${
                 includeNarration
                   ? "bg-green-500/10 border-green-500/30 text-green-400"
-                  : "bg-[#080808] border-white/10 text-white/40 hover:text-white/60"
+                  : "bg-[#0a0a0a] border-white/10 text-white/40 hover:text-white/60"
               }`}
               title={
                 includeNarration
@@ -1790,10 +1857,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             {/* Remove Silence Toggle */}
             <button
               onClick={() => setRemoveSilence(!removeSilence)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-md border transition-all text-[9px] font-black uppercase tracking-wider whitespace-nowrap leading-none ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[9px] font-black uppercase tracking-wider whitespace-nowrap ${
                 removeSilence
                   ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
-                  : "bg-[#080808] border-white/10 text-white/40 hover:text-white/60"
+                  : "bg-[#0a0a0a] border-white/10 text-white/40 hover:text-white/60"
               }`}
               title={
                 removeSilence
@@ -1811,8 +1878,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               disabled={isGeneratingImages || !thumbnail}
               size="small"
               icon="image"
-              variant="secondary"
-              className="rounded-md px-4 py-2 text-[9px] font-black uppercase tracking-wider whitespace-nowrap leading-none"
+              className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
               title={!thumbnail ? "Gere a capa primeiro" : undefined}
             >
               Imagens ({generatedImagesCount}/{scenes.length})
@@ -1825,7 +1891,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               }
               size="small"
               icon="zap"
-              className="rounded-md px-4 py-2 text-[9px] font-black uppercase tracking-wider whitespace-nowrap leading-none"
+              className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
             >
               Vídeos ({generatedVideosCount}/{scenes.length})
             </Button>
@@ -1836,8 +1902,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 disabled={isGeneratingAll}
                 size="small"
                 icon="refresh"
-                variant="secondary"
-                className="rounded-md px-4 py-2 text-[9px] font-black uppercase tracking-wider whitespace-nowrap leading-none"
+                className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
                 title="Regenerar todos os vídeos com o modelo selecionado"
               >
                 Regenerar
@@ -1849,8 +1914,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 disabled={isGeneratingAll || isMerging}
                 size="small"
                 icon="edit"
-                variant="secondary"
-                className="rounded-md px-4 py-2 text-[9px] font-black uppercase tracking-wider whitespace-nowrap leading-none"
+                className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
                 title="Editar timeline manualmente"
               >
                 Editar
@@ -1864,24 +1928,22 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               isLoading={isMerging}
               size="small"
               icon="video"
-              className="rounded-md px-4 py-2 text-[9px] font-black uppercase tracking-wider whitespace-nowrap leading-none"
+              className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
             >
               Juntar ({generatedVideosCount})
             </Button>
-            <Button
+            <button
               onClick={
                 mergedVideoUrl ? handleDownloadMerged : handleExportVideo
               }
               disabled={
                 isGeneratingAll || (!mergedVideoUrl && !hasGeneratedVideos)
               }
-              size="small"
-              icon="download"
-              variant="primary"
-              className="rounded-md px-4 py-2 text-[9px] font-black uppercase tracking-wider whitespace-nowrap leading-none"
+              className="px-3 py-2 rounded-lg bg-primary text-black hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Exportar"
             >
-              Exportar
-            </Button>
+              <Icon name="download" className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
@@ -2446,9 +2508,8 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   onClick={onGenerateThumbnail}
                   isLoading={isGeneratingThumbnail}
                   size="small"
-                  className="w-full mt-3 rounded-md"
+                  className="w-full mt-3 !rounded-lg !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
                   icon="image"
-                  variant="secondary"
                 >
                   Gerar Capa
                 </Button>
@@ -2494,8 +2555,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   <Button
                     onClick={handleGenerateAudio}
                     size="small"
-                    variant="secondary"
-                    className="w-full text-[9px] rounded-md"
+                    className="w-full !rounded-lg !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
                   >
                     Gerar Áudio
                   </Button>
@@ -2799,6 +2859,9 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                             <span className="text-[7px] font-black bg-primary text-black px-1.5 py-0.5 rounded-md">
                               {scene.sceneNumber}
                             </span>
+                            <span className="text-[7px] font-bold text-white bg-black/70 px-1.5 py-0.5 rounded-md">
+                              {scene.duration}s
+                            </span>
                             {hasImage && !hasVideo && (
                               <span className="text-[6px] font-bold bg-green-500/80 text-white px-1 py-0.5 rounded-md">
                                 IMG
@@ -2832,9 +2895,6 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                             >
                               <Icon name="eye" className="w-2.5 h-2.5" />
                             </button>
-                            <span className="text-[7px] font-bold text-white/70 bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded-md">
-                              {scene.duration}s
-                            </span>
                           </div>
                         </div>
                       </div>
@@ -2854,8 +2914,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                 )
                               }
                               size="small"
-                              variant="secondary"
-                              className="flex-1 text-[8px] rounded-md"
+                              className="flex-1 !text-[8px] !rounded-lg !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white !px-2 !py-1.5"
                               icon="image"
                               disabled={!thumbnail}
                               title={
@@ -2874,8 +2933,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                 handleGenerateVideo(scene.sceneNumber)
                               }
                               size="small"
-                              variant="secondary"
-                              className="flex-1 text-[8px] rounded-md"
+                              className="flex-1 !text-[8px] !rounded-lg !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white !px-2 !py-1.5"
                               icon="play"
                             >
                               Gerar
@@ -3021,19 +3079,33 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                     <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between">
-                      <span className="text-[8px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
-                        Cena {item.sceneNumber}
+                      <span
+                        className={`text-[8px] font-bold text-white px-1.5 py-0.5 rounded ${
+                          item.isFinalVideo
+                            ? "bg-primary text-black"
+                            : "bg-black/60"
+                        }`}
+                      >
+                        {item.label || `Cena ${item.sceneNumber}`}
                       </span>
                       <span className="text-[8px] text-white/70">
-                        {item.duration}s
+                        {Math.round(item.duration)}s
                       </span>
                     </div>
-                    {item.video.model && (
+                    {item.isFinalVideo ? (
                       <div className="absolute top-1 right-1">
-                        <span className="text-[6px] font-bold bg-blue-600/90 text-white px-1 py-0.5 rounded">
-                          {getModelShortName(item.video.model)}
+                        <span className="text-[6px] font-bold bg-green-600/90 text-white px-1 py-0.5 rounded">
+                          EXPORTADO
                         </span>
                       </div>
+                    ) : (
+                      item.video.model && (
+                        <div className="absolute top-1 right-1">
+                          <span className="text-[6px] font-bold bg-blue-600/90 text-white px-1 py-0.5 rounded">
+                            {getModelShortName(item.video.model)}
+                          </span>
+                        </div>
+                      )
                     )}
                     {/* Hover overlay */}
                     <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

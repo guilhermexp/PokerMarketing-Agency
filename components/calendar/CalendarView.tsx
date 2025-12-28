@@ -1,16 +1,26 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import type { ScheduledPost, CalendarViewType, GalleryImage, InstagramPublishState } from '../../types';
-import { Icon } from '../common/Icon';
-import { Button } from '../common/Button';
-import { MonthlyCalendar } from './MonthlyCalendar';
-import { WeeklyCalendar } from './WeeklyCalendar';
-import { SchedulePostModal } from './SchedulePostModal';
-import { isRubeConfigured } from '../../services/rubeService';
+import React, { useState, useMemo, useEffect } from "react";
+import type {
+  ScheduledPost,
+  CalendarViewType,
+  GalleryImage,
+  InstagramPublishState,
+} from "../../types";
+import { Icon } from "../common/Icon";
+import { Button } from "../common/Button";
+import { MonthlyCalendar } from "./MonthlyCalendar";
+import { WeeklyCalendar } from "./WeeklyCalendar";
+import { SchedulePostModal } from "./SchedulePostModal";
+import { isRubeConfigured } from "../../services/rubeService";
 
 interface CalendarViewProps {
   scheduledPosts: ScheduledPost[];
-  onSchedulePost: (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  onUpdateScheduledPost: (postId: string, updates: Partial<ScheduledPost>) => void;
+  onSchedulePost: (
+    post: Omit<ScheduledPost, "id" | "createdAt" | "updatedAt">,
+  ) => void;
+  onUpdateScheduledPost: (
+    postId: string,
+    updates: Partial<ScheduledPost>,
+  ) => void;
   onDeleteScheduledPost: (postId: string) => void;
   galleryImages: GalleryImage[];
   onPublishToInstagram: (post: ScheduledPost) => void;
@@ -24,9 +34,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onDeleteScheduledPost,
   galleryImages,
   onPublishToInstagram,
-  publishingStates
+  publishingStates,
 }) => {
-  const [viewType, setViewType] = useState<CalendarViewType>('weekly');
+  const [viewType, setViewType] = useState<CalendarViewType>("weekly");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -34,8 +44,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [pendingPosts, setPendingPosts] = useState<ScheduledPost[]>([]);
 
   const monthNames = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
   ];
 
   const currentMonth = currentDate.getMonth();
@@ -70,7 +90,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setIsScheduleModalOpen(true);
   };
 
-  const handleSchedulePost = (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleSchedulePost = (
+    post: Omit<ScheduledPost, "id" | "createdAt" | "updatedAt">,
+  ) => {
     onSchedulePost(post);
     setIsScheduleModalOpen(false);
     setSelectedDate(null);
@@ -78,9 +100,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   // Stats
   const stats = useMemo(() => {
-    const scheduled = scheduledPosts.filter(p => p.status === 'scheduled').length;
-    const published = scheduledPosts.filter(p => p.status === 'published').length;
-    const failed = scheduledPosts.filter(p => p.status === 'failed').length;
+    const scheduled = scheduledPosts.filter(
+      (p) => p.status === "scheduled",
+    ).length;
+    const published = scheduledPosts.filter(
+      (p) => p.status === "published",
+    ).length;
+    const failed = scheduledPosts.filter((p) => p.status === "failed").length;
     return { scheduled, published, failed, total: scheduledPosts.length };
   }, [scheduledPosts]);
 
@@ -91,8 +117,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       const fifteenMinutes = 15 * 60 * 1000;
 
       // Find posts due in next 15 minutes or overdue
-      const pending = scheduledPosts.filter(post => {
-        if (post.status !== 'scheduled') return false;
+      const pending = scheduledPosts.filter((post) => {
+        if (post.status !== "scheduled") return false;
         const timeUntil = post.scheduledTimestamp - now;
         // Due in next 15 minutes OR overdue
         return timeUntil <= fifteenMinutes;
@@ -103,12 +129,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         setShowNotificationBanner(true);
 
         // Browser notification if permitted
-        if ('Notification' in window && Notification.permission === 'granted') {
-          const overdue = pending.filter(p => p.scheduledTimestamp < now);
+        if ("Notification" in window && Notification.permission === "granted") {
+          const overdue = pending.filter((p) => p.scheduledTimestamp < now);
           if (overdue.length > 0) {
-            new Notification('Posts Pendentes!', {
+            new Notification("Posts Pendentes!", {
               body: `${overdue.length} post(s) aguardando publicacao`,
-              icon: '/favicon.ico'
+              icon: "/favicon.ico",
             });
           }
         }
@@ -125,17 +151,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   // Request notification permission on mount
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
+    if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
   }, []);
 
   const handlePublishAll = async () => {
-    const instagramPosts = pendingPosts.filter(p => p.platforms === 'instagram' || p.platforms === 'both');
+    const instagramPosts = pendingPosts.filter(
+      (p) => p.platforms === "instagram" || p.platforms === "both",
+    );
     for (const post of instagramPosts) {
       onPublishToInstagram(post);
       // Small delay between publications to avoid rate limits
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   };
 
@@ -144,7 +172,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="text-left">
-          <h2 className="text-2xl font-black text-white uppercase tracking-tight">Agenda</h2>
+          <h2 className="text-2xl font-black text-white uppercase tracking-tight">
+            Agenda
+          </h2>
           <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
             Agendamento de Publicações
           </p>
@@ -154,26 +184,35 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <div className="flex items-center gap-3 px-3 py-2 bg-[#0a0a0a] border border-white/10 rounded-lg">
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-amber-500" />
-              <span className="text-[9px] font-black text-white/40 uppercase">{stats.scheduled} agendados</span>
+              <span className="text-[9px] font-black text-white/40 uppercase">
+                {stats.scheduled} agendados
+              </span>
             </div>
             <div className="h-3 w-px bg-white/10" />
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-[9px] font-black text-white/40 uppercase">{stats.published} publicados</span>
+              <span className="text-[9px] font-black text-white/40 uppercase">
+                {stats.published} publicados
+              </span>
             </div>
             {stats.failed > 0 && (
               <>
                 <div className="h-3 w-px bg-white/10" />
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-red-500" />
-                  <span className="text-[9px] font-black text-red-400 uppercase">{stats.failed} falhas</span>
+                  <span className="text-[9px] font-black text-red-400 uppercase">
+                    {stats.failed} falhas
+                  </span>
                 </div>
               </>
             )}
           </div>
           <Button
-            onClick={() => { setSelectedDate(null); setIsScheduleModalOpen(true); }}
-            variant="primary"
+            onClick={() => {
+              setSelectedDate(null);
+              setIsScheduleModalOpen(true);
+            }}
+            variant="secondary"
             icon="plus"
             size="small"
           >
@@ -191,26 +230,30 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
             <div>
               <p className="text-xs font-bold text-amber-400">
-                {pendingPosts.length} post{pendingPosts.length > 1 ? 's' : ''} pendente{pendingPosts.length > 1 ? 's' : ''}
+                {pendingPosts.length} post{pendingPosts.length > 1 ? "s" : ""}{" "}
+                pendente{pendingPosts.length > 1 ? "s" : ""}
               </p>
               <p className="text-[9px] text-amber-400/60">
-                {pendingPosts.some(p => p.scheduledTimestamp < Date.now())
-                  ? 'Alguns posts estao atrasados!'
-                  : 'Pronto para publicar'}
+                {pendingPosts.some((p) => p.scheduledTimestamp < Date.now())
+                  ? "Alguns posts estao atrasados!"
+                  : "Pronto para publicar"}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isRubeConfigured() && pendingPosts.some(p => p.platforms === 'instagram' || p.platforms === 'both') && (
-              <Button
-                onClick={handlePublishAll}
-                variant="primary"
-                size="small"
-                icon="send"
-              >
-                Publicar Todos
-              </Button>
-            )}
+            {isRubeConfigured() &&
+              pendingPosts.some(
+                (p) => p.platforms === "instagram" || p.platforms === "both",
+              ) && (
+                <Button
+                  onClick={handlePublishAll}
+                  variant="primary"
+                  size="small"
+                  icon="send"
+                >
+                  Publicar Todos
+                </Button>
+              )}
             <button
               onClick={() => setShowNotificationBanner(false)}
               className="p-1.5 text-amber-400/40 hover:text-amber-400 transition-colors"
@@ -227,13 +270,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           {/* Navigation */}
           <div className="flex items-center gap-1">
             <button
-              onClick={viewType === 'monthly' ? goToPreviousMonth : goToPreviousWeek}
+              onClick={
+                viewType === "monthly" ? goToPreviousMonth : goToPreviousWeek
+              }
               className="p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
             >
               <Icon name="chevron-left" className="w-4 h-4" />
             </button>
             <button
-              onClick={viewType === 'monthly' ? goToNextMonth : goToNextWeek}
+              onClick={viewType === "monthly" ? goToNextMonth : goToNextWeek}
               className="p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
             >
               <Icon name="chevron-right" className="w-4 h-4" />
@@ -242,10 +287,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
           {/* Current Period */}
           <h3 className="text-sm font-black text-white uppercase tracking-wide">
-            {viewType === 'monthly'
+            {viewType === "monthly"
               ? `${monthNames[currentMonth]} ${currentYear}`
-              : `Semana de ${currentDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`
-            }
+              : `Semana de ${currentDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`}
           </h3>
 
           {/* Today Button */}
@@ -260,21 +304,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         {/* View Toggle */}
         <div className="flex items-center gap-1 p-1 bg-black/40 rounded-lg">
           <button
-            onClick={() => setViewType('monthly')}
+            onClick={() => setViewType("monthly")}
             className={`px-3 py-1.5 text-[8px] font-black uppercase tracking-wider rounded-md transition-all ${
-              viewType === 'monthly'
-                ? 'bg-white text-black'
-                : 'text-white/40 hover:text-white'
+              viewType === "monthly"
+                ? "bg-white text-black"
+                : "text-white/40 hover:text-white"
             }`}
           >
             Mensal
           </button>
           <button
-            onClick={() => setViewType('weekly')}
+            onClick={() => setViewType("weekly")}
             className={`px-3 py-1.5 text-[8px] font-black uppercase tracking-wider rounded-md transition-all ${
-              viewType === 'weekly'
-                ? 'bg-white text-black'
-                : 'text-white/40 hover:text-white'
+              viewType === "weekly"
+                ? "bg-white text-black"
+                : "text-white/40 hover:text-white"
             }`}
           >
             Semanal
@@ -284,7 +328,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
       {/* Calendar Grid */}
       <div className="flex-1 bg-[#111111] border border-white/5 rounded-xl overflow-hidden">
-        {viewType === 'monthly' ? (
+        {viewType === "monthly" ? (
           <MonthlyCalendar
             currentDate={currentDate}
             scheduledPosts={scheduledPosts}
@@ -311,7 +355,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {isScheduleModalOpen && (
         <SchedulePostModal
           isOpen={isScheduleModalOpen}
-          onClose={() => { setIsScheduleModalOpen(false); setSelectedDate(null); }}
+          onClose={() => {
+            setIsScheduleModalOpen(false);
+            setSelectedDate(null);
+          }}
           onSchedule={handleSchedulePost}
           galleryImages={galleryImages}
           initialDate={selectedDate}

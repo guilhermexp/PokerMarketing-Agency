@@ -9,19 +9,19 @@
 
 // Available permissions
 export const PERMISSIONS = {
-  CREATE_CAMPAIGN: 'create_campaign',
-  EDIT_CAMPAIGN: 'edit_campaign',
-  DELETE_CAMPAIGN: 'delete_campaign',
-  CREATE_FLYER: 'create_flyer',
-  SCHEDULE_POST: 'schedule_post',
-  PUBLISH_POST: 'publish_post',
-  VIEW_GALLERY: 'view_gallery',
-  DELETE_GALLERY: 'delete_gallery',
-  MANAGE_BRAND: 'manage_brand',
-  MANAGE_MEMBERS: 'manage_members',
-  MANAGE_ROLES: 'manage_roles',
-  MANAGE_ORGANIZATION: 'manage_organization',
-  VIEW_ANALYTICS: 'view_analytics',
+  CREATE_CAMPAIGN: "create_campaign",
+  EDIT_CAMPAIGN: "edit_campaign",
+  DELETE_CAMPAIGN: "delete_campaign",
+  CREATE_FLYER: "create_flyer",
+  SCHEDULE_POST: "schedule_post",
+  PUBLISH_POST: "publish_post",
+  VIEW_GALLERY: "view_gallery",
+  DELETE_GALLERY: "delete_gallery",
+  MANAGE_BRAND: "manage_brand",
+  MANAGE_MEMBERS: "manage_members",
+  MANAGE_ROLES: "manage_roles",
+  MANAGE_ORGANIZATION: "manage_organization",
+  VIEW_ANALYTICS: "view_analytics",
 };
 
 // All permissions (for personal context and admins)
@@ -48,10 +48,10 @@ export function getPermissionsForRole(orgRole) {
   if (!orgRole) return ALL_PERMISSIONS;
 
   // Admin has all permissions
-  if (orgRole === 'org:admin') return ALL_PERMISSIONS;
+  if (orgRole === "org:admin") return ALL_PERMISSIONS;
 
   // Member has limited permissions
-  if (orgRole === 'org:member') return MEMBER_PERMISSIONS;
+  if (orgRole === "org:member") return MEMBER_PERMISSIONS;
 
   // Unknown role - no permissions
   return [];
@@ -75,7 +75,7 @@ export function hasPermission(orgRole, permission) {
  * @returns {boolean}
  */
 export function hasAnyPermission(orgRole, permissions) {
-  return permissions.some(p => hasPermission(orgRole, p));
+  return permissions.some((p) => hasPermission(orgRole, p));
 }
 
 /**
@@ -85,7 +85,7 @@ export function hasAnyPermission(orgRole, permissions) {
  * @returns {boolean}
  */
 export function hasAllPermissions(orgRole, permissions) {
-  return permissions.every(p => hasPermission(orgRole, p));
+  return permissions.every((p) => hasPermission(orgRole, p));
 }
 
 /**
@@ -106,7 +106,7 @@ export function requirePermission(orgRole, permission) {
 export class PermissionDeniedError extends Error {
   constructor(permission) {
     super(`Permission denied: ${permission}`);
-    this.name = 'PermissionDeniedError';
+    this.name = "PermissionDeniedError";
     this.permission = permission;
     this.statusCode = 403;
   }
@@ -116,9 +116,9 @@ export class PermissionDeniedError extends Error {
  * Custom error for organization access denied
  */
 export class OrganizationAccessError extends Error {
-  constructor(message = 'Organization access denied') {
+  constructor(message = "Organization access denied") {
     super(message);
-    this.name = 'OrganizationAccessError';
+    this.name = "OrganizationAccessError";
     this.statusCode = 403;
   }
 }
@@ -146,7 +146,7 @@ export function createOrgContext(auth) {
  * @returns {boolean}
  */
 export function isAdmin(orgRole) {
-  return !orgRole || orgRole === 'org:admin'; // Personal context or admin
+  return !orgRole || orgRole === "org:admin"; // Personal context or admin
 }
 
 /**

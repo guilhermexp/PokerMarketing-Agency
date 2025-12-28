@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { Icon } from "./common/Icon";
 import { Button } from "./common/Button";
 import { Loader } from "./common/Loader";
 import { EmptyState } from "./common/EmptyState";
-import {
-  getCampaigns,
-  deleteCampaign,
-  type DbCampaign,
-} from "../services/apiClient";
+import { deleteCampaign, type DbCampaign } from "../services/apiClient";
+import { useCampaigns } from "../hooks/useAppData";
 
 interface CampaignWithCounts {
   id: string;
@@ -461,44 +458,35 @@ export function CampaignsList({
   onNewCampaign,
   currentCampaignId,
 }: CampaignsListProps) {
-  const [campaigns, setCampaigns] = useState<CampaignWithCounts[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Use cached data from SWR - no duplicate fetches!
+  const {
+    campaigns: dbCampaigns,
+    isLoading,
+    removeCampaign,
+  } = useCampaigns(userId, organizationId);
+
   const [loadingCampaignId, setLoadingCampaignId] = useState<string | null>(
     null,
   );
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadCampaigns();
-  }, [userId, organizationId]);
-
-  const loadCampaigns = async () => {
-    try {
-      setIsLoading(true);
-      const dbCampaigns = await getCampaigns(userId, organizationId);
-      const summaries: CampaignWithCounts[] = dbCampaigns.map(
-        (c: DbCampaign) => ({
-          id: c.id,
-          name: c.name,
-          status: c.status,
-          createdAt: c.created_at,
-          clipsCount: Number(c.clips_count) || 0,
-          postsCount: Number(c.posts_count) || 0,
-          adsCount: Number(c.ads_count) || 0,
-          postsBreakdown: c.posts_breakdown || {},
-          adsBreakdown: c.ads_breakdown || {},
-          clipPreviewUrl: c.clip_preview_url || null,
-          postPreviewUrl: c.post_preview_url || null,
-          adPreviewUrl: c.ad_preview_url || null,
-        }),
-      );
-      setCampaigns(summaries);
-    } catch (error) {
-      console.error("Failed to load campaigns:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Transform DB campaigns to display format (memoized to avoid recalc)
+  const campaigns = useMemo<CampaignWithCounts[]>(() => {
+    return dbCampaigns.map((c: DbCampaign) => ({
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      createdAt: c.created_at,
+      clipsCount: Number(c.clips_count) || 0,
+      postsCount: Number(c.posts_count) || 0,
+      adsCount: Number(c.ads_count) || 0,
+      postsBreakdown: c.posts_breakdown || {},
+      adsBreakdown: c.ads_breakdown || {},
+      clipPreviewUrl: c.clip_preview_url || null,
+      postPreviewUrl: c.post_preview_url || null,
+      adPreviewUrl: c.ad_preview_url || null,
+    }));
+  }, [dbCampaigns]);
 
   const handleSelectCampaign = (campaignId: string) => {
     setLoadingCampaignId(campaignId);
@@ -518,8 +506,9 @@ export function CampaignsList({
 
     try {
       setDeletingId(campaignId);
+      // Optimistic update - remove from cache immediately
+      removeCampaign(campaignId);
       await deleteCampaign(campaignId);
-      setCampaigns((prev) => prev.filter((c) => c.id !== campaignId));
     } catch (error) {
       console.error("Failed to delete campaign:", error);
     } finally {
@@ -561,9 +550,9 @@ export function CampaignsList({
         </div>
         <Button
           onClick={onNewCampaign}
-          icon="plus"
+          icon="upload"
           size="small"
-          variant="primary"
+          variant="secondary"
         >
           Nova Campanha
         </Button>
