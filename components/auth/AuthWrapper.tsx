@@ -1,12 +1,12 @@
-import { useEffect, useState, createContext, useContext } from 'react';
+import { useEffect, useState, createContext, useContext, useRef } from "react";
 import {
   SignedIn,
   SignedOut,
   SignIn,
   UserButton,
   useUser,
-} from '@clerk/clerk-react';
-import { getOrCreateUser, type DbUser } from '../../services/apiClient';
+} from "@clerk/clerk-react";
+import { getOrCreateUser, type DbUser } from "../../services/apiClient";
 
 interface AuthContextType {
   dbUser: DbUser | null;
@@ -35,52 +35,68 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   const [dbUser, setDbUser] = useState<DbUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Track if we've already synced this user to prevent duplicate calls
+  const syncedUserIdRef = useRef<string | null>(null);
+
+  // Extract primitive values to use as dependencies (prevents re-renders)
+  const clerkUserId = user?.id;
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
+  const userName = user?.fullName || user?.firstName || "User";
+  const userImage = user?.imageUrl;
+
   useEffect(() => {
     async function syncUser() {
       if (!clerkLoaded) return;
 
-      if (!isSignedIn || !user) {
+      if (!isSignedIn || !clerkUserId) {
         setDbUser(null);
         setIsLoading(false);
+        syncedUserIdRef.current = null;
+        return;
+      }
+
+      // Skip if we've already synced this user
+      if (syncedUserIdRef.current === clerkUserId) {
         return;
       }
 
       try {
-        const email = user.primaryEmailAddress?.emailAddress;
-        const name = user.fullName || user.firstName || 'User';
-
-        if (!email) {
-          console.error('User has no email address');
+        if (!userEmail) {
+          console.error("User has no email address");
           setIsLoading(false);
           return;
         }
 
+        console.log("[Auth] Syncing user to database (once per session)...");
         const syncedUser = await getOrCreateUser({
-          email,
-          name,
-          avatar_url: user.imageUrl,
-          auth_provider: 'clerk',
-          auth_provider_id: user.id,
+          email: userEmail,
+          name: userName,
+          avatar_url: userImage,
+          auth_provider: "clerk",
+          auth_provider_id: clerkUserId,
         });
 
         setDbUser(syncedUser);
+        syncedUserIdRef.current = clerkUserId; // Mark as synced
+        console.log("[Auth] User synced successfully:", syncedUser.id);
       } catch (error) {
-        console.error('Failed to sync user with database:', error);
+        console.error("Failed to sync user with database:", error);
         // Still allow access even if DB sync fails (for development)
         setDbUser({
-          id: user.id,
-          email: user.primaryEmailAddress?.emailAddress || '',
-          name: user.fullName || user.firstName || 'User',
-          avatar_url: user.imageUrl || null,
+          id: clerkUserId,
+          email: userEmail || "",
+          name: userName,
+          avatar_url: userImage || null,
           created_at: new Date().toISOString(),
         });
+        syncedUserIdRef.current = clerkUserId; // Still mark as synced to prevent retries
       } finally {
         setIsLoading(false);
       }
     }
 
     syncUser();
-  }, [clerkLoaded, isSignedIn, user]);
+  }, [clerkLoaded, isSignedIn, clerkUserId, userEmail, userName, userImage]);
 
   const contextValue: AuthContextType = {
     dbUser,
@@ -99,26 +115,25 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
             <SignIn
               appearance={{
                 elements: {
-                  rootBox: 'mx-auto',
-                  card: 'bg-[#0a0a0a] border border-white/10',
-                  headerTitle: 'text-white',
-                  headerSubtitle: 'text-white/50',
-                  socialButtonsBlockButton: 'bg-white/5 border-white/10 text-white hover:bg-white/10',
-                  formFieldLabel: 'text-white/70',
-                  formFieldInput: 'bg-white/5 border-white/10 text-white',
-                  footerActionLink: 'text-amber-500 hover:text-amber-400',
-                  identityPreviewText: 'text-white',
-                  identityPreviewEditButton: 'text-amber-500',
-                  formButtonPrimary: 'bg-white text-black hover:bg-white/90',
-                }
+                  rootBox: "mx-auto",
+                  card: "bg-[#0a0a0a] border border-white/10",
+                  headerTitle: "text-white",
+                  headerSubtitle: "text-white/50",
+                  socialButtonsBlockButton:
+                    "bg-white/5 border-white/10 text-white hover:bg-white/10",
+                  formFieldLabel: "text-white/70",
+                  formFieldInput: "bg-white/5 border-white/10 text-white",
+                  footerActionLink: "text-amber-500 hover:text-amber-400",
+                  identityPreviewText: "text-white",
+                  identityPreviewEditButton: "text-amber-500",
+                  formButtonPrimary: "bg-white text-black hover:bg-white/90",
+                },
               }}
             />
           </div>
         </div>
       </SignedOut>
-      <SignedIn>
-        {children}
-      </SignedIn>
+      <SignedIn>{children}</SignedIn>
     </AuthContext.Provider>
   );
 }
@@ -129,8 +144,8 @@ export function UserProfileButton() {
       afterSignOutUrl="/"
       appearance={{
         elements: {
-          avatarBox: 'w-8 h-8',
-        }
+          avatarBox: "w-8 h-8",
+        },
       }}
     />
   );
@@ -148,7 +163,7 @@ export function useCurrentUser() {
     userId,
     clerkUserId: user?.id,
     email: user?.primaryEmailAddress?.emailAddress,
-    name: user?.fullName || user?.firstName || 'User',
+    name: user?.fullName || user?.firstName || "User",
     avatarUrl: user?.imageUrl,
   };
 }

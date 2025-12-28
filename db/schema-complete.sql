@@ -54,16 +54,6 @@ CREATE TYPE instagram_content_type AS ENUM (
     'carousel'
 );
 
-CREATE TYPE image_source AS ENUM (
-    'Post',
-    'Anúncio',
-    'Clipe',
-    'Flyer',
-    'Flyer Diário',
-    'Logo',
-    'Edição'
-);
-
 CREATE TYPE image_model AS ENUM (
     'gemini-3-pro-image-preview',
     'imagen-4.0-generate-001'
@@ -375,7 +365,7 @@ CREATE TABLE gallery_images (
 
     src_url TEXT NOT NULL,
     prompt TEXT,
-    source image_source NOT NULL,
+    source VARCHAR(100) NOT NULL,
     model image_model NOT NULL,
     aspect_ratio VARCHAR(20),
     image_size image_size,

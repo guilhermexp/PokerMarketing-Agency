@@ -67,3 +67,12 @@ A aplicação utiliza um `importmap` em `index.html` para carregar as dependênc
 bun install
 bun run dev
 ```
+
+### Migrar imagens base64 da galeria
+
+Se o banco estiver com imagens base64 (data URLs) em `gallery_images.src_url`,
+isso gera transferencia enorme. Use o script abaixo para mover para Vercel Blob:
+
+```sh
+DATABASE_URL=... BLOB_READ_WRITE_TOKEN=... node db/migrate-gallery-base64-to-blob.mjs
+```

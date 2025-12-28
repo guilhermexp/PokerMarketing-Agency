@@ -129,6 +129,52 @@ export const generateCampaign = async (
   options: GenerationOptions,
 ): Promise<MarketingCampaign> => {
   const toneText = getToneText(brandProfile, "campaigns");
+
+  // Build quantity instructions from options
+  const quantities: string[] = [];
+
+  if (options.videoClipScripts.generate && options.videoClipScripts.count > 0) {
+    quantities.push(
+      `- Roteiros de vídeo (videoClipScripts): EXATAMENTE ${options.videoClipScripts.count} roteiro(s)`,
+    );
+  } else {
+    quantities.push(`- Roteiros de vídeo (videoClipScripts): 0 (array vazio)`);
+  }
+
+  const postPlatforms: string[] = [];
+  if (options.posts.instagram.generate && options.posts.instagram.count > 0) {
+    postPlatforms.push(`${options.posts.instagram.count}x Instagram`);
+  }
+  if (options.posts.facebook.generate && options.posts.facebook.count > 0) {
+    postPlatforms.push(`${options.posts.facebook.count}x Facebook`);
+  }
+  if (options.posts.twitter.generate && options.posts.twitter.count > 0) {
+    postPlatforms.push(`${options.posts.twitter.count}x Twitter`);
+  }
+  if (options.posts.linkedin.generate && options.posts.linkedin.count > 0) {
+    postPlatforms.push(`${options.posts.linkedin.count}x LinkedIn`);
+  }
+  if (postPlatforms.length > 0) {
+    quantities.push(`- Posts (posts): ${postPlatforms.join(", ")}`);
+  } else {
+    quantities.push(`- Posts (posts): 0 (array vazio)`);
+  }
+
+  const adPlatforms: string[] = [];
+  if (options.adCreatives.facebook.generate && options.adCreatives.facebook.count > 0) {
+    adPlatforms.push(`${options.adCreatives.facebook.count}x Facebook`);
+  }
+  if (options.adCreatives.google.generate && options.adCreatives.google.count > 0) {
+    adPlatforms.push(`${options.adCreatives.google.count}x Google`);
+  }
+  if (adPlatforms.length > 0) {
+    quantities.push(`- Anúncios (adCreatives): ${adPlatforms.join(", ")}`);
+  } else {
+    quantities.push(`- Anúncios (adCreatives): 0 (array vazio)`);
+  }
+
+  const quantityInstructions = quantities.join("\n    ");
+
   const parts: any[] = [
     {
       text: `
@@ -141,7 +187,10 @@ export const generateCampaign = async (
     **CONTEÚDO PARA ESTRUTURAR:**
     ${input.transcript}
 
-    **MISSÃO:** Gere uma campanha completa em JSON. Use prompts cinematográficos para imagens.
+    **QUANTIDADES EXATAS A GERAR (OBRIGATÓRIO SEGUIR):**
+    ${quantityInstructions}
+
+    **MISSÃO:** Gere uma campanha completa em JSON com as QUANTIDADES EXATAS especificadas acima. Use prompts cinematográficos para imagens.
     `,
     },
   ];
@@ -236,11 +285,19 @@ export const generateImage = async (
   const ai = getAi();
   const toneText = getToneText(brandProfile, "images");
 
-    // Build prompt with style reference instruction if provided
-    let fullPrompt = `PROMPT TÉCNICO: ${prompt}
-ESTILO VISUAL: ${toneText ? `${toneText}, ` : ''}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.
+  // Build prompt - typography rules ONLY apply when we have a style reference
+  // (i.e., scene images that need to match a thumbnail)
+  // Thumbnails are creative and don't need strict typography enforcement
+  let fullPrompt = `PROMPT TÉCNICO: ${prompt}
+ESTILO VISUAL: ${toneText ? `${toneText}, ` : ''}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
 
-**TIPOGRAFIA OBRIGATÓRIA (REGRA INVIOLÁVEL):**
+  // Typography rules ONLY for scene images (when styleReferenceImage is provided)
+  // This ensures visual consistency across scenes within a clip
+  // But allows creative freedom for the main thumbnail
+  if (options.styleReferenceImage) {
+    fullPrompt = `${fullPrompt}
+
+**TIPOGRAFIA OBRIGATÓRIA PARA CENAS (REGRA INVIOLÁVEL):**
 - Use EXCLUSIVAMENTE fonte BOLD CONDENSED SANS-SERIF (estilo Bebas Neue, Oswald, Impact, ou similar)
 - TODOS os textos devem usar a MESMA família tipográfica - PROIBIDO misturar estilos
 - Títulos em MAIÚSCULAS com peso BLACK ou EXTRA-BOLD
@@ -248,10 +305,7 @@ ESTILO VISUAL: ${toneText ? `${toneText}, ` : ''}Cores: ${brandProfile.primaryCo
 - PROIBIDO: fontes script/cursivas, serifadas clássicas, handwriting, ou fontes finas/light
 - A tipografia deve transmitir FORÇA, PODER e SOFISTICAÇÃO
 - Kerning apertado (letras próximas) para impacto visual máximo
-- Se houver subtexto, use a MESMA fonte em peso menor (Regular ou Medium), nunca outra família`;
-
-  if (options.styleReferenceImage) {
-    fullPrompt = `${fullPrompt}
+- Se houver subtexto, use a MESMA fonte em peso menor (Regular ou Medium), nunca outra família
 
 INSTRUÇÕES CRÍTICAS DE CONSISTÊNCIA VISUAL:
 A imagem de referência anexada é o GUIA DE ESTILO ABSOLUTO. Você DEVE copiar EXATAMENTE:

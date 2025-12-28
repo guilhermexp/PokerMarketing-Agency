@@ -97,144 +97,158 @@ const handleDownloadFlyer = (src: string, filename: string) => {
   document.body.removeChild(link);
 };
 
-const ImageCarousel: React.FC<{
+const FlyerThumbStrip: React.FC<{
   images: (GalleryImage | "loading")[];
   onEdit: (image: GalleryImage) => void;
   onQuickPost: (image: GalleryImage) => void;
   onPublish: (image: GalleryImage) => void;
-  onDownload: (image: GalleryImage) => void;
+  onDownload: (image: GalleryImage, index: number) => void;
   onCloneStyle?: (image: GalleryImage) => void;
-}> = ({ images, onEdit, onQuickPost, onPublish, onDownload, onCloneStyle }) => {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
+  showPublish?: boolean;
+  emptyTitle: string;
+  emptyDescription: string;
+}> = ({
+  images,
+  onEdit,
+  onQuickPost,
+  onPublish,
+  onDownload,
+  onCloneStyle,
+  showPublish = true,
+  emptyTitle,
+  emptyDescription,
+}) => {
+  const stripRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    // Auto-switch para a imagem mais recente quando ela termina de carregar
-    if (images.length > 0 && images[0] !== "loading" && activeIndex !== 0) {
-      setActiveIndex(0);
-    }
-  }, [images.length, images[0]]);
-
-  const next = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveIndex((prev) => (prev + 1) % images.length);
+  const scrollStrip = (direction: "prev" | "next") => {
+    const el = stripRef.current;
+    if (!el) return;
+    const scrollAmount = Math.round(el.clientWidth * 0.8);
+    el.scrollBy({
+      left: direction === "next" ? scrollAmount : -scrollAmount,
+      behavior: "smooth",
+    });
   };
-  const prev = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveIndex((prev) => (prev - 1 + images.length) % images.length);
-  };
 
-  if (images.length === 0)
+  if (images.length === 0) {
     return (
-      <div className="text-center opacity-10 flex flex-col items-center">
-        <Icon name="image" className="w-10 h-10 mb-2 text-white" />
-        <p className="text-[9px] font-black uppercase tracking-widest">
-          Awaiting Data
-        </p>
+      <div className="py-4 w-full">
+        <EmptyState
+          icon="image"
+          title={emptyTitle}
+          description={emptyDescription}
+          size="large"
+          className="w-full"
+        />
       </div>
     );
-
-  const currentItem = images[activeIndex];
+  }
 
   return (
-    <div
-      className="relative w-full h-full"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {currentItem === "loading" ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md z-10">
-          <Loader className="w-8 h-8 mb-3 text-primary" />
-          <p className="text-[8px] font-black text-white/40 uppercase tracking-widest animate-pulse">
-            Neural Forge...
-          </p>
-        </div>
-      ) : (
+    <div className="relative">
+      {images.length > 2 && (
         <>
-          <img
-            src={currentItem.src}
-            className="w-full h-full object-contain transition-transform duration-700 hover:scale-105 cursor-pointer"
-            onClick={() => onEdit(currentItem)}
-          />
-          <div
-            className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/40 transition-all duration-300 flex items-center justify-center backdrop-blur-[2px] z-20 ${isHovered ? "opacity-100" : "opacity-0"}`}
+          <button
+            type="button"
+            onClick={() => scrollStrip("prev")}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-white hover:bg-primary hover:text-black transition-all"
+            aria-label="Anterior"
           >
-            <div className="grid grid-cols-2 gap-2 p-4 max-w-[280px]">
-              {/* QuickPost - Primary Action */}
-              <button
-                onClick={() => onQuickPost(currentItem)}
-                className="col-span-2 flex items-center justify-center gap-2.5 px-5 py-3 bg-primary hover:bg-primary/90 rounded-xl text-black font-black text-[11px] uppercase tracking-wide transition-all hover:scale-[1.02] shadow-lg shadow-primary/30"
-              >
-                <Icon name="zap" className="w-4 h-4" />
-                QuickPost
-              </button>
-
-              {/* View */}
-              <button
-                onClick={() => onEdit(currentItem)}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-white font-bold text-[10px] uppercase tracking-wide transition-all"
-              >
-                <Icon name="eye" className="w-3.5 h-3.5" />
-                View
-              </button>
-
-              {/* Campanha */}
-              <button
-                onClick={() => onPublish(currentItem)}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-white font-bold text-[10px] uppercase tracking-wide transition-all"
-              >
-                <Icon name="users" className="w-3.5 h-3.5" />
-                Campanha
-              </button>
-
-              {/* Download */}
-              <button
-                onClick={() => onDownload(currentItem)}
-                className={`flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-white/70 hover:text-white font-bold text-[10px] uppercase tracking-wide transition-all ${onCloneStyle ? "" : "col-span-2"}`}
-              >
-                <Icon name="download" className="w-3.5 h-3.5" />
-                Download
-              </button>
-
-              {/* Modelo (opcional) */}
-              {onCloneStyle && (
-                <button
-                  onClick={() => onCloneStyle(currentItem)}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-white/70 hover:text-white font-bold text-[10px] uppercase tracking-wide transition-all"
-                >
-                  <Icon name="copy" className="w-3.5 h-3.5" />
-                  Modelo
-                </button>
-              )}
-            </div>
-          </div>
+            <Icon name="chevron-up" className="w-3.5 h-3.5 -rotate-90" />
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollStrip("next")}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-white hover:bg-primary hover:text-black transition-all"
+            aria-label="Próximo"
+          >
+            <Icon name="chevron-up" className="w-3.5 h-3.5 rotate-90" />
+          </button>
         </>
       )}
-
-      {images.length > 1 && (
+      <div
+        ref={stripRef}
+        className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent scroll-smooth px-4"
+        style={{ scrollSnapType: "x mandatory" }}
+      >
+      {images.map((flyer, index) => (
         <div
-          className={`absolute inset-x-3 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none z-30 transition-opacity ${isHovered ? "opacity-100" : "opacity-0"}`}
+          key={flyer === "loading" ? `loading-${index}` : flyer.id}
+          className="flex-shrink-0 w-[140px] group"
+          style={{ scrollSnapAlign: "start" }}
         >
-          <button
-            onClick={prev}
-            className="w-8 h-8 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center text-white pointer-events-auto hover:bg-primary hover:text-black transition-all"
-          >
-            <Icon name="chevron-up" className="w-4 h-4 -rotate-90" />
-          </button>
-          <button
-            onClick={next}
-            className="w-8 h-8 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center text-white pointer-events-auto hover:bg-primary hover:text-black transition-all"
-          >
-            <Icon name="chevron-up" className="w-4 h-4 rotate-90" />
-          </button>
+          <div className="aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border border-white/5 relative">
+            {flyer === "loading" ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
+                <Loader className="w-6 h-6 mb-2 text-primary" />
+                <p className="text-[8px] font-black text-white/40 uppercase tracking-widest animate-pulse">
+                  Gerando...
+                </p>
+              </div>
+            ) : (
+              <>
+                <img
+                  src={flyer.src}
+                  className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
+                  onClick={() => onEdit(flyer)}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-2 gap-1.5">
+                  <button
+                    onClick={() => onQuickPost(flyer)}
+                    className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-primary hover:bg-primary/90 rounded-lg text-black font-bold text-[9px] uppercase tracking-wide transition-all"
+                  >
+                    <Icon name="zap" className="w-3 h-3" />
+                    QuickPost
+                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => onEdit(flyer)}
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                    >
+                      <Icon name="eye" className="w-2.5 h-2.5" />
+                      View
+                    </button>
+                    <button
+                      onClick={() => onDownload(flyer, index)}
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                    >
+                      <Icon name="download" className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                  {onCloneStyle && showPublish && (
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => onPublish(flyer)}
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                      >
+                        <Icon name="users" className="w-2.5 h-2.5" />
+                        Campanha
+                      </button>
+                      <button
+                        onClick={() => onCloneStyle(flyer)}
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                      >
+                        <Icon name="copy" className="w-2.5 h-2.5" />
+                        Modelo
+                      </button>
+                    </div>
+                  )}
+                  {!onCloneStyle && showPublish && (
+                    <button
+                      onClick={() => onPublish(flyer)}
+                      className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                    >
+                      <Icon name="users" className="w-2.5 h-2.5" />
+                      Campanha
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      )}
-
-      {images.length > 1 && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/10 text-[7px] font-black text-white/60 uppercase tracking-widest z-30">
-          {activeIndex + 1} / {images.length}
-        </div>
-      )}
+      ))}
+      </div>
     </div>
   );
 };
@@ -526,75 +540,18 @@ const TournamentEventCard: React.FC<{
       </div>
       {isExpanded && (
         <div className="px-4 pb-4 pt-3 border-t border-white/5 animate-fade-in-up">
-          {generatedFlyers.length === 0 ? (
-            <div className="py-4">
-              <EmptyState
-                icon="image"
-                title="Nenhum flyer gerado"
-                description='Clique em "Gerar" para criar um flyer.'
-                size="large"
-                className="w-full"
-              />
-            </div>
-          ) : (
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-              {generatedFlyers.map((flyer, index) => (
-                <div
-                  key={flyer === "loading" ? `loading-${index}` : flyer.id}
-                  className="flex-shrink-0 w-[140px] group"
-                >
-                  <div className="aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border border-white/5 relative">
-                    {flyer === "loading" ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
-                        <Loader className="w-6 h-6 mb-2 text-primary" />
-                        <p className="text-[8px] font-black text-white/40 uppercase tracking-widest animate-pulse">
-                          Gerando...
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        <img
-                          src={flyer.src}
-                          className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
-                          onClick={() => setEditingFlyer(flyer)}
-                        />
-                        {/* Hover overlay with actions */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-2 gap-1.5">
-                          <button
-                            onClick={() => setQuickPostFlyer(flyer)}
-                            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-primary hover:bg-primary/90 rounded-lg text-black font-bold text-[9px] uppercase tracking-wide transition-all"
-                          >
-                            <Icon name="zap" className="w-3 h-3" />
-                            QuickPost
-                          </button>
-                          <div className="flex gap-1.5">
-                            <button
-                              onClick={() => setEditingFlyer(flyer)}
-                              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
-                            >
-                              <Icon name="eye" className="w-2.5 h-2.5" />
-                              View
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleDownloadFlyer(
-                                  flyer.src,
-                                  `flyer-${event.id}-${index}.png`,
-                                )
-                              }
-                              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
-                            >
-                              <Icon name="download" className="w-2.5 h-2.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <FlyerThumbStrip
+            images={generatedFlyers}
+            onEdit={setEditingFlyer}
+            onQuickPost={setQuickPostFlyer}
+            onDownload={(f, index) =>
+              handleDownloadFlyer(f.src, `flyer-${event.id}-${index}.png`)
+            }
+            onPublish={() => {}}
+            showPublish={false}
+            emptyTitle="Nenhum flyer gerado"
+            emptyDescription='Clique em "Gerar" para criar um flyer.'
+          />
         </div>
       )}
       {editingFlyer && (
@@ -989,21 +946,21 @@ const PeriodCardRow: React.FC<{
         </div>
       </div>
       {isExpanded && (
-        <div className="px-4 pb-4 pt-3 border-t border-white/5 animate-fade-in-up flex justify-center">
-          <div className="w-full max-w-[200px] aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border border-white/5 relative">
-            <ImageCarousel
-              images={generatedFlyers}
-              onEdit={setEditingFlyer}
-              onQuickPost={setQuickPostFlyer}
-              onPublish={(f) =>
-                onPublishToCampaign(`Campanha para grade ${label}`, f)
-              }
-              onDownload={(f) =>
-                handleDownloadFlyer(f.src, `period-${period}.png`)
-              }
-              onCloneStyle={onCloneStyle}
-            />
-          </div>
+        <div className="px-4 pb-4 pt-3 border-t border-white/5 animate-fade-in-up">
+          <FlyerThumbStrip
+            images={generatedFlyers}
+            onEdit={setEditingFlyer}
+            onQuickPost={setQuickPostFlyer}
+            onPublish={(f) =>
+              onPublishToCampaign(`Campanha para grade ${label}`, f)
+            }
+            onDownload={(f, index) =>
+              handleDownloadFlyer(f.src, `period-${period}-${index}.png`)
+            }
+            onCloneStyle={onCloneStyle}
+            emptyTitle="Nenhum flyer gerado"
+            emptyDescription='Clique em "Gerar" para criar um flyer.'
+          />
         </div>
       )}
       {editingFlyer && (
@@ -1426,15 +1383,19 @@ const PeriodCard: React.FC<{
         </Button>
       </div>
       <div className="flex-1 p-4 relative min-h-[300px] bg-black/40">
-        <ImageCarousel
+        <FlyerThumbStrip
           images={generatedFlyers}
           onEdit={setEditingFlyer}
           onQuickPost={setQuickPostFlyer}
           onPublish={(f) =>
             onPublishToCampaign(`Campanha para grade ${label}`, f)
           }
-          onDownload={(f) => handleDownloadFlyer(f.src, `period-${period}.png`)}
+          onDownload={(f, index) =>
+            handleDownloadFlyer(f.src, `period-${period}-${index}.png`)
+          }
           onCloneStyle={onCloneStyle}
+          emptyTitle="Nenhum flyer gerado"
+          emptyDescription='Clique em "Gerar" para criar um flyer.'
         />
       </div>
       {editingFlyer && (

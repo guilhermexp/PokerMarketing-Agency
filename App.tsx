@@ -16,6 +16,7 @@ import {
   uploadImageForInstagram,
   type InstagramContentType,
 } from "./services/rubeService";
+import { uploadDataUrlToBlob } from "./services/blobService";
 import type {
   BrandProfile,
   MarketingCampaign,
@@ -56,6 +57,7 @@ import {
   createWeekSchedule,
   deleteWeekSchedule,
   getScheduleEvents,
+  getWeekSchedulesList,
   schedulePostWithQStash,
   deleteGalleryImage,
   type DbCampaign,
@@ -63,6 +65,7 @@ import {
   type WeekScheduleWithCount,
 } from "./services/apiClient";
 import {
+  useInitialData,
   useGalleryImages,
   useScheduledPosts,
   useCampaigns,
@@ -97,6 +100,12 @@ const excelTimeToStr = (val: any): string => {
   return String(val || "");
 };
 
+const parseDateOnly = (dateStr: string): Date => {
+  const [datePart] = dateStr.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
+
 const resizeImageForChat = (
   dataUrl: string,
   maxWidth: number,
@@ -129,6 +138,27 @@ const resizeImageForChat = (
     img.onerror = (err) => reject(err);
     img.src = dataUrl;
   });
+};
+
+// Normalize platform names to match database enum values
+const normalizeSocialPlatform = (platform: string): string => {
+  const normalized = platform.toLowerCase().trim();
+  if (normalized.includes("twitter") || normalized.includes("x.com")) {
+    return "Twitter";
+  }
+  if (normalized.includes("instagram")) return "Instagram";
+  if (normalized.includes("linkedin")) return "LinkedIn";
+  if (normalized.includes("facebook")) return "Facebook";
+  return platform; // Return original if no match
+};
+
+const normalizeAdPlatform = (platform: string): string => {
+  const normalized = platform.toLowerCase().trim();
+  if (normalized.includes("facebook") || normalized.includes("meta")) {
+    return "Facebook";
+  }
+  if (normalized.includes("google")) return "Google";
+  return platform;
 };
 
 const getTruncatedHistory = (
@@ -166,7 +196,6 @@ function AppContent() {
   const [campaign, setCampaign] = useState<MarketingCampaign | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [activeView, setActiveView] = useState<ViewType>("campaign");
 
@@ -180,7 +209,14 @@ function AppContent() {
   const [lastUploadedImage, setLastUploadedImage] =
     useState<ChatReferenceImage | null>(null);
 
-  // === SWR CACHED DATA HOOKS (prevents duplicate fetches!) ===
+  // === OPTIMIZED: Single request to load ALL initial data ===
+  // This replaces 6 separate API calls with 1!
+  const { data: initialData, isLoading: isInitialLoading } = useInitialData(
+    userId,
+    organizationId,
+  );
+
+  // === SWR CACHED DATA HOOKS (now just read from cache populated by useInitialData) ===
   const {
     images: swrGalleryImages,
     addImage: swrAddGalleryImage,
@@ -200,14 +236,35 @@ function AppContent() {
     organizationId,
   );
 
-  const {
-    schedule: swrTournamentSchedule,
-    events: swrTournamentEvents,
-    setData: swrSetTournamentData,
-  } = useTournamentData(userId, organizationId);
+  const { schedule: swrTournamentSchedule, events: swrTournamentEvents } =
+    useTournamentData(userId, organizationId);
 
-  const { schedules: swrAllSchedules, setSchedules: swrSetAllSchedules } =
-    useSchedulesList(userId, organizationId);
+  const { schedules: swrAllSchedules } = useSchedulesList(
+    userId,
+    organizationId,
+  );
+
+  const [tournamentEvents, setTournamentEvents] = useState<TournamentEvent[]>(
+    [],
+  );
+  const [allSchedules, setAllSchedules] = useState<WeekScheduleWithCount[]>([]);
+
+  const mapDbEventToTournamentEvent = (e: any): TournamentEvent => ({
+    id: e.id,
+    day: e.day_of_week,
+    name: e.name,
+    game: e.game || "",
+    gtd: e.gtd || "",
+    buyIn: e.buy_in || "",
+    rebuy: e.rebuy || "",
+    addOn: e.add_on || "",
+    stack: e.stack || "",
+    players: e.players || "",
+    lateReg: e.late_reg || "",
+    minutes: e.minutes || "",
+    structure: e.structure || "",
+    times: e.times || {},
+  });
 
   // Transform SWR data to local format
   const galleryImages: GalleryImage[] = (swrGalleryImages || [])
@@ -260,26 +317,25 @@ function AppContent() {
     }),
   );
 
-  const tournamentEvents: TournamentEvent[] = (swrTournamentEvents || []).map(
-    (e) => ({
-      id: e.id,
-      day: e.day_of_week,
-      name: e.name,
-      game: e.game || "",
-      gtd: e.gtd || "",
-      buyIn: e.buy_in || "",
-      rebuy: e.rebuy || "",
-      addOn: e.add_on || "",
-      stack: e.stack || "",
-      players: e.players || "",
-      lateReg: e.late_reg || "",
-      minutes: e.minutes || "",
-      structure: e.structure || "",
-      times: e.times || {},
-    }),
-  );
+  useEffect(() => {
+    if (swrTournamentEvents && swrTournamentEvents.length > 0) {
+      setTournamentEvents(swrTournamentEvents.map(mapDbEventToTournamentEvent));
+    } else if (tournamentEvents.length > 0) {
+      // Only clear if we actually had events before (avoids unnecessary renders)
+      setTournamentEvents([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swrTournamentEvents]);
 
-  const allSchedules = swrAllSchedules || [];
+  useEffect(() => {
+    // Only update if the schedules actually differ
+    if (swrAllSchedules && swrAllSchedules.length > 0) {
+      setAllSchedules(swrAllSchedules);
+    } else if (allSchedules.length > 0) {
+      setAllSchedules([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swrAllSchedules]);
 
   // Local state for non-cached data
   const [weekScheduleInfo, setWeekScheduleInfo] =
@@ -318,61 +374,34 @@ function AppContent() {
     }
   }, [userId, organizationId]);
 
-  // Load ONLY brand profile and style refs on init (other data comes from SWR hooks)
-  // This effect only runs ONCE per userId thanks to hasInitializedRef
+  // === OPTIMIZED: Use initialData from unified endpoint ===
+  // Brand profile is now loaded via useInitialData (single request for ALL data)
   useEffect(() => {
-    const initAppData = async () => {
-      if (!userId || !orgLoaded) {
-        if (!userId) setIsLoading(false);
-        return;
-      }
-
-      // Prevent re-fetch on hot reload during development
-      if (hasInitializedRef.current) {
-        setIsLoading(false);
-        return;
-      }
-      hasInitializedRef.current = true;
-
-      try {
-        // Load brand profile from database (org-scoped if in organization)
-        const dbBrandProfile = await getBrandProfile(userId, organizationId);
-        if (dbBrandProfile) {
-          setBrandProfile({
-            name: dbBrandProfile.name,
-            description: dbBrandProfile.description || "",
-            logo: dbBrandProfile.logo_url || null,
-            primaryColor: dbBrandProfile.primary_color,
-            secondaryColor: dbBrandProfile.secondary_color,
-            toneOfVoice:
-              dbBrandProfile.tone_of_voice as BrandProfile["toneOfVoice"],
-            toneTargets:
-              (dbBrandProfile.settings
-                ?.toneTargets as BrandProfile["toneTargets"]) || undefined,
-            creativeModel:
-              (dbBrandProfile.settings
-                ?.creativeModel as BrandProfile["creativeModel"]) || undefined,
-          });
-        }
-
-        // Load style references from localStorage (will migrate later)
-        const savedRefs = localStorage.getItem("styleReferences");
-        if (savedRefs) setStyleReferences(JSON.parse(savedRefs));
-
-        // NOTE: Gallery images, scheduled posts, campaigns, and tournament data
-        // are now loaded via SWR hooks (useGalleryImages, useScheduledPosts, etc.)
-        // This eliminates duplicate fetches and provides automatic caching!
-      } catch (e) {
-        console.error("Failed to load data from database:", e);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (!authLoading && orgLoaded) {
-      initAppData();
+    if (initialData?.brandProfile && !brandProfile) {
+      const dbBrandProfile = initialData.brandProfile;
+      setBrandProfile({
+        name: dbBrandProfile.name,
+        description: dbBrandProfile.description || "",
+        logo: dbBrandProfile.logo_url || null,
+        primaryColor: dbBrandProfile.primary_color,
+        secondaryColor: dbBrandProfile.secondary_color,
+        toneOfVoice:
+          dbBrandProfile.tone_of_voice as BrandProfile["toneOfVoice"],
+        toneTargets:
+          (dbBrandProfile.settings
+            ?.toneTargets as BrandProfile["toneTargets"]) || undefined,
+        creativeModel:
+          (dbBrandProfile.settings
+            ?.creativeModel as BrandProfile["creativeModel"]) || undefined,
+      });
     }
-  }, [userId, authLoading, organizationId, orgLoaded]);
+  }, [initialData?.brandProfile, brandProfile]);
+
+  // Load style references from localStorage (local only, not from DB)
+  useEffect(() => {
+    const savedRefs = localStorage.getItem("styleReferences");
+    if (savedRefs) setStyleReferences(JSON.parse(savedRefs));
+  }, []);
 
   // Process tournament schedule info when SWR data loads
   useEffect(() => {
@@ -381,20 +410,18 @@ function AppContent() {
       setCurrentScheduleId(schedule.id);
 
       // Check if week is expired
-      const endDate = new Date(schedule.end_date);
+      const endDate = parseDateOnly(schedule.end_date);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       endDate.setHours(23, 59, 59, 999);
       setIsWeekExpired(today > endDate);
 
       // Set week schedule info (handle ISO datetime strings)
-      const startDateOnly = schedule.start_date.split("T")[0];
-      const endDateOnly = schedule.end_date.split("T")[0];
-      const startParts = startDateOnly.split("-");
-      const endParts = endDateOnly.split("-");
+      const startDate = parseDateOnly(schedule.start_date);
+      const endDateInfo = parseDateOnly(schedule.end_date);
       setWeekScheduleInfo({
-        startDate: `${startParts[2]}/${startParts[1]}`,
-        endDate: `${endParts[2]}/${endParts[1]}`,
+        startDate: `${String(startDate.getDate()).padStart(2, "0")}/${String(startDate.getMonth() + 1).padStart(2, "0")}`,
+        endDate: `${String(endDateInfo.getDate()).padStart(2, "0")}/${String(endDateInfo.getMonth() + 1).padStart(2, "0")}`,
         filename: schedule.filename || "Planilha carregada",
       });
     }
@@ -435,27 +462,32 @@ function AppContent() {
         image_size: null,
         created_at: new Date().toISOString(),
       });
-      createGalleryImage(userId, {
-        src_url: image.src,
-        prompt: image.prompt,
-        source: image.source,
-        model: image.model,
-        post_id: image.post_id,
-        ad_creative_id: image.ad_creative_id,
-        video_script_id: image.video_script_id,
-        organization_id: organizationId,
-      })
-        .then((dbImage) => {
+
+      (async () => {
+        try {
+          const srcUrl = image.src.startsWith("data:")
+            ? await uploadDataUrlToBlob(image.src)
+            : image.src;
+          const dbImage = await createGalleryImage(userId, {
+            src_url: srcUrl,
+            prompt: image.prompt,
+            source: image.source,
+            model: image.model,
+            post_id: image.post_id,
+            ad_creative_id: image.ad_creative_id,
+            video_script_id: image.video_script_id,
+            organization_id: organizationId,
+          });
           // Replace temp image with the real database image
           swrRemoveGalleryImage(tempId);
           swrAddGalleryImage(dbImage);
           if (toolImageReference?.id === tempId) {
             setToolImageReference({ id: dbImage.id, src: dbImage.src_url });
           }
-        })
-        .catch((e) => {
+        } catch (e) {
           console.error("Failed to save image to database:", e);
-        });
+        }
+      })();
     }
 
     return newImage;
@@ -789,13 +821,13 @@ function AppContent() {
               scenes: v.scenes,
             })),
             posts: r.posts.map((p) => ({
-              platform: p.platform,
+              platform: normalizeSocialPlatform(p.platform),
               content: p.content,
               hashtags: p.hashtags,
               image_prompt: p.image_prompt,
             })),
             ad_creatives: r.adCreatives.map((a) => ({
-              platform: a.platform,
+              platform: normalizeAdPlatform(a.platform),
               headline: a.headline,
               body: a.body,
               cta: a.cta,
@@ -938,40 +970,25 @@ function AppContent() {
         schedule.id,
         organizationId,
       );
-      const mappedEvents: TournamentEvent[] = eventsData.events.map((e) => ({
-        id: e.id,
-        day: e.day_of_week,
-        name: e.name,
-        game: e.game || "",
-        gtd: e.gtd || "",
-        buyIn: e.buy_in || "",
-        rebuy: e.rebuy || "",
-        addOn: e.add_on || "",
-        stack: e.stack || "",
-        players: e.players || "",
-        lateReg: e.late_reg || "",
-        minutes: e.minutes || "",
-        structure: e.structure || "",
-        times: e.times || {},
-      }));
+      const mappedEvents: TournamentEvent[] = eventsData.events.map(
+        mapDbEventToTournamentEvent,
+      );
       setTournamentEvents(mappedEvents);
       setCurrentScheduleId(schedule.id);
 
       // Check if this schedule is expired
-      const endDate = new Date(schedule.end_date);
+      const endDate = parseDateOnly(schedule.end_date);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       endDate.setHours(23, 59, 59, 999);
       setIsWeekExpired(today > endDate);
 
       // Set week schedule info (handle ISO datetime strings)
-      const startDateOnly = schedule.start_date.split("T")[0];
-      const endDateOnly = schedule.end_date.split("T")[0];
-      const startParts = startDateOnly.split("-");
-      const endParts = endDateOnly.split("-");
+      const startDate = parseDateOnly(schedule.start_date);
+      const endDateInfo = parseDateOnly(schedule.end_date);
       setWeekScheduleInfo({
-        startDate: `${startParts[2]}/${startParts[1]}`,
-        endDate: `${endParts[2]}/${endParts[1]}`,
+        startDate: `${String(startDate.getDate()).padStart(2, "0")}/${String(startDate.getMonth() + 1).padStart(2, "0")}`,
+        endDate: `${String(endDateInfo.getDate()).padStart(2, "0")}/${String(endDateInfo.getMonth() + 1).padStart(2, "0")}`,
         filename: schedule.filename || "Planilha carregada",
       });
 
@@ -1386,7 +1403,7 @@ function AppContent() {
     });
   };
 
-  if (isLoading || !orgLoaded)
+  if (isInitialLoading || !orgLoaded)
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <Loader className="h-16 w-16" />

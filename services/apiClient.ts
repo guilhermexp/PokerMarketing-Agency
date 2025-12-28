@@ -3,7 +3,50 @@
  * Provides typed methods for all database entities
  */
 
-const API_BASE = '/api/db';
+const API_BASE = "/api/db";
+
+// ============================================================================
+// OPTIMIZED: Unified Initial Data Load
+// Loads ALL user data in a SINGLE request instead of 6 separate requests
+// ============================================================================
+
+export interface InitialData {
+  brandProfile: DbBrandProfile | null;
+  gallery: DbGalleryImage[];
+  scheduledPosts: DbScheduledPost[];
+  campaigns: DbCampaign[];
+  tournamentSchedule: DbWeekSchedule | null;
+  tournamentEvents: DbTournamentEvent[];
+  schedulesList: WeekScheduleWithCount[];
+  _meta?: {
+    loadTime: number;
+    queriesExecuted: number;
+    timestamp: string;
+  };
+}
+
+/**
+ * Load ALL initial data in a single request
+ * This replaces 6 separate API calls with 1, dramatically reducing network overhead
+ */
+export async function getInitialData(
+  userId: string,
+  organizationId?: string | null,
+): Promise<InitialData> {
+  const params = new URLSearchParams({ user_id: userId });
+  if (organizationId) params.append("organization_id", organizationId);
+
+  console.log("[API] Loading all initial data in single request...");
+  const start = Date.now();
+
+  const result = await fetchApi<InitialData>(`/init?${params}`);
+
+  console.log(
+    `[API] ✅ Initial data loaded in ${Date.now() - start}ms (server: ${result._meta?.loadTime}ms)`,
+  );
+
+  return result;
+}
 
 /**
  * Convert a video URL to a display-safe URL
@@ -21,18 +64,20 @@ interface ApiResponse<T> {
 
 async function fetchApi<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...options.headers,
     },
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 
@@ -58,8 +103,8 @@ export async function getOrCreateUser(data: {
   auth_provider?: string;
   auth_provider_id?: string;
 }): Promise<DbUser> {
-  return fetchApi<DbUser>('/users', {
-    method: 'POST',
+  return fetchApi<DbUser>("/users", {
+    method: "POST",
     body: JSON.stringify(data),
   });
 }
@@ -85,30 +130,39 @@ export interface DbBrandProfile {
   created_at: string;
 }
 
-export async function getBrandProfile(userId: string, organizationId?: string | null): Promise<DbBrandProfile | null> {
+export async function getBrandProfile(
+  userId: string,
+  organizationId?: string | null,
+): Promise<DbBrandProfile | null> {
   const params = new URLSearchParams({ user_id: userId });
-  if (organizationId) params.append('organization_id', organizationId);
+  if (organizationId) params.append("organization_id", organizationId);
   return fetchApi<DbBrandProfile | null>(`/brand-profiles?${params}`);
 }
 
-export async function createBrandProfile(userId: string, data: {
-  name: string;
-  description?: string;
-  logo_url?: string;
-  primary_color: string;
-  secondary_color: string;
-  tone_of_voice: string;
-  organization_id?: string | null;
-}): Promise<DbBrandProfile> {
-  return fetchApi<DbBrandProfile>('/brand-profiles', {
-    method: 'POST',
+export async function createBrandProfile(
+  userId: string,
+  data: {
+    name: string;
+    description?: string;
+    logo_url?: string;
+    primary_color: string;
+    secondary_color: string;
+    tone_of_voice: string;
+    organization_id?: string | null;
+  },
+): Promise<DbBrandProfile> {
+  return fetchApi<DbBrandProfile>("/brand-profiles", {
+    method: "POST",
     body: JSON.stringify({ user_id: userId, ...data }),
   });
 }
 
-export async function updateBrandProfile(id: string, data: Partial<DbBrandProfile>): Promise<DbBrandProfile> {
+export async function updateBrandProfile(
+  id: string,
+  data: Partial<DbBrandProfile>,
+): Promise<DbBrandProfile> {
   return fetchApi<DbBrandProfile>(`/brand-profiles?id=${id}`, {
-    method: 'PUT',
+    method: "PUT",
     body: JSON.stringify(data),
   });
 }
@@ -129,49 +183,64 @@ export interface DbGalleryImage {
   created_at: string;
 }
 
-export async function getGalleryImages(userId: string, organizationId?: string | null, options?: {
-  source?: string;
-  limit?: number;
-}): Promise<DbGalleryImage[]> {
+export async function getGalleryImages(
+  userId: string,
+  organizationId?: string | null,
+  options?: {
+    source?: string;
+    limit?: number;
+  },
+): Promise<DbGalleryImage[]> {
   const params = new URLSearchParams({ user_id: userId });
-  if (organizationId) params.append('organization_id', organizationId);
-  if (options?.source) params.append('source', options.source);
-  if (options?.limit) params.append('limit', options.limit.toString());
+  if (organizationId) params.append("organization_id", organizationId);
+  if (options?.source) params.append("source", options.source);
+  if (options?.limit) params.append("limit", options.limit.toString());
 
   return fetchApi<DbGalleryImage[]>(`/gallery?${params}`);
 }
 
-export async function createGalleryImage(userId: string, data: {
-  src_url: string;
-  prompt?: string;
-  source: string;
-  model: string;
-  aspect_ratio?: string;
-  image_size?: string;
-  post_id?: string;
-  ad_creative_id?: string;
-  video_script_id?: string;
-  organization_id?: string | null;
-}): Promise<DbGalleryImage> {
-  return fetchApi<DbGalleryImage>('/gallery', {
-    method: 'POST',
+export async function createGalleryImage(
+  userId: string,
+  data: {
+    src_url: string;
+    prompt?: string;
+    source: string;
+    model: string;
+    aspect_ratio?: string;
+    image_size?: string;
+    post_id?: string;
+    ad_creative_id?: string;
+    video_script_id?: string;
+    organization_id?: string | null;
+  },
+): Promise<DbGalleryImage> {
+  return fetchApi<DbGalleryImage>("/gallery", {
+    method: "POST",
     body: JSON.stringify({ user_id: userId, ...data }),
   });
 }
 
 export async function deleteGalleryImage(id: string): Promise<void> {
   const response = await fetch(`${API_BASE}/gallery?id=${id}`, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
   });
   if (!response.ok) {
     throw new Error(`Failed to delete image: HTTP ${response.status}`);
   }
 }
 
-export async function markGalleryImagePublished(id: string): Promise<DbGalleryImage> {
+export async function markGalleryImagePublished(
+  id: string,
+): Promise<DbGalleryImage | null> {
+  // Skip if it's a temporary ID (not yet saved to database)
+  if (id.startsWith("temp-")) {
+    console.log("[API] Skipping markGalleryImagePublished for temp ID:", id);
+    return null;
+  }
+
   return fetchApi<DbGalleryImage>(`/gallery?id=${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify({ published_at: new Date().toISOString() }),
   });
 }
@@ -206,50 +275,60 @@ export interface DbScheduledPost {
   last_publish_attempt?: string;
 }
 
-export async function getScheduledPosts(userId: string, organizationId?: string | null, options?: {
-  status?: string;
-  startDate?: string;
-  endDate?: string;
-}): Promise<DbScheduledPost[]> {
+export async function getScheduledPosts(
+  userId: string,
+  organizationId?: string | null,
+  options?: {
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  },
+): Promise<DbScheduledPost[]> {
   const params = new URLSearchParams({ user_id: userId });
-  if (organizationId) params.append('organization_id', organizationId);
-  if (options?.status) params.append('status', options.status);
-  if (options?.startDate) params.append('start_date', options.startDate);
-  if (options?.endDate) params.append('end_date', options.endDate);
+  if (organizationId) params.append("organization_id", organizationId);
+  if (options?.status) params.append("status", options.status);
+  if (options?.startDate) params.append("start_date", options.startDate);
+  if (options?.endDate) params.append("end_date", options.endDate);
 
   return fetchApi<DbScheduledPost[]>(`/scheduled-posts?${params}`);
 }
 
-export async function createScheduledPost(userId: string, data: {
-  content_type: string;
-  content_id?: string;
-  image_url: string;
-  caption: string;
-  hashtags: string[];
-  scheduled_date: string;
-  scheduled_time: string;
-  scheduled_timestamp: string;
-  timezone: string;
-  platforms: string;
-  instagram_content_type?: string;
-  created_from?: string;
-  organization_id?: string | null;
-}): Promise<DbScheduledPost> {
-  return fetchApi<DbScheduledPost>('/scheduled-posts', {
-    method: 'POST',
+export async function createScheduledPost(
+  userId: string,
+  data: {
+    content_type: string;
+    content_id?: string;
+    image_url: string;
+    caption: string;
+    hashtags: string[];
+    scheduled_date: string;
+    scheduled_time: string;
+    scheduled_timestamp: string;
+    timezone: string;
+    platforms: string;
+    instagram_content_type?: string;
+    created_from?: string;
+    organization_id?: string | null;
+  },
+): Promise<DbScheduledPost> {
+  return fetchApi<DbScheduledPost>("/scheduled-posts", {
+    method: "POST",
     body: JSON.stringify({ user_id: userId, ...data }),
   });
 }
 
-export async function updateScheduledPost(id: string, data: Partial<DbScheduledPost>): Promise<DbScheduledPost> {
+export async function updateScheduledPost(
+  id: string,
+  data: Partial<DbScheduledPost>,
+): Promise<DbScheduledPost> {
   return fetchApi<DbScheduledPost>(`/scheduled-posts?id=${id}`, {
-    method: 'PUT',
+    method: "PUT",
     body: JSON.stringify(data),
   });
 }
 
 export async function deleteScheduledPost(id: string): Promise<void> {
-  await fetchApi(`/scheduled-posts?id=${id}`, { method: 'DELETE' });
+  await fetchApi(`/scheduled-posts?id=${id}`, { method: "DELETE" });
 }
 
 // ============================================================================
@@ -325,83 +404,106 @@ export interface DbCampaignFull extends DbCampaign {
   ad_creatives: DbAdCreative[];
 }
 
-export async function getCampaigns(userId: string, organizationId?: string | null): Promise<DbCampaign[]> {
+export async function getCampaigns(
+  userId: string,
+  organizationId?: string | null,
+): Promise<DbCampaign[]> {
   const params = new URLSearchParams({ user_id: userId });
-  if (organizationId) params.append('organization_id', organizationId);
+  if (organizationId) params.append("organization_id", organizationId);
   return fetchApi<DbCampaign[]>(`/campaigns?${params}`);
 }
 
-export async function getCampaignById(id: string, userId: string, organizationId?: string | null): Promise<DbCampaignFull | null> {
-  const params = new URLSearchParams({ id, user_id: userId, include_content: 'true' });
-  if (organizationId) params.append('organization_id', organizationId);
+export async function getCampaignById(
+  id: string,
+  userId: string,
+  organizationId?: string | null,
+): Promise<DbCampaignFull | null> {
+  const params = new URLSearchParams({
+    id,
+    user_id: userId,
+    include_content: "true",
+  });
+  if (organizationId) params.append("organization_id", organizationId);
   return fetchApi<DbCampaignFull | null>(`/campaigns?${params}`);
 }
 
-export async function createCampaign(userId: string, data: {
-  name?: string;
-  description?: string;
-  brand_profile_id?: string;
-  input_transcript?: string;
-  generation_options?: Record<string, unknown>;
-  status?: string;
-  organization_id?: string | null;
-  video_clip_scripts?: Array<{
-    title: string;
-    hook: string;
-    image_prompt?: string;
-    audio_script?: string;
-    scenes: Array<{
-      scene: number;
-      visual: string;
-      narration: string;
-      duration_seconds: number;
+export async function createCampaign(
+  userId: string,
+  data: {
+    name?: string;
+    description?: string;
+    brand_profile_id?: string;
+    input_transcript?: string;
+    generation_options?: Record<string, unknown>;
+    status?: string;
+    organization_id?: string | null;
+    video_clip_scripts?: Array<{
+      title: string;
+      hook: string;
+      image_prompt?: string;
+      audio_script?: string;
+      scenes: Array<{
+        scene: number;
+        visual: string;
+        narration: string;
+        duration_seconds: number;
+      }>;
     }>;
-  }>;
-  posts?: Array<{
-    platform: string;
-    content: string;
-    hashtags: string[];
-    image_prompt?: string;
-  }>;
-  ad_creatives?: Array<{
-    platform: string;
-    headline: string;
-    body: string;
-    cta: string;
-    image_prompt?: string;
-  }>;
-}): Promise<DbCampaign> {
-  return fetchApi<DbCampaign>('/campaigns', {
-    method: 'POST',
+    posts?: Array<{
+      platform: string;
+      content: string;
+      hashtags: string[];
+      image_prompt?: string;
+    }>;
+    ad_creatives?: Array<{
+      platform: string;
+      headline: string;
+      body: string;
+      cta: string;
+      image_prompt?: string;
+    }>;
+  },
+): Promise<DbCampaign> {
+  return fetchApi<DbCampaign>("/campaigns", {
+    method: "POST",
     body: JSON.stringify({ user_id: userId, ...data }),
   });
 }
 
-export async function updateCampaign(id: string, data: Partial<DbCampaign>): Promise<DbCampaign> {
+export async function updateCampaign(
+  id: string,
+  data: Partial<DbCampaign>,
+): Promise<DbCampaign> {
   return fetchApi<DbCampaign>(`/campaigns?id=${id}`, {
-    method: 'PUT',
+    method: "PUT",
     body: JSON.stringify(data),
   });
 }
 
 export async function deleteCampaign(id: string): Promise<void> {
-  await fetchApi(`/campaigns?id=${id}`, { method: 'DELETE' });
+  await fetchApi(`/campaigns?id=${id}`, { method: "DELETE" });
 }
 
 // ============================================================================
 // Posts & Ad Creatives Updates
 // ============================================================================
 
-export async function updatePostImage(postId: string, imageUrl: string): Promise<DbPost> {
+export async function updatePostImage(
+  postId: string,
+  imageUrl: string,
+): Promise<DbPost> {
   return fetchApi<DbPost>(`/posts?id=${postId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify({ image_url: imageUrl }),
   });
 }
 
-export async function updateAdCreativeImage(adId: string, imageUrl: string): Promise<DbAdCreative> {
+export async function updateAdCreativeImage(
+  adId: string,
+  imageUrl: string,
+): Promise<DbAdCreative> {
   return fetchApi<DbAdCreative>(`/ad-creatives?id=${adId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify({ image_url: imageUrl }),
   });
 }
@@ -414,7 +516,7 @@ export async function checkDatabaseHealth(): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE}/health`);
     const data = await response.json();
-    return data.status === 'healthy';
+    return data.status === "healthy";
   } catch {
     return false;
   }
@@ -440,18 +542,21 @@ export interface UploadResult {
 export async function uploadToBlob(
   blob: Blob,
   filename: string,
-  contentType: string
+  contentType: string,
 ): Promise<UploadResult> {
   // Convert blob to base64
   const arrayBuffer = await blob.arrayBuffer();
   const base64 = btoa(
-    new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+    new Uint8Array(arrayBuffer).reduce(
+      (data, byte) => data + String.fromCharCode(byte),
+      "",
+    ),
   );
 
-  const response = await fetch('/api/upload', {
-    method: 'POST',
+  const response = await fetch("/api/upload", {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
       filename,
@@ -461,7 +566,9 @@ export async function uploadToBlob(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 
@@ -471,18 +578,24 @@ export async function uploadToBlob(
 /**
  * Upload a video blob to Vercel Blob storage
  */
-export async function uploadVideo(blob: Blob, filename?: string): Promise<string> {
+export async function uploadVideo(
+  blob: Blob,
+  filename?: string,
+): Promise<string> {
   const name = filename || `video-${Date.now()}.mp4`;
-  const result = await uploadToBlob(blob, name, 'video/mp4');
+  const result = await uploadToBlob(blob, name, "video/mp4");
   return result.url;
 }
 
 /**
  * Upload an audio blob to Vercel Blob storage
  */
-export async function uploadAudio(blob: Blob, filename?: string): Promise<string> {
+export async function uploadAudio(
+  blob: Blob,
+  filename?: string,
+): Promise<string> {
   const name = filename || `audio-${Date.now()}.wav`;
-  const contentType = blob.type || 'audio/wav';
+  const contentType = blob.type || "audio/wav";
   const result = await uploadToBlob(blob, name, contentType);
   return result.url;
 }
@@ -532,9 +645,12 @@ export interface TournamentData {
 /**
  * Get current week schedule and events
  */
-export async function getTournamentData(userId: string, organizationId?: string | null): Promise<TournamentData> {
+export async function getTournamentData(
+  userId: string,
+  organizationId?: string | null,
+): Promise<TournamentData> {
   const params = new URLSearchParams({ user_id: userId });
-  if (organizationId) params.append('organization_id', organizationId);
+  if (organizationId) params.append("organization_id", organizationId);
   return fetchApi<TournamentData>(`/tournaments?${params}`);
 }
 
@@ -545,18 +661,30 @@ export interface WeekScheduleWithCount extends DbWeekSchedule {
   event_count: number;
 }
 
-export async function getWeekSchedulesList(userId: string, organizationId?: string | null): Promise<{ schedules: WeekScheduleWithCount[] }> {
+export async function getWeekSchedulesList(
+  userId: string,
+  organizationId?: string | null,
+): Promise<{ schedules: WeekScheduleWithCount[] }> {
   const params = new URLSearchParams({ user_id: userId });
-  if (organizationId) params.append('organization_id', organizationId);
-  return fetchApi<{ schedules: WeekScheduleWithCount[] }>(`/tournaments/list?${params}`);
+  if (organizationId) params.append("organization_id", organizationId);
+  return fetchApi<{ schedules: WeekScheduleWithCount[] }>(
+    `/tournaments/list?${params}`,
+  );
 }
 
 /**
  * Load events for a specific schedule
  */
-export async function getScheduleEvents(userId: string, scheduleId: string, organizationId?: string | null): Promise<{ events: DbTournamentEvent[] }> {
-  const params = new URLSearchParams({ user_id: userId, week_schedule_id: scheduleId });
-  if (organizationId) params.append('organization_id', organizationId);
+export async function getScheduleEvents(
+  userId: string,
+  scheduleId: string,
+  organizationId?: string | null,
+): Promise<{ events: DbTournamentEvent[] }> {
+  const params = new URLSearchParams({
+    user_id: userId,
+    week_schedule_id: scheduleId,
+  });
+  if (organizationId) params.append("organization_id", organizationId);
   return fetchApi<{ events: DbTournamentEvent[] }>(`/tournaments?${params}`);
 }
 
@@ -586,21 +714,28 @@ export async function createWeekSchedule(
       times?: Record<string, string>;
       eventDate?: string;
     }>;
-  }
+  },
 ): Promise<{ schedule: DbWeekSchedule; eventsCount: number }> {
-  return fetchApi<{ schedule: DbWeekSchedule; eventsCount: number }>('/tournaments', {
-    method: 'POST',
-    body: JSON.stringify({ user_id: userId, ...data }),
-  });
+  return fetchApi<{ schedule: DbWeekSchedule; eventsCount: number }>(
+    "/tournaments",
+    {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId, ...data }),
+    },
+  );
 }
 
 /**
  * Delete week schedule and its events
  */
-export async function deleteWeekSchedule(userId: string, scheduleId: string, organizationId?: string | null): Promise<void> {
+export async function deleteWeekSchedule(
+  userId: string,
+  scheduleId: string,
+  organizationId?: string | null,
+): Promise<void> {
   const params = new URLSearchParams({ id: scheduleId, user_id: userId });
-  if (organizationId) params.append('organization_id', organizationId);
-  await fetchApi(`/tournaments?${params}`, { method: 'DELETE' });
+  if (organizationId) params.append("organization_id", organizationId);
+  await fetchApi(`/tournaments?${params}`, { method: "DELETE" });
 }
 
 // ============================================================================
@@ -621,16 +756,18 @@ export interface QStashScheduleResult {
 export async function schedulePostWithQStash(
   postId: string,
   userId: string,
-  scheduledTimestamp: number | string
+  scheduledTimestamp: number | string,
 ): Promise<QStashScheduleResult> {
-  const response = await fetch('/api/qstash/schedule', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  const response = await fetch("/api/qstash/schedule", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ postId, userId, scheduledTimestamp }),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 
@@ -642,11 +779,13 @@ export async function schedulePostWithQStash(
  */
 export async function cancelQStashSchedule(messageId: string): Promise<void> {
   const response = await fetch(`/api/qstash/schedule?messageId=${messageId}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 }
@@ -674,8 +813,8 @@ export interface GenerationJobConfig {
 export interface GenerationJob {
   id: string;
   user_id: string;
-  job_type: 'flyer' | 'flyer_daily' | 'post' | 'ad';
-  status: 'queued' | 'processing' | 'completed' | 'failed';
+  job_type: "flyer" | "flyer_daily" | "post" | "ad";
+  status: "queued" | "processing" | "completed" | "failed";
   progress: number;
   result_url: string | null;
   result_gallery_id: string | null;
@@ -699,18 +838,20 @@ export interface QueueJobResult {
  */
 export async function queueGenerationJob(
   userId: string,
-  jobType: 'flyer' | 'flyer_daily' | 'post' | 'ad',
+  jobType: "flyer" | "flyer_daily" | "post" | "ad",
   prompt: string,
-  config: GenerationJobConfig
+  config: GenerationJobConfig,
 ): Promise<QueueJobResult> {
-  const response = await fetch('/api/generate/queue', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  const response = await fetch("/api/generate/queue", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, jobType, prompt, config }),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 
@@ -720,11 +861,15 @@ export async function queueGenerationJob(
 /**
  * Get status of a generation job
  */
-export async function getGenerationJobStatus(jobId: string): Promise<GenerationJob> {
+export async function getGenerationJobStatus(
+  jobId: string,
+): Promise<GenerationJob> {
   const response = await fetch(`/api/generate/status?jobId=${jobId}`);
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 
@@ -736,16 +881,18 @@ export async function getGenerationJobStatus(jobId: string): Promise<GenerationJ
  */
 export async function getGenerationJobs(
   userId: string,
-  options?: { status?: string; limit?: number }
+  options?: { status?: string; limit?: number },
 ): Promise<{ jobs: GenerationJob[]; total: number }> {
   const params = new URLSearchParams({ userId });
-  if (options?.status) params.append('status', options.status);
-  if (options?.limit) params.append('limit', options.limit.toString());
+  if (options?.status) params.append("status", options.status);
+  if (options?.limit) params.append("limit", options.limit.toString());
 
   const response = await fetch(`/api/generate/status?${params}`);
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 
@@ -763,7 +910,7 @@ export async function pollGenerationJob(
   jobId: string,
   onProgress?: (job: GenerationJob) => void,
   pollInterval = 2000,
-  timeout = 300000
+  timeout = 300000,
 ): Promise<GenerationJob> {
   const startTime = Date.now();
 
@@ -771,14 +918,14 @@ export async function pollGenerationJob(
     const job = await getGenerationJobStatus(jobId);
     onProgress?.(job);
 
-    if (job.status === 'completed' || job.status === 'failed') {
+    if (job.status === "completed" || job.status === "failed") {
       return job;
     }
 
     if (Date.now() - startTime > timeout) {
-      throw new Error('Generation job timed out');
+      throw new Error("Generation job timed out");
     }
 
-    await new Promise(resolve => setTimeout(resolve, pollInterval));
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
   }
 }

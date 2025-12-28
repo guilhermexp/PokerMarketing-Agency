@@ -137,7 +137,7 @@ export interface DbGalleryImage {
   user_id: string;
   src_url: string;
   prompt: string | null;
-  source: 'Post' | 'Anúncio' | 'Clipe' | 'Flyer' | 'Flyer Diário' | 'Logo' | 'Edição';
+  source: string;
   model: 'gemini-3-pro-image-preview' | 'imagen-4.0-generate-001';
   aspect_ratio: string | null;
   image_size: '1K' | '2K' | '4K' | null;

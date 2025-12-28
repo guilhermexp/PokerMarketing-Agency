@@ -133,7 +133,7 @@ export interface GalleryImage {
   id: string;
   src: string;
   prompt?: string;
-  source: 'Post' | 'Anúncio' | 'Clipe' | 'Flyer' | 'Flyer Diário' | 'Logo' | 'Edição' | 'Video Final';
+  source: string;
   model: ImageModel | 'video-export';  // Extended for videos
   aspectRatio?: string;
   imageSize?: ImageSize;
