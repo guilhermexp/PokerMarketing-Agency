@@ -4,29 +4,11 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { neon } from '@neondatabase/serverless';
-
-const DATABASE_URL = process.env.DATABASE_URL;
-
-function getSql() {
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL not configured');
-  }
-  return neon(DATABASE_URL);
-}
-
-function setCorsHeaders(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
+import { getSql, setupCors } from './_helpers/index';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCorsHeaders(res);
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  // Handle CORS
+  if (setupCors(req.method, res)) return;
 
   try {
     const sql = getSql();
@@ -64,18 +46,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'email and name are required' });
       }
 
-      // Check if user exists
-      const existing = await sql`
-        SELECT * FROM users
-        WHERE email = ${email} AND deleted_at IS NULL
-        LIMIT 1
-      `;
+      // Check if user exists by email or auth_provider_id
+      let existing;
+      if (auth_provider_id) {
+        existing = await sql`
+          SELECT * FROM users
+          WHERE auth_provider_id = ${auth_provider_id} AND deleted_at IS NULL
+          LIMIT 1
+        `;
+      }
 
-      if (existing.length > 0) {
-        // Update last login
+      if (!existing || existing.length === 0) {
+        existing = await sql`
+          SELECT * FROM users
+          WHERE email = ${email} AND deleted_at IS NULL
+          LIMIT 1
+        `;
+      }
+
+      if (existing && existing.length > 0) {
+        // Update last login and auth_provider_id if needed
         await sql`
           UPDATE users
-          SET last_login_at = NOW()
+          SET last_login_at = NOW(),
+              auth_provider_id = COALESCE(${auth_provider_id || null}, auth_provider_id)
           WHERE id = ${existing[0].id}
         `;
         return res.status(200).json(existing[0]);
@@ -85,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const result = await sql`
         INSERT INTO users (email, name, avatar_url, auth_provider, auth_provider_id)
         VALUES (${email}, ${name}, ${avatar_url || null},
-                ${auth_provider || 'email'}, ${auth_provider_id || null})
+                ${auth_provider || 'clerk'}, ${auth_provider_id || null})
         RETURNING *
       `;
 
@@ -104,7 +98,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const result = await sql`
         UPDATE users
         SET name = COALESCE(${name || null}, name),
-            avatar_url = COALESCE(${avatar_url || null}, avatar_url)
+            avatar_url = COALESCE(${avatar_url || null}, avatar_url),
+            updated_at = NOW()
         WHERE id = ${id as string}
         RETURNING *
       `;

@@ -4,12 +4,11 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { neon } from '@neondatabase/serverless';
 import { Receiver } from '@upstash/qstash';
 import { GoogleGenAI } from '@google/genai';
 import { put } from '@vercel/blob';
+import { getSql } from '../db/_helpers/index';
 
-const DATABASE_URL = process.env.DATABASE_URL;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // Initialize QStash Receiver for signature verification
@@ -17,11 +16,6 @@ const receiver = new Receiver({
   currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY || '',
   nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY || '',
 });
-
-function getSql() {
-  if (!DATABASE_URL) throw new Error('DATABASE_URL not configured');
-  return neon(DATABASE_URL);
-}
 
 function getAi() {
   if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured');

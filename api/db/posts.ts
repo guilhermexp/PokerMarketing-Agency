@@ -4,29 +4,11 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { neon } from '@neondatabase/serverless';
-
-const DATABASE_URL = process.env.DATABASE_URL;
-
-function getSql() {
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL not configured');
-  }
-  return neon(DATABASE_URL);
-}
-
-function setCorsHeaders(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, PATCH, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
+import { getSql, setupCors } from './_helpers/index';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCorsHeaders(res);
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  // Handle CORS
+  if (setupCors(req.method, res)) return;
 
   try {
     const sql = getSql();

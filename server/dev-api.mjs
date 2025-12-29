@@ -8,6 +8,7 @@ import cors from "cors";
 import { neon } from "@neondatabase/serverless";
 import { put } from "@vercel/blob";
 import { config } from "dotenv";
+import { fal } from "@fal-ai/client";
 import { clerkMiddleware, getAuth } from "@clerk/express";
 import {
   hasPermission,
@@ -2072,6 +2073,139 @@ app.post("/api/upload", async (req, res) => {
     console.error("[Upload] Error:", error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+// ============================================================================
+// AI VIDEO GENERATION API (FAL.ai)
+// Server-side video generation to avoid exposing FAL_KEY in browser
+// ============================================================================
+
+const configureFal = () => {
+  const apiKey = process.env.FAL_KEY;
+  if (!apiKey) {
+    throw new Error('FAL_KEY environment variable is not configured');
+  }
+  fal.config({ credentials: apiKey });
+};
+
+app.post("/api/ai/video", async (req, res) => {
+  try {
+    configureFal();
+
+    const { prompt, aspectRatio, model, imageUrl, sceneDuration } = req.body;
+
+    if (!prompt || !aspectRatio || !model) {
+      return res.status(400).json({
+        error: 'Missing required fields: prompt, aspectRatio, model',
+      });
+    }
+
+    console.log(`[Video API] Generating video with ${model}...`);
+
+    let videoUrl;
+    const isHttpUrl = imageUrl && imageUrl.startsWith('http');
+
+    if (model === 'sora-2') {
+      // Sora 2 - always use 12 seconds for best quality
+      const duration = 12;
+
+      let result;
+
+      if (isHttpUrl) {
+        console.log(`[Video API] Sora 2 image-to-video (${duration}s)...`);
+        result = await fal.subscribe('fal-ai/sora-2/image-to-video', {
+          input: {
+            prompt,
+            image_url: imageUrl,
+            resolution: '720p',
+            aspect_ratio: aspectRatio,
+            duration,
+            delete_video: false,
+          },
+          logs: true,
+        });
+      } else {
+        console.log(`[Video API] Sora 2 text-to-video (${duration}s)...`);
+        result = await fal.subscribe('fal-ai/sora-2/text-to-video', {
+          input: {
+            prompt,
+            resolution: '720p',
+            aspect_ratio: aspectRatio,
+            duration,
+            delete_video: false,
+          },
+          logs: true,
+        });
+      }
+
+      videoUrl = result?.data?.video?.url || result?.video?.url || '';
+    } else {
+      // Veo 3.1 Fast
+      const duration = sceneDuration && sceneDuration <= 4 ? '4s' : sceneDuration && sceneDuration <= 6 ? '6s' : '8s';
+
+      let result;
+
+      if (isHttpUrl) {
+        console.log(`[Video API] Veo 3.1 image-to-video (${duration})...`);
+        result = await fal.subscribe('fal-ai/veo3.1/fast/image-to-video', {
+          input: {
+            prompt,
+            image_url: imageUrl,
+            aspect_ratio: aspectRatio,
+            duration,
+            resolution: '720p',
+            generate_audio: true,
+          },
+          logs: true,
+        });
+      } else {
+        console.log(`[Video API] Veo 3.1 text-to-video (${duration})...`);
+        result = await fal.subscribe('fal-ai/veo3.1/fast', {
+          input: {
+            prompt,
+            aspect_ratio: aspectRatio,
+            duration,
+            resolution: '720p',
+            generate_audio: true,
+            auto_fix: true,
+          },
+          logs: true,
+        });
+      }
+
+      videoUrl = result?.data?.video?.url || result?.video?.url || '';
+    }
+
+    if (!videoUrl) {
+      throw new Error('Failed to generate video - invalid response');
+    }
+
+    console.log(`[Video API] Video generated: ${videoUrl}`);
+
+    // Download video and upload to Vercel Blob for permanent storage
+    console.log('[Video API] Uploading to Vercel Blob...');
+    const videoResponse = await fetch(videoUrl);
+    const videoBlob = await videoResponse.blob();
+
+    const filename = `${model}-video-${Date.now()}.mp4`;
+    const blob = await put(filename, videoBlob, {
+      access: 'public',
+      contentType: 'video/mp4',
+    });
+
+    console.log(`[Video API] Video stored: ${blob.url}`);
+
+    return res.status(200).json({
+      success: true,
+      url: blob.url,
+      model,
+    });
+  } catch (error) {
+    console.error('[Video API] Error:', error);
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to generate video',
     });
   }
 });

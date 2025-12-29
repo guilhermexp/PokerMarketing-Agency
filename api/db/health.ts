@@ -4,37 +4,18 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { neon } from '@neondatabase/serverless';
-
-const DATABASE_URL = process.env.DATABASE_URL;
-
-function setCorsHeaders(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
+import { getSql, setupCors } from './_helpers/index';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCorsHeaders(res);
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  // Handle CORS
+  if (setupCors(req.method, res)) return;
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    if (!DATABASE_URL) {
-      return res.status(503).json({
-        status: 'error',
-        message: 'DATABASE_URL not configured',
-        configured: false,
-      });
-    }
-
-    const sql = neon(DATABASE_URL);
+    const sql = getSql();
     const startTime = Date.now();
 
     // Simple query to test connection
@@ -52,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[DB Health] Error:', error);
     return res.status(503).json({
       status: 'error',
-      configured: !!DATABASE_URL,
+      configured: !!process.env.DATABASE_URL,
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

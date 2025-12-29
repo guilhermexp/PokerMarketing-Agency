@@ -4,27 +4,15 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { neon } from '@neondatabase/serverless';
 import { Client } from '@upstash/qstash';
+import { getSql, setupCors, resolveUserId } from '../db/_helpers/index';
 
-const DATABASE_URL = process.env.DATABASE_URL;
 const QSTASH_TOKEN = process.env.QSTASH_TOKEN;
-
-function getSql() {
-  if (!DATABASE_URL) throw new Error('DATABASE_URL not configured');
-  return neon(DATABASE_URL);
-}
 
 function getBaseUrl(req: VercelRequest): string {
   const host = req.headers.host || 'localhost:3000';
   const protocol = host.includes('localhost') ? 'http' : 'https';
   return `${protocol}://${host}`;
-}
-
-function setCorsHeaders(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
 export interface GenerationJobConfig {
@@ -51,43 +39,48 @@ export interface GenerationJobConfig {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCorsHeaders(res);
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  // Handle CORS
+  if (setupCors(req.method, res)) return;
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!DATABASE_URL || !QSTASH_TOKEN) {
-    return res.status(500).json({ error: 'Server configuration missing' });
+  if (!QSTASH_TOKEN) {
+    return res.status(500).json({ error: 'QStash not configured' });
   }
 
   try {
-    const { userId, jobType, prompt, config } = req.body as {
+    const sql = getSql();
+    const { userId, organizationId, jobType, prompt, config } = req.body as {
       userId: string;
+      organizationId?: string;
       jobType: 'flyer' | 'flyer_daily' | 'post' | 'ad';
       prompt: string;
       config: GenerationJobConfig;
     };
 
     if (!userId || !jobType || !prompt || !config) {
-      return res.status(400).json({ error: 'Missing required fields: userId, jobType, prompt, config' });
+      return res.status(400).json({
+        error: 'Missing required fields: userId, jobType, prompt, config',
+      });
     }
 
-    const sql = getSql();
+    // Resolve Clerk ID to DB UUID
+    const resolvedUserId = await resolveUserId(sql, userId);
+    if (!resolvedUserId) {
+      return res.status(400).json({ error: 'User not found' });
+    }
 
     // Create job in database
     const result = await sql`
-      INSERT INTO generation_jobs (user_id, job_type, prompt, config, status)
-      VALUES (${userId}, ${jobType}, ${prompt}, ${JSON.stringify(config)}, 'queued')
+      INSERT INTO generation_jobs (user_id, organization_id, job_type, prompt, config, status)
+      VALUES (${resolvedUserId}, ${organizationId || null}, ${jobType}, ${prompt}, ${JSON.stringify(config)}, 'queued')
       RETURNING id, created_at
     `;
 
     const job = result[0];
-    console.log(`[Generate Queue] Created job ${job.id} for user ${userId}`);
+    console.log(`[Generate Queue] Created job ${job.id} for user ${resolvedUserId}`);
 
     // Queue in QStash for immediate processing
     const client = new Client({ token: QSTASH_TOKEN });
@@ -113,13 +106,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       success: true,
       jobId: job.id,
       messageId: qstashResponse.messageId,
-      status: 'queued'
+      status: 'queued',
     });
-
   } catch (error) {
     console.error('[Generate Queue] Error:', error);
     return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to queue generation'
+      error: error instanceof Error ? error.message : 'Failed to queue generation',
     });
   }
 }

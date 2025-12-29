@@ -4,36 +4,26 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { neon } from '@neondatabase/serverless';
-
-const DATABASE_URL = process.env.DATABASE_URL;
-
-function getSql() {
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL not configured');
-  }
-  return neon(DATABASE_URL);
-}
-
-function setCorsHeaders(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
+import { getSql, setupCors, resolveUserId } from './_helpers/index';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCorsHeaders(res);
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  // Handle CORS
+  if (setupCors(req.method, res)) return;
 
   try {
     const sql = getSql();
 
     // GET - List campaigns or get single campaign
     if (req.method === 'GET') {
-      const { user_id, id, status, limit = '50', offset = '0', include_content } = req.query;
+      const {
+        user_id,
+        organization_id,
+        id,
+        status,
+        limit = '50',
+        offset = '0',
+        include_content,
+      } = req.query;
 
       // Get single campaign by ID
       if (id) {
@@ -66,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               SELECT * FROM ad_creatives
               WHERE campaign_id = ${id as string}
               ORDER BY sort_order ASC
-            `
+            `,
           ]);
 
           return res.status(200).json({
@@ -83,6 +73,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!user_id) {
         return res.status(400).json({ error: 'user_id is required' });
       }
+
+      // Resolve Clerk ID to DB UUID
+      const resolvedUserId = await resolveUserId(sql, user_id as string);
+      if (!resolvedUserId) {
+        return res.status(200).json([]);
+      }
+
+      const isOrgContext = !!organization_id;
+      const limitNum = parseInt(limit as string);
+      const offsetNum = parseInt(offset as string);
 
       // Query with counts and preview images
       // Preview images come from gallery_images linked via post_id, ad_creative_id, video_script_id
@@ -158,20 +158,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ORDER BY gi.created_at DESC
           LIMIT 1
         ) ad_gallery ON true
-        WHERE c.user_id = $1 AND c.deleted_at IS NULL
       `;
 
       let result;
-      if (status) {
-        result = await sql(
-          baseQuery + ` AND c.status = $2 ORDER BY c.created_at DESC LIMIT $3 OFFSET $4`,
-          [user_id as string, status as string, parseInt(limit as string), parseInt(offset as string)]
-        );
+
+      if (isOrgContext) {
+        if (status) {
+          result = await sql(
+            baseQuery +
+              ` WHERE c.organization_id = $1 AND c.deleted_at IS NULL AND c.status = $2 ORDER BY c.created_at DESC LIMIT $3 OFFSET $4`,
+            [organization_id as string, status as string, limitNum, offsetNum]
+          );
+        } else {
+          result = await sql(
+            baseQuery +
+              ` WHERE c.organization_id = $1 AND c.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT $2 OFFSET $3`,
+            [organization_id as string, limitNum, offsetNum]
+          );
+        }
       } else {
-        result = await sql(
-          baseQuery + ` ORDER BY c.created_at DESC LIMIT $2 OFFSET $3`,
-          [user_id as string, parseInt(limit as string), parseInt(offset as string)]
-        );
+        if (status) {
+          result = await sql(
+            baseQuery +
+              ` WHERE c.user_id = $1 AND c.organization_id IS NULL AND c.deleted_at IS NULL AND c.status = $2 ORDER BY c.created_at DESC LIMIT $3 OFFSET $4`,
+            [resolvedUserId, status as string, limitNum, offsetNum]
+          );
+        } else {
+          result = await sql(
+            baseQuery +
+              ` WHERE c.user_id = $1 AND c.organization_id IS NULL AND c.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT $2 OFFSET $3`,
+            [resolvedUserId, limitNum, offsetNum]
+          );
+        }
       }
 
       return res.status(200).json(result);
@@ -179,62 +197,119 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // POST - Create campaign with related content
     if (req.method === 'POST') {
-      const { user_id, brand_profile_id, name, description, input_transcript,
-              input_product_images, input_inspiration_images, generation_options,
-              status, video_clip_scripts, posts, ad_creatives } = req.body;
+      const {
+        user_id,
+        organization_id,
+        brand_profile_id,
+        name,
+        description,
+        input_transcript,
+        input_product_images,
+        input_inspiration_images,
+        generation_options,
+        status,
+        video_clip_scripts,
+        posts,
+        ad_creatives,
+      } = req.body;
 
       if (!user_id) {
         return res.status(400).json({ error: 'user_id is required' });
       }
 
+      // Resolve Clerk ID to DB UUID
+      const resolvedUserId = await resolveUserId(sql, user_id);
+      if (!resolvedUserId) {
+        return res.status(400).json({ error: 'User not found' });
+      }
+
       // Create campaign
       const campaignResult = await sql`
-        INSERT INTO campaigns (user_id, brand_profile_id, name, description, input_transcript,
-                               input_product_images, input_inspiration_images, generation_options, status)
-        VALUES (${user_id}, ${brand_profile_id || null}, ${name || null}, ${description || null},
-                ${input_transcript || null}, ${JSON.stringify(input_product_images || null)},
-                ${JSON.stringify(input_inspiration_images || null)}, ${JSON.stringify(generation_options || null)},
-                ${status || 'draft'})
+        INSERT INTO campaigns (
+          user_id, organization_id, brand_profile_id, name, description, input_transcript,
+          input_product_images, input_inspiration_images, generation_options, status
+        )
+        VALUES (
+          ${resolvedUserId}, ${organization_id || null}, ${brand_profile_id || null},
+          ${name || null}, ${description || null}, ${input_transcript || null},
+          ${JSON.stringify(input_product_images || null)},
+          ${JSON.stringify(input_inspiration_images || null)},
+          ${JSON.stringify(generation_options || null)},
+          ${status || 'draft'}
+        )
         RETURNING *
       `;
 
       const campaign = campaignResult[0];
 
-      // Create video clip scripts if provided
-      if (video_clip_scripts && Array.isArray(video_clip_scripts)) {
-        for (let i = 0; i < video_clip_scripts.length; i++) {
-          const script = video_clip_scripts[i];
-          await sql`
-            INSERT INTO video_clip_scripts (campaign_id, user_id, title, hook, image_prompt,
-                                            audio_script, scenes, sort_order)
-            VALUES (${campaign.id}, ${user_id}, ${script.title}, ${script.hook},
-                    ${script.image_prompt || null}, ${script.audio_script || null},
-                    ${JSON.stringify(script.scenes || [])}, ${i})
-          `;
+      // Create video clip scripts if provided - batch insert for performance
+      if (video_clip_scripts && Array.isArray(video_clip_scripts) && video_clip_scripts.length > 0) {
+        const batchSize = 50;
+        for (let i = 0; i < video_clip_scripts.length; i += batchSize) {
+          const batch = video_clip_scripts.slice(i, i + batchSize);
+          await Promise.all(
+            batch.map((script: Record<string, unknown>, idx: number) =>
+              sql`
+                INSERT INTO video_clip_scripts (
+                  campaign_id, user_id, organization_id, title, hook,
+                  image_prompt, audio_script, scenes, sort_order
+                )
+                VALUES (
+                  ${campaign.id}, ${resolvedUserId}, ${organization_id || null},
+                  ${(script.title as string) || ''}, ${(script.hook as string) || ''},
+                  ${(script.image_prompt as string) || null}, ${(script.audio_script as string) || null},
+                  ${JSON.stringify(script.scenes || [])}, ${i + idx}
+                )
+              `
+            )
+          );
         }
       }
 
-      // Create posts if provided
-      if (posts && Array.isArray(posts)) {
-        for (let i = 0; i < posts.length; i++) {
-          const post = posts[i];
-          await sql`
-            INSERT INTO posts (campaign_id, user_id, platform, content, hashtags, image_prompt, sort_order)
-            VALUES (${campaign.id}, ${user_id}, ${post.platform}, ${post.content},
-                    ${post.hashtags || []}, ${post.image_prompt || null}, ${i})
-          `;
+      // Create posts if provided - batch insert for performance
+      if (posts && Array.isArray(posts) && posts.length > 0) {
+        const batchSize = 50;
+        for (let i = 0; i < posts.length; i += batchSize) {
+          const batch = posts.slice(i, i + batchSize);
+          await Promise.all(
+            batch.map((post: Record<string, unknown>, idx: number) =>
+              sql`
+                INSERT INTO posts (
+                  campaign_id, user_id, organization_id, platform, content,
+                  hashtags, image_prompt, sort_order
+                )
+                VALUES (
+                  ${campaign.id}, ${resolvedUserId}, ${organization_id || null},
+                  ${(post.platform as string) || ''}, ${(post.content as string) || ''},
+                  ${(post.hashtags as string[]) || []}, ${(post.image_prompt as string) || null}, ${i + idx}
+                )
+              `
+            )
+          );
         }
       }
 
-      // Create ad creatives if provided
-      if (ad_creatives && Array.isArray(ad_creatives)) {
-        for (let i = 0; i < ad_creatives.length; i++) {
-          const ad = ad_creatives[i];
-          await sql`
-            INSERT INTO ad_creatives (campaign_id, user_id, platform, headline, body, cta, image_prompt, sort_order)
-            VALUES (${campaign.id}, ${user_id}, ${ad.platform}, ${ad.headline},
-                    ${ad.body}, ${ad.cta}, ${ad.image_prompt || null}, ${i})
-          `;
+      // Create ad creatives if provided - batch insert for performance
+      if (ad_creatives && Array.isArray(ad_creatives) && ad_creatives.length > 0) {
+        const batchSize = 50;
+        for (let i = 0; i < ad_creatives.length; i += batchSize) {
+          const batch = ad_creatives.slice(i, i + batchSize);
+          await Promise.all(
+            batch.map((ad: Record<string, unknown>, idx: number) =>
+              sql`
+                INSERT INTO ad_creatives (
+                  campaign_id, user_id, organization_id, platform, headline,
+                  body, cta, image_prompt, sort_order
+                )
+                VALUES (
+                  ${campaign.id}, ${resolvedUserId}, ${organization_id || null},
+                  ${(ad.platform as string) || ''}, ${(ad.headline as string) || ''},
+                  ${(ad.body as string) || ''}, ${(ad.cta as string) || ''},
+                  ${(ad.image_prompt as string) || null}, ${i + idx}
+                )
+              `
+            )
+          );
         }
       }
 
@@ -254,10 +329,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         UPDATE campaigns
         SET name = COALESCE(${name || null}, name),
             description = COALESCE(${description || null}, description),
-            status = COALESCE(${status || null}, status)
+            status = COALESCE(${status || null}, status),
+            updated_at = NOW()
         WHERE id = ${id as string}
         RETURNING *
       `;
+
+      if (!result[0]) {
+        return res.status(404).json({ error: 'Campaign not found' });
+      }
 
       return res.status(200).json(result[0]);
     }

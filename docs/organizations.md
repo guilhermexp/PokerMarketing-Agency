@@ -110,7 +110,7 @@ WHERE organization_id = $1
 ### Mapeamento de Permissões
 
 ```typescript
-// server/helpers/organization-context.mjs
+// api/db/_helpers/permissions.ts
 
 export const PERMISSIONS = {
   CREATE_CAMPAIGN: 'create_campaign',
@@ -226,23 +226,22 @@ export function CampaignsList({ userId, organizationId, ... }: CampaignsListProp
 }
 ```
 
-### Backend
+### Backend (Vercel Serverless Functions)
 
-#### 1. Middleware Clerk (server/dev-api.mjs)
+#### 1. Helpers Compartilhados (api/db/_helpers/)
 
-```javascript
-import { clerkMiddleware, getAuth } from '@clerk/express';
-
-app.use(clerkMiddleware({
-  publishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
-  secretKey: process.env.CLERK_SECRET_KEY,
-}));
+```typescript
+// api/db/_helpers/index.ts
+export { getSql, resolveUserId } from './database';
+export { setupCors } from './cors';
+// ... outros helpers
 ```
 
 #### 2. Filtragem por Organização
 
-```javascript
-app.get('/api/db/campaigns', async (req, res) => {
+```typescript
+// api/db/campaigns.ts
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { user_id, organization_id } = req.query;
 
   let campaigns;
@@ -270,25 +269,26 @@ app.get('/api/db/campaigns', async (req, res) => {
 
 #### 3. Verificação de Permissões
 
-```javascript
-import { hasPermission, PERMISSIONS } from './helpers/organization-context.mjs';
+```typescript
+// api/db/campaigns.ts
+import { getSql, setupCors, resolveUserId } from './_helpers';
 
-app.delete('/api/db/campaigns', async (req, res) => {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (setupCors(req.method, res)) return;
+
+  const sql = getSql();
   const { id, user_id } = req.query;
 
-  // Verificar se campanha pertence a organização
-  const campaign = await sql`SELECT organization_id FROM campaigns WHERE id = ${id}`;
-
-  if (campaign[0].organization_id && user_id) {
-    const context = await resolveOrganizationContext(sql, user_id, campaign[0].organization_id);
-
-    if (!hasPermission(context.orgRole, PERMISSIONS.DELETE_CAMPAIGN)) {
-      return res.status(403).json({ error: 'Permission denied' });
-    }
+  // Resolver user_id (Clerk ID -> DB UUID)
+  const resolvedUserId = await resolveUserId(sql, user_id);
+  if (!resolvedUserId) {
+    return res.status(400).json({ error: 'User not found' });
   }
 
-  // Prosseguir com deleção...
-});
+  // Filtragem por organização
+  const isOrgContext = !!organization_id;
+  // ... queries com filtro apropriado
+}
 ```
 
 ## Database Schema

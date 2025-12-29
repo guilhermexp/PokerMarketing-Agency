@@ -60,6 +60,7 @@ import {
   getWeekSchedulesList,
   schedulePostWithQStash,
   deleteGalleryImage,
+  updateGalleryImage,
   type DbCampaign,
   type DbWeekSchedule,
   type WeekScheduleWithCount,
@@ -494,11 +495,33 @@ function AppContent() {
   };
 
   const handleUpdateGalleryImage = (imageId: string, newImageSrc: string) => {
-    // Update SWR cache
+    // Update SWR cache immediately (optimistic update)
     swrUpdateGalleryImage(imageId, { src_url: newImageSrc });
     if (toolImageReference?.id === imageId)
       setToolImageReference({ id: imageId, src: newImageSrc });
-    // TODO: Add API call to update image in database when endpoint is available
+
+    // Skip temp images and blob URLs (already uploaded)
+    if (imageId.startsWith("temp-")) return;
+
+    // Upload to Blob and update database in background
+    (async () => {
+      try {
+        const srcUrl = newImageSrc.startsWith("data:")
+          ? await uploadDataUrlToBlob(newImageSrc)
+          : newImageSrc;
+
+        await updateGalleryImage(imageId, { src_url: srcUrl });
+
+        // Update cache with final Blob URL
+        if (srcUrl !== newImageSrc) {
+          swrUpdateGalleryImage(imageId, { src_url: srcUrl });
+          if (toolImageReference?.id === imageId)
+            setToolImageReference({ id: imageId, src: srcUrl });
+        }
+      } catch (e) {
+        console.error("Failed to update image in database:", e);
+      }
+    })();
   };
 
   const handleDeleteGalleryImage = async (imageId: string) => {
@@ -1403,7 +1426,13 @@ function AppContent() {
     });
   };
 
-  if (isInitialLoading || !orgLoaded)
+  // Show loader while:
+  // 1. Initial data is loading
+  // 2. Organization context is not loaded
+  // 3. Brand profile exists in initialData but hasn't been set to local state yet (race condition fix)
+  const isBrandProfilePending = !!(initialData?.brandProfile && !brandProfile);
+
+  if (isInitialLoading || !orgLoaded || isBrandProfilePending)
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <Loader className="h-16 w-16" />

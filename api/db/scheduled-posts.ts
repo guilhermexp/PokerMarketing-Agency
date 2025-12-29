@@ -4,76 +4,110 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { neon } from '@neondatabase/serverless';
-
-const DATABASE_URL = process.env.DATABASE_URL;
-
-function getSql() {
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL not configured');
-  }
-  return neon(DATABASE_URL);
-}
-
-function setCorsHeaders(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
+import { getSql, setupCors, resolveUserId } from './_helpers/index';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCorsHeaders(res);
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  // Handle CORS
+  if (setupCors(req.method, res)) return;
 
   try {
     const sql = getSql();
 
     // GET - List scheduled posts
     if (req.method === 'GET') {
-      const { user_id, status, start_date, end_date, limit = '100' } = req.query;
+      const { user_id, organization_id, status, start_date, end_date, limit = '100' } = req.query;
 
       if (!user_id) {
         return res.status(400).json({ error: 'user_id is required' });
       }
 
+      // Resolve Clerk ID to DB UUID
+      const resolvedUserId = await resolveUserId(sql, user_id as string);
+      if (!resolvedUserId) {
+        return res.status(200).json([]);
+      }
+
+      const isOrgContext = !!organization_id;
+      const limitNum = parseInt(limit as string);
+
       let result;
 
-      if (status && start_date && end_date) {
-        result = await sql`
-          SELECT * FROM scheduled_posts
-          WHERE user_id = ${user_id as string}
-            AND status = ${status as string}
-            AND scheduled_date >= ${start_date as string}
-            AND scheduled_date <= ${end_date as string}
-          ORDER BY scheduled_timestamp ASC
-          LIMIT ${parseInt(limit as string)}
-        `;
-      } else if (start_date && end_date) {
-        result = await sql`
-          SELECT * FROM scheduled_posts
-          WHERE user_id = ${user_id as string}
-            AND scheduled_date >= ${start_date as string}
-            AND scheduled_date <= ${end_date as string}
-          ORDER BY scheduled_timestamp ASC
-          LIMIT ${parseInt(limit as string)}
-        `;
-      } else if (status) {
-        result = await sql`
-          SELECT * FROM scheduled_posts
-          WHERE user_id = ${user_id as string} AND status = ${status as string}
-          ORDER BY scheduled_timestamp ASC
-          LIMIT ${parseInt(limit as string)}
-        `;
+      if (isOrgContext) {
+        if (status && start_date && end_date) {
+          result = await sql`
+            SELECT * FROM scheduled_posts
+            WHERE organization_id = ${organization_id as string}
+              AND status = ${status as string}
+              AND scheduled_date >= ${start_date as string}
+              AND scheduled_date <= ${end_date as string}
+            ORDER BY scheduled_timestamp ASC
+            LIMIT ${limitNum}
+          `;
+        } else if (start_date && end_date) {
+          result = await sql`
+            SELECT * FROM scheduled_posts
+            WHERE organization_id = ${organization_id as string}
+              AND scheduled_date >= ${start_date as string}
+              AND scheduled_date <= ${end_date as string}
+            ORDER BY scheduled_timestamp ASC
+            LIMIT ${limitNum}
+          `;
+        } else if (status) {
+          result = await sql`
+            SELECT * FROM scheduled_posts
+            WHERE organization_id = ${organization_id as string}
+              AND status = ${status as string}
+            ORDER BY scheduled_timestamp ASC
+            LIMIT ${limitNum}
+          `;
+        } else {
+          result = await sql`
+            SELECT * FROM scheduled_posts
+            WHERE organization_id = ${organization_id as string}
+            ORDER BY scheduled_timestamp ASC
+            LIMIT ${limitNum}
+          `;
+        }
       } else {
-        result = await sql`
-          SELECT * FROM scheduled_posts
-          WHERE user_id = ${user_id as string}
-          ORDER BY scheduled_timestamp ASC
-          LIMIT ${parseInt(limit as string)}
-        `;
+        if (status && start_date && end_date) {
+          result = await sql`
+            SELECT * FROM scheduled_posts
+            WHERE user_id = ${resolvedUserId}
+              AND organization_id IS NULL
+              AND status = ${status as string}
+              AND scheduled_date >= ${start_date as string}
+              AND scheduled_date <= ${end_date as string}
+            ORDER BY scheduled_timestamp ASC
+            LIMIT ${limitNum}
+          `;
+        } else if (start_date && end_date) {
+          result = await sql`
+            SELECT * FROM scheduled_posts
+            WHERE user_id = ${resolvedUserId}
+              AND organization_id IS NULL
+              AND scheduled_date >= ${start_date as string}
+              AND scheduled_date <= ${end_date as string}
+            ORDER BY scheduled_timestamp ASC
+            LIMIT ${limitNum}
+          `;
+        } else if (status) {
+          result = await sql`
+            SELECT * FROM scheduled_posts
+            WHERE user_id = ${resolvedUserId}
+              AND organization_id IS NULL
+              AND status = ${status as string}
+            ORDER BY scheduled_timestamp ASC
+            LIMIT ${limitNum}
+          `;
+        } else {
+          result = await sql`
+            SELECT * FROM scheduled_posts
+            WHERE user_id = ${resolvedUserId}
+              AND organization_id IS NULL
+            ORDER BY scheduled_timestamp ASC
+            LIMIT ${limitNum}
+          `;
+        }
       }
 
       return res.status(200).json(result);
@@ -81,40 +115,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // POST - Create scheduled post
     if (req.method === 'POST') {
-      const { user_id, content_type, content_id, image_url, caption, hashtags,
-              scheduled_date, scheduled_time, scheduled_timestamp, timezone,
-              platforms, instagram_content_type, created_from } = req.body;
+      const {
+        user_id,
+        organization_id,
+        content_type,
+        content_id,
+        image_url,
+        caption,
+        hashtags,
+        scheduled_date,
+        scheduled_time,
+        scheduled_timestamp,
+        timezone,
+        platforms,
+        instagram_content_type,
+        created_from,
+      } = req.body;
 
-      console.log('[Scheduled Posts] POST body:', JSON.stringify(req.body, null, 2));
-
-      if (!user_id || !content_type || !image_url || !scheduled_date ||
-          !scheduled_time || !scheduled_timestamp || !timezone || !platforms) {
-        console.log('[Scheduled Posts] Missing fields:', {
-          user_id: !!user_id,
-          content_type: !!content_type,
-          image_url: !!image_url,
-          scheduled_date: !!scheduled_date,
-          scheduled_time: !!scheduled_time,
-          scheduled_timestamp: !!scheduled_timestamp,
-          timezone: !!timezone,
-          platforms: !!platforms
-        });
+      if (
+        !user_id ||
+        !content_type ||
+        !image_url ||
+        !scheduled_date ||
+        !scheduled_time ||
+        !scheduled_timestamp ||
+        !timezone ||
+        !platforms
+      ) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
+      // Resolve Clerk ID to DB UUID
+      const resolvedUserId = await resolveUserId(sql, user_id);
+      if (!resolvedUserId) {
+        return res.status(400).json({ error: 'User not found' });
+      }
+
       // Convert scheduled_timestamp to bigint (milliseconds) if it's a string
-      const timestampMs = typeof scheduled_timestamp === 'string'
-        ? new Date(scheduled_timestamp).getTime()
-        : scheduled_timestamp;
+      const timestampMs =
+        typeof scheduled_timestamp === 'string'
+          ? new Date(scheduled_timestamp).getTime()
+          : scheduled_timestamp;
 
       const result = await sql`
-        INSERT INTO scheduled_posts (user_id, content_type, content_id, image_url, caption, hashtags,
-                                     scheduled_date, scheduled_time, scheduled_timestamp, timezone,
-                                     platforms, instagram_content_type, created_from)
-        VALUES (${user_id}, ${content_type}, ${content_id || null}, ${image_url},
-                ${caption || ''}, ${hashtags || []}, ${scheduled_date}, ${scheduled_time},
-                ${timestampMs}, ${timezone}, ${platforms},
-                ${instagram_content_type || 'photo'}, ${created_from || null})
+        INSERT INTO scheduled_posts (
+          user_id, organization_id, content_type, content_id, image_url,
+          caption, hashtags, scheduled_date, scheduled_time, scheduled_timestamp,
+          timezone, platforms, instagram_content_type, created_from
+        )
+        VALUES (
+          ${resolvedUserId}, ${organization_id || null}, ${content_type},
+          ${content_id || null}, ${image_url}, ${caption || ''}, ${hashtags || []},
+          ${scheduled_date}, ${scheduled_time}, ${timestampMs}, ${timezone},
+          ${platforms}, ${instagram_content_type || 'photo'}, ${created_from || null}
+        )
         RETURNING *
       `;
 
@@ -124,8 +178,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // PUT - Update scheduled post
     if (req.method === 'PUT') {
       const { id } = req.query;
-      const { status, published_at, error_message, instagram_media_id,
-              instagram_container_id, publish_attempts, last_publish_attempt } = req.body;
+      const {
+        status,
+        published_at,
+        error_message,
+        instagram_media_id,
+        instagram_container_id,
+        publish_attempts,
+        last_publish_attempt,
+      } = req.body;
 
       if (!id) {
         return res.status(400).json({ error: 'id is required' });
@@ -139,7 +200,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             instagram_media_id = COALESCE(${instagram_media_id || null}, instagram_media_id),
             instagram_container_id = COALESCE(${instagram_container_id || null}, instagram_container_id),
             publish_attempts = COALESCE(${publish_attempts || null}, publish_attempts),
-            last_publish_attempt = COALESCE(${last_publish_attempt || null}, last_publish_attempt)
+            last_publish_attempt = COALESCE(${last_publish_attempt || null}, last_publish_attempt),
+            updated_at = NOW()
         WHERE id = ${id as string}
         RETURNING *
       `;

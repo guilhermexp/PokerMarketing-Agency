@@ -230,19 +230,26 @@ export async function deleteGalleryImage(id: string): Promise<void> {
   }
 }
 
-export async function markGalleryImagePublished(
+export async function updateGalleryImage(
   id: string,
+  data: { src_url?: string; published_at?: string },
 ): Promise<DbGalleryImage | null> {
   // Skip if it's a temporary ID (not yet saved to database)
   if (id.startsWith("temp-")) {
-    console.log("[API] Skipping markGalleryImagePublished for temp ID:", id);
+    console.log("[API] Skipping updateGalleryImage for temp ID:", id);
     return null;
   }
 
   return fetchApi<DbGalleryImage>(`/gallery?id=${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ published_at: new Date().toISOString() }),
+    body: JSON.stringify(data),
   });
+}
+
+export async function markGalleryImagePublished(
+  id: string,
+): Promise<DbGalleryImage | null> {
+  return updateGalleryImage(id, { published_at: new Date().toISOString() });
 }
 
 // ============================================================================
@@ -928,4 +935,302 @@ export async function pollGenerationJob(
 
     await new Promise((resolve) => setTimeout(resolve, pollInterval));
   }
+}
+
+// ============================================================================
+// AI Generation API (Server-side)
+// These endpoints run on Vercel Serverless with rate limiting
+// ============================================================================
+
+const AI_API_BASE = "/api/ai";
+
+/**
+ * Helper to make authenticated AI API calls
+ */
+async function fetchAiApi<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  getToken?: () => Promise<string | null>,
+): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  // Add auth token if available
+  if (getToken) {
+    const token = await getToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+
+  const response = await fetch(`${AI_API_BASE}${endpoint}`, {
+    ...options,
+    headers: {
+      ...headers,
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// AI Types
+export interface AiBrandProfile {
+  name: string;
+  description: string;
+  logoUrl?: string | null;
+  primaryColor: string;
+  secondaryColor: string;
+  toneOfVoice: string;
+  toneTargets?: Array<"campaigns" | "posts" | "images" | "flyers">;
+  creativeModel?: string;
+}
+
+export interface AiImageFile {
+  base64: string;
+  mimeType: string;
+}
+
+export interface AiGenerationResult<T> {
+  success: boolean;
+  result?: T;
+  imageUrl?: string;
+  audioBase64?: string;
+  campaign?: AiCampaign;
+  model?: string;
+}
+
+export interface AiCampaign {
+  videoClipScripts: Array<{
+    title: string;
+    hook: string;
+    scenes: Array<{
+      scene: number;
+      visual: string;
+      narration: string;
+      duration_seconds: number;
+    }>;
+    image_prompt: string;
+    audio_script: string;
+  }>;
+  posts: Array<{
+    platform: string;
+    content: string;
+    hashtags: string[];
+    image_prompt: string;
+  }>;
+  adCreatives: Array<{
+    platform: string;
+    headline: string;
+    body: string;
+    cta: string;
+    image_prompt: string;
+  }>;
+}
+
+export interface AiGenerationOptions {
+  videoClipScripts: { generate: boolean; count: number };
+  posts: {
+    instagram: { generate: boolean; count: number };
+    facebook: { generate: boolean; count: number };
+    twitter: { generate: boolean; count: number };
+    linkedin: { generate: boolean; count: number };
+  };
+  adCreatives: {
+    facebook: { generate: boolean; count: number };
+    google: { generate: boolean; count: number };
+  };
+}
+
+/**
+ * Generate an image using AI (Gemini or Imagen)
+ */
+export async function generateAiImage(
+  params: {
+    prompt: string;
+    brandProfile: AiBrandProfile;
+    aspectRatio?: string;
+    model?: "gemini-3-pro-image-preview" | "imagen-4.0-generate-001";
+    imageSize?: "1K" | "2K" | "4K";
+    productImages?: AiImageFile[];
+    styleReferenceImage?: AiImageFile;
+  },
+  getToken?: () => Promise<string | null>,
+): Promise<string> {
+  const result = await fetchAiApi<AiGenerationResult<never>>(
+    "/image",
+    {
+      method: "POST",
+      body: JSON.stringify(params),
+    },
+    getToken,
+  );
+  return result.imageUrl!;
+}
+
+/**
+ * Generate a flyer using AI
+ */
+export async function generateAiFlyer(
+  params: {
+    prompt: string;
+    brandProfile: AiBrandProfile;
+    logo?: AiImageFile | null;
+    referenceImage?: AiImageFile | null;
+    aspectRatio?: string;
+    collabLogo?: AiImageFile | null;
+    imageSize?: "1K" | "2K" | "4K";
+    compositionAssets?: AiImageFile[];
+  },
+  getToken?: () => Promise<string | null>,
+): Promise<string> {
+  const result = await fetchAiApi<AiGenerationResult<never>>(
+    "/flyer",
+    {
+      method: "POST",
+      body: JSON.stringify(params),
+    },
+    getToken,
+  );
+  return result.imageUrl!;
+}
+
+/**
+ * Edit an image using AI
+ */
+export async function editAiImage(
+  params: {
+    image: AiImageFile;
+    prompt: string;
+    mask?: AiImageFile;
+    referenceImage?: AiImageFile;
+  },
+  getToken?: () => Promise<string | null>,
+): Promise<string> {
+  const result = await fetchAiApi<AiGenerationResult<never>>(
+    "/edit-image",
+    {
+      method: "POST",
+      body: JSON.stringify(params),
+    },
+    getToken,
+  );
+  return result.imageUrl!;
+}
+
+/**
+ * Generate speech audio using AI TTS
+ */
+export async function generateAiSpeech(
+  params: {
+    script: string;
+    voiceName?: string;
+  },
+  getToken?: () => Promise<string | null>,
+): Promise<string> {
+  const result = await fetchAiApi<AiGenerationResult<never>>(
+    "/speech",
+    {
+      method: "POST",
+      body: JSON.stringify(params),
+    },
+    getToken,
+  );
+  return result.audioBase64!;
+}
+
+/**
+ * Generate creative text using AI (quick post or custom)
+ */
+export async function generateAiText<T = Record<string, unknown>>(
+  params: {
+    type: "quickPost" | "custom";
+    brandProfile: AiBrandProfile;
+    context?: string;
+    systemPrompt?: string;
+    userPrompt?: string;
+    image?: AiImageFile;
+    temperature?: number;
+    responseSchema?: Record<string, unknown>;
+  },
+  getToken?: () => Promise<string | null>,
+): Promise<T> {
+  const result = await fetchAiApi<AiGenerationResult<T>>(
+    "/text",
+    {
+      method: "POST",
+      body: JSON.stringify(params),
+    },
+    getToken,
+  );
+  return result.result!;
+}
+
+/**
+ * Generate a marketing campaign using AI
+ */
+export async function generateAiCampaign(
+  params: {
+    brandProfile: AiBrandProfile;
+    transcript: string;
+    options: AiGenerationOptions;
+    productImages?: AiImageFile[];
+  },
+  getToken?: () => Promise<string | null>,
+): Promise<AiCampaign> {
+  const result = await fetchAiApi<AiGenerationResult<never>>(
+    "/campaign",
+    {
+      method: "POST",
+      body: JSON.stringify(params),
+    },
+    getToken,
+  );
+  return result.campaign!;
+}
+
+// ============================================================================
+// Video Generation API (Server-side FAL.ai)
+// ============================================================================
+
+export type ApiVideoModel = "sora-2" | "veo-3.1";
+
+export interface VideoGenerationResult {
+  success: boolean;
+  url: string;
+  model: ApiVideoModel;
+}
+
+/**
+ * Generate video using FAL.ai models (server-side)
+ * This avoids exposing FAL_KEY in the browser
+ */
+export async function generateVideo(params: {
+  prompt: string;
+  aspectRatio: "16:9" | "9:16";
+  model: ApiVideoModel;
+  imageUrl?: string;
+  sceneDuration?: number;
+}): Promise<string> {
+  const response = await fetch("/api/ai/video", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || `Video generation failed: HTTP ${response.status}`);
+  }
+
+  const result: VideoGenerationResult = await response.json();
+  return result.url;
 }

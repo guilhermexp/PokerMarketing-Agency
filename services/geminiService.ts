@@ -13,7 +13,7 @@ import type {
   ToneTarget,
 } from "../types";
 import { isFalModel } from "../types";
-import { generateFalVideo } from "./falService";
+import { generateVideo as generateServerVideo } from "./apiClient";
 import { generateCreativeText } from "./llmService";
 import { getEnv } from "../utils/env";
 
@@ -609,21 +609,21 @@ export const generateVideo = async (
 ): Promise<GenerateVideoResult> => {
   // Helper function to use fal.ai
   const useFalAi = async (): Promise<string> => {
-    // If there's an image, upload it to fal.ai storage first (needs HTTP URL)
+    // If there's an image, upload to Vercel Blob first (needs HTTP URL)
     let imageUrl: string | undefined;
     if (image) {
-      const { uploadImageToFal } = await import("./falService");
-      imageUrl = await uploadImageToFal(image.base64, image.mimeType);
+      const { uploadImageToBlob } = await import("./blobService");
+      imageUrl = await uploadImageToBlob(image.base64, image.mimeType);
     }
 
-    // Use fal.ai Veo 3.1 Fast (same model, different API)
-    const result = await generateFalVideo(
+    // Use fal.ai Veo 3.1 Fast via server-side API
+    const result = await generateServerVideo({
       prompt,
       aspectRatio,
-      "fal-ai/veo3.1/fast",
+      model: "veo-3.1",
       imageUrl,
-    );
-    console.log("[fal.ai] Video generated successfully via fal.ai");
+    });
+    console.log("[Video API] Video generated successfully via server");
     return result;
   };
 
@@ -650,7 +650,6 @@ export const generateVideo = async (
         numberOfVideos: 1,
         resolution: "720p",
         aspectRatio,
-        generateAudio: true, // Enable native audio generation with Veo 3.1
       },
     });
 

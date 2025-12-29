@@ -19,7 +19,8 @@ import {
   convertToJsonPrompt,
   type GenerateVideoResult,
 } from "../../services/geminiService";
-import { generateFalVideo, uploadImageToFal } from "../../services/falService";
+import { generateVideo as generateServerVideo, type ApiVideoModel } from "../../services/apiClient";
+import { uploadImageToBlob } from "../../services/blobService";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import { ExportVideoModal } from "../common/ExportVideoModal";
 import {
@@ -135,7 +136,8 @@ interface VideoState {
 const getModelShortName = (model: string): string => {
   if (model.includes("sora")) return "Sora";
   if (model.includes("veo")) return "Veo";
-  return model.split("/").pop() || model;
+  if (model.includes("gemini")) return "Gemini";
+  return model.split("/").pop()?.slice(0, 10) || model.slice(0, 10);
 };
 
 interface SceneReferenceImage {
@@ -162,8 +164,10 @@ interface AudioTrack {
   id: string;
   name: string;
   url: string;
-  duration: number;
-  offsetMs: number; // Offset in milliseconds for manual sync (can be negative)
+  originalDuration: number;
+  trimStart: number;
+  trimEnd: number;
+  offsetSeconds: number; // Offset in seconds from timeline start
   volume: number; // 0-1
 }
 
@@ -177,15 +181,15 @@ interface EditorState {
   totalDuration: number;
 }
 
-// Format time in MM:SS format
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
+  const ms = Math.floor((seconds % 1) * 10);
+  return `${mins}:${secs.toString().padStart(2, "0")}.${ms}`;
 };
 
-const TIMELINE_PX_PER_SEC = 10;
-const MIN_CLIP_WIDTH = 80;
+const TIMELINE_PX_PER_SEC = 40; // Increased to 40px/s for better precision
+const MIN_CLIP_WIDTH = 20; // 0.5s * 40px/s = 20px
 const MIN_CLIP_DURATION = 0.5;
 
 const getClipDuration = (clip: EditableClip): number => {
@@ -193,6 +197,8 @@ const getClipDuration = (clip: EditableClip): number => {
 };
 
 const getClipWidth = (duration: number): number => {
+  // Linear scaling: duration * px_per_sec
+  // Only clamp to absolute minimum rendering width
   return Math.max(MIN_CLIP_WIDTH, duration * TIMELINE_PX_PER_SEC);
 };
 
@@ -311,16 +317,129 @@ const ClipCard: React.FC<ClipCardProps> = ({
     pxPerSec: number;
   } | null>(null);
 
+  const playheadDragRef = useRef<{
+    startX: number;
+    startTime: number;
+    pxPerSec: number;
+  } | null>(null);
+
+  const audioTrimDragRef = useRef<{
+    trackId: string;
+    side: "start" | "end";
+    startX: number;
+    startTrimStart: number;
+    startTrimEnd: number;
+  } | null>(null);
+
+  const audioDragRef = useRef<{
+    trackId: string;
+    startX: number;
+    startOffset: number;
+  } | null>(null);
+
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const editorAudioRef = useRef<HTMLAudioElement>(null);
+
   useEffect(() => {
     editorStateRef.current = editorState;
   }, [editorState]);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
+      // Handle Playhead Drag
+      if (playheadDragRef.current && editorStateRef.current) {
+        const dragState = playheadDragRef.current;
+        const deltaX = event.clientX - dragState.startX;
+        const deltaSeconds = deltaX / dragState.pxPerSec;
+
+        const newTime = Math.max(0, Math.min(dragState.startTime + deltaSeconds, editorStateRef.current.totalDuration));
+
+        setEditorState(prev => {
+          if (!prev) return prev;
+          return { ...prev, currentTime: newTime };
+        });
+
+        // Seek video to match new global time
+        if (editorStateRef.current.clips.length > 0 && editorVideoRef.current) {
+          const clips = editorStateRef.current.clips;
+          let accumulatedFuncTime = 0;
+          let activeClip: EditableClip | undefined;
+
+          for (const clip of clips) {
+            const duration = getClipDuration(clip);
+            if (newTime >= accumulatedFuncTime && newTime < accumulatedFuncTime + duration) {
+              activeClip = clip;
+              break;
+            }
+            accumulatedFuncTime += duration;
+          }
+
+          if (activeClip) {
+            const localTime = newTime - accumulatedFuncTime;
+            editorVideoRef.current.src = getVideoDisplayUrl(activeClip.videoUrl);
+            editorVideoRef.current.currentTime = activeClip.trimStart + localTime;
+            editorVideoRef.current.muted = !!activeClip.muted;
+          }
+        }
+        return;
+      }
+
+      // Handle Audio Drag (move position)
+      if (audioDragRef.current && editorStateRef.current) {
+        const dragState = audioDragRef.current;
+        const deltaX = event.clientX - dragState.startX;
+        const deltaSeconds = deltaX / TIMELINE_PX_PER_SEC;
+        const newOffset = Math.max(0, dragState.startOffset + deltaSeconds);
+
+        setEditorState((prev) => {
+          if (!prev) return prev;
+          const updatedTracks = prev.audioTracks.map((track) =>
+            track.id === dragState.trackId ? { ...track, offsetSeconds: newOffset } : track,
+          );
+          return { ...prev, audioTracks: updatedTracks };
+        });
+        return;
+      }
+
+      // Handle Audio Trim Drag
+      if (audioTrimDragRef.current && editorStateRef.current) {
+        const dragState = audioTrimDragRef.current;
+        const deltaX = event.clientX - dragState.startX;
+        const deltaSeconds = deltaX / TIMELINE_PX_PER_SEC;
+
+        setEditorState((prev) => {
+          if (!prev) return prev;
+          const trackIndex = prev.audioTracks.findIndex((t) => t.id === dragState.trackId);
+          if (trackIndex === -1) return prev;
+          const track = prev.audioTracks[trackIndex];
+
+          let newTrimStart = track.trimStart;
+          let newTrimEnd = track.trimEnd;
+
+          if (dragState.side === "start") {
+            newTrimStart = Math.min(
+              Math.max(dragState.startTrimStart + deltaSeconds, 0),
+              dragState.startTrimEnd - MIN_CLIP_DURATION,
+            );
+          } else {
+            newTrimEnd = Math.max(
+              Math.min(dragState.startTrimEnd + deltaSeconds, track.originalDuration),
+              dragState.startTrimStart + MIN_CLIP_DURATION,
+            );
+          }
+
+          const updatedTrack = { ...track, trimStart: newTrimStart, trimEnd: newTrimEnd };
+          const newTracks = [...prev.audioTracks];
+          newTracks[trackIndex] = updatedTrack;
+          return { ...prev, audioTracks: newTracks };
+        });
+        return;
+      }
+
+      // Handle Video Trim Drag
       if (!trimDragRef.current) return;
       const dragState = trimDragRef.current;
       const deltaX = event.clientX - dragState.startX;
-      const deltaSeconds = deltaX / dragState.pxPerSec;
 
       setEditorState((prev) => {
         if (!prev) return prev;
@@ -332,12 +451,22 @@ const ClipCard: React.FC<ClipCardProps> = ({
         let newTrimStart = clip.trimStart;
         let newTrimEnd = clip.trimEnd;
 
+        // Calculate delta directly from pixels using constant scale
+        const deltaSeconds = deltaX / TIMELINE_PX_PER_SEC;
+
         if (dragState.side === "start") {
+          // Adjust start point
           newTrimStart = Math.min(
             Math.max(dragState.startTrimStart + deltaSeconds, 0),
             dragState.startTrimEnd - MIN_CLIP_DURATION,
           );
+
+          // Preview frame update
+          if (editorVideoRef.current) {
+            editorVideoRef.current.currentTime = newTrimStart;
+          }
         } else {
+          // Adjust end point
           newTrimEnd = Math.max(
             Math.min(
               dragState.startTrimEnd + deltaSeconds,
@@ -345,6 +474,11 @@ const ClipCard: React.FC<ClipCardProps> = ({
             ),
             dragState.startTrimStart + MIN_CLIP_DURATION,
           );
+
+          // Preview frame update
+          if (editorVideoRef.current) {
+            editorVideoRef.current.currentTime = newTrimEnd;
+          }
         }
 
         const updatedClip = {
@@ -370,6 +504,9 @@ const ClipCard: React.FC<ClipCardProps> = ({
 
     const handleMouseUp = () => {
       trimDragRef.current = null;
+      playheadDragRef.current = null;
+      audioTrimDragRef.current = null;
+      audioDragRef.current = null;
     };
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -712,13 +849,15 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF (Bebas Neu
             jsonPrompt,
           );
 
-          videoUrl = await generateFalVideo(
-            jsonPrompt,
-            "9:16",
-            selectedVideoModel,
+          // Map model name to API format
+          const apiModel: ApiVideoModel = selectedVideoModel.includes("sora") ? "sora-2" : "veo-3.1";
+          videoUrl = await generateServerVideo({
+            prompt: jsonPrompt,
+            aspectRatio: "9:16",
+            model: apiModel,
             imageUrl,
-            currentScene.duration,
-          );
+            sceneDuration: currentScene.duration,
+          });
         } else {
           // Use Veo 3.1 - includes narration for audio generation
           const genericPrompt = buildPromptForVeo(sceneNumber);
@@ -975,10 +1114,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           styleReferenceImage: styleRef,
         });
 
-        // Upload to fal.ai to get HTTP URL for Sora
+        // Upload to Vercel Blob to get HTTP URL for video generation
         const base64Data = imageDataUrl.split(",")[1];
         const mimeType = imageDataUrl.match(/data:(.*?);/)?.[1] || "image/png";
-        const httpUrl = await uploadImageToFal(base64Data, mimeType);
+        const httpUrl = await uploadImageToBlob(base64Data, mimeType);
 
         // Update state with both URLs
         setSceneImages((prev) => ({
@@ -1056,9 +1195,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         styleReferenceImage: styleRef,
       });
 
+      // Upload to Vercel Blob to get HTTP URL for video generation
       const base64Data = imageDataUrl.split(",")[1];
       const mimeType = imageDataUrl.match(/data:(.*?);/)?.[1] || "image/png";
-      const httpUrl = await uploadImageToFal(base64Data, mimeType);
+      const httpUrl = await uploadImageToBlob(base64Data, mimeType);
 
       setSceneImages((prev) => ({
         ...prev,
@@ -1324,35 +1464,57 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     return available;
   };
 
+  // Helper to get actual video duration
+  const getVideoDuration = (url: string): Promise<number> => {
+    return new Promise((resolve) => {
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.onloadedmetadata = () => {
+        resolve(video.duration);
+        video.remove();
+      };
+      video.onerror = () => {
+        resolve(8); // Fallback to 8s if can't load
+        video.remove();
+      };
+      video.src = getVideoDisplayUrl(url);
+    });
+  };
+
   // Add a video to the timeline
-  const handleAddClipToTimeline = (
+  const handleAddClipToTimeline = async (
     sceneNumber: number,
     video: VideoState,
-    duration: number,
+    _fallbackDuration: number,
   ) => {
-    if (!editorState) return;
+    if (!editorState || !video.url) return;
+
+    // Get actual video duration
+    const actualDuration = await getVideoDuration(video.url);
 
     const newClip: EditableClip = {
       id: `clip-${sceneNumber}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       sceneNumber,
-      videoUrl: video.url!,
-      originalDuration: duration,
+      videoUrl: video.url,
+      originalDuration: actualDuration,
       trimStart: 0,
-      trimEnd: duration,
+      trimEnd: actualDuration,
       model: video.model,
       muted: false,
     };
 
-    const newClips = [...editorState.clips, newClip];
-    const totalDuration = newClips.reduce(
-      (acc, c) => acc + getClipDuration(c),
-      0,
-    );
-
-    setEditorState({
-      ...editorState,
-      clips: newClips,
-      totalDuration,
+    setEditorState((prev) => {
+      if (!prev) return prev;
+      const newClips = [...prev.clips, newClip];
+      const totalDuration = newClips.reduce(
+        (acc, c) => acc + getClipDuration(c),
+        0,
+      );
+      return {
+        ...prev,
+        clips: newClips,
+        totalDuration,
+      };
     });
   };
 
@@ -1596,6 +1758,75 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     });
   };
 
+  const handleStartPlayheadDrag = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!editorState) return;
+
+    playheadDragRef.current = {
+      startX: event.clientX,
+      startTime: editorState.currentTime,
+      pxPerSec: TIMELINE_PX_PER_SEC
+    };
+  };
+
+  const handleSplitClip = () => {
+    if (!editorState) return;
+
+    const currentTime = editorState.currentTime;
+    let accumulatedTime = 0;
+    let targetClipIndex = -1;
+    let splitLocalTime = 0;
+
+    // Find the clip under the playhead
+    for (let i = 0; i < editorState.clips.length; i++) {
+      const clip = editorState.clips[i];
+      const duration = getClipDuration(clip);
+
+      if (currentTime >= accumulatedTime && currentTime < accumulatedTime + duration) {
+        targetClipIndex = i;
+        splitLocalTime = currentTime - accumulatedTime; // Offset within the trimmed clip
+        break;
+      }
+      accumulatedTime += duration;
+    }
+
+    if (targetClipIndex === -1) return; // Playhead not over a clip
+
+    const clip = editorState.clips[targetClipIndex];
+    // Convert visual local time (0..duration) back to original video time
+    const splitTimeOriginal = clip.trimStart + splitLocalTime;
+
+    // Enforce minimum duration for split parts
+    if (splitLocalTime < MIN_CLIP_DURATION || (getClipDuration(clip) - splitLocalTime) < MIN_CLIP_DURATION) {
+      alert(`O clip deve ter pelo menos ${MIN_CLIP_DURATION}s para ser cortado.`);
+      return;
+    }
+
+    // Create two new clips
+    const leftClip: EditableClip = {
+      ...clip,
+      id: `clip-${clip.sceneNumber}-${Date.now()}-left`,
+      trimEnd: splitTimeOriginal
+    };
+
+    const rightClip: EditableClip = {
+      ...clip,
+      id: `clip-${clip.sceneNumber}-${Date.now()}-right`,
+      trimStart: splitTimeOriginal
+    };
+
+    const newClips = [...editorState.clips];
+    newClips.splice(targetClipIndex, 1, leftClip, rightClip);
+
+    // Update state without changing total duration logic (it remains same, just split)
+    setEditorState({
+      ...editorState,
+      clips: newClips,
+      selectedClipId: rightClip.id // Select the new right part
+    });
+  };
+
   const handleStartTrim = (
     event: React.MouseEvent,
     clipId: string,
@@ -1607,7 +1838,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     const clip = editorState.clips.find((c) => c.id === clipId);
     if (!clip) return;
     const duration = getClipDuration(clip);
-    const pxPerSec = getClipWidth(duration) / Math.max(duration, 0.01);
+    const pxPerSec = TIMELINE_PX_PER_SEC; // Use constant scale
     trimDragRef.current = {
       clipId,
       side,
@@ -1621,17 +1852,111 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     );
   };
 
+
+
+  // Track if editor has clips (for effect dependency)
+  const hasEditorClips = isEditing && (editorState?.clips.length ?? 0) > 0;
+
   useEffect(() => {
     const video = editorVideoRef.current;
     if (!video) return;
 
-    const handleTimeUpdate = () => {
+    let animationFrameId: number;
+
+    const updateLoop = () => {
       const state = editorStateRef.current;
-      if (!state || state.clips.length === 0) return;
+      if (!state || state.clips.length === 0) {
+        animationFrameId = requestAnimationFrame(updateLoop);
+        return;
+      }
+
+      // If playing, update time continuously
+      if (state.isPlaying && !video.paused) {
+        const activeIndex = state.selectedClipId
+          ? state.clips.findIndex((c) => c.id === state.selectedClipId)
+          : 0;
+
+        if (activeIndex >= 0) {
+          const activeClip = state.clips[activeIndex];
+          const clipOffset = getTimelineOffset(state.clips, activeIndex);
+          const localTime = Math.max(0, video.currentTime - activeClip.trimStart);
+          const timelineTime = clipOffset + localTime;
+
+          setEditorState((prev) => {
+            if (!prev) return prev;
+            // Avoid redundant updates if time hasn't changed significantly (optional optimization)
+            if (Math.abs(prev.currentTime - timelineTime) < 0.01) return prev;
+
+            return {
+              ...prev,
+              currentTime: Math.min(timelineTime, prev.totalDuration),
+            };
+          });
+
+          // Sync audio playback position
+          if (editorAudioRef.current && state.audioTracks.length > 0) {
+            const audioTrack = state.audioTracks[0];
+            const audioTimelineStart = audioTrack.offsetSeconds;
+            const audioTimelineEnd = audioTimelineStart + (audioTrack.trimEnd - audioTrack.trimStart);
+
+            // Check if current time is within audio range
+            if (timelineTime >= audioTimelineStart && timelineTime < audioTimelineEnd) {
+              const audioLocalTime = audioTrack.trimStart + (timelineTime - audioTimelineStart);
+              // Only seek if significantly out of sync
+              if (Math.abs(editorAudioRef.current.currentTime - audioLocalTime) > 0.3) {
+                editorAudioRef.current.currentTime = audioLocalTime;
+              }
+              if (editorAudioRef.current.paused) {
+                editorAudioRef.current.volume = audioTrack.volume;
+                editorAudioRef.current.play().catch(() => {});
+              }
+            } else if (!editorAudioRef.current.paused) {
+              editorAudioRef.current.pause();
+            }
+          }
+
+          // Handle Clip Transition
+          if (video.currentTime >= activeClip.trimEnd - 0.05) {
+            const nextIndex = activeIndex + 1;
+            if (nextIndex < state.clips.length) {
+              const nextClip = state.clips[nextIndex];
+              video.src = getVideoDisplayUrl(nextClip.videoUrl);
+              video.currentTime = nextClip.trimStart;
+              video.muted = !!nextClip.muted;
+              void video.play();
+
+              // Use functional update to ensure we don't lose the playing state
+              setEditorState((prev) =>
+                prev ? { ...prev, selectedClipId: nextClip.id } : null,
+              );
+            } else {
+              // End of timeline
+              video.pause();
+              setEditorState((prev) =>
+                prev
+                  ? { ...prev, isPlaying: false, currentTime: prev.totalDuration }
+                  : null,
+              );
+            }
+          }
+        }
+      }
+
+      animationFrameId = requestAnimationFrame(updateLoop);
+    };
+
+    animationFrameId = requestAnimationFrame(updateLoop);
+
+    // Keep timeupdate for seeking/pause updates (non-playing state)
+    const handleTimeUpdateForSeek = () => {
+      const state = editorStateRef.current;
+      if (!state || state.isPlaying) return; // Handled by rAF if playing
+
       const activeIndex = state.selectedClipId
         ? state.clips.findIndex((c) => c.id === state.selectedClipId)
         : 0;
       if (activeIndex < 0) return;
+
       const activeClip = state.clips[activeIndex];
       const clipOffset = getTimelineOffset(state.clips, activeIndex);
       const localTime = Math.max(0, video.currentTime - activeClip.trimStart);
@@ -1644,58 +1969,101 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           currentTime: Math.min(timelineTime, prev.totalDuration),
         };
       });
+    };
 
-      if (video.currentTime >= activeClip.trimEnd - 0.05) {
-        const nextIndex = activeIndex + 1;
-        if (nextIndex < state.clips.length) {
-          const nextClip = state.clips[nextIndex];
-          video.src = getVideoDisplayUrl(nextClip.videoUrl);
-          video.currentTime = nextClip.trimStart;
-          video.muted = !!nextClip.muted;
-          if (state.isPlaying) {
-            void video.play();
-          }
-          setEditorState((prev) =>
-            prev ? { ...prev, selectedClipId: nextClip.id } : null,
-          );
-        } else {
-          video.pause();
-          setEditorState((prev) =>
-            prev
-              ? { ...prev, isPlaying: false, currentTime: prev.totalDuration }
-              : null,
-          );
+    video.addEventListener("timeupdate", handleTimeUpdateForSeek);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      video.removeEventListener("timeupdate", handleTimeUpdateForSeek);
+    };
+  }, [hasEditorClips]);
+
+  // Keyboard shortcuts for editor
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      const state = editorStateRef.current;
+      if (!state) return;
+
+      // Delete or Backspace to delete selected clip or audio
+      if (event.key === "Delete" || event.key === "Backspace") {
+        if (state.selectedClipId) {
+          event.preventDefault();
+          handleDeleteClip(state.selectedClipId);
+        } else if (state.selectedAudioId) {
+          event.preventDefault();
+          handleDeleteAudioTrack(state.selectedAudioId);
         }
+      }
+
+      // Space to play/pause
+      if (event.key === " " && (state.clips.length > 0 || state.audioTracks.length > 0)) {
+        event.preventDefault();
+        handlePlayPause();
       }
     };
 
-    video.addEventListener("timeupdate", handleTimeUpdate);
-    return () => {
-      video.removeEventListener("timeupdate", handleTimeUpdate);
-    };
-  }, []);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isEditing]);
 
   // --- Audio Track Functions ---
 
-  const handleAddAudioTrack = (
+  // Helper to get audio track duration (trimmed)
+  const getAudioTrackDuration = (track: AudioTrack): number => {
+    return Math.max(0, track.trimEnd - track.trimStart);
+  };
+
+  // Helper to get audio duration from URL
+  const getAudioDuration = (url: string): Promise<number> => {
+    return new Promise((resolve) => {
+      const audio = document.createElement("audio");
+      audio.preload = "metadata";
+      audio.onloadedmetadata = () => {
+        resolve(audio.duration);
+        audio.remove();
+      };
+      audio.onerror = () => {
+        resolve(10); // Fallback
+        audio.remove();
+      };
+      audio.src = url;
+    });
+  };
+
+  const handleAddAudioTrack = async (
     audioUrl: string,
     name: string,
-    duration: number,
+    _fallbackDuration: number,
   ) => {
     if (!editorState) return;
+
+    const actualDuration = await getAudioDuration(audioUrl);
 
     const newTrack: AudioTrack = {
       id: `audio-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       name,
       url: audioUrl,
-      duration,
-      offsetMs: 0,
+      originalDuration: actualDuration,
+      trimStart: 0,
+      trimEnd: actualDuration,
+      offsetSeconds: 0,
       volume: 1,
     };
 
-    setEditorState({
-      ...editorState,
-      audioTracks: [...editorState.audioTracks, newTrack],
+    setEditorState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        audioTracks: [...prev.audioTracks, newTrack],
+      };
     });
   };
 
@@ -1708,10 +2076,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     });
   };
 
-  const handleUpdateAudioOffset = (audioId: string, offsetMs: number) => {
+  const handleUpdateAudioOffset = (audioId: string, offsetSeconds: number) => {
     if (!editorState) return;
     const updatedTracks = editorState.audioTracks.map((track) =>
-      track.id === audioId ? { ...track, offsetMs } : track,
+      track.id === audioId ? { ...track, offsetSeconds: Math.max(0, offsetSeconds) } : track,
     );
     setEditorState({
       ...editorState,
@@ -1742,6 +2110,40 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           ? null
           : editorState.selectedAudioId,
     });
+  };
+
+  const handleStartAudioTrim = (
+    event: React.MouseEvent,
+    trackId: string,
+    side: "start" | "end",
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!editorState) return;
+    const track = editorState.audioTracks.find((t) => t.id === trackId);
+    if (!track) return;
+
+    audioTrimDragRef.current = {
+      trackId,
+      side,
+      startX: event.clientX,
+      startTrimStart: track.trimStart,
+      startTrimEnd: track.trimEnd,
+    };
+  };
+
+  const handleStartAudioDrag = (event: React.MouseEvent, trackId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!editorState) return;
+    const track = editorState.audioTracks.find((t) => t.id === trackId);
+    if (!track) return;
+
+    audioDragRef.current = {
+      trackId,
+      startX: event.clientX,
+      startOffset: track.offsetSeconds,
+    };
   };
 
   // Check if thumbnail is already in favorites
@@ -1837,11 +2239,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             {/* Narration Toggle */}
             <button
               onClick={() => setIncludeNarration(!includeNarration)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[9px] font-black uppercase tracking-wider whitespace-nowrap ${
-                includeNarration
-                  ? "bg-green-500/10 border-green-500/30 text-green-400"
-                  : "bg-[#0a0a0a] border-white/10 text-white/40 hover:text-white/60"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[9px] font-black uppercase tracking-wider whitespace-nowrap ${includeNarration
+                ? "bg-green-500/10 border-green-500/30 text-green-400"
+                : "bg-[#0a0a0a] border-white/10 text-white/40 hover:text-white/60"
+                }`}
               title={
                 includeNarration
                   ? "Incluir narração no prompt"
@@ -1857,11 +2258,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             {/* Remove Silence Toggle */}
             <button
               onClick={() => setRemoveSilence(!removeSilence)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[9px] font-black uppercase tracking-wider whitespace-nowrap ${
-                removeSilence
-                  ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
-                  : "bg-[#0a0a0a] border-white/10 text-white/40 hover:text-white/60"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[9px] font-black uppercase tracking-wider whitespace-nowrap ${removeSilence
+                ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                : "bg-[#0a0a0a] border-white/10 text-white/40 hover:text-white/60"
+                }`}
               title={
                 removeSilence
                   ? "Remover silencios entre clips ao juntar/exportar"
@@ -2004,16 +2404,38 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                       controls
                       crossOrigin="anonymous"
                       muted={!!selectedEditorClip?.muted}
-                      onPlay={() =>
+                      onLoadedMetadata={() => {
+                        // Seek to trimStart when video loads
+                        if (editorVideoRef.current && selectedEditorClip) {
+                          editorVideoRef.current.currentTime = selectedEditorClip.trimStart;
+                        }
+                      }}
+                      onPlay={() => {
                         setEditorState((prev) =>
                           prev ? { ...prev, isPlaying: true } : null,
-                        )
-                      }
-                      onPause={() =>
+                        );
+                        // Sync audio playback
+                        if (editorAudioRef.current && editorState.audioTracks.length > 0) {
+                          editorAudioRef.current.play().catch(() => {});
+                        }
+                      }}
+                      onPause={() => {
                         setEditorState((prev) =>
                           prev ? { ...prev, isPlaying: false } : null,
-                        )
-                      }
+                        );
+                        // Pause audio
+                        if (editorAudioRef.current) {
+                          editorAudioRef.current.pause();
+                        }
+                      }}
+                    />
+                  )}
+                  {/* Hidden audio element for audio tracks */}
+                  {editorState.audioTracks.length > 0 && (
+                    <audio
+                      ref={editorAudioRef}
+                      src={editorState.audioTracks[0]?.url}
+                      style={{ display: 'none' }}
                     />
                   )}
                 </div>
@@ -2037,19 +2459,37 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             {/* Timeline */}
             <div className="py-4 bg-[#0d0d0d] border-t border-white/5 flex items-center px-4 gap-4">
               {/* Play/Pause Button */}
-              <button
-                onClick={handlePlayPause}
-                disabled={editorState.clips.length === 0}
-                className="w-10 h-10 rounded-full bg-white hover:bg-white/90 disabled:bg-white/30 disabled:cursor-not-allowed flex items-center justify-center text-black transition-colors flex-shrink-0"
-              >
-                <Icon
-                  name={editorState.isPlaying ? "pause" : "play"}
-                  className="w-4 h-4"
-                />
-              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handlePlayPause}
+                  disabled={editorState.clips.length === 0}
+                  className="w-10 h-10 rounded-full bg-white hover:bg-white/90 disabled:bg-white/30 disabled:cursor-not-allowed flex items-center justify-center text-black transition-colors flex-shrink-0"
+                >
+                  <Icon
+                    name={editorState.isPlaying ? "pause" : "play"}
+                    className="w-4 h-4"
+                  />
+                </button>
+                <button
+                  onClick={handleSplitClip}
+                  disabled={editorState.clips.length === 0}
+                  className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white transition-colors"
+                  title="Cortar (Split)"
+                >
+                  <Icon name="scissors" className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => editorState.selectedClipId && handleDeleteClip(editorState.selectedClipId)}
+                  disabled={!editorState.selectedClipId}
+                  className="w-10 h-10 rounded-full bg-white/10 hover:bg-red-500/50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white transition-colors"
+                  title="Excluir clip selecionado (Delete)"
+                >
+                  <Icon name="trash" className="w-4 h-4" />
+                </button>
+              </div>
 
               {/* Timeline Track with Playhead */}
-              <div className="flex-1 relative min-h-[80px] flex items-center">
+              <div className="flex-1 relative min-h-[100px] flex items-center" ref={timelineRef}>
                 {editorState.clips.length === 0 ? (
                   /* Empty state */
                   <div className="flex-1 flex items-center justify-center border-2 border-dashed border-white/20 rounded-lg h-16">
@@ -2059,9 +2499,22 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   </div>
                 ) : (
                   /* Clips Container */
-                  <div className="relative flex overflow-x-auto py-2 scrollbar-thin scrollbar-thumb-white/10">
+                  <div className="relative flex flex-col overflow-x-auto py-2 scrollbar-thin scrollbar-thumb-white/10">
+                    {/* Ruler */}
+                    <div className="h-5 flex relative mb-1" style={{ width: `${Math.max(100, editorState.totalDuration * TIMELINE_PX_PER_SEC)}px` }}>
+                      {Array.from({ length: Math.ceil(editorState.totalDuration) + 1 }).map((_, i) => (
+                        <div key={i} className="absolute top-0 bottom-0 border-l border-white/20" style={{ left: `${i * TIMELINE_PX_PER_SEC}px` }}>
+                          <span className="absolute -top-1 left-1 text-[8px] text-white/40">{i}s</span>
+                          {/* Minor ticks */}
+                          {Array.from({ length: 4 }).map((_, j) => (
+                            <div key={j} className="absolute bottom-0 h-1 border-l border-white/10" style={{ left: `${(j + 1) * (TIMELINE_PX_PER_SEC / 5)}px` }} />
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+
                     {/* Clips Strip */}
-                    <div className="flex relative border-2 border-white/20 rounded-lg overflow-hidden">
+                    <div className="flex relative border-2 border-white/20 rounded-lg overflow-hidden h-16">
                       {editorState.clips.map((clip, idx) => {
                         const isSelected =
                           editorState.selectedClipId === clip.id;
@@ -2076,9 +2529,8 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                             onDragOver={(e) => handleDragOver(e, clip.id)}
                             onDragEnd={handleDragEnd}
                             onClick={() => handleSelectClip(clip.id)}
-                            className={`relative h-16 cursor-move transition-all ${
-                              isSelected ? "ring-2 ring-white z-10" : ""
-                            } ${draggedClipId === clip.id ? "opacity-50" : ""} ${clip.muted ? "opacity-80" : ""}`}
+                            className={`relative h-16 cursor-move transition-all ${isSelected ? "ring-2 ring-white z-10" : ""
+                              } ${draggedClipId === clip.id ? "opacity-50" : ""} ${clip.muted ? "opacity-80" : ""}`}
                             style={{ width: `${clipWidth}px` }}
                           >
                             {/* Video thumbnail */}
@@ -2123,36 +2575,25 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                               </span>
                             </div>
 
-                            {/* Model tag */}
-                            {clip.model && (
-                              <div className="absolute top-1 right-2">
-                                <span className="text-[6px] font-bold bg-blue-600/90 text-white px-1 py-0.5 rounded">
-                                  {getModelShortName(clip.model)}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Mute toggle */}
+                            {/* Mute toggle - bottom left */}
                             {isSelected && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleToggleClipMute(clip.id);
                                 }}
-                                className={`absolute top-1 left-2 rounded-full px-1.5 py-1 text-[6px] font-bold flex items-center gap-1 ${
-                                  clip.muted
-                                    ? "bg-red-500/80 text-white"
-                                    : "bg-black/60 text-white/80"
-                                }`}
+                                className={`absolute bottom-1 left-1 rounded px-1 py-0.5 text-[6px] font-bold flex items-center gap-0.5 ${clip.muted
+                                  ? "bg-red-500/80 text-white"
+                                  : "bg-black/60 text-white/80"
+                                  }`}
                                 title={
                                   clip.muted ? "Clip sem audio" : "Mutar clip"
                                 }
                               >
                                 <Icon
                                   name={clip.muted ? "mic-off" : "audio"}
-                                  className="w-3 h-3"
+                                  className="w-2.5 h-2.5"
                                 />
-                                {clip.muted ? "MUDO" : "AUDIO"}
                               </button>
                             )}
                           </div>
@@ -2160,17 +2601,19 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                       })}
                     </div>
 
-                    {/* Playhead */}
+                    {/* Playhead (Draggable) */}
                     {editorState.clips.length > 0 && (
                       <div
-                        className="absolute top-0 bottom-0 w-0.5 bg-white z-20 pointer-events-none"
+                        className="absolute top-0 bottom-0 w-4 -ml-2 z-30 cursor-ew-resize group hover:z-40"
+                        onMouseDown={handleStartPlayheadDrag}
                         style={{
-                          left: `${Math.min(95, (editorState.currentTime / Math.max(1, editorState.totalDuration)) * 100)}%`,
-                          transition: "left 0.1s linear",
+                          left: `${editorState.currentTime * TIMELINE_PX_PER_SEC}px`,
                         }}
                       >
-                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full" />
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full" />
+                        <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-red-500 group-hover:bg-red-400">
+                          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-red-500 rounded-full shadow-sm" />
+                          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-red-500 rounded-full shadow-sm" />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2203,66 +2646,108 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               </div>
             </div>
 
-            {/* Audio Track Section */}
+            {/* Audio Track Section - Timeline Style */}
             <div className="px-4 pb-4 bg-[#0d0d0d] border-t border-white/5">
               <div className="flex items-center gap-4">
-                {/* Audio label */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Icon name="audio" className="w-4 h-4 text-green-400" />
-                  <span className="text-[10px] text-white/50 uppercase tracking-wider">
-                    Áudio
-                  </span>
+                {/* Audio label and controls */}
+                <div className="flex flex-col gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 h-10 justify-center">
+                    <Icon name="audio" className="w-4 h-4 text-green-400" />
+                    <span className="text-[10px] text-white/50 uppercase tracking-wider">
+                      Áudio
+                    </span>
+                  </div>
+                  {/* Delete audio button */}
+                  <button
+                    onClick={() => editorState.selectedAudioId && handleDeleteAudioTrack(editorState.selectedAudioId)}
+                    disabled={!editorState.selectedAudioId}
+                    className="w-10 h-10 rounded-full bg-white/10 hover:bg-red-500/50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white transition-colors"
+                    title="Excluir áudio selecionado (Delete)"
+                  >
+                    <Icon name="trash" className="w-4 h-4" />
+                  </button>
                 </div>
 
-                {/* Audio tracks container */}
-                <div className="flex-1 min-h-[40px] flex items-center gap-2">
+                {/* Audio timeline container */}
+                <div className="flex-1 min-h-[50px] relative overflow-x-auto">
                   {editorState.audioTracks.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center border-2 border-dashed border-green-500/20 rounded-lg h-10">
+                    <div className="flex items-center justify-center border-2 border-dashed border-green-500/20 rounded-lg h-12">
                       <p className="text-white/30 text-xs">
                         {audioState.url
-                          ? "Clique em + para adicionar o áudio gerado"
+                          ? "Clique em + para adicionar o áudio"
                           : "Gere o áudio primeiro"}
                       </p>
                     </div>
                   ) : (
-                    <div className="flex gap-2 overflow-x-auto py-1">
+                    <div
+                      className="relative h-12 border border-green-500/30 rounded-lg overflow-visible"
+                      style={{ width: `${Math.max(200, editorState.totalDuration * TIMELINE_PX_PER_SEC + 100)}px` }}
+                    >
                       {editorState.audioTracks.map((track) => {
-                        const isSelected =
-                          editorState.selectedAudioId === track.id;
-                        const offsetLeft = Math.max(0, track.offsetMs / 100); // Convert ms to pixels
+                        const isSelected = editorState.selectedAudioId === track.id;
+                        const trackDuration = getAudioTrackDuration(track);
+                        const trackWidth = Math.max(MIN_CLIP_WIDTH, trackDuration * TIMELINE_PX_PER_SEC);
+                        const offsetLeft = track.offsetSeconds * TIMELINE_PX_PER_SEC;
 
                         return (
                           <div
                             key={track.id}
                             onClick={() => handleSelectAudio(track.id)}
-                            className={`relative h-10 px-3 rounded-lg bg-green-500/20 border flex items-center gap-2 cursor-pointer transition-all ${
+                            onMouseDown={(e) => {
+                              if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('audio-drag-handle')) {
+                                handleStartAudioDrag(e, track.id);
+                              }
+                            }}
+                            className={`absolute top-1 bottom-1 rounded cursor-move transition-all ${
                               isSelected
-                                ? "border-green-400 ring-1 ring-green-400"
-                                : "border-green-500/30"
+                                ? "bg-green-500/40 ring-2 ring-green-400"
+                                : "bg-green-500/20 hover:bg-green-500/30"
                             }`}
-                            style={{ marginLeft: `${offsetLeft}px` }}
+                            style={{
+                              left: `${offsetLeft}px`,
+                              width: `${trackWidth}px`,
+                            }}
                           >
-                            <Icon
-                              name="audio"
-                              className="w-3 h-3 text-green-400"
-                            />
-                            <span className="text-[10px] text-white/80 whitespace-nowrap">
-                              {track.name}
-                            </span>
-                            <span className="text-[8px] text-green-400/80">
-                              {Math.round(track.duration)}s
-                            </span>
+                            {/* Waveform visual placeholder */}
+                            <div className="audio-drag-handle absolute inset-0 flex items-center justify-center overflow-hidden">
+                              <div className="flex items-center gap-[2px] h-full py-2">
+                                {Array.from({ length: Math.floor(trackWidth / 4) }).map((_, i) => (
+                                  <div
+                                    key={i}
+                                    className="w-[2px] bg-green-400/60 rounded-full"
+                                    style={{ height: `${20 + Math.sin(i * 0.5) * 15 + Math.random() * 10}%` }}
+                                  />
+                                ))}
+                              </div>
+                            </div>
 
-                            {/* Delete button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteAudioTrack(track.id);
-                              }}
-                              className="ml-1 text-white/40 hover:text-red-400 transition-colors"
-                            >
-                              <Icon name="x" className="w-3 h-3" />
-                            </button>
+                            {/* Track info */}
+                            <div className="absolute bottom-0.5 left-1 right-1 flex items-center justify-between pointer-events-none">
+                              <span className="text-[7px] font-bold text-white bg-black/40 px-1 rounded">
+                                {track.name}
+                              </span>
+                              <span className="text-[7px] font-bold text-green-300 bg-black/40 px-1 rounded">
+                                {trackDuration.toFixed(1)}s
+                              </span>
+                            </div>
+
+                            {/* Trim Handles - Only show on selected */}
+                            {isSelected && (
+                              <>
+                                <div
+                                  className="absolute left-0 top-0 bottom-0 w-2 bg-green-400 cursor-ew-resize flex items-center justify-center hover:bg-green-300 rounded-l"
+                                  onMouseDown={(e) => handleStartAudioTrim(e, track.id, "start")}
+                                >
+                                  <div className="w-0.5 h-4 bg-black/30 rounded-full" />
+                                </div>
+                                <div
+                                  className="absolute right-0 top-0 bottom-0 w-2 bg-green-400 cursor-ew-resize flex items-center justify-center hover:bg-green-300 rounded-r"
+                                  onMouseDown={(e) => handleStartAudioTrim(e, track.id, "end")}
+                                >
+                                  <div className="w-0.5 h-4 bg-black/30 rounded-full" />
+                                </div>
+                              </>
+                            )}
                           </div>
                         );
                       })}
@@ -2274,69 +2759,28 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 <button
                   onClick={() => {
                     if (audioState.url) {
-                      // Get duration from audio element if possible
-                      const audioDuration = totalDuration || 10; // Fallback to clip duration
-                      handleAddAudioTrack(
-                        audioState.url,
-                        "Narração",
-                        audioDuration,
-                      );
+                      const audioDuration = totalDuration || 10;
+                      handleAddAudioTrack(audioState.url, "Narração", audioDuration);
                     }
                   }}
-                  disabled={
-                    !audioState.url || editorState.audioTracks.length > 0
-                  }
-                  className="w-8 h-8 rounded-lg bg-green-500/10 hover:bg-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-green-400/50 hover:text-green-400 transition-colors flex-shrink-0"
-                  title="Adicionar áudio gerado"
+                  disabled={!audioState.url}
+                  className="w-10 h-10 rounded-lg bg-green-500/10 hover:bg-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-green-400/50 hover:text-green-400 transition-colors flex-shrink-0"
+                  title="Adicionar áudio"
                 >
                   <Icon name="plus" className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Audio Sync Controls - Show when audio is selected */}
+              {/* Audio Controls - Show when audio is selected */}
               {editorState.selectedAudioId && (
                 <div className="mt-3 p-3 rounded-lg bg-white/5 border border-green-500/20">
                   <div className="flex items-center gap-4">
                     <span className="text-[10px] text-white/50 uppercase tracking-wider flex-shrink-0">
-                      Sincronizar
-                    </span>
-
-                    {/* Offset slider */}
-                    <div className="flex-1 flex items-center gap-2">
-                      <span className="text-[9px] text-white/40">-2s</span>
-                      <input
-                        type="range"
-                        min="-2000"
-                        max="2000"
-                        step="50"
-                        value={
-                          editorState.audioTracks.find(
-                            (t) => t.id === editorState.selectedAudioId,
-                          )?.offsetMs || 0
-                        }
-                        onChange={(e) =>
-                          handleUpdateAudioOffset(
-                            editorState.selectedAudioId!,
-                            parseInt(e.target.value),
-                          )
-                        }
-                        className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-green-400"
-                      />
-                      <span className="text-[9px] text-white/40">+2s</span>
-                    </div>
-
-                    {/* Offset value display */}
-                    <span className="text-[10px] text-green-400 font-mono tabular-nums w-12 text-right">
-                      {(
-                        (editorState.audioTracks.find(
-                          (t) => t.id === editorState.selectedAudioId,
-                        )?.offsetMs || 0) / 1000
-                      ).toFixed(1)}
-                      s
+                      Volume
                     </span>
 
                     {/* Volume control */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center gap-2">
                       <Icon name="audio" className="w-3 h-3 text-white/40" />
                       <input
                         type="range"
@@ -2353,8 +2797,25 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                             parseInt(e.target.value) / 100,
                           )
                         }
-                        className="w-16 h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+                        className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-green-400"
                       />
+                      <span className="text-[10px] text-green-400 font-mono w-10">
+                        {Math.round(
+                          (editorState.audioTracks.find(
+                            (t) => t.id === editorState.selectedAudioId,
+                          )?.volume || 1) * 100
+                        )}%
+                      </span>
+                    </div>
+
+                    {/* Position info */}
+                    <div className="flex items-center gap-2 text-[10px] text-white/50">
+                      <span>Início:</span>
+                      <span className="text-green-400 font-mono">
+                        {(editorState.audioTracks.find(
+                          (t) => t.id === editorState.selectedAudioId,
+                        )?.offsetSeconds || 0).toFixed(1)}s
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -3080,11 +3541,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                     <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between">
                       <span
-                        className={`text-[8px] font-bold text-white px-1.5 py-0.5 rounded ${
-                          item.isFinalVideo
-                            ? "bg-primary text-black"
-                            : "bg-black/60"
-                        }`}
+                        className={`text-[8px] font-bold text-white px-1.5 py-0.5 rounded ${item.isFinalVideo
+                          ? "bg-primary text-black"
+                          : "bg-black/60"
+                          }`}
                       >
                         {item.label || `Cena ${item.sceneNumber}`}
                       </span>

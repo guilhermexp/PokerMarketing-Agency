@@ -4,11 +4,14 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { setupCors } from './db/_helpers/index';
 
 const MCP_URL = 'https://rube.app/mcp';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Only allow POST
+  // Handle CORS
+  if (setupCors(req.method, res)) return;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -30,13 +33,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const text = await response.text();
-
-    // Set CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    // Return the response
     res.status(response.status).send(text);
   } catch (error) {
     console.error('[Rube Proxy] Error:', error);

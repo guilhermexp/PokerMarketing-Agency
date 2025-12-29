@@ -21,6 +21,10 @@ export default defineConfig(({ mode }) => {
             target: 'http://localhost:3002',
             changeOrigin: true,
           },
+          '/api/ai': {
+            target: 'http://localhost:3002',
+            changeOrigin: true,
+          },
           '/api/generate': {
             target: 'http://localhost:3002',
             changeOrigin: true,
@@ -54,8 +58,7 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.FAL_KEY': JSON.stringify(env.FAL_KEY),
-        'import.meta.env.VITE_FAL_KEY': JSON.stringify(env.FAL_KEY),
+        // FAL_KEY removed - video generation is now server-side via /api/ai/video
         'process.env.RUBE_TOKEN': JSON.stringify(env.RUBE_TOKEN),
         'import.meta.env.VITE_RUBE_TOKEN': JSON.stringify(env.RUBE_TOKEN),
         'process.env.BLOB_READ_WRITE_TOKEN': JSON.stringify(env.BLOB_READ_WRITE_TOKEN),
