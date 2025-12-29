@@ -126,19 +126,19 @@ export const isFalModel = (model: VideoModel): model is FalVideoModel =>
   model.startsWith('fal-ai/');
 
 
-// Gallery can contain images and videos
-export type GalleryMediaType = 'image' | 'video';
+// Gallery can contain images, videos and audio
+export type GalleryMediaType = 'image' | 'video' | 'audio';
 
 export interface GalleryImage {
   id: string;
   src: string;
   prompt?: string;
   source: string;
-  model: ImageModel | 'video-export';  // Extended for videos
+  model: ImageModel | 'video-export' | 'tts-generation';  // Extended for videos and audio
   aspectRatio?: string;
   imageSize?: ImageSize;
   mediaType?: GalleryMediaType;  // 'image' by default
-  duration?: number;  // For videos, duration in seconds
+  duration?: number;  // For videos and audio, duration in seconds
   // Database linking for campaign previews
   post_id?: string;
   ad_creative_id?: string;
