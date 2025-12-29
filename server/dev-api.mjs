@@ -780,6 +780,8 @@ app.post("/api/db/gallery", async (req, res) => {
     req.body.user_id,
     "source:",
     req.body.source,
+    "media_type:",
+    req.body.media_type,
   );
   try {
     const sql = getSql();
@@ -795,6 +797,10 @@ app.post("/api/db/gallery", async (req, res) => {
       post_id,
       ad_creative_id,
       video_script_id,
+      is_style_reference,
+      style_reference_name,
+      media_type,
+      duration,
     } = req.body;
 
     if (!user_id || !src_url || !source || !model) {
@@ -847,10 +853,13 @@ app.post("/api/db/gallery", async (req, res) => {
 
     const result = await sql`
       INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, source, model, aspect_ratio, image_size,
-                                  post_id, ad_creative_id, video_script_id)
+                                  post_id, ad_creative_id, video_script_id, is_style_reference, style_reference_name,
+                                  media_type, duration)
       VALUES (${resolvedUserId}, ${organization_id || null}, ${src_url}, ${prompt || null}, ${source}, ${model},
               ${aspect_ratio || null}, ${image_size || null},
-              ${post_id || null}, ${ad_creative_id || null}, ${video_script_id || null})
+              ${post_id || null}, ${ad_creative_id || null}, ${video_script_id || null},
+              ${is_style_reference || false}, ${style_reference_name || null},
+              ${media_type || 'image'}, ${duration || null})
       RETURNING *
     `;
 

@@ -276,6 +276,8 @@ function AppContent() {
       prompt: img.prompt || undefined,
       source: img.source as GalleryImage["source"],
       model: img.model as GalleryImage["model"],
+      mediaType: (img.media_type as GalleryImage["mediaType"]) || "image",
+      duration: img.duration || undefined,
     }));
 
   const scheduledPosts: ScheduledPost[] = (swrScheduledPosts || [])
@@ -478,6 +480,8 @@ function AppContent() {
             ad_creative_id: image.ad_creative_id,
             video_script_id: image.video_script_id,
             organization_id: organizationId,
+            media_type: image.mediaType,
+            duration: image.duration,
           });
           // Replace temp image with the real database image
           swrRemoveGalleryImage(tempId);

@@ -366,20 +366,26 @@ export const concatenateVideos = async (
 
       // Build the audio filter with delay and volume
       // adelay: delay audio by X ms (only for positive offset)
+      // Use adelay=delays:all=1 format which works for any number of channels (mono or stereo)
       // volume: adjust volume
-      const delayMs = Math.max(0, audioTrack.offsetMs);
-      const audioFilter = `adelay=${delayMs}|${delayMs},volume=${audioTrack.volume}`;
+      // Ensure offsetMs is a valid number, default to 0 if NaN/undefined
+      const safeOffsetMs = Number.isFinite(audioTrack.offsetMs) ? audioTrack.offsetMs : 0;
+      const delayMs = Math.max(0, Math.round(safeOffsetMs));
+      const safeVolume = Number.isFinite(audioTrack.volume) ? audioTrack.volume : 1;
+      const audioFilter = `adelay=${delayMs}:all=1,volume=${safeVolume}`;
+
+      console.log('[FFmpeg] Audio mixing params - offsetMs:', audioTrack.offsetMs, '-> delayMs:', delayMs, 'volume:', safeVolume);
 
       try {
         // Mix audio: replace original audio with our narration
         // If offset is negative, we need to trim the start of the audio
-        if (audioTrack.offsetMs < 0) {
+        if (safeOffsetMs < 0) {
           // Negative offset: skip start of audio
-          const skipSec = Math.abs(offsetSec);
+          const skipSec = Math.abs(safeOffsetMs / 1000);
           await ffmpeg.exec([
             '-i', outputFilename,
             '-i', audioFilename,
-            '-filter_complex', `[1:a]atrim=start=${skipSec},asetpts=PTS-STARTPTS,volume=${audioTrack.volume}[audio];[0:a][audio]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
+            '-filter_complex', `[1:a]atrim=start=${skipSec},asetpts=PTS-STARTPTS,volume=${safeVolume}[audio];[0:a][audio]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
             '-map', '0:v',
             '-map', '[aout]',
             '-c:v', 'copy',
@@ -400,14 +406,31 @@ export const concatenateVideos = async (
           ]);
         }
 
-        // Cleanup intermediate files
-        await ffmpeg.deleteFile(outputFilename);
-        await ffmpeg.deleteFile(audioFilename);
-        finalOutputFilename = audioWithMixFilename;
+        // Verify the output file was created successfully before cleaning up
+        try {
+          const mixedOutputData = await ffmpeg.readFile(audioWithMixFilename);
+          if (mixedOutputData && mixedOutputData instanceof Uint8Array && mixedOutputData.length > 0) {
+            // Success! Cleanup intermediate files and use the mixed output
+            console.log('[FFmpeg] Audio mixing successful, output size:', mixedOutputData.length);
+            await ffmpeg.deleteFile(outputFilename);
+            await ffmpeg.deleteFile(audioFilename);
+            finalOutputFilename = audioWithMixFilename;
+          } else {
+            throw new Error('Mixed output file is empty');
+          }
+        } catch (verifyError) {
+          console.warn('[FFmpeg] Audio mix output verification failed, using video without mixed audio:', verifyError);
+          // Cleanup failed audio files
+          try { await ffmpeg.deleteFile(audioFilename); } catch { /* ignore */ }
+          try { await ffmpeg.deleteFile(audioWithMixFilename); } catch { /* ignore */ }
+          // Keep using original output
+        }
       } catch (audioError) {
-        console.warn('Audio mixing failed, using video without mixed audio:', audioError);
+        console.warn('[FFmpeg] Audio mixing failed, using video without mixed audio:', audioError);
         // Keep using the original output without mixed audio
-        await ffmpeg.deleteFile(audioFilename);
+        try {
+          await ffmpeg.deleteFile(audioFilename);
+        } catch { /* ignore cleanup errors */ }
       }
     }
 
@@ -417,7 +440,15 @@ export const concatenateVideos = async (
       message: 'Finalizando...',
     });
 
+    // Read the final output file
+    console.log('[FFmpeg] Reading final output file:', finalOutputFilename);
     const outputData = await ffmpeg.readFile(finalOutputFilename);
+
+    // Validate output data
+    if (!outputData || (outputData instanceof Uint8Array && outputData.length === 0)) {
+      throw new Error('FFmpeg produced empty output file');
+    }
+    console.log('[FFmpeg] Output file size:', outputData instanceof Uint8Array ? outputData.length : 'unknown');
 
     // Cleanup
     for (const filename of inputFilenames) {

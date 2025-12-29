@@ -212,6 +212,8 @@ export async function createGalleryImage(
     ad_creative_id?: string;
     video_script_id?: string;
     organization_id?: string | null;
+    media_type?: string;
+    duration?: number;
   },
 ): Promise<DbGalleryImage> {
   return fetchApi<DbGalleryImage>("/gallery", {
@@ -551,8 +553,17 @@ export async function uploadToBlob(
   filename: string,
   contentType: string,
 ): Promise<UploadResult> {
+  // Validate blob before uploading
+  if (!blob || blob.size === 0) {
+    throw new Error("Cannot upload empty blob");
+  }
+
   // Convert blob to base64
   const arrayBuffer = await blob.arrayBuffer();
+  if (arrayBuffer.byteLength === 0) {
+    throw new Error("Blob contains no data");
+  }
+
   const base64 = btoa(
     new Uint8Array(arrayBuffer).reduce(
       (data, byte) => data + String.fromCharCode(byte),

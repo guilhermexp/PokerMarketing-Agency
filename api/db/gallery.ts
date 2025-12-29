@@ -93,6 +93,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         video_script_id,
         is_style_reference,
         style_reference_name,
+        media_type,
+        duration,
       } = req.body;
 
       if (!user_id || !src_url || !source || !model) {
@@ -111,14 +113,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         INSERT INTO gallery_images (
           user_id, organization_id, src_url, prompt, source, model,
           aspect_ratio, image_size, post_id, ad_creative_id, video_script_id,
-          is_style_reference, style_reference_name
+          is_style_reference, style_reference_name, media_type, duration
         )
         VALUES (
           ${resolvedUserId}, ${organization_id || null}, ${src_url},
           ${prompt || null}, ${source}, ${model}, ${aspect_ratio || null},
           ${image_size || null}, ${post_id || null}, ${ad_creative_id || null},
           ${video_script_id || null}, ${is_style_reference || false},
-          ${style_reference_name || null}
+          ${style_reference_name || null}, ${media_type || 'image'},
+          ${duration || null}
         )
         RETURNING *
       `;
