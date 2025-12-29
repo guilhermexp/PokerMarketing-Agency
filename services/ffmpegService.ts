@@ -33,6 +33,10 @@ export interface VideoInput {
   trimStart?: number;  // Start time in seconds (optional)
   trimEnd?: number;    // End time in seconds (optional)
   mute?: boolean;      // Mute original audio for this clip
+  transitionOut?: {    // Transition to next clip
+    type: string;      // FFmpeg xfade transition type
+    duration: number;  // Transition duration in seconds
+  };
 }
 
 // Singleton FFmpeg instance
@@ -216,6 +220,89 @@ const hasTrimApplied = (videos: VideoInput[]): boolean => {
 };
 
 /**
+ * Check if any video has transitions
+ */
+const hasTransitions = (videos: VideoInput[]): boolean => {
+  return videos.some(v =>
+    v.transitionOut?.type && v.transitionOut.type !== 'none'
+  );
+};
+
+/**
+ * Build filter complex with xfade transitions between clips
+ * Uses FFmpeg xfade filter for smooth video transitions and acrossfade for audio
+ */
+const buildXfadeConcatFilter = (
+  videos: VideoInput[],
+  options: { removeSilence?: boolean } = {}
+): { filterComplex: string; videoOutput: string; audioOutput: string } => {
+  if (videos.length === 0) {
+    return { filterComplex: '', videoOutput: '', audioOutput: '' };
+  }
+
+  if (videos.length === 1) {
+    return buildTrimConcatFilter(videos, options);
+  }
+
+  const parts: string[] = [];
+
+  // Step 1: Apply trim to each video and prepare streams
+  videos.forEach((video, i) => {
+    const start = video.trimStart ?? 0;
+    const end = video.trimEnd ?? video.duration;
+    const isMuted = !!video.mute;
+    const silenceFilter = options.removeSilence
+      ? ',silenceremove=start_periods=1:start_duration=0.2:start_threshold=-45dB:stop_periods=1:stop_duration=0.2:stop_threshold=-45dB'
+      : '';
+
+    // Video: trim, reset PTS, ensure yuv420p format
+    parts.push(`[${i}:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS,format=yuv420p[v${i}]`);
+    // Audio: trim, reset PTS, apply volume/silence filters
+    parts.push(`[${i}:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS${isMuted ? ',volume=0' : ''}${silenceFilter}[a${i}]`);
+  });
+
+  // Step 2: Chain xfade filters for video
+  // FFmpeg xfade needs cumulative offset calculation
+  let cumulativeOffset = 0;
+
+  for (let i = 0; i < videos.length - 1; i++) {
+    const video = videos[i];
+    const clipDuration = (video.trimEnd ?? video.duration) - (video.trimStart ?? 0);
+    const transition = video.transitionOut;
+
+    // Default to fade if no transition specified
+    const transitionType = transition?.type || 'fade';
+    const transitionDuration = transition?.duration || CROSSFADE_DURATION;
+
+    // xfade offset is when the transition starts
+    // For first transition: clip0_duration - transition_duration
+    // For subsequent: previous_offset + clip_duration - transition_duration
+    const offset = cumulativeOffset + clipDuration - transitionDuration;
+
+    // Input labels: first uses [v0], subsequent use previous output
+    const inLabel = i === 0 ? '[v0]' : `[vt${i - 1}]`;
+    // Output labels: last outputs [vfinal], others output [vtN]
+    const outLabel = i === videos.length - 2 ? '[vfinal]' : `[vt${i}]`;
+
+    parts.push(`${inLabel}[v${i + 1}]xfade=transition=${transitionType}:duration=${transitionDuration}:offset=${offset.toFixed(3)}${outLabel}`);
+
+    // Audio crossfade with same timing
+    const aInLabel = i === 0 ? '[a0]' : `[at${i - 1}]`;
+    const aOutLabel = i === videos.length - 2 ? '[afinal]' : `[at${i}]`;
+    parts.push(`${aInLabel}[a${i + 1}]acrossfade=d=${transitionDuration}:c1=tri:c2=tri${aOutLabel}`);
+
+    // Update cumulative offset for next iteration
+    cumulativeOffset = offset;
+  }
+
+  return {
+    filterComplex: parts.join(';'),
+    videoOutput: '[vfinal]',
+    audioOutput: '[afinal]',
+  };
+};
+
+/**
  * Concatenate multiple videos into single output with optional audio mixing
  */
 export const concatenateVideos = async (
@@ -282,8 +369,9 @@ export const concatenateVideos = async (
 
     const outputFilename = `output.${outputFormat}`;
 
-    // Check if any trim is applied
+    // Check if any trim is applied or transitions are configured
     const useTrim = hasTrimApplied(sortedVideos) || !!removeSilence;
+    const useTransitions = hasTransitions(sortedVideos);
 
     if (sortedVideos.length === 1 && !useTrim) {
       // Single video without trim: just copy
@@ -293,10 +381,15 @@ export const concatenateVideos = async (
         outputFilename,
       ]);
     } else {
-      // Use trim filter if trim is applied, otherwise use simple concat
-      const { filterComplex, videoOutput, audioOutput } = useTrim
-        ? buildTrimConcatFilter(sortedVideos, { removeSilence })
-        : buildSimpleConcatFilter(sortedVideos.length);
+      // Select filter based on features needed:
+      // 1. With transitions: use xfade filter chain
+      // 2. With trim only: use trim+concat filter
+      // 3. Simple: use basic concat
+      const { filterComplex, videoOutput, audioOutput } = useTransitions
+        ? buildXfadeConcatFilter(sortedVideos, { removeSilence })
+        : useTrim
+          ? buildTrimConcatFilter(sortedVideos, { removeSilence })
+          : buildSimpleConcatFilter(sortedVideos.length);
 
       // Build input arguments
       const inputArgs: string[] = [];

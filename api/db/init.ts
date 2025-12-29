@@ -102,6 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : sql`SELECT * FROM scheduled_posts WHERE user_id = ${resolvedUserId} AND organization_id IS NULL ORDER BY scheduled_timestamp ASC LIMIT 100`,
 
       // 4. Campaigns with counts (optimized single query)
+      // Preview URLs: first try entity tables, then fallback to gallery_images
       isOrgContext
         ? sql`
           SELECT
@@ -109,9 +110,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
             COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
             COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
-            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
-            (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url
+            COALESCE(
+              (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1),
+              (SELECT gi.src_url FROM gallery_images gi
+               INNER JOIN video_clip_scripts vcs ON gi.video_script_id = vcs.id
+               WHERE vcs.campaign_id = c.id AND gi.deleted_at IS NULL AND gi.src_url NOT LIKE 'data:%' AND gi.src_url NOT LIKE 'blob:%'
+               ORDER BY gi.created_at DESC LIMIT 1)
+            ) as clip_preview_url,
+            COALESCE(
+              (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
+              (SELECT gi.src_url FROM gallery_images gi
+               INNER JOIN posts p ON gi.post_id = p.id
+               WHERE p.campaign_id = c.id AND gi.deleted_at IS NULL AND gi.src_url NOT LIKE 'data:%' AND gi.src_url NOT LIKE 'blob:%'
+               ORDER BY gi.created_at DESC LIMIT 1)
+            ) as post_preview_url,
+            COALESCE(
+              (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
+              (SELECT gi.src_url FROM gallery_images gi
+               INNER JOIN ad_creatives ac ON gi.ad_creative_id = ac.id
+               WHERE ac.campaign_id = c.id AND gi.deleted_at IS NULL AND gi.src_url NOT LIKE 'data:%' AND gi.src_url NOT LIKE 'blob:%'
+               ORDER BY gi.created_at DESC LIMIT 1)
+            ) as ad_preview_url
           FROM campaigns c
           WHERE c.organization_id = ${organizationId} AND c.deleted_at IS NULL
           ORDER BY c.created_at DESC
@@ -123,9 +142,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
             COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
             COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
-            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
-            (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url
+            COALESCE(
+              (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1),
+              (SELECT gi.src_url FROM gallery_images gi
+               INNER JOIN video_clip_scripts vcs ON gi.video_script_id = vcs.id
+               WHERE vcs.campaign_id = c.id AND gi.deleted_at IS NULL AND gi.src_url NOT LIKE 'data:%' AND gi.src_url NOT LIKE 'blob:%'
+               ORDER BY gi.created_at DESC LIMIT 1)
+            ) as clip_preview_url,
+            COALESCE(
+              (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
+              (SELECT gi.src_url FROM gallery_images gi
+               INNER JOIN posts p ON gi.post_id = p.id
+               WHERE p.campaign_id = c.id AND gi.deleted_at IS NULL AND gi.src_url NOT LIKE 'data:%' AND gi.src_url NOT LIKE 'blob:%'
+               ORDER BY gi.created_at DESC LIMIT 1)
+            ) as post_preview_url,
+            COALESCE(
+              (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
+              (SELECT gi.src_url FROM gallery_images gi
+               INNER JOIN ad_creatives ac ON gi.ad_creative_id = ac.id
+               WHERE ac.campaign_id = c.id AND gi.deleted_at IS NULL AND gi.src_url NOT LIKE 'data:%' AND gi.src_url NOT LIKE 'blob:%'
+               ORDER BY gi.created_at DESC LIMIT 1)
+            ) as ad_preview_url
           FROM campaigns c
           WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL
           ORDER BY c.created_at DESC

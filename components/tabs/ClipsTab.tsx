@@ -11,7 +11,7 @@ import type {
 import { isFalModel } from "../../types";
 import { Button } from "../common/Button";
 import { Loader } from "../common/Loader";
-import { Icon } from "../common/Icon";
+import { Icon, type IconName } from "../common/Icon";
 import {
   generateImage,
   generateVideo,
@@ -168,6 +168,24 @@ interface SceneReferenceImage {
 
 // --- Video Editor Interfaces ---
 
+// Transition types supported by FFmpeg xfade filter
+type TransitionType =
+  | 'none'
+  | 'fade'
+  | 'dissolve'
+  | 'wiperight'
+  | 'wipeleft'
+  | 'slideright'
+  | 'slideleft'
+  | 'circleopen'
+  | 'circleclose'
+  | 'zoom';
+
+interface ClipTransition {
+  type: TransitionType;
+  duration: number; // 0.3, 0.5, 1, 1.5, 2
+}
+
 interface EditableClip {
   id: string;
   sceneNumber: number;
@@ -177,6 +195,7 @@ interface EditableClip {
   trimEnd: number;
   model?: string;
   muted?: boolean;
+  transitionOut?: ClipTransition; // Transition to the next clip
 }
 
 interface AudioTrack {
@@ -218,10 +237,21 @@ const getClipDuration = (clip: EditableClip): number => {
   return Math.max(0, clip.trimEnd - clip.trimStart);
 };
 
-// Calculate total duration considering both video clips and audio tracks
+// Get effective transition duration (0 if no transition or 'none')
+const getTransitionDuration = (clip: EditableClip): number => {
+  if (!clip.transitionOut || clip.transitionOut.type === 'none') return 0;
+  return clip.transitionOut.duration;
+};
+
+// Calculate total duration considering video clips, audio tracks, and transition overlaps
 const calculateTotalMediaDuration = (clips: EditableClip[], audioTracks: AudioTrack[]): number => {
-  // Video duration: sum of all clip durations
-  const videoDuration = clips.reduce((acc, c) => acc + getClipDuration(c), 0);
+  // Video duration: sum of all clip durations minus transition overlaps
+  let videoDuration = clips.reduce((acc, c) => acc + getClipDuration(c), 0);
+
+  // Subtract overlap from each transition (clips overlap during transition)
+  for (let i = 0; i < clips.length - 1; i++) {
+    videoDuration -= getTransitionDuration(clips[i]);
+  }
 
   // Audio duration: max end position of all audio tracks
   const audioDuration = audioTracks.reduce((maxEnd, track) => {
@@ -248,9 +278,83 @@ const getTimelineOffset = (
   for (let i = 0; i < clipIndex; i++) {
     const c = clips[i];
     offset += getClipDuration(c);
+    // Subtract transition overlap (except for last clip before target)
+    if (i < clipIndex - 1) {
+      offset -= getTransitionDuration(c);
+    }
   }
   return offset;
 };
+
+// CSS styles for real-time transition preview
+const getTransitionStyles = (type: TransitionType, progress: number): {
+  outgoing: React.CSSProperties;
+  incoming: React.CSSProperties;
+} => {
+  const base = { outgoing: {} as React.CSSProperties, incoming: {} as React.CSSProperties };
+
+  switch (type) {
+    case 'fade':
+    case 'dissolve':
+      return {
+        outgoing: { opacity: 1 - progress },
+        incoming: { opacity: progress },
+      };
+    case 'wiperight':
+      return {
+        outgoing: {},
+        incoming: { clipPath: `inset(0 ${100 - progress * 100}% 0 0)` },
+      };
+    case 'wipeleft':
+      return {
+        outgoing: {},
+        incoming: { clipPath: `inset(0 0 0 ${100 - progress * 100}%)` },
+      };
+    case 'slideright':
+      return {
+        outgoing: {},
+        incoming: { transform: `translateX(${(1 - progress) * 100}%)` },
+      };
+    case 'slideleft':
+      return {
+        outgoing: {},
+        incoming: { transform: `translateX(${(1 - progress) * -100}%)` },
+      };
+    case 'circleopen':
+      return {
+        outgoing: {},
+        incoming: { clipPath: `circle(${progress * 75}% at center)` },
+      };
+    case 'circleclose':
+      return {
+        outgoing: {},
+        incoming: { clipPath: `circle(${(1 - progress) * 75}% at center)` },
+      };
+    case 'zoom':
+      return {
+        outgoing: {},
+        incoming: { transform: `scale(${1 + (1 - progress) * 0.5})`, transformOrigin: 'center' },
+      };
+    default:
+      return base;
+  }
+};
+
+// Transition type labels for UI - using IconName for SVG icons
+const TRANSITION_OPTIONS: { type: TransitionType; label: string; icon: IconName }[] = [
+  { type: 'none', label: 'Corte', icon: 'scissors' },
+  { type: 'fade', label: 'Fade', icon: 'moon' },
+  { type: 'dissolve', label: 'Dissolve', icon: 'star' },
+  { type: 'wiperight', label: 'Wipe', icon: 'chevron-right' },
+  { type: 'wipeleft', label: 'Wipe', icon: 'chevron-left' },
+  { type: 'slideright', label: 'Slide', icon: 'arrowRight' },
+  { type: 'slideleft', label: 'Slide', icon: 'arrow-left' },
+  { type: 'circleopen', label: 'Circle', icon: 'sun' },
+  { type: 'circleclose', label: 'Circle', icon: 'eye' },
+  { type: 'zoom', label: 'Zoom', icon: 'search' },
+];
+
+const DURATION_OPTIONS = [0.3, 0.5, 1, 1.5, 2] as const;
 
 // --- Clip Card (Inline with Scenes) ---
 
@@ -377,6 +481,17 @@ const ClipCard: React.FC<ClipCardProps> = ({
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const editorAudioRef = useRef<HTMLAudioElement>(null);
+  const transitionVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Transition editing state
+  const [editingTransitionIndex, setEditingTransitionIndex] = useState<number | null>(null);
+
+  // Real-time transition preview state
+  const [transitionPreview, setTransitionPreview] = useState<{
+    active: boolean;
+    progress: number; // 0-1
+    type: TransitionType;
+  } | null>(null);
 
   useEffect(() => {
     editorStateRef.current = editorState;
@@ -1733,6 +1848,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       trimStart: clip.trimStart,
       trimEnd: clip.trimEnd,
       mute: clip.muted,
+      // Include transition if configured (not 'none')
+      transitionOut: clip.transitionOut?.type && clip.transitionOut.type !== 'none'
+        ? { type: clip.transitionOut.type, duration: clip.transitionOut.duration }
+        : undefined,
     }));
 
     // Clear merged video if exists
@@ -2411,6 +2530,54 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             }
           }
 
+          // Handle Transition Preview (real-time CSS-based transitions)
+          const clipDuration = getClipDuration(activeClip);
+          const transitionDur = getTransitionDuration(activeClip);
+          const nextIndex = activeIndex + 1;
+
+          if (transitionDur > 0 && nextIndex < state.clips.length) {
+            const transitionStartTime = activeClip.trimEnd - transitionDur;
+
+            // Check if we're in the transition zone
+            if (video.currentTime >= transitionStartTime && video.currentTime < activeClip.trimEnd) {
+              const progress = (video.currentTime - transitionStartTime) / transitionDur;
+              const nextClip = state.clips[nextIndex];
+
+              // Preload next video if not already loaded
+              if (transitionVideoRef.current) {
+                const nextVideoUrl = getVideoDisplayUrl(nextClip.videoUrl);
+                if (!transitionVideoRef.current.src || !transitionVideoRef.current.src.includes(nextClip.videoUrl)) {
+                  transitionVideoRef.current.src = nextVideoUrl;
+                  transitionVideoRef.current.currentTime = nextClip.trimStart;
+                  transitionVideoRef.current.muted = true;
+                  transitionVideoRef.current.play().catch(() => {});
+                } else {
+                  // Keep secondary video in sync during transition
+                  const expectedSecondaryTime = nextClip.trimStart + (video.currentTime - transitionStartTime);
+                  if (Math.abs(transitionVideoRef.current.currentTime - expectedSecondaryTime) > 0.1) {
+                    transitionVideoRef.current.currentTime = expectedSecondaryTime;
+                  }
+                  if (transitionVideoRef.current.paused) {
+                    transitionVideoRef.current.play().catch(() => {});
+                  }
+                }
+              }
+
+              // Update transition preview state
+              setTransitionPreview({
+                active: true,
+                progress: Math.min(1, progress),
+                type: activeClip.transitionOut!.type,
+              });
+            } else {
+              // Not in transition zone - clear preview if active
+              setTransitionPreview((prev) => prev?.active ? null : prev);
+            }
+          } else {
+            // No transition configured - ensure preview is cleared
+            setTransitionPreview((prev) => prev?.active ? null : prev);
+          }
+
           // Handle Clip Transition
           if (video.currentTime >= activeClip.trimEnd - 0.05) {
             const nextIndex = activeIndex + 1;
@@ -2437,6 +2604,9 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 video.muted = !!nextClip.muted;
                 void video.play();
               }
+
+              // Clear transition preview when clip changes
+              setTransitionPreview(null);
 
               // Use functional update to ensure we don't lose the playing state
               setEditorState((prev) =>
@@ -2975,37 +3145,53 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   </div>
                 </div>
               ) : (
-                <div className="aspect-[9/16] h-full max-h-[400px] bg-[#0a0a0a] rounded-xl overflow-hidden border border-white/10">
+                <div className="aspect-[9/16] h-full max-h-[400px] bg-[#0a0a0a] rounded-xl overflow-hidden border border-white/10 relative">
                   {editorState.clips.length > 0 && (
-                    <video
-                      ref={editorVideoRef}
-                      src={
-                        selectedEditorClip?.videoUrl
-                          ? getVideoDisplayUrl(selectedEditorClip.videoUrl)
-                          : undefined
-                      }
-                      className="w-full h-full object-cover"
-                      controls
-                      crossOrigin="anonymous"
-                      muted={!!selectedEditorClip?.muted}
-                      onLoadedMetadata={() => {
-                        // Seek to trimStart when video loads
-                        if (editorVideoRef.current && selectedEditorClip) {
-                          editorVideoRef.current.currentTime = selectedEditorClip.trimStart;
+                    <>
+                      {/* Primary video - outgoing during transition */}
+                      <video
+                        ref={editorVideoRef}
+                        src={
+                          selectedEditorClip?.videoUrl
+                            ? getVideoDisplayUrl(selectedEditorClip.videoUrl)
+                            : undefined
                         }
-                      }}
-                      onPlay={() => {
-                        // Only update state, don't auto-start audio here
-                        // Audio sync is handled in the animation loop based on playMode
-                      }}
-                      onPause={() => {
-                        // Only pause audio if we're in 'all' mode (video+audio sync)
-                        // In 'video' mode, audio should already be paused
-                        if (editorState.playMode === 'all' && editorAudioRef.current) {
-                          editorAudioRef.current.pause();
-                        }
-                      }}
-                    />
+                        className="w-full h-full object-cover"
+                        style={transitionPreview?.active
+                          ? { ...getTransitionStyles(transitionPreview.type, transitionPreview.progress).outgoing, position: 'relative', zIndex: 1 }
+                          : undefined}
+                        controls={!transitionPreview?.active}
+                        crossOrigin="anonymous"
+                        muted={!!selectedEditorClip?.muted}
+                        onLoadedMetadata={() => {
+                          // Seek to trimStart when video loads
+                          if (editorVideoRef.current && selectedEditorClip) {
+                            editorVideoRef.current.currentTime = selectedEditorClip.trimStart;
+                          }
+                        }}
+                        onPlay={() => {
+                          // Only update state, don't auto-start audio here
+                          // Audio sync is handled in the animation loop based on playMode
+                        }}
+                        onPause={() => {
+                          // Only pause audio if we're in 'all' mode (video+audio sync)
+                          // In 'video' mode, audio should already be paused
+                          if (editorState.playMode === 'all' && editorAudioRef.current) {
+                            editorAudioRef.current.pause();
+                          }
+                        }}
+                      />
+                      {/* Secondary video - incoming during transition (overlay) */}
+                      {transitionPreview?.active && (
+                        <video
+                          ref={transitionVideoRef}
+                          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                          style={{ ...getTransitionStyles(transitionPreview.type, transitionPreview.progress).incoming, zIndex: 2 }}
+                          crossOrigin="anonymous"
+                          muted
+                        />
+                      )}
+                    </>
                   )}
                   {/* Hidden audio element for audio tracks */}
                   {editorState.audioTracks.length > 0 && (
@@ -3206,9 +3392,41 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                               </>
                             )}
 
-                            {/* Clip divider line */}
+                            {/* Transition divider - clickable to add/edit transition */}
                             {idx < editorState.clips.length - 1 && (
-                              <div className="absolute right-0 top-0 bottom-0 w-px bg-white/30" />
+                              <div
+                                className="absolute -right-3 top-0 bottom-0 w-6 flex items-center justify-center cursor-pointer group z-20"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingTransitionIndex(idx);
+                                }}
+                                title={clip.transitionOut?.type && clip.transitionOut.type !== 'none'
+                                  ? `${clip.transitionOut.type} (${clip.transitionOut.duration}s) - Clique para editar`
+                                  : 'Adicionar transição'}
+                              >
+                                {/* Vertical line */}
+                                <div className={`absolute w-px h-full ${
+                                  clip.transitionOut?.type && clip.transitionOut.type !== 'none'
+                                    ? 'bg-green-500'
+                                    : 'bg-white/30'
+                                }`} />
+                                {/* Transition indicator button */}
+                                <div className={`relative w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                                  clip.transitionOut?.type && clip.transitionOut.type !== 'none'
+                                    ? 'bg-green-500 text-black'
+                                    : 'bg-white/10 text-white/50 opacity-0 group-hover:opacity-100'
+                                }`}>
+                                  {clip.transitionOut?.type && clip.transitionOut.type !== 'none'
+                                    ? <Icon name={TRANSITION_OPTIONS.find(t => t.type === clip.transitionOut?.type)?.icon || 'chevron-right'} className="w-3 h-3" />
+                                    : <Icon name="plus" className="w-2.5 h-2.5" />}
+                                </div>
+                                {/* Duration badge */}
+                                {clip.transitionOut?.type && clip.transitionOut.type !== 'none' && (
+                                  <div className="absolute -bottom-3 text-[7px] text-green-500/80 whitespace-nowrap">
+                                    {clip.transitionOut.duration}s
+                                  </div>
+                                )}
+                              </div>
                             )}
 
                             {/* Duration badge */}
@@ -4242,6 +4460,146 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             </div>
             <div className="px-4 py-3 border-t border-white/5 flex justify-end">
               <Button size="small" onClick={() => setShowAddClipModal(false)}>
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transition Picker Modal */}
+      {editingTransitionIndex !== null && editorState && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setEditingTransitionIndex(null)}
+        >
+          <div
+            className="bg-[#0a0a0a] border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <span className="text-xs">↔</span>
+                </div>
+                <h3 className="text-xs font-black text-white uppercase tracking-wide">
+                  Transição
+                </h3>
+              </div>
+              <button
+                onClick={() => setEditingTransitionIndex(null)}
+                className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+              >
+                <Icon name="x" className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="p-4">
+              {/* Current clip info */}
+              <p className="text-xs text-white/50 mb-4">
+                Entre cena {editorState.clips[editingTransitionIndex]?.sceneNumber} e cena {editorState.clips[editingTransitionIndex + 1]?.sceneNumber}
+              </p>
+
+              {/* Transition type grid */}
+              <div className="grid grid-cols-5 gap-2 mb-4">
+                {TRANSITION_OPTIONS.map((option) => {
+                  const currentTransition = editorState.clips[editingTransitionIndex]?.transitionOut;
+                  const isSelected = currentTransition?.type === option.type ||
+                    (!currentTransition && option.type === 'none');
+
+                  return (
+                    <button
+                      key={option.type}
+                      onClick={() => {
+                        setEditorState((prev) => {
+                          if (!prev) return prev;
+                          const newClips = [...prev.clips];
+                          if (option.type === 'none') {
+                            // Remove transition
+                            newClips[editingTransitionIndex] = {
+                              ...newClips[editingTransitionIndex],
+                              transitionOut: undefined,
+                            };
+                          } else {
+                            // Set transition with current or default duration
+                            const currentDuration = newClips[editingTransitionIndex].transitionOut?.duration || 0.5;
+                            newClips[editingTransitionIndex] = {
+                              ...newClips[editingTransitionIndex],
+                              transitionOut: {
+                                type: option.type,
+                                duration: currentDuration,
+                              },
+                            };
+                          }
+                          return {
+                            ...prev,
+                            clips: newClips,
+                            totalDuration: calculateTotalMediaDuration(newClips, prev.audioTracks),
+                          };
+                        });
+                      }}
+                      className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${
+                        isSelected
+                          ? 'bg-green-500 text-black'
+                          : 'bg-white/5 hover:bg-white/10 text-white/70 hover:text-white'
+                      }`}
+                      title={option.label}
+                    >
+                      <Icon name={option.icon} className="w-5 h-5" />
+                      <span className="text-[8px] font-medium truncate w-full text-center">
+                        {option.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Duration selector - only show if a transition is selected */}
+              {editorState.clips[editingTransitionIndex]?.transitionOut?.type &&
+                editorState.clips[editingTransitionIndex]?.transitionOut?.type !== 'none' && (
+                <div className="mb-4">
+                  <p className="text-xs text-white/50 mb-2">Duração</p>
+                  <div className="flex gap-2">
+                    {DURATION_OPTIONS.map((duration) => {
+                      const isSelected = editorState.clips[editingTransitionIndex]?.transitionOut?.duration === duration;
+                      return (
+                        <button
+                          key={duration}
+                          onClick={() => {
+                            setEditorState((prev) => {
+                              if (!prev) return prev;
+                              const newClips = [...prev.clips];
+                              if (newClips[editingTransitionIndex].transitionOut) {
+                                newClips[editingTransitionIndex] = {
+                                  ...newClips[editingTransitionIndex],
+                                  transitionOut: {
+                                    ...newClips[editingTransitionIndex].transitionOut!,
+                                    duration,
+                                  },
+                                };
+                              }
+                              return {
+                                ...prev,
+                                clips: newClips,
+                                totalDuration: calculateTotalMediaDuration(newClips, prev.audioTracks),
+                              };
+                            });
+                          }}
+                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                            isSelected
+                              ? 'bg-green-500 text-black'
+                              : 'bg-white/5 hover:bg-white/10 text-white/70'
+                          }`}
+                        >
+                          {duration}s
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t border-white/5 flex justify-end">
+              <Button size="small" onClick={() => setEditingTransitionIndex(null)}>
                 Fechar
               </Button>
             </div>

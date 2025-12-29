@@ -1431,12 +1431,13 @@ function AppContent() {
   };
 
   // Show loader while:
-  // 1. Initial data is loading
-  // 2. Organization context is not loaded
-  // 3. Brand profile exists in initialData but hasn't been set to local state yet (race condition fix)
+  // 1. Authentication is loading
+  // 2. Initial data is loading
+  // 3. Organization context is not loaded
+  // 4. Brand profile exists in initialData but hasn't been set to local state yet (race condition fix)
   const isBrandProfilePending = !!(initialData?.brandProfile && !brandProfile);
 
-  if (isInitialLoading || !orgLoaded || isBrandProfilePending)
+  if (authLoading || isInitialLoading || !orgLoaded || isBrandProfilePending)
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <Loader className="h-16 w-16" />
