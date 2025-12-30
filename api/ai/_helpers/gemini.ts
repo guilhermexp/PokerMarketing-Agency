@@ -229,7 +229,7 @@ export const generateStructuredContent = async (
     config: {
       responseMimeType: 'application/json',
       responseSchema,
-      generationConfig: { temperature },
+      temperature,
     },
   });
 

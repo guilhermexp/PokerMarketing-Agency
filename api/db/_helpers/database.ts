@@ -80,5 +80,6 @@ export async function validateUser(
     LIMIT 1
   `;
 
-  return result[0] || null;
+  if (!result[0]) return null;
+  return { id: result[0].id as string, email: result[0].email as string };
 }

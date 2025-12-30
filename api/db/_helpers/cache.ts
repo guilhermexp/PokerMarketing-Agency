@@ -50,7 +50,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
   if (!redis) return null;
 
   try {
-    return await redis.get<T>(key);
+    return await redis.get(key) as T | null;
   } catch (error) {
     console.warn('[Cache] Get failed:', error);
     return null;

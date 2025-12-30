@@ -184,7 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Invalid signature' });
   }
 
-  if (!DATABASE_URL || !GEMINI_API_KEY) {
+  if (!process.env.DATABASE_URL || !GEMINI_API_KEY) {
     return res.status(500).json({ error: 'Server configuration missing' });
   }
 

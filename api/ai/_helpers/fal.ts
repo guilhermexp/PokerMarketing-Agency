@@ -30,7 +30,7 @@ export const generateSora2Video = async (
   prompt: string,
   aspectRatio: '16:9' | '9:16',
   imageUrl?: string,
-  duration: 4 | 8 | 12 = 12
+  duration: number = 12
 ): Promise<string> => {
   configureFal();
 
@@ -46,7 +46,7 @@ export const generateSora2Video = async (
         image_url: imageUrl,
         resolution: '720p',
         aspect_ratio: aspectRatio,
-        duration,
+        duration: duration as any,
         delete_video: false,
       },
       logs: true,
@@ -62,7 +62,7 @@ export const generateSora2Video = async (
         prompt,
         resolution: '720p',
         aspect_ratio: aspectRatio,
-        duration,
+        duration: duration as any,
         delete_video: false,
       },
       logs: true,

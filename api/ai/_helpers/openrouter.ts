@@ -29,7 +29,7 @@ export const generateTextWithOpenRouter = async (
 ): Promise<string> => {
   const openrouter = getOpenRouter();
 
-  const response = await openrouter.chat.completions.create({
+  const response = await (openrouter.chat as any).completions.create({
     model,
     messages: [
       { role: 'system', content: systemPrompt },
@@ -71,7 +71,7 @@ export const generateTextWithOpenRouterVision = async (
     });
   }
 
-  const response = await openrouter.chat.completions.create({
+  const response = await (openrouter.chat as any).completions.create({
     model,
     messages: [{ role: 'user', content }],
     response_format: { type: 'json_object' },

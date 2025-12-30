@@ -84,111 +84,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const limitNum = parseInt(limit as string);
       const offsetNum = parseInt(offset as string);
 
-      // Query with counts and preview images
-      // Preview images come from gallery_images linked via post_id, ad_creative_id, video_script_id
-      // OR from the entity tables themselves if image_url/thumbnail_url is set
-      const baseQuery = `
-        SELECT
-          c.*,
-          COALESCE(clips.count, 0) as clips_count,
-          COALESCE(posts.count, 0) as posts_count,
-          COALESCE(ads.count, 0) as ads_count,
-          COALESCE(clips.preview_url, clip_gallery.preview_url) as clip_preview_url,
-          COALESCE(posts.preview_url, post_gallery.preview_url) as post_preview_url,
-          COALESCE(ads.preview_url, ad_gallery.preview_url) as ad_preview_url,
-          posts.breakdown as posts_breakdown,
-          ads.breakdown as ads_breakdown
-        FROM campaigns c
-        LEFT JOIN (
-          SELECT
-            campaign_id,
-            COUNT(*) as count,
-            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = v.campaign_id AND thumbnail_url IS NOT NULL LIMIT 1) as preview_url
-          FROM video_clip_scripts v
-          GROUP BY campaign_id
-        ) clips ON clips.campaign_id = c.id
-        LEFT JOIN (
-          SELECT
-            campaign_id,
-            COUNT(*) as count,
-            (SELECT image_url FROM posts WHERE campaign_id = p.campaign_id AND image_url IS NOT NULL LIMIT 1) as preview_url,
-            jsonb_object_agg(platform, platform_count) as breakdown
-          FROM (
-            SELECT campaign_id, platform, COUNT(*) as platform_count
-            FROM posts
-            GROUP BY campaign_id, platform
-          ) p
-          GROUP BY campaign_id
-        ) posts ON posts.campaign_id = c.id
-        LEFT JOIN (
-          SELECT
-            campaign_id,
-            COUNT(*) as count,
-            (SELECT image_url FROM ad_creatives WHERE campaign_id = a.campaign_id AND image_url IS NOT NULL LIMIT 1) as preview_url,
-            jsonb_object_agg(platform, platform_count) as breakdown
-          FROM (
-            SELECT campaign_id, platform, COUNT(*) as platform_count
-            FROM ad_creatives
-            GROUP BY campaign_id, platform
-          ) a
-          GROUP BY campaign_id
-        ) ads ON ads.campaign_id = c.id
-        -- Fallback: get preview from gallery_images linked to entities
-        LEFT JOIN LATERAL (
-          SELECT gi.src_url as preview_url
-          FROM gallery_images gi
-          INNER JOIN video_clip_scripts vcs ON gi.video_script_id = vcs.id
-          WHERE vcs.campaign_id = c.id AND gi.deleted_at IS NULL
-          ORDER BY gi.created_at DESC
-          LIMIT 1
-        ) clip_gallery ON true
-        LEFT JOIN LATERAL (
-          SELECT gi.src_url as preview_url
-          FROM gallery_images gi
-          INNER JOIN posts p ON gi.post_id = p.id
-          WHERE p.campaign_id = c.id AND gi.deleted_at IS NULL
-          ORDER BY gi.created_at DESC
-          LIMIT 1
-        ) post_gallery ON true
-        LEFT JOIN LATERAL (
-          SELECT gi.src_url as preview_url
-          FROM gallery_images gi
-          INNER JOIN ad_creatives ac ON gi.ad_creative_id = ac.id
-          WHERE ac.campaign_id = c.id AND gi.deleted_at IS NULL
-          ORDER BY gi.created_at DESC
-          LIMIT 1
-        ) ad_gallery ON true
-      `;
-
+      // Query with counts and preview images using template literals
       let result;
 
       if (isOrgContext) {
         if (status) {
-          result = await sql(
-            baseQuery +
-              ` WHERE c.organization_id = $1 AND c.deleted_at IS NULL AND c.status = $2 ORDER BY c.created_at DESC LIMIT $3 OFFSET $4`,
-            [organization_id as string, status as string, limitNum, offsetNum]
-          );
+          result = await sql`
+            SELECT
+              c.*,
+              COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
+              COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
+              COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
+              (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
+              (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL LIMIT 1) as post_preview_url,
+              (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL LIMIT 1) as ad_preview_url
+            FROM campaigns c
+            WHERE c.organization_id = ${organization_id as string} AND c.deleted_at IS NULL AND c.status = ${status as string}
+            ORDER BY c.created_at DESC
+            LIMIT ${limitNum} OFFSET ${offsetNum}
+          `;
         } else {
-          result = await sql(
-            baseQuery +
-              ` WHERE c.organization_id = $1 AND c.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT $2 OFFSET $3`,
-            [organization_id as string, limitNum, offsetNum]
-          );
+          result = await sql`
+            SELECT
+              c.*,
+              COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
+              COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
+              COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
+              (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
+              (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL LIMIT 1) as post_preview_url,
+              (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL LIMIT 1) as ad_preview_url
+            FROM campaigns c
+            WHERE c.organization_id = ${organization_id as string} AND c.deleted_at IS NULL
+            ORDER BY c.created_at DESC
+            LIMIT ${limitNum} OFFSET ${offsetNum}
+          `;
         }
       } else {
         if (status) {
-          result = await sql(
-            baseQuery +
-              ` WHERE c.user_id = $1 AND c.organization_id IS NULL AND c.deleted_at IS NULL AND c.status = $2 ORDER BY c.created_at DESC LIMIT $3 OFFSET $4`,
-            [resolvedUserId, status as string, limitNum, offsetNum]
-          );
+          result = await sql`
+            SELECT
+              c.*,
+              COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
+              COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
+              COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
+              (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
+              (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL LIMIT 1) as post_preview_url,
+              (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL LIMIT 1) as ad_preview_url
+            FROM campaigns c
+            WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL AND c.status = ${status as string}
+            ORDER BY c.created_at DESC
+            LIMIT ${limitNum} OFFSET ${offsetNum}
+          `;
         } else {
-          result = await sql(
-            baseQuery +
-              ` WHERE c.user_id = $1 AND c.organization_id IS NULL AND c.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT $2 OFFSET $3`,
-            [resolvedUserId, limitNum, offsetNum]
-          );
+          result = await sql`
+            SELECT
+              c.*,
+              COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
+              COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
+              COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
+              (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
+              (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL LIMIT 1) as post_preview_url,
+              (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL LIMIT 1) as ad_preview_url
+            FROM campaigns c
+            WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL
+            ORDER BY c.created_at DESC
+            LIMIT ${limitNum} OFFSET ${offsetNum}
+          `;
         }
       }
 

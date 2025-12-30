@@ -65,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (model === 'sora-2') {
       // Sora 2 - always use 12 seconds for best quality
-      const duration = 12;
+      const duration: number = 12;
 
       let result: FalVideoResponse;
 
@@ -77,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             image_url: imageUrl,
             resolution: '720p',
             aspect_ratio: aspectRatio,
-            duration,
+            duration: duration as any,
             delete_video: false,
           },
           logs: true,
@@ -89,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             prompt,
             resolution: '720p',
             aspect_ratio: aspectRatio,
-            duration,
+            duration: duration as any,
             delete_video: false,
           },
           logs: true,
