@@ -278,6 +278,10 @@ function AppContent() {
       model: img.model as GalleryImage["model"],
       mediaType: (img.media_type as GalleryImage["mediaType"]) || "image",
       duration: img.duration || undefined,
+      // Campaign linking fields
+      post_id: img.post_id || undefined,
+      ad_creative_id: img.ad_creative_id || undefined,
+      video_script_id: img.video_script_id || undefined,
     }));
 
   const scheduledPosts: ScheduledPost[] = (swrScheduledPosts || [])
@@ -388,6 +392,7 @@ function AppContent() {
         logo: dbBrandProfile.logo_url || null,
         primaryColor: dbBrandProfile.primary_color,
         secondaryColor: dbBrandProfile.secondary_color,
+        tertiaryColor: dbBrandProfile.tertiary_color || "",
         toneOfVoice:
           dbBrandProfile.tone_of_voice as BrandProfile["toneOfVoice"],
         toneTargets:
@@ -464,6 +469,12 @@ function AppContent() {
         aspect_ratio: null,
         image_size: null,
         created_at: new Date().toISOString(),
+        // Include linking fields for immediate filtering support
+        post_id: image.post_id || null,
+        ad_creative_id: image.ad_creative_id || null,
+        video_script_id: image.video_script_id || null,
+        media_type: image.mediaType || null,
+        duration: image.duration || null,
       });
 
       (async () => {
@@ -1481,6 +1492,7 @@ function AppContent() {
                   logo_url: p.logo || undefined,
                   primary_color: p.primaryColor,
                   secondary_color: p.secondaryColor,
+                  tertiary_color: p.tertiaryColor,
                   tone_of_voice: p.toneOfVoice,
                   organization_id: organizationId,
                 });
@@ -1523,6 +1535,7 @@ function AppContent() {
                       logo_url: p.logo || undefined,
                       primary_color: p.primaryColor,
                       secondary_color: p.secondaryColor,
+                      tertiary_color: p.tertiaryColor,
                       tone_of_voice: p.toneOfVoice,
                       settings: {
                         ...existingProfile.settings,

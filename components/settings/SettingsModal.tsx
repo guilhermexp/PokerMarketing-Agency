@@ -19,7 +19,7 @@ interface SettingsModalProps {
   onSaveProfile: (profile: BrandProfile) => void;
 }
 
-type Tab = 'brand' | 'team';
+type Tab = 'brand' | 'tone' | 'team';
 
 const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string; dataUrl: string }> =>
   new Promise((resolve, reject) => {
@@ -61,25 +61,25 @@ const ColorWidget: React.FC<{
   name: string;
   isAnalyzing: boolean;
 }> = ({ label, color, onChange, name, isAnalyzing }) => (
-  <div className="bg-[#111111] border border-white/10 p-3 rounded-xl flex items-center justify-between group transition-all hover:border-white/20 w-full overflow-hidden">
-    <div className="flex flex-col min-w-0 flex-1 pr-2">
-      <label className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-1 truncate">{label}</label>
-      <span className={`text-[10px] font-mono text-white/50 group-hover:text-white transition-colors truncate ${isAnalyzing ? 'animate-pulse' : ''}`}>
+  <div className="relative w-full">
+    <label className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2 block">{label}</label>
+    <div className="bg-[#111111] border border-white/10 rounded-xl h-[56px] px-3 flex items-center gap-3 group transition-all hover:border-white/20">
+      <div className="relative w-8 h-8 flex items-center justify-center flex-shrink-0">
+        <input
+          type="color"
+          name={name}
+          value={color}
+          onChange={onChange}
+          className="w-full h-full rounded-lg cursor-pointer bg-transparent border-none p-0 overflow-hidden relative z-10 opacity-0"
+        />
+        <div
+          className="absolute w-8 h-8 rounded-lg pointer-events-none z-0 ring-1 ring-white/10 transition-all"
+          style={{ backgroundColor: color }}
+        />
+      </div>
+      <span className={`text-[11px] font-mono text-white/40 group-hover:text-white/60 transition-colors ${isAnalyzing ? 'animate-pulse' : ''}`}>
         {isAnalyzing ? '...' : color.toUpperCase()}
       </span>
-    </div>
-    <div className="relative w-7 h-7 flex items-center justify-center flex-shrink-0">
-      <input
-        type="color"
-        name={name}
-        value={color}
-        onChange={onChange}
-        className="w-full h-full rounded-lg cursor-pointer bg-transparent border-none p-0 overflow-hidden relative z-10 opacity-0"
-      />
-      <div
-        className="absolute w-6 h-6 rounded-lg pointer-events-none z-0 border border-white/20 shadow-lg transition-all"
-        style={{ backgroundColor: color }}
-      ></div>
     </div>
   </div>
 );
@@ -110,23 +110,23 @@ const CustomSelect: React.FC<{
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-[#111111] border border-white/10 rounded-xl p-3 flex items-center justify-between text-left transition-all hover:border-white/20 outline-none"
+        className="w-full h-[56px] bg-[#111111] border border-white/10 rounded-xl px-3 flex items-center justify-between text-left transition-all hover:border-white/20 outline-none"
       >
         <span className="text-xs font-medium text-white truncate">{value}</span>
         <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} className="w-3 h-3 text-white/30 flex-shrink-0 ml-2" />
       </button>
 
       {isOpen && (
-        <div className="absolute z-[100] bottom-full mb-2 w-full bg-[#151515] border border-white/10 rounded-xl overflow-hidden shadow-xl">
+        <div className="absolute z-[100] bottom-full mb-2 w-full bg-[#0a0a0a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
           {options.map((opt) => (
             <button
               key={opt}
               type="button"
               onClick={() => { onChange(opt); setIsOpen(false); }}
-              className={`w-full px-4 py-2.5 text-left text-xs font-medium transition-colors ${
+              className={`w-full px-3 py-2.5 text-left text-xs font-medium transition-colors ${
                 value === opt
-                  ? 'bg-primary text-black'
-                  : 'text-white/60 hover:bg-white/5 hover:text-white'
+                  ? 'bg-white/10 text-white'
+                  : 'text-white/40 hover:bg-white/5 hover:text-white/70'
               }`}
             >
               {opt}
@@ -147,12 +147,14 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
     logo: brandProfile.logo || null,
     primaryColor: brandProfile.primaryColor || '#FFFFFF',
     secondaryColor: brandProfile.secondaryColor || '#737373',
+    tertiaryColor: brandProfile.tertiaryColor || '',
     toneOfVoice: brandProfile.toneOfVoice || 'Casual',
     toneTargets: brandProfile.toneTargets || defaultToneTargets,
     creativeModel: brandProfile.creativeModel || 'gemini-3-pro',
   });
   const [isAnalyzingLogo, setIsAnalyzingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(brandProfile.logo || null);
+  const [logoMeta, setLogoMeta] = useState<{ type: string; size: string; dimensions?: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Reset profile when brandProfile changes
@@ -163,6 +165,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
       logo: brandProfile.logo || null,
       primaryColor: brandProfile.primaryColor || '#FFFFFF',
       secondaryColor: brandProfile.secondaryColor || '#737373',
+      tertiaryColor: brandProfile.tertiaryColor || '',
       toneOfVoice: brandProfile.toneOfVoice || 'Casual',
       toneTargets: brandProfile.toneTargets || defaultToneTargets,
       creativeModel: brandProfile.creativeModel || 'gemini-3-pro',
@@ -170,20 +173,41 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
     setLogoPreview(brandProfile.logo || null);
   }, [brandProfile]);
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       const file = acceptedFiles[0];
       setProfile((prev) => ({ ...prev, logo: file }));
       setIsAnalyzingLogo(true);
+
+      // Extract file metadata
+      const fileType = file.type.split('/')[1]?.toUpperCase() || 'IMG';
+      const fileSize = formatFileSize(file.size);
+      setLogoMeta({ type: fileType, size: fileSize });
+
       try {
         const { base64, mimeType, dataUrl } = await fileToBase64(file);
         setLogoPreview(dataUrl);
+
+        // Get image dimensions
+        const img = new Image();
+        img.onload = () => {
+          setLogoMeta(prev => prev ? { ...prev, dimensions: `${img.width}×${img.height}` } : null);
+        };
+        img.src = dataUrl;
+
         const colors = await extractColorsFromLogo({ base64, mimeType });
         setProfile((prev) => ({
           ...prev,
           logo: file,
           primaryColor: colors.primaryColor,
-          secondaryColor: colors.secondaryColor,
+          secondaryColor: colors.secondaryColor || prev.secondaryColor,
+          tertiaryColor: colors.tertiaryColor || '', // Empty string if no tertiary color
         }));
       } catch (error) {
         console.error('Failed to extract colors:', error);
@@ -243,6 +267,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'brand', label: 'Marca', icon: 'palette' },
+    { id: 'tone', label: 'Tom', icon: 'sliders' },
     { id: 'team', label: 'Time', icon: 'users' },
   ];
 
@@ -333,9 +358,14 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                       </label>
                       <div
                         {...getRootProps()}
-                        className={`group relative cursor-pointer bg-[#111111] border border-white/10 rounded-xl p-6 h-[160px] flex flex-col items-center justify-center transition-all ${
+                        className={`group relative cursor-pointer border border-white/10 rounded-xl h-[160px] flex flex-col items-center justify-center transition-all overflow-hidden ${
                           isDragActive ? 'border-primary' : 'hover:border-white/20'
                         }`}
+                        style={{
+                          background: logoPreview
+                            ? 'repeating-conic-gradient(#3a3a3a 0% 25%, #252525 0% 50%) 50% / 12px 12px'
+                            : '#111111'
+                        }}
                       >
                         <input {...getInputProps()} />
                         {isAnalyzingLogo && (
@@ -347,11 +377,28 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                           </div>
                         )}
                         {logoPreview ? (
-                          <img
-                            src={logoPreview}
-                            alt="Logo"
-                            className="max-h-24 max-w-full object-contain filter group-hover:scale-105 transition-transform duration-300"
-                          />
+                          <>
+                            {logoMeta && (
+                              <div className="absolute top-2 left-2 flex gap-1.5 z-10">
+                                <span className="px-1.5 py-0.5 bg-black/60 backdrop-blur-sm rounded text-[9px] font-mono text-white/70">
+                                  {logoMeta.type}
+                                </span>
+                                {logoMeta.dimensions && (
+                                  <span className="px-1.5 py-0.5 bg-black/60 backdrop-blur-sm rounded text-[9px] font-mono text-white/70">
+                                    {logoMeta.dimensions}
+                                  </span>
+                                )}
+                                <span className="px-1.5 py-0.5 bg-black/60 backdrop-blur-sm rounded text-[9px] font-mono text-white/70">
+                                  {logoMeta.size}
+                                </span>
+                              </div>
+                            )}
+                            <img
+                              src={logoPreview}
+                              alt="Logo"
+                              className="max-h-36 max-w-[90%] object-contain filter group-hover:scale-105 transition-transform duration-300"
+                            />
+                          </>
                         ) : (
                           <div className="text-center">
                             <div className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center mx-auto mb-3 border border-white/10 group-hover:bg-primary/10 transition-all">
@@ -363,86 +410,31 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                       </div>
                     </div>
 
-                    {/* Technical Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <CustomSelect
-                        label="Tom"
-                        value={profile.toneOfVoice}
-                        options={tones}
-                        onChange={handleToneChange}
-                      />
+                    {/* Colors Grid */}
+                    <div className={`grid gap-3 ${profile.tertiaryColor ? 'grid-cols-3' : 'grid-cols-2'}`}>
                       <ColorWidget
-                        label="Cor Principal"
+                        label="Primária"
                         name="primaryColor"
                         color={profile.primaryColor}
                         onChange={handleChange}
                         isAnalyzing={isAnalyzingLogo}
                       />
                       <ColorWidget
-                        label="Cor Secundária"
+                        label="Secundária"
                         name="secondaryColor"
                         color={profile.secondaryColor}
                         onChange={handleChange}
                         isAnalyzing={isAnalyzingLogo}
                       />
-                    </div>
-
-                    {/* Tone Targets */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
-                        Aplicar Tom em
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {(Object.keys(toneTargetLabels) as ToneTarget[]).map((target) => {
-                          const isActive = (profile.toneTargets || defaultToneTargets).includes(target);
-                          return (
-                            <button
-                              key={target}
-                              type="button"
-                              onClick={() => handleToneTargetToggle(target)}
-                              className={`px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all ${
-                                isActive
-                                  ? 'bg-primary/20 text-primary border border-primary/30'
-                                  : 'bg-white/5 text-white/40 border border-white/10 hover:bg-white/10'
-                              }`}
-                            >
-                              {toneTargetLabels[target]}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Creative Model Selector */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
-                        Modelo Criativo
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {creativeModels.map((model) => {
-                          const isActive = (profile.creativeModel || 'gemini-3-pro') === model.id;
-                          return (
-                            <button
-                              key={model.id}
-                              type="button"
-                              onClick={() => setProfile(p => ({ ...p, creativeModel: model.id }))}
-                              className={`px-3 py-2 rounded-lg text-[10px] font-medium transition-all flex flex-col items-start ${
-                                isActive
-                                  ? 'bg-primary/20 text-primary border border-primary/30'
-                                  : 'bg-white/5 text-white/40 border border-white/10 hover:bg-white/10'
-                              }`}
-                            >
-                              <span className="font-bold">{model.label}</span>
-                              <span className={`text-[8px] ${isActive ? 'text-primary/60' : 'text-white/30'}`}>
-                                {model.provider}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className="text-[9px] text-white/30 mt-2">
-                        Modelo usado para gerar campanhas, posts e prompts de vídeo.
-                      </p>
+                      {profile.tertiaryColor && (
+                        <ColorWidget
+                          label="Terciária"
+                          name="tertiaryColor"
+                          color={profile.tertiaryColor}
+                          onChange={handleChange}
+                          isAnalyzing={isAnalyzingLogo}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -458,6 +450,108 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                   </Button>
                 </div>
               </form>
+            )}
+
+            {activeTab === 'tone' && (
+              <div className="space-y-8 py-2">
+                {/* Tom de Voz */}
+                <div>
+                  <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-3">
+                    Tom de Voz
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {tones.map((tone) => {
+                      const isActive = profile.toneOfVoice === tone;
+                      return (
+                        <button
+                          key={tone}
+                          type="button"
+                          onClick={() => setProfile(p => ({ ...p, toneOfVoice: tone as ToneOfVoice }))}
+                          className={`px-3 py-2.5 rounded-lg text-[10px] font-medium transition-all ${
+                            isActive
+                              ? 'bg-white text-black'
+                              : 'bg-white/[0.03] text-white/40 hover:bg-white/[0.06] hover:text-white/60'
+                          }`}
+                        >
+                          {tone}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Aplicar Tom em */}
+                <div>
+                  <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-3">
+                    Aplicar Tom em
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(Object.keys(toneTargetLabels) as ToneTarget[]).map((target) => {
+                      const isActive = (profile.toneTargets || defaultToneTargets).includes(target);
+                      return (
+                        <button
+                          key={target}
+                          type="button"
+                          onClick={() => handleToneTargetToggle(target)}
+                          className={`px-3 py-1.5 rounded-full text-[10px] font-medium transition-all ${
+                            isActive
+                              ? 'bg-white text-black'
+                              : 'bg-white/[0.03] text-white/30 hover:text-white/50 hover:bg-white/[0.06]'
+                          }`}
+                        >
+                          {toneTargetLabels[target]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Modelo Criativo */}
+                <div>
+                  <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-3">
+                    Modelo Criativo
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {creativeModels.map((model) => {
+                      const isActive = (profile.creativeModel || 'gemini-3-pro') === model.id;
+                      return (
+                        <button
+                          key={model.id}
+                          type="button"
+                          onClick={() => setProfile(p => ({ ...p, creativeModel: model.id }))}
+                          className={`px-4 py-3 rounded-lg text-left transition-all ${
+                            isActive
+                              ? 'bg-white/[0.08] ring-1 ring-white/20'
+                              : 'bg-white/[0.02] hover:bg-white/[0.05]'
+                          }`}
+                        >
+                          <span className={`block text-[11px] font-semibold ${isActive ? 'text-white' : 'text-white/50'}`}>
+                            {model.label}
+                          </span>
+                          <span className={`block text-[9px] mt-0.5 ${isActive ? 'text-white/40' : 'text-white/20'}`}>
+                            {model.provider}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[9px] text-white/20 mt-3">
+                    Modelo usado para gerar campanhas, posts e prompts de vídeo.
+                  </p>
+                </div>
+
+                {/* Save Button */}
+                <div className="pt-4 flex justify-end">
+                  <Button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={isSaving}
+                    variant="primary"
+                  >
+                    {isSaving ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                </div>
+              </div>
             )}
 
             {activeTab === 'team' && (

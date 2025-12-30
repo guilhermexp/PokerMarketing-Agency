@@ -148,9 +148,12 @@ export const UploadForm: React.FC<UploadFormProps> = ({ onGenerate, isGenerating
     <>
       <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in-up">
         {/* Title */}
-        <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight text-center mb-10">
-          O que vamos criar?
-        </h1>
+        <div className="flex items-center justify-center gap-4 mb-10">
+          <img src="/logo-socialab.png" alt="Socialab" className="w-48 h-48 md:w-64 md:h-64 -rotate-12 hover:rotate-0 transition-transform duration-500" />
+          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight">
+            O que vamos criar?
+          </h1>
+        </div>
 
         {/* Main Input Box */}
         <div className="w-full max-w-3xl relative">

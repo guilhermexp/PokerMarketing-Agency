@@ -19,7 +19,7 @@ import {
   convertToJsonPrompt,
   type GenerateVideoResult,
 } from "../../services/geminiService";
-import { generateVideo as generateServerVideo, type ApiVideoModel } from "../../services/apiClient";
+import { generateVideo as generateServerVideo, updateClipThumbnail, type ApiVideoModel } from "../../services/apiClient";
 import { uploadImageToBlob } from "../../services/blobService";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import { ExportVideoModal } from "../common/ExportVideoModal";
@@ -120,6 +120,50 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
+};
+
+// Convert URL (HTTP or data URL) to base64 with mimeType for use as style reference
+const urlToBase64 = async (
+  src: string,
+): Promise<{ base64: string; mimeType: string } | null> => {
+  if (!src) return null;
+
+  // Handle data URLs
+  if (src.startsWith("data:")) {
+    const match = src.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      return { base64: match[2], mimeType: match[1] };
+    }
+    // Fallback for malformed data URLs
+    const parts = src.split(",");
+    return { base64: parts[1] || "", mimeType: "image/png" };
+  }
+
+  // Handle HTTP URLs - fetch and convert to base64
+  try {
+    const response = await fetch(src);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) {
+          resolve({ base64: match[2], mimeType: match[1] });
+        } else {
+          resolve({
+            base64: dataUrl.split(",")[1] || "",
+            mimeType: blob.type || "image/png",
+          });
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error("[urlToBase64] Failed to convert URL:", src, error);
+    return null;
+  }
 };
 
 // --- Component Interfaces ---
@@ -355,6 +399,64 @@ const TRANSITION_OPTIONS: { type: TransitionType; label: string; icon: IconName 
 ];
 
 const DURATION_OPTIONS = [0.3, 0.5, 1, 1.5, 2] as const;
+
+// Helper to find gallery images with fallback for legacy data without video_script_id
+const findGalleryImage = (
+  galleryImages: GalleryImage[] | undefined,
+  clipId: string | undefined,
+  source: string,
+  additionalFilter?: (img: GalleryImage) => boolean,
+): GalleryImage | undefined => {
+  if (!galleryImages || galleryImages.length === 0) return undefined;
+
+  // First try: exact match with video_script_id
+  if (clipId) {
+    const exactMatch = galleryImages.find(
+      (img) =>
+        img.source === source &&
+        img.video_script_id === clipId &&
+        (!additionalFilter || additionalFilter(img)),
+    );
+    if (exactMatch) return exactMatch;
+  }
+
+  // Fallback: legacy data without video_script_id
+  return galleryImages.find(
+    (img) =>
+      img.source === source &&
+      !img.video_script_id &&
+      (!additionalFilter || additionalFilter(img)),
+  );
+};
+
+// Helper to filter gallery images (returns array) with fallback
+const filterGalleryImages = (
+  galleryImages: GalleryImage[] | undefined,
+  clipId: string | undefined,
+  sourceFilter: (source: string) => boolean,
+  additionalFilter?: (img: GalleryImage) => boolean,
+): GalleryImage[] => {
+  if (!galleryImages || galleryImages.length === 0) return [];
+
+  // First try: exact match with video_script_id
+  if (clipId) {
+    const exactMatches = galleryImages.filter(
+      (img) =>
+        sourceFilter(img.source) &&
+        img.video_script_id === clipId &&
+        (!additionalFilter || additionalFilter(img)),
+    );
+    if (exactMatches.length > 0) return exactMatches;
+  }
+
+  // Fallback: legacy data without video_script_id
+  return galleryImages.filter(
+    (img) =>
+      sourceFilter(img.source) &&
+      !img.video_script_id &&
+      (!additionalFilter || additionalFilter(img)),
+  );
+};
 
 // --- Clip Card (Inline with Scenes) ---
 
@@ -753,22 +855,25 @@ const ClipCard: React.FC<ClipCardProps> = ({
     }
   }, [mergedVideoUrl]);
 
-  // Load audio from gallery if available
+  // Load audio from gallery if available (filtered by video_script_id)
   const hasInitializedAudio = useRef(false);
   useEffect(() => {
-    if (hasInitializedAudio.current || !galleryImages) return;
+    if (hasInitializedAudio.current || !galleryImages || !clip.id) return;
 
-    // Find audio in gallery
-    const savedAudio = galleryImages.find(
-      (img) => img.mediaType === "audio" && img.source === "Narração"
+    // Find audio in gallery linked to this specific clip (with fallback for legacy data)
+    const savedAudio = findGalleryImage(
+      galleryImages,
+      clip.id,
+      "Narração",
+      (img) => img.mediaType === "audio",
     );
 
     if (savedAudio?.src) {
       hasInitializedAudio.current = true;
       setAudioState({ url: savedAudio.src, isLoading: false });
-      console.log("[ClipsTab] Loaded audio from gallery:", savedAudio.src);
+      console.log("[ClipsTab] Loaded audio from gallery for clip:", clip.id, savedAudio.src);
     }
-  }, [galleryImages]);
+  }, [galleryImages, clip.id]);
 
   // Auto-switch scene to video when video is generated
   const setSceneSlide = (sceneNumber: number, slide: "image" | "video") => {
@@ -824,23 +929,19 @@ const ClipCard: React.FC<ClipCardProps> = ({
         galleryImages.map((img) => img.source),
       );
       parsedScenes.forEach((scene) => {
-        // Look for videos that match this clip's scene (multiple formats for compatibility)
+        // Look for videos that match this clip's scene (with fallback for legacy data)
         const newSource = `Video-${truncatedTitle}-${scene.sceneNumber}`;
         const oldSourceFull = `Video-${clip.title}-${scene.sceneNumber}`;
-        const sceneVideos = galleryImages.filter(
-          (img) =>
-            img.source === newSource ||
-            img.source === oldSourceFull ||
-            img.source?.startsWith(
-              `Video-${clip.title}-${scene.sceneNumber}-`,
-            ) ||
-            img.source?.startsWith(
-              `Video-${truncatedTitle}-${scene.sceneNumber}-`,
-            ),
-        );
+        const sourceMatches = (source: string) =>
+          source === newSource ||
+          source === oldSourceFull ||
+          source?.startsWith(`Video-${clip.title}-${scene.sceneNumber}-`) ||
+          source?.startsWith(`Video-${truncatedTitle}-${scene.sceneNumber}-`);
+
+        const sceneVideos = filterGalleryImages(galleryImages, clip.id, sourceMatches);
         if (sceneVideos.length > 0) {
           console.log(
-            `[ClipCard] Recovered ${sceneVideos.length} videos for scene ${scene.sceneNumber}:`,
+            `[ClipCard] Recovered ${sceneVideos.length} videos for clip ${clip.id} scene ${scene.sceneNumber}:`,
             sceneVideos.map((v) => v.source),
           );
           initialVideoStates[scene.sceneNumber] = sceneVideos.map((v) => ({
@@ -870,15 +971,14 @@ const ClipCard: React.FC<ClipCardProps> = ({
     scenes.forEach((scene) => {
       const newSource = `Video-${truncatedTitle}-${scene.sceneNumber}`;
       const oldSourceFull = `Video-${clip.title}-${scene.sceneNumber}`;
-      const galleryVideos = galleryImages.filter(
-        (img) =>
-          img.source === newSource ||
-          img.source === oldSourceFull ||
-          img.source?.startsWith(`Video-${clip.title}-${scene.sceneNumber}-`) ||
-          img.source?.startsWith(
-            `Video-${truncatedTitle}-${scene.sceneNumber}-`,
-          ),
-      );
+      // Filter by video_script_id with fallback for legacy data
+      const sourceMatches = (source: string) =>
+        source === newSource ||
+        source === oldSourceFull ||
+        source?.startsWith(`Video-${clip.title}-${scene.sceneNumber}-`) ||
+        source?.startsWith(`Video-${truncatedTitle}-${scene.sceneNumber}-`);
+
+      const galleryVideos = filterGalleryImages(galleryImages, clip.id, sourceMatches);
 
       const currentVideos = videoStates[scene.sceneNumber] || [];
 
@@ -888,7 +988,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
         if (!alreadyInState) {
           hasNewVideos = true;
           console.log(
-            `[ClipCard] Found new video in gallery for scene ${scene.sceneNumber}:`,
+            `[ClipCard] Found new video in gallery for clip ${clip.id} scene ${scene.sceneNumber}:`,
             gv.source,
           );
           setVideoStates((prev) => ({
@@ -917,16 +1017,19 @@ const ClipCard: React.FC<ClipCardProps> = ({
       return;
 
     // Try to recover existing scene images from gallery (only once on mount)
-    if (!hasInitializedSceneImages.current) {
+    // Filter by video_script_id to only load images belonging to this specific clip
+    if (!hasInitializedSceneImages.current && clip.id) {
       hasInitializedSceneImages.current = true;
       const recoveredSceneImages: Record<number, SceneReferenceImage> = {};
       scenes.forEach((scene) => {
-        // Look for an image that matches this clip's scene (both new truncated and old full format)
+        // Look for an image that matches this clip's scene (with fallback for legacy data)
         const newSource = getSceneSource(scene.sceneNumber);
         const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
-        const existingImage = galleryImages.find(
-          (img) => img.source === newSource || img.source === oldSource,
-        );
+        const existingImage = findGalleryImage(
+          galleryImages,
+          clip.id,
+          newSource,
+        ) || findGalleryImage(galleryImages, clip.id, oldSource);
         if (existingImage) {
           // Check if src is HTTP URL or data URL
           const isHttpUrl = existingImage.src.startsWith("http");
@@ -939,13 +1042,14 @@ const ClipCard: React.FC<ClipCardProps> = ({
       });
       if (Object.keys(recoveredSceneImages).length > 0) {
         console.log(
-          "[ClipCard] Recovered scene images:",
+          "[ClipCard] Recovered scene images for clip:",
+          clip.id,
           Object.keys(recoveredSceneImages),
         );
         setSceneImages(recoveredSceneImages);
       }
     }
-  }, [scenes, galleryImages, clip.title]);
+  }, [scenes, galleryImages, clip.title, clip.id]);
 
   // Track trigger changes and auto-generate scene images
   // Initialize to 0 to prevent initial trigger (0 !== undefined would trigger)
@@ -962,16 +1066,17 @@ const ClipCard: React.FC<ClipCardProps> = ({
       prevTriggerRef.current = triggerSceneImageGeneration;
 
       // Check if all scenes already have images (either in state or in gallery)
+      // Filter by video_script_id to only consider images from this specific clip
       const allScenesHaveImages = scenes.every((scene) => {
         // Check state first
         if (sceneImages[scene.sceneNumber]?.dataUrl) return true;
-        // Then check gallery (both new truncated and old full format)
+        // Then check gallery (with fallback for legacy data)
         if (galleryImages && galleryImages.length > 0) {
           const newSource = getSceneSource(scene.sceneNumber);
           const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
-          return galleryImages.some(
-            (img) => img.source === newSource || img.source === oldSource,
-          );
+          const found = findGalleryImage(galleryImages, clip.id, newSource) ||
+                        findGalleryImage(galleryImages, clip.id, oldSource);
+          return !!found;
         }
         return false;
       });
@@ -1215,6 +1320,7 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF (Bebas Neu
             prompt: `[VIDEO:${modelUsed}] ${currentScene.visual}`,
             source: videoSource as any,
             model: "gemini-3-pro-image-preview", // Fallback - DB enum doesn't support video models
+            video_script_id: clip.id, // Link to video_clip_script for campaign filtering
           });
         }
 
@@ -1302,13 +1408,17 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF (Bebas Neu
 
     setIsGeneratingImages(true);
 
-    // Extract base64 from thumbnail for style reference
-    const thumbnailBase64 = thumbnail.src.split(",")[1];
-    const thumbnailMimeType =
-      thumbnail.src.match(/data:(.*?);/)?.[1] || "image/png";
+    // Extract base64 from thumbnail for style reference (handles both data URLs and HTTP URLs)
+    const thumbnailData = await urlToBase64(thumbnail.src);
+    if (!thumbnailData) {
+      console.error("[ClipsTab] Failed to convert thumbnail to base64");
+      alert("Falha ao processar capa. Tente novamente.");
+      setIsGeneratingImages(false);
+      return;
+    }
     const styleRef: ImageFile = {
-      base64: thumbnailBase64,
-      mimeType: thumbnailMimeType,
+      base64: thumbnailData.base64,
+      mimeType: thumbnailData.mimeType,
     };
 
     // Generate image for each scene sequentially
@@ -1316,13 +1426,12 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF (Bebas Neu
       // Skip if scene already has an image in state
       if (sceneImages[scene.sceneNumber]?.dataUrl) continue;
 
-      // Skip if scene already has an image in gallery (both new truncated and old full format)
+      // Skip if scene already has an image in gallery (with fallback for legacy data)
       if (galleryImages && galleryImages.length > 0) {
         const newSource = getSceneSource(scene.sceneNumber);
         const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
-        const existingInGallery = galleryImages.find(
-          (img) => img.source === newSource || img.source === oldSource,
-        );
+        const existingInGallery = findGalleryImage(galleryImages, clip.id, newSource) ||
+                                  findGalleryImage(galleryImages, clip.id, oldSource);
         if (existingInGallery) {
           // Recover from gallery instead of generating
           const isHttpUrl = existingInGallery.src.startsWith("http");
@@ -1374,13 +1483,14 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           },
         }));
 
-        // Save to gallery for persistence
+        // Save to gallery for persistence (linked to clip for filtering)
         if (onAddImageToGallery) {
           onAddImageToGallery({
             src: imageDataUrl,
             prompt: scene.visual,
             source: getSceneSource(scene.sceneNumber),
             model: "gemini-3-pro-image-preview",
+            video_script_id: clip.id, // Link to video_clip_script for campaign filtering
           });
         }
       } catch (err: any) {
@@ -1414,12 +1524,16 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     const scene = scenes.find((s) => s.sceneNumber === sceneNumber);
     if (!scene) return;
 
-    const thumbnailBase64 = thumbnail.src.split(",")[1];
-    const thumbnailMimeType =
-      thumbnail.src.match(/data:(.*?);/)?.[1] || "image/png";
+    // Extract base64 from thumbnail for style reference (handles both data URLs and HTTP URLs)
+    const thumbnailData = await urlToBase64(thumbnail.src);
+    if (!thumbnailData) {
+      console.error("[ClipsTab] Failed to convert thumbnail to base64");
+      alert("Falha ao processar capa. Tente novamente.");
+      return;
+    }
     const styleRef: ImageFile = {
-      base64: thumbnailBase64,
-      mimeType: thumbnailMimeType,
+      base64: thumbnailData.base64,
+      mimeType: thumbnailData.mimeType,
     };
 
     try {
@@ -1450,13 +1564,14 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         [sceneNumber]: { dataUrl: imageDataUrl, httpUrl, isUploading: false },
       }));
 
-      // Save to gallery for persistence
+      // Save to gallery for persistence (linked to clip for filtering)
       if (onAddImageToGallery) {
         onAddImageToGallery({
           src: imageDataUrl,
           prompt: scene.visual,
           source: getSceneSource(sceneNumber),
           model: "gemini-3-pro-image-preview",
+          video_script_id: clip.id, // Link to video_clip_script for campaign filtering
         });
       }
     } catch (err: any) {
@@ -1519,7 +1634,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             audio.src = persistedUrl;
           });
 
-          // Save to gallery for persistence
+          // Save to gallery for persistence (linked to video_script_id for campaign filtering)
           if (onAddImageToGallery) {
             onAddImageToGallery({
               src: persistedUrl,
@@ -1528,9 +1643,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               model: "tts-generation" as any,
               mediaType: "audio",
               duration: audioDuration,
+              video_script_id: clip.id, // Link to video_clip_script for campaign filtering
             });
           }
-          console.log("[ClipsTab] Audio saved to gallery:", persistedUrl);
+          console.log("[ClipsTab] Audio saved to gallery for clip:", clip.id, persistedUrl);
         }
       } catch (uploadErr) {
         console.warn("[ClipsTab] Failed to upload audio, using local URL:", uploadErr);
@@ -1754,10 +1870,13 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       });
     });
 
-    // Add "Video Final" from gallery (exported/concatenated videos)
+    // Add "Video Final" from gallery (exported/concatenated videos for this clip)
     if (galleryImages && galleryImages.length > 0) {
-      const finalVideos = galleryImages.filter(
-        (img) => img.source === "Video Final" && img.src,
+      const finalVideos = filterGalleryImages(
+        galleryImages,
+        clip.id,
+        (source) => source === "Video Final",
+        (img) => !!img.src,
       );
       finalVideos.forEach((finalVideo, idx) => {
         available.push({
@@ -1906,7 +2025,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           `video-final-${Date.now()}.mp4`,
         );
 
-        // Add to gallery as a video
+        // Add to gallery as a video (linked to clip for filtering)
         onAddImageToGallery({
           src: videoUrl,
           prompt: `Video editado com ${editorState.clips.length} cenas`,
@@ -1915,6 +2034,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           mediaType: "video",
           duration: totalDuration,
           aspectRatio: "9:16",
+          video_script_id: clip.id, // Link to video_clip_script for campaign filtering
         });
 
         console.log("[ClipsTab] Video saved to gallery:", videoUrl);
@@ -4641,36 +4761,55 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
 
   const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
 
-  // Initialize thumbnails - try to recover existing ones from gallery
+  // Initialize thumbnails - try to recover existing ones from gallery (filtered by clip id)
   useEffect(() => {
     const length = videoClipScripts.length;
 
-    // Try to find existing thumbnails from gallery
-    const recoveredThumbnails: (GalleryImage | null)[] = videoClipScripts.map(
-      (clip) => {
+    // Try to find existing thumbnails from gallery, but preserve already-set thumbnails
+    setThumbnails((prevThumbnails) => {
+      return videoClipScripts.map((clip, index) => {
+        // If we already have a valid thumbnail for this index, keep it
+        const existingThumbnail = prevThumbnails[index];
+        if (existingThumbnail && existingThumbnail.src) {
+          // Also check if it still matches this clip (for when clips are reordered)
+          if (existingThumbnail.video_script_id === clip.id || existingThumbnail.source === "Clipe") {
+            return existingThumbnail;
+          }
+        }
+
+        // Otherwise, try to recover from gallery
         if (!galleryImages || galleryImages.length === 0) return null;
 
-        // Look for an image that matches this clip's prompt (source: 'Clipe')
-        const existingImage = galleryImages.find(
-          (img) => img.source === "Clipe" && img.prompt === clip.image_prompt,
+        // First try: Look for image with matching video_script_id (new data)
+        if (clip.id) {
+          const exactMatch = galleryImages.find(
+            (img) => img.source === "Clipe" && img.video_script_id === clip.id,
+          );
+          if (exactMatch) return exactMatch;
+        }
+
+        // Fallback: For old data without video_script_id, find any Clipe image
+        // that doesn't have a video_script_id set (legacy data)
+        const legacyMatch = galleryImages.find(
+          (img) => img.source === "Clipe" && !img.video_script_id,
         );
-
-        return existingImage || null;
-      },
-    );
-
-    setThumbnails(recoveredThumbnails);
-    setExtraInstructions(Array(length).fill(""));
-    setGenerationState({
-      isGenerating: Array(length).fill(false),
-      errors: Array(length).fill(null),
+        return legacyMatch || null;
+      });
     });
-    setSceneImageTriggers(Array(length).fill(0));
+
+    setExtraInstructions((prev) => prev.length === length ? prev : Array(length).fill(""));
+    setGenerationState((prev) =>
+      prev.isGenerating.length === length ? prev : {
+        isGenerating: Array(length).fill(false),
+        errors: Array(length).fill(null),
+      }
+    );
+    setSceneImageTriggers((prev) => prev.length === length ? prev : Array(length).fill(0));
   }, [videoClipScripts, galleryImages]);
 
   // Listen for job completions
   useEffect(() => {
-    const unsubComplete = onJobComplete((job: ActiveJob) => {
+    const unsubComplete = onJobComplete(async (job: ActiveJob) => {
       if (job.context?.startsWith("clip-") && job.result_url) {
         const indexMatch = job.context.match(/clip-(\d+)/);
         if (indexMatch) {
@@ -4693,6 +4832,17 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
             newGenerating[index] = false;
             return { ...prev, isGenerating: newGenerating };
           });
+          // Update clip thumbnail_url in database for campaign previews
+          if (clip?.id) {
+            try {
+              await updateClipThumbnail(clip.id, job.result_url);
+            } catch (err) {
+              console.error(
+                "[ClipsTab] Failed to update clip thumbnail in database:",
+                err,
+              );
+            }
+          }
         }
       }
     });
@@ -4814,6 +4964,17 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
         newThumbnails[index] = galleryImage;
         return newThumbnails;
       });
+      // Update clip thumbnail_url in database for campaign previews
+      if (clip.id) {
+        try {
+          await updateClipThumbnail(clip.id, generatedImageUrl);
+        } catch (err) {
+          console.error(
+            "[ClipsTab] Failed to update clip thumbnail in database:",
+            err,
+          );
+        }
+      }
     } catch (err: any) {
       setGenerationState((prev) => {
         const newErrors = [...prev.errors];

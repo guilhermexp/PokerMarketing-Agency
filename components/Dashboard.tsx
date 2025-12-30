@@ -253,18 +253,18 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           {sidebarCollapsed ? (
             <button
               onClick={() => setSidebarCollapsed(false)}
-              className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors"
+              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors overflow-hidden"
             >
-              <Icon name="logo" className="h-4 w-4 text-white/70" />
+              <img src="/icon.png" alt="Socialab" className="h-8 w-8 rounded-lg" />
             </button>
           ) : (
             <>
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 flex-shrink-0">
-                  <Icon name="logo" className="h-3.5 w-3.5 text-white/70" />
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <img src="/icon.png" alt="Socialab" className="h-9 w-9 rounded-xl" />
                 </div>
-                <span className="text-xs font-semibold text-white/80">
-                  Director
+                <span className="text-sm font-semibold text-white/80">
+                  Socialab
                 </span>
               </div>
               <button
@@ -276,32 +276,6 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             </>
           )}
         </div>
-
-        {/* Organization Switcher */}
-        {!sidebarCollapsed && (
-          <div className="px-2 py-2 border-b border-white/[0.04]">
-            <OrganizationSwitcher
-              hidePersonal={false}
-              afterCreateOrganizationUrl="/"
-              afterLeaveOrganizationUrl="/"
-              afterSelectOrganizationUrl="/"
-              appearance={{
-                elements: {
-                  rootBox: "w-full",
-                  organizationSwitcherTrigger:
-                    "w-full flex items-center gap-2 px-2 py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors text-white/70 text-xs",
-                  organizationSwitcherPopoverCard:
-                    "bg-[#0a0a0a] border border-white/10 rounded-xl shadow-2xl",
-                  organizationSwitcherPopoverActions: "bg-[#0a0a0a]",
-                  organizationSwitcherPopoverActionButton:
-                    "text-white/70 hover:bg-white/5",
-                  organizationPreview: "text-white",
-                  organizationSwitcherPopoverFooter: "border-white/10",
-                },
-              }}
-            />
-          </div>
-        )}
 
         {/* Navigation */}
         <nav
@@ -344,10 +318,32 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           />
         </nav>
 
-        {/* Footer - Brand Info & Logout */}
+        {/* Footer */}
         <div
-          className={`${sidebarCollapsed ? "p-2" : "p-2"} border-t border-white/[0.04] space-y-1`}
+          className={`${sidebarCollapsed ? "p-2" : "p-2"} border-t border-white/[0.04] space-y-1.5`}
         >
+          {!sidebarCollapsed && (
+            <OrganizationSwitcher
+              hidePersonal={false}
+              afterCreateOrganizationUrl="/"
+              afterLeaveOrganizationUrl="/"
+              afterSelectOrganizationUrl="/"
+              appearance={{
+                elements: {
+                  rootBox: "w-full",
+                  organizationSwitcherTrigger:
+                    "w-full flex items-center gap-2 px-2 py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors text-white/70 text-xs",
+                  organizationSwitcherPopoverCard:
+                    "bg-[#0a0a0a] border border-white/10 rounded-xl shadow-2xl",
+                  organizationSwitcherPopoverActions: "bg-[#0a0a0a]",
+                  organizationSwitcherPopoverActionButton:
+                    "text-white/70 hover:bg-white/5",
+                  organizationPreview: "text-white",
+                  organizationSwitcherPopoverFooter: "border-white/10",
+                },
+              }}
+            />
+          )}
           {!sidebarCollapsed ? (
             <>
               <button
@@ -423,15 +419,25 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
               />
             )}
             {isGenerating && (
-              <div className="flex flex-col items-center justify-center text-center p-32 aura-card border-white/5 bg-white/[0.01]">
-                <Loader className="h-12 w-12" />
-                <h2 className="text-4xl font-black mt-10 tracking-[-0.05em] uppercase">
-                  Synthesizing Identity
-                </h2>
-                <p className="text-white/40 mt-4 max-w-xs text-xs font-medium tracking-wide">
-                  Autonomous agents are configuring your marketing ecosystem.
-                </p>
-              </div>
+              <>
+                <div className="flex flex-col items-center justify-center text-center p-32 aura-card border-white/5 bg-white/[0.01]">
+                  <p className="text-white/50 text-sm font-medium tracking-wide">criando...</p>
+                  <h2 className="text-4xl font-black mt-4 tracking-[-0.05em] uppercase">
+                    Synthesizing Identity
+                  </h2>
+                  <p className="text-white/40 mt-4 max-w-xs text-xs font-medium tracking-wide">
+                    Autonomous agents are configuring your marketing ecosystem.
+                  </p>
+                </div>
+                <div className="flex justify-center mt-20">
+                  <img
+                    src="/logo-socialab.png"
+                    alt="Socialab"
+                    className="w-48 h-48 md:w-64 md:h-64 animate-spin"
+                    style={{ animationDuration: '8s' }}
+                  />
+                </div>
+              </>
             )}
             {campaign && (
               <div className="animate-fade-in-up space-y-6">

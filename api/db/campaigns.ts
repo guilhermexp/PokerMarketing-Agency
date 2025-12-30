@@ -342,6 +342,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(result[0]);
     }
 
+    // PATCH - Update clip thumbnail_url
+    if (req.method === 'PATCH') {
+      const { clip_id } = req.query;
+      const { thumbnail_url } = req.body;
+
+      if (!clip_id) {
+        return res.status(400).json({ error: 'clip_id is required' });
+      }
+
+      const result = await sql`
+        UPDATE video_clip_scripts
+        SET thumbnail_url = ${thumbnail_url || null},
+            updated_at = NOW()
+        WHERE id = ${clip_id as string}
+        RETURNING *
+      `;
+
+      if (!result[0]) {
+        return res.status(404).json({ error: 'Clip not found' });
+      }
+
+      return res.status(200).json(result[0]);
+    }
+
     // DELETE - Soft delete campaign
     if (req.method === 'DELETE') {
       const { id } = req.query;

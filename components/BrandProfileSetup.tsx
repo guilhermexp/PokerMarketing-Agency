@@ -122,6 +122,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
     logo: existingProfile?.logo || null,
     primaryColor: existingProfile?.primaryColor || '#FFFFFF',
     secondaryColor: existingProfile?.secondaryColor || '#737373',
+    tertiaryColor: existingProfile?.tertiaryColor || '',
     toneOfVoice: existingProfile?.toneOfVoice || 'Casual',
   });
   const [isAnalyzingLogo, setIsAnalyzingLogo] = useState(false);
@@ -140,7 +141,8 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
           ...prev,
           logo: file,
           primaryColor: colors.primaryColor,
-          secondaryColor: colors.secondaryColor,
+          secondaryColor: colors.secondaryColor || prev.secondaryColor,
+          tertiaryColor: colors.tertiaryColor || '',
         }));
       } catch (error) {
         console.error("Failed to extract colors:", error);
@@ -193,7 +195,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                     <div className="w-10 h-10 aura-card flex items-center justify-center border-white/5 bg-white/5">
                         <Icon name="logo" className="w-5 h-5 text-white" />
                     </div>
-                    <span className="text-[10px] font-black tracking-[0.5em] uppercase text-white/40">DirectorAi</span>
+                    <span className="text-[10px] font-black tracking-[0.5em] uppercase text-white/40">Socialab</span>
                 </div>
 
                 <div className="space-y-1 mb-8">
@@ -293,28 +295,37 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                                     </div>
                                 </div>
 
-                                {/* Technical Grid: Refined sm:grid-cols-3 layout with reduced gaps for absolute alignment */}
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                                    <CustomSelect 
-                                      label="Tone" 
-                                      value={profile.toneOfVoice} 
-                                      options={tones} 
-                                      onChange={handleToneChange} 
+                                {/* Technical Grid */}
+                                <div className={`grid grid-cols-2 gap-2.5 ${profile.tertiaryColor ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
+                                    <CustomSelect
+                                      label="Tone"
+                                      value={profile.toneOfVoice}
+                                      options={tones}
+                                      onChange={handleToneChange}
                                     />
-                                    <ColorWidget 
-                                        label="Primary" 
-                                        name="primaryColor" 
-                                        color={profile.primaryColor} 
-                                        onChange={handleChange} 
+                                    <ColorWidget
+                                        label="Primary"
+                                        name="primaryColor"
+                                        color={profile.primaryColor}
+                                        onChange={handleChange}
                                         isAnalyzing={isAnalyzingLogo}
                                     />
-                                    <ColorWidget 
-                                        label="Accent" 
-                                        name="secondaryColor" 
-                                        color={profile.secondaryColor} 
-                                        onChange={handleChange} 
+                                    <ColorWidget
+                                        label="Accent"
+                                        name="secondaryColor"
+                                        color={profile.secondaryColor}
+                                        onChange={handleChange}
                                         isAnalyzing={isAnalyzingLogo}
                                     />
+                                    {profile.tertiaryColor && (
+                                      <ColorWidget
+                                          label="Tertiary"
+                                          name="tertiaryColor"
+                                          color={profile.tertiaryColor}
+                                          onChange={handleChange}
+                                          isAnalyzing={isAnalyzingLogo}
+                                      />
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -334,7 +345,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                 </div>
                 
                 <p className="text-center text-white/10 text-[8px] uppercase font-black tracking-[0.6em] mt-8">
-                    DirectorAi • Integrated Core v2.5
+                    Socialab • Integrated Core v2.5
                 </p>
             </div>
         </div>

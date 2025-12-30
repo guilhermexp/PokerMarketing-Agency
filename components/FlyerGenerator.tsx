@@ -88,6 +88,47 @@ const fileToBase64 = (
     reader.onerror = (error) => reject(error);
   });
 
+// Convert URL (HTTP or data URL) to base64 with mimeType
+const urlToBase64 = async (
+  src: string,
+): Promise<{ base64: string; mimeType: string } | null> => {
+  if (!src) return null;
+
+  // Already a data URL - extract base64
+  if (src.startsWith("data:")) {
+    const match = src.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      return { base64: match[2], mimeType: match[1] };
+    }
+    // Fallback for malformed data URLs
+    const parts = src.split(",");
+    return { base64: parts[1] || "", mimeType: "image/png" };
+  }
+
+  // HTTP URL - fetch and convert to base64
+  try {
+    const response = await fetch(src);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) {
+          resolve({ base64: match[2], mimeType: match[1] });
+        } else {
+          resolve({ base64: dataUrl.split(",")[1] || "", mimeType: blob.type || "image/png" });
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error("[urlToBase64] Failed to convert URL:", src, error);
+    return null;
+  }
+};
+
 const handleDownloadFlyer = (src: string, filename: string) => {
   const link = document.createElement("a");
   link.href = src;
@@ -429,15 +470,12 @@ const TournamentEventCard: React.FC<{
     setGeneratedFlyers((prev) => ["loading", ...prev]);
 
     try {
-      let logoToUse = brandProfile.logo
-        ? { base64: brandProfile.logo.split(",")[1], mimeType: "image/png" }
-        : null;
-      let collabLogoToUse = collabLogo
-        ? { base64: collabLogo.split(",")[1], mimeType: "image/png" }
-        : null;
-      let refData = styleReference
-        ? { base64: styleReference.src.split(",")[1], mimeType: "image/png" }
-        : null;
+      // Convert all image sources to base64 (handles both data URLs and HTTP URLs)
+      const [logoToUse, collabLogoToUse, refData] = await Promise.all([
+        brandProfile.logo ? urlToBase64(brandProfile.logo) : null,
+        collabLogo ? urlToBase64(collabLogo) : null,
+        styleReference?.src ? urlToBase64(styleReference.src) : null,
+      ]);
       const assetsToUse = compositionAssets.map((a) => ({
         base64: a.base64,
         mimeType: a.mimeType,
@@ -808,15 +846,12 @@ const PeriodCardRow: React.FC<{
       setGeneratedFlyers((prev) => ["loading", ...prev]);
 
       try {
-        let logoToUse = brandProfile.logo
-          ? { base64: brandProfile.logo.split(",")[1], mimeType: "image/png" }
-          : null;
-        let collabLogoToUse = collabLogo
-          ? { base64: collabLogo.split(",")[1], mimeType: "image/png" }
-          : null;
-        let refData = styleReference
-          ? { base64: styleReference.src.split(",")[1], mimeType: "image/png" }
-          : null;
+        // Convert all image sources to base64 (handles both data URLs and HTTP URLs)
+        const [logoToUse, collabLogoToUse, refData] = await Promise.all([
+          brandProfile.logo ? urlToBase64(brandProfile.logo) : null,
+          collabLogo ? urlToBase64(collabLogo) : null,
+          styleReference?.src ? urlToBase64(styleReference.src) : null,
+        ]);
         const assetsToUse = compositionAssets.map((a) => ({
           base64: a.base64,
           mimeType: a.mimeType,
@@ -1278,15 +1313,12 @@ const PeriodCard: React.FC<{
       setGeneratedFlyers((prev) => ["loading", ...prev]);
 
       try {
-        let logoToUse = brandProfile.logo
-          ? { base64: brandProfile.logo.split(",")[1], mimeType: "image/png" }
-          : null;
-        let collabLogoToUse = collabLogo
-          ? { base64: collabLogo.split(",")[1], mimeType: "image/png" }
-          : null;
-        let refData = styleReference
-          ? { base64: styleReference.src.split(",")[1], mimeType: "image/png" }
-          : null;
+        // Convert all image sources to base64 (handles both data URLs and HTTP URLs)
+        const [logoToUse, collabLogoToUse, refData] = await Promise.all([
+          brandProfile.logo ? urlToBase64(brandProfile.logo) : null,
+          collabLogo ? urlToBase64(collabLogo) : null,
+          styleReference?.src ? urlToBase64(styleReference.src) : null,
+        ]);
         const assetsToUse = compositionAssets.map((a) => ({
           base64: a.base64,
           mimeType: a.mimeType,

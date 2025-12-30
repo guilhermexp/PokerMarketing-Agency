@@ -125,6 +125,7 @@ export interface DbBrandProfile {
   logo_url: string | null;
   primary_color: string;
   secondary_color: string;
+  tertiary_color: string;
   tone_of_voice: string;
   settings: Record<string, unknown>;
   created_at: string;
@@ -147,6 +148,7 @@ export async function createBrandProfile(
     logo_url?: string;
     primary_color: string;
     secondary_color: string;
+    tertiary_color: string;
     tone_of_voice: string;
     organization_id?: string | null;
   },
@@ -514,6 +516,16 @@ export async function updateAdCreativeImage(
   return fetchApi<DbAdCreative>(`/ad-creatives?id=${adId}`, {
     method: "PATCH",
     body: JSON.stringify({ image_url: imageUrl }),
+  });
+}
+
+export async function updateClipThumbnail(
+  clipId: string,
+  thumbnailUrl: string,
+): Promise<DbVideoClipScript> {
+  return fetchApi<DbVideoClipScript>(`/campaigns?clip_id=${clipId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ thumbnail_url: thumbnailUrl }),
   });
 }
 

@@ -108,10 +108,28 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   return (
     <AuthContext.Provider value={contextValue}>
       <SignedOut>
-        <div className="min-h-screen flex items-center justify-center bg-black">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-white mb-2">DirectorAi</h1>
-            <p className="text-white/40 mb-8">Poker Marketing Agency</p>
+        <div className="min-h-screen flex items-center justify-center bg-black relative overflow-hidden">
+          {/* Scattered logos */}
+          <img src="/logo-socialab.png" alt="" className="absolute top-[5%] left-[3%] w-28 h-28 opacity-10 -rotate-12" />
+          <img src="/icon.png" alt="" className="absolute top-[8%] right-[5%] w-24 h-24 opacity-20 rotate-[20deg] rounded-2xl" />
+          <img src="/logo-socialab.png" alt="" className="absolute top-[15%] left-[20%] w-20 h-20 opacity-8 rotate-[25deg]" />
+          <img src="/icon.png" alt="" className="absolute top-[12%] right-[22%] w-16 h-16 opacity-15 -rotate-[15deg] rounded-xl" />
+          <img src="/logo-socialab.png" alt="" className="absolute top-[35%] left-[2%] w-24 h-24 opacity-10 rotate-[45deg]" />
+          <img src="/icon.png" alt="" className="absolute top-[40%] right-[2%] w-20 h-20 opacity-15 -rotate-[30deg] rounded-xl" />
+          <img src="/logo-socialab.png" alt="" className="absolute top-[55%] left-[8%] w-18 h-18 opacity-8 -rotate-[20deg]" />
+          <img src="/icon.png" alt="" className="absolute top-[60%] right-[6%] w-22 h-22 opacity-20 rotate-[35deg] rounded-2xl" />
+          <img src="/logo-socialab.png" alt="" className="absolute bottom-[25%] left-[5%] w-26 h-26 opacity-10 rotate-[15deg]" />
+          <img src="/icon.png" alt="" className="absolute bottom-[30%] right-[4%] w-18 h-18 opacity-15 -rotate-[45deg] rounded-lg" />
+          <img src="/logo-socialab.png" alt="" className="absolute bottom-[12%] left-[15%] w-22 h-22 opacity-8 rotate-[50deg]" />
+          <img src="/icon.png" alt="" className="absolute bottom-[8%] right-[18%] w-20 h-20 opacity-20 rotate-[10deg] rounded-xl" />
+          <img src="/logo-socialab.png" alt="" className="absolute bottom-[5%] left-[35%] w-16 h-16 opacity-5 -rotate-[35deg]" />
+          <img src="/icon.png" alt="" className="absolute bottom-[3%] right-[35%] w-14 h-14 opacity-10 rotate-[55deg] rounded-lg" />
+          <img src="/logo-socialab.png" alt="" className="absolute top-[75%] left-[1%] w-20 h-20 opacity-8 rotate-[70deg]" />
+          <img src="/icon.png" alt="" className="absolute top-[25%] right-[12%] w-12 h-12 opacity-10 -rotate-[60deg] rounded-lg" />
+
+          <div className="text-center relative z-10 -mt-20">
+            <img src="/logo-socialab.png" alt="Socialab" className="w-48 h-48 mx-auto -mb-6" />
+            <p className="text-white/40 mb-2">Seu laboratório de Mídia Social</p>
             <SignIn
               appearance={{
                 elements: {

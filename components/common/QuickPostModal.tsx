@@ -9,6 +9,28 @@ import { Icon } from './Icon';
 import { Loader } from './Loader';
 import { Card } from './Card';
 
+// Convert URL (HTTP or data URL) to data URL for Gemini API
+const urlToDataUrl = async (src: string): Promise<string | null> => {
+    // If already a data URL, return as-is
+    if (src.startsWith("data:")) {
+        return src;
+    }
+    // HTTP URL - fetch and convert to data URL
+    try {
+        const response = await fetch(src);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (error) {
+        console.error("[urlToDataUrl] Failed to convert URL:", src, error);
+        return null;
+    }
+};
+
 export interface QuickPostModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -31,14 +53,17 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
     const [editedHashtags, setEditedHashtags] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
-    const [contentType, setContentType] = useState<'photo' | 'story'>('photo');
+    const [contentType, setContentType] = useState<'photo' | 'story'>('story'); // Start with Stories (no caption needed)
     const [isPublishing, setIsPublishing] = useState(false);
     const [publishProgress, setPublishProgress] = useState<PublishProgress | null>(null);
     const [publishError, setPublishError] = useState<string | null>(null);
 
+    // Generate caption only when switching to Feed mode (not on mount)
     useEffect(() => {
-        if (isOpen && !post) handleGenerate();
-    }, [isOpen]);
+        if (isOpen && contentType === 'photo' && !post && !isGenerating) {
+            handleGenerate();
+        }
+    }, [isOpen, contentType]);
 
     useEffect(() => {
         if (post) {
@@ -61,7 +86,9 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
         try {
             // Build context from image info if not provided
             const contextText = context || image.prompt || 'Imagem para publicação';
-            const result = await generateQuickPostText(brandProfile, contextText, image.src);
+            // Convert HTTP URL to data URL for Gemini API
+            const imageDataUrl = await urlToDataUrl(image.src);
+            const result = await generateQuickPostText(brandProfile, contextText, imageDataUrl || undefined);
             setPost(result);
         } catch (e) {
             console.error(e);
@@ -156,25 +183,35 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                     image.source?.startsWith('Video-');
 
     return (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
-            <Card className="w-full max-w-lg border-white/10 bg-[#080808] overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center bg-[#0d0d0d]">
-                    <div className="flex items-center space-x-2">
-                        <div className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center">
-                            <Icon name="instagram" className="w-3 h-3 text-primary" />
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl z-[300] flex items-center justify-center p-3 sm:p-4 md:p-6">
+            <Card className="w-full max-w-[95vw] md:max-w-4xl lg:max-w-5xl border-white/10 bg-[#080808] overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
+                {/* Header */}
+                <div className="px-4 sm:px-5 py-3 border-b border-white/5 flex justify-between items-center bg-[#0d0d0d] shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                            <Icon name="instagram" className="w-4 h-4 text-white/70" />
                         </div>
-                        <h3 className="text-[10px] font-black text-white uppercase tracking-wide">QuickPost</h3>
+                        <div>
+                            <h3 className="text-xs sm:text-sm font-bold text-white/90 uppercase tracking-wide">QuickPost</h3>
+                            <p className="text-[9px] text-white/40">Publicar no Instagram</p>
+                        </div>
                     </div>
-                    <button onClick={onClose} className="text-white/20 hover:text-white transition-colors"><Icon name="x" className="w-4 h-4" /></button>
+                    <button
+                        onClick={onClose}
+                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all"
+                    >
+                        <Icon name="x" className="w-4 h-4" />
+                    </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                    {/* Content Type Selector */}
+
+                {/* Content Type Selector - Fixed at top */}
+                <div className="px-4 sm:px-5 py-3 border-b border-white/5 bg-[#0a0a0a] shrink-0">
                     <div className="flex gap-2 justify-center">
                         <button
                             onClick={() => setContentType('photo')}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all ${
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wide transition-all ${
                                 contentType === 'photo'
-                                    ? 'bg-primary text-black'
+                                    ? 'bg-primary text-black shadow-lg shadow-primary/30'
                                     : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/70'
                             }`}
                         >
@@ -183,9 +220,9 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                         </button>
                         <button
                             onClick={() => setContentType('story')}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all ${
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wide transition-all ${
                                 contentType === 'story'
-                                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                                    ? 'bg-white/15 text-white border border-white/20'
                                     : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/70'
                             }`}
                         >
@@ -193,111 +230,181 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                             Stories
                         </button>
                     </div>
+                </div>
 
-                    {/* Image/Video Preview */}
-                    <div className="w-full max-w-xs mx-auto rounded-xl overflow-hidden border border-white/10 shadow-xl">
-                        {isVideo ? (
-                            <video src={image.src} className="w-full h-auto object-contain" controls muted />
-                        ) : (
-                            <img src={image.src} className="w-full h-auto object-contain" />
-                        )}
-                    </div>
-
-                    {/* Publishing Progress */}
-                    {isPublishing && publishProgress && (
-                        <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-black text-white/70 uppercase tracking-wide">
-                                    {publishProgress.message}
-                                </span>
-                                <span className="text-[10px] font-bold text-primary">
-                                    {publishProgress.progress}%
-                                </span>
+                {/* Main Content - Responsive Grid */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 p-4 sm:p-5 md:p-6 min-h-full">
+                        {/* Left: Image Preview */}
+                        <div className="flex flex-col items-center justify-center">
+                            <div className={`relative w-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black ${
+                                contentType === 'story' ? 'aspect-[9/16] max-w-[280px]' : 'aspect-square max-w-[320px]'
+                            } mx-auto`}>
+                                {isVideo ? (
+                                    <video
+                                        src={image.src}
+                                        className="absolute inset-0 w-full h-full object-cover"
+                                        controls
+                                        muted
+                                    />
+                                ) : (
+                                    <img
+                                        src={image.src}
+                                        alt="Preview"
+                                        className="absolute inset-0 w-full h-full object-cover"
+                                    />
+                                )}
+                                {/* Instagram-like overlay */}
+                                <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+                                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between pointer-events-none">
+                                    <div className="flex items-center gap-3 text-white/80">
+                                        <Icon name="heart" className="w-5 h-5" />
+                                        <Icon name="message-circle" className="w-5 h-5" />
+                                        <Icon name="send" className="w-5 h-5" />
+                                    </div>
+                                    <Icon name="bookmark" className="w-5 h-5 text-white/80" />
+                                </div>
                             </div>
-                            <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                <div
-                                    className={`h-full transition-all duration-300 ${
-                                        publishProgress.step === 'completed' ? 'bg-green-500' :
-                                        publishProgress.step === 'failed' ? 'bg-red-500' : 'bg-primary'
-                                    }`}
-                                    style={{ width: `${publishProgress.progress}%` }}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Success Message */}
-                    {publishProgress?.step === 'completed' && (
-                        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 flex items-center gap-3">
-                            <Icon name="check" className="w-5 h-5 text-green-400" />
-                            <span className="text-xs font-bold text-green-400">Publicado com sucesso!</span>
-                        </div>
-                    )}
-
-                    {/* Error Message */}
-                    {publishError && (
-                        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-3">
-                            <Icon name="alert-circle" className="w-5 h-5 text-red-400" />
-                            <span className="text-xs font-bold text-red-400">{publishError}</span>
-                        </div>
-                    )}
-
-                    {isGenerating ? (
-                        <div className="flex flex-col items-center justify-center py-8 space-y-3">
-                            <Loader className="w-8 h-8" />
-                            <p className="text-[9px] font-black text-white/30 uppercase tracking-widest animate-pulse">Forjando Copy...</p>
-                        </div>
-                    ) : post && contentType === 'photo' ? (
-                        <div className="space-y-3 animate-fade-in-up">
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-black text-white/30 uppercase tracking-wide">Legenda</label>
-                                <textarea
-                                    value={editedContent}
-                                    onChange={(e) => setEditedContent(e.target.value)}
-                                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs leading-relaxed text-white/90 resize-none outline-none focus:border-primary/50 transition-colors min-h-[120px]"
-                                    placeholder="Escreva sua legenda..."
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-black text-white/30 uppercase tracking-wide">Hashtags</label>
-                                <textarea
-                                    value={editedHashtags}
-                                    onChange={(e) => setEditedHashtags(e.target.value)}
-                                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs leading-relaxed text-primary resize-none outline-none focus:border-primary/50 transition-colors min-h-[50px]"
-                                    placeholder="#hashtag1 #hashtag2..."
-                                />
-                            </div>
-                        </div>
-                    ) : contentType === 'story' ? (
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
-                            <Icon name="stories" className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                            <p className="text-[10px] text-white/50 font-medium">
-                                Stories não suportam legendas. A imagem será publicada diretamente.
+                            <p className="text-[9px] text-white/30 mt-3 text-center font-medium">
+                                Preview {contentType === 'story' ? '9:16 Stories' : '1:1 Feed'}
                             </p>
                         </div>
-                    ) : null}
-                </div>
-                <div className="p-5 border-t border-white/5 bg-[#0d0d0d] space-y-3">
-                    {/* Publish Now Button */}
-                    <Button
-                        onClick={handlePublishNow}
-                        variant="primary"
-                        size="small"
-                        className={`w-full ${contentType === 'story' ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600' : ''}`}
-                        icon={contentType === 'story' ? 'stories' : 'instagram'}
-                        disabled={isPublishing || (contentType === 'photo' && isGenerating) || publishProgress?.step === 'completed'}
-                    >
-                        {isPublishing ? 'Publicando...' : `Publicar ${contentType === 'story' ? 'nos Stories' : 'no Feed'} Agora`}
-                    </Button>
 
-                    {/* Share/Regenerate Buttons */}
-                    <div className="flex gap-3">
-                        <Button onClick={handleGenerate} variant="secondary" size="small" className="flex-1" icon="zap" disabled={isGenerating || isPublishing}>
-                            Refazer
+                        {/* Right: Content Editor */}
+                        <div className="flex flex-col space-y-4">
+                            {/* Publishing Progress */}
+                            {isPublishing && publishProgress && (
+                                <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-bold text-white/70 uppercase tracking-wide">
+                                            {publishProgress.message}
+                                        </span>
+                                        <span className="text-xs font-bold text-primary">
+                                            {publishProgress.progress}%
+                                        </span>
+                                    </div>
+                                    <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full transition-all duration-300 ${
+                                                publishProgress.step === 'completed' ? 'bg-green-500' :
+                                                publishProgress.step === 'failed' ? 'bg-red-500' : 'bg-primary'
+                                            }`}
+                                            style={{ width: `${publishProgress.progress}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Success Message */}
+                            {publishProgress?.step === 'completed' && (
+                                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                                        <Icon name="check" className="w-4 h-4 text-green-400" />
+                                    </div>
+                                    <span className="text-sm font-bold text-green-400">Publicado com sucesso!</span>
+                                </div>
+                            )}
+
+                            {/* Error Message */}
+                            {publishError && (
+                                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
+                                        <Icon name="alert-circle" className="w-4 h-4 text-red-400" />
+                                    </div>
+                                    <span className="text-sm font-bold text-red-400">{publishError}</span>
+                                </div>
+                            )}
+
+                            {/* Content Area */}
+                            {isGenerating ? (
+                                <div className="flex-1 flex flex-col items-center justify-center py-8 space-y-4 bg-white/[0.02] rounded-xl border border-white/5">
+                                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                                        <Loader className="w-6 h-6" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-xs font-bold text-white/50 uppercase tracking-wide">Gerando Copy</p>
+                                        <p className="text-[10px] text-white/30 mt-1">Criando legenda otimizada...</p>
+                                    </div>
+                                </div>
+                            ) : post && contentType === 'photo' ? (
+                                <div className="flex-1 flex flex-col space-y-4">
+                                    <div className="flex-1 space-y-2">
+                                        <label className="text-[10px] font-bold text-white/50 uppercase tracking-wide flex items-center gap-2">
+                                            <Icon name="edit-3" className="w-3 h-3" />
+                                            Legenda
+                                        </label>
+                                        <textarea
+                                            value={editedContent}
+                                            onChange={(e) => setEditedContent(e.target.value)}
+                                            className="w-full flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm leading-relaxed text-white/90 resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-[140px]"
+                                            placeholder="Escreva sua legenda..."
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-white/50 uppercase tracking-wide flex items-center gap-2">
+                                            <Icon name="hash" className="w-3 h-3" />
+                                            Hashtags
+                                        </label>
+                                        <textarea
+                                            value={editedHashtags}
+                                            onChange={(e) => setEditedHashtags(e.target.value)}
+                                            className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm leading-relaxed text-primary/80 resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-[80px]"
+                                            placeholder="#hashtag1 #hashtag2..."
+                                        />
+                                    </div>
+                                </div>
+                            ) : contentType === 'story' ? (
+                                <div className="flex-1 flex items-center justify-center">
+                                    <div className="bg-white/[0.03] border border-white/10 rounded-xl p-5 text-center max-w-xs">
+                                        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-3">
+                                            <Icon name="stories" className="w-5 h-5 text-white/60" />
+                                        </div>
+                                        <h4 className="text-xs font-bold text-white/70 mb-1.5">Publicação Direta</h4>
+                                        <p className="text-[10px] text-white/40 leading-relaxed">
+                                            Stories não suportam legendas. A imagem será publicada no formato 9:16.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="p-4 sm:p-5 border-t border-white/5 bg-[#0d0d0d] shrink-0">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <Button
+                            onClick={handlePublishNow}
+                            variant="primary"
+                            size="small"
+                            className="flex-1 sm:flex-[2] py-3"
+                            icon={contentType === 'story' ? 'stories' : 'instagram'}
+                            disabled={isPublishing || (contentType === 'photo' && isGenerating) || publishProgress?.step === 'completed'}
+                        >
+                            {isPublishing ? 'Publicando...' : `Publicar ${contentType === 'story' ? 'nos Stories' : 'no Feed'}`}
                         </Button>
-                        <Button onClick={handleShare} variant="secondary" size="small" className="flex-1" icon="share-alt" disabled={isGenerating || !post || isPublishing}>
-                            {isCopied ? 'Copiado!' : 'Compartilhar'}
-                        </Button>
+                        <div className="flex gap-3 sm:flex-1">
+                            <Button
+                                onClick={handleGenerate}
+                                variant="secondary"
+                                size="small"
+                                className="flex-1"
+                                icon="refresh-cw"
+                                disabled={isGenerating || isPublishing}
+                            >
+                                <span className="hidden sm:inline">Refazer</span>
+                            </Button>
+                            <Button
+                                onClick={handleShare}
+                                variant="secondary"
+                                size="small"
+                                className="flex-1"
+                                icon="share-2"
+                                disabled={isGenerating || !post || isPublishing}
+                            >
+                                <span className="hidden sm:inline">{isCopied ? 'Copiado!' : 'Compartilhar'}</span>
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </Card>

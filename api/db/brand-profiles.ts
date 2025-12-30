@@ -56,6 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         logo_url,
         primary_color,
         secondary_color,
+        tertiary_color,
         tone_of_voice,
         settings,
       } = req.body;
@@ -73,12 +74,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const result = await sql`
         INSERT INTO brand_profiles (
           user_id, organization_id, name, description, logo_url,
-          primary_color, secondary_color, tone_of_voice, settings
+          primary_color, secondary_color, tertiary_color, tone_of_voice, settings
         )
         VALUES (
           ${resolvedUserId}, ${organization_id || null}, ${name},
           ${description || null}, ${logo_url || null}, ${primary_color},
-          ${secondary_color}, ${tone_of_voice}, ${JSON.stringify(settings || {})}
+          ${secondary_color}, ${tertiary_color || '#F59E0B'}, ${tone_of_voice}, ${JSON.stringify(settings || {})}
         )
         RETURNING *
       `;
@@ -95,6 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         logo_url,
         primary_color,
         secondary_color,
+        tertiary_color,
         tone_of_voice,
         settings,
       } = req.body;
@@ -110,6 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             logo_url = COALESCE(${logo_url || null}, logo_url),
             primary_color = COALESCE(${primary_color || null}, primary_color),
             secondary_color = COALESCE(${secondary_color || null}, secondary_color),
+            tertiary_color = COALESCE(${tertiary_color || null}, tertiary_color),
             tone_of_voice = COALESCE(${tone_of_voice || null}, tone_of_voice),
             settings = COALESCE(${settings ? JSON.stringify(settings) : null}, settings),
             updated_at = NOW()

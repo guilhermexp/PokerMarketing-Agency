@@ -723,14 +723,28 @@ export const generateLogo = async (prompt: string): Promise<string> => {
 
 export const extractColorsFromLogo = async (
   logo: ImageFile,
-): Promise<{ primaryColor: string; secondaryColor: string }> => {
+): Promise<{ primaryColor: string; secondaryColor: string | null; tertiaryColor: string | null }> => {
   const ai = getAi();
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
     contents: {
       parts: [
         {
-          text: "Extraia as duas cores dominantes da marca em formato hexadecimal.",
+          text: `Analise este logo e extraia APENAS as cores que REALMENTE existem na imagem visível.
+
+REGRAS IMPORTANTES:
+- Extraia somente cores que você pode ver nos pixels da imagem
+- NÃO invente cores que não existem
+- Ignore áreas transparentes (não conte transparência como cor)
+- Se o logo tiver apenas 1 cor visível, retorne null para secondaryColor e tertiaryColor
+- Se o logo tiver apenas 2 cores visíveis, retorne null para tertiaryColor
+
+PRIORIDADE DAS CORES:
+- primaryColor: A cor mais dominante/presente no logo (maior área)
+- secondaryColor: A segunda cor mais presente (se existir), ou null
+- tertiaryColor: Uma terceira cor de destaque/acento (se existir), ou null
+
+Retorne as cores em formato hexadecimal (#RRGGBB).`,
         },
         { inlineData: { mimeType: logo.mimeType, data: logo.base64 } },
       ],
@@ -741,9 +755,10 @@ export const extractColorsFromLogo = async (
         type: Type.OBJECT,
         properties: {
           primaryColor: { type: Type.STRING },
-          secondaryColor: { type: Type.STRING },
+          secondaryColor: { type: Type.STRING, nullable: true },
+          tertiaryColor: { type: Type.STRING, nullable: true },
         },
-        required: ["primaryColor", "secondaryColor"],
+        required: ["primaryColor"],
       },
     },
   });

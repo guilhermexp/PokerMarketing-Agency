@@ -14,6 +14,7 @@ export interface BrandProfile {
   logo: string | null;
   primaryColor: string;
   secondaryColor: string;
+  tertiaryColor: string;
   toneOfVoice: ToneOfVoice;
   toneTargets?: ToneTarget[]; // Onde aplicar o tom (default: todos exceto videos)
   creativeModel?: CreativeModel; // Modelo para geração criativa (default: gemini-3-pro)
