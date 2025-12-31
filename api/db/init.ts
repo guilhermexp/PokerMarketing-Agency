@@ -25,7 +25,7 @@ import {
   createRateLimitKey,
   getCachedUserId,
   cacheUserId,
-} from './_helpers/index';
+} from './_helpers/index.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle CORS

@@ -4,7 +4,7 @@
  */
 
 // Database helpers
-export { getSql, resolveUserId, setRLSContext } from './database';
+export { getSql, resolveUserId, setRLSContext } from './database.js';
 
 // Authentication helpers
 export {
@@ -13,7 +13,7 @@ export {
   AuthenticationError,
   AuthorizationError,
   type AuthContext,
-} from './auth';
+} from './auth.js';
 
 // Permission helpers
 export {
@@ -32,10 +32,10 @@ export {
   isPersonalContext,
   type Permission,
   type OrgContext,
-} from './permissions';
+} from './permissions.js';
 
 // CORS helpers
-export { setCorsHeaders, handleCorsPreflightIfNeeded, setupCors } from './cors';
+export { setCorsHeaders, handleCorsPreflightIfNeeded, setupCors } from './cors.js';
 
 // Rate limiting helpers
 export {
@@ -45,7 +45,7 @@ export {
   createRateLimitKey,
   type RateLimitConfig,
   type RateLimitType,
-} from './rate-limit';
+} from './rate-limit.js';
 
 // Cache helpers
 export {
@@ -59,4 +59,4 @@ export {
   getCachedUserId,
   invalidateUserCache,
   invalidateBrandProfileCache,
-} from './cache';
+} from './cache.js';
