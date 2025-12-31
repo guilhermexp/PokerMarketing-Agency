@@ -74,22 +74,22 @@ export const buildFlyerPrompt = (brandProfile: BrandProfile): string => {
   const toneText = getToneText(brandProfile, 'flyers');
 
   return `
-**PERSONA:** Você é Diretor de Arte Sênior de uma agência de publicidade internacional de elite especializada em iGaming e Poker.
+**PERSONA:** Você é Diretor de Arte Sênior de uma agência de publicidade internacional de elite.
 
-**MISSÃO CRÍTICA (NÃO PULE ESTA REGRA):**
-Todo torneio de poker é definido pelo seu VALOR GARANTIDO (GTD).
-Você DEVE escrever o valor do **GARANTIDO (GTD)** em cada item da lista.
-O GTD deve estar em destaque visual (fonte negrito, cor vibrante ou tamanho maior).
+**MISSÃO CRÍTICA:**
+Crie materiais visuais de alta qualidade que representem fielmente a marca e comuniquem a mensagem de forma impactante.
+Se houver valores ou informações importantes no conteúdo, destaque-os visualmente (fonte negrito, cor vibrante ou tamanho maior).
 
 **REGRAS DE CONTEÚDO:**
-1. Se o prompt fornecer um valor de "GTD", ele deve aparecer obrigatoriamente.
-2. O Horário e o Nome do Torneio devem estar perfeitamente legíveis.
-3. Use a marca ${brandProfile.name}.
+1. Destaque informações importantes (valores, datas, horários) de forma clara e legível.
+2. Use a marca ${brandProfile.name}.
+3. Siga a identidade visual da marca em todos os elementos.
 
 **IDENTIDADE DA MARCA - ${brandProfile.name}:**
+${brandProfile.description ? `- Descrição: ${brandProfile.description}` : ''}
 ${toneText ? `- Tom de Comunicação: ${toneText}` : ''}
 - Cor Primária (dominante): ${brandProfile.primaryColor}
-- Cor de Acento (destaques, GTD, CTAs): ${brandProfile.secondaryColor}
+- Cor de Acento (destaques, CTAs): ${brandProfile.secondaryColor}
 
 **PRINCÍPIOS DE DESIGN PROFISSIONAL:**
 
@@ -116,7 +116,7 @@ ${toneText ? `- Tom de Comunicação: ${toneText}` : ''}
    - Prefira elegância sutil a ostentação visual
 
 **ATMOSFERA FINAL:**
-- Poker de alta classe, luxo e sofisticação
+- Alta classe, luxo e sofisticação
 - Cinematográfico mas não exagerado
 - Profissional mas criativo
 - Impactante mas elegante`;
@@ -126,7 +126,7 @@ ${toneText ? `- Tom de Comunicação: ${toneText}` : ''}
  * Build edit image prompt
  */
 export const buildEditImagePrompt = (editInstruction: string): string => {
-  return `DESIGNER SÊNIOR: Execute alteração profissional: ${editInstruction}. Texto original e logos são SAGRADOS, não cubra informações de valores (GTD/GARANTIDO).`;
+  return `DESIGNER SÊNIOR: Execute alteração profissional: ${editInstruction}. Texto original e logos são SAGRADOS, não cubra informações importantes (valores, datas, contatos).`;
 };
 
 /**
@@ -136,18 +136,18 @@ export const buildQuickPostPrompt = (brandProfile: BrandProfile, context: string
   const toneText = getToneText(brandProfile, 'posts');
 
   return `
-Você é Social Media Manager de elite. Crie um post de INSTAGRAM de alta performance para um clube de poker.
+Você é Social Media Manager de elite. Crie um post de INSTAGRAM de alta performance.
 
-**CONTEXTO DO EVENTO:**
+**CONTEXTO:**
 ${context}
 
-**MARCA:** ${brandProfile.name}${toneText ? ` | **TOM:** ${toneText}` : ''}
+**MARCA:** ${brandProfile.name}${brandProfile.description ? ` - ${brandProfile.description}` : ''}${toneText ? ` | **TOM:** ${toneText}` : ''}
 
 **REGRAS DE OURO:**
-1. GANCHO EXPLOSIVO com emojis de poker.
-2. DESTAQUE O GARANTIDO (GTD) se houver.
-3. CTA FORTE (ex: Link na Bio).
-4. 5-8 Hashtags estratégicas.
+1. GANCHO EXPLOSIVO com emojis relevantes ao tema.
+2. DESTAQUE informações importantes (valores, datas, ofertas).
+3. CTA FORTE (ex: Link na Bio, Saiba Mais).
+4. 5-8 Hashtags estratégicas relevantes à marca e ao conteúdo.
 
 Responda apenas JSON:
 { "platform": "Instagram", "content": "Texto Legenda", "hashtags": ["tag1", "tag2"], "image_prompt": "descrição visual" }`;

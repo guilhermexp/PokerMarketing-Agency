@@ -86,7 +86,7 @@ export const generateCreativeText = async (
       return await generateTextWithOpenRouterVision(model, textParts, imageParts, temperature);
     } else {
       // Usa versão texto puro
-      const systemPrompt = "Você é um assistente de marketing criativo especializado em poker e iGaming. Sempre responda em JSON válido.";
+      const systemPrompt = "Você é um assistente de marketing criativo especializado em criar campanhas de alta performance. Sempre responda em JSON válido.";
       const userPrompt = textParts.join('\n\n');
       return await generateTextWithOpenRouter(model, systemPrompt, userPrompt, temperature);
     }

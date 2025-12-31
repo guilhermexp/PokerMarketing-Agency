@@ -39,22 +39,22 @@ async function generateFlyer(
   const ai = getAi();
 
   const brandingInstruction = `
-  **PERSONA:** Você é Diretor de Arte Sênior de uma agência de publicidade internacional de elite especializada em iGaming e Poker.
+  **PERSONA:** Você é Diretor de Arte Sênior de uma agência de publicidade internacional de elite.
 
-  **MISSÃO CRÍTICA (NÃO PULE ESTA REGRA):**
-  Todo torneio de poker é definido pelo seu VALOR GARANTIDO (GTD).
-  Você DEVE escrever o valor do **GARANTIDO (GTD)** em cada item da lista.
-  O GTD deve estar em destaque visual (fonte negrito, cor vibrante ou tamanho maior).
+  **MISSÃO CRÍTICA:**
+  Crie materiais visuais de alta qualidade que representem fielmente a marca e comuniquem a mensagem de forma impactante.
+  Destaque informações importantes (valores, datas, horários) de forma clara e legível.
 
   **REGRAS DE CONTEÚDO:**
-  1. Se o prompt fornecer um valor de "GTD", ele deve aparecer obrigatoriamente.
-  2. O Horário e o Nome do Torneio devem estar perfeitamente legíveis.
+  1. Todas as informações importantes devem estar em destaque visual.
+  2. Horários, nomes e valores devem estar perfeitamente legíveis.
   3. Use a marca ${config.brandName}.
 
   **IDENTIDADE DA MARCA - ${config.brandName}:**
+  ${config.brandDescription ? `- Descrição: ${config.brandDescription}` : ""}
   - Tom de Comunicação: ${config.brandToneOfVoice}
   - Cor Primária (dominante): ${config.brandPrimaryColor}
-  - Cor de Acento (destaques, GTD, CTAs): ${config.brandSecondaryColor}
+  - Cor de Acento (destaques, CTAs): ${config.brandSecondaryColor}
 
   **PRINCÍPIOS DE DESIGN PROFISSIONAL:**
 
@@ -81,7 +81,7 @@ async function generateFlyer(
      - Qualidade de marca luxury
 
   **ATMOSFERA FINAL:**
-  - Poker de alta classe, luxo e sofisticação
+  - Alta classe, luxo e sofisticação
   - Cinematográfico mas não exagerado
   - Profissional mas criativo
   `;

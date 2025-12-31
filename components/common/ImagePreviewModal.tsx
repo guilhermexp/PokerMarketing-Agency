@@ -523,7 +523,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                       className="w-full bg-black/40 border border-white/[0.08] rounded-2xl p-4 text-sm text-white focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all resize-none placeholder:text-white/20 leading-relaxed"
                       placeholder="Descreva o que deseja alterar na imagem...
 
-Ex: 'Substitua o fundo por uma mesa de poker luxuosa' ou 'Adicione efeitos de luz neon'"
+Ex: 'Substitua o fundo por um cenário luxuoso' ou 'Adicione efeitos de luz neon'"
                     />
                     <div className="flex items-start gap-3 px-1 py-2 bg-white/[0.02] rounded-xl">
                       <Icon name="zap" className="w-4 h-4 text-primary/60 mt-0.5 flex-shrink-0" />

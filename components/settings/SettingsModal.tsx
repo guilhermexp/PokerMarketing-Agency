@@ -330,7 +330,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                         value={profile.name}
                         onChange={handleChange}
                         required
-                        placeholder="Ex: CPC Poker Online"
+                        placeholder="Ex: Nome da Sua Marca"
                         className="w-full bg-[#111111] border border-white/10 rounded-xl p-3 text-white text-sm font-medium focus:outline-none focus:border-primary/50 transition-all placeholder:text-white/20"
                       />
                     </div>

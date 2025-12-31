@@ -168,7 +168,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                       type="text"
                       value={hashtags}
                       onChange={(e) => setHashtags(e.target.value)}
-                      placeholder="#poker #torneio #evento"
+                      placeholder="#suamarca #evento #promocao"
                       className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-primary/50"
                     />
                   </div>

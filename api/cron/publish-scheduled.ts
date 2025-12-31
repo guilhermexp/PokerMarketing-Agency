@@ -13,7 +13,7 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const RUBE_TOKEN = process.env.RUBE_TOKEN;
 const CRON_SECRET = process.env.CRON_SECRET;
 const MCP_URL = 'https://rube.app/mcp';
-const INSTAGRAM_USER_ID = '25281402468195799'; // cpcpokeronline
+const INSTAGRAM_USER_ID = process.env.INSTAGRAM_USER_ID || '25281402468195799';
 
 // Types
 interface ScheduledPost {

@@ -179,6 +179,7 @@ interface ClipsTabProps {
   onRemoveStyleReference?: (id: string) => void;
   userId?: string | null;
   galleryImages?: GalleryImage[];
+  campaignId?: string;
 }
 
 interface Scene {
@@ -600,14 +601,23 @@ const ClipCard: React.FC<ClipCardProps> = ({
   }, [editorState]);
 
   // --- LocalStorage Persistence for Editor State ---
-  const EDITOR_STORAGE_KEY = 'poker-marketing-editor-draft';
+  // Use campaign-scoped key to prevent cross-campaign data contamination
+  const getEditorStorageKey = useCallback(() => {
+    return campaignId
+      ? `poker-marketing-editor-draft-${campaignId}`
+      : 'poker-marketing-editor-draft';
+  }, [campaignId]);
 
-  // Check if there's a saved session on mount
-  const [hasSavedSession, setHasSavedSession] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    const saved = localStorage.getItem(EDITOR_STORAGE_KEY);
-    return !!saved;
-  });
+  // Check if there's a saved session on mount or when campaign changes
+  const [hasSavedSession, setHasSavedSession] = useState<boolean>(false);
+
+  // Update hasSavedSession when campaignId changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storageKey = getEditorStorageKey();
+    const saved = localStorage.getItem(storageKey);
+    setHasSavedSession(!!saved);
+  }, [getEditorStorageKey]);
 
   // Auto-save editor state to localStorage (debounced)
   useEffect(() => {
@@ -616,6 +626,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
     // Don't save if there's nothing to save
     if (editorState.clips.length === 0 && editorState.audioTracks.length === 0) return;
 
+    const storageKey = getEditorStorageKey();
     const timeoutId = setTimeout(() => {
       try {
         const stateToSave = {
@@ -627,7 +638,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
           totalDuration: editorState.totalDuration,
           savedAt: Date.now(),
         };
-        localStorage.setItem(EDITOR_STORAGE_KEY, JSON.stringify(stateToSave));
+        localStorage.setItem(storageKey, JSON.stringify(stateToSave));
         setHasSavedSession(true);
       } catch (error) {
         console.warn('Failed to save editor state:', error);
@@ -635,22 +646,24 @@ const ClipCard: React.FC<ClipCardProps> = ({
     }, 500); // Debounce 500ms
 
     return () => clearTimeout(timeoutId);
-  }, [editorState, isEditing]);
+  }, [editorState, isEditing, getEditorStorageKey]);
 
   // Function to clear saved session
   const clearSavedSession = useCallback(() => {
     try {
-      localStorage.removeItem(EDITOR_STORAGE_KEY);
+      const storageKey = getEditorStorageKey();
+      localStorage.removeItem(storageKey);
       setHasSavedSession(false);
     } catch (error) {
       console.warn('Failed to clear saved session:', error);
     }
-  }, []);
+  }, [getEditorStorageKey]);
 
   // Function to restore saved session
   const restoreSavedSession = useCallback(() => {
     try {
-      const saved = localStorage.getItem(EDITOR_STORAGE_KEY);
+      const storageKey = getEditorStorageKey();
+      const saved = localStorage.getItem(storageKey);
       if (!saved) return null;
 
       const parsed = JSON.parse(saved);
@@ -672,7 +685,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
       console.warn('Failed to restore saved session:', error);
       return null;
     }
-  }, []);
+  }, [getEditorStorageKey]);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -1106,15 +1119,20 @@ const ClipCard: React.FC<ClipCardProps> = ({
         ? `\n\nCONTEXTO DA NARRAÇÃO: "${currentScene.narration}"`
         : "";
 
-      return `Cena de vídeo promocional de poker:
+      const brandContext = brandProfile.description
+        ? `\n\nCONTEXTO DA MARCA: ${brandProfile.name} - ${brandProfile.description}`
+        : `\n\nMARCA: ${brandProfile.name}`;
+
+      return `Cena de vídeo promocional:
 
 VISUAL: ${currentScene.visual}
 ${narrationBlock}
+${brandContext}
 
 Estilo: ${brandProfile.toneOfVoice}, cinematográfico, cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.
-Movimento de câmera suave, iluminação dramática de cassino. Criar visual que combine com o contexto da narração.
+Movimento de câmera suave, iluminação dramática profissional. Criar visual que combine com o contexto da narração e identidade da marca.
 
-TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF (Bebas Neue/Oswald), MAIÚSCULAS, impactante.`;
+TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCULAS, impactante.`;
     },
     [scenes, brandProfile, includeNarration],
   );
@@ -1129,15 +1147,20 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF (Bebas Neu
         ? `\n\nNARRAÇÃO (falar em português brasileiro, voz empolgante e profissional): "${currentScene.narration}"`
         : "";
 
-      return `Cena de vídeo promocional de poker:
+      const brandContext = brandProfile.description
+        ? `\n\nCONTEXTO DA MARCA: ${brandProfile.name} - ${brandProfile.description}`
+        : `\n\nMARCA: ${brandProfile.name}`;
+
+      return `Cena de vídeo promocional:
 
 VISUAL: ${currentScene.visual}
 ${narrationBlock}
+${brandContext}
 
 Estilo: ${brandProfile.toneOfVoice}, cinematográfico, cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.
-Movimento de câmera suave, iluminação dramática de cassino.
+Movimento de câmera suave, iluminação dramática profissional.
 
-TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF (Bebas Neue/Oswald), MAIÚSCULAS, impactante.`;
+TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCULAS, impactante.`;
     },
     [scenes, brandProfile, includeNarration],
   );
@@ -4743,6 +4766,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
   onRemoveStyleReference,
   userId,
   galleryImages,
+  campaignId,
 }) => {
   const [thumbnails, setThumbnails] = useState<(GalleryImage | null)[]>([]);
   const [extraInstructions, setExtraInstructions] = useState<string[]>([]);

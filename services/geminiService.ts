@@ -251,21 +251,21 @@ export const generateQuickPostText = async (
   const parts: any[] = [
     {
       text: `
-    Você é Social Media Manager de elite. Crie um post de INSTAGRAM de alta performance para um clube de poker.
+    Você é Social Media Manager de elite. Crie um post de INSTAGRAM de alta performance.
 
-    **CONTEXTO DO EVENTO:**
+    **CONTEXTO:**
     ${context}
 
-    **MARCA:** ${brandProfile.name}${toneText ? ` | **TOM:** ${toneText}` : ""}
+    **MARCA:** ${brandProfile.name}${brandProfile.description ? ` - ${brandProfile.description}` : ""}${toneText ? ` | **TOM:** ${toneText}` : ""}
 
-    **REGRAS DE OURO:**
-    1. GANCHO EXPLOSIVO com emojis de poker.
-    2. DESTAQUE O GARANTIDO (GTD) se houver.
-    3. CTA FORTE (ex: Link na Bio).
-    4. 5-8 Hashtags estratégicas.
+    **DIRETRIZES:**
+    1. GANCHO EXPLOSIVO com emojis relevantes ao tema da marca.
+    2. DESTAQUE as informações mais importantes do contexto.
+    3. CTA FORTE e relevante ao conteúdo.
+    4. 5-8 Hashtags estratégicas para o nicho da marca.
 
     Responda apenas JSON:
-    { "platform": "Instagram", "content": "Texto Legenda", "hashtags": ["tag1", "tag2"], "image_prompt": "descrição visual" }
+    { "platform": "Instagram", "content": "Texto Legenda", "hashtags": ["tag1", "tag2"], "image_prompt": "descrição visual cinematográfica" }
     `,
     },
   ];
@@ -425,7 +425,7 @@ export const editImage = async (
   referenceImage?: { base64: string; mimeType: string },
 ): Promise<string> => {
   const ai = getAi();
-  const instructionPrompt = `DESIGNER SÊNIOR: Execute alteração profissional: ${prompt}. Texto original e logos são SAGRADOS, não cubra informações de valores (GTD/GARANTIDO).`;
+  const instructionPrompt = `DESIGNER SÊNIOR: Execute alteração profissional: ${prompt}. Texto original e logos são SAGRADOS, preserve informações importantes visíveis.`;
 
   const parts: any[] = [
     { text: instructionPrompt },
@@ -780,22 +780,22 @@ export const generateFlyer = async (
   const toneText = getToneText(brandProfile, "flyers");
 
   const brandingInstruction = `
-    **PERSONA:** Você é Diretor de Arte Sênior de uma agência de publicidade internacional de elite especializada em iGaming e Poker.
+    **PERSONA:** Você é Diretor de Arte Sênior de uma agência de publicidade internacional de elite.
 
-    **MISSÃO CRÍTICA (NÃO PULE ESTA REGRA):**
-    Todo torneio de poker é definido pelo seu VALOR GARANTIDO (GTD).
-    Você DEVE escrever o valor do **GARANTIDO (GTD)** em cada item da lista.
-    O GTD deve estar em destaque visual (fonte negrito, cor vibrante ou tamanho maior).
+    **MISSÃO CRÍTICA:**
+    Crie materiais visuais de alta qualidade que representem fielmente a marca e comuniquem a mensagem de forma impactante.
+    Destaque informações importantes (valores, datas, horários) de forma clara e legível.
 
     **REGRAS DE CONTEÚDO:**
-    1. Se o prompt fornecer um valor de "GTD", ele deve aparecer obrigatoriamente.
-    2. O Horário e o Nome do Torneio devem estar perfeitamente legíveis.
+    1. Todas as informações importantes devem estar em destaque visual (fonte negrito, cor vibrante ou tamanho maior).
+    2. Horários, nomes e valores devem estar perfeitamente legíveis.
     3. Use a marca ${brandProfile.name}.
 
     **IDENTIDADE DA MARCA - ${brandProfile.name}:**
+    ${brandProfile.description ? `- Descrição: ${brandProfile.description}` : ""}
     ${toneText ? `- Tom de Comunicação: ${toneText}` : ""}
     - Cor Primária (dominante): ${brandProfile.primaryColor}
-    - Cor de Acento (destaques, GTD, CTAs): ${brandProfile.secondaryColor}
+    - Cor de Acento (destaques, CTAs): ${brandProfile.secondaryColor}
 
     **PRINCÍPIOS DE DESIGN PROFISSIONAL:**
 
@@ -828,7 +828,7 @@ export const generateFlyer = async (
        - Evite excesso de efeitos (brilhos, sombras, neons chamativos)
        - Prefira elegância sutil a ostentação visual
        - Qualidade de marca luxury - refinamento, não exagero
-       - Se usar elementos de poker (fichas, cartas), que sejam fotorealistas e integrados, não clipart
+       - Use elementos visuais fotorealistas e integrados ao contexto da marca
 
     6. PERSONALIZAÇÃO DA MARCA:
        - O flyer deve parecer EXCLUSIVAMENTE da marca ${brandProfile.name}
@@ -837,7 +837,7 @@ export const generateFlyer = async (
        - Seja consistente: todos os flyers desta marca devem ter DNA visual comum
 
     **ATMOSFERA FINAL:**
-    - Poker de alta classe, luxo e sofisticação
+    - Alta classe, luxo e sofisticação
     - Cinematográfico mas não exagerado
     - Profissional mas criativo
     - Impactante mas elegante

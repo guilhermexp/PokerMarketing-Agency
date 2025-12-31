@@ -495,6 +495,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       onRemoveStyleReference={onRemoveStyleReference}
                       userId={userId}
                       galleryImages={galleryImages}
+                      campaignId={campaign.id}
                     />
                   )}
                   {activeTab === "posts" && (
@@ -618,7 +619,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                   contentId: image.id,
                   imageUrl: image.src,
                   caption: image.prompt || "Post agendado",
-                  hashtags: ["poker", "torneio"],
+                  hashtags: [],
                   scheduledDate: dateStr,
                   scheduledTime: "12:00",
                   scheduledTimestamp: tomorrow.getTime(),

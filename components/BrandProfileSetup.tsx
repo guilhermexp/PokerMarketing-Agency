@@ -249,7 +249,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                                         value={profile.name} 
                                         onChange={handleChange} 
                                         required 
-                                        placeholder="EX: CPC POKER ONLINE"
+                                        placeholder="EX: NOME DA SUA MARCA"
                                         className="w-full bg-[#111111] border border-white/5 rounded-2xl p-4 text-white text-base font-bold focus:outline-none focus:border-primary/50 transition-all placeholder:text-white/5"
                                     />
                                 </div>

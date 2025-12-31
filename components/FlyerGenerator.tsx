@@ -426,7 +426,7 @@ const TournamentEventCard: React.FC<{
         - O GTD (${gtdVal}) deve ocupar pelo menos 30% da área visual
         - Use a cor ${brandProfile.secondaryColor} no valor GTD
         - Fundo escuro/elegante baseado em ${brandProfile.primaryColor}
-        - Atmosfera: mesa de poker premium, cassino de luxo
+        - Atmosfera: ambiente premium, elegante e sofisticado
         - Tipografia impactante e moderna para o valor monetário
         `;
 
@@ -1224,8 +1224,8 @@ const PeriodCard: React.FC<{
         - Logo da marca no topo
         - GTD em destaque com cor ${brandProfile.secondaryColor}
         - Fundo baseado em ${brandProfile.primaryColor}
-        - Visual premium de poker/cassino
-        - Efeitos visuais: partículas, brilhos, fichas decorativas
+        - Visual premium e sofisticado
+        - Efeitos visuais: partículas, brilhos, elementos decorativos
         `
         : `
         TIPO: Grade de Programação com Destaque Principal
@@ -1245,7 +1245,7 @@ const PeriodCard: React.FC<{
         - Esta seção deve ocupar aproximadamente 40% da área do flyer
         - Nome do torneio em FONTE GIGANTE E BOLD
         - GTD (${topEvent ? formatCurrencyValue(topEvent.gtd, currency) : ""}) deve ser o MAIOR elemento visual - cor ${brandProfile.secondaryColor}
-        - Efeitos visuais: partículas, brilhos, explosão de elementos (fichas/cartas voando são opcionais)
+        - Efeitos visuais: partículas, brilhos, explosão de elementos dinâmicos
         - Background desta área pode ter gradiente ou elementos visuais dinâmicos
         - Horário e Buy-in em tamanho médio, bem legíveis
 
@@ -1272,7 +1272,7 @@ const PeriodCard: React.FC<{
         - Título "${label}" logo após o logo
         - Fundo baseado em ${brandProfile.primaryColor}
         - Contraste forte entre o DESTAQUE (topo) e a GRADE (inferior)
-        - Visual profissional de sportsbook/cassino premium
+        - Visual profissional e premium
         `;
 
       // Use background job if userId is available AND we're not in dev mode

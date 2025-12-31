@@ -13,7 +13,7 @@ const assistantTools = {
         properties: {
           description: {
             type: Type.STRING,
-            description: "Descrição técnica detalhada para a IA de imagem (estilo poker, cinematográfico, iluminação dramática, etc).",
+            description: "Descrição técnica detalhada para a IA de imagem (estilo cinematográfico, iluminação dramática, cores da marca, etc).",
           },
           aspect_ratio: {
             type: Type.STRING,
@@ -32,7 +32,7 @@ const assistantTools = {
         properties: {
           prompt: {
             type: Type.STRING,
-            description: "Descrição exata da alteração (ex: 'mude o fundo para um cassino em Las Vegas').",
+            description: "Descrição exata da alteração desejada na imagem.",
           },
         },
         required: ["prompt"],
@@ -82,14 +82,14 @@ export const runAssistantConversationStream = async (
         toneOfVoice: brandProfile.toneOfVoice,
     } : null;
 
-    const systemInstruction = `Você é o Diretor de Criação Sênior da DirectorAi. Especialista em Branding e Design para Poker.
+    const systemInstruction = `Você é o Diretor de Criação Sênior da DirectorAi. Especialista em Branding e Design de alta performance.
 
 SUAS CAPACIDADES CORE:
 1. CRIAÇÃO E ITERAÇÃO: Crie imagens do zero e continue editando-as até o usuário aprovar.
 2. REFERÊNCIAS: Use imagens de referência enviadas no chat para guiar o estilo das suas criações.
 3. BRANDING: Você conhece a marca: ${JSON.stringify(brandInfo)}. Sempre use a paleta de cores e o tom de voz oficial.
 
-NOTA TÉCNICA: Por restrições do sistema, ferramentas de busca externa e ferramentas de design não podem coexistir. Use seu vasto conhecimento interno sobre a indústria do poker (WSOP, BSOP, calendários, estética de cassinos) para responder e criar artes sem depender de busca externa.
+NOTA TÉCNICA: Por restrições do sistema, ferramentas de busca externa e ferramentas de design não podem coexistir. Use seu vasto conhecimento interno sobre a indústria da marca para responder e criar artes sem depender de busca externa.
 
 Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
 

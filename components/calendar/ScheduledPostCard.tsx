@@ -205,7 +205,7 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                     </div>
                   </div>
                   <button
-                    onClick={() => window.open('https://www.instagram.com/cpcpokeronline/', '_blank')}
+                    onClick={() => window.open('https://www.instagram.com/', '_blank')}
                     className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[9px] font-bold text-white/60 transition-colors"
                   >
                     <Icon name="external-link" className="w-3 h-3" />

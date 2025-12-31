@@ -19,7 +19,9 @@ import { getEnv } from "../utils/env";
 // MCP Configuration
 // Use proxy in dev/browser to avoid CORS, direct URL in prod/serverless
 const MCP_URL = '/api/rube';
-const INSTAGRAM_USER_ID = '25281402468195799'; // cpcpokeronline
+// Instagram User ID from environment or fallback
+const getInstagramUserId = () => getEnv("VITE_INSTAGRAM_USER_ID") || getEnv("INSTAGRAM_USER_ID") || '25281402468195799';
+const getInstagramUsername = () => getEnv("VITE_INSTAGRAM_USERNAME") || getEnv("INSTAGRAM_USERNAME") || 'default_user';
 
 // Get token - only needed for serverless function, browser uses proxy
 const getToken = () => getEnv("VITE_RUBE_TOKEN") || getEnv("RUBE_TOKEN");
@@ -206,7 +208,7 @@ export const executeInstagramTool = async (
 export const checkPublishingQuota = async (): Promise<PublishingQuota> => {
   try {
     const result = await executeInstagramTool('INSTAGRAM_GET_IG_USER_CONTENT_PUBLISHING_LIMIT', {
-      ig_user_id: INSTAGRAM_USER_ID,
+      ig_user_id: getInstagramUserId(),
       fields: 'quota_usage,config'
     });
 
@@ -235,7 +237,7 @@ export const createMediaContainer = async (
   caption: string
 ): Promise<string> => {
   const args: Record<string, unknown> = {
-    ig_user_id: INSTAGRAM_USER_ID,
+    ig_user_id: getInstagramUserId(),
   };
 
   // Stories don't support captions
@@ -290,7 +292,7 @@ export const createCarouselContainer = async (
   for (const url of mediaUrls) {
     const isVideo = url.includes('.mp4') || url.includes('.mov') || url.includes('video');
     const args: Record<string, unknown> = {
-      ig_user_id: INSTAGRAM_USER_ID,
+      ig_user_id: getInstagramUserId(),
       content_type: 'carousel_item',
       is_carousel_item: true
     };
@@ -314,7 +316,7 @@ export const createCarouselContainer = async (
 
   // Now create the carousel container
   const result = await executeInstagramTool('INSTAGRAM_CREATE_CAROUSEL_CONTAINER', {
-    ig_user_id: INSTAGRAM_USER_ID,
+    ig_user_id: getInstagramUserId(),
     caption: caption,
     children: itemIds
   });
@@ -338,7 +340,7 @@ export const getContainerStatus = async (containerId: string): Promise<string> =
  */
 export const publishContainer = async (containerId: string): Promise<string> => {
   const result = await executeInstagramTool('INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH', {
-    ig_user_id: INSTAGRAM_USER_ID,
+    ig_user_id: getInstagramUserId(),
     creation_id: containerId
   });
 
@@ -350,7 +352,7 @@ export const publishContainer = async (containerId: string): Promise<string> => 
  */
 export const publishCarousel = async (containerId: string): Promise<string> => {
   const result = await executeInstagramTool('INSTAGRAM_CREATE_POST', {
-    ig_user_id: INSTAGRAM_USER_ID,
+    ig_user_id: getInstagramUserId(),
     creation_id: containerId
   });
 
@@ -468,13 +470,13 @@ export const publishToInstagram = async (
 export const getInstagramUserInfo = async (): Promise<{ id: string; username: string }> => {
   try {
     const result = await executeInstagramTool('INSTAGRAM_GET_USER_INFO', {
-      ig_user_id: INSTAGRAM_USER_ID
+      ig_user_id: getInstagramUserId()
     });
     return {
-      id: result.id || INSTAGRAM_USER_ID,
-      username: result.username || 'cpcpokeronline'
+      id: result.id || getInstagramUserId(),
+      username: result.username || getInstagramUsername()
     };
   } catch {
-    return { id: INSTAGRAM_USER_ID, username: 'cpcpokeronline' };
+    return { id: getInstagramUserId(), username: getInstagramUsername() };
   }
 };
