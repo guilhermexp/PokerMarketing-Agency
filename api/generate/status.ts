@@ -4,7 +4,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSql, setupCors, resolveUserId } from '../db/_helpers/index';
+import { getSql, setupCors, resolveUserId } from '../db/_helpers/index.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle CORS

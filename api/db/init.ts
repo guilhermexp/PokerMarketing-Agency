@@ -20,11 +20,6 @@ import {
   getSql,
   resolveUserId,
   setupCors,
-  requireAuth,
-  applyRateLimit,
-  createRateLimitKey,
-  getCachedUserId,
-  cacheUserId,
 } from './_helpers/index.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -39,28 +34,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const start = Date.now();
 
   try {
-    // Require authentication
-    const auth = await requireAuth(req);
-
-    // Apply rate limiting
-    const rateLimitKey = createRateLimitKey(auth.userId, auth.orgId);
-    const rateLimitOk = await applyRateLimit('standard', rateLimitKey, res);
-    if (!rateLimitOk) return;
-
     const sql = getSql();
 
-    // Use userId from JWT token (more secure than query param)
-    const clerkUserId = auth.userId!;
-    const organizationId = auth.orgId;
+    // Get user_id from query params (Clerk handles auth on frontend)
+    const { user_id, organization_id } = req.query;
 
-    // Check cache first for user ID resolution
-    let resolvedUserId = await getCachedUserId(clerkUserId);
-    if (!resolvedUserId) {
-      resolvedUserId = await resolveUserId(sql, clerkUserId);
-      if (resolvedUserId) {
-        await cacheUserId(clerkUserId, resolvedUserId);
-      }
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
     }
+
+    const clerkUserId = user_id as string;
+    const organizationId = organization_id as string | undefined;
+
+    // Resolve Clerk ID to DB UUID
+    const resolvedUserId = await resolveUserId(sql, clerkUserId);
 
     if (!resolvedUserId) {
       console.log('[Init API] User not found, returning empty data');
@@ -254,12 +241,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (error: any) {
     console.error('[Init API] Error:', error);
-
-    // Handle authentication errors
-    if (error.name === 'AuthenticationError') {
-      return res.status(401).json({ error: error.message });
-    }
-
     return res.status(500).json({ error: error.message || 'Internal server error' });
   }
 }

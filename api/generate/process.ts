@@ -7,7 +7,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Receiver } from '@upstash/qstash';
 import { GoogleGenAI } from '@google/genai';
 import { put } from '@vercel/blob';
-import { getSql } from '../db/_helpers/index';
+import { getSql } from '../db/_helpers/index.js';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 

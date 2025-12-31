@@ -5,7 +5,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Client } from '@upstash/qstash';
-import { getSql, setupCors, resolveUserId } from '../db/_helpers/index';
+import { getSql, setupCors, resolveUserId } from '../db/_helpers/index.js';
 
 const QSTASH_TOKEN = process.env.QSTASH_TOKEN;
 
