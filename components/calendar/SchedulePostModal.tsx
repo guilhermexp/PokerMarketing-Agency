@@ -173,55 +173,104 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             )}
           </div>
 
-          {/* Form Panel */}
-          <div className="w-full lg:w-80 shrink-0 p-4 space-y-4 overflow-y-auto bg-[#111]">
-            {/* Selected Image Preview */}
-            {selectedImage && (
-              <div className="relative rounded-xl overflow-hidden">
-                <img
-                  src={selectedImage.src}
-                  alt=""
-                  className="w-full aspect-video object-cover"
-                />
-                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 rounded-lg">
-                  <span className="text-[9px] font-bold text-white/70 uppercase">{selectedImage.source}</span>
+          {/* Instagram Preview Panel */}
+          <div className="w-full lg:w-96 shrink-0 overflow-y-auto bg-black flex flex-col">
+            {/* Instagram Post Preview */}
+            <div className="bg-black border-b border-white/10">
+              {/* Post Header */}
+              <div className="flex items-center gap-3 p-3">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 p-[2px]">
+                  <div className="w-full h-full rounded-full bg-black flex items-center justify-center">
+                    <span className="text-[10px] font-bold text-white">IG</span>
+                  </div>
                 </div>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-white">seu_perfil</p>
+                  <p className="text-[10px] text-white/50">Local</p>
+                </div>
+                <Icon name="more-horizontal" className="w-5 h-5 text-white" />
               </div>
-            )}
 
-            {/* Caption */}
-            <div>
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2 block">
-                Legenda
-              </label>
-              <textarea
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                placeholder="Escreva a legenda..."
-                rows={2}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 resize-none"
-              />
+              {/* Post Image */}
+              <div className="aspect-square bg-[#111] flex items-center justify-center">
+                {selectedImage ? (
+                  <img
+                    src={selectedImage.src}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="text-center">
+                    <Icon name="image" className="w-12 h-12 text-white/20 mx-auto mb-2" />
+                    <p className="text-xs text-white/30">Selecione uma imagem</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Post Actions */}
+              <div className="p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-4">
+                    <Icon name="heart" className="w-6 h-6 text-white" />
+                    <Icon name="message-circle" className="w-6 h-6 text-white" />
+                    <Icon name="send" className="w-6 h-6 text-white" />
+                  </div>
+                  <Icon name="bookmark" className="w-6 h-6 text-white" />
+                </div>
+                <p className="text-xs font-semibold text-white mb-1">1.234 curtidas</p>
+
+                {/* Caption Preview */}
+                <div className="text-xs text-white">
+                  <span className="font-semibold">seu_perfil</span>{' '}
+                  <span className="text-white/80">
+                    {caption || <span className="text-white/30 italic">Sua legenda aparecerá aqui...</span>}
+                  </span>
+                </div>
+
+                {/* Hashtags Preview */}
+                {hashtags && (
+                  <p className="text-xs text-[#00a3ff] mt-1">
+                    {hashtags.split(/[\s,]+/).map(tag => tag.startsWith('#') ? tag : `#${tag}`).filter(t => t.length > 1).join(' ')}
+                  </p>
+                )}
+
+                <p className="text-[10px] text-white/40 mt-2 uppercase">
+                  {publishNow ? 'Agora' : `${scheduledDate} às ${scheduledTime}`}
+                </p>
+              </div>
             </div>
 
-            {/* Hashtags */}
-            <div>
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2 block">
-                Hashtags
-              </label>
-              <input
-                type="text"
-                value={hashtags}
-                onChange={(e) => setHashtags(e.target.value)}
-                placeholder="#poker #torneio"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
-              />
-            </div>
+            {/* Form Fields */}
+            <div className="p-4 space-y-4 bg-[#0a0a0a]">
+              {/* Caption Input */}
+              <div>
+                <label className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2 block">
+                  Legenda
+                </label>
+                <textarea
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="Escreva a legenda..."
+                  rows={2}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 resize-none"
+                />
+              </div>
 
-            {/* When */}
-            <div>
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2 block">
-                Quando
-              </label>
+              {/* Hashtags Input */}
+              <div>
+                <label className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2 block">
+                  Hashtags
+                </label>
+                <input
+                  type="text"
+                  value={hashtags}
+                  onChange={(e) => setHashtags(e.target.value)}
+                  placeholder="#poker #torneio"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                />
+              </div>
+
+              {/* Schedule Options */}
               <div className="flex gap-2">
                 <button
                   onClick={() => setPublishNow(true)}
@@ -240,78 +289,68 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   Agendar
                 </button>
               </div>
-            </div>
 
-            {/* Date & Time */}
-            {!publishNow && (
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  min={todayStr}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-white/20"
-                />
-                <input
-                  type="time"
-                  value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                  className={`flex-1 bg-white/5 border rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-white/20 ${
-                    isTimeInPast ? 'border-red-500/50' : 'border-white/10'
-                  }`}
-                />
-              </div>
-            )}
-
-            {/* Platform */}
-            <div>
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2 block">
-                Plataforma
-              </label>
-              <div className="flex gap-1">
-                {[
-                  { id: 'instagram', icon: 'instagram' },
-                  { id: 'facebook', icon: 'facebook' },
-                  { id: 'both', icon: 'share' },
-                ].map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => setPlatforms(p.id as SchedulingPlatform)}
-                    className={`flex-1 flex items-center justify-center py-2 rounded-lg text-xs font-bold transition-all ${
-                      platforms === p.id ? 'bg-white/10 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10'
+              {/* Date & Time */}
+              {!publishNow && (
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    min={todayStr}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-white/20"
+                  />
+                  <input
+                    type="time"
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
+                    className={`flex-1 bg-white/5 border rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-white/20 ${
+                      isTimeInPast ? 'border-red-500/50' : 'border-white/10'
                     }`}
-                  >
-                    <Icon name={p.icon as any} className="w-4 h-4" />
-                  </button>
-                ))}
-              </div>
-            </div>
+                  />
+                </div>
+              )}
 
-            {/* Content Type (Instagram only) */}
-            {platforms !== 'facebook' && (
-              <div>
-                <label className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2 block">
-                  Tipo
-                </label>
+              {/* Platform & Type Row */}
+              <div className="flex gap-2">
                 <div className="flex gap-1">
                   {[
-                    { id: 'photo', label: 'Feed' },
-                    { id: 'reel', label: 'Reel' },
-                    { id: 'story', label: 'Story' },
-                  ].map((t) => (
+                    { id: 'instagram', icon: 'instagram' },
+                    { id: 'facebook', icon: 'facebook' },
+                    { id: 'both', icon: 'share' },
+                  ].map((p) => (
                     <button
-                      key={t.id}
-                      onClick={() => setContentType(t.id as InstagramContentType)}
-                      className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${
-                        contentType === t.id ? 'bg-white/10 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10'
+                      key={p.id}
+                      onClick={() => setPlatforms(p.id as SchedulingPlatform)}
+                      className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${
+                        platforms === p.id ? 'bg-white/10 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10'
                       }`}
                     >
-                      {t.label}
+                      <Icon name={p.icon as any} className="w-4 h-4" />
                     </button>
                   ))}
                 </div>
+                {platforms !== 'facebook' && (
+                  <div className="flex-1 flex gap-1">
+                    {[
+                      { id: 'photo', label: 'Feed' },
+                      { id: 'reel', label: 'Reel' },
+                      { id: 'story', label: 'Story' },
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setContentType(t.id as InstagramContentType)}
+                        className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                          contentType === t.id ? 'bg-white/10 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
 
