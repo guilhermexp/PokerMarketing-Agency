@@ -6,13 +6,44 @@
 
 import React, { useState, useEffect } from 'react';
 import { useBackgroundJobs, type ActiveJob } from '../../hooks/useBackgroundJobs';
+import { cancelGenerationJob, cancelAllGenerationJobs } from '../../services/apiClient';
 import { Icon } from './Icon';
 
 export const BackgroundJobsIndicator: React.FC = () => {
-  const { pendingJobs, completedJobs, failedJobs, onJobComplete, onJobFailed } = useBackgroundJobs();
+  const { pendingJobs, completedJobs, failedJobs, onJobComplete, onJobFailed, refreshJobs } = useBackgroundJobs();
   const [isExpanded, setIsExpanded] = useState(false);
   const [recentlyCompleted, setRecentlyCompleted] = useState<ActiveJob[]>([]);
   const [showNotification, setShowNotification] = useState(false);
+  const [cancellingJob, setCancellingJob] = useState<string | null>(null);
+  const [cancellingAll, setCancellingAll] = useState(false);
+
+  const handleCancelJob = async (jobId: string) => {
+    setCancellingJob(jobId);
+    try {
+      await cancelGenerationJob(jobId);
+      await refreshJobs();
+    } catch (error) {
+      console.error('Failed to cancel job:', error);
+    } finally {
+      setCancellingJob(null);
+    }
+  };
+
+  const handleCancelAll = async () => {
+    if (pendingJobs.length === 0) return;
+    const userId = pendingJobs[0]?.user_id;
+    if (!userId) return;
+
+    setCancellingAll(true);
+    try {
+      await cancelAllGenerationJobs(userId);
+      await refreshJobs();
+    } catch (error) {
+      console.error('Failed to cancel all jobs:', error);
+    } finally {
+      setCancellingAll(false);
+    }
+  };
 
   // Listen for completed jobs to show notification
   useEffect(() => {
@@ -75,12 +106,23 @@ export const BackgroundJobsIndicator: React.FC = () => {
               <h4 className="text-xs font-black text-white uppercase tracking-wider">
                 Jobs em Background
               </h4>
-              <button
-                onClick={() => setIsExpanded(false)}
-                className="p-1 text-white/40 hover:text-white"
-              >
-                <Icon name="x" className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                {pendingJobs.length > 0 && (
+                  <button
+                    onClick={handleCancelAll}
+                    disabled={cancellingAll}
+                    className="px-2 py-1 text-[9px] font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
+                  >
+                    {cancellingAll ? 'Cancelando...' : 'Cancelar Todos'}
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsExpanded(false)}
+                  className="p-1 text-white/40 hover:text-white"
+                >
+                  <Icon name="x" className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <div className="max-h-64 overflow-y-auto">
@@ -93,7 +135,7 @@ export const BackgroundJobsIndicator: React.FC = () => {
                   {pendingJobs.map(job => (
                     <div
                       key={job.id}
-                      className="px-2 py-1.5 rounded-lg bg-amber-500/10 flex items-center gap-2 mb-1"
+                      className="px-2 py-1.5 rounded-lg bg-amber-500/10 flex items-center gap-2 mb-1 group"
                     >
                       {getStatusIcon(job.status)}
                       <span className="text-[10px] text-white/70 flex-1 truncate">
@@ -103,6 +145,18 @@ export const BackgroundJobsIndicator: React.FC = () => {
                       {job.status === 'processing' && (
                         <span className="text-[9px] text-amber-400">{job.progress}%</span>
                       )}
+                      <button
+                        onClick={() => handleCancelJob(job.id)}
+                        disabled={cancellingJob === job.id}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition-all disabled:opacity-50"
+                        title="Cancelar"
+                      >
+                        {cancellingJob === job.id ? (
+                          <div className="w-3 h-3 border border-red-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Icon name="x" className="w-3 h-3" />
+                        )}
+                      </button>
                     </div>
                   ))}
                 </div>

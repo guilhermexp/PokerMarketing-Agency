@@ -2256,6 +2256,65 @@ app.get("/api/generate/status", async (req, res) => {
   }
 });
 
+// Cancel/Delete a job
+app.delete("/api/generate/job/:jobId", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { jobId } = req.params;
+
+    if (!jobId) {
+      return res.status(400).json({ error: "jobId is required" });
+    }
+
+    // Cancel the job (mark as failed)
+    const result = await sql`
+      UPDATE generation_jobs
+      SET status = 'failed',
+          error_message = 'Cancelled by user'
+      WHERE id = ${jobId}
+      AND status IN ('queued', 'processing')
+      RETURNING id
+    `;
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Job not found or already completed" });
+    }
+
+    console.log(`[Generate] Job ${jobId} cancelled by user`);
+    res.json({ success: true, jobId });
+  } catch (error) {
+    console.error("[Generate Cancel] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cancel all pending jobs for a user
+app.post("/api/generate/cancel-all", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const result = await sql`
+      UPDATE generation_jobs
+      SET status = 'failed',
+          error_message = 'Cancelled by user (bulk)'
+      WHERE user_id = ${userId}
+      AND status IN ('queued', 'processing')
+      RETURNING id
+    `;
+
+    console.log(`[Generate] Cancelled ${result.length} jobs for user ${userId}`);
+    res.json({ success: true, cancelledCount: result.length });
+  } catch (error) {
+    console.error("[Generate Cancel All] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Video Proxy API
 app.get("/api/proxy-video", async (req, res) => {
   try {

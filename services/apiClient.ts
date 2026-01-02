@@ -960,6 +960,39 @@ export async function pollGenerationJob(
   }
 }
 
+/**
+ * Cancel a specific generation job
+ */
+export async function cancelGenerationJob(jobId: string): Promise<void> {
+  const response = await fetch(`/api/generate/job/${jobId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+}
+
+/**
+ * Cancel all pending jobs for a user
+ */
+export async function cancelAllGenerationJobs(userId: string): Promise<number> {
+  const response = await fetch("/api/generate/cancel-all", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  const result = await response.json();
+  return result.cancelledCount;
+}
+
 // ============================================================================
 // AI Generation API (Server-side)
 // These endpoints run on Vercel Serverless with rate limiting
