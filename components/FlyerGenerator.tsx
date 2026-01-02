@@ -1816,7 +1816,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     }
     return { ALL: true, MORNING: true, AFTERNOON: true, NIGHT: true, HIGHLIGHTS: true };
   });
-  const [isPeriodSelectorOpen, setIsPeriodSelectorOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [showOnlyWithGtd, setShowOnlyWithGtd] = useState(() => {
     return localStorage.getItem("flyer_showOnlyWithGtd") === "true";
   });
@@ -2239,59 +2239,14 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   ? "Grades de Período"
                   : "Torneios Individuais"}
               </Button>
-              {/* Period selector - only show in "Grades de Período" view */}
-              {!showIndividualTournaments && (
-                <div className="relative">
-                  <button
-                    onClick={() => setIsPeriodSelectorOpen(!isPeriodSelectorOpen)}
-                    className={`px-2.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${
-                      isPeriodSelectorOpen
-                        ? "bg-primary/20 text-primary border border-primary/30"
-                        : "bg-[#0a0a0a] text-white/40 border border-white/10 hover:text-white/60"
-                    }`}
-                    title="Selecionar grades"
-                  >
-                    <Icon name="settings" className="w-3.5 h-3.5" />
-                    <span>{Object.values(enabledPeriods).filter(Boolean).length}/5</span>
-                  </button>
-                  {isPeriodSelectorOpen && (
-                    <>
-                      {/* Backdrop */}
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setIsPeriodSelectorOpen(false)}
-                      />
-                      {/* Dropdown */}
-                      <div className="absolute top-full left-0 mt-1 z-50 bg-[#111] border border-white/10 rounded-xl p-2 min-w-[180px] shadow-xl">
-                        <p className="text-[8px] font-black text-white/30 uppercase tracking-wider px-2 py-1 mb-1">
-                          Grades a gerar
-                        </p>
-                        {(["ALL", "MORNING", "AFTERNOON", "NIGHT", "HIGHLIGHTS"] as TimePeriod[]).map((period) => (
-                          <label
-                            key={period}
-                            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer transition-colors"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={enabledPeriods[period]}
-                              onChange={(e) =>
-                                setEnabledPeriods((prev) => ({
-                                  ...prev,
-                                  [period]: e.target.checked,
-                                }))
-                              }
-                              className="w-3.5 h-3.5 rounded border-white/20 bg-transparent text-primary focus:ring-primary/50 focus:ring-offset-0"
-                            />
-                            <span className="text-[10px] text-white/70 font-medium">
-                              {periodLabels[selectedLanguage][period]}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+              {/* Settings button */}
+              <button
+                onClick={() => setIsSettingsModalOpen(true)}
+                className="px-2.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 bg-[#0a0a0a] text-white/40 border border-white/10 hover:text-white/60 hover:border-white/20"
+                title="Configurações"
+              >
+                <Icon name="settings" className="w-3.5 h-3.5" />
+              </button>
               {showIndividualTournaments && (
                 <>
                   <button
@@ -2475,9 +2430,9 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
           )}
 
           <div className="space-y-4">
-            {/* Linha de controles */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-              <div className="space-y-1.5">
+            {/* Linha de controles simplificada */}
+            <div className="flex items-end gap-3">
+              <div className="space-y-1.5 flex-1 max-w-[200px]">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
                   Dia Ativo
                 </label>
@@ -2494,110 +2449,29 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   ))}
                 </select>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
-                  Aspect Ratio
-                </label>
-                <select
-                  value={selectedAspectRatio}
-                  onChange={(e) => setSelectedAspectRatio(e.target.value)}
-                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none appearance-none cursor-pointer"
-                >
-                  <option value="9:16">Vertical (9:16)</option>
-                  <option value="1:1">Quadrado (1:1)</option>
-                  <option value="16:9">Widescreen (16:9)</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
-                  Moeda
-                </label>
-                <select
-                  value={selectedCurrency}
-                  onChange={(e) =>
-                    setSelectedCurrency(e.target.value as Currency)
-                  }
-                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none appearance-none cursor-pointer"
-                >
-                  <option value="BRL">Real (R$)</option>
-                  <option value="USD">Dólar ($)</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
-                  Idioma
-                </label>
-                <select
-                  value={selectedLanguage}
-                  onChange={(e) =>
-                    setSelectedLanguage(e.target.value as "pt" | "en")
-                  }
-                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none appearance-none cursor-pointer"
-                >
-                  <option value="pt">Português (BR)</option>
-                  <option value="en">English (US)</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
-                  Engine IA
-                </label>
-                <select
-                  value={selectedImageModel}
-                  onChange={(e) =>
-                    setSelectedImageModel(e.target.value as ImageModel)
-                  }
-                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none appearance-none cursor-pointer"
-                >
-                  <option value="gemini-3-pro-image-preview">
-                    Gemini 3 Pro Image
-                  </option>
-                  <option value="imagen-4.0-generate-001">Imagen 4.0</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
-                  Resolução
-                </label>
-                <select
-                  value={selectedImageSize}
-                  onChange={(e) =>
-                    setSelectedImageSize(e.target.value as ImageSize)
-                  }
-                  disabled={selectedImageModel === "imagen-4.0-generate-001"}
-                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none appearance-none cursor-pointer disabled:opacity-20"
-                >
-                  <option value="1K">HD (1K)</option>
-                  <option value="2K">QuadHD (2K)</option>
-                  <option value="4K">UltraHD (4K)</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                <Button
-                  variant="primary"
-                  size="small"
-                  className="w-full"
-                  onClick={() => {
-                    setIsBatchGenerating(true);
-                    setDailyFlyerState({
-                      ALL: [],
-                      MORNING: [],
-                      AFTERNOON: [],
-                      NIGHT: [],
-                      HIGHLIGHTS: [],
-                    });
-                    setBatchTrigger(true);
-                    setTimeout(() => {
-                      setBatchTrigger(false);
-                      setIsBatchGenerating(false);
-                    }, 1500);
-                  }}
-                  isLoading={isBatchGenerating}
-                  icon="zap"
-                >
-                  Gerar Grade
-                </Button>
-              </div>
+              <Button
+                variant="primary"
+                size="small"
+                onClick={() => {
+                  setIsBatchGenerating(true);
+                  setDailyFlyerState({
+                    ALL: [],
+                    MORNING: [],
+                    AFTERNOON: [],
+                    NIGHT: [],
+                    HIGHLIGHTS: [],
+                  });
+                  setBatchTrigger(true);
+                  setTimeout(() => {
+                    setBatchTrigger(false);
+                    setIsBatchGenerating(false);
+                  }, 1500);
+                }}
+                isLoading={isBatchGenerating}
+                icon="zap"
+              >
+                Gerar Grade
+              </Button>
             </div>
           </div>
 
@@ -2911,6 +2785,149 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
             onSave={(ev) => onAddEvent(ev)}
             day={selectedDay}
           />
+
+          {/* Settings Modal */}
+          {isSettingsModalOpen && (
+            <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
+              <Card className="w-full max-w-md border-white/10 bg-[#080808] overflow-hidden">
+                <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center bg-[#0d0d0d]">
+                  <h3 className="text-[10px] font-black text-white uppercase tracking-wide">
+                    Configurações de Geração
+                  </h3>
+                  <button
+                    onClick={() => setIsSettingsModalOpen(false)}
+                    className="text-white/20 hover:text-white transition-colors"
+                  >
+                    <Icon name="x" className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="p-5 space-y-5">
+                  {/* Grades a Gerar */}
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-black text-white/30 uppercase tracking-wide">
+                      Grades a Gerar
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["ALL", "MORNING", "AFTERNOON", "NIGHT", "HIGHLIGHTS"] as TimePeriod[]).map((period) => (
+                        <label
+                          key={period}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all border ${
+                            enabledPeriods[period]
+                              ? "bg-primary/10 border-primary/30 text-white"
+                              : "bg-[#0a0a0a] border-white/5 text-white/40 hover:border-white/10"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={enabledPeriods[period]}
+                            onChange={(e) =>
+                              setEnabledPeriods((prev) => ({
+                                ...prev,
+                                [period]: e.target.checked,
+                              }))
+                            }
+                            className="w-3.5 h-3.5 rounded border-white/20 bg-transparent text-primary focus:ring-primary/50 focus:ring-offset-0"
+                          />
+                          <span className="text-[10px] font-bold">
+                            {periodLabels[selectedLanguage][period]}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Configurações de Imagem */}
+                  <div className="space-y-3">
+                    <p className="text-[9px] font-black text-white/30 uppercase tracking-wide">
+                      Configurações de Imagem
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[8px] font-bold text-white/40 uppercase tracking-wide">
+                          Aspect Ratio
+                        </label>
+                        <select
+                          value={selectedAspectRatio}
+                          onChange={(e) => setSelectedAspectRatio(e.target.value)}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
+                        >
+                          <option value="9:16">Vertical (9:16)</option>
+                          <option value="1:1">Quadrado (1:1)</option>
+                          <option value="16:9">Widescreen (16:9)</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[8px] font-bold text-white/40 uppercase tracking-wide">
+                          Resolução
+                        </label>
+                        <select
+                          value={selectedImageSize}
+                          onChange={(e) => setSelectedImageSize(e.target.value as ImageSize)}
+                          disabled={selectedImageModel === "imagen-4.0-generate-001"}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer disabled:opacity-20"
+                        >
+                          <option value="1K">HD (1K)</option>
+                          <option value="2K">QuadHD (2K)</option>
+                          <option value="4K">UltraHD (4K)</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[8px] font-bold text-white/40 uppercase tracking-wide">
+                          Engine IA
+                        </label>
+                        <select
+                          value={selectedImageModel}
+                          onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
+                        >
+                          <option value="gemini-3-pro-image-preview">Gemini 3 Pro</option>
+                          <option value="imagen-4.0-generate-001">Imagen 4.0</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[8px] font-bold text-white/40 uppercase tracking-wide">
+                          Moeda
+                        </label>
+                        <select
+                          value={selectedCurrency}
+                          onChange={(e) => setSelectedCurrency(e.target.value as Currency)}
+                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
+                        >
+                          <option value="BRL">Real (R$)</option>
+                          <option value="USD">Dólar ($)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Idioma */}
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-bold text-white/40 uppercase tracking-wide">
+                      Idioma do Texto
+                    </label>
+                    <select
+                      value={selectedLanguage}
+                      onChange={(e) => setSelectedLanguage(e.target.value as "pt" | "en")}
+                      className="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="pt">Português (BR)</option>
+                      <option value="en">English (US)</option>
+                    </select>
+                  </div>
+
+                  {/* Fechar */}
+                  <Button
+                    variant="primary"
+                    size="small"
+                    className="w-full"
+                    onClick={() => setIsSettingsModalOpen(false)}
+                  >
+                    Salvar Configurações
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          )}
         </div>
       </div>
 
