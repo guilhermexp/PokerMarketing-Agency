@@ -684,7 +684,9 @@ const PeriodCardRow: React.FC<{
   userId,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Auto-expand if there are already generated flyers
+  const hasExistingFlyers = generatedFlyers.some((f) => f !== "loading");
+  const [isExpanded, setIsExpanded] = useState(hasExistingFlyers);
   const [editingFlyer, setEditingFlyer] = useState<GalleryImage | null>(null);
   const [quickPostFlyer, setQuickPostFlyer] = useState<GalleryImage | null>(
     null,
@@ -750,6 +752,13 @@ const PeriodCardRow: React.FC<{
       }
     }
   }, [pendingJob, isGenerating, generatedFlyers, setGeneratedFlyers]);
+
+  // Auto-expand when flyers are loaded from storage
+  useEffect(() => {
+    if (hasExistingFlyers && !isExpanded) {
+      setIsExpanded(true);
+    }
+  }, [hasExistingFlyers]);
 
   const parseGtd = (gtd: string): number => {
     if (!gtd || gtd === "---") return 0;

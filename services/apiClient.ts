@@ -843,7 +843,7 @@ export interface GenerationJobConfig {
 export interface GenerationJob {
   id: string;
   user_id: string;
-  job_type: "flyer" | "flyer_daily" | "post" | "ad";
+  job_type: "flyer" | "flyer_daily" | "post" | "ad" | "clip";
   status: "queued" | "processing" | "completed" | "failed";
   progress: number;
   result_url: string | null;

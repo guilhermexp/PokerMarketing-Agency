@@ -513,7 +513,8 @@ CREATE TYPE generation_job_type AS ENUM (
     'flyer',
     'flyer_daily',
     'post',
-    'ad'
+    'ad',
+    'clip'
 );
 
 CREATE TABLE generation_jobs (

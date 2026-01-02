@@ -479,6 +479,8 @@ interface ClipCardProps {
   onAddImageToGallery?: (image: Omit<GalleryImage, "id">) => GalleryImage;
   galleryImages?: GalleryImage[];
   campaignId?: string;
+  onGenerateAllClipImages?: () => void; // Generate thumbnail + all scene images for this clip
+  isGeneratingAllClipImages?: boolean;
 }
 
 const ClipCard: React.FC<ClipCardProps> = ({
@@ -499,6 +501,8 @@ const ClipCard: React.FC<ClipCardProps> = ({
   onAddImageToGallery,
   galleryImages,
   campaignId,
+  onGenerateAllClipImages,
+  isGeneratingAllClipImages,
 }) => {
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [videoStates, setVideoStates] = useState<Record<number, VideoState[]>>(
@@ -1509,9 +1513,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         }));
 
         // Save to gallery for persistence (linked to clip for filtering)
-        if (onAddImageToGallery) {
+        // Use httpUrl (blob URL) instead of dataUrl for persistence
+        if (onAddImageToGallery && httpUrl) {
           onAddImageToGallery({
-            src: imageDataUrl,
+            src: httpUrl,
             prompt: scene.visual,
             source: getSceneSource(scene.sceneNumber),
             model: "gemini-3-pro-image-preview",
@@ -1590,9 +1595,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       }));
 
       // Save to gallery for persistence (linked to clip for filtering)
-      if (onAddImageToGallery) {
+      // Use httpUrl (blob URL) instead of dataUrl for persistence
+      if (onAddImageToGallery && httpUrl) {
         onAddImageToGallery({
-          src: imageDataUrl,
+          src: httpUrl,
           prompt: scene.visual,
           source: getSceneSource(sceneNumber),
           model: "gemini-3-pro-image-preview",
@@ -3153,6 +3159,19 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               <span>{removeSilence ? "Sem Silencio" : "Com Silencio"}</span>
             </button>
             {/* Action Buttons */}
+            {onGenerateAllClipImages && (
+              <Button
+                onClick={onGenerateAllClipImages}
+                isLoading={isGeneratingAllClipImages}
+                disabled={isGeneratingAllClipImages || isGeneratingThumbnail || isGeneratingImages}
+                size="small"
+                icon="zap"
+                className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-primary/20 !text-primary !border !border-primary/30 hover:!bg-primary/30"
+                title="Gerar capa + todas as imagens de referência deste clip"
+              >
+                Gerar Todas
+              </Button>
+            )}
             <Button
               onClick={handleGenerateSceneImages}
               isLoading={isGeneratingImages}
@@ -4779,11 +4798,11 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
     isGenerating: [],
     errors: [],
   });
-  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [selectedImageModel] = useState<ImageModel>(
     "gemini-3-pro-image-preview",
   );
   const [sceneImageTriggers, setSceneImageTriggers] = useState<number[]>([]);
+  const [generatingAllForClip, setGeneratingAllForClip] = useState<number | null>(null);
 
   const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
 
@@ -5021,48 +5040,31 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
     }
   };
 
-  const handleGenerateAllImages = async () => {
-    setIsGeneratingAll(true);
+  // Generate all images for a specific clip (thumbnail + scene images)
+  const handleGenerateAllForClip = async (clipIndex: number) => {
+    setGeneratingAllForClip(clipIndex);
 
-    // Generate thumbnails and trigger scene images for each clip sequentially
-    for (let index = 0; index < videoClipScripts.length; index++) {
-      if (!thumbnails[index]) {
-        await handleGenerateThumbnail(index, extraInstructions[index]);
+    try {
+      // Generate thumbnail if not present
+      if (!thumbnails[clipIndex]) {
+        await handleGenerateThumbnail(clipIndex, extraInstructions[clipIndex]);
       }
-      // Trigger scene image generation for this clip after its thumbnail is ready
+
+      // Trigger scene image generation after thumbnail
       // Small delay to ensure thumbnail state is updated
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 300));
       setSceneImageTriggers((prev) => {
         const next = [...prev];
-        next[index] = prev[index] + 1;
+        next[clipIndex] = (prev[clipIndex] || 0) + 1;
         return next;
       });
+    } finally {
+      setGeneratingAllForClip(null);
     }
-
-    setIsGeneratingAll(false);
   };
 
   return (
     <div className="space-y-6">
-      {/* Controls Bar */}
-      <div className="flex items-center gap-4">
-        <Button
-          onClick={handleGenerateAllImages}
-          isLoading={isGeneratingAll}
-          disabled={
-            isGeneratingAll || generationState.isGenerating.some(Boolean)
-          }
-          icon="zap"
-          size="small"
-          className="rounded-md"
-        >
-          Gerar Todas Imagens
-        </Button>
-        <p className="text-[9px] text-white/30">
-          Gera capas + imagens de referência para todas as cenas
-        </p>
-      </div>
-
       {/* Clips */}
       {videoClipScripts.map((clip, index) => (
         <ClipCard
@@ -5094,6 +5096,8 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
           onAddImageToGallery={onAddImageToGallery}
           galleryImages={galleryImages}
           campaignId={campaignId}
+          onGenerateAllClipImages={() => handleGenerateAllForClip(index)}
+          isGeneratingAllClipImages={generatingAllForClip === index}
         />
       ))}
     </div>
