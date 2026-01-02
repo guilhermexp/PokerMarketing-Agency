@@ -177,29 +177,37 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               {[...images].reverse().map((image) => (
                 <div
                   key={image.id}
-                  onClick={() => setSelectedImage(image)}
-                  className="group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 cursor-pointer break-inside-avoid mb-3"
+                  onClick={() => !isAudio(image) && setSelectedImage(image)}
+                  className={`group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 break-inside-avoid mb-3 ${isAudio(image) ? "" : "cursor-pointer"}`}
                 >
                   {isAudio(image) ? (
-                    <div className="w-full aspect-square bg-gradient-to-br from-primary/20 via-[#1a1a1a] to-[#111] flex flex-col items-center justify-center p-4">
-                      <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mb-3">
-                        <Icon name="volume-2" className="w-8 h-8 text-primary" />
+                    <div className="w-full aspect-[4/3] bg-gradient-to-br from-primary/20 via-[#1a1a1a] to-[#111] flex flex-col items-center justify-center p-4">
+                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-2">
+                        <Icon name="volume-2" className="w-6 h-6 text-primary" />
                       </div>
-                      <p className="text-[10px] text-white/60 font-bold uppercase tracking-wide mb-2">
+                      <p className="text-[9px] text-white/60 font-bold uppercase tracking-wide mb-1">
                         Narração
                       </p>
                       {image.duration && (
-                        <span className="text-xs text-white/40 font-mono">
+                        <span className="text-[10px] text-white/40 font-mono mb-2">
                           {formatDuration(image.duration)}
                         </span>
                       )}
                       <audio
                         src={image.src}
-                        className="w-full mt-3 h-8"
+                        className="w-full h-7"
                         controls
                         preload="metadata"
-                        onClick={(e) => e.stopPropagation()}
                       />
+                      <a
+                        href={image.src}
+                        download={`narracao-${image.id.substring(0, 8)}.mp3`}
+                        className="mt-2 text-[9px] text-primary hover:text-primary/80 font-bold uppercase tracking-wide flex items-center gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Icon name="download" className="w-3 h-3" />
+                        Download
+                      </a>
                     </div>
                   ) : isVideo(image) ? (
                     <video
@@ -247,53 +255,59 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Actions */}
+                  {/* Actions - Hide edit/favorite for audio */}
                   <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleFavorite(image);
-                      }}
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all backdrop-blur-sm ${isFavorite(image) ? "bg-primary text-black shadow-lg shadow-primary/30" : "bg-black/60 text-white/80 hover:bg-black/80 hover:text-primary"}`}
-                      title={
-                        isFavorite(image)
-                          ? "Remover dos favoritos"
-                          : "Adicionar aos favoritos"
-                      }
-                    >
-                      <Icon name="heart" className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedImage(image);
-                      }}
-                      className="w-7 h-7 rounded-lg bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/80 hover:bg-black/80 transition-all"
-                      title="Editar imagem"
-                    >
-                      <Icon name="edit" className="w-3.5 h-3.5" />
-                    </button>
+                    {!isAudio(image) && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleFavorite(image);
+                          }}
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all backdrop-blur-sm ${isFavorite(image) ? "bg-primary text-black shadow-lg shadow-primary/30" : "bg-black/60 text-white/80 hover:bg-black/80 hover:text-primary"}`}
+                          title={
+                            isFavorite(image)
+                              ? "Remover dos favoritos"
+                              : "Adicionar aos favoritos"
+                          }
+                        >
+                          <Icon name="heart" className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedImage(image);
+                          }}
+                          className="w-7 h-7 rounded-lg bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/80 hover:bg-black/80 transition-all"
+                          title="Editar imagem"
+                        >
+                          <Icon name="edit" className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
                     {onDeleteImage && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           if (
                             confirm(
-                              "Tem certeza que deseja excluir esta imagem?",
+                              isAudio(image)
+                                ? "Tem certeza que deseja excluir este áudio?"
+                                : "Tem certeza que deseja excluir esta imagem?",
                             )
                           )
                             onDeleteImage(image.id);
                         }}
                         className="w-7 h-7 rounded-lg bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/80 hover:bg-red-500/80 hover:text-white transition-all"
-                        title="Excluir imagem"
+                        title={isAudio(image) ? "Excluir áudio" : "Excluir imagem"}
                       >
                         <Icon name="trash" className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
 
-                  {/* Favorite indicator */}
-                  {isFavorite(image) && (
+                  {/* Favorite indicator - not for audio */}
+                  {!isAudio(image) && isFavorite(image) && (
                     <div className="absolute top-2 left-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
                       <Icon name="heart" className="w-3 h-3 text-black" />
                     </div>
@@ -309,15 +323,6 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     </div>
                   )}
 
-                  {/* Audio indicator */}
-                  {isAudio(image) && (
-                    <div className="absolute bottom-2 left-2 bg-primary/80 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
-                      <Icon name="volume-2" className="w-3 h-3 text-black" />
-                      <span className="text-[8px] font-bold text-black uppercase">
-                        Áudio
-                      </span>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>

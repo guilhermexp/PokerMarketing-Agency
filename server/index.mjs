@@ -1911,6 +1911,40 @@ app.delete("/api/db/campaigns", async (req, res) => {
   }
 });
 
+// Update clip thumbnail
+app.patch("/api/db/campaigns", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { clip_id } = req.query;
+    const { thumbnail_url } = req.body;
+
+    if (!clip_id) {
+      return res.status(400).json({ error: "clip_id is required" });
+    }
+
+    if (!thumbnail_url) {
+      return res.status(400).json({ error: "thumbnail_url is required" });
+    }
+
+    const result = await sql`
+      UPDATE video_clip_scripts
+      SET thumbnail_url = ${thumbnail_url}, updated_at = NOW()
+      WHERE id = ${clip_id}
+      RETURNING *
+    `;
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Clip not found" });
+    }
+
+    console.log(`[Campaigns API] Updated clip ${clip_id} thumbnail`);
+    res.status(200).json(result[0]);
+  } catch (error) {
+    console.error("[Campaigns API] Error updating clip thumbnail:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Tournaments API
 app.get("/api/db/tournaments/list", async (req, res) => {
   try {

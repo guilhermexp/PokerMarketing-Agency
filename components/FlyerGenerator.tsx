@@ -1784,9 +1784,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     },
   );
   const [showIndividualTournaments, setShowIndividualTournaments] = useState(
-    () => {
-      return localStorage.getItem("flyer_showIndividual") === "true";
-    },
+    false, // Always start with "Grades de Período" view
   );
   const [showOnlyWithGtd, setShowOnlyWithGtd] = useState(() => {
     return localStorage.getItem("flyer_showOnlyWithGtd") === "true";
@@ -1830,12 +1828,6 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   useEffect(() => {
     localStorage.setItem("flyer_imageModel", selectedImageModel);
   }, [selectedImageModel]);
-  useEffect(() => {
-    localStorage.setItem(
-      "flyer_showIndividual",
-      String(showIndividualTournaments),
-    );
-  }, [showIndividualTournaments]);
   useEffect(() => {
     localStorage.setItem("flyer_showOnlyWithGtd", String(showOnlyWithGtd));
   }, [showOnlyWithGtd]);
@@ -2144,13 +2136,41 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-6 animate-fade-in-up px-6 py-5">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="text-left">
-              <h2 className="text-2xl font-black text-white uppercase tracking-tight">
-                Daily Protocol
-              </h2>
-              <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
-                Agrupamento Inteligente • Ciclo Diário
-              </p>
+            <div className="flex items-center gap-4">
+              <div className="text-left">
+                <h2 className="text-2xl font-black text-white uppercase tracking-tight">
+                  Daily Protocol
+                </h2>
+                <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
+                  Agrupamento Inteligente • Ciclo Diário
+                </p>
+              </div>
+              {/* Week info inline in header */}
+              {events.length > 0 && weekScheduleInfo && (
+                <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-[#0a0a0a] border border-white/5 rounded-xl">
+                  <button
+                    onClick={() => setIsSchedulesPanelOpen(!isSchedulesPanelOpen)}
+                    className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                  >
+                    <Icon name="calendar" className="w-3 h-3 text-white/30" />
+                    <span className="text-[9px] font-bold text-white/50 uppercase">
+                      Semana {weekScheduleInfo.startDate} a {weekScheduleInfo.endDate}
+                    </span>
+                    <Icon
+                      name={isSchedulesPanelOpen ? "chevron-up" : "chevron-down"}
+                      className="w-3 h-3 text-white/30"
+                    />
+                  </button>
+                  <div className="h-3 w-px bg-white/10" />
+                  <span className="text-[9px] font-black text-white/40 uppercase">
+                    {weekStats.totalTournaments} torneios
+                  </span>
+                  <div className="h-3 w-px bg-white/10" />
+                  <span className="text-[9px] font-black text-primary uppercase">
+                    GTD Total: {formatCurrencyValue(String(weekStats.totalGtd), selectedCurrency)}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -2258,51 +2278,6 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               >
                 Remover
               </Button>
-            </div>
-          )}
-
-          {/* Legenda fixa da semana - só aparece quando tem planilha carregada */}
-          {events.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[#111111] border border-white/5 rounded-xl">
-              <div className="flex items-center gap-4">
-                {weekScheduleInfo && (
-                  <button
-                    onClick={() =>
-                      setIsSchedulesPanelOpen(!isSchedulesPanelOpen)
-                    }
-                    className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-                  >
-                    <Icon name="calendar" className="w-3 h-3 text-white/20" />
-                    <span className="text-[8px] font-bold text-white/40 uppercase">
-                      Semana {weekScheduleInfo.startDate} a{" "}
-                      {weekScheduleInfo.endDate}
-                    </span>
-                    <Icon
-                      name={
-                        isSchedulesPanelOpen ? "chevron-up" : "chevron-down"
-                      }
-                      className="w-3 h-3 text-white/20"
-                    />
-                  </button>
-                )}
-                <div className="h-3 w-px bg-white/10" />
-                <span className="text-[8px] font-black text-white/30 uppercase">
-                  {weekStats.totalTournaments} torneios
-                </span>
-                <div className="h-3 w-px bg-white/10" />
-                <span className="text-[8px] font-black text-primary/60 uppercase">
-                  GTD Total:{" "}
-                  {formatCurrencyValue(
-                    String(weekStats.totalGtd),
-                    selectedCurrency,
-                  )}
-                </span>
-              </div>
-              {allSchedules.length > 1 && (
-                <span className="text-[8px] text-white/20">
-                  {allSchedules.length} planilhas salvas
-                </span>
-              )}
             </div>
           )}
 
