@@ -497,8 +497,9 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
     setIsGeneratingAll(false);
   };
 
-  const handleImageUpdate = (index: number, newSrc: string) => {
+  const handleImageUpdate = async (index: number, newSrc: string) => {
     const image = images[index];
+    const ad = adCreatives[index];
     if (image) {
       onUpdateGalleryImage(image.id, newSrc);
       const updatedImage = { ...image, src: newSrc };
@@ -507,6 +508,16 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
         newImages[index] = updatedImage;
         return newImages;
       });
+
+      // Also update the database so the edit persists
+      if (ad?.id) {
+        try {
+          await updateAdCreativeImage(ad.id, newSrc);
+          console.log("[AdCreativesTab] Updated ad image in database:", ad.id);
+        } catch (err) {
+          console.error("[AdCreativesTab] Failed to update ad image in database:", err);
+        }
+      }
     }
   };
 

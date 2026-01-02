@@ -522,8 +522,9 @@ export const PostsTab: React.FC<PostsTabProps> = ({
     setIsGeneratingAll(false);
   };
 
-  const handleImageUpdate = (index: number, newSrc: string) => {
+  const handleImageUpdate = async (index: number, newSrc: string) => {
     const image = images[index];
+    const post = posts[index];
     if (image) {
       onUpdateGalleryImage(image.id, newSrc);
       const updatedImage = { ...image, src: newSrc };
@@ -532,6 +533,16 @@ export const PostsTab: React.FC<PostsTabProps> = ({
         newImages[index] = updatedImage;
         return newImages;
       });
+
+      // Also update the database so the edit persists
+      if (post?.id) {
+        try {
+          await updatePostImage(post.id, newSrc);
+          console.log("[PostsTab] Updated post image in database:", post.id);
+        } catch (err) {
+          console.error("[PostsTab] Failed to update post image in database:", err);
+        }
+      }
     }
   };
 

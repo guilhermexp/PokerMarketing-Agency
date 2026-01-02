@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { editImage } from '../../services/geminiService';
+import { uploadImageToBlob } from '../../services/blobService';
 import { Button } from './Button';
 import { Icon } from './Icon';
 import { Loader } from './Loader';
@@ -37,6 +38,32 @@ const fileToImageFile = (file: File): Promise<ImageFile> =>
     };
     reader.onerror = error => reject(error);
   });
+
+// Helper to convert image URL to base64
+const urlToBase64 = async (url: string): Promise<{ base64: string; mimeType: string }> => {
+  // If it's already a data URL, just extract the parts
+  if (url.startsWith('data:')) {
+    const [header, base64] = url.split(',');
+    const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+    return { base64, mimeType };
+  }
+
+  // For HTTP URLs, fetch and convert to base64
+  const response = await fetch(url);
+  const blob = await response.blob();
+  const mimeType = blob.type || 'image/png';
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.split(',')[1];
+      resolve({ base64, mimeType });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
 
 const ImageUploader: React.FC<{
     image: ImageFile | null;
@@ -229,8 +256,8 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     setIsEditing(true);
     setError(null);
     try {
-        const [imgHeader, imgBase64] = image.src.split(',');
-        const imgMimeType = imgHeader.match(/:(.*?);/)?.[1] || 'image/png';
+        // Convert image URL (data: or http:) to base64
+        const { base64: imgBase64, mimeType: imgMimeType } = await urlToBase64(image.src);
 
         const maskCanvas = maskCanvasRef.current;
         let maskData: { base64: string, mimeType: string } | undefined = undefined;
@@ -242,7 +269,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 
             if (hasDrawing) {
                const maskDataUrl = maskCanvas.toDataURL('image/png');
-               const [maskHeader, maskBase64] = maskDataUrl.split(',');
+               const [, maskBase64] = maskDataUrl.split(',');
                maskData = { base64: maskBase64, mimeType: 'image/png' };
             }
         }
@@ -251,11 +278,28 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             ? { base64: referenceImage.base64, mimeType: referenceImage.mimeType }
             : undefined;
 
-        const newImageUrl = await editImage(imgBase64, imgMimeType, editPrompt, maskData, refImageData);
+        const editedImageDataUrl = await editImage(imgBase64, imgMimeType, editPrompt, maskData, refImageData);
 
-        onImageUpdate(newImageUrl);
+        // Upload edited image to blob storage for persistence
+        let finalImageUrl = editedImageDataUrl;
+        if (editedImageDataUrl.startsWith('data:')) {
+            const [header, base64Data] = editedImageDataUrl.split(',');
+            const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+            try {
+                finalImageUrl = await uploadImageToBlob(base64Data, mimeType);
+                console.log('[ImagePreviewModal] Edited image uploaded to blob:', finalImageUrl);
+            } catch (uploadErr) {
+                console.error('[ImagePreviewModal] Failed to upload edited image:', uploadErr);
+                // Continue with data URL if upload fails
+            }
+        }
+
+        onImageUpdate(finalImageUrl);
         setEditPrompt('');
         clearMask();
+
+        // Redraw canvas with the new image
+        setTimeout(() => drawCanvases(), 100);
     } catch (err: any) {
         setError(err.message || 'Falha ao editar a imagem.');
     } finally {
@@ -267,11 +311,28 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     setIsRemovingBackground(true);
     setError(null);
     try {
-        const [imgHeader, imgBase64] = image.src.split(',');
-        const imgMimeType = imgHeader.match(/:(.*?);/)?.[1] || 'image/png';
+        // Convert image URL (data: or http:) to base64
+        const { base64: imgBase64, mimeType: imgMimeType } = await urlToBase64(image.src);
         const removeBgPrompt = "Remova o fundo desta imagem, deixando-o transparente. Mantenha apenas o objeto principal em primeiro plano.";
-        const newImageUrl = await editImage(imgBase64, imgMimeType, removeBgPrompt);
-        onImageUpdate(newImageUrl);
+        const editedImageDataUrl = await editImage(imgBase64, imgMimeType, removeBgPrompt);
+
+        // Upload edited image to blob storage for persistence
+        let finalImageUrl = editedImageDataUrl;
+        if (editedImageDataUrl.startsWith('data:')) {
+            const [header, base64Data] = editedImageDataUrl.split(',');
+            const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+            try {
+                finalImageUrl = await uploadImageToBlob(base64Data, mimeType);
+                console.log('[ImagePreviewModal] Background removed image uploaded to blob:', finalImageUrl);
+            } catch (uploadErr) {
+                console.error('[ImagePreviewModal] Failed to upload edited image:', uploadErr);
+            }
+        }
+
+        onImageUpdate(finalImageUrl);
+
+        // Redraw canvas with the new image
+        setTimeout(() => drawCanvases(), 100);
     } catch (err: any) {
         setError(err.message || 'Falha ao remover o fundo.');
     } finally {
