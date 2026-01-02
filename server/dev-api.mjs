@@ -72,33 +72,30 @@ async function resolveOrganizationContext(sql, userId, organizationId) {
 const DATABASE_URL = process.env.DATABASE_URL;
 
 // ============================================================================
-// DEBUG: Request counter for tracking database calls
+// LOGGING: Clean, organized request tracking
 // ============================================================================
 let requestCounter = 0;
-let queryCounter = 0;
-const requestLog = new Map(); // Track queries per request
+const requestLog = new Map();
 
-function logQuery(requestId, endpoint, queryName) {
-  queryCounter++;
+// ANSI colors for terminal
+const colors = {
+  reset: '\x1b[0m',
+  dim: '\x1b[2m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  cyan: '\x1b[36m',
+  red: '\x1b[31m',
+};
+
+function logQuery(requestId, _endpoint, _queryName) {
   if (!requestLog.has(requestId)) {
-    requestLog.set(requestId, []);
+    requestLog.set(requestId, 0);
   }
-  requestLog.get(requestId).push(queryName);
-  console.log(
-    `[DB DEBUG] Request #${requestId} | Query #${queryCounter} | ${endpoint} | ${queryName}`,
-  );
+  requestLog.set(requestId, requestLog.get(requestId) + 1);
 }
 
-function logRequestSummary(requestId, endpoint) {
-  const queries = requestLog.get(requestId) || [];
-  console.log(
-    `[DB SUMMARY] Request #${requestId} | ${endpoint} | Total queries: ${queries.length}`,
-  );
-  if (queries.length > 3) {
-    console.warn(
-      `[DB WARNING] ⚠️ High query count (${queries.length}) for ${endpoint}!`,
-    );
-  }
+function logRequestSummary(requestId, _endpoint) {
   requestLog.delete(requestId);
 }
 
@@ -109,7 +106,6 @@ const USER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 function getCachedUserId(clerkId) {
   const cached = userIdCache.get(clerkId);
   if (cached && Date.now() - cached.timestamp < USER_CACHE_TTL) {
-    console.log(`[CACHE HIT] User ID for ${clerkId.substring(0, 10)}...`);
     return cached.userId;
   }
   return null;
@@ -218,26 +214,27 @@ async function setRLSContext(sql, userId, organizationId = null) {
 }
 
 // ============================================================================
-// Request logging middleware - tracks all API calls
+// Request logging middleware - clean, organized output
 // ============================================================================
 app.use("/api/db", (req, res, next) => {
   const reqId = ++requestCounter;
   req.requestId = reqId;
   const start = Date.now();
 
-  console.log(`\n[API REQUEST #${reqId}] ${req.method} ${req.originalUrl}`);
+  // Extract clean endpoint name
+  const endpoint = req.originalUrl.split('?')[0].replace('/api/db/', '');
+  const method = req.method.padEnd(4);
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    const queries = requestLog.get(reqId)?.length || 0;
+    const status = res.statusCode;
+    const statusColor = status < 400 ? colors.green : colors.red;
+    const durationColor = duration > 500 ? colors.yellow : colors.dim;
+
     console.log(
-      `[API COMPLETE #${reqId}] ${req.method} ${req.originalUrl} - ${res.statusCode} - ${duration}ms - ${queries} queries`,
+      `${colors.cyan}${method}${colors.reset} /${endpoint} ${statusColor}${status}${colors.reset} ${durationColor}${duration}ms${colors.reset}`
     );
-    if (queries > 2) {
-      console.warn(
-        `[PERF WARNING] ⚠️ ${req.originalUrl} made ${queries} DB queries!`,
-      );
-    }
+
     logRequestSummary(reqId, req.originalUrl);
   });
 
@@ -317,10 +314,6 @@ app.get("/api/db/init", async (req, res) => {
 
     // Run ALL queries in parallel - this is the key optimization!
     const isOrgContext = !!organization_id;
-
-    console.log(
-      `[Init API] Loading all data for user ${resolvedUserId.substring(0, 8)}... (org: ${isOrgContext})`,
-    );
 
     const [
       brandProfileResult,
@@ -429,11 +422,6 @@ app.get("/api/db/init", async (req, res) => {
         `,
     ]);
 
-    const duration = Date.now() - start;
-    console.log(
-      `[Init API] ✅ Loaded all data in ${duration}ms with 6 parallel queries (instead of 6 separate requests)`,
-    );
-
     // Extract tournament data
     const tournamentData = tournamentResult[0] || null;
 
@@ -457,7 +445,7 @@ app.get("/api/db/init", async (req, res) => {
       tournamentEvents: tournamentData?.events || [],
       schedulesList: schedulesListResult,
       _meta: {
-        loadTime: duration,
+        loadTime: Date.now() - start,
         queriesExecuted: 6,
         timestamp: new Date().toISOString(),
       },
@@ -494,14 +482,12 @@ app.get("/api/db/users", async (req, res) => {
 });
 
 app.post("/api/db/users", async (req, res) => {
-  console.log("[Users API] POST request body:", req.body);
   try {
     const sql = getSql();
     const { email, name, avatar_url, auth_provider, auth_provider_id } =
       req.body;
 
     if (!email || !name) {
-      console.log("[Users API] Missing fields - email:", email, "name:", name);
       return res.status(400).json({ error: "email and name are required" });
     }
 
@@ -576,7 +562,6 @@ app.get("/api/db/brand-profiles", async (req, res) => {
 });
 
 app.post("/api/db/brand-profiles", async (req, res) => {
-  console.log("[Brand Profiles API] POST request body:", req.body);
   try {
     const sql = getSql();
     const {
@@ -591,12 +576,6 @@ app.post("/api/db/brand-profiles", async (req, res) => {
     } = req.body;
 
     if (!user_id || !name) {
-      console.log(
-        "[Brand Profiles API] Missing fields - user_id:",
-        user_id,
-        "name:",
-        name,
-      );
       return res.status(400).json({ error: "user_id and name are required" });
     }
 
@@ -775,14 +754,6 @@ app.get("/api/db/gallery", async (req, res) => {
 });
 
 app.post("/api/db/gallery", async (req, res) => {
-  console.log(
-    "[Gallery API] POST request - user_id:",
-    req.body.user_id,
-    "source:",
-    req.body.source,
-    "media_type:",
-    req.body.media_type,
-  );
   try {
     const sql = getSql();
     const {
@@ -804,16 +775,6 @@ app.post("/api/db/gallery", async (req, res) => {
     } = req.body;
 
     if (!user_id || !src_url || !source || !model) {
-      console.log(
-        "[Gallery API] Missing fields - user_id:",
-        user_id,
-        "src_url:",
-        !!src_url,
-        "source:",
-        source,
-        "model:",
-        model,
-      );
       return res
         .status(400)
         .json({ error: "user_id, src_url, source, and model are required" });
@@ -837,18 +798,6 @@ app.post("/api/db/gallery", async (req, res) => {
           .status(403)
           .json({ error: "Permission denied: create_flyer required" });
       }
-    }
-
-    // Log linking IDs for debugging
-    if (post_id || ad_creative_id || video_script_id) {
-      console.log(
-        "[Gallery API] Linking to campaign content - post_id:",
-        post_id,
-        "ad_creative_id:",
-        ad_creative_id,
-        "video_script_id:",
-        video_script_id,
-      );
     }
 
     const result = await sql`
@@ -1090,14 +1039,6 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
       created_from,
     } = req.body;
 
-    console.log("[Scheduled Posts API] POST body:", {
-      user_id,
-      organization_id,
-      content_type,
-      image_url: !!image_url,
-      scheduled_timestamp,
-    });
-
     if (
       !user_id ||
       !image_url ||
@@ -1106,7 +1047,6 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
       !scheduled_time ||
       !platforms
     ) {
-      console.log("[Scheduled Posts API] Missing fields");
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -1135,12 +1075,6 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
       typeof scheduled_timestamp === "string"
         ? new Date(scheduled_timestamp).getTime()
         : scheduled_timestamp;
-
-    console.log("[Scheduled Posts API] Timestamp conversion:", {
-      original: scheduled_timestamp,
-      type: typeof scheduled_timestamp,
-      converted: timestampMs,
-    });
 
     const result = await sql`
       INSERT INTO scheduled_posts (
@@ -1282,20 +1216,11 @@ app.get("/api/db/campaigns", async (req, res) => {
 
     // Get single campaign by ID
     if (id) {
-      console.log(
-        "[Campaigns API] Fetching campaign by ID:",
-        id,
-        "include_content:",
-        include_content,
-      );
-
       const result = await sql`
         SELECT * FROM campaigns
         WHERE id = ${id} AND deleted_at IS NULL
         LIMIT 1
       `;
-
-      console.log("[Campaigns API] Campaign found:", result[0] ? "yes" : "no");
 
       if (!result[0]) {
         return res.status(200).json(null);
@@ -1323,16 +1248,6 @@ app.get("/api/db/campaigns", async (req, res) => {
           `,
         ]);
 
-        console.log(
-          "[Campaigns API] Content counts:",
-          videoScripts.length,
-          "clips,",
-          posts.length,
-          "posts,",
-          adCreatives.length,
-          "ads",
-        );
-
         return res.status(200).json({
           ...campaign,
           video_clip_scripts: videoScripts,
@@ -1351,8 +1266,7 @@ app.get("/api/db/campaigns", async (req, res) => {
     // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
-      console.log("[Campaigns API] Could not resolve user_id:", user_id);
-      return res.status(200).json([]); // Return empty array if user not found
+      return res.status(200).json([]);
     }
 
     // OPTIMIZED: Single query with all counts and previews using subqueries
@@ -1406,9 +1320,6 @@ app.get("/api/db/campaigns", async (req, res) => {
       `;
     }
 
-    console.log(
-      `[Campaigns API] Fetched ${result.length} campaigns with SINGLE optimized query`,
-    );
     res.json(result);
   } catch (error) {
     if (error instanceof OrganizationAccessError) {
@@ -1442,11 +1353,7 @@ app.post("/api/db/campaigns", async (req, res) => {
     // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
-      console.log("[Campaigns API] Could not resolve user_id:", user_id);
-      return res.status(400).json({
-        error:
-          "User not found. Please ensure user exists before creating campaigns.",
-      });
+      return res.status(400).json({ error: "User not found" });
     }
 
     // Verify organization membership and permission if organization_id provided
@@ -1504,16 +1411,6 @@ app.post("/api/db/campaigns", async (req, res) => {
         `;
       }
     }
-
-    console.log(
-      "[Campaigns API] Created campaign with",
-      video_clip_scripts?.length || 0,
-      "clips,",
-      posts?.length || 0,
-      "posts,",
-      ad_creatives?.length || 0,
-      "ads",
-    );
 
     res.status(201).json(campaign);
   } catch (error) {
@@ -2225,18 +2122,17 @@ const startup = async () => {
       const sql = getSql();
       await ensureGallerySourceType(sql);
     } catch (error) {
-      console.error(
-        "[Dev API Server] Startup checks failed:",
-        error?.message || error,
-      );
+      console.error(`${colors.red}✗ Startup check failed${colors.reset}`);
     }
   }
 
   app.listen(PORT, () => {
-    console.log(`[Dev API Server] Running on http://localhost:${PORT}`);
-    console.log(
-      `[Dev API Server] Database: ${DATABASE_URL ? "Connected" : "NOT CONFIGURED"}`,
-    );
+    console.log('');
+    console.log(`${colors.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+    console.log(`${colors.green}  API Server${colors.reset}  http://localhost:${PORT}`);
+    console.log(`${colors.green}  Database${colors.reset}    ${DATABASE_URL ? `${colors.green}Connected${colors.reset}` : `${colors.red}NOT CONFIGURED${colors.reset}`}`);
+    console.log(`${colors.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+    console.log('');
   });
 };
 
