@@ -16,7 +16,8 @@ const isVideoItem = (image: GalleryImage) => {
     image.mediaType === 'video' ||
     image.src?.endsWith('.mp4') ||
     image.src?.includes('video') ||
-    image.source?.startsWith('Video-')
+    image.source?.startsWith('Video-') ||
+    image.source === 'Video Final'
   );
 };
 
