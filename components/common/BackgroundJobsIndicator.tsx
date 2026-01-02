@@ -180,9 +180,17 @@ export const BackgroundJobsIndicator: React.FC = () => {
               {/* Recently Completed */}
               {recentlyCompleted.length > 0 && (
                 <div className="p-2 border-t border-white/5">
-                  <p className="text-[9px] font-bold text-green-400 uppercase tracking-wider px-2 mb-1">
-                    Concluídos Recentemente
-                  </p>
+                  <div className="flex items-center justify-between px-2 mb-1">
+                    <p className="text-[9px] font-bold text-green-400 uppercase tracking-wider">
+                      Concluídos Recentemente
+                    </p>
+                    <button
+                      onClick={() => setRecentlyCompleted([])}
+                      className="text-[9px] font-bold text-white/40 hover:text-white/70 transition-colors"
+                    >
+                      Limpar
+                    </button>
+                  </div>
                   {recentlyCompleted.map(job => (
                     <div
                       key={job.id}
