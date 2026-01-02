@@ -59,6 +59,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   const [contentType, setContentType] = useState<InstagramContentType>('photo');
   const [publishNow, setPublishNow] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [galleryFilter, setGalleryFilter] = useState<'all' | 'flyers' | 'posts' | 'videos'>('all');
 
   const isCarousel = contentType === 'carousel';
   const isReel = contentType === 'reel';
@@ -72,7 +73,14 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
     return scheduled.getTime() < Date.now();
   }, [scheduledDate, scheduledTime, publishNow]);
 
-  // Filter media based on content type - videos only for Reels
+  // Helper to check item type by source
+  const isFlyer = (img: GalleryImage) =>
+    img.source === 'Flyer' || img.source === 'Flyer Diário';
+
+  const isPost = (img: GalleryImage) =>
+    img.source === 'Post' || img.source === 'Anúncio';
+
+  // Filter media based on content type and gallery filter
   const eligibleImages = useMemo(() => {
     return galleryImages.filter(img => {
       const isAudio = isAudioItem(img);
@@ -82,12 +90,17 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       if (isAudio) return false;
 
       // For Reels, allow both images and videos
-      if (isReel) return true;
-
       // For other types, only images
-      return !isVideo;
+      if (!isReel && isVideo) return false;
+
+      // Apply gallery filter
+      if (galleryFilter === 'flyers') return isFlyer(img);
+      if (galleryFilter === 'posts') return isPost(img);
+      if (galleryFilter === 'videos') return isVideo;
+
+      return true;
     });
-  }, [galleryImages, isReel]);
+  }, [galleryImages, isReel, galleryFilter]);
 
   const handleSelectImage = (image: GalleryImage) => {
     // Pause video when changing selection
@@ -205,7 +218,30 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
         {/* Content - Two columns on large screens */}
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           {/* Gallery Grid */}
-          <div className="flex-1 overflow-y-auto p-4 border-b lg:border-b-0 lg:border-r border-white/5">
+          <div className="flex-1 overflow-y-auto border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col">
+            {/* Gallery Filter */}
+            <div className="px-4 pt-4 pb-2 flex gap-1 shrink-0">
+              {[
+                { id: 'all', label: 'Todos' },
+                { id: 'flyers', label: 'Flyers' },
+                { id: 'posts', label: 'Campanhas' },
+                ...(isReel ? [{ id: 'videos', label: 'Vídeos' }] : []),
+              ].map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setGalleryFilter(filter.id as typeof galleryFilter)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                    galleryFilter === filter.id
+                      ? 'bg-white/10 text-white'
+                      : 'text-white/40 hover:text-white/60 hover:bg-white/5'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 pb-4">
             {eligibleImages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
@@ -285,6 +321,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 })}
               </div>
             )}
+            </div>
           </div>
 
           {/* Instagram Preview Panel */}
