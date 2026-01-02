@@ -878,11 +878,12 @@ export async function queueGenerationJob(
   prompt: string,
   config: GenerationJobConfig,
   context?: string,
+  organizationId?: string | null,
 ): Promise<QueueJobResult> {
   const response = await fetch("/api/generate/queue", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, jobType, prompt, config, context }),
+    body: JSON.stringify({ userId, organizationId, jobType, prompt, config, context }),
   });
 
   if (!response.ok) {
@@ -918,9 +919,10 @@ export async function getGenerationJobStatus(
  */
 export async function getGenerationJobs(
   userId: string,
-  options?: { status?: string; limit?: number },
+  options?: { status?: string; limit?: number; organizationId?: string | null },
 ): Promise<{ jobs: GenerationJob[]; total: number }> {
   const params = new URLSearchParams({ userId });
+  if (options?.organizationId) params.append("organizationId", options.organizationId);
   if (options?.status) params.append("status", options.status);
   if (options?.limit) params.append("limit", options.limit.toString());
 

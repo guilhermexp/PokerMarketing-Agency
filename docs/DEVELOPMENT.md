@@ -49,7 +49,7 @@ npm run dev:full
 
 **Requerimentos:**
 - Docker instalado (para `npm run dev:redis`)
-- OU Redis rodando em `localhost:6379`
+- OU Redis rodando em `localhost:6380`
 
 ## Configuracao
 
@@ -90,7 +90,7 @@ npm run dev:redis
 
 **Opcao B: Docker manual**
 ```bash
-docker run -d -p 6379:6379 --name redis redis:7-alpine
+docker run -d -p 6380:6379 --name poker-redis redis:7-alpine
 ```
 
 **Opcao C: Redis instalado localmente**
@@ -133,7 +133,7 @@ npm run dev:full
 | Vite (frontend) | 5173 | Ambos |
 | Dev API | 3002 | `npm run dev` |
 | Full Server | 8080 | `npm run dev:full` |
-| Redis | 6379 | `npm run dev:full` |
+| Redis | 6380 | `npm run dev:full` |
 
 ## Estrutura de Servidores
 

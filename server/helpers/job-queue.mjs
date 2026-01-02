@@ -7,7 +7,7 @@ import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 
 // Redis connection - Railway provides REDIS_URL
-const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || 'redis://localhost:6379';
+const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || 'redis://localhost:6380';
 
 let connection = null;
 let imageQueue = null;

@@ -1763,9 +1763,10 @@ function AppContent() {
 
 function AppWithBackgroundJobs() {
   const { userId } = useAuth();
+  const { organization } = useOrganization();
 
   return (
-    <BackgroundJobsProvider userId={userId}>
+    <BackgroundJobsProvider userId={userId} organizationId={organization?.id}>
       <AppContent />
       <BackgroundJobsIndicator />
     </BackgroundJobsProvider>

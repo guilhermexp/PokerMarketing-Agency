@@ -60,11 +60,13 @@ export const useBackgroundJobs = () => {
 
 interface BackgroundJobsProviderProps {
   userId: string | null;
+  organizationId?: string | null;
   children: React.ReactNode;
 }
 
 export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
   userId,
+  organizationId,
   children,
 }) => {
   const [jobs, setJobs] = useState<ActiveJob[]>([]);
@@ -88,7 +90,10 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
     if (!userId) return;
 
     try {
-      const result = await getGenerationJobs(userId, { limit: 100 });
+      const result = await getGenerationJobs(userId, {
+        limit: 100,
+        organizationId: organizationId || undefined,
+      });
       const serverJobs = result.jobs as ActiveJob[];
 
       setJobs(prev => {
@@ -111,7 +116,7 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
     } catch (error) {
       console.error('[BackgroundJobs] Failed to refresh jobs:', error);
     }
-  }, [userId]);
+  }, [userId, organizationId]);
 
   // Ref to track if we've done initial load
   const hasLoadedRef = useRef(false);
@@ -178,8 +183,8 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
     setJobs(prev => [optimisticJob, ...prev]);
 
     try {
-      // Queue on server (pass context to persist in database)
-      const result = await queueGenerationJob(userId, jobType, prompt, config, context);
+      // Queue on server (pass context and organizationId to persist in database)
+      const result = await queueGenerationJob(userId, jobType, prompt, config, context, organizationId);
 
       // Update with real job ID
       setJobs(prev => prev.map(j =>
@@ -194,7 +199,7 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
       setJobs(prev => prev.filter(j => j.localId !== localId));
       throw error;
     }
-  }, []);
+  }, [organizationId]);
 
   // Get job by context
   const getJobByContext = useCallback((context: string) => {

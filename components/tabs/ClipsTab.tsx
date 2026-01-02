@@ -19,7 +19,11 @@ import {
   convertToJsonPrompt,
   type GenerateVideoResult,
 } from "../../services/geminiService";
-import { generateVideo as generateServerVideo, updateClipThumbnail, type ApiVideoModel } from "../../services/apiClient";
+import {
+  generateVideo as generateServerVideo,
+  updateClipThumbnail,
+  type ApiVideoModel,
+} from "../../services/apiClient";
 import { uploadImageToBlob } from "../../services/blobService";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import { ExportVideoModal } from "../common/ExportVideoModal";
@@ -194,6 +198,7 @@ interface VideoState {
   isLoading: boolean;
   error?: string | null;
   model?: string; // Track which model generated this video
+  duration?: number;
 }
 
 // Get short model name for display
@@ -202,6 +207,22 @@ const getModelShortName = (model: string): string => {
   if (model.includes("veo")) return "Veo";
   if (model.includes("gemini")) return "Gemini";
   return model.split("/").pop()?.slice(0, 10) || model.slice(0, 10);
+};
+
+const getVideoDuration = (url: string): Promise<number> => {
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      resolve(video.duration);
+      video.remove();
+    };
+    video.onerror = () => {
+      resolve(8); // Fallback to 8s if can't load
+      video.remove();
+    };
+    video.src = getVideoDisplayUrl(url);
+  });
 };
 
 interface SceneReferenceImage {
@@ -215,16 +236,16 @@ interface SceneReferenceImage {
 
 // Transition types supported by FFmpeg xfade filter
 type TransitionType =
-  | 'none'
-  | 'fade'
-  | 'dissolve'
-  | 'wiperight'
-  | 'wipeleft'
-  | 'slideright'
-  | 'slideleft'
-  | 'circleopen'
-  | 'circleclose'
-  | 'zoom';
+  | "none"
+  | "fade"
+  | "dissolve"
+  | "wiperight"
+  | "wipeleft"
+  | "slideright"
+  | "slideleft"
+  | "circleopen"
+  | "circleclose"
+  | "zoom";
 
 interface ClipTransition {
   type: TransitionType;
@@ -254,7 +275,7 @@ interface AudioTrack {
   volume: number; // 0-1
 }
 
-type PlayMode = 'all' | 'video' | 'audio' | null;
+type PlayMode = "all" | "video" | "audio" | null;
 
 interface EditorState {
   clips: EditableClip[];
@@ -284,12 +305,15 @@ const getClipDuration = (clip: EditableClip): number => {
 
 // Get effective transition duration (0 if no transition or 'none')
 const getTransitionDuration = (clip: EditableClip): number => {
-  if (!clip.transitionOut || clip.transitionOut.type === 'none') return 0;
+  if (!clip.transitionOut || clip.transitionOut.type === "none") return 0;
   return clip.transitionOut.duration;
 };
 
 // Calculate total duration considering video clips, audio tracks, and transition overlaps
-const calculateTotalMediaDuration = (clips: EditableClip[], audioTracks: AudioTrack[]): number => {
+const calculateTotalMediaDuration = (
+  clips: EditableClip[],
+  audioTracks: AudioTrack[],
+): number => {
   // Video duration: sum of all clip durations minus transition overlaps
   let videoDuration = clips.reduce((acc, c) => acc + getClipDuration(c), 0);
 
@@ -332,53 +356,62 @@ const getTimelineOffset = (
 };
 
 // CSS styles for real-time transition preview
-const getTransitionStyles = (type: TransitionType, progress: number): {
+const getTransitionStyles = (
+  type: TransitionType,
+  progress: number,
+): {
   outgoing: React.CSSProperties;
   incoming: React.CSSProperties;
 } => {
-  const base = { outgoing: {} as React.CSSProperties, incoming: {} as React.CSSProperties };
+  const base = {
+    outgoing: {} as React.CSSProperties,
+    incoming: {} as React.CSSProperties,
+  };
 
   switch (type) {
-    case 'fade':
-    case 'dissolve':
+    case "fade":
+    case "dissolve":
       return {
         outgoing: { opacity: 1 - progress },
         incoming: { opacity: progress },
       };
-    case 'wiperight':
+    case "wiperight":
       return {
         outgoing: {},
         incoming: { clipPath: `inset(0 ${100 - progress * 100}% 0 0)` },
       };
-    case 'wipeleft':
+    case "wipeleft":
       return {
         outgoing: {},
         incoming: { clipPath: `inset(0 0 0 ${100 - progress * 100}%)` },
       };
-    case 'slideright':
+    case "slideright":
       return {
         outgoing: {},
         incoming: { transform: `translateX(${(1 - progress) * 100}%)` },
       };
-    case 'slideleft':
+    case "slideleft":
       return {
         outgoing: {},
         incoming: { transform: `translateX(${(1 - progress) * -100}%)` },
       };
-    case 'circleopen':
+    case "circleopen":
       return {
         outgoing: {},
         incoming: { clipPath: `circle(${progress * 75}% at center)` },
       };
-    case 'circleclose':
+    case "circleclose":
       return {
         outgoing: {},
         incoming: { clipPath: `circle(${(1 - progress) * 75}% at center)` },
       };
-    case 'zoom':
+    case "zoom":
       return {
         outgoing: {},
-        incoming: { transform: `scale(${1 + (1 - progress) * 0.5})`, transformOrigin: 'center' },
+        incoming: {
+          transform: `scale(${1 + (1 - progress) * 0.5})`,
+          transformOrigin: "center",
+        },
       };
     default:
       return base;
@@ -386,17 +419,21 @@ const getTransitionStyles = (type: TransitionType, progress: number): {
 };
 
 // Transition type labels for UI - using IconName for SVG icons
-const TRANSITION_OPTIONS: { type: TransitionType; label: string; icon: IconName }[] = [
-  { type: 'none', label: 'Corte', icon: 'scissors' },
-  { type: 'fade', label: 'Fade', icon: 'moon' },
-  { type: 'dissolve', label: 'Dissolve', icon: 'star' },
-  { type: 'wiperight', label: 'Wipe', icon: 'chevron-right' },
-  { type: 'wipeleft', label: 'Wipe', icon: 'chevron-left' },
-  { type: 'slideright', label: 'Slide', icon: 'arrowRight' },
-  { type: 'slideleft', label: 'Slide', icon: 'arrow-left' },
-  { type: 'circleopen', label: 'Circle', icon: 'sun' },
-  { type: 'circleclose', label: 'Circle', icon: 'eye' },
-  { type: 'zoom', label: 'Zoom', icon: 'search' },
+const TRANSITION_OPTIONS: {
+  type: TransitionType;
+  label: string;
+  icon: IconName;
+}[] = [
+  { type: "none", label: "Corte", icon: "scissors" },
+  { type: "fade", label: "Fade", icon: "moon" },
+  { type: "dissolve", label: "Dissolve", icon: "star" },
+  { type: "wiperight", label: "Wipe", icon: "chevron-right" },
+  { type: "wipeleft", label: "Wipe", icon: "chevron-left" },
+  { type: "slideright", label: "Slide", icon: "arrowRight" },
+  { type: "slideleft", label: "Slide", icon: "arrow-left" },
+  { type: "circleopen", label: "Circle", icon: "sun" },
+  { type: "circleclose", label: "Circle", icon: "eye" },
+  { type: "zoom", label: "Zoom", icon: "search" },
 ];
 
 const DURATION_OPTIONS = [0.3, 0.5, 1, 1.5, 2] as const;
@@ -483,6 +520,137 @@ interface ClipCardProps {
   isGeneratingAllClipImages?: boolean;
 }
 
+const ClipSettingsModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  selectedImageModel: ImageModel;
+  onChangeImageModel: (model: ImageModel) => void;
+  selectedVideoModel: VideoModel;
+  onChangeVideoModel: (model: VideoModel) => void;
+  includeNarration: boolean;
+  onToggleNarration: () => void;
+  removeSilence: boolean;
+  onToggleRemoveSilence: () => void;
+}> = ({
+  isOpen,
+  onClose,
+  selectedImageModel,
+  onChangeImageModel,
+  selectedVideoModel,
+  onChangeVideoModel,
+  includeNarration,
+  onToggleNarration,
+  removeSilence,
+  onToggleRemoveSilence,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <button
+        className="absolute inset-0 bg-black/70"
+        onClick={onClose}
+        aria-label="Fechar configurações"
+      />
+      <div className="relative w-full max-w-md bg-[#0f0f0f] border border-white/10 rounded-2xl shadow-2xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+              <Icon name="settings" className="w-4 h-4 text-white/60" />
+            </div>
+            <h4 className="text-xs font-black text-white uppercase tracking-wider">
+              Configurações do Clip
+            </h4>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 text-white/40 hover:text-white transition-colors"
+          >
+            <Icon name="x" className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="px-4 py-4 space-y-4">
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider">
+              Modelos
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="text-[10px] text-white/40">
+                Imagem
+                <select
+                  value={selectedImageModel}
+                  onChange={(e) =>
+                    onChangeImageModel(e.target.value as ImageModel)
+                  }
+                  className="mt-1 w-full bg-[#080808] border border-white/10 rounded-lg px-2 py-2 text-[10px] text-white/70 focus:border-primary/50 outline-none transition-all"
+                >
+                  <option value="gemini-3-pro-image-preview">Gemini 3</option>
+                  <option value="imagen-4.0-generate-001">Imagen 4</option>
+                </select>
+              </label>
+              <label className="text-[10px] text-white/40">
+                Vídeo
+                <select
+                  value={selectedVideoModel}
+                  onChange={(e) =>
+                    onChangeVideoModel(e.target.value as VideoModel)
+                  }
+                  className="mt-1 w-full bg-[#080808] border border-white/10 rounded-lg px-2 py-2 text-[10px] text-white/70 focus:border-primary/50 outline-none transition-all"
+                >
+                  <option value="fal-ai/sora-2/text-to-video">Sora 2</option>
+                  <option value="veo-3.1-fast-generate-preview">Veo 3.1</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider">
+              Narração e Áudio
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={onToggleNarration}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[9px] font-black uppercase tracking-wider ${
+                  includeNarration
+                    ? "bg-green-500/10 border-green-500/30 text-green-400"
+                    : "bg-[#0a0a0a] border-white/10 text-white/40 hover:text-white/60"
+                }`}
+              >
+                <Icon
+                  name={includeNarration ? "mic" : "mic-off"}
+                  className="w-3 h-3"
+                />
+                <span>
+                  {includeNarration ? "Com Narração" : "Sem Narração"}
+                </span>
+              </button>
+              <button
+                onClick={onToggleRemoveSilence}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[9px] font-black uppercase tracking-wider ${
+                  removeSilence
+                    ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                    : "bg-[#0a0a0a] border-white/10 text-white/40 hover:text-white/60"
+                }`}
+              >
+                <Icon name="audio" className="w-3 h-3" />
+                <span>{removeSilence ? "Sem Silencio" : "Com Silencio"}</span>
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg bg-white/5 text-[10px] font-bold text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ClipCard: React.FC<ClipCardProps> = ({
   clip,
   brandProfile,
@@ -551,6 +719,8 @@ const ClipCard: React.FC<ClipCardProps> = ({
   const [scenePreviewSlides, setScenePreviewSlides] = useState<
     Record<number, "image" | "video">
   >({}); // Per-scene carousel
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const durationRequestsRef = useRef<Set<string>>(new Set());
 
   // Video Editor State
   const [isEditing, setIsEditing] = useState(false);
@@ -593,7 +763,9 @@ const ClipCard: React.FC<ClipCardProps> = ({
   const transitionVideoRef = useRef<HTMLVideoElement>(null);
 
   // Transition editing state
-  const [editingTransitionIndex, setEditingTransitionIndex] = useState<number | null>(null);
+  const [editingTransitionIndex, setEditingTransitionIndex] = useState<
+    number | null
+  >(null);
 
   // Real-time transition preview state
   const [transitionPreview, setTransitionPreview] = useState<{
@@ -611,7 +783,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
   const getEditorStorageKey = useCallback(() => {
     return campaignId
       ? `poker-marketing-editor-draft-${campaignId}`
-      : 'poker-marketing-editor-draft';
+      : "poker-marketing-editor-draft";
   }, [campaignId]);
 
   // Check if there's a saved session on mount or when campaign changes
@@ -619,7 +791,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
 
   // Update hasSavedSession when campaignId changes
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     const storageKey = getEditorStorageKey();
     const saved = localStorage.getItem(storageKey);
     setHasSavedSession(!!saved);
@@ -630,7 +802,8 @@ const ClipCard: React.FC<ClipCardProps> = ({
     if (!editorState || !isEditing) return;
 
     // Don't save if there's nothing to save
-    if (editorState.clips.length === 0 && editorState.audioTracks.length === 0) return;
+    if (editorState.clips.length === 0 && editorState.audioTracks.length === 0)
+      return;
 
     const storageKey = getEditorStorageKey();
     const timeoutId = setTimeout(() => {
@@ -647,7 +820,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
         localStorage.setItem(storageKey, JSON.stringify(stateToSave));
         setHasSavedSession(true);
       } catch (error) {
-        console.warn('Failed to save editor state:', error);
+        console.warn("Failed to save editor state:", error);
       }
     }, 500); // Debounce 500ms
 
@@ -661,7 +834,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
       localStorage.removeItem(storageKey);
       setHasSavedSession(false);
     } catch (error) {
-      console.warn('Failed to clear saved session:', error);
+      console.warn("Failed to clear saved session:", error);
     }
   }, [getEditorStorageKey]);
 
@@ -688,7 +861,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
         totalDuration,
       };
     } catch (error) {
-      console.warn('Failed to restore saved session:', error);
+      console.warn("Failed to restore saved session:", error);
       return null;
     }
   }, [getEditorStorageKey]);
@@ -701,9 +874,15 @@ const ClipCard: React.FC<ClipCardProps> = ({
         const deltaX = event.clientX - dragState.startX;
         const deltaSeconds = deltaX / dragState.pxPerSec;
 
-        const newTime = Math.max(0, Math.min(dragState.startTime + deltaSeconds, editorStateRef.current.totalDuration));
+        const newTime = Math.max(
+          0,
+          Math.min(
+            dragState.startTime + deltaSeconds,
+            editorStateRef.current.totalDuration,
+          ),
+        );
 
-        setEditorState(prev => {
+        setEditorState((prev) => {
           if (!prev) return prev;
           return { ...prev, currentTime: newTime };
         });
@@ -716,7 +895,10 @@ const ClipCard: React.FC<ClipCardProps> = ({
 
           for (const clip of clips) {
             const duration = getClipDuration(clip);
-            if (newTime >= accumulatedFuncTime && newTime < accumulatedFuncTime + duration) {
+            if (
+              newTime >= accumulatedFuncTime &&
+              newTime < accumulatedFuncTime + duration
+            ) {
               activeClip = clip;
               break;
             }
@@ -725,8 +907,11 @@ const ClipCard: React.FC<ClipCardProps> = ({
 
           if (activeClip) {
             const localTime = newTime - accumulatedFuncTime;
-            editorVideoRef.current.src = getVideoDisplayUrl(activeClip.videoUrl);
-            editorVideoRef.current.currentTime = activeClip.trimStart + localTime;
+            editorVideoRef.current.src = getVideoDisplayUrl(
+              activeClip.videoUrl,
+            );
+            editorVideoRef.current.currentTime =
+              activeClip.trimStart + localTime;
             editorVideoRef.current.muted = !!activeClip.muted;
           }
         }
@@ -743,7 +928,9 @@ const ClipCard: React.FC<ClipCardProps> = ({
         setEditorState((prev) => {
           if (!prev) return prev;
           const updatedTracks = prev.audioTracks.map((track) =>
-            track.id === dragState.trackId ? { ...track, offsetSeconds: newOffset } : track,
+            track.id === dragState.trackId
+              ? { ...track, offsetSeconds: newOffset }
+              : track,
           );
           return { ...prev, audioTracks: updatedTracks };
         });
@@ -758,7 +945,9 @@ const ClipCard: React.FC<ClipCardProps> = ({
 
         setEditorState((prev) => {
           if (!prev) return prev;
-          const trackIndex = prev.audioTracks.findIndex((t) => t.id === dragState.trackId);
+          const trackIndex = prev.audioTracks.findIndex(
+            (t) => t.id === dragState.trackId,
+          );
           if (trackIndex === -1) return prev;
           const track = prev.audioTracks[trackIndex];
 
@@ -772,16 +961,26 @@ const ClipCard: React.FC<ClipCardProps> = ({
             );
           } else {
             newTrimEnd = Math.max(
-              Math.min(dragState.startTrimEnd + deltaSeconds, track.originalDuration),
+              Math.min(
+                dragState.startTrimEnd + deltaSeconds,
+                track.originalDuration,
+              ),
               dragState.startTrimStart + MIN_CLIP_DURATION,
             );
           }
 
-          const updatedTrack = { ...track, trimStart: newTrimStart, trimEnd: newTrimEnd };
+          const updatedTrack = {
+            ...track,
+            trimStart: newTrimStart,
+            trimEnd: newTrimEnd,
+          };
           const newTracks = [...prev.audioTracks];
           newTracks[trackIndex] = updatedTrack;
           // Recalculate total duration as audio trim affects end position
-          const totalDuration = calculateTotalMediaDuration(prev.clips, newTracks);
+          const totalDuration = calculateTotalMediaDuration(
+            prev.clips,
+            newTracks,
+          );
           return { ...prev, audioTracks: newTracks, totalDuration };
         });
         return;
@@ -840,7 +1039,10 @@ const ClipCard: React.FC<ClipCardProps> = ({
         const newClips = [...prev.clips];
         newClips[clipIndex] = updatedClip;
         // Recalculate total duration considering both video and audio
-        const totalDuration = calculateTotalMediaDuration(newClips, prev.audioTracks);
+        const totalDuration = calculateTotalMediaDuration(
+          newClips,
+          prev.audioTracks,
+        );
         const currentTime = Math.min(prev.currentTime, totalDuration);
         return {
           ...prev,
@@ -890,7 +1092,11 @@ const ClipCard: React.FC<ClipCardProps> = ({
     if (savedAudio?.src) {
       hasInitializedAudio.current = true;
       setAudioState({ url: savedAudio.src, isLoading: false });
-      console.log("[ClipsTab] Loaded audio from gallery for clip:", clip.id, savedAudio.src);
+      console.log(
+        "[ClipsTab] Loaded audio from gallery for clip:",
+        clip.id,
+        savedAudio.src,
+      );
     }
   }, [galleryImages, clip.id]);
 
@@ -914,6 +1120,11 @@ const ClipCard: React.FC<ClipCardProps> = ({
   // Helper to generate scene image source identifier (max 50 chars for DB VARCHAR(50))
   const getSceneSource = (sceneNumber: number) => {
     return `Cena-${getTruncatedTitle()}-${sceneNumber}`;
+  };
+  const getAudioKey = () => {
+    const base =
+      clip.id || `${getTruncatedTitle()}-${clip.hook.substring(0, 10)}`.trim();
+    return base.replace(/[^a-z0-9-_]+/gi, "-");
   };
 
   useEffect(() => {
@@ -957,7 +1168,11 @@ const ClipCard: React.FC<ClipCardProps> = ({
           source?.startsWith(`Video-${clip.title}-${scene.sceneNumber}-`) ||
           source?.startsWith(`Video-${truncatedTitle}-${scene.sceneNumber}-`);
 
-        const sceneVideos = filterGalleryImages(galleryImages, clip.id, sourceMatches);
+        const sceneVideos = filterGalleryImages(
+          galleryImages,
+          clip.id,
+          sourceMatches,
+        );
         if (sceneVideos.length > 0) {
           console.log(
             `[ClipCard] Recovered ${sceneVideos.length} videos for clip ${clip.id} scene ${scene.sceneNumber}:`,
@@ -997,7 +1212,11 @@ const ClipCard: React.FC<ClipCardProps> = ({
         source?.startsWith(`Video-${clip.title}-${scene.sceneNumber}-`) ||
         source?.startsWith(`Video-${truncatedTitle}-${scene.sceneNumber}-`);
 
-      const galleryVideos = filterGalleryImages(galleryImages, clip.id, sourceMatches);
+      const galleryVideos = filterGalleryImages(
+        galleryImages,
+        clip.id,
+        sourceMatches,
+      );
 
       const currentVideos = videoStates[scene.sceneNumber] || [];
 
@@ -1030,6 +1249,64 @@ const ClipCard: React.FC<ClipCardProps> = ({
     }
   }, [galleryImages, scenes, clip.title, videoStates]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const pending: Array<{ sceneNumber: number; index: number; url: string }> =
+      [];
+
+    Object.entries(videoStates).forEach(([sceneKey, videos]) => {
+      const sceneNumber = Number(sceneKey);
+      videos.forEach((video, index) => {
+        if (
+          video.url &&
+          video.duration == null &&
+          !durationRequestsRef.current.has(video.url)
+        ) {
+          durationRequestsRef.current.add(video.url);
+          pending.push({ sceneNumber, index, url: video.url });
+        }
+      });
+    });
+
+    if (pending.length === 0) return () => {};
+
+    const loadDurations = async () => {
+      const updates: Array<{
+        sceneNumber: number;
+        index: number;
+        duration: number;
+      }> = [];
+
+      for (const item of pending) {
+        const duration = await getVideoDuration(item.url);
+        if (cancelled) return;
+        updates.push({ ...item, duration });
+      }
+
+      if (updates.length === 0 || cancelled) return;
+
+      setVideoStates((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        updates.forEach(({ sceneNumber, index, duration }) => {
+          const list = next[sceneNumber];
+          if (!list || !list[index] || list[index].duration != null) return;
+          const updated = [...list];
+          updated[index] = { ...updated[index], duration };
+          next[sceneNumber] = updated;
+          changed = true;
+        });
+        return changed ? next : prev;
+      });
+    };
+
+    loadDurations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [videoStates]);
+
   // Initial scene images recovery
   useEffect(() => {
     if (scenes.length === 0 || !galleryImages || galleryImages.length === 0)
@@ -1044,11 +1321,9 @@ const ClipCard: React.FC<ClipCardProps> = ({
         // Look for an image that matches this clip's scene (with fallback for legacy data)
         const newSource = getSceneSource(scene.sceneNumber);
         const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
-        const existingImage = findGalleryImage(
-          galleryImages,
-          clip.id,
-          newSource,
-        ) || findGalleryImage(galleryImages, clip.id, oldSource);
+        const existingImage =
+          findGalleryImage(galleryImages, clip.id, newSource) ||
+          findGalleryImage(galleryImages, clip.id, oldSource);
         if (existingImage) {
           // Check if src is HTTP URL or data URL
           const isHttpUrl = existingImage.src.startsWith("http");
@@ -1093,8 +1368,9 @@ const ClipCard: React.FC<ClipCardProps> = ({
         if (galleryImages && galleryImages.length > 0) {
           const newSource = getSceneSource(scene.sceneNumber);
           const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
-          const found = findGalleryImage(galleryImages, clip.id, newSource) ||
-                        findGalleryImage(galleryImages, clip.id, oldSource);
+          const found =
+            findGalleryImage(galleryImages, clip.id, newSource) ||
+            findGalleryImage(galleryImages, clip.id, oldSource);
           return !!found;
         }
         return false;
@@ -1229,7 +1505,9 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
           );
 
           // Map model name to API format
-          const apiModel: ApiVideoModel = selectedVideoModel.includes("sora") ? "sora-2" : "veo-3.1";
+          const apiModel: ApiVideoModel = selectedVideoModel.includes("sora")
+            ? "sora-2"
+            : "veo-3.1";
           videoUrl = await generateServerVideo({
             prompt: jsonPrompt,
             aspectRatio: "9:16",
@@ -1459,8 +1737,9 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
       if (galleryImages && galleryImages.length > 0) {
         const newSource = getSceneSource(scene.sceneNumber);
         const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
-        const existingInGallery = findGalleryImage(galleryImages, clip.id, newSource) ||
-                                  findGalleryImage(galleryImages, clip.id, oldSource);
+        const existingInGallery =
+          findGalleryImage(galleryImages, clip.id, newSource) ||
+          findGalleryImage(galleryImages, clip.id, oldSource);
         if (existingInGallery) {
           // Recover from gallery instead of generating
           const isHttpUrl = existingInGallery.src.startsWith("http");
@@ -1641,7 +1920,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            filename: `narration-${clip.id}.wav`,
+            filename: `narration-${getAudioKey()}.wav`,
             contentType: "audio/wav",
             data: base64Data,
           }),
@@ -1670,17 +1949,24 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             onAddImageToGallery({
               src: persistedUrl,
               prompt: sceneNarration.slice(0, 200),
-              source: "Narração",
+              source: `Narracao-${getAudioKey()}`,
               model: "tts-generation" as any,
               mediaType: "audio",
               duration: audioDuration,
               video_script_id: clip.id, // Link to video_clip_script for campaign filtering
             });
           }
-          console.log("[ClipsTab] Audio saved to gallery for clip:", clip.id, persistedUrl);
+          console.log(
+            "[ClipsTab] Audio saved to gallery for clip:",
+            clip.id,
+            persistedUrl,
+          );
         }
       } catch (uploadErr) {
-        console.warn("[ClipsTab] Failed to upload audio, using local URL:", uploadErr);
+        console.warn(
+          "[ClipsTab] Failed to upload audio, using local URL:",
+          uploadErr,
+        );
       }
 
       setAudioState({ url: persistedUrl, isLoading: false });
@@ -1848,7 +2134,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     // Check if there's a saved session to restore
     if (restoreSession && hasSavedSession) {
       const savedState = restoreSavedSession();
-      if (savedState && (savedState.clips.length > 0 || savedState.audioTracks.length > 0)) {
+      if (
+        savedState &&
+        (savedState.clips.length > 0 || savedState.audioTracks.length > 0)
+      ) {
         setEditorState(savedState);
         setIsEditing(true);
         return;
@@ -1927,23 +2216,6 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     return available;
   };
 
-  // Helper to get actual video duration
-  const getVideoDuration = (url: string): Promise<number> => {
-    return new Promise((resolve) => {
-      const video = document.createElement("video");
-      video.preload = "metadata";
-      video.onloadedmetadata = () => {
-        resolve(video.duration);
-        video.remove();
-      };
-      video.onerror = () => {
-        resolve(8); // Fallback to 8s if can't load
-        video.remove();
-      };
-      video.src = getVideoDisplayUrl(url);
-    });
-  };
-
   // Add a video to the timeline
   const handleAddClipToTimeline = async (
     sceneNumber: number,
@@ -1999,9 +2271,13 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       trimEnd: clip.trimEnd,
       mute: clip.muted,
       // Include transition if configured (not 'none')
-      transitionOut: clip.transitionOut?.type && clip.transitionOut.type !== 'none'
-        ? { type: clip.transitionOut.type, duration: clip.transitionOut.duration }
-        : undefined,
+      transitionOut:
+        clip.transitionOut?.type && clip.transitionOut.type !== "none"
+          ? {
+              type: clip.transitionOut.type,
+              duration: clip.transitionOut.duration,
+            }
+          : undefined,
     }));
 
     // Clear merged video if exists
@@ -2097,7 +2373,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
   const updateEditorClips = (newClips: EditableClip[]) => {
     if (!editorState) return;
     // Calculate total duration considering both video and audio
-    const totalDuration = calculateTotalMediaDuration(newClips, editorState.audioTracks);
+    const totalDuration = calculateTotalMediaDuration(
+      newClips,
+      editorState.audioTracks,
+    );
     const currentTime = Math.min(editorState.currentTime, totalDuration);
     setEditorState({
       ...editorState,
@@ -2168,7 +2447,9 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     if (video) video.pause();
     if (audio) audio.pause();
 
-    setEditorState((prev) => (prev ? { ...prev, isPlaying: false, playMode: null } : null));
+    setEditorState((prev) =>
+      prev ? { ...prev, isPlaying: false, playMode: null } : null,
+    );
   };
 
   // Play video only
@@ -2178,7 +2459,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     if (!video) return;
 
     // If already playing video, pause
-    if (editorState.isPlaying && editorState.playMode === 'video') {
+    if (editorState.isPlaying && editorState.playMode === "video") {
       handleStop();
       return;
     }
@@ -2205,12 +2486,22 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     if (video.src !== displayUrl) {
       video.src = displayUrl;
     }
-    const safeTrimEnd = Math.max(activeClip.trimStart, activeClip.trimEnd - 0.05);
+    const safeTrimEnd = Math.max(
+      activeClip.trimStart,
+      activeClip.trimEnd - 0.05,
+    );
     video.currentTime = Math.min(safeTrimEnd, activeClip.trimStart + localTime);
     video.muted = !!activeClip.muted;
     void video.play();
     setEditorState((prev) =>
-      prev ? { ...prev, isPlaying: true, playMode: 'video', selectedClipId: activeClip.id } : null,
+      prev
+        ? {
+            ...prev,
+            isPlaying: true,
+            playMode: "video",
+            selectedClipId: activeClip.id,
+          }
+        : null,
     );
   };
 
@@ -2221,7 +2512,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     if (!audio || editorState.audioTracks.length === 0) return;
 
     // If already playing audio, pause
-    if (editorState.isPlaying && editorState.playMode === 'audio') {
+    if (editorState.isPlaying && editorState.playMode === "audio") {
       handleStop();
       return;
     }
@@ -2244,7 +2535,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     audio.volume = track.volume;
     void audio.play();
     setEditorState((prev) =>
-      prev ? { ...prev, isPlaying: true, playMode: 'audio' } : null,
+      prev ? { ...prev, isPlaying: true, playMode: "audio" } : null,
     );
   };
 
@@ -2255,7 +2546,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     const audio = editorAudioRef.current;
 
     // If already playing all, pause
-    if (editorState.isPlaying && editorState.playMode === 'all') {
+    if (editorState.isPlaying && editorState.playMode === "all") {
       handleStop();
       return;
     }
@@ -2280,8 +2571,14 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       if (video.src !== displayUrl) {
         video.src = displayUrl;
       }
-      const safeTrimEnd = Math.max(activeClip.trimStart, activeClip.trimEnd - 0.05);
-      video.currentTime = Math.min(safeTrimEnd, activeClip.trimStart + localTime);
+      const safeTrimEnd = Math.max(
+        activeClip.trimStart,
+        activeClip.trimEnd - 0.05,
+      );
+      video.currentTime = Math.min(
+        safeTrimEnd,
+        activeClip.trimStart + localTime,
+      );
       video.muted = !!activeClip.muted;
       void video.play();
     }
@@ -2290,15 +2587,20 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     if (audio && editorState.audioTracks.length > 0) {
       const track = editorState.audioTracks[0];
       const audioTimelineStart = track.offsetSeconds;
-      const audioTimelineEnd = audioTimelineStart + (track.trimEnd - track.trimStart);
+      const audioTimelineEnd =
+        audioTimelineStart + (track.trimEnd - track.trimStart);
 
       // Calculate current timeline position
       const currentTimelinePos = editorState.currentTime;
 
       // Check if current position is within audio range
-      if (currentTimelinePos >= audioTimelineStart && currentTimelinePos < audioTimelineEnd) {
+      if (
+        currentTimelinePos >= audioTimelineStart &&
+        currentTimelinePos < audioTimelineEnd
+      ) {
         // Calculate the correct audio position
-        const audioLocalTime = track.trimStart + (currentTimelinePos - audioTimelineStart);
+        const audioLocalTime =
+          track.trimStart + (currentTimelinePos - audioTimelineStart);
         audio.currentTime = audioLocalTime;
         audio.volume = track.volume;
         void audio.play().catch(() => {});
@@ -2310,7 +2612,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     }
 
     setEditorState((prev) =>
-      prev ? { ...prev, isPlaying: true, playMode: 'all' } : null,
+      prev ? { ...prev, isPlaying: true, playMode: "all" } : null,
     );
   };
 
@@ -2350,7 +2652,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     playheadDragRef.current = {
       startX: event.clientX,
       startTime: editorState.currentTime,
-      pxPerSec: TIMELINE_PX_PER_SEC
+      pxPerSec: TIMELINE_PX_PER_SEC,
     };
   };
 
@@ -2360,15 +2662,22 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
     // Don't seek if we're clicking on a clip, audio track, or button
     const target = event.target as HTMLElement;
-    if (target.closest('button') || target.closest('[data-clip]') || target.closest('[data-audio-track]')) {
+    if (
+      target.closest("button") ||
+      target.closest("[data-clip]") ||
+      target.closest("[data-audio-track]")
+    ) {
       return;
     }
 
     const rect = timelineRef.current.getBoundingClientRect();
     const clickX = event.clientX - rect.left;
-    const newTime = Math.max(0, Math.min(clickX / TIMELINE_PX_PER_SEC, editorState.totalDuration));
+    const newTime = Math.max(
+      0,
+      Math.min(clickX / TIMELINE_PX_PER_SEC, editorState.totalDuration),
+    );
 
-    setEditorState(prev => {
+    setEditorState((prev) => {
       if (!prev) return prev;
       return { ...prev, currentTime: newTime };
     });
@@ -2380,11 +2689,16 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
       for (const clip of clips) {
         const duration = getClipDuration(clip);
-        if (newTime >= accumulatedTime && newTime < accumulatedTime + duration) {
+        if (
+          newTime >= accumulatedTime &&
+          newTime < accumulatedTime + duration
+        ) {
           const localTime = clip.trimStart + (newTime - accumulatedTime);
           editorVideoRef.current.src = getVideoDisplayUrl(clip.videoUrl);
           editorVideoRef.current.currentTime = localTime;
-          setEditorState(prev => prev ? { ...prev, selectedClipId: clip.id } : null);
+          setEditorState((prev) =>
+            prev ? { ...prev, selectedClipId: clip.id } : null,
+          );
           break;
         }
         accumulatedTime += duration;
@@ -2405,7 +2719,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       const clip = editorState.clips[i];
       const duration = getClipDuration(clip);
 
-      if (currentTime >= accumulatedTime && currentTime < accumulatedTime + duration) {
+      if (
+        currentTime >= accumulatedTime &&
+        currentTime < accumulatedTime + duration
+      ) {
         targetClipIndex = i;
         splitLocalTime = currentTime - accumulatedTime; // Offset within the trimmed clip
         break;
@@ -2420,8 +2737,13 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     const splitTimeOriginal = clip.trimStart + splitLocalTime;
 
     // Enforce minimum duration for split parts
-    if (splitLocalTime < MIN_CLIP_DURATION || (getClipDuration(clip) - splitLocalTime) < MIN_CLIP_DURATION) {
-      alert(`O clip deve ter pelo menos ${MIN_CLIP_DURATION}s para ser cortado.`);
+    if (
+      splitLocalTime < MIN_CLIP_DURATION ||
+      getClipDuration(clip) - splitLocalTime < MIN_CLIP_DURATION
+    ) {
+      alert(
+        `O clip deve ter pelo menos ${MIN_CLIP_DURATION}s para ser cortado.`,
+      );
       return;
     }
 
@@ -2429,13 +2751,13 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     const leftClip: EditableClip = {
       ...clip,
       id: `clip-${clip.sceneNumber}-${Date.now()}-left`,
-      trimEnd: splitTimeOriginal
+      trimEnd: splitTimeOriginal,
     };
 
     const rightClip: EditableClip = {
       ...clip,
       id: `clip-${clip.sceneNumber}-${Date.now()}-right`,
-      trimStart: splitTimeOriginal
+      trimStart: splitTimeOriginal,
     };
 
     const newClips = [...editorState.clips];
@@ -2445,7 +2767,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     setEditorState({
       ...editorState,
       clips: newClips,
-      selectedClipId: rightClip.id // Select the new right part
+      selectedClipId: rightClip.id, // Select the new right part
     });
   };
 
@@ -2480,8 +2802,13 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     const splitTimeOriginal = track.trimStart + splitLocalTime;
 
     // Enforce minimum duration for split parts
-    if (splitLocalTime < MIN_CLIP_DURATION || (trackDuration - splitLocalTime) < MIN_CLIP_DURATION) {
-      alert(`O áudio deve ter pelo menos ${MIN_CLIP_DURATION}s para ser cortado.`);
+    if (
+      splitLocalTime < MIN_CLIP_DURATION ||
+      trackDuration - splitLocalTime < MIN_CLIP_DURATION
+    ) {
+      alert(
+        `O áudio deve ter pelo menos ${MIN_CLIP_DURATION}s para ser cortado.`,
+      );
       return;
     }
 
@@ -2509,7 +2836,6 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     });
   };
 
-
   const handleStartTrim = (
     event: React.MouseEvent,
     clipId: string,
@@ -2535,8 +2861,6 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     );
   };
 
-
-
   // Track if editor has clips (for effect dependency)
   const hasEditorClips = isEditing && (editorState?.clips.length ?? 0) > 0;
 
@@ -2554,20 +2878,24 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       }
 
       // Handle audio-only playback
-      if (state.isPlaying && state.playMode === 'audio') {
+      if (state.isPlaying && state.playMode === "audio") {
         const audio = editorAudioRef.current;
         if (audio && state.audioTracks.length > 0 && !audio.paused) {
           const audioTrack = state.audioTracks[0];
           // Calculate timeline time from audio position
           const audioLocalTime = audio.currentTime;
-          const timelineTime = audioTrack.offsetSeconds + (audioLocalTime - audioTrack.trimStart);
+          const timelineTime =
+            audioTrack.offsetSeconds + (audioLocalTime - audioTrack.trimStart);
 
           setEditorState((prev) => {
             if (!prev) return prev;
             if (Math.abs(prev.currentTime - timelineTime) < 0.01) return prev;
             return {
               ...prev,
-              currentTime: Math.min(Math.max(0, timelineTime), prev.totalDuration),
+              currentTime: Math.min(
+                Math.max(0, timelineTime),
+                prev.totalDuration,
+              ),
             };
           });
 
@@ -2585,35 +2913,50 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
       // Handle audio continuation after video ends in 'all' mode
       // This handles the case when video has finished but audio extends beyond
-      if (state.isPlaying && state.playMode === 'all' && video.paused && state.audioTracks.length > 0) {
+      if (
+        state.isPlaying &&
+        state.playMode === "all" &&
+        video.paused &&
+        state.audioTracks.length > 0
+      ) {
         const audio = editorAudioRef.current;
         const audioTrack = state.audioTracks[0];
 
         if (audio) {
           // Calculate where we should be in the audio based on current timeline position
           const audioTimelineStart = audioTrack.offsetSeconds;
-          const audioTimelineEnd = audioTimelineStart + (audioTrack.trimEnd - audioTrack.trimStart);
+          const audioTimelineEnd =
+            audioTimelineStart + (audioTrack.trimEnd - audioTrack.trimStart);
 
           // Check if we're still within audio range
           if (state.currentTime < audioTimelineEnd) {
             // If audio is paused, restart it at the correct position
             if (audio.paused) {
-              const audioLocalTime = audioTrack.trimStart + (state.currentTime - audioTimelineStart);
-              audio.currentTime = Math.max(audioTrack.trimStart, Math.min(audioLocalTime, audioTrack.trimEnd));
+              const audioLocalTime =
+                audioTrack.trimStart + (state.currentTime - audioTimelineStart);
+              audio.currentTime = Math.max(
+                audioTrack.trimStart,
+                Math.min(audioLocalTime, audioTrack.trimEnd),
+              );
               audio.volume = audioTrack.volume;
               audio.play().catch(() => {});
             }
 
             // Update timeline time based on audio position
             const audioLocalTime = audio.currentTime;
-            const timelineTime = audioTrack.offsetSeconds + (audioLocalTime - audioTrack.trimStart);
+            const timelineTime =
+              audioTrack.offsetSeconds +
+              (audioLocalTime - audioTrack.trimStart);
 
             setEditorState((prev) => {
               if (!prev) return prev;
               if (Math.abs(prev.currentTime - timelineTime) < 0.01) return prev;
               return {
                 ...prev,
-                currentTime: Math.min(Math.max(0, timelineTime), prev.totalDuration),
+                currentTime: Math.min(
+                  Math.max(0, timelineTime),
+                  prev.totalDuration,
+                ),
               };
             });
 
@@ -2621,14 +2964,28 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             if (audioLocalTime >= audioTrack.trimEnd - 0.05) {
               audio.pause();
               setEditorState((prev) =>
-                prev ? { ...prev, isPlaying: false, playMode: null, currentTime: prev.totalDuration } : null,
+                prev
+                  ? {
+                      ...prev,
+                      isPlaying: false,
+                      playMode: null,
+                      currentTime: prev.totalDuration,
+                    }
+                  : null,
               );
             }
           } else {
             // Audio has ended too, stop everything
             audio.pause();
             setEditorState((prev) =>
-              prev ? { ...prev, isPlaying: false, playMode: null, currentTime: prev.totalDuration } : null,
+              prev
+                ? {
+                    ...prev,
+                    isPlaying: false,
+                    playMode: null,
+                    currentTime: prev.totalDuration,
+                  }
+                : null,
             );
           }
         }
@@ -2637,7 +2994,11 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       }
 
       // If playing video (video-only or all), update time continuously
-      if (state.isPlaying && (state.playMode === 'video' || state.playMode === 'all') && !video.paused) {
+      if (
+        state.isPlaying &&
+        (state.playMode === "video" || state.playMode === "all") &&
+        !video.paused
+      ) {
         const activeIndex = state.selectedClipId
           ? state.clips.findIndex((c) => c.id === state.selectedClipId)
           : 0;
@@ -2645,7 +3006,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         if (activeIndex >= 0) {
           const activeClip = state.clips[activeIndex];
           const clipOffset = getTimelineOffset(state.clips, activeIndex);
-          const localTime = Math.max(0, video.currentTime - activeClip.trimStart);
+          const localTime = Math.max(
+            0,
+            video.currentTime - activeClip.trimStart,
+          );
           const timelineTime = clipOffset + localTime;
 
           setEditorState((prev) => {
@@ -2660,16 +3024,28 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           });
 
           // Sync audio playback position (only in 'all' mode)
-          if (state.playMode === 'all' && editorAudioRef.current && state.audioTracks.length > 0) {
+          if (
+            state.playMode === "all" &&
+            editorAudioRef.current &&
+            state.audioTracks.length > 0
+          ) {
             const audioTrack = state.audioTracks[0];
             const audioTimelineStart = audioTrack.offsetSeconds;
-            const audioTimelineEnd = audioTimelineStart + (audioTrack.trimEnd - audioTrack.trimStart);
+            const audioTimelineEnd =
+              audioTimelineStart + (audioTrack.trimEnd - audioTrack.trimStart);
 
             // Check if current time is within audio range
-            if (timelineTime >= audioTimelineStart && timelineTime < audioTimelineEnd) {
-              const audioLocalTime = audioTrack.trimStart + (timelineTime - audioTimelineStart);
+            if (
+              timelineTime >= audioTimelineStart &&
+              timelineTime < audioTimelineEnd
+            ) {
+              const audioLocalTime =
+                audioTrack.trimStart + (timelineTime - audioTimelineStart);
               // Only seek if significantly out of sync
-              if (Math.abs(editorAudioRef.current.currentTime - audioLocalTime) > 0.3) {
+              if (
+                Math.abs(editorAudioRef.current.currentTime - audioLocalTime) >
+                0.3
+              ) {
                 editorAudioRef.current.currentTime = audioLocalTime;
               }
               if (editorAudioRef.current.paused) {
@@ -2690,23 +3066,38 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             const transitionStartTime = activeClip.trimEnd - transitionDur;
 
             // Check if we're in the transition zone
-            if (video.currentTime >= transitionStartTime && video.currentTime < activeClip.trimEnd) {
-              const progress = (video.currentTime - transitionStartTime) / transitionDur;
+            if (
+              video.currentTime >= transitionStartTime &&
+              video.currentTime < activeClip.trimEnd
+            ) {
+              const progress =
+                (video.currentTime - transitionStartTime) / transitionDur;
               const nextClip = state.clips[nextIndex];
 
               // Preload next video if not already loaded
               if (transitionVideoRef.current) {
                 const nextVideoUrl = getVideoDisplayUrl(nextClip.videoUrl);
-                if (!transitionVideoRef.current.src || !transitionVideoRef.current.src.includes(nextClip.videoUrl)) {
+                if (
+                  !transitionVideoRef.current.src ||
+                  !transitionVideoRef.current.src.includes(nextClip.videoUrl)
+                ) {
                   transitionVideoRef.current.src = nextVideoUrl;
                   transitionVideoRef.current.currentTime = nextClip.trimStart;
                   transitionVideoRef.current.muted = true;
                   transitionVideoRef.current.play().catch(() => {});
                 } else {
                   // Keep secondary video in sync during transition
-                  const expectedSecondaryTime = nextClip.trimStart + (video.currentTime - transitionStartTime);
-                  if (Math.abs(transitionVideoRef.current.currentTime - expectedSecondaryTime) > 0.1) {
-                    transitionVideoRef.current.currentTime = expectedSecondaryTime;
+                  const expectedSecondaryTime =
+                    nextClip.trimStart +
+                    (video.currentTime - transitionStartTime);
+                  if (
+                    Math.abs(
+                      transitionVideoRef.current.currentTime -
+                        expectedSecondaryTime,
+                    ) > 0.1
+                  ) {
+                    transitionVideoRef.current.currentTime =
+                      expectedSecondaryTime;
                   }
                   if (transitionVideoRef.current.paused) {
                     transitionVideoRef.current.play().catch(() => {});
@@ -2722,11 +3113,11 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               });
             } else {
               // Not in transition zone - clear preview if active
-              setTransitionPreview((prev) => prev?.active ? null : prev);
+              setTransitionPreview((prev) => (prev?.active ? null : prev));
             }
           } else {
             // No transition configured - ensure preview is cleared
-            setTransitionPreview((prev) => prev?.active ? null : prev);
+            setTransitionPreview((prev) => (prev?.active ? null : prev));
           }
 
           // Handle Clip Transition
@@ -2743,10 +3134,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   video.currentTime = nextClip.trimStart;
                   video.muted = !!nextClip.muted;
                   void video.play();
-                  video.removeEventListener('canplay', handleCanPlay);
+                  video.removeEventListener("canplay", handleCanPlay);
                 };
 
-                video.addEventListener('canplay', handleCanPlay);
+                video.addEventListener("canplay", handleCanPlay);
                 video.src = nextVideoUrl;
                 video.load();
               } else {
@@ -2768,18 +3159,32 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               video.pause();
 
               // Calculate video duration (sum of all clips)
-              const videoDuration = state.clips.reduce((acc, c) => acc + getClipDuration(c), 0);
+              const videoDuration = state.clips.reduce(
+                (acc, c) => acc + getClipDuration(c),
+                0,
+              );
 
               // Check if audio extends beyond video in 'all' mode
-              if (state.playMode === 'all' && state.audioTracks.length > 0 && editorAudioRef.current) {
+              if (
+                state.playMode === "all" &&
+                state.audioTracks.length > 0 &&
+                editorAudioRef.current
+              ) {
                 const audioTrack = state.audioTracks[0];
-                const audioTimelineEnd = audioTrack.offsetSeconds + (audioTrack.trimEnd - audioTrack.trimStart);
+                const audioTimelineEnd =
+                  audioTrack.offsetSeconds +
+                  (audioTrack.trimEnd - audioTrack.trimStart);
 
                 // If audio extends beyond video, keep playing audio
-                if (audioTimelineEnd > videoDuration && timelineTime < audioTimelineEnd) {
+                if (
+                  audioTimelineEnd > videoDuration &&
+                  timelineTime < audioTimelineEnd
+                ) {
                   // Ensure audio is playing at the correct position
                   const audio = editorAudioRef.current;
-                  const audioLocalTime = audioTrack.trimStart + (timelineTime - audioTrack.offsetSeconds);
+                  const audioLocalTime =
+                    audioTrack.trimStart +
+                    (timelineTime - audioTrack.offsetSeconds);
 
                   if (audio.paused) {
                     audio.currentTime = audioLocalTime;
@@ -2797,7 +3202,12 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               if (editorAudioRef.current) editorAudioRef.current.pause();
               setEditorState((prev) =>
                 prev
-                  ? { ...prev, isPlaying: false, playMode: null, currentTime: prev.totalDuration }
+                  ? {
+                      ...prev,
+                      isPlaying: false,
+                      playMode: null,
+                      currentTime: prev.totalDuration,
+                    }
                   : null,
               );
             }
@@ -2819,7 +3229,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       if (playheadDragRef.current) return;
 
       // Calculate total video duration
-      const videoDuration = state.clips.reduce((acc, c) => acc + getClipDuration(c), 0);
+      const videoDuration = state.clips.reduce(
+        (acc, c) => acc + getClipDuration(c),
+        0,
+      );
 
       // If current position is beyond video (in audio-only zone), don't override it
       // The user may have manually positioned the playhead there
@@ -2861,7 +3274,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
     const handleKeyDown = (event: KeyboardEvent) => {
       // Don't trigger if user is typing in an input
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
 
@@ -2880,7 +3296,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       }
 
       // Space to play/pause
-      if (event.key === " " && (state.clips.length > 0 || state.audioTracks.length > 0)) {
+      if (
+        event.key === " " &&
+        (state.clips.length > 0 || state.audioTracks.length > 0)
+      ) {
         event.preventDefault();
         handlePlayPause();
       }
@@ -2938,7 +3357,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       if (!prev) return prev;
       const newAudioTracks = [...prev.audioTracks, newTrack];
       // Recalculate total duration considering the new audio track
-      const totalDuration = calculateTotalMediaDuration(prev.clips, newAudioTracks);
+      const totalDuration = calculateTotalMediaDuration(
+        prev.clips,
+        newAudioTracks,
+      );
       return {
         ...prev,
         audioTracks: newAudioTracks,
@@ -2959,10 +3381,15 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
   const handleUpdateAudioOffset = (audioId: string, offsetSeconds: number) => {
     if (!editorState) return;
     const updatedTracks = editorState.audioTracks.map((track) =>
-      track.id === audioId ? { ...track, offsetSeconds: Math.max(0, offsetSeconds) } : track,
+      track.id === audioId
+        ? { ...track, offsetSeconds: Math.max(0, offsetSeconds) }
+        : track,
     );
     // Recalculate total duration as audio offset affects end position
-    const totalDuration = calculateTotalMediaDuration(editorState.clips, updatedTracks);
+    const totalDuration = calculateTotalMediaDuration(
+      editorState.clips,
+      updatedTracks,
+    );
     setEditorState({
       ...editorState,
       audioTracks: updatedTracks,
@@ -2985,9 +3412,14 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
   const handleDeleteAudioTrack = (audioId: string) => {
     if (!editorState) return;
-    const filteredTracks = editorState.audioTracks.filter((t) => t.id !== audioId);
+    const filteredTracks = editorState.audioTracks.filter(
+      (t) => t.id !== audioId,
+    );
     // Recalculate total duration after removing audio track
-    const totalDuration = calculateTotalMediaDuration(editorState.clips, filteredTracks);
+    const totalDuration = calculateTotalMediaDuration(
+      editorState.clips,
+      filteredTracks,
+    );
     setEditorState({
       ...editorState,
       audioTracks: filteredTracks,
@@ -3098,72 +3530,23 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* Model Selectors */}
-            <div className="flex items-center gap-2 border-r border-white/10 pr-3">
-              <select
-                value={selectedImageModel}
-                onChange={(e) =>
-                  setSelectedImageModel(e.target.value as ImageModel)
-                }
-                className="bg-[#080808] border border-white/10 rounded-lg px-2 py-1.5 text-[9px] text-white/70 focus:border-primary/50 outline-none transition-all"
-                title="Modelo de Imagem"
-              >
-                <option value="gemini-3-pro-image-preview">Gemini 3</option>
-                <option value="imagen-4.0-generate-001">Imagen 4</option>
-              </select>
-              <select
-                value={selectedVideoModel}
-                onChange={(e) =>
-                  setSelectedVideoModel(e.target.value as VideoModel)
-                }
-                className="bg-[#080808] border border-white/10 rounded-lg px-2 py-1.5 text-[9px] text-white/70 focus:border-primary/50 outline-none transition-all"
-                title="Modelo de Vídeo"
-              >
-                <option value="fal-ai/sora-2/text-to-video">Sora 2</option>
-                <option value="veo-3.1-fast-generate-preview">Veo 3.1</option>
-              </select>
-            </div>
-            {/* Narration Toggle */}
             <button
-              onClick={() => setIncludeNarration(!includeNarration)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[9px] font-black uppercase tracking-wider whitespace-nowrap ${includeNarration
-                ? "bg-green-500/10 border-green-500/30 text-green-400"
-                : "bg-[#0a0a0a] border-white/10 text-white/40 hover:text-white/60"
-                }`}
-              title={
-                includeNarration
-                  ? "Incluir narração no prompt"
-                  : "Gerar vídeos sem narração no prompt"
-              }
+              onClick={() => setIsSettingsOpen(true)}
+              className="w-9 h-9 rounded-lg border border-white/10 bg-white/[0.03] text-white/50 hover:text-white hover:bg-white/[0.06] transition-all flex items-center justify-center"
+              title="Configurações do clip"
             >
-              <Icon
-                name={includeNarration ? "mic" : "mic-off"}
-                className="w-3 h-3"
-              />
-              <span>{includeNarration ? "Com Narração" : "Sem Narração"}</span>
-            </button>
-            {/* Remove Silence Toggle */}
-            <button
-              onClick={() => setRemoveSilence(!removeSilence)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[9px] font-black uppercase tracking-wider whitespace-nowrap ${removeSilence
-                ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
-                : "bg-[#0a0a0a] border-white/10 text-white/40 hover:text-white/60"
-                }`}
-              title={
-                removeSilence
-                  ? "Remover silencios entre clips ao juntar/exportar"
-                  : "Manter silencios originais"
-              }
-            >
-              <Icon name="audio" className="w-3 h-3" />
-              <span>{removeSilence ? "Sem Silencio" : "Com Silencio"}</span>
+              <Icon name="settings" className="w-4 h-4" />
             </button>
             {/* Action Buttons */}
             {onGenerateAllClipImages && (
               <Button
                 onClick={onGenerateAllClipImages}
                 isLoading={isGeneratingAllClipImages}
-                disabled={isGeneratingAllClipImages || isGeneratingThumbnail || isGeneratingImages}
+                disabled={
+                  isGeneratingAllClipImages ||
+                  isGeneratingThumbnail ||
+                  isGeneratingImages
+                }
                 size="small"
                 icon="zap"
                 className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-primary/20 !text-primary !border !border-primary/30 hover:!bg-primary/30"
@@ -3217,10 +3600,14 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   icon={hasSavedSession ? "play" : "edit"}
                   className={`!rounded-lg !px-3 !py-2 !text-[9px] !border !border-white/10 hover:!text-white ${
                     hasSavedSession
-                      ? '!bg-primary/20 !text-primary hover:!bg-primary/30'
-                      : '!bg-[#0a0a0a] !text-white/70 hover:!bg-[#111]'
+                      ? "!bg-primary/20 !text-primary hover:!bg-primary/30"
+                      : "!bg-[#0a0a0a] !text-white/70 hover:!bg-[#111]"
                   }`}
-                  title={hasSavedSession ? "Continuar edição salva" : "Editar timeline manualmente"}
+                  title={
+                    hasSavedSession
+                      ? "Continuar edição salva"
+                      : "Editar timeline manualmente"
+                  }
                 >
                   {hasSavedSession ? "Continuar" : "Editar"}
                 </Button>
@@ -3321,16 +3708,26 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                             : undefined
                         }
                         className="w-full h-full object-cover"
-                        style={transitionPreview?.active
-                          ? { ...getTransitionStyles(transitionPreview.type, transitionPreview.progress).outgoing, position: 'relative', zIndex: 1 }
-                          : undefined}
+                        style={
+                          transitionPreview?.active
+                            ? {
+                                ...getTransitionStyles(
+                                  transitionPreview.type,
+                                  transitionPreview.progress,
+                                ).outgoing,
+                                position: "relative",
+                                zIndex: 1,
+                              }
+                            : undefined
+                        }
                         controls={!transitionPreview?.active}
                         crossOrigin="anonymous"
                         muted={!!selectedEditorClip?.muted}
                         onLoadedMetadata={() => {
                           // Seek to trimStart when video loads
                           if (editorVideoRef.current && selectedEditorClip) {
-                            editorVideoRef.current.currentTime = selectedEditorClip.trimStart;
+                            editorVideoRef.current.currentTime =
+                              selectedEditorClip.trimStart;
                           }
                         }}
                         onPlay={() => {
@@ -3340,7 +3737,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                         onPause={() => {
                           // Only pause audio if we're in 'all' mode (video+audio sync)
                           // In 'video' mode, audio should already be paused
-                          if (editorState.playMode === 'all' && editorAudioRef.current) {
+                          if (
+                            editorState.playMode === "all" &&
+                            editorAudioRef.current
+                          ) {
                             editorAudioRef.current.pause();
                           }
                         }}
@@ -3350,7 +3750,13 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                         <video
                           ref={transitionVideoRef}
                           className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                          style={{ ...getTransitionStyles(transitionPreview.type, transitionPreview.progress).incoming, zIndex: 2 }}
+                          style={{
+                            ...getTransitionStyles(
+                              transitionPreview.type,
+                              transitionPreview.progress,
+                            ).incoming,
+                            zIndex: 2,
+                          }}
                           crossOrigin="anonymous"
                           muted
                         />
@@ -3362,7 +3768,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                     <audio
                       ref={editorAudioRef}
                       src={editorState.audioTracks[0]?.url}
-                      style={{ display: 'none' }}
+                      style={{ display: "none" }}
                     />
                   )}
                 </div>
@@ -3391,16 +3797,23 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   {/* Play All - Main button */}
                   <button
                     onClick={handlePlayAll}
-                    disabled={editorState.clips.length === 0 && editorState.audioTracks.length === 0}
+                    disabled={
+                      editorState.clips.length === 0 &&
+                      editorState.audioTracks.length === 0
+                    }
                     className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                      editorState.isPlaying && editorState.playMode === 'all'
+                      editorState.isPlaying && editorState.playMode === "all"
                         ? "bg-primary text-black"
                         : "bg-white hover:bg-white/90 disabled:bg-white/30 disabled:cursor-not-allowed text-black"
                     }`}
                     title="Play tudo (vídeo + áudio)"
                   >
                     <Icon
-                      name={editorState.isPlaying && editorState.playMode === 'all' ? "pause" : "play"}
+                      name={
+                        editorState.isPlaying && editorState.playMode === "all"
+                          ? "pause"
+                          : "play"
+                      }
                       className="w-4 h-4"
                     />
                   </button>
@@ -3409,7 +3822,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                     onClick={handlePlayVideo}
                     disabled={editorState.clips.length === 0}
                     className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                      editorState.isPlaying && editorState.playMode === 'video'
+                      editorState.isPlaying && editorState.playMode === "video"
                         ? "bg-blue-500 text-white"
                         : "bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed text-white"
                     }`}
@@ -3422,14 +3835,19 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                     onClick={handlePlayAudio}
                     disabled={editorState.audioTracks.length === 0}
                     className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                      editorState.isPlaying && editorState.playMode === 'audio'
+                      editorState.isPlaying && editorState.playMode === "audio"
                         ? "bg-green-500 text-white"
                         : "bg-green-500/20 hover:bg-green-500/40 disabled:opacity-30 disabled:cursor-not-allowed text-green-400"
                     }`}
                     title="Play só áudio"
                   >
                     <Icon
-                      name={editorState.isPlaying && editorState.playMode === 'audio' ? "pause" : "play"}
+                      name={
+                        editorState.isPlaying &&
+                        editorState.playMode === "audio"
+                          ? "pause"
+                          : "play"
+                      }
                       className="w-4 h-4"
                     />
                   </button>
@@ -3442,15 +3860,25 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                         handleSplitClip();
                       }
                     }}
-                    disabled={editorState.clips.length === 0 && editorState.audioTracks.length === 0}
+                    disabled={
+                      editorState.clips.length === 0 &&
+                      editorState.audioTracks.length === 0
+                    }
                     className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white transition-colors"
-                    title={editorState.selectedAudioId ? "Cortar áudio selecionado" : "Cortar vídeo"}
+                    title={
+                      editorState.selectedAudioId
+                        ? "Cortar áudio selecionado"
+                        : "Cortar vídeo"
+                    }
                   >
                     <Icon name="scissors" className="w-4 h-4" />
                   </button>
                   {/* Delete Video */}
                   <button
-                    onClick={() => editorState.selectedClipId && handleDeleteClip(editorState.selectedClipId)}
+                    onClick={() =>
+                      editorState.selectedClipId &&
+                      handleDeleteClip(editorState.selectedClipId)
+                    }
                     disabled={!editorState.selectedClipId}
                     className="w-10 h-10 rounded-full bg-white/10 hover:bg-red-500/50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white transition-colors"
                     title="Excluir clip selecionado (Delete)"
@@ -3459,7 +3887,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   </button>
                   {/* Delete Audio */}
                   <button
-                    onClick={() => editorState.selectedAudioId && handleDeleteAudioTrack(editorState.selectedAudioId)}
+                    onClick={() =>
+                      editorState.selectedAudioId &&
+                      handleDeleteAudioTrack(editorState.selectedAudioId)
+                    }
                     disabled={!editorState.selectedAudioId}
                     className="w-10 h-10 rounded-full bg-white/10 hover:bg-red-500/50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-green-400 transition-colors"
                     title="Excluir áudio selecionado"
@@ -3474,168 +3905,214 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   ref={timelineRef}
                   onClick={handleTimelineClick}
                 >
-                {editorState.clips.length === 0 ? (
-                  /* Empty state */
-                  <div className="flex items-center border-2 border-dashed border-white/20 rounded-lg h-16">
-                    <p className="text-white/30 text-sm px-4 flex-1">
-                      Clique em + para adicionar vídeos
-                    </p>
-                    {/* Add video button */}
-                    <button
-                      onClick={() => setShowAddClipModal(true)}
-                      className="mr-2 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/50 hover:text-white transition-colors flex-shrink-0"
-                      title="Adicionar vídeo"
-                    >
-                      <Icon name="plus" className="w-3 h-3" />
-                    </button>
-                  </div>
-                ) : (
-                  /* Clips Container */
-                  <div className="relative flex flex-col overflow-x-auto py-2 scrollbar-thin scrollbar-thumb-white/10">
-                    {/* Ruler */}
-                    <div className="h-5 flex relative mb-1" style={{ width: `${Math.max(100, editorState.totalDuration * TIMELINE_PX_PER_SEC)}px` }}>
-                      {Array.from({ length: Math.ceil(editorState.totalDuration) + 1 }).map((_, i) => (
-                        <div key={i} className="absolute top-0 bottom-0 border-l border-white/20" style={{ left: `${i * TIMELINE_PX_PER_SEC}px` }}>
-                          <span className="absolute -top-1 left-1 text-[8px] text-white/40">{i}s</span>
-                          {/* Minor ticks */}
-                          {Array.from({ length: 4 }).map((_, j) => (
-                            <div key={j} className="absolute bottom-0 h-1 border-l border-white/10" style={{ left: `${(j + 1) * (TIMELINE_PX_PER_SEC / 5)}px` }} />
-                          ))}
-                        </div>
-                      ))}
+                  {editorState.clips.length === 0 ? (
+                    /* Empty state */
+                    <div className="flex items-center border-2 border-dashed border-white/20 rounded-lg h-16">
+                      <p className="text-white/30 text-sm px-4 flex-1">
+                        Clique em + para adicionar vídeos
+                      </p>
+                      {/* Add video button */}
+                      <button
+                        onClick={() => setShowAddClipModal(true)}
+                        className="mr-2 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/50 hover:text-white transition-colors flex-shrink-0"
+                        title="Adicionar vídeo"
+                      >
+                        <Icon name="plus" className="w-3 h-3" />
+                      </button>
                     </div>
-
-                    {/* Clips Strip */}
-                    <div className="flex relative border-2 border-white/20 rounded-lg overflow-hidden h-16">
-                      {editorState.clips.map((clip, idx) => {
-                        const isSelected =
-                          editorState.selectedClipId === clip.id;
-                        const clipDuration = getClipDuration(clip);
-                        const clipWidth = getClipWidth(clipDuration);
-
-                        return (
+                  ) : (
+                    /* Clips Container */
+                    <div className="relative flex flex-col overflow-x-auto py-2 scrollbar-thin scrollbar-thumb-white/10">
+                      {/* Ruler */}
+                      <div
+                        className="h-5 flex relative mb-1"
+                        style={{
+                          width: `${Math.max(100, editorState.totalDuration * TIMELINE_PX_PER_SEC)}px`,
+                        }}
+                      >
+                        {Array.from({
+                          length: Math.ceil(editorState.totalDuration) + 1,
+                        }).map((_, i) => (
                           <div
-                            key={clip.id}
-                            data-clip="true"
-                            draggable
-                            onDragStart={() => handleDragStart(clip.id)}
-                            onDragOver={(e) => handleDragOver(e, clip.id)}
-                            onDragEnd={handleDragEnd}
-                            onClick={() => handleSelectClip(clip.id)}
-                            className={`relative h-16 cursor-move transition-all ${isSelected ? "ring-2 ring-white z-10" : ""
-                              } ${draggedClipId === clip.id ? "opacity-50" : ""} ${clip.muted ? "opacity-80" : ""}`}
-                            style={{ width: `${clipWidth}px` }}
+                            key={i}
+                            className="absolute top-0 bottom-0 border-l border-white/20"
+                            style={{ left: `${i * TIMELINE_PX_PER_SEC}px` }}
                           >
-                            {/* Video thumbnail */}
-                            <video
-                              src={getVideoDisplayUrl(clip.videoUrl)}
-                              className="w-full h-full object-cover pointer-events-none"
-                              crossOrigin="anonymous"
-                              muted
-                            />
-
-                            {/* Trim Handles - Only show on selected clip */}
-                            {isSelected && (
-                              <>
-                                <div
-                                  className="absolute left-0 top-0 bottom-0 w-2 bg-white cursor-ew-resize flex items-center justify-center hover:bg-white/90"
-                                  onMouseDown={(e) =>
-                                    handleStartTrim(e, clip.id, "start")
-                                  }
-                                >
-                                  <div className="w-0.5 h-6 bg-black/30 rounded-full" />
-                                </div>
-                                <div
-                                  className="absolute right-0 top-0 bottom-0 w-2 bg-white cursor-ew-resize flex items-center justify-center hover:bg-white/90"
-                                  onMouseDown={(e) =>
-                                    handleStartTrim(e, clip.id, "end")
-                                  }
-                                >
-                                  <div className="w-0.5 h-6 bg-black/30 rounded-full" />
-                                </div>
-                              </>
-                            )}
-
-                            {/* Transition divider - clickable to add/edit transition */}
-                            {idx < editorState.clips.length - 1 && (
+                            <span className="absolute -top-1 left-1 text-[8px] text-white/40">
+                              {i}s
+                            </span>
+                            {/* Minor ticks */}
+                            {Array.from({ length: 4 }).map((_, j) => (
                               <div
-                                className="absolute -right-3 top-0 bottom-0 w-6 flex items-center justify-center cursor-pointer group z-20"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingTransitionIndex(idx);
+                                key={j}
+                                className="absolute bottom-0 h-1 border-l border-white/10"
+                                style={{
+                                  left: `${(j + 1) * (TIMELINE_PX_PER_SEC / 5)}px`,
                                 }}
-                                title={clip.transitionOut?.type && clip.transitionOut.type !== 'none'
-                                  ? `${clip.transitionOut.type} (${clip.transitionOut.duration}s) - Clique para editar`
-                                  : 'Adicionar transição'}
-                              >
-                                {/* Vertical line */}
-                                <div className={`absolute w-px h-full ${
-                                  clip.transitionOut?.type && clip.transitionOut.type !== 'none'
-                                    ? 'bg-green-500'
-                                    : 'bg-white/30'
-                                }`} />
-                                {/* Transition indicator button */}
-                                <div className={`relative w-5 h-5 rounded-full flex items-center justify-center transition-all ${
-                                  clip.transitionOut?.type && clip.transitionOut.type !== 'none'
-                                    ? 'bg-green-500 text-black'
-                                    : 'bg-white/10 text-white/50 opacity-0 group-hover:opacity-100'
-                                }`}>
-                                  {clip.transitionOut?.type && clip.transitionOut.type !== 'none'
-                                    ? <Icon name={TRANSITION_OPTIONS.find(t => t.type === clip.transitionOut?.type)?.icon || 'chevron-right'} className="w-3 h-3" />
-                                    : <Icon name="plus" className="w-2.5 h-2.5" />}
-                                </div>
-                                {/* Duration badge */}
-                                {clip.transitionOut?.type && clip.transitionOut.type !== 'none' && (
-                                  <div className="absolute -bottom-3 text-[7px] text-green-500/80 whitespace-nowrap">
-                                    {clip.transitionOut.duration}s
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Duration badge */}
-                            <div className="absolute bottom-1 left-1/2 -translate-x-1/2">
-                              <span className="text-[8px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
-                                {Math.round(clipDuration)}s
-                              </span>
-                            </div>
-
-                            {/* Mute toggle - bottom left */}
-                            {isSelected && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleClipMute(clip.id);
-                                }}
-                                className={`absolute bottom-1 left-1 rounded px-1 py-0.5 text-[6px] font-bold flex items-center gap-0.5 ${clip.muted
-                                  ? "bg-red-500/80 text-white"
-                                  : "bg-black/60 text-white/80"
-                                  }`}
-                                title={
-                                  clip.muted ? "Clip sem audio" : "Mutar clip"
-                                }
-                              >
-                                <Icon
-                                  name={clip.muted ? "mic-off" : "audio"}
-                                  className="w-2.5 h-2.5"
-                                />
-                              </button>
-                            )}
+                              />
+                            ))}
                           </div>
-                        );
-                      })}
-                    </div>
+                        ))}
+                      </div>
 
-                    {/* Add clip button inline */}
-                    <button
-                      onClick={() => setShowAddClipModal(true)}
-                      className="ml-2 w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/50 hover:text-white transition-colors flex-shrink-0"
-                      title="Adicionar vídeo"
-                    >
-                      <Icon name="plus" className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+                      {/* Clips Strip */}
+                      <div className="flex relative border-2 border-white/20 rounded-lg overflow-hidden h-16">
+                        {editorState.clips.map((clip, idx) => {
+                          const isSelected =
+                            editorState.selectedClipId === clip.id;
+                          const clipDuration = getClipDuration(clip);
+                          const clipWidth = getClipWidth(clipDuration);
+
+                          return (
+                            <div
+                              key={clip.id}
+                              data-clip="true"
+                              draggable
+                              onDragStart={() => handleDragStart(clip.id)}
+                              onDragOver={(e) => handleDragOver(e, clip.id)}
+                              onDragEnd={handleDragEnd}
+                              onClick={() => handleSelectClip(clip.id)}
+                              className={`relative h-16 cursor-move transition-all ${
+                                isSelected ? "ring-2 ring-white z-10" : ""
+                              } ${draggedClipId === clip.id ? "opacity-50" : ""} ${clip.muted ? "opacity-80" : ""}`}
+                              style={{ width: `${clipWidth}px` }}
+                            >
+                              {/* Video thumbnail */}
+                              <video
+                                src={getVideoDisplayUrl(clip.videoUrl)}
+                                className="w-full h-full object-cover pointer-events-none"
+                                crossOrigin="anonymous"
+                                muted
+                              />
+
+                              {/* Trim Handles - Only show on selected clip */}
+                              {isSelected && (
+                                <>
+                                  <div
+                                    className="absolute left-0 top-0 bottom-0 w-2 bg-white cursor-ew-resize flex items-center justify-center hover:bg-white/90"
+                                    onMouseDown={(e) =>
+                                      handleStartTrim(e, clip.id, "start")
+                                    }
+                                  >
+                                    <div className="w-0.5 h-6 bg-black/30 rounded-full" />
+                                  </div>
+                                  <div
+                                    className="absolute right-0 top-0 bottom-0 w-2 bg-white cursor-ew-resize flex items-center justify-center hover:bg-white/90"
+                                    onMouseDown={(e) =>
+                                      handleStartTrim(e, clip.id, "end")
+                                    }
+                                  >
+                                    <div className="w-0.5 h-6 bg-black/30 rounded-full" />
+                                  </div>
+                                </>
+                              )}
+
+                              {/* Transition divider - clickable to add/edit transition */}
+                              {idx < editorState.clips.length - 1 && (
+                                <div
+                                  className="absolute -right-3 top-0 bottom-0 w-6 flex items-center justify-center cursor-pointer group z-20"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingTransitionIndex(idx);
+                                  }}
+                                  title={
+                                    clip.transitionOut?.type &&
+                                    clip.transitionOut.type !== "none"
+                                      ? `${clip.transitionOut.type} (${clip.transitionOut.duration}s) - Clique para editar`
+                                      : "Adicionar transição"
+                                  }
+                                >
+                                  {/* Vertical line */}
+                                  <div
+                                    className={`absolute w-px h-full ${
+                                      clip.transitionOut?.type &&
+                                      clip.transitionOut.type !== "none"
+                                        ? "bg-green-500"
+                                        : "bg-white/30"
+                                    }`}
+                                  />
+                                  {/* Transition indicator button */}
+                                  <div
+                                    className={`relative w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                                      clip.transitionOut?.type &&
+                                      clip.transitionOut.type !== "none"
+                                        ? "bg-green-500 text-black"
+                                        : "bg-white/10 text-white/50 opacity-0 group-hover:opacity-100"
+                                    }`}
+                                  >
+                                    {clip.transitionOut?.type &&
+                                    clip.transitionOut.type !== "none" ? (
+                                      <Icon
+                                        name={
+                                          TRANSITION_OPTIONS.find(
+                                            (t) =>
+                                              t.type ===
+                                              clip.transitionOut?.type,
+                                          )?.icon || "chevron-right"
+                                        }
+                                        className="w-3 h-3"
+                                      />
+                                    ) : (
+                                      <Icon
+                                        name="plus"
+                                        className="w-2.5 h-2.5"
+                                      />
+                                    )}
+                                  </div>
+                                  {/* Duration badge */}
+                                  {clip.transitionOut?.type &&
+                                    clip.transitionOut.type !== "none" && (
+                                      <div className="absolute -bottom-3 text-[7px] text-green-500/80 whitespace-nowrap">
+                                        {clip.transitionOut.duration}s
+                                      </div>
+                                    )}
+                                </div>
+                              )}
+
+                              {/* Duration badge */}
+                              <div className="absolute bottom-1 left-1/2 -translate-x-1/2">
+                                <span className="text-[8px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
+                                  {Math.round(clipDuration)}s
+                                </span>
+                              </div>
+
+                              {/* Mute toggle - bottom left */}
+                              {isSelected && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleClipMute(clip.id);
+                                  }}
+                                  className={`absolute bottom-1 left-1 rounded px-1 py-0.5 text-[6px] font-bold flex items-center gap-0.5 ${
+                                    clip.muted
+                                      ? "bg-red-500/80 text-white"
+                                      : "bg-black/60 text-white/80"
+                                  }`}
+                                  title={
+                                    clip.muted ? "Clip sem audio" : "Mutar clip"
+                                  }
+                                >
+                                  <Icon
+                                    name={clip.muted ? "mic-off" : "audio"}
+                                    className="w-2.5 h-2.5"
+                                  />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Add clip button inline */}
+                      <button
+                        onClick={() => setShowAddClipModal(true)}
+                        className="ml-2 w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/50 hover:text-white transition-colors flex-shrink-0"
+                        title="Adicionar vídeo"
+                      >
+                        <Icon name="plus" className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
 
                   {/* Audio Track Timeline */}
                   <div className="mt-3">
@@ -3650,12 +4127,19 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                         <button
                           onClick={async () => {
                             if (audioState.url) {
-                              const audioDuration = await new Promise<number>((resolve) => {
-                                const audio = new Audio(audioState.url!);
-                                audio.onloadedmetadata = () => resolve(audio.duration);
-                                audio.onerror = () => resolve(10);
-                              });
-                              handleAddAudioTrack(audioState.url, "Narração", audioDuration);
+                              const audioDuration = await new Promise<number>(
+                                (resolve) => {
+                                  const audio = new Audio(audioState.url!);
+                                  audio.onloadedmetadata = () =>
+                                    resolve(audio.duration);
+                                  audio.onerror = () => resolve(10);
+                                },
+                              );
+                              handleAddAudioTrack(
+                                audioState.url,
+                                "Narração",
+                                audioDuration,
+                              );
                             }
                           }}
                           disabled={!audioState.url}
@@ -3669,13 +4153,20 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                       <div className="flex items-center">
                         <div
                           className="relative h-12 border border-green-500/30 rounded-lg overflow-visible flex-1"
-                          style={{ width: `${Math.max(200, editorState.totalDuration * TIMELINE_PX_PER_SEC)}px` }}
+                          style={{
+                            width: `${Math.max(200, editorState.totalDuration * TIMELINE_PX_PER_SEC)}px`,
+                          }}
                         >
                           {editorState.audioTracks.map((track) => {
-                            const isSelected = editorState.selectedAudioId === track.id;
+                            const isSelected =
+                              editorState.selectedAudioId === track.id;
                             const trackDuration = getAudioTrackDuration(track);
-                            const trackWidth = Math.max(MIN_CLIP_WIDTH, trackDuration * TIMELINE_PX_PER_SEC);
-                            const offsetLeft = track.offsetSeconds * TIMELINE_PX_PER_SEC;
+                            const trackWidth = Math.max(
+                              MIN_CLIP_WIDTH,
+                              trackDuration * TIMELINE_PX_PER_SEC,
+                            );
+                            const offsetLeft =
+                              track.offsetSeconds * TIMELINE_PX_PER_SEC;
 
                             return (
                               <div
@@ -3683,7 +4174,12 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                 data-audio-track="true"
                                 onClick={() => handleSelectAudio(track.id)}
                                 onMouseDown={(e) => {
-                                  if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('audio-drag-handle')) {
+                                  if (
+                                    e.target === e.currentTarget ||
+                                    (
+                                      e.target as HTMLElement
+                                    ).classList.contains("audio-drag-handle")
+                                  ) {
                                     handleStartAudioDrag(e, track.id);
                                   }
                                 }}
@@ -3700,11 +4196,15 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                 {/* Waveform visual placeholder */}
                                 <div className="audio-drag-handle absolute inset-0 flex items-center justify-center overflow-hidden">
                                   <div className="flex items-center gap-[2px] h-full py-2">
-                                    {Array.from({ length: Math.floor(trackWidth / 4) }).map((_, i) => (
+                                    {Array.from({
+                                      length: Math.floor(trackWidth / 4),
+                                    }).map((_, i) => (
                                       <div
                                         key={i}
                                         className="w-[2px] bg-green-400/60 rounded-full"
-                                        style={{ height: `${20 + Math.sin(i * 0.5) * 15 + Math.random() * 10}%` }}
+                                        style={{
+                                          height: `${20 + Math.sin(i * 0.5) * 15 + Math.random() * 10}%`,
+                                        }}
                                       />
                                     ))}
                                   </div>
@@ -3725,13 +4225,21 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                   <>
                                     <div
                                       className="absolute left-0 top-0 bottom-0 w-2 bg-green-400 cursor-ew-resize flex items-center justify-center hover:bg-green-300 rounded-l"
-                                      onMouseDown={(e) => handleStartAudioTrim(e, track.id, "start")}
+                                      onMouseDown={(e) =>
+                                        handleStartAudioTrim(
+                                          e,
+                                          track.id,
+                                          "start",
+                                        )
+                                      }
                                     >
                                       <div className="w-0.5 h-4 bg-black/30 rounded-full" />
                                     </div>
                                     <div
                                       className="absolute right-0 top-0 bottom-0 w-2 bg-green-400 cursor-ew-resize flex items-center justify-center hover:bg-green-300 rounded-r"
-                                      onMouseDown={(e) => handleStartAudioTrim(e, track.id, "end")}
+                                      onMouseDown={(e) =>
+                                        handleStartAudioTrim(e, track.id, "end")
+                                      }
                                     >
                                       <div className="w-0.5 h-4 bg-black/30 rounded-full" />
                                     </div>
@@ -3745,12 +4253,19 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                         <button
                           onClick={async () => {
                             if (audioState.url) {
-                              const audioDuration = await new Promise<number>((resolve) => {
-                                const audio = new Audio(audioState.url!);
-                                audio.onloadedmetadata = () => resolve(audio.duration);
-                                audio.onerror = () => resolve(10);
-                              });
-                              handleAddAudioTrack(audioState.url, "Narração", audioDuration);
+                              const audioDuration = await new Promise<number>(
+                                (resolve) => {
+                                  const audio = new Audio(audioState.url!);
+                                  audio.onloadedmetadata = () =>
+                                    resolve(audio.duration);
+                                  audio.onerror = () => resolve(10);
+                                },
+                              );
+                              handleAddAudioTrack(
+                                audioState.url,
+                                "Narração",
+                                audioDuration,
+                              );
                             }
                           }}
                           disabled={!audioState.url}
@@ -3764,7 +4279,8 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   </div>
 
                   {/* Shared Playhead (Draggable) - spans both video and audio */}
-                  {(editorState.clips.length > 0 || editorState.audioTracks.length > 0) && (
+                  {(editorState.clips.length > 0 ||
+                    editorState.audioTracks.length > 0) && (
                     <div
                       className="absolute top-0 bottom-0 w-6 -ml-3 z-40 cursor-grab active:cursor-grabbing group"
                       onMouseDown={handleStartPlayheadDrag}
@@ -3834,8 +4350,9 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                         {Math.round(
                           (editorState.audioTracks.find(
                             (t) => t.id === editorState.selectedAudioId,
-                          )?.volume || 1) * 100
-                        )}%
+                          )?.volume || 1) * 100,
+                        )}
+                        %
                       </span>
                     </div>
 
@@ -3843,9 +4360,12 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                     <div className="flex items-center gap-2 text-[10px] text-white/50">
                       <span>Início:</span>
                       <span className="text-green-400 font-mono">
-                        {(editorState.audioTracks.find(
-                          (t) => t.id === editorState.selectedAudioId,
-                        )?.offsetSeconds || 0).toFixed(1)}s
+                        {(
+                          editorState.audioTracks.find(
+                            (t) => t.id === editorState.selectedAudioId,
+                          )?.offsetSeconds || 0
+                        ).toFixed(1)}
+                        s
                       </span>
                     </div>
                   </div>
@@ -4093,7 +4613,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
               <div
                 id={`scenes-carousel-${clip.title}`}
-                className="flex gap-4 overflow-x-auto pb-4 px-6 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent scroll-smooth"
+                className="flex gap-4 overflow-x-auto pb-4 px-6 scrollbar-none scroll-smooth"
               >
                 {scenes.map((scene) => {
                   const sceneImage = sceneImages[scene.sceneNumber];
@@ -4114,6 +4634,11 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                     scenePreviewSlides[scene.sceneNumber] ||
                     (hasVideo ? "video" : "image");
                   const showCarousel = hasImage && hasVideo;
+                  const durationValue =
+                    currentVideo?.duration != null
+                      ? currentVideo.duration
+                      : scene.duration;
+                  const durationLabel = `${Math.round(durationValue)}s`;
 
                   // Navigate between videos
                   const navigateVideo = (direction: "prev" | "next") => {
@@ -4134,7 +4659,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   return (
                     <div
                       key={scene.sceneNumber}
-                      className={`bg-[#0a0a0a] rounded-xl border overflow-hidden flex flex-col flex-shrink-0 w-64 ${hasVideo ? "border-blue-500/20" : hasImage ? "border-green-500/20" : "border-white/5"}`}
+                      className="bg-[#0a0a0a] rounded-xl border border-white/5 overflow-hidden flex flex-col flex-shrink-0 w-72"
                     >
                       {/* Scene Preview - Carousel */}
                       <div className="aspect-[9/16] bg-black relative">
@@ -4351,9 +4876,11 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                             <span className="text-[7px] font-black bg-primary text-black px-1.5 py-0.5 rounded-md">
                               {scene.sceneNumber}
                             </span>
-                            <span className="text-[7px] font-bold text-white bg-black/70 px-1.5 py-0.5 rounded-md">
-                              {scene.duration}s
-                            </span>
+                            {hasVideo && (
+                              <span className="text-[7px] font-bold text-white bg-black/70 px-1.5 py-0.5 rounded-md">
+                                {durationLabel}
+                              </span>
+                            )}
                             {hasImage && !hasVideo && (
                               <span className="text-[6px] font-bold bg-green-500/80 text-white px-1 py-0.5 rounded-md">
                                 IMG
@@ -4572,10 +5099,11 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                     <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between">
                       <span
-                        className={`text-[8px] font-bold text-white px-1.5 py-0.5 rounded ${item.isFinalVideo
-                          ? "bg-primary text-black"
-                          : "bg-black/60"
-                          }`}
+                        className={`text-[8px] font-bold text-white px-1.5 py-0.5 rounded ${
+                          item.isFinalVideo
+                            ? "bg-primary text-black"
+                            : "bg-black/60"
+                        }`}
                       >
                         {item.label || `Cena ${item.sceneNumber}`}
                       </span>
@@ -4660,15 +5188,19 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             <div className="p-4">
               {/* Current clip info */}
               <p className="text-xs text-white/50 mb-4">
-                Entre cena {editorState.clips[editingTransitionIndex]?.sceneNumber} e cena {editorState.clips[editingTransitionIndex + 1]?.sceneNumber}
+                Entre cena{" "}
+                {editorState.clips[editingTransitionIndex]?.sceneNumber} e cena{" "}
+                {editorState.clips[editingTransitionIndex + 1]?.sceneNumber}
               </p>
 
               {/* Transition type grid */}
               <div className="grid grid-cols-5 gap-2 mb-4">
                 {TRANSITION_OPTIONS.map((option) => {
-                  const currentTransition = editorState.clips[editingTransitionIndex]?.transitionOut;
-                  const isSelected = currentTransition?.type === option.type ||
-                    (!currentTransition && option.type === 'none');
+                  const currentTransition =
+                    editorState.clips[editingTransitionIndex]?.transitionOut;
+                  const isSelected =
+                    currentTransition?.type === option.type ||
+                    (!currentTransition && option.type === "none");
 
                   return (
                     <button
@@ -4677,7 +5209,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                         setEditorState((prev) => {
                           if (!prev) return prev;
                           const newClips = [...prev.clips];
-                          if (option.type === 'none') {
+                          if (option.type === "none") {
                             // Remove transition
                             newClips[editingTransitionIndex] = {
                               ...newClips[editingTransitionIndex],
@@ -4685,7 +5217,9 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                             };
                           } else {
                             // Set transition with current or default duration
-                            const currentDuration = newClips[editingTransitionIndex].transitionOut?.duration || 0.5;
+                            const currentDuration =
+                              newClips[editingTransitionIndex].transitionOut
+                                ?.duration || 0.5;
                             newClips[editingTransitionIndex] = {
                               ...newClips[editingTransitionIndex],
                               transitionOut: {
@@ -4697,14 +5231,17 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                           return {
                             ...prev,
                             clips: newClips,
-                            totalDuration: calculateTotalMediaDuration(newClips, prev.audioTracks),
+                            totalDuration: calculateTotalMediaDuration(
+                              newClips,
+                              prev.audioTracks,
+                            ),
                           };
                         });
                       }}
                       className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${
                         isSelected
-                          ? 'bg-green-500 text-black'
-                          : 'bg-white/5 hover:bg-white/10 text-white/70 hover:text-white'
+                          ? "bg-green-500 text-black"
+                          : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white"
                       }`}
                       title={option.label}
                     >
@@ -4719,57 +5256,81 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
               {/* Duration selector - only show if a transition is selected */}
               {editorState.clips[editingTransitionIndex]?.transitionOut?.type &&
-                editorState.clips[editingTransitionIndex]?.transitionOut?.type !== 'none' && (
-                <div className="mb-4">
-                  <p className="text-xs text-white/50 mb-2">Duração</p>
-                  <div className="flex gap-2">
-                    {DURATION_OPTIONS.map((duration) => {
-                      const isSelected = editorState.clips[editingTransitionIndex]?.transitionOut?.duration === duration;
-                      return (
-                        <button
-                          key={duration}
-                          onClick={() => {
-                            setEditorState((prev) => {
-                              if (!prev) return prev;
-                              const newClips = [...prev.clips];
-                              if (newClips[editingTransitionIndex].transitionOut) {
-                                newClips[editingTransitionIndex] = {
-                                  ...newClips[editingTransitionIndex],
-                                  transitionOut: {
-                                    ...newClips[editingTransitionIndex].transitionOut!,
-                                    duration,
-                                  },
+                editorState.clips[editingTransitionIndex]?.transitionOut
+                  ?.type !== "none" && (
+                  <div className="mb-4">
+                    <p className="text-xs text-white/50 mb-2">Duração</p>
+                    <div className="flex gap-2">
+                      {DURATION_OPTIONS.map((duration) => {
+                        const isSelected =
+                          editorState.clips[editingTransitionIndex]
+                            ?.transitionOut?.duration === duration;
+                        return (
+                          <button
+                            key={duration}
+                            onClick={() => {
+                              setEditorState((prev) => {
+                                if (!prev) return prev;
+                                const newClips = [...prev.clips];
+                                if (
+                                  newClips[editingTransitionIndex].transitionOut
+                                ) {
+                                  newClips[editingTransitionIndex] = {
+                                    ...newClips[editingTransitionIndex],
+                                    transitionOut: {
+                                      ...newClips[editingTransitionIndex]
+                                        .transitionOut!,
+                                      duration,
+                                    },
+                                  };
+                                }
+                                return {
+                                  ...prev,
+                                  clips: newClips,
+                                  totalDuration: calculateTotalMediaDuration(
+                                    newClips,
+                                    prev.audioTracks,
+                                  ),
                                 };
-                              }
-                              return {
-                                ...prev,
-                                clips: newClips,
-                                totalDuration: calculateTotalMediaDuration(newClips, prev.audioTracks),
-                              };
-                            });
-                          }}
-                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                            isSelected
-                              ? 'bg-green-500 text-black'
-                              : 'bg-white/5 hover:bg-white/10 text-white/70'
-                          }`}
-                        >
-                          {duration}s
-                        </button>
-                      );
-                    })}
+                              });
+                            }}
+                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                              isSelected
+                                ? "bg-green-500 text-black"
+                                : "bg-white/5 hover:bg-white/10 text-white/70"
+                            }`}
+                          >
+                            {duration}s
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
             <div className="px-4 py-3 border-t border-white/5 flex justify-end">
-              <Button size="small" onClick={() => setEditingTransitionIndex(null)}>
+              <Button
+                size="small"
+                onClick={() => setEditingTransitionIndex(null)}
+              >
                 Fechar
               </Button>
             </div>
           </div>
         </div>
       )}
+      <ClipSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        selectedImageModel={selectedImageModel}
+        onChangeImageModel={setSelectedImageModel}
+        selectedVideoModel={selectedVideoModel}
+        onChangeVideoModel={setSelectedVideoModel}
+        includeNarration={includeNarration}
+        onToggleNarration={() => setIncludeNarration(!includeNarration)}
+        removeSilence={removeSilence}
+        onToggleRemoveSilence={() => setRemoveSilence(!removeSilence)}
+      />
     </>
   );
 };
@@ -4802,7 +5363,9 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
     "gemini-3-pro-image-preview",
   );
   const [sceneImageTriggers, setSceneImageTriggers] = useState<number[]>([]);
-  const [generatingAllForClip, setGeneratingAllForClip] = useState<number | null>(null);
+  const [generatingAllForClip, setGeneratingAllForClip] = useState<
+    number | null
+  >(null);
 
   const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
 
@@ -4847,14 +5410,20 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
       });
     });
 
-    setExtraInstructions((prev) => prev.length === length ? prev : Array(length).fill(""));
-    setGenerationState((prev) =>
-      prev.isGenerating.length === length ? prev : {
-        isGenerating: Array(length).fill(false),
-        errors: Array(length).fill(null),
-      }
+    setExtraInstructions((prev) =>
+      prev.length === length ? prev : Array(length).fill(""),
     );
-    setSceneImageTriggers((prev) => prev.length === length ? prev : Array(length).fill(0));
+    setGenerationState((prev) =>
+      prev.isGenerating.length === length
+        ? prev
+        : {
+            isGenerating: Array(length).fill(false),
+            errors: Array(length).fill(null),
+          },
+    );
+    setSceneImageTriggers((prev) =>
+      prev.length === length ? prev : Array(length).fill(0),
+    );
   }, [videoClipScripts, galleryImages]);
 
   // Listen for job completions

@@ -86,7 +86,38 @@ const colors = {
   blue: '\x1b[34m',
   cyan: '\x1b[36m',
   red: '\x1b[31m',
+  magenta: '\x1b[35m',
 };
+
+// ============================================================================
+// LOGGING HELPERS
+// ============================================================================
+
+function logExternalAPI(service, action, details = '') {
+  const timestamp = new Date().toLocaleTimeString('pt-BR');
+  console.log(
+    `${colors.magenta}[${service}]${colors.reset} ${colors.cyan}${action}${colors.reset}${details ? ` ${colors.dim}${details}${colors.reset}` : ''}`
+  );
+}
+
+function logExternalAPIResult(service, action, duration, success = true) {
+  const status = success ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
+  console.log(
+    `${colors.magenta}[${service}]${colors.reset} ${status} ${action} ${colors.dim}${duration}ms${colors.reset}`
+  );
+}
+
+function logError(context, error) {
+  console.error(`\n${colors.red}━━━ ERROR: ${context} ━━━${colors.reset}`);
+  console.error(`${colors.red}Message:${colors.reset}`, error.message);
+  if (error.stack) {
+    console.error(`${colors.dim}${error.stack}${colors.reset}`);
+  }
+  if (error.response?.data) {
+    console.error(`${colors.yellow}Response:${colors.reset}`, JSON.stringify(error.response.data, null, 2));
+  }
+  console.error(`${colors.red}━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}\n`);
+}
 
 function logQuery(requestId, _endpoint, _queryName) {
   if (!requestLog.has(requestId)) {
@@ -451,7 +482,7 @@ app.get("/api/db/init", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("[Init API] Error:", error);
+    logError('Init API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -476,7 +507,7 @@ app.get("/api/db/users", async (req, res) => {
 
     return res.status(400).json({ error: "email or id is required" });
   } catch (error) {
-    console.error("[Users API] Error:", error);
+    logError('Users API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -507,7 +538,7 @@ app.post("/api/db/users", async (req, res) => {
 
     res.status(201).json(result[0]);
   } catch (error) {
-    console.error("[Users API] Error:", error);
+    logError('Users API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -556,7 +587,7 @@ app.get("/api/db/brand-profiles", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Brand Profiles API] Error:", error);
+    logError('Brand Profiles API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -614,7 +645,7 @@ app.post("/api/db/brand-profiles", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Brand Profiles API] Error:", error);
+    logError('Brand Profiles API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -681,7 +712,7 @@ app.put("/api/db/brand-profiles", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Brand Profiles API] Error:", error);
+    logError('Brand Profiles API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -748,7 +779,7 @@ app.get("/api/db/gallery", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Gallery API] Error:", error);
+    logError('Gallery API GET', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -820,7 +851,7 @@ app.post("/api/db/gallery", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Gallery API] Error:", error);
+    logError('Gallery API POST', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -850,7 +881,7 @@ app.patch("/api/db/gallery", async (req, res) => {
 
     return res.status(200).json(result[0]);
   } catch (error) {
-    console.error("[Gallery API] PATCH Error:", error);
+    logError('Gallery API PATCH', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -896,7 +927,7 @@ app.delete("/api/db/gallery", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Gallery API] Error:", error);
+    logError('Gallery API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -924,7 +955,7 @@ app.patch("/api/db/posts", async (req, res) => {
 
     res.json(result[0]);
   } catch (error) {
-    console.error("[Posts API] Error:", error);
+    logError('Posts API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -952,7 +983,7 @@ app.patch("/api/db/ad-creatives", async (req, res) => {
 
     res.json(result[0]);
   } catch (error) {
-    console.error("[Ad Creatives API] Error:", error);
+    logError('Ad Creatives API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1014,7 +1045,7 @@ app.get("/api/db/scheduled-posts", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Scheduled Posts API] Error:", error);
+    logError('Scheduled Posts API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1098,7 +1129,7 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Scheduled Posts API] Error:", error);
+    logError('Scheduled Posts API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1157,7 +1188,7 @@ app.put("/api/db/scheduled-posts", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Scheduled Posts API] Error:", error);
+    logError('Scheduled Posts API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1203,7 +1234,7 @@ app.delete("/api/db/scheduled-posts", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Scheduled Posts API] Error:", error);
+    logError('Scheduled Posts API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1325,7 +1356,7 @@ app.get("/api/db/campaigns", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Campaigns API] Error:", error);
+    logError('Campaigns API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1420,7 +1451,7 @@ app.post("/api/db/campaigns", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Campaigns API] Error:", error);
+    logError('Campaigns API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1471,7 +1502,7 @@ app.delete("/api/db/campaigns", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Campaigns API] Error:", error);
+    logError('Campaigns API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1526,7 +1557,7 @@ app.get("/api/db/tournaments/list", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Tournaments API] List Error:", error);
+    logError('Tournaments API List', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1596,7 +1627,7 @@ app.get("/api/db/tournaments", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Tournaments API] Error:", error);
+    logError('Tournaments API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1683,7 +1714,7 @@ app.post("/api/db/tournaments", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Tournaments API] Error:", error);
+    logError('Tournaments API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1731,7 +1762,7 @@ app.delete("/api/db/tournaments", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Tournaments API] Error:", error);
+    logError('Tournaments API', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1786,7 +1817,7 @@ app.post("/api/generate/queue", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Generate Queue] Error:", error);
+    logError('Generate Queue', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1794,13 +1825,13 @@ app.post("/api/generate/queue", async (req, res) => {
 app.get("/api/generate/status", async (req, res) => {
   try {
     const sql = getSql();
-    const { jobId, userId, status: filterStatus, limit } = req.query;
+    const { jobId, userId, organizationId, status: filterStatus, limit } = req.query;
 
     // Single job query
     if (jobId) {
       const jobs = await sql`
         SELECT
-          id, user_id, job_type, status, progress,
+          id, user_id, organization_id, job_type, status, progress,
           result_url, result_gallery_id, error_message,
           created_at, started_at, completed_at, attempts
         FROM generation_jobs
@@ -1820,28 +1851,57 @@ app.get("/api/generate/status", async (req, res) => {
       let jobs;
       const limitNum = parseInt(limit) || 50;
 
-      if (filterStatus) {
-        jobs = await sql`
-          SELECT
-            id, user_id, job_type, status, progress,
-            result_url, result_gallery_id, error_message,
-            created_at, started_at, completed_at
-          FROM generation_jobs
-          WHERE user_id = ${userId} AND status = ${filterStatus}
-          ORDER BY created_at DESC
-          LIMIT ${limitNum}
-        `;
+      // Filter by organization context
+      if (organizationId) {
+        // Organization context - show only org jobs
+        if (filterStatus) {
+          jobs = await sql`
+            SELECT
+              id, user_id, organization_id, job_type, status, progress,
+              result_url, result_gallery_id, error_message,
+              created_at, started_at, completed_at
+            FROM generation_jobs
+            WHERE organization_id = ${organizationId} AND status = ${filterStatus}
+            ORDER BY created_at DESC
+            LIMIT ${limitNum}
+          `;
+        } else {
+          jobs = await sql`
+            SELECT
+              id, user_id, organization_id, job_type, status, progress,
+              result_url, result_gallery_id, error_message,
+              created_at, started_at, completed_at
+            FROM generation_jobs
+            WHERE organization_id = ${organizationId}
+            ORDER BY created_at DESC
+            LIMIT ${limitNum}
+          `;
+        }
       } else {
-        jobs = await sql`
-          SELECT
-            id, user_id, job_type, status, progress,
-            result_url, result_gallery_id, error_message,
-            created_at, started_at, completed_at
-          FROM generation_jobs
-          WHERE user_id = ${userId}
-          ORDER BY created_at DESC
-          LIMIT ${limitNum}
-        `;
+        // Personal context - show only personal jobs (no organization)
+        if (filterStatus) {
+          jobs = await sql`
+            SELECT
+              id, user_id, organization_id, job_type, status, progress,
+              result_url, result_gallery_id, error_message,
+              created_at, started_at, completed_at
+            FROM generation_jobs
+            WHERE user_id = ${userId} AND organization_id IS NULL AND status = ${filterStatus}
+            ORDER BY created_at DESC
+            LIMIT ${limitNum}
+          `;
+        } else {
+          jobs = await sql`
+            SELECT
+              id, user_id, organization_id, job_type, status, progress,
+              result_url, result_gallery_id, error_message,
+              created_at, started_at, completed_at
+            FROM generation_jobs
+            WHERE user_id = ${userId} AND organization_id IS NULL
+            ORDER BY created_at DESC
+            LIMIT ${limitNum}
+          `;
+        }
       }
 
       return res.json({ jobs, total: jobs.length });
@@ -1849,7 +1909,7 @@ app.get("/api/generate/status", async (req, res) => {
 
     return res.status(400).json({ error: "jobId or userId is required" });
   } catch (error) {
-    console.error("[Generate Status] Error:", error);
+    logError('Generate Status', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1926,7 +1986,7 @@ app.get("/api/proxy-video", async (req, res) => {
     const buffer = await response.arrayBuffer();
     res.send(Buffer.from(buffer));
   } catch (error) {
-    console.error("[Video Proxy] Error:", error);
+    logError('Video Proxy', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1962,12 +2022,15 @@ app.post("/api/upload", async (req, res) => {
     const uniqueFilename = `${timestamp}-${filename}`;
 
     // Upload to Vercel Blob
+    logExternalAPI('Vercel Blob', 'Upload file', `${contentType} | ${(buffer.length / 1024).toFixed(1)}KB`);
+    const uploadStart = Date.now();
+
     const blob = await put(uniqueFilename, buffer, {
       access: "public",
       contentType,
     });
 
-    console.log("[Upload] File uploaded:", blob.url);
+    logExternalAPIResult('Vercel Blob', 'Upload file', Date.now() - uploadStart);
 
     return res.status(200).json({
       success: true,
@@ -1976,7 +2039,7 @@ app.post("/api/upload", async (req, res) => {
       size: buffer.length,
     });
   } catch (error) {
-    console.error("[Upload] Error:", error);
+    logError('Upload API', error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : "Unknown error",
     });
@@ -2008,20 +2071,22 @@ app.post("/api/ai/video", async (req, res) => {
       });
     }
 
-    console.log(`[Video API] Generating video with ${model}...`);
-
     let videoUrl;
     const isHttpUrl = imageUrl && imageUrl.startsWith('http');
+    const mode = isHttpUrl ? 'image-to-video' : 'text-to-video';
 
     if (model === 'sora-2') {
       // Sora 2 - always use 12 seconds for best quality
       const duration = 12;
+      const endpoint = isHttpUrl ? 'fal-ai/sora-2/image-to-video' : 'fal-ai/sora-2/text-to-video';
+
+      logExternalAPI('Fal.ai', `Sora 2 ${mode}`, `${duration}s | ${aspectRatio}`);
+      const startTime = Date.now();
 
       let result;
 
       if (isHttpUrl) {
-        console.log(`[Video API] Sora 2 image-to-video (${duration}s)...`);
-        result = await fal.subscribe('fal-ai/sora-2/image-to-video', {
+        result = await fal.subscribe(endpoint, {
           input: {
             prompt,
             image_url: imageUrl,
@@ -2033,8 +2098,7 @@ app.post("/api/ai/video", async (req, res) => {
           logs: true,
         });
       } else {
-        console.log(`[Video API] Sora 2 text-to-video (${duration}s)...`);
-        result = await fal.subscribe('fal-ai/sora-2/text-to-video', {
+        result = await fal.subscribe(endpoint, {
           input: {
             prompt,
             resolution: '720p',
@@ -2046,16 +2110,20 @@ app.post("/api/ai/video", async (req, res) => {
         });
       }
 
+      logExternalAPIResult('Fal.ai', `Sora 2 ${mode}`, Date.now() - startTime);
       videoUrl = result?.data?.video?.url || result?.video?.url || '';
     } else {
       // Veo 3.1 Fast
       const duration = sceneDuration && sceneDuration <= 4 ? '4s' : sceneDuration && sceneDuration <= 6 ? '6s' : '8s';
+      const endpoint = isHttpUrl ? 'fal-ai/veo3.1/fast/image-to-video' : 'fal-ai/veo3.1/fast';
+
+      logExternalAPI('Fal.ai', `Veo 3.1 ${mode}`, `${duration} | ${aspectRatio}`);
+      const startTime = Date.now();
 
       let result;
 
       if (isHttpUrl) {
-        console.log(`[Video API] Veo 3.1 image-to-video (${duration})...`);
-        result = await fal.subscribe('fal-ai/veo3.1/fast/image-to-video', {
+        result = await fal.subscribe(endpoint, {
           input: {
             prompt,
             image_url: imageUrl,
@@ -2067,8 +2135,7 @@ app.post("/api/ai/video", async (req, res) => {
           logs: true,
         });
       } else {
-        console.log(`[Video API] Veo 3.1 text-to-video (${duration})...`);
-        result = await fal.subscribe('fal-ai/veo3.1/fast', {
+        result = await fal.subscribe(endpoint, {
           input: {
             prompt,
             aspect_ratio: aspectRatio,
@@ -2081,6 +2148,7 @@ app.post("/api/ai/video", async (req, res) => {
         });
       }
 
+      logExternalAPIResult('Fal.ai', `Veo 3.1 ${mode}`, Date.now() - startTime);
       videoUrl = result?.data?.video?.url || result?.video?.url || '';
     }
 
@@ -2088,10 +2156,10 @@ app.post("/api/ai/video", async (req, res) => {
       throw new Error('Failed to generate video - invalid response');
     }
 
-    console.log(`[Video API] Video generated: ${videoUrl}`);
-
     // Download video and upload to Vercel Blob for permanent storage
-    console.log('[Video API] Uploading to Vercel Blob...');
+    logExternalAPI('Vercel Blob', 'Upload video', model);
+    const uploadStart = Date.now();
+
     const videoResponse = await fetch(videoUrl);
     const videoBlob = await videoResponse.blob();
 
@@ -2101,7 +2169,7 @@ app.post("/api/ai/video", async (req, res) => {
       contentType: 'video/mp4',
     });
 
-    console.log(`[Video API] Video stored: ${blob.url}`);
+    logExternalAPIResult('Vercel Blob', 'Upload video', Date.now() - uploadStart);
 
     return res.status(200).json({
       success: true,
@@ -2109,7 +2177,7 @@ app.post("/api/ai/video", async (req, res) => {
       model,
     });
   } catch (error) {
-    console.error('[Video API] Error:', error);
+    logError('Video API', error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to generate video',
     });
