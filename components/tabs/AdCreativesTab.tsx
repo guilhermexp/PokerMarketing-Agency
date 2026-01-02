@@ -12,6 +12,7 @@ import { Button } from "../common/Button";
 import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
 import { generateImage } from "../../services/geminiService";
+import { uploadImageToBlob } from "../../services/blobService";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import {
   useBackgroundJobs,
@@ -421,7 +422,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
         productImages.push({ base64: base64Data, mimeType });
       }
 
-      const generatedImageUrl = await generateImage(
+      const generatedImageDataUrl = await generateImage(
         ad.image_prompt,
         brandProfile,
         {
@@ -431,8 +432,22 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
         },
       );
 
+      // Upload to blob storage to get persistent URL
+      let httpUrl = generatedImageDataUrl;
+      if (generatedImageDataUrl.startsWith("data:")) {
+        const [header, base64Data] = generatedImageDataUrl.split(",");
+        const mimeType = header.match(/:(.*?);/)?.[1] || "image/png";
+        try {
+          httpUrl = await uploadImageToBlob(base64Data, mimeType);
+          console.log("[AdCreativesTab] Uploaded to blob:", httpUrl);
+        } catch (uploadErr) {
+          console.error("[AdCreativesTab] Failed to upload to blob:", uploadErr);
+          // Fall back to data URL (won't persist but will show)
+        }
+      }
+
       const galleryImage = onAddImageToGallery({
-        src: generatedImageUrl,
+        src: httpUrl,
         prompt: ad.image_prompt,
         source: getAdSource(index, ad.platform) as any,
         model: selectedImageModel,
@@ -447,7 +462,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
       // Update ad creative image_url in database
       if (ad.id) {
         try {
-          await updateAdCreativeImage(ad.id, generatedImageUrl);
+          await updateAdCreativeImage(ad.id, httpUrl);
         } catch (err) {
           console.error(
             "[AdCreativesTab] Failed to update ad image in database:",

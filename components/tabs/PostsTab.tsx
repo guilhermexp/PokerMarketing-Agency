@@ -13,6 +13,7 @@ import { Button } from "../common/Button";
 import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
 import { generateImage } from "../../services/geminiService";
+import { uploadImageToBlob } from "../../services/blobService";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import {
   useBackgroundJobs,
@@ -444,7 +445,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
         productImages.push({ base64: base64Data, mimeType });
       }
 
-      const generatedImageUrl = await generateImage(
+      const generatedImageDataUrl = await generateImage(
         post.image_prompt,
         brandProfile,
         {
@@ -454,10 +455,24 @@ export const PostsTab: React.FC<PostsTabProps> = ({
         },
       );
 
+      // Upload to blob storage to get persistent URL
+      let httpUrl = generatedImageDataUrl;
+      if (generatedImageDataUrl.startsWith("data:")) {
+        const [header, base64Data] = generatedImageDataUrl.split(",");
+        const mimeType = header.match(/:(.*?);/)?.[1] || "image/png";
+        try {
+          httpUrl = await uploadImageToBlob(base64Data, mimeType);
+          console.log("[PostsTab] Uploaded to blob:", httpUrl);
+        } catch (uploadErr) {
+          console.error("[PostsTab] Failed to upload to blob:", uploadErr);
+          // Fall back to data URL (won't persist but will show)
+        }
+      }
+
       const source = getPostSource(index, post.platform);
       console.log("[PostsTab] Saving image to gallery with source:", source);
       const galleryImage = onAddImageToGallery({
-        src: generatedImageUrl,
+        src: httpUrl,
         prompt: post.image_prompt,
         source: source as any,
         model: selectedImageModel,
@@ -472,7 +487,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
       // Update post image_url in database
       if (post.id) {
         try {
-          await updatePostImage(post.id, generatedImageUrl);
+          await updatePostImage(post.id, httpUrl);
         } catch (err) {
           console.error(
             "[PostsTab] Failed to update post image in database:",
