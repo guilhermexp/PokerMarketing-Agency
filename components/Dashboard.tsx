@@ -311,7 +311,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           />
           <NavItem
             icon="layout"
-            label="Assets"
+            label="Galeria"
             active={activeView === "gallery"}
             onClick={() => onViewChange("gallery")}
             collapsed={sidebarCollapsed}

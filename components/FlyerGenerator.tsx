@@ -2011,8 +2011,19 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     const dayIndex = dayOrder.indexOf(day);
     const startDayIndex = dayOrder.indexOf("MONDAY");
     const diff = dayIndex - startDayIndex;
-    const date = startDay + diff;
-    return `${String(date).padStart(2, "0")}/${String(startMonth).padStart(2, "0")}`;
+
+    // Use Date object to handle month/year transitions correctly
+    const currentYear = new Date().getFullYear();
+    // Determine the correct year for the start date
+    const startYear = startMonth === 12 && new Date().getMonth() === 0
+      ? currentYear - 1
+      : currentYear;
+    const startDate = new Date(startYear, startMonth - 1, startDay);
+    startDate.setDate(startDate.getDate() + diff);
+
+    const resultDay = startDate.getDate();
+    const resultMonth = startDate.getMonth() + 1;
+    return `${String(resultDay).padStart(2, "0")}/${String(resultMonth).padStart(2, "0")}`;
   };
 
   const getEventsByPeriod = (period: TimePeriod): TournamentEvent[] => {

@@ -80,10 +80,29 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   // Check if gallery item is a video
   const isVideo = (image: GalleryImage) => {
     return (
+      image.mediaType === "video" ||
       image.src?.endsWith(".mp4") ||
       image.src?.includes("video") ||
       image.source?.startsWith("Video-")
     );
+  };
+
+  // Check if gallery item is an audio
+  const isAudio = (image: GalleryImage) => {
+    return (
+      image.mediaType === "audio" ||
+      image.model === "tts-generation" ||
+      image.src?.endsWith(".mp3") ||
+      image.src?.endsWith(".wav") ||
+      image.source?.includes("Narração")
+    );
+  };
+
+  // Format duration for display
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleToggleFavorite = (image: GalleryImage) => {
@@ -161,7 +180,28 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                   onClick={() => setSelectedImage(image)}
                   className="group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 cursor-pointer break-inside-avoid mb-3"
                 >
-                  {isVideo(image) ? (
+                  {isAudio(image) ? (
+                    <div className="w-full aspect-square bg-gradient-to-br from-primary/20 via-[#1a1a1a] to-[#111] flex flex-col items-center justify-center p-4">
+                      <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mb-3">
+                        <Icon name="volume-2" className="w-8 h-8 text-primary" />
+                      </div>
+                      <p className="text-[10px] text-white/60 font-bold uppercase tracking-wide mb-2">
+                        Narração
+                      </p>
+                      {image.duration && (
+                        <span className="text-xs text-white/40 font-mono">
+                          {formatDuration(image.duration)}
+                        </span>
+                      )}
+                      <audio
+                        src={image.src}
+                        className="w-full mt-3 h-8"
+                        controls
+                        preload="metadata"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  ) : isVideo(image) ? (
                     <video
                       src={image.src}
                       className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
@@ -265,6 +305,16 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       <Icon name="video" className="w-3 h-3 text-white" />
                       <span className="text-[8px] font-bold text-white uppercase">
                         Vídeo
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Audio indicator */}
+                  {isAudio(image) && (
+                    <div className="absolute bottom-2 left-2 bg-primary/80 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                      <Icon name="volume-2" className="w-3 h-3 text-black" />
+                      <span className="text-[8px] font-bold text-black uppercase">
+                        Áudio
                       </span>
                     </div>
                   )}
