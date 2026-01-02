@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import type { ScheduledPost, GalleryImage, SchedulingPlatform, InstagramContentType } from '../../types';
 import { Icon } from '../common/Icon';
 
@@ -9,6 +9,26 @@ interface SchedulePostModalProps {
   galleryImages: GalleryImage[];
   initialDate?: string | null;
 }
+
+// Check if gallery item is a video
+const isVideoItem = (image: GalleryImage) => {
+  return (
+    image.mediaType === 'video' ||
+    image.src?.endsWith('.mp4') ||
+    image.src?.includes('video') ||
+    image.source?.startsWith('Video-')
+  );
+};
+
+// Check if gallery item is an audio
+const isAudioItem = (image: GalleryImage) => {
+  return (
+    image.mediaType === 'audio' ||
+    image.model === 'tts-generation' ||
+    image.src?.endsWith('.mp3') ||
+    image.src?.endsWith('.wav')
+  );
+};
 
 export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   isOpen,
@@ -28,6 +48,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes() % 60).padStart(2, '0')}`;
   };
 
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [selectedImages, setSelectedImages] = useState<GalleryImage[]>([]);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [caption, setCaption] = useState('');
@@ -37,11 +58,13 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   const [platforms] = useState<SchedulingPlatform>('instagram');
   const [contentType, setContentType] = useState<InstagramContentType>('photo');
   const [publishNow, setPublishNow] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const isCarousel = contentType === 'carousel';
   const isReel = contentType === 'reel';
   const isStory = contentType === 'story';
   const selectedImage = selectedImages[0] || null;
+  const selectedIsVideo = selectedImage && isVideoItem(selectedImage);
 
   const isTimeInPast = useMemo(() => {
     if (publishNow) return false;
@@ -49,16 +72,30 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
     return scheduled.getTime() < Date.now();
   }, [scheduledDate, scheduledTime, publishNow]);
 
-  // Filter only images (not audio/video) that can be scheduled
+  // Filter media based on content type - videos only for Reels
   const eligibleImages = useMemo(() => {
     return galleryImages.filter(img => {
-      const isAudio = img.mediaType === 'audio' || img.model === 'tts-generation' || img.src?.endsWith('.mp3');
-      const isVideo = img.mediaType === 'video' || img.src?.endsWith('.mp4');
-      return !isAudio && !isVideo;
+      const isAudio = isAudioItem(img);
+      const isVideo = isVideoItem(img);
+
+      // Audio is never allowed
+      if (isAudio) return false;
+
+      // For Reels, allow both images and videos
+      if (isReel) return true;
+
+      // For other types, only images
+      return !isVideo;
     });
-  }, [galleryImages]);
+  }, [galleryImages, isReel]);
 
   const handleSelectImage = (image: GalleryImage) => {
+    // Pause video when changing selection
+    if (videoRef.current) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+
     if (isCarousel) {
       // Toggle selection for carousel
       const isSelected = selectedImages.some(img => img.id === image.id);
@@ -84,6 +121,17 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
   const getSelectionIndex = (image: GalleryImage) => {
     return selectedImages.findIndex(img => img.id === image.id);
+  };
+
+  const togglePlayPause = () => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
   };
 
   const handleSubmit = () => {
@@ -173,6 +221,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 {eligibleImages.map((image) => {
                   const selectionIndex = getSelectionIndex(image);
                   const isSelected = selectionIndex !== -1;
+                  const itemIsVideo = isVideoItem(image);
                   return (
                     <div
                       key={image.id}
@@ -183,11 +232,21 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                           : 'border-white/5 hover:border-white/20'
                       }`}
                     >
-                      <img
-                        src={image.src}
-                        alt={image.prompt}
-                        className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                      />
+                      {itemIsVideo ? (
+                        <video
+                          src={image.src}
+                          className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      ) : (
+                        <img
+                          src={image.src}
+                          alt={image.prompt}
+                          className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                        />
+                      )}
 
                       {/* Overlay */}
                       <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent transition-all duration-300 flex flex-col justify-end p-3 ${
@@ -202,6 +261,14 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                           </span>
                         </div>
                       </div>
+
+                      {/* Video indicator */}
+                      {itemIsVideo && (
+                        <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                          <Icon name="video" className="w-3 h-3 text-white" />
+                          <span className="text-[8px] font-bold text-white uppercase">Vídeo</span>
+                        </div>
+                      )}
 
                       {/* Selected indicator */}
                       {isSelected && (
@@ -281,11 +348,23 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   <div className="relative w-full max-w-[280px] aspect-[9/16] bg-[#111] rounded-2xl overflow-hidden">
                     {selectedImages.length > 0 ? (
                       <>
-                        <img
-                          src={selectedImages[0]?.src}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
+                        {selectedIsVideo ? (
+                          <video
+                            ref={videoRef}
+                            src={selectedImages[0]?.src}
+                            className="w-full h-full object-cover"
+                            loop
+                            playsInline
+                            onClick={togglePlayPause}
+                            onEnded={() => setIsPlaying(false)}
+                          />
+                        ) : (
+                          <img
+                            src={selectedImages[0]?.src}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        )}
                         {/* Reel UI */}
                         <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
                           <div className="flex items-end gap-3">
@@ -333,18 +412,35 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                             </div>
                           </div>
                         </div>
-                        {/* Play button */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                            <Icon name="play" className="w-8 h-8 text-white ml-1" />
+                        {/* Play/Pause button */}
+                        {selectedIsVideo ? (
+                          <button
+                            onClick={togglePlayPause}
+                            className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
+                              isPlaying ? 'opacity-0 hover:opacity-100' : 'opacity-100'
+                            }`}
+                          >
+                            <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                              {isPlaying ? (
+                                <Icon name="pause" className="w-8 h-8 text-white" />
+                              ) : (
+                                <Icon name="play" className="w-8 h-8 text-white ml-1" />
+                              )}
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                              <Icon name="play" className="w-8 h-8 text-white ml-1" />
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <div className="text-center">
                           <Icon name="video" className="w-12 h-12 text-white/20 mx-auto mb-2" />
-                          <p className="text-xs text-white/30">Selecione uma imagem</p>
+                          <p className="text-xs text-white/30">Selecione um vídeo ou imagem</p>
                         </div>
                       </div>
                     )}
