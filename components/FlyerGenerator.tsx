@@ -1786,6 +1786,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   const [showIndividualTournaments, setShowIndividualTournaments] = useState(
     false, // Always start with "Grades de Período" view
   );
+  const [showPastTournaments, setShowPastTournaments] = useState(false); // Collapsed by default
   const [showOnlyWithGtd, setShowOnlyWithGtd] = useState(() => {
     return localStorage.getItem("flyer_showOnlyWithGtd") === "true";
   });
@@ -1965,6 +1966,23 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
       }
       return getSortValue(a.times?.["-3"]) - getSortValue(b.times?.["-3"]); // Por horário
     });
+
+  // Separate past and upcoming events based on current time (for individual tournaments view)
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  const currentTimeValue = currentHour * 60 + currentMinute;
+
+  const isEventPast = (event: TournamentEvent): boolean => {
+    const timeStr = event.times?.["-3"] || "";
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    if (isNaN(hours)) return false;
+    const eventTimeValue = hours * 60 + (minutes || 0);
+    return eventTimeValue < currentTimeValue;
+  };
+
+  const pastEvents = currentEvents.filter(isEventPast);
+  const upcomingEvents = currentEvents.filter((e) => !isEventPast(e));
 
   // Estatísticas do dia selecionado (baseado em TODOS os eventos do dia, não filtrados)
   const allDayEvents = events.filter((e) => e.day === selectedDay);
@@ -2705,33 +2723,93 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
           ) : (
             <div className="space-y-2">
               {currentEvents.length > 0 ? (
-                currentEvents.map((e) => (
-                  <TournamentEventCard
-                    key={e.id}
-                    event={e}
-                    brandProfile={brandProfile}
-                    aspectRatio={selectedAspectRatio}
-                    currency={selectedCurrency}
-                    language={selectedLanguage}
-                    model={selectedImageModel}
-                    imageSize={selectedImageSize}
-                    onAddImageToGallery={onAddImageToGallery}
-                    onUpdateGalleryImage={onUpdateGalleryImage}
-                    onSetChatReference={onSetChatReference}
-                    generatedFlyers={flyerState[e.id] || []}
-                    setGeneratedFlyers={(u) =>
-                      setFlyerState((prev) => ({
-                        ...prev,
-                        [e.id]: u(prev[e.id] || []),
-                      }))
-                    }
-                    collabLogo={collabLogo}
-                    styleReference={globalStyleReference}
-                    compositionAssets={compositionAssets}
-                    onPublishToCampaign={onPublishToCampaign}
-                    userId={userId}
-                  />
-                ))
+                <>
+                  {/* Past tournaments - collapsible */}
+                  {pastEvents.length > 0 && (
+                    <div className="mb-4">
+                      <button
+                        onClick={() => setShowPastTournaments(!showPastTournaments)}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-[#0a0a0a] border border-white/5 rounded-xl hover:border-white/10 transition-all"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Icon name="clock" className="w-3.5 h-3.5 text-white/30" />
+                          <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">
+                            {pastEvents.length} torneio{pastEvents.length > 1 ? "s" : ""} já iniciado{pastEvents.length > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                        <Icon
+                          name={showPastTournaments ? "chevron-up" : "chevron-down"}
+                          className="w-4 h-4 text-white/30"
+                        />
+                      </button>
+                      {showPastTournaments && (
+                        <div className="mt-2 space-y-2 opacity-60">
+                          {pastEvents.map((e) => (
+                            <TournamentEventCard
+                              key={e.id}
+                              event={e}
+                              brandProfile={brandProfile}
+                              aspectRatio={selectedAspectRatio}
+                              currency={selectedCurrency}
+                              language={selectedLanguage}
+                              model={selectedImageModel}
+                              imageSize={selectedImageSize}
+                              onAddImageToGallery={onAddImageToGallery}
+                              onUpdateGalleryImage={onUpdateGalleryImage}
+                              onSetChatReference={onSetChatReference}
+                              generatedFlyers={flyerState[e.id] || []}
+                              setGeneratedFlyers={(u) =>
+                                setFlyerState((prev) => ({
+                                  ...prev,
+                                  [e.id]: u(prev[e.id] || []),
+                                }))
+                              }
+                              collabLogo={collabLogo}
+                              styleReference={globalStyleReference}
+                              compositionAssets={compositionAssets}
+                              onPublishToCampaign={onPublishToCampaign}
+                              userId={userId}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* Upcoming tournaments */}
+                  {upcomingEvents.length > 0 ? (
+                    upcomingEvents.map((e) => (
+                      <TournamentEventCard
+                        key={e.id}
+                        event={e}
+                        brandProfile={brandProfile}
+                        aspectRatio={selectedAspectRatio}
+                        currency={selectedCurrency}
+                        language={selectedLanguage}
+                        model={selectedImageModel}
+                        imageSize={selectedImageSize}
+                        onAddImageToGallery={onAddImageToGallery}
+                        onUpdateGalleryImage={onUpdateGalleryImage}
+                        onSetChatReference={onSetChatReference}
+                        generatedFlyers={flyerState[e.id] || []}
+                        setGeneratedFlyers={(u) =>
+                          setFlyerState((prev) => ({
+                            ...prev,
+                            [e.id]: u(prev[e.id] || []),
+                          }))
+                        }
+                        collabLogo={collabLogo}
+                        styleReference={globalStyleReference}
+                        compositionAssets={compositionAssets}
+                        onPublishToCampaign={onPublishToCampaign}
+                        userId={userId}
+                      />
+                    ))
+                  ) : pastEvents.length > 0 ? (
+                    <p className="text-white/20 text-xs font-bold uppercase tracking-wide text-center py-8">
+                      Todos os torneios de hoje já iniciaram.
+                    </p>
+                  ) : null}
+                </>
               ) : (
                 <p className="text-white/20 text-xs font-bold uppercase tracking-wide text-center py-12">
                   Nenhum torneio detectado para este dia.
