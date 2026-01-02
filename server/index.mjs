@@ -3196,6 +3196,15 @@ async function runAutoMigrations() {
       ADD COLUMN IF NOT EXISTS context VARCHAR(255)
     `;
     console.log("[Migration] ✓ Ensured context column exists");
+
+    // Add 'clip' to generation_job_type enum if not exists
+    try {
+      await sql`ALTER TYPE generation_job_type ADD VALUE IF NOT EXISTS 'clip'`;
+      console.log("[Migration] ✓ Ensured 'clip' job type exists");
+    } catch (enumError) {
+      // Might already exist or different PG version
+      console.log("[Migration] Note: clip enum might already exist");
+    }
   } catch (error) {
     console.error("[Migration] Error:", error.message);
     // Don't fail startup - column might already exist with different syntax

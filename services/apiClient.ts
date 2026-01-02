@@ -869,7 +869,7 @@ export interface QueueJobResult {
  */
 export async function queueGenerationJob(
   userId: string,
-  jobType: "flyer" | "flyer_daily" | "post" | "ad",
+  jobType: "flyer" | "flyer_daily" | "post" | "ad" | "clip",
   prompt: string,
   config: GenerationJobConfig,
   context?: string,

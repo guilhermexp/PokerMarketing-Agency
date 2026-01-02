@@ -66,7 +66,8 @@ export const BackgroundJobsIndicator: React.FC = () => {
       'flyer': 'Flyer',
       'flyer_daily': 'Grade Diária',
       'post': 'Post',
-      'ad': 'Anúncio'
+      'ad': 'Anúncio',
+      'clip': 'Capa de Clipe'
     };
     return labels[type] || type;
   };

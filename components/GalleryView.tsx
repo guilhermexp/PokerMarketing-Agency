@@ -174,7 +174,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           /* Gallery View - Masonry Layout */
           images.length > 0 ? (
             <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3 space-y-3">
-              {[...images].reverse().map((image) => (
+              {images.map((image) => (
                 <div
                   key={image.id}
                   onClick={() => !isAudio(image) && setSelectedImage(image)}

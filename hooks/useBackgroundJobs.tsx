@@ -29,7 +29,7 @@ interface BackgroundJobsContextValue {
   // Actions
   queueJob: (
     userId: string,
-    jobType: 'flyer' | 'flyer_daily' | 'post' | 'ad',
+    jobType: 'flyer' | 'flyer_daily' | 'post' | 'ad' | 'clip',
     prompt: string,
     config: GenerationJobConfig,
     context?: string
@@ -150,7 +150,7 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
   // Queue a new job
   const queueJob = useCallback(async (
     userId: string,
-    jobType: 'flyer' | 'flyer_daily' | 'post' | 'ad',
+    jobType: 'flyer' | 'flyer_daily' | 'post' | 'ad' | 'clip',
     prompt: string,
     config: GenerationJobConfig,
     context?: string
