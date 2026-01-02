@@ -1817,6 +1817,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     return { ALL: true, MORNING: true, AFTERNOON: true, NIGHT: true, HIGHLIGHTS: true };
   });
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [activeHelpTooltip, setActiveHelpTooltip] = useState<string | null>(null);
   const [showOnlyWithGtd, setShowOnlyWithGtd] = useState(() => {
     return localStorage.getItem("flyer_showOnlyWithGtd") === "true";
   });
@@ -2477,10 +2478,33 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
 
           {/* Opções de assets - linha simples igual aos selects */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 -mt-2">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
-                Logo Colab
-              </label>
+            {/* Logo Colab */}
+            <div className="space-y-1.5 relative">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
+                  Logo Colab
+                </label>
+                <button
+                  onClick={() => setActiveHelpTooltip(activeHelpTooltip === "logo" ? null : "logo")}
+                  className="w-4 h-4 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[8px] font-bold text-white/30 hover:text-white/50 transition-all"
+                >
+                  ?
+                </button>
+              </div>
+              {activeHelpTooltip === "logo" && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setActiveHelpTooltip(null)} />
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-[#1a1a1a] border border-white/10 rounded-xl p-3 w-64 shadow-xl">
+                    <p className="text-[10px] font-bold text-white mb-1">Logo de Colaborador</p>
+                    <p className="text-[9px] text-white/50 leading-relaxed mb-2">
+                      Adicione o logo de um parceiro ou patrocinador que aparecerá junto ao logo principal da marca nos flyers.
+                    </p>
+                    <p className="text-[8px] text-primary/70 font-medium">
+                      Resultado: Logo exibido no canto do flyer, ao lado do logo principal.
+                    </p>
+                  </div>
+                </>
+              )}
               <label className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white flex items-center gap-2 cursor-pointer hover:border-white/20 transition-colors group">
                 {collabLogo ? (
                   <>
@@ -2521,10 +2545,34 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 />
               </label>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
-                Referência
-              </label>
+
+            {/* Referência */}
+            <div className="space-y-1.5 relative">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
+                  Referência
+                </label>
+                <button
+                  onClick={() => setActiveHelpTooltip(activeHelpTooltip === "ref" ? null : "ref")}
+                  className="w-4 h-4 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[8px] font-bold text-white/30 hover:text-white/50 transition-all"
+                >
+                  ?
+                </button>
+              </div>
+              {activeHelpTooltip === "ref" && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setActiveHelpTooltip(null)} />
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-[#1a1a1a] border border-white/10 rounded-xl p-3 w-64 shadow-xl">
+                    <p className="text-[10px] font-bold text-white mb-1">Imagem de Referência</p>
+                    <p className="text-[9px] text-white/50 leading-relaxed mb-2">
+                      Envie uma imagem para servir como guia de estilo visual. A IA analisará cores, composição e estética para criar flyers similares.
+                    </p>
+                    <p className="text-[8px] text-primary/70 font-medium">
+                      Resultado: Flyers com visual e estilo inspirados na referência.
+                    </p>
+                  </div>
+                </>
+              )}
               <label className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white flex items-center gap-2 cursor-pointer hover:border-white/20 transition-colors group">
                 {manualStyleRef ? (
                   <>
@@ -2573,10 +2621,34 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 />
               </label>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
-                Ativos
-              </label>
+
+            {/* Ativos */}
+            <div className="space-y-1.5 relative">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
+                  Ativos
+                </label>
+                <button
+                  onClick={() => setActiveHelpTooltip(activeHelpTooltip === "assets" ? null : "assets")}
+                  className="w-4 h-4 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[8px] font-bold text-white/30 hover:text-white/50 transition-all"
+                >
+                  ?
+                </button>
+              </div>
+              {activeHelpTooltip === "assets" && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setActiveHelpTooltip(null)} />
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-[#1a1a1a] border border-white/10 rounded-xl p-3 w-64 shadow-xl">
+                    <p className="text-[10px] font-bold text-white mb-1">Ativos de Composição</p>
+                    <p className="text-[9px] text-white/50 leading-relaxed mb-2">
+                      Adicione elementos visuais como mockups de celular, fotos de pessoas, fichas de poker ou outros assets que serão incorporados na composição do flyer.
+                    </p>
+                    <p className="text-[8px] text-primary/70 font-medium">
+                      Resultado: Elementos integrados harmoniosamente no design final.
+                    </p>
+                  </div>
+                </>
+              )}
               <label className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white flex items-center gap-2 cursor-pointer hover:border-white/20 transition-colors">
                 {compositionAssets.length > 0 ? (
                   <>
@@ -2627,10 +2699,34 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 />
               </label>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
-                Favoritos
-              </label>
+
+            {/* Favoritos */}
+            <div className="space-y-1.5 relative">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.1em]">
+                  Favoritos
+                </label>
+                <button
+                  onClick={() => setActiveHelpTooltip(activeHelpTooltip === "favs" ? null : "favs")}
+                  className="w-4 h-4 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[8px] font-bold text-white/30 hover:text-white/50 transition-all"
+                >
+                  ?
+                </button>
+              </div>
+              {activeHelpTooltip === "favs" && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setActiveHelpTooltip(null)} />
+                  <div className="absolute top-full right-0 mt-1 z-50 bg-[#1a1a1a] border border-white/10 rounded-xl p-3 w-64 shadow-xl">
+                    <p className="text-[10px] font-bold text-white mb-1">Estilos Favoritos</p>
+                    <p className="text-[9px] text-white/50 leading-relaxed mb-2">
+                      Acesse sua biblioteca de estilos salvos. Favorite flyers da galeria para reutilizar como referência em novas gerações.
+                    </p>
+                    <p className="text-[8px] text-primary/70 font-medium">
+                      Resultado: Aplique estilos consistentes em todas as suas criações.
+                    </p>
+                  </div>
+                </>
+              )}
               <button
                 onClick={() => setIsStylePanelOpen(!isStylePanelOpen)}
                 className={`w-full bg-[#0a0a0a] border rounded-xl px-3 py-2.5 text-xs flex items-center gap-2 transition-colors ${isStylePanelOpen ? "border-primary/50 text-primary" : "border-white/10 text-white/30 hover:border-white/20"}`}
