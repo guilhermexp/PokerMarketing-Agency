@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "./common/Icon";
 import { Button } from "./common/Button";
 import { Loader } from "./common/Loader";
@@ -19,6 +20,7 @@ interface CampaignWithCounts {
   clipPreviewUrl: string | null;
   postPreviewUrl: string | null;
   adPreviewUrl: string | null;
+  inputTranscript: string | null;
 }
 
 interface CampaignsListProps {
@@ -122,6 +124,7 @@ const CampaignCard: React.FC<{
   onDelete,
   index,
 }) => {
+  const [showPrompt, setShowPrompt] = useState(false);
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("pt-BR", {
@@ -206,9 +209,72 @@ const CampaignCard: React.FC<{
             </div>
           </div>
 
-          <StatusBadge status={campaign.status} />
+          <div className="flex items-center gap-2">
+            {campaign.inputTranscript && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowPrompt(true);
+                }}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-all"
+                title="Ver requisição original"
+              >
+                <Icon name="eye" className="w-4 h-4" />
+              </button>
+            )}
+            <StatusBadge status={campaign.status} />
+          </div>
         </div>
       </div>
+
+      {/* Prompt Modal - rendered via portal */}
+      {showPrompt && campaign.inputTranscript && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          onClick={() => setShowPrompt(false)}
+        >
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          <div
+            className="relative w-full max-w-lg bg-[#0d0d0d] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Icon name="eye" className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Requisição Original</h4>
+                  <p className="text-[10px] text-white/40">Prompt usado para criar esta campanha</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPrompt(false)}
+                className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.06] transition-all"
+              >
+                <Icon name="x" className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 max-h-[60vh] overflow-y-auto">
+              <p className="text-sm text-white/70 whitespace-pre-wrap leading-relaxed">
+                {campaign.inputTranscript}
+              </p>
+            </div>
+            <div className="px-5 py-3 border-t border-white/[0.06] flex justify-end">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(campaign.inputTranscript || "");
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] text-[10px] font-bold text-white/50 hover:text-white hover:bg-white/[0.08] transition-all"
+              >
+                <Icon name="copy" className="w-3 h-3" />
+                Copiar
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Content */}
       <div className="relative p-5 space-y-4">
@@ -485,6 +551,7 @@ export function CampaignsList({
       clipPreviewUrl: c.clip_preview_url || null,
       postPreviewUrl: c.post_preview_url || null,
       adPreviewUrl: c.ad_preview_url || null,
+      inputTranscript: c.input_transcript || null,
     }));
   }, [dbCampaigns]);
 
