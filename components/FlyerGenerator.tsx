@@ -2019,18 +2019,21 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   };
 
   const getEventsByPeriod = (period: TimePeriod): TournamentEvent[] => {
-    if (period === "ALL") return currentEvents;
-    const morning = currentEvents.filter((e) => {
+    // For period grids, only include tournaments WITH GTD (makes sense for summaries)
+    const eventsWithGtd = currentEvents.filter((e) => parseGtd(e.gtd) > 0);
+
+    if (period === "ALL") return eventsWithGtd;
+    const morning = eventsWithGtd.filter((e) => {
       const h = (e.times?.["-3"] || "").split(":");
       const hour = parseInt(h[0]);
       return !isNaN(hour) && hour >= 6 && hour < 12;
     });
-    const afternoon = currentEvents.filter((e) => {
+    const afternoon = eventsWithGtd.filter((e) => {
       const h = (e.times?.["-3"] || "").split(":");
       const hour = parseInt(h[0]);
       return !isNaN(hour) && hour >= 12 && hour < 18;
     });
-    const night = currentEvents.filter((e) => {
+    const night = eventsWithGtd.filter((e) => {
       const h = (e.times?.["-3"] || "").split(":");
       const hour = parseInt(h[0]);
       return (
@@ -2042,7 +2045,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     if (period === "NIGHT") return night;
     // HIGHLIGHTS: top 3 torneios com maior GTD (não os primeiros por horário)
     if (period === "HIGHLIGHTS")
-      return [...currentEvents]
+      return [...eventsWithGtd]
         .sort((a, b) => parseGtd(b.gtd) - parseGtd(a.gtd))
         .slice(0, 3);
     return [];
