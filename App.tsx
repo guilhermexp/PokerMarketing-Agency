@@ -998,6 +998,7 @@ function AppContent() {
               image_prompt: v.image_prompt || "",
               audio_script: v.audio_script || "",
               scenes: v.scenes || [],
+              thumbnail_url: v.thumbnail_url || null, // Include saved thumbnail URL
             }),
           ),
           posts: (fullCampaign.posts || []).map((p) => ({

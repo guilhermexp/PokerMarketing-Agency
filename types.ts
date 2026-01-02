@@ -38,6 +38,7 @@ export interface VideoClipScript {
   }[];
   image_prompt: string;
   audio_script: string;
+  thumbnail_url?: string | null;  // Generated thumbnail URL (from database)
 }
 
 export interface Post {

@@ -531,7 +531,10 @@ CREATE TABLE generation_jobs (
     status generation_job_status NOT NULL DEFAULT 'queued',
     progress INTEGER DEFAULT 0,
 
-    -- QStash message ID for cancellation
+    -- Context for matching job with UI component (e.g., "flyer-period-ALL")
+    context VARCHAR(255),
+
+    -- QStash message ID for cancellation (legacy)
     qstash_message_id VARCHAR(255),
 
     -- Result

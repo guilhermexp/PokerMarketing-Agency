@@ -4787,39 +4787,44 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
 
   const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
 
-  // Initialize thumbnails - try to recover existing ones from gallery (filtered by clip id)
+  // Initialize thumbnails - prioritize thumbnail_url from clip, then gallery
   useEffect(() => {
     const length = videoClipScripts.length;
 
-    // Try to find existing thumbnails from gallery, but preserve already-set thumbnails
+    // Try to find existing thumbnails, prioritizing clip's saved thumbnail_url
     setThumbnails((prevThumbnails) => {
       return videoClipScripts.map((clip, index) => {
-        // If we already have a valid thumbnail for this index, keep it
+        // If we already have a valid thumbnail for this index that matches this clip, keep it
         const existingThumbnail = prevThumbnails[index];
         if (existingThumbnail && existingThumbnail.src) {
-          // Also check if it still matches this clip (for when clips are reordered)
-          if (existingThumbnail.video_script_id === clip.id || existingThumbnail.source === "Clipe") {
+          // Check if it still matches this clip (for when clips are reordered)
+          if (existingThumbnail.video_script_id === clip.id) {
             return existingThumbnail;
           }
         }
 
-        // Otherwise, try to recover from gallery
-        if (!galleryImages || galleryImages.length === 0) return null;
+        // Priority 1: Use clip's saved thumbnail_url from database
+        if (clip.thumbnail_url) {
+          return {
+            id: `thumbnail-${clip.id}`,
+            src: clip.thumbnail_url,
+            prompt: clip.image_prompt,
+            source: "Clipe" as const,
+            model: "gemini-3-pro-image-preview" as const,
+            video_script_id: clip.id,
+          };
+        }
 
-        // First try: Look for image with matching video_script_id (new data)
-        if (clip.id) {
+        // Priority 2: Try to recover from gallery by video_script_id
+        if (galleryImages && galleryImages.length > 0 && clip.id) {
           const exactMatch = galleryImages.find(
             (img) => img.source === "Clipe" && img.video_script_id === clip.id,
           );
           if (exactMatch) return exactMatch;
         }
 
-        // Fallback: For old data without video_script_id, find any Clipe image
-        // that doesn't have a video_script_id set (legacy data)
-        const legacyMatch = galleryImages.find(
-          (img) => img.source === "Clipe" && !img.video_script_id,
-        );
-        return legacyMatch || null;
+        // No thumbnail found - user will need to generate one
+        return null;
       });
     });
 

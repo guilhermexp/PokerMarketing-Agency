@@ -853,6 +853,7 @@ export interface GenerationJob {
   started_at: string | null;
   completed_at: string | null;
   attempts: number;
+  context?: string; // Used to match job with UI component (e.g., "flyer-period-ALL")
 }
 
 export interface QueueJobResult {
@@ -864,18 +865,19 @@ export interface QueueJobResult {
 
 /**
  * Queue a new image generation job for background processing
- * Returns immediately, job runs in background via QStash
+ * Returns immediately, job runs in background via BullMQ
  */
 export async function queueGenerationJob(
   userId: string,
   jobType: "flyer" | "flyer_daily" | "post" | "ad",
   prompt: string,
   config: GenerationJobConfig,
+  context?: string,
 ): Promise<QueueJobResult> {
   const response = await fetch("/api/generate/queue", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, jobType, prompt, config }),
+    body: JSON.stringify({ userId, jobType, prompt, config, context }),
   });
 
   if (!response.ok) {

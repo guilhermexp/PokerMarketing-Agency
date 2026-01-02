@@ -46,11 +46,13 @@ async function runMigration() {
       CREATE TABLE IF NOT EXISTS generation_jobs (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
         job_type generation_job_type NOT NULL,
         prompt TEXT NOT NULL,
         config JSONB NOT NULL DEFAULT '{}',
         status generation_job_status NOT NULL DEFAULT 'queued',
         progress INTEGER DEFAULT 0,
+        context VARCHAR(255),
         qstash_message_id VARCHAR(255),
         result_url TEXT,
         result_gallery_id UUID REFERENCES gallery_images(id) ON DELETE SET NULL,
@@ -63,6 +65,17 @@ async function runMigration() {
       )
     `;
     console.log('✓ Created generation_jobs table');
+
+    // Add context column if table already exists (migration for existing databases)
+    await sql`
+      ALTER TABLE generation_jobs
+      ADD COLUMN IF NOT EXISTS context VARCHAR(255)
+    `;
+    await sql`
+      ALTER TABLE generation_jobs
+      ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE
+    `;
+    console.log('✓ Ensured context and organization_id columns exist');
 
     // Create indexes
     await sql`CREATE INDEX IF NOT EXISTS idx_generation_jobs_user ON generation_jobs(user_id)`;

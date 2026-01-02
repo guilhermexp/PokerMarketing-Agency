@@ -178,8 +178,8 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
     setJobs(prev => [optimisticJob, ...prev]);
 
     try {
-      // Queue on server
-      const result = await queueGenerationJob(userId, jobType, prompt, config);
+      // Queue on server (pass context to persist in database)
+      const result = await queueGenerationJob(userId, jobType, prompt, config, context);
 
       // Update with real job ID
       setJobs(prev => prev.map(j =>
