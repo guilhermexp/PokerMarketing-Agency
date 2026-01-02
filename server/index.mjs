@@ -2616,6 +2616,117 @@ app.post("/api/ai/speech", async (req, res) => {
   }
 });
 
+// AI Assistant Streaming Endpoint
+app.post("/api/ai/assistant", async (req, res) => {
+  try {
+    const { history, brandProfile } = req.body;
+
+    if (!history) {
+      return res.status(400).json({ error: "history is required" });
+    }
+
+    console.log("[Assistant API] Starting streaming conversation...");
+
+    const ai = getGeminiAi();
+
+    const assistantTools = {
+      functionDeclarations: [
+        {
+          name: "create_image",
+          description: "Gera uma nova imagem de marketing do zero.",
+          parameters: {
+            type: Type.OBJECT,
+            properties: {
+              description: {
+                type: Type.STRING,
+                description: "Descrição técnica detalhada para a IA de imagem.",
+              },
+              aspect_ratio: {
+                type: Type.STRING,
+                enum: ["1:1", "9:16", "16:9"],
+                description: "Proporção da imagem.",
+              }
+            },
+            required: ["description"],
+          },
+        },
+        {
+          name: "edit_referenced_image",
+          description: "Edita a imagem atualmente em foco.",
+          parameters: {
+            type: Type.OBJECT,
+            properties: {
+              prompt: {
+                type: Type.STRING,
+                description: "Descrição exata da alteração desejada.",
+              },
+            },
+            required: ["prompt"],
+          },
+        },
+        {
+          name: "create_brand_logo",
+          description: "Cria um novo logo para a marca.",
+          parameters: {
+            type: Type.OBJECT,
+            properties: {
+              prompt: { type: Type.STRING, description: "Descrição do logo." },
+            },
+            required: ["prompt"],
+          },
+        }
+      ],
+    };
+
+    const systemInstruction = `Você é o Diretor de Criação Sênior da DirectorAi. Especialista em Branding e Design de alta performance.
+
+SUAS CAPACIDADES CORE:
+1. CRIAÇÃO E ITERAÇÃO: Crie imagens do zero e continue editando-as até o usuário aprovar.
+2. REFERÊNCIAS: Use imagens de referência enviadas no chat para guiar o estilo das suas criações.
+3. BRANDING: Você conhece a marca: ${JSON.stringify(brandProfile)}. Sempre use a paleta de cores e o tom de voz oficial.
+
+Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
+
+    // Set headers for SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const stream = await ai.models.generateContentStream({
+      model: 'gemini-3-pro-preview',
+      contents: history,
+      config: {
+        systemInstruction,
+        tools: [assistantTools],
+        temperature: 0.5,
+      },
+    });
+
+    for await (const chunk of stream) {
+      const text = chunk.text || '';
+      const functionCall = chunk.candidates?.[0]?.content?.parts?.find(p => p.functionCall)?.functionCall;
+
+      const data = { text };
+      if (functionCall) {
+        data.functionCall = functionCall;
+      }
+
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+
+    console.log("[Assistant API] Streaming completed");
+  } catch (error) {
+    console.error("[Assistant API] Error:", error);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: error.message || "Failed to run assistant" });
+    }
+    res.end();
+  }
+});
+
 // AI Video Generation API
 const configureFal = () => {
   const apiKey = process.env.FAL_KEY;

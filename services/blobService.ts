@@ -1,24 +1,17 @@
 /**
- * Vercel Blob Service
- * Upload images to Vercel Blob storage for public HTTP URLs
+ * Blob Service - Upload images via server API
+ * Uses /api/upload endpoint to keep tokens secure on server
  */
-
-import { put } from '@vercel/blob';
-import { getEnv } from "../utils/env";
-
-// Get token with fresh read pattern
-const getToken = () =>
-  getEnv("VITE_BLOB_READ_WRITE_TOKEN") || getEnv("BLOB_READ_WRITE_TOKEN");
 
 /**
- * Check if Vercel Blob is configured
+ * Check if Blob upload is available (always true, server handles token)
  */
 export const isBlobConfigured = (): boolean => {
-  return Boolean(getToken());
+  return true;
 };
 
 /**
- * Upload an image to Vercel Blob and get a public HTTP URL
+ * Upload an image to Vercel Blob via server API
  * @param base64Data - Base64 encoded image data (without data URL prefix)
  * @param mimeType - MIME type of the image (default: image/png)
  * @returns Public HTTP URL of the uploaded image
@@ -27,40 +20,31 @@ export const uploadImageToBlob = async (
   base64Data: string,
   mimeType: string = 'image/png'
 ): Promise<string> => {
-  const token = getToken();
+  console.log('[Blob Service] Uploading image via API...');
 
-  if (!token) {
-    throw new Error('BLOB_READ_WRITE_TOKEN não configurado. Adicione ao arquivo .env.');
+  const extension = mimeType.split('/')[1] || 'png';
+  const filename = `upload-${Date.now()}.${extension}`;
+
+  const response = await fetch('/api/upload', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      filename,
+      contentType: mimeType,
+      data: base64Data,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(error.error || `Upload failed: ${response.status}`);
   }
 
-  console.log('[Vercel Blob] Uploading image...');
-
-  try {
-    // Convert base64 to Blob
-    const byteString = atob(base64Data);
-    const arrayBuffer = new ArrayBuffer(byteString.length);
-    const uint8Array = new Uint8Array(arrayBuffer);
-    for (let i = 0; i < byteString.length; i++) {
-      uint8Array[i] = byteString.charCodeAt(i);
-    }
-    const blob = new Blob([uint8Array], { type: mimeType });
-
-    // Generate filename
-    const extension = mimeType.split('/')[1] || 'png';
-    const filename = `instagram-${Date.now()}.${extension}`;
-
-    // Upload to Vercel Blob
-    const { url } = await put(filename, blob, {
-      access: 'public',
-      token,
-    });
-
-    console.log(`[Vercel Blob] Image uploaded: ${url}`);
-    return url;
-  } catch (error) {
-    console.error('[Vercel Blob] Upload error:', error);
-    throw new Error(`Falha no upload: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-  }
+  const result = await response.json();
+  console.log(`[Blob Service] Image uploaded: ${result.url}`);
+  return result.url;
 };
 
 /**
