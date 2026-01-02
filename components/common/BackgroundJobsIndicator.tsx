@@ -135,28 +135,42 @@ export const BackgroundJobsIndicator: React.FC = () => {
                   {pendingJobs.map(job => (
                     <div
                       key={job.id}
-                      className="px-2 py-1.5 rounded-lg bg-amber-500/10 flex items-center gap-2 mb-1 group"
+                      className="rounded-lg bg-amber-500/10 mb-1 group overflow-hidden"
                     >
-                      {getStatusIcon(job.status)}
-                      <span className="text-[10px] text-white/70 flex-1 truncate">
-                        {getJobTypeLabel(job.job_type)}
-                        {job.context && <span className="text-white/30"> • {job.context.split('-').slice(-1)[0]}</span>}
-                      </span>
-                      {job.status === 'processing' && (
-                        <span className="text-[9px] text-amber-400">{job.progress}%</span>
-                      )}
-                      <button
-                        onClick={() => handleCancelJob(job.id)}
-                        disabled={cancellingJob === job.id}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition-all disabled:opacity-50"
-                        title="Cancelar"
-                      >
-                        {cancellingJob === job.id ? (
-                          <div className="w-3 h-3 border border-red-400 border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Icon name="x" className="w-3 h-3" />
+                      <div className="px-2 py-1.5 flex items-center gap-2">
+                        {getStatusIcon(job.status)}
+                        <span className="text-[10px] text-white/70 flex-1 truncate">
+                          {getJobTypeLabel(job.job_type)}
+                          {job.context && <span className="text-white/30"> • {job.context.split('-').slice(-1)[0]}</span>}
+                        </span>
+                        {job.status === 'processing' && (
+                          <span className="text-[9px] text-amber-400 font-bold">{job.progress || 0}%</span>
                         )}
-                      </button>
+                        {job.status === 'queued' && (
+                          <span className="text-[9px] text-white/40">Aguardando</span>
+                        )}
+                        <button
+                          onClick={() => handleCancelJob(job.id)}
+                          disabled={cancellingJob === job.id}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition-all disabled:opacity-50"
+                          title="Cancelar"
+                        >
+                          {cancellingJob === job.id ? (
+                            <div className="w-3 h-3 border border-red-400 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Icon name="x" className="w-3 h-3" />
+                          )}
+                        </button>
+                      </div>
+                      {/* Progress bar */}
+                      {job.status === 'processing' && (
+                        <div className="h-0.5 bg-black/20">
+                          <div
+                            className="h-full bg-amber-400 transition-all duration-500"
+                            style={{ width: `${job.progress || 0}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

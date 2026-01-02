@@ -130,8 +130,22 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
     }
   }, [userId]);
 
-  // NO automatic polling - user refreshes manually or we use webhooks
-  // This prevents unnecessary database queries
+  // Auto-polling when there are pending jobs
+  useEffect(() => {
+    // Only poll if there are pending jobs
+    if (pendingJobs.length === 0) return;
+
+    console.log(`[BackgroundJobs] Starting auto-poll (${pendingJobs.length} pending jobs)`);
+
+    const pollInterval = setInterval(() => {
+      refreshJobsRef.current();
+    }, 3000); // Poll every 3 seconds
+
+    return () => {
+      console.log('[BackgroundJobs] Stopping auto-poll');
+      clearInterval(pollInterval);
+    };
+  }, [pendingJobs.length > 0]); // Only re-run when pending state changes
 
   // Queue a new job
   const queueJob = useCallback(async (
