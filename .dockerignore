@@ -1,0 +1,32 @@
+# Ignore local build artifacts
+dist
+dist-ssr
+
+# Dependencies are installed during build
+node_modules
+
+# Development files
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage

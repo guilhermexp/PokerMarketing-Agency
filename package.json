@@ -8,7 +8,8 @@
     "dev:api": "node server/dev-api.mjs",
     "dev:vite": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node server/index.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^2.29.0",

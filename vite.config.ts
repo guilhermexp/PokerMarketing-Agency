@@ -5,7 +5,21 @@ import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
+    // Load from .env file
+    const envFile = loadEnv(mode, '.', '');
+
+    // Merge with process.env (Docker ENV vars take precedence)
+    const env = {
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY || envFile.GEMINI_API_KEY,
+      VITE_CLERK_PUBLISHABLE_KEY: process.env.VITE_CLERK_PUBLISHABLE_KEY || envFile.VITE_CLERK_PUBLISHABLE_KEY,
+      OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || envFile.OPENROUTER_API_KEY,
+      BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN || envFile.BLOB_READ_WRITE_TOKEN,
+      DATABASE_URL: process.env.DATABASE_URL || envFile.DATABASE_URL,
+      RUBE_TOKEN: process.env.RUBE_TOKEN || envFile.RUBE_TOKEN,
+    };
+
+    console.log('[Vite Config] GEMINI_API_KEY available:', !!env.GEMINI_API_KEY);
+
     return {
       server: {
         port: 3000,
@@ -58,6 +72,7 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        'import.meta.env.VITE_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         // FAL_KEY removed - video generation is now server-side via /api/ai/video
         'process.env.RUBE_TOKEN': JSON.stringify(env.RUBE_TOKEN),
         'import.meta.env.VITE_RUBE_TOKEN': JSON.stringify(env.RUBE_TOKEN),

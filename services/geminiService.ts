@@ -15,9 +15,13 @@ import type {
 import { isFalModel } from "../types";
 import { generateVideo as generateServerVideo } from "./apiClient";
 import { generateCreativeText } from "./llmService";
-import { getEnv } from "../utils/env";
-
-const getApiKey = () => getEnv("VITE_API_KEY") || getEnv("API_KEY");
+// Direct static access - Vite replaces these at build time
+// Dynamic access via getEnv() doesn't work because Vite only replaces static references
+const getApiKey = () => {
+  // @ts-ignore - Vite injects import.meta.env.VITE_API_KEY at build time
+  const key = import.meta.env.VITE_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
+  return key || '';
+};
 // Helper to ensure fresh GoogleGenAI instance with latest API key
 const getAi = () => new GoogleGenAI({ apiKey: getApiKey() });
 

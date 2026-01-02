@@ -478,6 +478,7 @@ interface ClipCardProps {
   triggerSceneImageGeneration?: number; // Increment to trigger auto-generation of scene images
   onAddImageToGallery?: (image: Omit<GalleryImage, "id">) => GalleryImage;
   galleryImages?: GalleryImage[];
+  campaignId?: string;
 }
 
 const ClipCard: React.FC<ClipCardProps> = ({
@@ -497,6 +498,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
   triggerSceneImageGeneration,
   onAddImageToGallery,
   galleryImages,
+  campaignId,
 }) => {
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [videoStates, setVideoStates] = useState<Record<number, VideoState[]>>(
@@ -5086,6 +5088,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
           triggerSceneImageGeneration={sceneImageTriggers[index]}
           onAddImageToGallery={onAddImageToGallery}
           galleryImages={galleryImages}
+          campaignId={campaignId}
         />
       ))}
     </div>
