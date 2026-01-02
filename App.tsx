@@ -411,6 +411,78 @@ function AppContent() {
     if (savedRefs) setStyleReferences(JSON.parse(savedRefs));
   }, []);
 
+  // Load daily flyer state from localStorage and match with gallery images
+  const hasRestoredDailyFlyersRef = useRef(false);
+  useEffect(() => {
+    if (!galleryImages.length || hasRestoredDailyFlyersRef.current) return;
+
+    const savedDailyFlyers = localStorage.getItem("dailyFlyerMapping");
+    if (!savedDailyFlyers) return;
+
+    try {
+      const mapping: Record<TimePeriod, string[]> = JSON.parse(savedDailyFlyers);
+      const newState: Record<TimePeriod, GalleryImage[]> = {
+        ALL: [],
+        MORNING: [],
+        AFTERNOON: [],
+        NIGHT: [],
+        HIGHLIGHTS: [],
+      };
+
+      // Match saved IDs with actual gallery images
+      Object.entries(mapping).forEach(([period, ids]) => {
+        const periodKey = period as TimePeriod;
+        ids.forEach((id) => {
+          const image = galleryImages.find((img) => img.id === id);
+          if (image) {
+            newState[periodKey].push(image);
+          }
+        });
+      });
+
+      // Only update if we found any matches
+      const hasImages = Object.values(newState).some((arr) => arr.length > 0);
+      if (hasImages) {
+        hasRestoredDailyFlyersRef.current = true;
+        setDailyFlyerState(newState);
+        console.log("[App] Restored daily flyer state from localStorage");
+      }
+    } catch (e) {
+      console.error("[App] Failed to parse daily flyer mapping:", e);
+    }
+  }, [galleryImages]);
+
+  // Save daily flyer state to localStorage when it changes
+  useEffect(() => {
+    // Don't save during initial restore
+    if (!hasRestoredDailyFlyersRef.current) {
+      // Check if there's something to save (user generated new flyers)
+      const hasRealImages = Object.values(dailyFlyerState).some(
+        (arr) => arr.some((item) => item !== "loading" && typeof item === "object")
+      );
+      if (hasRealImages) {
+        hasRestoredDailyFlyersRef.current = true; // Mark as ready to save
+      } else {
+        return;
+      }
+    }
+
+    // Extract just the IDs for each period
+    const mapping: Record<string, string[]> = {};
+    Object.entries(dailyFlyerState).forEach(([period, images]) => {
+      mapping[period] = images
+        .filter((img): img is GalleryImage => img !== "loading" && typeof img === "object")
+        .map((img) => img.id);
+    });
+
+    // Only save if there's at least one image
+    const hasAnyImages = Object.values(mapping).some((ids) => ids.length > 0);
+    if (hasAnyImages) {
+      localStorage.setItem("dailyFlyerMapping", JSON.stringify(mapping));
+      console.log("[App] Saved daily flyer mapping to localStorage");
+    }
+  }, [dailyFlyerState]);
+
   // Process tournament schedule info when SWR data loads
   useEffect(() => {
     if (swrTournamentSchedule) {
