@@ -183,6 +183,11 @@ export interface DbGalleryImage {
   aspect_ratio: string | null;
   image_size: string | null;
   created_at: string;
+  media_type?: string | null;
+  duration?: number | null;
+  post_id?: string | null;
+  ad_creative_id?: string | null;
+  video_script_id?: string | null;
 }
 
 export async function getGalleryImages(
