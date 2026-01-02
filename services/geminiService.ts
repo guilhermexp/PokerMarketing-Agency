@@ -15,7 +15,6 @@ import type {
   Post,
 } from "../types";
 import { generateVideo as generateServerVideo } from "./apiClient";
-import { generateCreativeText } from "./llmService";
 import { getAuthToken } from "./authService";
 
 // API base URL - empty for same-origin requests
@@ -47,14 +46,22 @@ export const generateCampaign = async (
   input: ContentInput,
   options: GenerationOptions,
 ): Promise<MarketingCampaign> => {
-  // Use the llmService which already handles server-side generation
-  const result = await generateCreativeText(
-    brandProfile,
-    [{ text: buildCampaignPrompt(brandProfile, input.transcript, options) }],
-    null, // schema handled by server
-    0.7,
-  );
-  return JSON.parse(result);
+  // Use the dedicated campaign endpoint which has the correct schema
+  const response = await apiCall("/api/ai/campaign", {
+    brandProfile: {
+      name: brandProfile.name,
+      description: brandProfile.description,
+      primaryColor: brandProfile.primaryColor,
+      secondaryColor: brandProfile.secondaryColor,
+      toneOfVoice: brandProfile.toneOfVoice,
+      creativeModel: brandProfile.creativeModel,
+    },
+    transcript: input.transcript,
+    options,
+    productImages: input.productImages,
+  });
+
+  return response.campaign;
 };
 
 // Helper to build campaign prompt
