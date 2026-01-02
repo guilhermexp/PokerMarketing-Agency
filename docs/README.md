@@ -138,9 +138,15 @@ npm install
 cp .env.example .env
 # Editar .env com suas chaves
 
-# Rodar em desenvolvimento
+# Modo simples (sem Redis, jobs nao processam)
 npm run dev
+
+# Modo completo (com Redis, identico a producao)
+npm run dev:redis     # Inicia Redis via Docker
+npm run dev:full      # Inicia app completo
 ```
+
+Veja [DEVELOPMENT.md](./DEVELOPMENT.md) para detalhes sobre os modos de desenvolvimento.
 
 ## Deploy no Railway
 
@@ -158,6 +164,8 @@ Veja [DEPLOYMENT.md](./DEPLOYMENT.md) para instruções detalhadas.
 ## Documentação Adicional
 
 - [DOCUMENTATION.md](../DOCUMENTATION.md) - Documentação técnica completa
+- [DEVELOPMENT.md](./DEVELOPMENT.md) - Guia de desenvolvimento local
+- [DEPLOYMENT.md](./DEPLOYMENT.md) - Guia de deploy no Railway
 - [DEBUGGING.md](./DEBUGGING.md) - Guia de depuração
 - [MODEL_DOCUMENTATION.md](./MODEL_DOCUMENTATION.md) - Detalhes dos modelos de IA
 

@@ -1805,6 +1805,18 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     false, // Always start with "Grades de Período" view
   );
   const [showPastTournaments, setShowPastTournaments] = useState(false); // Collapsed by default
+  const [enabledPeriods, setEnabledPeriods] = useState<Record<TimePeriod, boolean>>(() => {
+    const saved = localStorage.getItem("flyer_enabledPeriods");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return { ALL: true, MORNING: true, AFTERNOON: true, NIGHT: true, HIGHLIGHTS: true };
+      }
+    }
+    return { ALL: true, MORNING: true, AFTERNOON: true, NIGHT: true, HIGHLIGHTS: true };
+  });
+  const [isPeriodSelectorOpen, setIsPeriodSelectorOpen] = useState(false);
   const [showOnlyWithGtd, setShowOnlyWithGtd] = useState(() => {
     return localStorage.getItem("flyer_showOnlyWithGtd") === "true";
   });
@@ -1853,6 +1865,9 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   useEffect(() => {
     localStorage.setItem("flyer_sortBy", sortBy);
   }, [sortBy]);
+  useEffect(() => {
+    localStorage.setItem("flyer_enabledPeriods", JSON.stringify(enabledPeriods));
+  }, [enabledPeriods]);
   useEffect(() => {
     try {
       if (collabLogo) {
@@ -2224,6 +2239,59 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   ? "Grades de Período"
                   : "Torneios Individuais"}
               </Button>
+              {/* Period selector - only show in "Grades de Período" view */}
+              {!showIndividualTournaments && (
+                <div className="relative">
+                  <button
+                    onClick={() => setIsPeriodSelectorOpen(!isPeriodSelectorOpen)}
+                    className={`px-2.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                      isPeriodSelectorOpen
+                        ? "bg-primary/20 text-primary border border-primary/30"
+                        : "bg-[#0a0a0a] text-white/40 border border-white/10 hover:text-white/60"
+                    }`}
+                    title="Selecionar grades"
+                  >
+                    <Icon name="settings" className="w-3.5 h-3.5" />
+                    <span>{Object.values(enabledPeriods).filter(Boolean).length}/5</span>
+                  </button>
+                  {isPeriodSelectorOpen && (
+                    <>
+                      {/* Backdrop */}
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setIsPeriodSelectorOpen(false)}
+                      />
+                      {/* Dropdown */}
+                      <div className="absolute top-full left-0 mt-1 z-50 bg-[#111] border border-white/10 rounded-xl p-2 min-w-[180px] shadow-xl">
+                        <p className="text-[8px] font-black text-white/30 uppercase tracking-wider px-2 py-1 mb-1">
+                          Grades a gerar
+                        </p>
+                        {(["ALL", "MORNING", "AFTERNOON", "NIGHT", "HIGHLIGHTS"] as TimePeriod[]).map((period) => (
+                          <label
+                            key={period}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={enabledPeriods[period]}
+                              onChange={(e) =>
+                                setEnabledPeriods((prev) => ({
+                                  ...prev,
+                                  [period]: e.target.checked,
+                                }))
+                              }
+                              className="w-3.5 h-3.5 rounded border-white/20 bg-transparent text-primary focus:ring-primary/50 focus:ring-offset-0"
+                            />
+                            <span className="text-[10px] text-white/70 font-medium">
+                              {periodLabels[selectedLanguage][period]}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               {showIndividualTournaments && (
                 <>
                   <button
@@ -2709,7 +2777,9 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   "NIGHT",
                   "HIGHLIGHTS",
                 ] as TimePeriod[]
-              ).map((p) => (
+              )
+                .filter((p) => enabledPeriods[p])
+                .map((p) => (
                 <PeriodCardRow
                   key={p}
                   period={p}

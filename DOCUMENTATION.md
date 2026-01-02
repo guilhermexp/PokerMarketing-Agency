@@ -319,5 +319,64 @@ CMD ["node", "server/index.mjs"]
 
 ---
 
+## 11. Desenvolvimento Local
+
+### Modos de Desenvolvimento
+
+A aplicacao tem dois modos de desenvolvimento:
+
+| Modo | Comando | Redis | Jobs |
+|------|---------|-------|------|
+| **Simples** | `npm run dev` | Nao | Nao processam |
+| **Completo** | `npm run dev:full` | Sim | Funcionam |
+
+### Modo Simples
+
+```bash
+npm run dev
+```
+
+- Roda `dev-api.mjs` (porta 3002) + Vite (porta 5173)
+- APIs de banco funcionam normalmente
+- Jobs ficam em "queued" para sempre (nao processa)
+- Bom para desenvolver UI sem Redis
+
+### Modo Completo
+
+```bash
+# Iniciar Redis via Docker
+npm run dev:redis
+
+# Iniciar aplicacao completa
+npm run dev:full
+```
+
+- Roda `server/index.mjs` (porta 8080) + Vite (porta 5173)
+- Comportamento identico a producao
+- Processa jobs em background via BullMQ
+
+### docker-compose.yml
+
+O arquivo `docker-compose.yml` fornece Redis para desenvolvimento:
+
+```bash
+# Iniciar
+npm run dev:redis
+
+# Parar
+npm run dev:redis:stop
+```
+
+---
+
+## 12. Documentacao Adicional
+
+- `docs/DEVELOPMENT.md` - Guia completo de desenvolvimento local
+- `docs/DEPLOYMENT.md` - Guia de deploy no Railway
+- `docs/DEBUGGING.md` - Guia de depuracao
+- `docs/MODEL_DOCUMENTATION.md` - Detalhes dos modelos de IA
+
+---
+
 *DirectorAi - Aura Engine Documentation v3.0*
 *Ultima atualizacao: Janeiro 2026*
