@@ -1,94 +1,252 @@
-# Documentação dos Modelos de Geração e Edição de Imagem
+# Documentacao dos Modelos de IA
 
-Este documento serve como um guia para desenvolvedores entenderem como os diferentes modelos de IA para manipulação de imagens são integrados e utilizados na aplicação DirectorAi.
+Este documento serve como guia para desenvolvedores entenderem como os diferentes modelos de IA sao integrados e utilizados na aplicacao DirectorAi.
 
-## Visão Geral da Arquitetura
+## Arquitetura: API Endpoints
 
-Toda a lógica de interação com as APIs de imagem está centralizada no arquivo `services/geminiService.ts`. Isso garante que qualquer componente que precise gerar ou editar uma imagem utilize uma função padronizada, facilitando a manutenção.
+Todas as chamadas de IA passam por endpoints no Express server. O frontend nao acessa os modelos diretamente.
 
-As funções-chave são:
-- `generateImage()`: Para criação de imagens a partir de um prompt de texto (Text-to-Image).
-- `editImage()`: Para edições complexas em uma imagem existente.
-- `createBrandedImageVariant()`: Para criar uma nova imagem baseada em uma referência, aplicando a identidade visual da marca.
-- `generateFlyer()`: Uma função multimodal que pode tanto gerar uma imagem do zero quanto usar um logo e uma imagem de referência para criar um design.
+```
+Frontend --> /api/ai/* --> Express Server --> Gemini/Fal.ai APIs
+```
 
----
+### Endpoints Disponiveis
 
-## 1. Geração de Imagens (Text-to-Image)
-
-Esta é a funcionalidade mais básica, usada quando uma imagem precisa ser criada puramente a partir de uma descrição textual.
-
-### Função Principal
-
-`generateImage(prompt: string, aspectRatio: string, model: ImageModel)`
-
-### Modelos Suportados
-
-A aplicação suporta dois modelos, selecionáveis pela interface do usuário através do tipo `ImageModel` (`'gemini-imagen' | 'bytedance-seedream'`).
-
-#### a) Google Gemini (Imagen 4.0)
-
-- **ID na Aplicação:** `gemini-imagen`
-- **Modelo Real:** `imagen-4.0-generate-001`
-- **Uso:** É o modelo padrão. O prompt do usuário é enriquecido com um prefixo para garantir um estilo consistente: `Imagem de marketing vibrante e de alta qualidade para um post de rede social. O estilo deve ser moderno e limpo. Assunto: ${prompt}`.
-- **Quando Usar:** É a escolha principal para resultados de alta qualidade, especialmente quando se busca um estilo mais limpo e corporativo.
-
-#### b) Bytedance Seedream 4.0
-
-- **ID na Aplicação:** `bytedance-seedream`
-- **Modelo Real:** `fal-ai/bytedance/seedream/v4/text-to-image`
-- **Uso:** Utiliza a API da [Fal.ai](http.ai/). Requer uma chave de API separada (`FAL_API_KEY`). O prompt também é enriquecido para guiar o modelo: `vibrant, high-quality marketing image for a social media post. clean modern style. Subject: ${prompt}`. A função também converte a URL da imagem retornada para base64.
-- **Quando Usar:** Oferece um estilo visual alternativo, que pode ser mais artístico ou estilizado. É uma ótima opção para dar variedade criativa ao usuário.
-
-### Como Modificar ou Adicionar um Novo Modelo
-
-1.  **Atualizar o Tipo:** Adicione o novo ID do modelo ao tipo `ImageModel` em `types.ts`.
-2.  **Implementar a Lógica:** Na função `generateImage` em `services/geminiService.ts`, adicione um novo bloco `if` ou `case` para lidar com a chamada à API do novo modelo.
-3.  **Atualizar a UI:** Adicione a nova opção nos componentes de seletor de modelo (`ClipsTab.tsx`, `PostsTab.tsx`, `AdCreativesTab.tsx`, `FlyerGenerator.tsx`).
+| Endpoint | Metodo | Funcao |
+|----------|--------|--------|
+| `/api/ai/generate-image` | POST | Gera imagem via Gemini |
+| `/api/ai/edit-image` | POST | Edita imagem existente |
+| `/api/ai/generate-campaign` | POST | Gera campanha completa (JSON) |
+| `/api/ai/generate-tts` | POST | Gera audio TTS |
+| `/api/ai/generate-video` | POST | Gera video via Veo |
+| `/api/generate/queue` | POST | Adiciona job na fila BullMQ |
+| `/api/generate/status` | GET | Consulta status dos jobs |
 
 ---
 
-## 2. Edição e Variação de Imagens (Image-to-Image)
+## 1. Modelos de Texto/JSON
 
-Para tarefas que envolvem modificar uma imagem existente ou criar uma nova a partir de referências visuais, a aplicação utiliza exclusivamente o modelo multimodal do Gemini.
+### Geracao de Campanhas
 
-### Modelo Principal
+| Modelo | ID | Uso |
+|--------|----|----|
+| **Gemini 2.5 Flash** | `gemini-2.5-flash-preview-05-20` | Geracao de campanhas JSON |
 
-- **Modelo Real:** `gemini-2.5-flash-image-preview`
-- **Importante:** Este é o **único** modelo utilizado para todas as tarefas de edição, variante e geração multimodal. Isso garante consistência e aproveita seus recursos avançados, como o entendimento de múltiplas imagens e máscaras.
+```typescript
+// Exemplo de chamada
+const response = await fetch('/api/ai/generate-campaign', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    prompt: transcription,
+    brandProfile: brandData,
+    referenceImageBase64: imageData
+  })
+});
+```
 
-### Funções e Casos de Uso
+**Caracteristicas:**
+- Retorna JSON estruturado com posts, clips, ads
+- Usa responseSchema para garantir formato correto
+- Suporta imagem de referencia para contexto
 
-#### a) Edição Geral (`editImage`)
+---
 
-- **Função:** `editImage(base64ImageData, mimeType, prompt, mask?, referenceImage?)`
-- **Uso:** Chamada a partir do `ImagePreviewModal.tsx`. É a função mais flexível.
-- **Lógica:** Constrói um array de `parts` que pode conter:
-    1.  A imagem a ser editada.
-    2.  Uma máscara (opcional), que instrui o modelo a aplicar a edição apenas na área pintada.
-    3.  Uma imagem de referência (opcional), para inspirar o estilo ou conteúdo da edição.
-    4.  Um prompt de texto detalhado descrevendo a alteração.
-- **Modificações:** Para alterar o comportamento, ajuste o `instructionPrompt` dentro da função. A ordem das `parts` é crucial e segue a documentação do Gemini.
+## 2. Modelos de Imagem
 
-#### b) Variação de Marca (`createBrandedImageVariant`)
+### Geracao de Imagens (Text-to-Image)
 
-- **Função:** `createBrandedImageVariant(referenceImage, brandProfile, contextPrompt)`
-- **Uso:** Chamada nas abas de Posts e Anúncios quando uma imagem de referência da campanha é fornecida.
-- **Lógica:** Cria um prompt extremamente detalhado que instrui o modelo a atuar como um designer de marca. Envia a imagem de referência e o logo da marca (se existir) e pede para o modelo reimaginar a imagem de referência aplicando as cores, o tom de voz e o logo da marca.
-- **Modificações:** O `instructionPrompt` nesta função é a chave para a qualidade dos resultados. Ajustes finos neste prompt podem alterar drasticamente o quão bem o modelo incorpora a identidade da marca.
+| Modelo | ID | Endpoint | Uso |
+|--------|----|---------|----|
+| **Gemini 3 Pro Image** | `gemini-3-pro-image-preview` | `/api/ai/generate-image` | Imagens de alta qualidade |
 
-#### c) Geração de Flyer Multimodal (`generateFlyer`)
+```typescript
+const response = await fetch('/api/ai/generate-image', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    prompt: "Flyer de poker com tema neon",
+    brandProfile: { name: "Club XYZ", colors: {...} },
+    options: { aspectRatio: '16:9' }
+  })
+});
+```
 
-- **Função:** `generateFlyer(basePrompt, logo?, referenceImage?, aspectRatio, model)`
-- **Uso:** Chamada a partir do `FlyerGenerator.tsx`.
-- **Lógica:**
-    - Se **nenhum** logo ou imagem de referência for fornecido, a função simplesmente chama `generateImage` (Text-to-Image) com o modelo selecionado pelo usuário (Gemini ou Bytedance).
-    - Se um logo e/ou imagem de referência **forem fornecidos**, a função **ignora o modelo selecionado na UI e usa `gemini-2.5-flash-image-preview`**. Ela constrói um prompt multimodal que instrui o modelo a usar a imagem de referência como inspiração de estilo e a integrar o logo profissionalmente no novo design.
-- **Modificações:** O `imageHandlingInstructions` dentro da função é vital. Ele instrui o modelo a não simplesmente "colar" a imagem de referência em um novo fundo, mas a criar um design completamente novo, o que é crucial para respeitar a `aspectRatio` solicitada.
+### Edicao de Imagens (Image-to-Image)
 
-## Boas Práticas e Considerações
+| Modelo | ID | Endpoint | Uso |
+|--------|----|---------|----|
+| **Gemini 2.5 Flash Image** | `gemini-2.5-flash-preview-image` | `/api/ai/edit-image` | Edicao rapida |
 
-- **Centralização:** Mantenha toda a lógica de API em `services/geminiService.ts`.
-- **Tipagem:** Sempre que adicionar um novo modelo ou funcionalidade, atualize as interfaces em `types.ts`.
-- **Prompts:** A qualidade da saída da IA é diretamente proporcional à qualidade dos prompts. Os prompts nas funções de serviço foram cuidadosamente elaborados. Ao modificar, seja claro, específico e forneça contexto.
-- **Segurança:** A chave `FAL_API_KEY` está hardcoded. Em um ambiente de produção, ela deve ser movida para uma variável de ambiente segura.
+```typescript
+const response = await fetch('/api/ai/edit-image', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    imageBase64: originalImage,
+    mimeType: 'image/png',
+    prompt: "Altere as cores para tons de azul",
+    maskBase64: maskImage  // opcional
+  })
+});
+```
+
+**Capacidades:**
+- Edicao com mascara (areas especificas)
+- Imagem de referencia para estilo
+- Variacao de marca (aplicar identidade visual)
+
+---
+
+## 3. Modelos de Video
+
+### Geracao de Video
+
+| Modelo | ID | Endpoint | Uso |
+|--------|----|---------|----|
+| **Veo 3.1** | `veo-3.1-fast-generate-preview` | `/api/ai/generate-video` | Video principal |
+| **Sora 2** | `fal-ai/sora-2/text-to-video` | Fal.ai API | Fallback |
+
+```typescript
+// Via rubeService.ts
+const result = await generateVideoFromImage({
+  imageUrl: thumbnailUrl,
+  prompt: "Camera zoom suave, efeito cinematico",
+  duration: 5
+});
+```
+
+**Fluxo de Geracao:**
+1. Envia imagem de referencia (thumbnail)
+2. Modelo gera video de 5-10 segundos
+3. Resultado salvo no Vercel Blob
+
+**Fallback:** Se Veo falhar, sistema tenta Sora 2 automaticamente.
+
+---
+
+## 4. Modelos de Audio
+
+### Text-to-Speech
+
+| Modelo | ID | Endpoint | Uso |
+|--------|----|---------|----|
+| **Gemini TTS** | `gemini-2.5-flash-preview-tts` | `/api/ai/generate-tts` | Narracao |
+
+```typescript
+const response = await fetch('/api/ai/generate-tts', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    text: "Bem-vindos ao nosso torneio de poker!",
+    voice: "Zephyr"  // voz em portugues
+  })
+});
+```
+
+**Vozes Disponiveis:**
+- `Zephyr` - Voz masculina natural em PT-BR
+- Outras vozes do Gemini TTS
+
+---
+
+## 5. Sistema de Filas (Background Jobs)
+
+Para operacoes demoradas (imagens), usamos fila assincrona:
+
+```typescript
+// Frontend enfileira job
+const result = await queueGenerationJob(
+  userId,
+  'clip',           // tipo: flyer, flyer_daily, post, ad, clip
+  prompt,
+  { aspectRatio: '16:9' },
+  'clip-0'          // contexto para identificar no frontend
+);
+
+// Worker processa em background
+// Frontend faz polling para status
+const status = await checkJobStatus(userId);
+```
+
+**Tipos de Jobs:**
+
+| Tipo | Descricao | Contexto |
+|------|-----------|----------|
+| `flyer` | Flyer individual | `flyer-{tournamentId}` |
+| `flyer_daily` | Grade diaria | `flyer-period-{period}` |
+| `post` | Post social | `post-{index}` |
+| `ad` | Criativo anuncio | `ad-{index}` |
+| `clip` | Capa de clip | `clip-{index}` |
+
+---
+
+## 6. Tabela Resumo de Modelos
+
+| Funcionalidade | Modelo | Provider |
+|----------------|--------|----------|
+| Campanhas JSON | `gemini-2.5-flash-preview-05-20` | Google |
+| Imagens Pro | `gemini-3-pro-image-preview` | Google |
+| Edicao Rapida | `gemini-2.5-flash-preview-image` | Google |
+| TTS | `gemini-2.5-flash-preview-tts` | Google |
+| Video | `veo-3.1-fast-generate-preview` | Google |
+| Video Fallback | `fal-ai/sora-2/text-to-video` | Fal.ai |
+
+---
+
+## 7. Variaveis de Ambiente
+
+| Variavel | Modelo(s) | Obrigatoria |
+|----------|-----------|-------------|
+| `GEMINI_API_KEY` | Todos os modelos Gemini | Sim |
+| `FAL_KEY` | Sora 2 | Nao (fallback) |
+| `RUBE_TOKEN` | API Rube (video) | Nao |
+| `OPENROUTER_API_KEY` | Modelos alternativos | Nao |
+
+---
+
+## 8. Boas Praticas
+
+### Prompts
+
+Os prompts sao enriquecidos no backend para melhor qualidade:
+
+```javascript
+// server/index.mjs
+const enrichedPrompt = `
+**BRAND CONTEXT:**
+- Nome: ${brandProfile.name}
+- Cores: ${brandProfile.colors.primary}, ${brandProfile.colors.secondary}
+- Tom: ${brandProfile.style.voice}
+
+**PROMPT DO USUARIO:**
+${prompt}
+
+**INSTRUCOES:**
+Criar imagem de marketing profissional...
+`;
+```
+
+### Tratamento de Erros
+
+```javascript
+try {
+  const result = await generateImage(prompt, brandProfile);
+  if (!result.success) {
+    // Tentar modelo alternativo ou retornar erro amigavel
+  }
+} catch (error) {
+  console.error('AI Error:', error);
+  // Log para debugging, mensagem amigavel para usuario
+}
+```
+
+### Cache e Otimizacao
+
+- Imagens sao salvas no Vercel Blob (nao regenerar)
+- Jobs em fila evitam sobrecarga da API
+- Concurrency limitada a 2 jobs simultaneos
+
+---
+
+*DirectorAi - Aura Engine v3.0*

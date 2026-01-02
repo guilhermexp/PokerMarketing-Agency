@@ -1,83 +1,270 @@
-# Guia de Depuração do DirectorAi
+# Guia de Depuracao do DirectorAi
 
-Este documento fornece orientações para depurar a aplicação DirectorAi, desde o fluxo de estado do React até as chamadas à API do Gemini.
+Este documento fornece orientacoes para depurar a aplicacao DirectorAi, incluindo o backend Express, sistema de filas e integracao com IA.
 
-## 1. Gerenciamento de Estado Principal
+## 1. Arquitetura de Depuracao
 
-O coração da aplicação é o componente `App.tsx`. Ele atua como o principal contêiner de estado, gerenciando os dados mais importantes e passando-os para os componentes filhos através de props.
+A aplicacao tem tres camadas principais para depuracao:
 
-### Estados-Chave em `App.tsx`:
+1. **Frontend (React)** - Componentes, estado, hooks
+2. **Backend (Express)** - Endpoints API, middleware
+3. **Jobs (BullMQ/Redis)** - Fila de processamento assincrono
 
--   `brandProfile`: Armazena os dados da marca do usuário (nome, logo, cores, etc.). É carregado do `localStorage` na inicialização.
--   `campaign`: Contém os resultados da campanha de marketing gerada pela IA. É `null` até que uma campanha seja gerada com sucesso.
--   `galleryImages`: Um array com todas as imagens que o usuário gerou e salvou. Também é persistido no `localStorage`.
--   `tournamentEvents`, `flyerState`, `dailyFlyerState`: Gerenciam os dados e os flyers gerados para a funcionalidade do Gerador de Flyers.
--   `chatHistory`: Mantém o histórico da conversa com o Assistente de IA.
+## 2. Depurando o Frontend
 
-### Fluxo de Dados
+### React DevTools
 
-O fluxo de dados é estritamente unidirecional (de cima para baixo):
+Use a extensao React DevTools para inspecionar:
+- Arvore de componentes
+- Props e state de cada componente
+- Context providers (BackgroundJobsProvider, etc.)
 
-1.  `App.tsx` mantém o estado.
-2.  O estado é passado para o `Dashboard.tsx`.
-3.  O `Dashboard.tsx` passa os dados relevantes para as abas ativas (ex: `ClipsTab.tsx`) ou outras visualizações (ex: `FlyerGenerator.tsx`).
-4.  Funções para modificar o estado (ex: `handleGenerate`, `onAddImageToGallery`) também são passadas de `App.tsx` para baixo, permitindo que os componentes filhos solicitem alterações no estado central.
+### Estados Principais
 
-## 2. Depurando Chamadas à API de IA
+Os dados agora sao gerenciados via hooks com persistencia em banco:
 
-Toda a comunicação com as APIs do Gemini está centralizada nos arquivos da pasta `/services`.
+| Hook | Funcao | Origem dos Dados |
+|------|--------|------------------|
+| `useInitialData` | Carrega dados iniciais | PostgreSQL via `/api/db/init` |
+| `useCampaigns` | CRUD de campanhas | PostgreSQL |
+| `useGalleryImages` | CRUD de galeria | PostgreSQL + Vercel Blob |
+| `useBackgroundJobs` | Status de jobs | PostgreSQL + polling |
 
--   `geminiService.ts`: Contém a lógica para gerar campanhas, imagens, vídeos e áudio.
--   `assistantService.ts`: Gerencia a conversa com o Assistente de IA, incluindo o uso de ferramentas.
+### Console do Navegador
 
-### Passos para Depuração:
+Verifique o console para erros de:
+- Chamadas fetch() que falharam
+- Erros de parsing JSON
+- Erros de componentes React
 
-1.  **Inspecione o Prompt:** A maneira mais eficaz de depurar é verificar exatamente o que está sendo enviado para a IA. Antes de qualquer chamada `await ai.models.generateContent(...)` ou similar, adicione um `console.log()` para inspecionar o prompt completo ou o objeto `contents`.
+```javascript
+// Exemplo: debugar chamada de API
+const response = await fetch('/api/ai/generate-image', {...});
+console.log('Response status:', response.status);
+const data = await response.json();
+console.log('Response data:', data);
+```
 
-    ```typescript
-    // Exemplo em geminiService.ts -> generateImage
-    const fullPrompt = `**PROMPT:** ${prompt}...`;
-    console.log("Enviando para a IA de Imagem:", fullPrompt); // Adicione esta linha
-    
-    const response = await ai.models.generateImages(...);
-    ```
+## 3. Depurando o Backend
 
-2.  **Verifique a Resposta da API:** Faça o log da resposta bruta da API para ver o que a IA está retornando. Para respostas em JSON, isso pode ajudar a identificar se o formato está quebrado.
+### Logs do Railway
 
-    ```typescript
-    // Exemplo em geminiService.ts -> generateCampaign
-    const response = await ai.models.generateContent(...);
-    console.log("Resposta da IA (bruta):", response.text); // Adicione esta linha
+```bash
+# Ver ultimos 50 logs
+railway logs --tail 50
 
-    const jsonText = response.text.trim();
-    const campaignData = JSON.parse(jsonText);
-    ```
+# Logs em tempo real
+railway logs -f
 
-3.  **Use a Aba de Rede (Network):** Abra as ferramentas de desenvolvedor do seu navegador e vá para a aba "Network". Você pode filtrar pelas chamadas para a API do Google (geralmente contendo `generativelanguage.googleapis.com`) para ver a requisição completa, os headers e a resposta.
+# Logs de um servico especifico
+railway logs --service redis
+```
 
-### Erros Comuns:
+### Testando Endpoints Localmente
 
--   **Erro de Chave de API:** Se você vir erros `401` ou `403`, sua `API_KEY` provavelmente está inválida ou faltando. Lembre-se que para o Veo (vídeo), uma chave de API específica com faturamento habilitado é necessária.
--   **Erro de Schema (JSON):** Se a IA retornar um JSON que não corresponde ao `responseSchema` definido, a chamada falhará. Verifique o prompt para ter certeza de que as instruções são claras o suficiente para que a IA siga o formato.
--   **Limite de Tokens Excedido:** Ocorre quando o prompt, o histórico da conversa ou as imagens são muito grandes. A aplicação tenta mitigar isso redimensionando imagens para o chat, mas pode acontecer. A mensagem de erro geralmente indica "token count exceeds".
+```bash
+# Health check
+curl http://localhost:8080/api/health
 
-## 3. Depurando Componentes da Interface (UI)
+# Gerar imagem (POST)
+curl -X POST http://localhost:8080/api/ai/generate-image \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "teste", "userId": "user_123"}'
 
--   **React DevTools:** Use a extensão React DevTools no seu navegador. Ela permite inspecionar a árvore de componentes, ver as `props` que cada um recebe e verificar seu `state`. É a melhor maneira de entender por que um componente não está renderizando como esperado.
--   **Verifique as Props:** Se um componente não está se comportando corretamente, o primeiro passo é verificar as props que ele está recebendo no React DevTools. Por exemplo, se uma imagem não aparece no `PostsTab`, verifique se as props `posts` e `brandProfile` estão sendo passadas corretamente do `Dashboard.tsx`.
+# Status de jobs
+curl "http://localhost:8080/api/generate/status?userId=user_123"
+```
 
-## 4. Problemas Comuns e Soluções
+### Adicionando Logs no Server
 
--   **Imagens não geram ou não aparecem:**
-    -   Verifique o console por erros da `geminiService.ts`.
-    -   Certifique-se de que os dados base64 da imagem estão sendo formatados corretamente (`data:image/png;base64,...`).
-    -   Verifique o `localStorage` no seu navegador (em Application -> Local Storage) para ver se não excedeu a cota, o que impediria o salvamento na galeria.
+```javascript
+// Em server/index.mjs
+app.post('/api/ai/generate-image', async (req, res) => {
+  console.log('=== Generate Image Request ===');
+  console.log('Body:', JSON.stringify(req.body, null, 2));
 
--   **O Assistente não responde ou não usa a ferramenta certa:**
-    -   Verifique o `systemInstruction` em `assistantService.ts`. Ele é a principal diretriz para o comportamento do assistente.
-    -   Faça o `console.log` do `history` enviado para a função `runAssistantConversationStream` para ver o contexto que a IA está recebendo.
-    -   Verifique se a lógica de chamada de função em `App.tsx` (`executeTool`) está correta.
+  try {
+    const result = await generateImage(prompt, brandProfile);
+    console.log('Result:', result.success ? 'OK' : result.error);
+    res.json(result);
+  } catch (error) {
+    console.error('Error:', error.message);
+    console.error('Stack:', error.stack);
+    res.status(500).json({ error: error.message });
+  }
+});
+```
 
--   **Estilos do Tailwind CSS não aplicando:**
-    -   Certifique-se de que o nome da classe está correto.
-    -   Lembre-se que as cores customizadas (ex: `bg-primary`) são definidas no `tailwind.config` dentro do `index.html`. Verifique se as variáveis CSS (`--color-primary`, etc.) estão definidas corretamente.
+## 4. Depurando o Sistema de Filas
+
+### Jobs Travados
+
+1. Verifique o indicador "Jobs em Background" no frontend
+2. Use o botao "Cancelar" ou "Cancelar Todos"
+3. Verifique logs do Railway
+
+### Verificando Jobs no Banco
+
+```sql
+-- Jobs pendentes
+SELECT id, job_type, status, context, created_at
+FROM generation_jobs
+WHERE status IN ('queued', 'processing')
+ORDER BY created_at DESC;
+
+-- Jobs falhados
+SELECT id, job_type, error_message, created_at
+FROM generation_jobs
+WHERE status = 'failed'
+ORDER BY created_at DESC
+LIMIT 10;
+```
+
+### Testando Fila Manualmente
+
+```bash
+# Via curl
+curl -X POST http://localhost:8080/api/generate/queue \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "user_123",
+    "jobType": "flyer",
+    "prompt": "Teste de flyer",
+    "config": {},
+    "context": "test-context"
+  }'
+```
+
+## 5. Problemas Comuns e Solucoes
+
+### Imagens Nao Persistem
+
+1. **Verifique se esta usando URL do Blob (nao data URL)**
+   ```typescript
+   // ERRADO
+   onAddImageToGallery({ src: dataUrl }); // data:image/png;base64,...
+
+   // CERTO
+   const httpUrl = await uploadImageToBlob(base64Data, mimeType);
+   onAddImageToGallery({ src: httpUrl }); // https://xxx.blob.vercel-storage.com/...
+   ```
+
+2. **Verifique se o video_script_id esta sendo salvo**
+   ```typescript
+   // Deve passar o ID do clip
+   onAddImageToGallery({
+     src: httpUrl,
+     videoScriptId: clipId
+   });
+   ```
+
+3. **Verifique a galeria carregando**
+   ```javascript
+   console.log('Gallery images:', galleryImages);
+   ```
+
+### Jobs Completam mas UI Nao Atualiza
+
+1. **Verifique o campo `context` do job**
+   - O context deve ser unico por item (ex: `clip-0`, `post-1`)
+   - O frontend usa o context para saber qual componente atualizar
+
+2. **Verifique o polling**
+   ```javascript
+   // Em useBackgroundJobs
+   console.log('Polling jobs:', pendingJobs);
+   ```
+
+### Erros de API Key
+
+1. **No frontend**: "An API Key must be set"
+   - Verifique se `VITE_API_KEY` esta definido no vite.config.ts
+   - Rebuild necessario apos mudanca
+
+2. **No backend**: "Invalid API key"
+   - Verifique `GEMINI_API_KEY` nas variaveis do Railway
+   - Nao use prefixo VITE_ no server
+
+### Erros de Banco de Dados
+
+```bash
+# Testar conexao
+node -e "
+  import('postgres').then(({default: postgres}) => {
+    const sql = postgres(process.env.DATABASE_URL);
+    sql\`SELECT 1\`.then(console.log).catch(console.error);
+  });
+"
+```
+
+### Jobs com Tipo 'clip' Nao Funcionam
+
+O enum do banco pode nao incluir 'clip'. Execute:
+
+```sql
+ALTER TYPE generation_job_type ADD VALUE IF NOT EXISTS 'clip';
+```
+
+Ou deixe a auto-migracao do server rodar no startup.
+
+## 6. Variaveis de Ambiente
+
+### Verificando no Railway
+
+```bash
+railway variables list
+```
+
+### Variaveis Obrigatorias
+
+| Variavel | Frontend | Backend |
+|----------|----------|---------|
+| `GEMINI_API_KEY` | - | X |
+| `DATABASE_URL` | - | X |
+| `BLOB_READ_WRITE_TOKEN` | - | X |
+| `VITE_CLERK_PUBLISHABLE_KEY` | X | - |
+| `CLERK_SECRET_KEY` | - | X |
+| `REDIS_URL` ou `REDIS_PRIVATE_URL` | - | X |
+
+## 7. Ferramentas Uteis
+
+### Extensoes do Navegador
+
+- **React DevTools** - Inspecionar componentes
+- **Redux DevTools** - Se usar Redux/Zustand
+- **Network Tab** - Requisicoes HTTP
+
+### CLI
+
+```bash
+# Railway CLI
+railway logs -f          # Logs em tempo real
+railway shell            # Shell no container
+railway variables list   # Listar variaveis
+
+# PostgreSQL
+psql $DATABASE_URL       # Conectar ao banco
+
+# Redis
+redis-cli -u $REDIS_URL  # Conectar ao Redis
+```
+
+## 8. Migracao de Banco
+
+### Adicionar Coluna Manualmente
+
+```bash
+node db/run-context-migration.mjs
+```
+
+### Auto-Migracao
+
+O server executa migracoes automaticas no startup:
+- Adiciona coluna `context` se nao existir
+- Adiciona valor `clip` ao enum se nao existir
+
+Verifique os logs do startup para ver se as migracoes rodaram.
+
+---
+
+*DirectorAi - Aura Engine v3.0*

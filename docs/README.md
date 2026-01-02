@@ -1,62 +1,166 @@
-# DirectorAi: Poker Marketing Agency
+# DirectorAi: Aura Engine
 
-DirectorAi é um kit de crescimento com IA projetado para criadores, com foco em agências de marketing de poker. A aplicação ajuda a reaproveitar conteúdo, como transcrições de vídeos ou posts, transformando-o automaticamente em campanhas de marketing completas, incluindo clipes de vídeo, posts para redes sociais e criativos de anúncio.
+DirectorAi é um kit de crescimento com IA projetado para criadores, com foco em agências de marketing. A aplicação ajuda a reaproveitar conteúdo, como transcrições de vídeos ou posts, transformando-o automaticamente em campanhas de marketing completas, incluindo clipes de vídeo, posts para redes sociais e criativos de anúncio.
 
-## ✨ Funcionalidades Principais
+## Funcionalidades Principais
 
-- **Gerador de Campanhas:** Transforma uma simples transcrição de texto e uma imagem de referência opcional em uma campanha de marketing multiplataforma.
-- **Gerador de Flyers de Torneios:** Importa planilhas de torneios de poker (.xlsx) e gera flyers promocionais individuais ou resumos diários, com alta customização.
-- **Perfil de Marca Dinâmico:** Configura a identidade visual da sua marca (logo, cores, tom de voz) para que toda a geração de conteúdo da IA seja consistente.
-- **Suporte a Múltiplos Modelos de IA:** Permite escolher entre diferentes modelos de IA para geração de imagem (Google Gemini e Bytedance Seedream) para obter estilos visuais variados.
-- **Edição de Imagem Avançada:** Oferece uma interface para editar imagens geradas usando prompts de texto, máscaras de edição e imagens de referência.
-- **Galeria de Mídia:** Armazena todas as imagens geradas, permitindo fácil acesso, reutilização e edição.
-- **Assistente de IA:** Um chatbot integrado que entende o contexto da aplicação, permitindo executar ações como criar logos, editar imagens da galeria e consultar informações de torneios.
+- **Gerador de Campanhas:** Transforma transcrição de texto em campanhas de marketing multiplataforma completas
+- **Gerador de Flyers de Torneios:** Importa planilhas (.xlsx) e gera flyers promocionais individuais ou resumos diários
+- **Perfil de Marca Dinâmico:** Configura identidade visual (logo, cores, tom de voz) para consistência na geração de conteúdo
+- **Geração de Imagens IA:** Utiliza Google Gemini para criar imagens de alta qualidade
+- **Edição de Imagem Avançada:** Edita imagens usando prompts de texto e máscaras
+- **Geração de Vídeo:** Cria vídeos a partir de imagens usando Veo 3.1 ou Sora 2
+- **Text-to-Speech:** Narra scripts em português brasileiro com vozes naturais
+- **Galeria de Mídia:** Armazena todas as imagens geradas com persistência em nuvem
+- **Background Jobs:** Processamento assíncrono com feedback em tempo real
 
-## 🚀 Arquitetura e Tecnologias
+## Arquitetura
 
-A aplicação é um Single Page Application (SPA) construído com as seguintes tecnologias:
+A aplicação é uma SPA React com backend Express, otimizada para deploy em Railway.
 
-- **Frontend:**
-  - **React:** Biblioteca principal para a construção da interface de usuário.
-  - **TypeScript:** Para tipagem estática e um desenvolvimento mais robusto.
-  - **Tailwind CSS:** Para estilização rápida e consistente.
+### Stack Tecnológico
 
-- **Serviços de IA e Backend:**
-  - **Google Gemini API (`@google/genai`):**
-    - `gemini-2.5-flash`: Utilizado para tarefas de texto, como a geração de campanhas e a lógica do assistente.
-    - `imagen-4.0-generate-001`: Modelo principal para geração de imagens (text-to-image).
-    - `gemini-2.5-flash-image-preview`: Modelo multimodal para edição avançada de imagens, variações de marca e geração de flyers com inputs visuais.
-    - `veo-2.0-generate-001`: Utilizado para a geração de vídeos a partir de roteiros.
-  - **Fal.ai API:**
-    - `bytedance/seedream/v4`: Utilizado como um modelo alternativo para geração de imagens (text-to-image), oferecendo um estilo visual diferente.
+| Camada | Tecnologia | Descrição |
+|--------|------------|-----------|
+| **Frontend** | React 19 + TypeScript + Tailwind CSS | SPA com componentes modulares |
+| **Backend** | Express.js (ESM) | API REST servindo frontend e endpoints de IA |
+| **Banco de Dados** | PostgreSQL (Neon Serverless) | Persistência de usuários, campanhas, galeria |
+| **Armazenamento** | Vercel Blob Storage | Imagens, vídeos e áudios gerados |
+| **Autenticação** | Clerk | Auth multi-tenant com organizações |
+| **Fila de Jobs** | BullMQ + Redis | Processamento assíncrono de imagens |
+| **IA - Imagem** | Google Gemini API | Geração e edição de imagens |
+| **IA - Vídeo** | Veo 3.1 + Fal.ai (Sora 2) | Geração de vídeos |
+| **IA - Áudio** | Gemini TTS (Zephyr) | Narração em português brasileiro |
+| **Deploy** | Railway | Container Docker com Redis integrado |
 
-## 📁 Estrutura de Arquivos
+### Diagrama de Fluxo
+
+```
+[Usuário] --> [Frontend React]
+                   |
+                   v
+            [Express Server]
+                   |
+    +--------------+--------------+
+    |              |              |
+    v              v              v
+[PostgreSQL]  [Vercel Blob]  [BullMQ/Redis]
+                                  |
+                                  v
+                          [Job Processor]
+                                  |
+                   +--------------+--------------+
+                   |              |              |
+                   v              v              v
+             [Gemini API]   [Veo API]    [Fal.ai API]
+```
+
+## Estrutura de Arquivos
 
 ```
 /
-├── components/
-│   ├── tabs/             # Componentes para cada aba da dashboard (Clipes, Posts, etc.)
-│   ├── common/           # Componentes reutilizáveis (Botões, Cards, Ícones)
-│   ├── assistant/        # Componentes relacionados ao painel do Assistente de IA
-│   ├── BrandProfileSetup.tsx # Formulário de configuração da marca
-│   ├── Dashboard.tsx       # Componente principal da dashboard
-│   ├── FlyerGenerator.tsx  # Lógica e UI do gerador de flyers
-│   └── ...
+├── server/
+│   ├── index.mjs              # Express server principal
+│   └── helpers/
+│       └── job-queue.mjs      # BullMQ queue e worker
+│
 ├── services/
-│   ├── geminiService.ts    # Lógica central para chamadas à API do Gemini e Bytedance
-│   └── assistantService.ts # Lógica para a conversa com o Assistente de IA
-├── types.ts              # Definições de tipos do TypeScript para todo o projeto
-├── App.tsx                 # Componente raiz, gerencia o estado principal
-├── index.html              # Ponto de entrada HTML
-└── index.tsx               # Ponto de entrada do React
+│   ├── apiClient.ts           # Cliente HTTP para todas as APIs
+│   ├── geminiService.ts       # Wrapper para /api/ai/* endpoints
+│   ├── blobService.ts         # Upload para Vercel Blob
+│   └── rubeService.ts         # Geração de vídeo (Veo/Fal.ai)
+│
+├── hooks/
+│   ├── useBackgroundJobs.tsx  # Provider e hooks para jobs
+│   ├── useInitialData.ts      # Carrega dados iniciais via SWR
+│   ├── useGalleryImages.ts    # CRUD de galeria
+│   └── useCampaigns.ts        # CRUD de campanhas
+│
+├── components/
+│   ├── tabs/
+│   │   ├── ClipsTab.tsx       # Edição de clips de vídeo
+│   │   ├── PostsTab.tsx       # Posts para redes sociais
+│   │   └── AdCreativesTab.tsx # Criativos de anúncio
+│   ├── common/
+│   │   └── BackgroundJobsIndicator.tsx  # UI de jobs em andamento
+│   ├── Dashboard.tsx
+│   ├── FlyerGenerator.tsx
+│   └── BrandProfileSetup.tsx
+│
+├── db/
+│   ├── schema.sql             # Schema completo do PostgreSQL
+│   └── run-migration.mjs      # Script de migração
+│
+├── Dockerfile                 # Build para Railway
+├── railway.toml               # Configuração Railway
+└── vite.config.ts             # Build do frontend
 ```
 
-## 🏁 Como Começar
+## Variáveis de Ambiente
 
-Para rodar esta aplicação, o ambiente de execução precisa ter a seguinte variável de ambiente configurada:
+### Obrigatórias
 
-- `API_KEY`: Sua chave de API do Google AI Studio para acessar os modelos Gemini.
+| Variável | Descrição |
+|----------|-----------|
+| `DATABASE_URL` | URL do PostgreSQL (Neon) |
+| `GEMINI_API_KEY` | Chave da API Google Gemini |
+| `BLOB_READ_WRITE_TOKEN` | Token do Vercel Blob Storage |
+| `VITE_CLERK_PUBLISHABLE_KEY` | Chave pública do Clerk |
+| `CLERK_SECRET_KEY` | Chave secreta do Clerk |
 
-A chave da API da Fal.ai para o modelo Bytedance está atualmente hardcoded em `services/geminiService.ts`, mas idealmente também seria gerenciada via variáveis de ambiente.
+### Opcionais
 
-A aplicação utiliza um `importmap` em `index.html` para carregar as dependências (React, @google/genai, etc.) diretamente de um CDN, simplificando o processo de build.
+| Variável | Descrição |
+|----------|-----------|
+| `REDIS_URL` ou `REDIS_PRIVATE_URL` | URL do Redis (Railway) |
+| `FAL_KEY` | Chave da API Fal.ai (Sora 2) |
+| `OPENROUTER_API_KEY` | Chave OpenRouter (modelos alternativos) |
+| `RUBE_TOKEN` | Token para API Rube (vídeo) |
+
+## Modelos de IA Utilizados
+
+| Funcionalidade | Modelo | Endpoint |
+|----------------|--------|----------|
+| Campanhas (JSON) | `gemini-2.5-flash-preview-05-20` | `/api/ai/generate-campaign` |
+| Imagens Pro | `gemini-3-pro-image-preview` | `/api/ai/generate-image` |
+| Edição Rápida | `gemini-2.5-flash-preview-image` | `/api/ai/edit-image` |
+| TTS (Voz) | `gemini-2.5-flash-preview-tts` | `/api/ai/generate-tts` |
+| Vídeo | `veo-3.1-fast-generate-preview` | `/api/ai/generate-video` |
+| Vídeo (Fallback) | `fal-ai/sora-2/text-to-video` | Fal.ai API |
+
+## Desenvolvimento Local
+
+```bash
+# Instalar dependências
+npm install
+
+# Configurar variáveis de ambiente
+cp .env.example .env
+# Editar .env com suas chaves
+
+# Rodar em desenvolvimento
+npm run dev
+```
+
+## Deploy no Railway
+
+1. Crie projeto no Railway
+2. Adicione serviço Redis
+3. Configure variáveis de ambiente
+4. Conecte repositório GitHub ou use CLI:
+   ```bash
+   railway link
+   railway up
+   ```
+
+Veja [DEPLOYMENT.md](./DEPLOYMENT.md) para instruções detalhadas.
+
+## Documentação Adicional
+
+- [DOCUMENTATION.md](../DOCUMENTATION.md) - Documentação técnica completa
+- [DEBUGGING.md](./DEBUGGING.md) - Guia de depuração
+- [MODEL_DOCUMENTATION.md](./MODEL_DOCUMENTATION.md) - Detalhes dos modelos de IA
+
+---
+
+*DirectorAi - Aura Engine v3.0*

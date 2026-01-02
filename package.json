@@ -7,6 +7,10 @@
     "dev": "concurrently \"bun run dev:api\" \"bun run dev:vite\"",
     "dev:api": "node server/dev-api.mjs",
     "dev:vite": "vite",
+    "dev:full": "concurrently \"bun run dev:server\" \"bun run dev:vite\"",
+    "dev:server": "node server/index.mjs",
+    "dev:redis": "docker compose up -d redis",
+    "dev:redis:stop": "docker compose down",
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server/index.mjs"

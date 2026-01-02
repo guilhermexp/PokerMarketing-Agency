@@ -230,30 +230,32 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     />
                   )}
 
-                  {/* Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
-                    <p className="text-white text-[10px] font-bold leading-snug line-clamp-2 mb-2">
-                      {image.prompt}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="text-[8px] text-white/80 font-bold bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
-                        {image.source}
-                      </span>
-                      {image.model && (
-                        <span className="text-[8px] text-primary font-bold bg-primary/20 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
-                          {image.model === "imagen-4.0-generate-001"
-                            ? "Imagen"
-                            : "Gemini"}
+                  {/* Overlay - Hide for audio cards */}
+                  {!isAudio(image) && (
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
+                      <p className="text-white text-[10px] font-bold leading-snug line-clamp-2 mb-2">
+                        {image.prompt}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="text-[8px] text-white/80 font-bold bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
+                          {image.source}
                         </span>
-                      )}
-                      {image.published_at && (
-                        <span className="text-[8px] text-green-400 font-bold bg-green-500/20 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide flex items-center gap-1">
-                          <Icon name="check" className="w-2.5 h-2.5" />
-                          Publicado
-                        </span>
-                      )}
+                        {image.model && (
+                          <span className="text-[8px] text-primary font-bold bg-primary/20 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
+                            {image.model === "imagen-4.0-generate-001"
+                              ? "Imagen"
+                              : "Gemini"}
+                          </span>
+                        )}
+                        {image.published_at && (
+                          <span className="text-[8px] text-green-400 font-bold bg-green-500/20 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide flex items-center gap-1">
+                            <Icon name="check" className="w-2.5 h-2.5" />
+                            Publicado
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Actions - Hide edit/favorite for audio */}
                   <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
