@@ -21,6 +21,12 @@ import {
   OrganizationAccessError,
   createOrgContext,
 } from "./helpers/organization-context.mjs";
+import {
+  getImageQueue,
+  addJob,
+  initializeWorker,
+  closeQueue,
+} from "./helpers/job-queue.mjs";
 
 config();
 
@@ -567,6 +573,194 @@ async function resolveUserId(sql, userId) {
 
   console.log("[User Lookup] No user found for auth_provider_id:", userId);
   return null;
+}
+
+// ============================================================================
+// BULLMQ JOB PROCESSOR
+// ============================================================================
+
+/**
+ * Process image generation jobs from BullMQ queue
+ */
+const processGenerationJob = async (job) => {
+  const { jobId, prompt, config } = job.data;
+  const sql = getSql();
+
+  console.log(`[JobProcessor] Processing job ${jobId}`);
+
+  try {
+    // Mark as processing
+    await sql`
+      UPDATE generation_jobs
+      SET status = 'processing',
+          started_at = NOW(),
+          attempts = COALESCE(attempts, 0) + 1
+      WHERE id = ${jobId}
+    `;
+
+    job.updateProgress(10);
+
+    // Build brand profile object for helpers
+    const brandProfile = {
+      name: config.brandName,
+      description: config.brandDescription,
+      toneOfVoice: config.brandToneOfVoice,
+      primaryColor: config.brandPrimaryColor,
+      secondaryColor: config.brandSecondaryColor,
+    };
+
+    // Generate the image using existing helper
+    const ai = getGeminiAi();
+    const brandingInstruction = buildFlyerPrompt(brandProfile);
+
+    const parts = [
+      { text: brandingInstruction },
+      { text: `DADOS DO FLYER PARA INSERIR NA ARTE:\n${prompt}` },
+    ];
+
+    // Add logo if provided
+    if (config.logo) {
+      const logoData = config.logo.startsWith("data:")
+        ? config.logo.split(",")[1]
+        : config.logo;
+      parts.push({ inlineData: { data: logoData, mimeType: "image/png" } });
+    }
+
+    // Add collab logo if provided
+    if (config.collabLogo) {
+      const collabData = config.collabLogo.startsWith("data:")
+        ? config.collabLogo.split(",")[1]
+        : config.collabLogo;
+      parts.push({ inlineData: { data: collabData, mimeType: "image/png" } });
+    }
+
+    // Add style reference if provided
+    if (config.styleReference) {
+      parts.push({ text: "USE ESTA IMAGEM COMO REFERÊNCIA DE LAYOUT E FONTES:" });
+      const refData = config.styleReference.startsWith("data:")
+        ? config.styleReference.split(",")[1]
+        : config.styleReference;
+      parts.push({ inlineData: { data: refData, mimeType: "image/png" } });
+    }
+
+    // Add composition assets
+    if (config.compositionAssets && config.compositionAssets.length > 0) {
+      config.compositionAssets.forEach((asset, i) => {
+        parts.push({ text: `Ativo de composição ${i + 1}:` });
+        const assetData = asset.startsWith("data:") ? asset.split(",")[1] : asset;
+        parts.push({ inlineData: { data: assetData, mimeType: "image/png" } });
+      });
+    }
+
+    job.updateProgress(30);
+
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: config.model || "gemini-3-pro-image-preview",
+        contents: { parts },
+        config: {
+          imageConfig: {
+            aspectRatio: mapAspectRatio(config.aspectRatio),
+            imageSize: config.imageSize || "1K",
+          },
+        },
+      })
+    );
+
+    job.updateProgress(70);
+
+    // Extract image from response
+    let imageDataUrl = null;
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        break;
+      }
+    }
+
+    if (!imageDataUrl) {
+      throw new Error("AI failed to generate image");
+    }
+
+    // Upload to Vercel Blob
+    const matches = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!matches) throw new Error("Invalid image data");
+
+    const [, mimeType, base64Data] = matches;
+    const buffer = Buffer.from(base64Data, "base64");
+    const extension = mimeType.split("/")[1] || "png";
+
+    const blob = await put(`generated/${jobId}.${extension}`, buffer, {
+      access: "public",
+      contentType: mimeType,
+    });
+
+    job.updateProgress(90);
+
+    // Get user_id from job record
+    const jobRecord = await sql`
+      SELECT user_id, organization_id FROM generation_jobs WHERE id = ${jobId}
+    `;
+
+    if (jobRecord.length === 0) {
+      throw new Error("Job record not found");
+    }
+
+    // Save to gallery
+    const galleryResult = await sql`
+      INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, source, model, aspect_ratio, image_size)
+      VALUES (
+        ${jobRecord[0].user_id},
+        ${jobRecord[0].organization_id},
+        ${blob.url},
+        ${prompt},
+        ${config.source || "Flyer"},
+        ${config.model || "gemini-3-pro-image-preview"},
+        ${config.aspectRatio},
+        ${config.imageSize || "1K"}
+      )
+      RETURNING id
+    `;
+
+    const galleryId = galleryResult[0]?.id;
+
+    // Mark as completed
+    await sql`
+      UPDATE generation_jobs
+      SET status = 'completed',
+          result_url = ${blob.url},
+          result_gallery_id = ${galleryId},
+          completed_at = NOW(),
+          progress = 100
+      WHERE id = ${jobId}
+    `;
+
+    console.log(`[JobProcessor] Completed job ${jobId}, gallery ID: ${galleryId}`);
+
+    return { success: true, resultUrl: blob.url, galleryId };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`[JobProcessor] Error for job ${jobId}:`, errorMessage);
+
+    // Update job as failed
+    await sql`
+      UPDATE generation_jobs
+      SET status = 'failed',
+          error_message = ${errorMessage}
+      WHERE id = ${jobId}
+    `;
+
+    throw error;
+  }
+};
+
+// Initialize the BullMQ worker if Redis is configured
+const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL;
+if (REDIS_URL) {
+  console.log("[Server] Redis configured, initializing BullMQ worker...");
+  initializeWorker(processGenerationJob);
+} else {
+  console.log("[Server] No Redis URL configured, background jobs will use polling fallback");
 }
 
 // ============================================================================
@@ -1965,17 +2159,31 @@ app.post("/api/generate/queue", async (req, res) => {
       }
     }
 
+    // Insert job into database
     const result = await sql`
       INSERT INTO generation_jobs (user_id, organization_id, job_type, prompt, config, status)
       VALUES (${userId}, ${organizationId || null}, ${jobType}, ${prompt}, ${JSON.stringify(config)}, 'queued')
       RETURNING id, created_at
     `;
 
-    const job = result[0];
+    const dbJob = result[0];
+
+    // Add to BullMQ queue if Redis is configured
+    const redisUrl = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL;
+    if (redisUrl) {
+      try {
+        await addJob(dbJob.id, { prompt, config });
+        console.log(`[Generate Queue] Job ${dbJob.id} added to BullMQ queue`);
+      } catch (queueError) {
+        console.error(`[Generate Queue] Failed to add to BullMQ, job will be processed by fallback:`, queueError.message);
+      }
+    } else {
+      console.log(`[Generate Queue] No Redis configured, job ${dbJob.id} saved to DB only`);
+    }
 
     res.json({
       success: true,
-      jobId: job.id,
+      jobId: dbJob.id,
       status: "queued",
     });
   } catch (error) {
