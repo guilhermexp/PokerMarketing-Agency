@@ -234,8 +234,13 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   </p>
                 )}
 
-                <p className="text-[10px] text-white/40 mt-2 uppercase">
-                  {publishNow ? 'Agora' : `${scheduledDate} às ${scheduledTime}`}
+                <p className="text-[10px] text-white/40 mt-2">
+                  {publishNow ? 'Agora' : new Date(`${scheduledDate}T${scheduledTime}`).toLocaleDateString('pt-BR', {
+                    day: 'numeric',
+                    month: 'long',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
                 </p>
               </div>
             </div>
