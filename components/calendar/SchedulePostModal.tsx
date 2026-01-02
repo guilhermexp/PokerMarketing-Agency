@@ -90,76 +90,84 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Gallery Picker - Full Screen Gallery View
+  // Gallery Picker - Modal with Overlay
   if (showGallery) {
     return (
-      <div className="fixed inset-0 bg-black z-[300] flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-[#0a0a0a]">
-          <div>
-            <h2 className="text-lg font-black text-white uppercase tracking-tight">
-              Galeria de Assets
-            </h2>
-            <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-0.5">
-              {eligibleImages.length} itens • Selecione uma imagem para agendar
-            </p>
-          </div>
-          <button
-            onClick={() => setShowGallery(false)}
-            className="p-2 text-white/30 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-          >
-            <Icon name="x" className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Gallery Grid - Masonry Layout */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {eligibleImages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-                <Icon name="image" className="w-8 h-8 text-white/20" />
-              </div>
-              <p className="text-sm font-bold text-white/40">Galeria Vazia</p>
-              <p className="text-xs text-white/20 mt-1">
-                Gere imagens em Campanhas ou Flyers para aparecerem aqui
+      <div
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[300] flex items-center justify-center p-4 md:p-8"
+        onClick={() => setShowGallery(false)}
+      >
+        <div
+          className="w-full max-w-5xl max-h-[85vh] bg-[#0a0a0a] rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center shrink-0">
+            <div>
+              <h2 className="text-lg font-black text-white uppercase tracking-tight">
+                Galeria de Assets
+              </h2>
+              <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-0.5">
+                {eligibleImages.length} itens • Selecione uma imagem para agendar
               </p>
             </div>
-          ) : (
-            <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3 space-y-3">
-              {eligibleImages.map((image) => (
-                <div
-                  key={image.id}
-                  onClick={() => handleSelectImage(image)}
-                  className="group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 break-inside-avoid mb-3 cursor-pointer"
-                >
-                  <img
-                    src={image.src}
-                    alt={image.prompt}
-                    className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                  />
+            <button
+              onClick={() => setShowGallery(false)}
+              className="p-2 text-white/30 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+            >
+              <Icon name="x" className="w-5 h-5" />
+            </button>
+          </div>
 
-                  {/* Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
-                    <p className="text-white text-[10px] font-bold leading-snug line-clamp-2 mb-2">
-                      {image.prompt}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="text-[8px] text-white/80 font-bold bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
-                        {image.source}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Selection indicator */}
-                  <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                      <Icon name="check" className="w-6 h-6 text-black" />
-                    </div>
-                  </div>
+          {/* Gallery Grid - Masonry Layout */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {eligibleImages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
+                  <Icon name="image" className="w-8 h-8 text-white/20" />
                 </div>
-              ))}
-            </div>
-          )}
+                <p className="text-sm font-bold text-white/40">Galeria Vazia</p>
+                <p className="text-xs text-white/20 mt-1">
+                  Gere imagens em Campanhas ou Flyers para aparecerem aqui
+                </p>
+              </div>
+            ) : (
+              <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
+                {eligibleImages.map((image) => (
+                  <div
+                    key={image.id}
+                    onClick={() => handleSelectImage(image)}
+                    className="group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 break-inside-avoid mb-3 cursor-pointer"
+                  >
+                    <img
+                      src={image.src}
+                      alt={image.prompt}
+                      className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                    />
+
+                    {/* Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
+                      <p className="text-white text-[10px] font-bold leading-snug line-clamp-2 mb-2">
+                        {image.prompt}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="text-[8px] text-white/80 font-bold bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
+                          {image.source}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Selection indicator */}
+                    <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                        <Icon name="check" className="w-6 h-6 text-black" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
