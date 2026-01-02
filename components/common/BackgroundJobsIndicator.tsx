@@ -30,6 +30,21 @@ export const BackgroundJobsIndicator: React.FC = () => {
   const [cancellingJob, setCancellingJob] = useState<string | null>(null);
   const [cancellingAll, setCancellingAll] = useState(false);
   const dismissedCompletedRef = useRef<Set<string>>(new Set());
+  const dismissedStorageKey = "backgroundJobsDismissed";
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = localStorage.getItem(dismissedStorageKey);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        dismissedCompletedRef.current = new Set(parsed);
+      }
+    } catch (error) {
+      console.warn("[BackgroundJobs] Failed to read dismissed jobs:", error);
+    }
+  }, []);
 
   const handleCancelJob = async (jobId: string) => {
     setCancellingJob(jobId);
@@ -212,9 +227,23 @@ export const BackgroundJobsIndicator: React.FC = () => {
                     </p>
                     <button
                       onClick={() => {
-                        recentlyCompleted.forEach((job) =>
-                          dismissedCompletedRef.current.add(job.id),
-                        );
+                        const ids = new Set(dismissedCompletedRef.current);
+                        recentlyCompleted.forEach((job) => ids.add(job.id));
+                        completedJobs.forEach((job) => ids.add(job.id));
+                        dismissedCompletedRef.current = ids;
+                        if (typeof window !== "undefined") {
+                          try {
+                            localStorage.setItem(
+                              dismissedStorageKey,
+                              JSON.stringify(Array.from(ids)),
+                            );
+                          } catch (error) {
+                            console.warn(
+                              "[BackgroundJobs] Failed to persist dismissed jobs:",
+                              error,
+                            );
+                          }
+                        }
                         setRecentlyCompleted([]);
                       }}
                       className="text-[9px] font-bold text-white/40 hover:text-white/70 transition-colors"
