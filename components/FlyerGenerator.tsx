@@ -2172,16 +2172,6 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                       className="w-3 h-3 text-white/30"
                     />
                   </button>
-                  {/* Day stats card */}
-                  <div className="flex items-center gap-3 px-3 py-2 bg-primary/10 border border-primary/20 rounded-xl">
-                    <span className="text-[8px] font-bold text-primary/50 uppercase">Resumo por sessão:</span>
-                    <span className="text-[9px] font-black text-primary/80 uppercase">
-                      {dayStats.count} torneios
-                    </span>
-                    <span className="text-[9px] font-black text-primary uppercase">
-                      {formatCurrencyValue(String(dayStats.totalGtd), selectedCurrency)}
-                    </span>
-                  </div>
                 </div>
               )}
             </div>
