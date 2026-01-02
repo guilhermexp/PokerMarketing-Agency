@@ -2454,6 +2454,168 @@ app.post("/api/ai/text", async (req, res) => {
   }
 });
 
+// AI Edit Image
+app.post("/api/ai/edit-image", async (req, res) => {
+  try {
+    const { image, prompt, mask, referenceImage } = req.body;
+
+    if (!image || !prompt) {
+      return res.status(400).json({ error: "image and prompt are required" });
+    }
+
+    console.log("[Edit Image API] Editing image...");
+
+    const ai = getGeminiAi();
+    const instructionPrompt = `DESIGNER SÊNIOR: Execute alteração profissional: ${prompt}. Texto original e logos são SAGRADOS, preserve informações importantes visíveis.`;
+
+    const parts = [
+      { text: instructionPrompt },
+      { inlineData: { data: image.base64, mimeType: image.mimeType } },
+    ];
+
+    if (mask) {
+      parts.push({ inlineData: { data: mask.base64, mimeType: mask.mimeType } });
+    }
+    if (referenceImage) {
+      parts.push({ inlineData: { data: referenceImage.base64, mimeType: referenceImage.mimeType } });
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-image-preview",
+      contents: { parts },
+      config: { imageConfig: { imageSize: "1K" } },
+    });
+
+    let imageDataUrl = null;
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        break;
+      }
+    }
+
+    if (!imageDataUrl) {
+      throw new Error("Failed to edit image");
+    }
+
+    console.log("[Edit Image API] Image edited successfully");
+
+    res.json({
+      success: true,
+      imageUrl: imageDataUrl,
+    });
+  } catch (error) {
+    console.error("[Edit Image API] Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to edit image" });
+  }
+});
+
+// AI Extract Colors from Logo
+app.post("/api/ai/extract-colors", async (req, res) => {
+  try {
+    const { logo } = req.body;
+
+    if (!logo) {
+      return res.status(400).json({ error: "logo is required" });
+    }
+
+    console.log("[Extract Colors API] Analyzing logo...");
+
+    const ai = getGeminiAi();
+
+    const colorSchema = {
+      type: Type.OBJECT,
+      properties: {
+        primaryColor: { type: Type.STRING },
+        secondaryColor: { type: Type.STRING, nullable: true },
+        tertiaryColor: { type: Type.STRING, nullable: true },
+      },
+      required: ["primaryColor"],
+    };
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: {
+        parts: [
+          {
+            text: `Analise este logo e extraia APENAS as cores que REALMENTE existem na imagem visível.
+
+REGRAS IMPORTANTES:
+- Extraia somente cores que você pode ver nos pixels da imagem
+- NÃO invente cores que não existem
+- Ignore áreas transparentes (não conte transparência como cor)
+- Se o logo tiver apenas 1 cor visível, retorne null para secondaryColor e tertiaryColor
+- Se o logo tiver apenas 2 cores visíveis, retorne null para tertiaryColor
+
+PRIORIDADE DAS CORES:
+- primaryColor: A cor mais dominante/presente no logo (maior área)
+- secondaryColor: A segunda cor mais presente (se existir), ou null
+- tertiaryColor: Uma terceira cor de destaque/acento (se existir), ou null
+
+Retorne as cores em formato hexadecimal (#RRGGBB).`,
+          },
+          { inlineData: { mimeType: logo.mimeType, data: logo.base64 } },
+        ],
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: colorSchema,
+      },
+    });
+
+    const colors = JSON.parse(response.text.trim());
+
+    console.log("[Extract Colors API] Colors extracted:", colors);
+
+    res.json(colors);
+  } catch (error) {
+    console.error("[Extract Colors API] Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to extract colors" });
+  }
+});
+
+// AI Speech Generation (TTS)
+app.post("/api/ai/speech", async (req, res) => {
+  try {
+    const { script, voiceName = "Orus" } = req.body;
+
+    if (!script) {
+      return res.status(400).json({ error: "script is required" });
+    }
+
+    console.log("[Speech API] Generating speech...");
+
+    const ai = getGeminiAi();
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: script }] }],
+      config: {
+        responseModalities: ["AUDIO"],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName } },
+        },
+      },
+    });
+
+    const audioBase64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
+
+    if (!audioBase64) {
+      throw new Error("Failed to generate speech");
+    }
+
+    console.log("[Speech API] Speech generated successfully");
+
+    res.json({
+      success: true,
+      audioBase64,
+    });
+  } catch (error) {
+    console.error("[Speech API] Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to generate speech" });
+  }
+});
+
 // AI Video Generation API
 const configureFal = () => {
   const apiKey = process.env.FAL_KEY;
