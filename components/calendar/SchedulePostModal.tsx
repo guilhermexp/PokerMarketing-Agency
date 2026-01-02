@@ -188,7 +188,11 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   <p className="text-xs font-semibold text-white">seu_perfil</p>
                   <p className="text-[10px] text-white/50">Local</p>
                 </div>
-                <Icon name="more-horizontal" className="w-5 h-5 text-white" />
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <circle cx="5" cy="12" r="2" />
+                  <circle cx="12" cy="12" r="2" />
+                  <circle cx="19" cy="12" r="2" />
+                </svg>
               </div>
 
               {/* Post Image */}
@@ -212,10 +216,17 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-4">
                     <Icon name="heart" className="w-6 h-6 text-white" />
-                    <Icon name="message-circle" className="w-6 h-6 text-white" />
-                    <Icon name="send" className="w-6 h-6 text-white" />
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                    </svg>
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <line x1="22" y1="2" x2="11" y2="13" />
+                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
                   </div>
-                  <Icon name="bookmark" className="w-6 h-6 text-white" />
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                  </svg>
                 </div>
                 <p className="text-xs font-semibold text-white mb-1">1.234 curtidas</p>
 
