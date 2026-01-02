@@ -227,14 +227,14 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
               {/* Story Preview */}
               {isStory && (
-                <div className="flex-1 flex flex-col">
-                  <div className={`${getAspectRatio()} max-h-[400px] bg-[#111] relative mx-auto w-full max-w-[225px]`}>
+                <div className="flex-1 flex items-center justify-center p-4">
+                  <div className="relative w-full max-w-[280px] aspect-[9/16] bg-[#111] rounded-2xl overflow-hidden">
                     {selectedImages.length > 0 ? (
                       <>
                         <img
                           src={selectedImages[0]?.src}
                           alt=""
-                          className="w-full h-full object-cover rounded-xl"
+                          className="w-full h-full object-cover"
                         />
                         {/* Story Header */}
                         <div className="absolute top-0 left-0 right-0 p-3">
@@ -264,7 +264,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                         </div>
                       </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center rounded-xl">
+                      <div className="w-full h-full flex items-center justify-center">
                         <div className="text-center">
                           <Icon name="image" className="w-12 h-12 text-white/20 mx-auto mb-2" />
                           <p className="text-xs text-white/30">Selecione uma imagem</p>
@@ -277,14 +277,14 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
               {/* Reel Preview */}
               {isReel && (
-                <div className="flex-1 flex flex-col">
-                  <div className={`${getAspectRatio()} max-h-[400px] bg-[#111] relative mx-auto w-full max-w-[225px]`}>
+                <div className="flex-1 flex items-center justify-center p-4">
+                  <div className="relative w-full max-w-[280px] aspect-[9/16] bg-[#111] rounded-2xl overflow-hidden">
                     {selectedImages.length > 0 ? (
                       <>
                         <img
                           src={selectedImages[0]?.src}
                           alt=""
-                          className="w-full h-full object-cover rounded-xl"
+                          className="w-full h-full object-cover"
                         />
                         {/* Reel UI */}
                         <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
@@ -341,7 +341,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                         </div>
                       </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center rounded-xl">
+                      <div className="w-full h-full flex items-center justify-center">
                         <div className="text-center">
                           <Icon name="video" className="w-12 h-12 text-white/20 mx-auto mb-2" />
                           <p className="text-xs text-white/30">Selecione uma imagem</p>
