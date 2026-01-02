@@ -205,11 +205,35 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
   const { signOut } = useClerk();
   const [activeTab, setActiveTab] = useState<Tab>("clips");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsedDesktop, setSidebarCollapsedDesktop] = useState(true);
   const [isInsideSchedule, setIsInsideSchedule] = useState(false);
   const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(
     null,
   );
+  const sidebarCollapsed = isMobile ? !sidebarOpen : sidebarCollapsedDesktop;
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mediaQuery = window.matchMedia("(max-width: 639px)");
+    const handleChange = () => setIsMobile(mediaQuery.matches);
+    handleChange();
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    }
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
+
+  React.useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    } else {
+      setSidebarOpen(true);
+    }
+  }, [isMobile]);
 
   // Format date string (handles both ISO and DD/MM formats)
   const formatDateDisplay = (dateStr: string) => {
@@ -242,110 +266,200 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
   const showUploadForm = !campaign && !isGenerating;
 
   return (
-    <div className="h-screen flex overflow-hidden bg-black text-white font-sans selection:bg-primary selection:text-black">
+    <div className="min-h-[100dvh] md:h-screen flex overflow-hidden bg-black text-white font-sans selection:bg-primary selection:text-black">
       <aside
-        className={`${sidebarCollapsed ? "w-14" : "w-52"} bg-[#0a0a0a] flex flex-col flex-shrink-0 border-r border-white/[0.06] z-20 transition-all duration-300`}
+        className={`${sidebarCollapsed ? (isMobile ? "w-0 border-r-0 pointer-events-none" : "w-14 border-r border-white/[0.06]") : "w-52 border-r border-white/[0.06]"} bg-[#0a0a0a] flex flex-col flex-shrink-0 overflow-hidden z-20 transition-all duration-300`}
       >
-        {/* Header */}
-        <div
-          className={`h-14 flex items-center ${sidebarCollapsed ? "justify-center" : "justify-between px-3"} flex-shrink-0 border-b border-white/[0.04]`}
-        >
-          {sidebarCollapsed ? (
-            <button
-              onClick={() => setSidebarCollapsed(false)}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors overflow-hidden"
-            >
-              <img src="/icon.png" alt="Socialab" className="h-8 w-8 rounded-lg" />
-            </button>
-          ) : (
+        {sidebarCollapsed ? (
+          !isMobile && (
             <>
+              {/* Collapsed Header */}
+              <div className="h-14 flex items-center justify-center flex-shrink-0 border-b border-white/[0.04]">
+                <button
+                  onClick={() => setSidebarCollapsedDesktop(false)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors overflow-hidden"
+                  title="Abrir menu"
+                >
+                  <img
+                    src="/icon.png"
+                    alt="Socialab"
+                    className="h-8 w-8 rounded-lg"
+                  />
+                </button>
+              </div>
+
+              {/* Navigation */}
+              <nav className="flex-grow px-2 py-3 space-y-0.5">
+                <NavItem
+                  icon="zap"
+                  label="Direct"
+                  active={activeView === "campaign"}
+                  onClick={() => onViewChange("campaign")}
+                  collapsed
+                />
+                <NavItem
+                  icon="layers"
+                  label="Campanhas"
+                  active={activeView === "campaigns"}
+                  onClick={() => onViewChange("campaigns")}
+                  collapsed
+                />
+                <NavItem
+                  icon="image"
+                  label="Flyers"
+                  active={activeView === "flyer"}
+                  onClick={() => onViewChange("flyer")}
+                  collapsed
+                />
+                <NavItem
+                  icon="calendar"
+                  label="Agenda"
+                  active={activeView === "calendar"}
+                  onClick={() => onViewChange("calendar")}
+                  collapsed
+                />
+                <NavItem
+                  icon="layout"
+                  label="Galeria"
+                  active={activeView === "gallery"}
+                  onClick={() => onViewChange("gallery")}
+                  collapsed
+                />
+              </nav>
+
+              {/* Footer */}
+              <div className="p-2 border-t border-white/[0.04] space-y-1.5">
+                <button
+                  onClick={onEditProfile}
+                  title={brandProfile.name}
+                  className="w-full flex justify-center py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
+                >
+                  {brandProfile.logo ? (
+                    <img
+                      src={brandProfile.logo}
+                      alt="Logo"
+                      className="h-5 w-5 rounded object-cover"
+                    />
+                  ) : (
+                    <span className="text-[9px] font-bold text-white/50">
+                      {brandProfile.name.substring(0, 2).toUpperCase()}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => signOut()}
+                  title="Sair"
+                  className="w-full flex justify-center py-2 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  <Icon name="log-out" className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )
+        ) : (
+          <>
+            {/* Header */}
+            <div className="h-14 flex items-center justify-between px-3 flex-shrink-0 border-b border-white/[0.04]">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  <img src="/icon.png" alt="Socialab" className="h-9 w-9 rounded-xl" />
+                  <img
+                    src="/icon.png"
+                    alt="Socialab"
+                    className="h-9 w-9 rounded-xl"
+                  />
                 </div>
                 <span className="text-sm font-semibold text-white/80">
                   Socialab
                 </span>
               </div>
               <button
-                onClick={() => setSidebarCollapsed(true)}
+                onClick={() =>
+                  isMobile
+                    ? setSidebarOpen(false)
+                    : setSidebarCollapsedDesktop(true)
+                }
                 className="p-1.5 text-white/20 hover:text-white/50 hover:bg-white/[0.04] rounded-md transition-all"
               >
                 <Icon name="chevron-left" className="w-3.5 h-3.5" />
               </button>
-            </>
-          )}
-        </div>
+            </div>
 
-        {/* Navigation */}
-        <nav
-          className={`flex-grow ${sidebarCollapsed ? "px-2 py-3" : "px-2 py-3"} space-y-0.5`}
-        >
-          <NavItem
-            icon="zap"
-            label="Direct"
-            active={activeView === "campaign"}
-            onClick={() => onViewChange("campaign")}
-            collapsed={sidebarCollapsed}
-          />
-          <NavItem
-            icon="layers"
-            label="Campanhas"
-            active={activeView === "campaigns"}
-            onClick={() => onViewChange("campaigns")}
-            collapsed={sidebarCollapsed}
-          />
-          <NavItem
-            icon="image"
-            label="Flyers"
-            active={activeView === "flyer"}
-            onClick={() => onViewChange("flyer")}
-            collapsed={sidebarCollapsed}
-          />
-          <NavItem
-            icon="calendar"
-            label="Agenda"
-            active={activeView === "calendar"}
-            onClick={() => onViewChange("calendar")}
-            collapsed={sidebarCollapsed}
-          />
-          <NavItem
-            icon="layout"
-            label="Galeria"
-            active={activeView === "gallery"}
-            onClick={() => onViewChange("gallery")}
-            collapsed={sidebarCollapsed}
-          />
-        </nav>
+            {/* Navigation */}
+            <nav className="flex-grow px-2 py-3 space-y-0.5">
+              <NavItem
+                icon="zap"
+                label="Direct"
+                active={activeView === "campaign"}
+                onClick={() => {
+                  onViewChange("campaign");
+                  if (isMobile) setSidebarOpen(false);
+                }}
+                collapsed={false}
+              />
+              <NavItem
+                icon="layers"
+                label="Campanhas"
+                active={activeView === "campaigns"}
+                onClick={() => {
+                  onViewChange("campaigns");
+                  if (isMobile) setSidebarOpen(false);
+                }}
+                collapsed={false}
+              />
+              <NavItem
+                icon="image"
+                label="Flyers"
+                active={activeView === "flyer"}
+                onClick={() => {
+                  onViewChange("flyer");
+                  if (isMobile) setSidebarOpen(false);
+                }}
+                collapsed={false}
+              />
+              <NavItem
+                icon="calendar"
+                label="Agenda"
+                active={activeView === "calendar"}
+                onClick={() => {
+                  onViewChange("calendar");
+                  if (isMobile) setSidebarOpen(false);
+                }}
+                collapsed={false}
+              />
+              <NavItem
+                icon="layout"
+                label="Galeria"
+                active={activeView === "gallery"}
+                onClick={() => {
+                  onViewChange("gallery");
+                  if (isMobile) setSidebarOpen(false);
+                }}
+                collapsed={false}
+              />
+            </nav>
 
-        {/* Footer */}
-        <div
-          className={`${sidebarCollapsed ? "p-2" : "p-2"} border-t border-white/[0.04] space-y-1.5`}
-        >
-          {!sidebarCollapsed && (
-            <OrganizationSwitcher
-              hidePersonal={false}
-              afterCreateOrganizationUrl="/"
-              afterLeaveOrganizationUrl="/"
-              afterSelectOrganizationUrl="/"
-              appearance={{
-                elements: {
-                  rootBox: "w-full",
-                  organizationSwitcherTrigger:
-                    "w-full flex items-center gap-2 px-2 py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors text-white/70 text-xs",
-                  organizationSwitcherPopoverCard:
-                    "bg-[#0a0a0a] border border-white/10 rounded-xl shadow-2xl",
-                  organizationSwitcherPopoverActions: "bg-[#0a0a0a]",
-                  organizationSwitcherPopoverActionButton:
-                    "text-white/70 hover:bg-white/5",
-                  organizationPreview: "text-white",
-                  organizationSwitcherPopoverFooter: "border-white/10",
-                },
-              }}
-            />
-          )}
-          {!sidebarCollapsed ? (
-            <>
+            {/* Footer */}
+            <div className="p-2 border-t border-white/[0.04] space-y-1.5">
+              <OrganizationSwitcher
+                hidePersonal={false}
+                afterCreateOrganizationUrl="/"
+                afterLeaveOrganizationUrl="/"
+                afterSelectOrganizationUrl="/"
+                appearance={{
+                  elements: {
+                    rootBox: "w-full",
+                    organizationSwitcherTrigger:
+                      "w-full flex items-center gap-2 px-2 py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors text-white/70 text-xs",
+                    organizationSwitcherPopoverCard:
+                      "bg-[#0a0a0a] border border-white/10 rounded-xl shadow-2xl",
+                    organizationSwitcherPopoverActions: "bg-[#0a0a0a]",
+                    organizationSwitcherPopoverActionButton:
+                      "text-white/70 hover:bg-white/5",
+                    organizationPreview: "text-white",
+                    organizationSwitcherPopoverFooter: "border-white/10",
+                  },
+                }}
+              />
               <button
                 onClick={onEditProfile}
                 className="w-full flex items-center gap-2 py-2 px-2 bg-white/[0.03] hover:bg-white/[0.06] rounded-lg transition-colors"
@@ -373,41 +487,14 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 <Icon name="log-out" className="w-4 h-4" />
                 <span className="text-[10px] font-medium">Sair</span>
               </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={onEditProfile}
-                title={brandProfile.name}
-                className="w-full flex justify-center py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
-              >
-                {brandProfile.logo ? (
-                  <img
-                    src={brandProfile.logo}
-                    alt="Logo"
-                    className="h-5 w-5 rounded object-cover"
-                  />
-                ) : (
-                  <span className="text-[9px] font-bold text-white/50">
-                    {brandProfile.name.substring(0, 2).toUpperCase()}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => signOut()}
-                title="Sair"
-                className="w-full flex justify-center py-2 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-              >
-                <Icon name="log-out" className="w-4 h-4" />
-              </button>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </aside>
 
-      <main className="flex-1 overflow-y-auto relative z-10 bg-[#070707]">
+      <main className="flex-1 overflow-y-auto relative z-10 bg-[#070707] pb-[env(safe-area-inset-bottom)]">
         {activeView === "campaign" && (
-          <div className="px-6 py-5">
+          <div className="px-4 py-4 sm:px-6 sm:py-5">
             {showUploadForm && (
               <UploadForm
                 onGenerate={onGenerate}
@@ -421,7 +508,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             {isGenerating && (
               <>
                 <div className="flex flex-col items-center justify-center text-center p-32 aura-card border-white/5 bg-white/[0.01]">
-                  <p className="text-white/50 text-sm font-medium tracking-wide">criando...</p>
+                  <p className="text-white/50 text-sm font-medium tracking-wide">
+                    criando...
+                  </p>
                   <h2 className="text-4xl font-black mt-4 tracking-[-0.05em] uppercase">
                     Synthesizing Identity
                   </h2>
@@ -434,7 +523,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     src="/logo-socialab.png"
                     alt="Socialab"
                     className="w-48 h-48 md:w-64 md:h-64 animate-spin"
-                    style={{ animationDuration: '8s' }}
+                    style={{ animationDuration: "8s" }}
                   />
                 </div>
               </>
@@ -546,7 +635,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         {activeView === "flyer" && isInsideSchedule && (
           <div className="flex flex-col h-full">
             {/* Back button header */}
-            <div className="flex items-center gap-3 px-6 py-3 border-b border-white/5 flex-shrink-0 bg-[#070707]">
+            <div className="flex items-center gap-3 px-4 py-3 sm:px-6 border-b border-white/5 flex-shrink-0 bg-[#070707]">
               <button
                 onClick={handleBackToSchedulesList}
                 className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors"
@@ -596,7 +685,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           </div>
         )}
         {activeView === "gallery" && (
-          <div className="px-6 py-5">
+          <div className="px-4 py-4 sm:px-6 sm:py-5">
             <GalleryView
               images={galleryImages}
               onUpdateImage={onUpdateGalleryImage}
@@ -633,7 +722,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           </div>
         )}
         {activeView === "calendar" && (
-          <div className="px-6 py-5 h-full">
+          <div className="px-4 py-4 sm:px-6 sm:py-5 h-full">
             <CalendarView
               scheduledPosts={scheduledPosts}
               onSchedulePost={onSchedulePost}
@@ -646,7 +735,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           </div>
         )}
         {activeView === "campaigns" && userId && (
-          <div className="px-6 py-5">
+          <div className="px-4 py-4 sm:px-6 sm:py-5">
             <CampaignsList
               userId={userId}
               organizationId={organizationId}
@@ -667,14 +756,29 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         referenceImage={chatReferenceImage}
         onClearReference={() => onSetChatReference(null)}
       />
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
         <button
           onClick={onToggleAssistant}
-          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-105 ${isAssistantOpen ? "bg-white/10 backdrop-blur-xl text-white border border-white/10" : "bg-white/10 backdrop-blur-xl text-white/60 hover:text-white border border-white/5"}`}
+          className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-105 ${isAssistantOpen ? "bg-white/10 backdrop-blur-xl text-white border border-white/10" : "bg-white/10 backdrop-blur-xl text-white/60 hover:text-white border border-white/5"}`}
         >
           <Icon name={isAssistantOpen ? "x" : "zap"} className="w-5 h-5" />
         </button>
       </div>
+      {isMobile && !sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed top-4 left-4 z-40 w-10 h-10 rounded-xl bg-white/10 backdrop-blur-xl text-white/60 hover:text-white border border-white/5 flex items-center justify-center transition-all sm:hidden"
+        >
+          <Icon name="chevron-right" className="w-4 h-4" />
+        </button>
+      )}
+      {isMobile && sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-10 bg-black/60 sm:hidden"
+          aria-label="Fechar menu"
+        />
+      )}
 
       {/* QuickPost Modal for Gallery */}
       {quickPostImage && (
