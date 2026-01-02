@@ -2145,30 +2145,40 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   Agrupamento Inteligente • Ciclo Diário
                 </p>
               </div>
-              {/* Week info inline in header */}
+              {/* Week and day stats inline in header */}
               {events.length > 0 && weekScheduleInfo && (
-                <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-[#0a0a0a] border border-white/5 rounded-xl">
+                <div className="hidden md:flex items-center gap-2">
+                  {/* Week stats card */}
                   <button
                     onClick={() => setIsSchedulesPanelOpen(!isSchedulesPanelOpen)}
-                    className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                    className="flex items-center gap-3 px-3 py-2 bg-[#0a0a0a] border border-white/5 rounded-xl hover:border-white/10 transition-all"
                   >
-                    <Icon name="calendar" className="w-3 h-3 text-white/30" />
+                    <Icon name="calendar" className="w-3.5 h-3.5 text-white/30" />
                     <span className="text-[9px] font-bold text-white/50 uppercase">
                       Semana {weekScheduleInfo.startDate} a {weekScheduleInfo.endDate}
+                    </span>
+                    <div className="h-3 w-px bg-white/10" />
+                    <span className="text-[9px] font-black text-white/50 uppercase">
+                      {weekStats.totalTournaments} torneios
+                    </span>
+                    <span className="text-[9px] font-black text-primary/70 uppercase">
+                      {formatCurrencyValue(String(weekStats.totalGtd), selectedCurrency)}
                     </span>
                     <Icon
                       name={isSchedulesPanelOpen ? "chevron-up" : "chevron-down"}
                       className="w-3 h-3 text-white/30"
                     />
                   </button>
-                  <div className="h-3 w-px bg-white/10" />
-                  <span className="text-[9px] font-black text-white/40 uppercase">
-                    {weekStats.totalTournaments} torneios
-                  </span>
-                  <div className="h-3 w-px bg-white/10" />
-                  <span className="text-[9px] font-black text-primary uppercase">
-                    GTD Total: {formatCurrencyValue(String(weekStats.totalGtd), selectedCurrency)}
-                  </span>
+                  {/* Day stats card */}
+                  <div className="flex items-center gap-3 px-3 py-2 bg-primary/10 border border-primary/20 rounded-xl">
+                    <span className="text-[8px] font-bold text-primary/50 uppercase">Resumo por sessão:</span>
+                    <span className="text-[9px] font-black text-primary/80 uppercase">
+                      {dayStats.count} torneios
+                    </span>
+                    <span className="text-[9px] font-black text-primary uppercase">
+                      {formatCurrencyValue(String(dayStats.totalGtd), selectedCurrency)}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
@@ -2210,21 +2220,6 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     <option value="gtd">Por GTD ↓</option>
                   </select>
                 </>
-              )}
-              {currentEvents.length > 0 && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-[#0a0a0a] border border-white/10 rounded-lg">
-                  <span className="text-[9px] font-black text-white/40 uppercase tracking-wider">
-                    {showOnlyWithGtd ? currentEvents.length : dayStats.count}{" "}
-                    torneios
-                  </span>
-                  <div className="h-3 w-px bg-white/20" />
-                  <span className="text-[9px] font-black text-primary/70 uppercase tracking-wider">
-                    {formatCurrencyValue(
-                      String(dayStats.totalGtd),
-                      selectedCurrency,
-                    )}
-                  </span>
-                </div>
               )}
               <Button
                 onClick={() => setIsManualModalOpen(true)}
