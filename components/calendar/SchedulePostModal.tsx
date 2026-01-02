@@ -29,6 +29,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   };
 
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
+  const [showGallery, setShowGallery] = useState(false);
   const [caption, setCaption] = useState('');
   const [hashtags, setHashtags] = useState('');
   const [scheduledDate, setScheduledDate] = useState(initialDate || todayStr);
@@ -48,6 +49,11 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       ['Flyer', 'Flyer Diário', 'Post', 'Anúncio'].includes(img.source)
     );
   }, [galleryImages]);
+
+  const handleSelectImage = (image: GalleryImage) => {
+    setSelectedImage(image);
+    setShowGallery(false);
+  };
 
   const handleSubmit = () => {
     if (!selectedImage) return;
@@ -81,10 +87,57 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Gallery Picker Modal
+  if (showGallery) {
+    return (
+      <div className="fixed inset-0 bg-black/95 backdrop-blur-sm z-[300] flex items-center justify-center p-4" onClick={() => setShowGallery(false)}>
+        <div
+          className="w-full max-w-2xl bg-[#111] rounded-2xl overflow-hidden border border-white/10"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center">
+            <h3 className="text-sm font-bold text-white">Selecionar Imagem</h3>
+            <button onClick={() => setShowGallery(false)} className="text-white/30 hover:text-white transition-colors">
+              <Icon name="x" className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Gallery Grid */}
+          <div className="p-4 max-h-[60vh] overflow-y-auto">
+            {eligibleImages.length === 0 ? (
+              <div className="text-center py-12 text-white/30 text-xs">
+                Nenhuma imagem disponível na galeria
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-3">
+                {eligibleImages.map(image => (
+                  <button
+                    key={image.id}
+                    onClick={() => handleSelectImage(image)}
+                    className="group aspect-square rounded-xl overflow-hidden border border-white/10 hover:border-white/30 transition-all relative"
+                  >
+                    <img src={image.src} alt="" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Icon name="check" className="w-8 h-8 text-white" />
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
+                      <span className="text-[9px] font-bold text-white/70 uppercase">{image.source}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[300] flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg bg-[#111] rounded-2xl overflow-hidden border border-white/10"
+        className="w-full max-w-md bg-[#111] rounded-2xl overflow-hidden border border-white/10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -98,32 +151,36 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
         {/* Content */}
         <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
           {/* Image Selection */}
-          <div>
-            <label className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-3 block">
-              Imagem
-            </label>
-            {eligibleImages.length === 0 ? (
-              <div className="text-center py-8 text-white/30 text-xs border border-dashed border-white/10 rounded-xl">
-                Nenhuma imagem disponível
+          {!selectedImage ? (
+            <button
+              onClick={() => setShowGallery(true)}
+              className="w-full aspect-video rounded-xl border-2 border-dashed border-white/20 hover:border-white/40 transition-colors flex flex-col items-center justify-center gap-3 group"
+            >
+              <div className="w-12 h-12 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors flex items-center justify-center">
+                <Icon name="image" className="w-6 h-6 text-white/40 group-hover:text-white/60" />
               </div>
-            ) : (
-              <div className="grid grid-cols-5 gap-2">
-                {eligibleImages.slice(0, 10).map(image => (
-                  <button
-                    key={image.id}
-                    onClick={() => setSelectedImage(image)}
-                    className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                      selectedImage?.id === image.id
-                        ? 'border-primary scale-105'
-                        : 'border-transparent opacity-60 hover:opacity-100'
-                    }`}
-                  >
-                    <img src={image.src} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
+              <span className="text-xs text-white/40 group-hover:text-white/60 font-medium">
+                Selecionar da Galeria
+              </span>
+            </button>
+          ) : (
+            <div className="relative">
+              <img
+                src={selectedImage.src}
+                alt=""
+                className="w-full aspect-video object-cover rounded-xl"
+              />
+              <button
+                onClick={() => setShowGallery(true)}
+                className="absolute top-2 right-2 px-3 py-1.5 bg-black/70 hover:bg-black/90 rounded-lg text-[10px] font-bold text-white transition-colors"
+              >
+                Trocar
+              </button>
+              <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 rounded-lg">
+                <span className="text-[9px] font-bold text-white/70 uppercase">{selectedImage.source}</span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {selectedImage && (
             <>
@@ -136,7 +193,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder="Escreva a legenda..."
-                  rows={3}
+                  rows={2}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 resize-none"
                 />
               </div>
