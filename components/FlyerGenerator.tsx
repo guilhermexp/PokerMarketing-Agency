@@ -2240,14 +2240,6 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   ? "Grades de Período"
                   : "Torneios Individuais"}
               </Button>
-              {/* Settings button */}
-              <button
-                onClick={() => setIsSettingsModalOpen(true)}
-                className="px-2.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 bg-[#0a0a0a] text-white/40 border border-white/10 hover:text-white/60 hover:border-white/20"
-                title="Configurações"
-              >
-                <Icon name="settings" className="w-3.5 h-3.5" />
-              </button>
               {showIndividualTournaments && (
                 <>
                   <button
@@ -2282,20 +2274,31 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               >
                 Add Manual
               </Button>
-              <label className="cursor-pointer group">
-                <div className="bg-white text-black font-black px-4 py-2.5 rounded-xl flex items-center space-x-2 transition-all active:scale-95 text-[10px] tracking-wide uppercase hover:bg-white/90">
-                  <Icon name="upload" className="w-3.5 h-3.5" />
-                  <span>Upload Spreadsheet</span>
-                </div>
-                <input
-                  type="file"
-                  className="hidden"
-                  accept=".xlsx,.xls"
-                  onChange={(e) =>
-                    e.target.files?.[0] && onFileUpload(e.target.files[0])
-                  }
-                />
-              </label>
+              {/* Upload Spreadsheet - only show when no schedule is loaded */}
+              {!weekScheduleInfo && (
+                <label className="cursor-pointer group">
+                  <div className="bg-white text-black font-black px-4 py-2.5 rounded-xl flex items-center space-x-2 transition-all active:scale-95 text-[10px] tracking-wide uppercase hover:bg-white/90">
+                    <Icon name="upload" className="w-3.5 h-3.5" />
+                    <span>Upload Spreadsheet</span>
+                  </div>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".xlsx,.xls"
+                    onChange={(e) =>
+                      e.target.files?.[0] && onFileUpload(e.target.files[0])
+                    }
+                  />
+                </label>
+              )}
+              {/* Settings button */}
+              <button
+                onClick={() => setIsSettingsModalOpen(true)}
+                className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center transition-all active:scale-95 hover:bg-white/90"
+                title="Configurações"
+              >
+                <Icon name="settings" className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
