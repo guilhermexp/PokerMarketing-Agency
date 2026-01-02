@@ -1,76 +1,106 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Socialab</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <style>
-      body {
-        background-color: var(--color-background);
-        color: var(--color-text-main);
-        -webkit-font-smoothing: antialiased;
-        overflow-x: hidden;
-      }
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/png" href="/icon.png" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content="#0c0c0c" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta
+            name="apple-mobile-web-app-status-bar-style"
+            content="black-translucent"
+        />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="apple-touch-icon" href="/pwa-192.png" />
+        <title>Socialab</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            body {
+                background-color: var(--color-background);
+                color: var(--color-text-main);
+                -webkit-font-smoothing: antialiased;
+                overflow-x: hidden;
+            }
 
-      .aura-card {
-        background: #111111;
-        border: 1px solid #222222;
-        border-radius: 2.5rem;
-        transition: border-color 0.4s ease, box-shadow 0.4s ease;
-      }
+            .aura-card {
+                background: #111111;
+                border: 1px solid #222222;
+                border-radius: 2.5rem;
+                transition:
+                    border-color 0.4s ease,
+                    box-shadow 0.4s ease;
+            }
 
-      .aura-input {
-        background: #111111;
-        border: 1px solid #222222;
-        border-radius: 1.5rem;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      }
+            .aura-input {
+                background: #111111;
+                border: 1px solid #222222;
+                border-radius: 1.5rem;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
 
-      .aura-input:focus {
-        border-color: #F59E0B;
-        background: #161616;
-        box-shadow: 0 0 30px rgba(245, 158, 11, 0.05);
-      }
+            .aura-input:focus {
+                border-color: #f59e0b;
+                background: #161616;
+                box-shadow: 0 0 30px rgba(245, 158, 11, 0.05);
+            }
 
-      /* Scrollbar Minimalista */
-      ::-webkit-scrollbar { width: 3px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; }
-      
-      @keyframes slow-glow {
-        0%, 100% { opacity: 0.1; transform: scale(1); }
-        50% { opacity: 0.3; transform: scale(1.1); }
-      }
-      .glow-spot {
-        position: absolute;
-        width: 60vw;
-        height: 60vw;
-        background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
-        pointer-events: none;
-        filter: blur(80px);
-        animation: slow-glow 15s infinite ease-in-out;
-      }
-    </style>
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://aistudiocdn.com/react@^19.1.1",
-        "react/": "https://aistudiocdn.com/react@^19.1.1/",
-        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0",
-        "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-        "react-dropzone": "https://aistudiocdn.com/react-dropzone@^14.3.8",
-        "xlsx": "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/xlsx.mjs"
-      }
-    }
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+            /* Scrollbar Minimalista */
+            ::-webkit-scrollbar {
+                width: 3px;
+            }
+            ::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: #222;
+                border-radius: 10px;
+            }
+
+            @keyframes slow-glow {
+                0%,
+                100% {
+                    opacity: 0.1;
+                    transform: scale(1);
+                }
+                50% {
+                    opacity: 0.3;
+                    transform: scale(1.1);
+                }
+            }
+            .glow-spot {
+                position: absolute;
+                width: 60vw;
+                height: 60vw;
+                background: radial-gradient(
+                    circle,
+                    rgba(255, 255, 255, 0.08) 0%,
+                    transparent 70%
+                );
+                pointer-events: none;
+                filter: blur(80px);
+                animation: slow-glow 15s infinite ease-in-out;
+            }
+        </style>
+        <script type="importmap">
+            {
+                "imports": {
+                    "react": "https://aistudiocdn.com/react@^19.1.1",
+                    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+                    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0",
+                    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+                    "react-dropzone": "https://aistudiocdn.com/react-dropzone@^14.3.8",
+                    "xlsx": "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/xlsx.mjs"
+                }
+            }
+        </script>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module" src="/index.tsx"></script>
+    </body>
 </html>
