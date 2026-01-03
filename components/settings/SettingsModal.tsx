@@ -590,7 +590,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                       </div>
                     </div>
                     <Button
-                      variant="secondary"
+                      variant="ghost"
                       size="sm"
                       onClick={() => setShowInstagramModal(true)}
                     >

@@ -26,7 +26,7 @@ interface ConnectInstagramModalProps {
   onAccountConnected: (account: InstagramAccount) => void;
 }
 
-const RUBE_INSTAGRAM_URL = 'https://rube.app/marketplace/instagram';
+const RUBE_API_KEYS_URL = 'https://rube.app/settings/api-keys';
 
 export function ConnectInstagramModal({
   isOpen,
@@ -41,7 +41,7 @@ export function ConnectInstagramModal({
   const [step, setStep] = useState<1 | 2>(1);
 
   const handleOpenRube = () => {
-    window.open(RUBE_INSTAGRAM_URL, '_blank');
+    window.open(RUBE_API_KEYS_URL, '_blank');
     setStep(2);
   };
 
@@ -127,12 +127,12 @@ export function ConnectInstagramModal({
                 <span className="text-[10px] font-bold text-white">1</span>
               </div>
               <div>
-                <p className="text-xs font-medium text-white">Abra o Rube e conecte seu Instagram</p>
+                <p className="text-xs font-medium text-white">Conecte o Instagram no Rube</p>
                 <p className="text-[10px] text-white/40 mt-1">
-                  Crie uma conta no Rube (gratis) e conecte sua conta Instagram Business/Creator
+                  Crie uma conta no Rube (grátis), conecte seu Instagram e gere o token na página API Keys
                 </p>
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="sm"
                   onClick={handleOpenRube}
                   className="mt-2"
@@ -153,7 +153,7 @@ export function ConnectInstagramModal({
               <div className="flex-1">
                 <p className="text-xs font-medium text-white">Copie o token e cole aqui</p>
                 <p className="text-[10px] text-white/40 mt-1">
-                  No Rube, clique em "Install Rube" e copie o token JWT
+                  Clique em "Copy" no passo 2 da página API Keys do Rube
                 </p>
                 <div className="mt-2">
                   <textarea

@@ -23,10 +23,14 @@ interface RubeMCPRequest {
  * Validate a Rube token by calling the Instagram User Info tool
  * Returns the Instagram user ID and username if valid
  */
-async function validateRubeToken(rubeToken: string): Promise<{
-  instagramUserId: string;
-  instagramUsername: string;
-} | null> {
+interface ValidationResult {
+  success: boolean;
+  instagramUserId?: string;
+  instagramUsername?: string;
+  error?: string;
+}
+
+async function validateRubeToken(rubeToken: string): Promise<ValidationResult> {
   try {
     // First, we need to get the list of connected accounts to find the Instagram user ID
     const request: RubeMCPRequest = {
@@ -50,21 +54,38 @@ async function validateRubeToken(rubeToken: string): Promise<{
       }
     };
 
+    console.log('[Instagram Accounts] Validating token...');
+
     const response = await fetch(RUBE_MCP_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
         'Authorization': `Bearer ${rubeToken}`
       },
       body: JSON.stringify(request)
     });
 
-    if (!response.ok) {
-      console.error('[Instagram Accounts] Rube validation failed:', response.status);
-      return null;
+    const text = await response.text();
+
+    // Check if response is HTML (error page)
+    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+      console.error('[Instagram Accounts] Received HTML instead of JSON');
+      return {
+        success: false,
+        error: 'Token inválido ou expirado. Gere um novo token no Rube.'
+      };
     }
 
-    const text = await response.text();
+    if (!response.ok) {
+      console.error('[Instagram Accounts] Rube validation failed:', response.status, text.substring(0, 200));
+      return {
+        success: false,
+        error: `Erro ao validar token (${response.status}). Verifique se o token está correto.`
+      };
+    }
+
+    console.log('[Instagram Accounts] Response received, parsing...');
 
     // Parse SSE response
     const lines = text.split('\n');
@@ -72,14 +93,37 @@ async function validateRubeToken(rubeToken: string): Promise<{
       if (line.startsWith('data: ')) {
         try {
           const json = JSON.parse(line.substring(6));
+
+          // Check for error in response
+          if (json?.error) {
+            console.error('[Instagram Accounts] Rube error:', json.error);
+            return {
+              success: false,
+              error: 'Instagram não conectado no Rube. Conecte seu Instagram primeiro em rube.app/marketplace/instagram'
+            };
+          }
+
           const nestedData = json?.result?.content?.[0]?.text;
           if (nestedData) {
             const parsed = JSON.parse(nestedData);
+
+            // Check for error in nested data
+            if (parsed?.error || parsed?.data?.error) {
+              const errMsg = parsed?.error?.message || parsed?.data?.error?.message || 'Instagram não encontrado';
+              console.error('[Instagram Accounts] Nested error:', errMsg);
+              return {
+                success: false,
+                error: 'Instagram não conectado no Rube. Vá em rube.app/marketplace/instagram e conecte sua conta.'
+              };
+            }
+
             const results = parsed?.data?.data?.results || parsed?.data?.results;
             if (results && results.length > 0) {
               const userData = results[0]?.response?.data;
               if (userData?.id) {
+                console.log('[Instagram Accounts] Found Instagram user:', userData.username);
                 return {
+                  success: true,
                   instagramUserId: String(userData.id),
                   instagramUsername: userData.username || 'unknown'
                 };
@@ -87,15 +131,22 @@ async function validateRubeToken(rubeToken: string): Promise<{
             }
           }
         } catch (e) {
-          console.error('[Instagram Accounts] Parse error:', e);
+          console.error('[Instagram Accounts] Parse error:', e, 'Line:', line.substring(0, 100));
         }
       }
     }
 
-    return null;
+    console.error('[Instagram Accounts] No valid data found in response');
+    return {
+      success: false,
+      error: 'Instagram não conectado no Rube. Conecte em rube.app/marketplace/instagram e depois copie o token em API Keys.'
+    };
   } catch (error) {
     console.error('[Instagram Accounts] Validation error:', error);
-    return null;
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Erro ao validar token'
+    };
   }
 }
 
@@ -169,9 +220,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Validate the Rube token and get Instagram user info
       const validation = await validateRubeToken(rube_token);
-      if (!validation) {
+      if (!validation.success) {
         return res.status(400).json({
-          error: 'Token inválido ou Instagram não conectado no Rube. Verifique se você conectou o Instagram no site do Rube.'
+          error: validation.error || 'Token inválido ou Instagram não conectado no Rube.'
         });
       }
 
@@ -234,16 +285,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // If updating token, validate it first
       if (rube_token) {
         const validation = await validateRubeToken(rube_token);
-        if (!validation) {
+        if (!validation.success) {
           return res.status(400).json({
-            error: 'Token inválido. Verifique se o Instagram ainda está conectado no Rube.'
+            error: validation.error || 'Token inválido. Verifique se o Instagram ainda está conectado no Rube.'
           });
         }
 
         const result = await sql`
           UPDATE instagram_accounts
           SET rube_token = ${rube_token},
-              instagram_username = ${validation.instagramUsername},
+              instagram_username = ${validation.instagramUsername || 'unknown'},
               updated_at = NOW()
           WHERE id = ${id as string}
           RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
