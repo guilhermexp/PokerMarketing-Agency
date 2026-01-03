@@ -282,6 +282,9 @@ function AppContent() {
       post_id: img.post_id || undefined,
       ad_creative_id: img.ad_creative_id || undefined,
       video_script_id: img.video_script_id || undefined,
+      // Timestamps
+      created_at: img.created_at,
+      published_at: img.published_at || undefined,
     }));
 
   const scheduledPosts: ScheduledPost[] = (swrScheduledPosts || [])

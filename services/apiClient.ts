@@ -183,6 +183,7 @@ export interface DbGalleryImage {
   aspect_ratio: string | null;
   image_size: string | null;
   created_at: string;
+  published_at?: string | null;
   media_type?: string | null;
   duration?: number | null;
   post_id?: string | null;

@@ -103,6 +103,22 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
     });
   }, [galleryImages, isReel, galleryFilter]);
 
+  // Check if image was created today
+  const isToday = (dateString?: string) => {
+    if (!dateString) return false;
+    const imageDate = new Date(dateString);
+    const todayDate = new Date();
+    return (
+      imageDate.getDate() === todayDate.getDate() &&
+      imageDate.getMonth() === todayDate.getMonth() &&
+      imageDate.getFullYear() === todayDate.getFullYear()
+    );
+  };
+
+  // Separate images into today and older
+  const todayEligibleImages = eligibleImages.filter((img) => isToday(img.created_at));
+  const olderEligibleImages = eligibleImages.filter((img) => !isToday(img.created_at));
+
   const handleSelectImage = (image: GalleryImage) => {
     // Pause video when changing selection
     if (videoRef.current) {
@@ -254,72 +270,168 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 </p>
               </div>
             ) : (
-              <div className="columns-2 sm:columns-3 lg:columns-3 gap-3">
-                {eligibleImages.map((image) => {
-                  const selectionIndex = getSelectionIndex(image);
-                  const isSelected = selectionIndex !== -1;
-                  const itemIsVideo = isVideoItem(image);
-                  return (
-                    <div
-                      key={image.id}
-                      onClick={() => handleSelectImage(image)}
-                      className={`group relative overflow-hidden rounded-xl border-2 bg-[#111111] transition-all break-inside-avoid mb-3 cursor-pointer ${
-                        isSelected
-                          ? 'border-primary shadow-lg shadow-primary/20'
-                          : 'border-white/5 hover:border-white/20'
-                      }`}
-                    >
-                      {itemIsVideo ? (
-                        <video
-                          src={image.src}
-                          className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                          muted
-                          playsInline
-                          preload="metadata"
-                        />
-                      ) : (
-                        <img
-                          src={image.src}
-                          alt={image.prompt}
-                          className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                        />
-                      )}
+              <div className="space-y-4">
+                {/* Today's Images Section */}
+                {todayEligibleImages.length > 0 && (
+                  <div className="bg-gradient-to-br from-primary/5 via-transparent to-transparent rounded-xl p-3 border border-primary/10">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                      <h3 className="text-[10px] font-black text-primary uppercase tracking-wider">
+                        Gerados Hoje
+                      </h3>
+                      <span className="text-[9px] text-white/40 font-bold">
+                        {todayEligibleImages.length} {todayEligibleImages.length === 1 ? 'item' : 'itens'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {todayEligibleImages.map((image) => {
+                        const selectionIndex = getSelectionIndex(image);
+                        const isSelected = selectionIndex !== -1;
+                        const itemIsVideo = isVideoItem(image);
+                        return (
+                          <div
+                            key={image.id}
+                            onClick={() => handleSelectImage(image)}
+                            className={`group relative overflow-hidden rounded-xl border-2 bg-[#111111] transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-primary shadow-lg shadow-primary/20'
+                                : 'border-white/5 hover:border-white/20'
+                            }`}
+                          >
+                            {itemIsVideo ? (
+                              <video
+                                src={image.src}
+                                className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                                muted
+                                playsInline
+                                preload="metadata"
+                              />
+                            ) : (
+                              <img
+                                src={image.src}
+                                alt={image.prompt}
+                                className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                              />
+                            )}
 
-                      {/* Overlay */}
-                      <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent transition-all duration-300 flex flex-col justify-end p-3 ${
-                        isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                      }`}>
-                        <p className="text-white text-[10px] font-bold leading-snug line-clamp-2 mb-2">
-                          {image.prompt}
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          <span className="text-[8px] text-white/80 font-bold bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
-                            {image.source}
-                          </span>
-                        </div>
-                      </div>
+                            {/* Overlay */}
+                            <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent transition-all duration-300 flex flex-col justify-end p-2 ${
+                              isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                            }`}>
+                              <p className="text-white text-[9px] font-bold leading-snug line-clamp-2 mb-1">
+                                {image.prompt}
+                              </p>
+                              <span className="text-[7px] text-white/80 font-bold bg-white/10 backdrop-blur-sm px-1.5 py-0.5 rounded-full uppercase tracking-wide self-start">
+                                {image.source}
+                              </span>
+                            </div>
 
-                      {/* Video indicator */}
-                      {itemIsVideo && (
-                        <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
-                          <Icon name="video" className="w-3 h-3 text-white" />
-                          <span className="text-[8px] font-bold text-white uppercase">Vídeo</span>
-                        </div>
-                      )}
+                            {/* Video indicator */}
+                            {itemIsVideo && (
+                              <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                                <Icon name="video" className="w-3 h-3 text-white" />
+                                <span className="text-[8px] font-bold text-white uppercase">Vídeo</span>
+                              </div>
+                            )}
 
-                      {/* Selected indicator */}
-                      {isSelected && (
-                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                          {isCarousel ? (
-                            <span className="text-[10px] font-black text-black">{selectionIndex + 1}</span>
+                            {/* Selected indicator */}
+                            {isSelected && (
+                              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                                {isCarousel ? (
+                                  <span className="text-[9px] font-black text-black">{selectionIndex + 1}</span>
+                                ) : (
+                                  <Icon name="check" className="w-3 h-3 text-black" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Divider - only show if both sections have content */}
+                {todayEligibleImages.length > 0 && olderEligibleImages.length > 0 && (
+                  <div className="flex items-center gap-3 py-1">
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                    <span className="text-[8px] text-white/30 font-bold uppercase tracking-wider">
+                      Anteriores
+                    </span>
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                  </div>
+                )}
+
+                {/* Older Images Section */}
+                {olderEligibleImages.length > 0 && (
+                  <div className="columns-2 sm:columns-3 lg:columns-3 gap-3">
+                    {olderEligibleImages.map((image) => {
+                      const selectionIndex = getSelectionIndex(image);
+                      const isSelected = selectionIndex !== -1;
+                      const itemIsVideo = isVideoItem(image);
+                      return (
+                        <div
+                          key={image.id}
+                          onClick={() => handleSelectImage(image)}
+                          className={`group relative overflow-hidden rounded-xl border-2 bg-[#111111] transition-all break-inside-avoid mb-3 cursor-pointer ${
+                            isSelected
+                              ? 'border-primary shadow-lg shadow-primary/20'
+                              : 'border-white/5 hover:border-white/20'
+                          }`}
+                        >
+                          {itemIsVideo ? (
+                            <video
+                              src={image.src}
+                              className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                              muted
+                              playsInline
+                              preload="metadata"
+                            />
                           ) : (
-                            <Icon name="check" className="w-3.5 h-3.5 text-black" />
+                            <img
+                              src={image.src}
+                              alt={image.prompt}
+                              className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                            />
+                          )}
+
+                          {/* Overlay */}
+                          <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent transition-all duration-300 flex flex-col justify-end p-3 ${
+                            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                          }`}>
+                            <p className="text-white text-[10px] font-bold leading-snug line-clamp-2 mb-2">
+                              {image.prompt}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              <span className="text-[8px] text-white/80 font-bold bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
+                                {image.source}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Video indicator */}
+                          {itemIsVideo && (
+                            <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                              <Icon name="video" className="w-3 h-3 text-white" />
+                              <span className="text-[8px] font-bold text-white uppercase">Vídeo</span>
+                            </div>
+                          )}
+
+                          {/* Selected indicator */}
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                              {isCarousel ? (
+                                <span className="text-[10px] font-black text-black">{selectionIndex + 1}</span>
+                              ) : (
+                                <Icon name="check" className="w-3.5 h-3.5 text-black" />
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
             </div>

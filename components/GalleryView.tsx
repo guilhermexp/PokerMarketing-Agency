@@ -39,6 +39,7 @@ interface GalleryItemProps {
   onToggleFavorite: (img: GalleryImage) => void;
   onSelect: (img: GalleryImage | null) => void;
   onDelete?: (id: string) => void;
+  className?: string;
 }
 
 const GalleryItem: React.FC<GalleryItemProps> = ({
@@ -50,10 +51,11 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
   onToggleFavorite,
   onSelect,
   onDelete,
+  className = "",
 }) => (
   <div
     onClick={() => !isAudio(image) && onSelect(image)}
-    className={`group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 break-inside-avoid mb-3 ${isAudio(image) ? "" : "cursor-pointer"}`}
+    className={`group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 ${isAudio(image) ? "" : "cursor-pointer"} ${className}`}
   >
     {isAudio(image) ? (
       <div className="w-full aspect-[4/3] bg-gradient-to-br from-primary/20 via-[#1a1a1a] to-[#111] flex flex-col items-center justify-center p-4">
@@ -346,7 +348,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             <div className="space-y-6">
               {/* Today's Images Section */}
               {todayImages.length > 0 && (
-                <div>
+                <div className="bg-gradient-to-br from-primary/5 via-transparent to-transparent rounded-2xl p-4 border border-primary/10">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
@@ -358,7 +360,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       </span>
                     </div>
                   </div>
-                  <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3 space-y-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                     {todayImages.map((image) => (
                       <GalleryItem
                         key={image.id}
@@ -389,7 +391,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
               {/* Older Images Section */}
               {olderImages.length > 0 && (
-                <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3 space-y-3">
+                <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3">
                   {olderImages.map((image) => (
                     <GalleryItem
                       key={image.id}
@@ -401,6 +403,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       onToggleFavorite={handleToggleFavorite}
                       onSelect={setSelectedImage}
                       onDelete={onDeleteImage}
+                      className="break-inside-avoid mb-3"
                     />
                   ))}
                 </div>

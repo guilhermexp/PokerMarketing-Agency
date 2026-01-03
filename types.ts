@@ -147,6 +147,8 @@ export interface GalleryImage {
   video_script_id?: string;
   // Publishing status
   published_at?: string;  // ISO timestamp when published to Instagram
+  // Timestamps
+  created_at?: string;  // ISO timestamp when created
 }
 
 export interface StyleReference {
