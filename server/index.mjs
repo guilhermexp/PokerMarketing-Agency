@@ -3559,6 +3559,26 @@ async function runAutoMigrations() {
       // Might already exist or different PG version
       console.log("[Migration] Note: clip enum might already exist");
     }
+
+    // Create instagram_accounts table if not exists
+    await sql`
+      CREATE TABLE IF NOT EXISTS instagram_accounts (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        organization_id VARCHAR(50),
+        instagram_user_id VARCHAR(255) NOT NULL,
+        instagram_username VARCHAR(255),
+        rube_token TEXT NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        connected_at TIMESTAMPTZ DEFAULT NOW(),
+        last_used_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, instagram_user_id)
+      )
+    `;
+    console.log("[Migration] ✓ Ensured instagram_accounts table exists");
+
   } catch (error) {
     console.error("[Migration] Error:", error.message);
     // Don't fail startup - column might already exist with different syntax
