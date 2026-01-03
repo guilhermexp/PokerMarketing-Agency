@@ -25,8 +25,12 @@ import {
   getImageQueue,
   addJob,
   initializeWorker,
+  initializeScheduledPostsChecker,
+  schedulePostForPublishing,
+  cancelScheduledPost,
   closeQueue,
 } from "./helpers/job-queue.mjs";
+import { checkAndPublishScheduledPosts, publishScheduledPostById } from "./helpers/scheduled-publisher.mjs";
 
 config();
 
@@ -799,6 +803,11 @@ const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL;
 if (REDIS_URL) {
   console.log("[Server] Redis configured, initializing BullMQ worker...");
   initializeWorker(processGenerationJob);
+
+  // Initialize scheduled posts publisher (exact time + 5min fallback)
+  initializeScheduledPostsChecker(checkAndPublishScheduledPosts, publishScheduledPostById)
+    .then(() => console.log("[Server] Scheduled posts publisher initialized"))
+    .catch((err) => console.error("[Server] Failed to initialize scheduled posts publisher:", err.message));
 } else {
   console.log("[Server] No Redis URL configured, background jobs will use polling fallback");
 }
@@ -1593,7 +1602,25 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
       RETURNING *
     `;
 
-    res.status(201).json(result[0]);
+    const newPost = result[0];
+
+    // Schedule the job for exact-time publishing (if Redis is available)
+    const REDIS_AVAILABLE = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL;
+    if (REDIS_AVAILABLE && newPost.status === 'scheduled') {
+      try {
+        const jobResult = await schedulePostForPublishing(
+          newPost.id,
+          resolvedUserId,
+          timestampMs
+        );
+        console.log(`[Scheduled Posts API] Job scheduled for post ${newPost.id}: ${jobResult.scheduledFor}`);
+      } catch (jobError) {
+        // Don't fail the request, fallback checker will handle it
+        console.warn(`[Scheduled Posts API] Failed to schedule job, will use fallback:`, jobError.message);
+      }
+    }
+
+    res.status(201).json(newPost);
   } catch (error) {
     if (
       error instanceof OrganizationAccessError ||
@@ -1691,6 +1718,16 @@ app.delete("/api/db/scheduled-posts", async (req, res) => {
             .status(403)
             .json({ error: "Permission denied: schedule_post required" });
         }
+      }
+    }
+
+    // Cancel the scheduled job if Redis is available
+    const REDIS_AVAILABLE = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL;
+    if (REDIS_AVAILABLE) {
+      try {
+        await cancelScheduledPost(id);
+      } catch (e) {
+        // Ignore - job may not exist
       }
     }
 

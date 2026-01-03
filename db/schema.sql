@@ -384,6 +384,44 @@ CREATE INDEX idx_scheduled_posts_timestamp ON scheduled_posts(scheduled_timestam
 CREATE INDEX idx_scheduled_posts_user_calendar ON scheduled_posts(user_id, scheduled_date);
 
 -- ============================================================================
+-- INSTAGRAM ACCOUNTS TABLE (Multi-tenant Rube MCP Integration)
+-- ============================================================================
+
+CREATE TABLE instagram_accounts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id VARCHAR(50),
+
+    -- Instagram account details
+    instagram_user_id VARCHAR(255) NOT NULL,
+    instagram_username VARCHAR(255),
+
+    -- Rube MCP token for this account
+    rube_token TEXT NOT NULL,
+
+    -- Status
+    is_active BOOLEAN DEFAULT TRUE,
+    connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    -- Constraints
+    UNIQUE(user_id, instagram_user_id)
+);
+
+CREATE INDEX idx_instagram_accounts_user ON instagram_accounts(user_id) WHERE is_active = TRUE;
+CREATE INDEX idx_instagram_accounts_org ON instagram_accounts(organization_id) WHERE is_active = TRUE;
+
+-- Add FK from scheduled_posts to instagram_accounts
+ALTER TABLE scheduled_posts
+    ADD COLUMN instagram_account_id UUID REFERENCES instagram_accounts(id) ON DELETE SET NULL;
+
+CREATE INDEX idx_scheduled_posts_instagram ON scheduled_posts(instagram_account_id);
+
+-- ============================================================================
 -- TOURNAMENT EVENTS TABLE
 -- ============================================================================
 
@@ -705,6 +743,10 @@ CREATE TRIGGER update_scheduled_posts_updated_at
     BEFORE UPDATE ON scheduled_posts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_instagram_accounts_updated_at
+    BEFORE UPDATE ON instagram_accounts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 CREATE TRIGGER update_tournament_events_updated_at
     BEFORE UPDATE ON tournament_events
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -737,6 +779,7 @@ ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ad_creatives ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gallery_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scheduled_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE instagram_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tournament_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE week_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
@@ -773,6 +816,9 @@ CREATE POLICY "Users can manage own gallery images" ON gallery_images
     FOR ALL USING (user_id = auth.uid());
 
 CREATE POLICY "Users can manage own scheduled posts" ON scheduled_posts
+    FOR ALL USING (user_id = auth.uid());
+
+CREATE POLICY "Users can manage own instagram accounts" ON instagram_accounts
     FOR ALL USING (user_id = auth.uid());
 
 CREATE POLICY "Users can manage own tournament events" ON tournament_events

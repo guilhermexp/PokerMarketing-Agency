@@ -10,7 +10,8 @@ import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 import { extractColorsFromLogo } from '../../services/geminiService';
-import { useOrganization, OrganizationProfile } from '@clerk/clerk-react';
+import { useOrganization, OrganizationProfile, useUser } from '@clerk/clerk-react';
+import { ConnectInstagramModal, useInstagramAccounts } from './ConnectInstagramModal';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -19,7 +20,7 @@ interface SettingsModalProps {
   onSaveProfile: (profile: BrandProfile) => void;
 }
 
-type Tab = 'brand' | 'tone' | 'team';
+type Tab = 'brand' | 'tone' | 'integrations' | 'team';
 
 const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string; dataUrl: string }> =>
   new Promise((resolve, reject) => {
@@ -140,7 +141,26 @@ const CustomSelect: React.FC<{
 
 export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: SettingsModalProps) {
   const { organization } = useOrganization();
+  const { user } = useUser();
   const [activeTab, setActiveTab] = useState<Tab>('brand');
+  const [showInstagramModal, setShowInstagramModal] = useState(false);
+
+  // Instagram accounts management
+  const {
+    accounts: instagramAccounts,
+    loading: loadingAccounts,
+    fetchAccounts,
+    addAccount,
+    removeAccount
+  } = useInstagramAccounts(user?.id || '', organization?.id);
+
+  // Fetch Instagram accounts when integrations tab is active
+  useEffect(() => {
+    if (activeTab === 'integrations' && user?.id) {
+      fetchAccounts();
+    }
+  }, [activeTab, user?.id]);
+
   const [profile, setProfile] = useState<Omit<BrandProfile, 'logo'> & { logo: string | null | File }>({
     name: brandProfile.name || '',
     description: brandProfile.description || '',
@@ -268,6 +288,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'brand', label: 'Marca', icon: 'palette' },
     { id: 'tone', label: 'Tom', icon: 'sliders' },
+    { id: 'integrations', label: 'Integrações', icon: 'link' },
     { id: 'team', label: 'Time', icon: 'users' },
   ];
 
@@ -554,6 +575,100 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
               </div>
             )}
 
+            {activeTab === 'integrations' && (
+              <div className="space-y-6 py-2">
+                {/* Instagram Integration */}
+                <div className="border border-white/10 rounded-xl p-5 bg-white/[0.02]">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 rounded-xl flex items-center justify-center">
+                        <Icon name="instagram" className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Instagram</h3>
+                        <p className="text-[10px] text-white/40">Publicar fotos e vídeos automaticamente</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowInstagramModal(true)}
+                    >
+                      <Icon name="plus" className="w-3 h-3 mr-1.5" />
+                      Conectar
+                    </Button>
+                  </div>
+
+                  {/* Connected Accounts */}
+                  {loadingAccounts ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader className="w-5 h-5 text-white/40" />
+                    </div>
+                  ) : instagramAccounts.length > 0 ? (
+                    <div className="space-y-2">
+                      {instagramAccounts.map((account) => (
+                        <div
+                          key={account.id}
+                          className="flex items-center justify-between p-3 bg-white/[0.03] rounded-lg border border-white/5"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-gradient-to-br from-purple-500/20 via-pink-500/20 to-orange-500/20 rounded-full flex items-center justify-center">
+                              <Icon name="user" className="w-4 h-4 text-pink-400" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-white">
+                                @{account.instagram_username}
+                              </p>
+                              <p className="text-[9px] text-white/30">
+                                Conectado {new Date(account.connected_at).toLocaleDateString('pt-BR')}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded text-[9px] font-medium">
+                              Ativo
+                            </span>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Desconectar @${account.instagram_username}?`)) {
+                                  removeAccount(account.id);
+                                }
+                              }}
+                              className="p-1.5 hover:bg-white/5 rounded-lg transition-colors"
+                              title="Desconectar"
+                            >
+                              <Icon name="trash" className="w-3.5 h-3.5 text-white/30 hover:text-red-400" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Icon name="instagram" className="w-6 h-6 text-white/20" />
+                      </div>
+                      <p className="text-xs text-white/40 mb-1">Nenhuma conta conectada</p>
+                      <p className="text-[10px] text-white/20">Clique em "Conectar" para adicionar uma conta</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Future Integrations Placeholder */}
+                <div className="border border-white/5 border-dashed rounded-xl p-5 opacity-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center">
+                      <Icon name="facebook" className="w-5 h-5 text-white/30" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-white/30">Facebook</h3>
+                      <p className="text-[10px] text-white/20">Em breve</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'team' && (
               <OrganizationProfile
                 appearance={{
@@ -578,6 +693,15 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
           </div>
         </div>
       </div>
+
+      {/* Connect Instagram Modal */}
+      <ConnectInstagramModal
+        isOpen={showInstagramModal}
+        onClose={() => setShowInstagramModal(false)}
+        userId={user?.id || ''}
+        organizationId={organization?.id}
+        onAccountConnected={addAccount}
+      />
     </div>
   );
 }

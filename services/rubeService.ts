@@ -3,6 +3,8 @@
  * Handles communication with Rube MCP for Instagram publishing
  * Uses JSON-RPC 2.0 protocol over HTTP
  *
+ * Supports multi-tenant mode via InstagramContext for per-user tokens
+ *
  * Tested and verified tools:
  * - INSTAGRAM_CREATE_MEDIA_CONTAINER (for feed posts, reels)
  * - INSTAGRAM_CREATE_CAROUSEL_CONTAINER (for carousels)
@@ -19,7 +21,7 @@ import { getEnv } from "../utils/env";
 // MCP Configuration
 // Use proxy in dev/browser to avoid CORS, direct URL in prod/serverless
 const MCP_URL = '/api/rube';
-// Instagram User ID from environment or fallback
+// Instagram User ID from environment or fallback (used in dev/single-tenant mode)
 const getInstagramUserId = () => getEnv("VITE_INSTAGRAM_USER_ID") || getEnv("INSTAGRAM_USER_ID") || '25281402468195799';
 const getInstagramUsername = () => getEnv("VITE_INSTAGRAM_USERNAME") || getEnv("INSTAGRAM_USERNAME") || 'default_user';
 
@@ -28,6 +30,16 @@ const getToken = () => getEnv("VITE_RUBE_TOKEN") || getEnv("RUBE_TOKEN");
 
 // Generate unique JSON-RPC ID
 const generateId = () => `rube_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+/**
+ * Multi-tenant context for Instagram operations
+ * When provided, uses user-specific token from database
+ * When not provided, falls back to global RUBE_TOKEN (dev mode)
+ */
+export interface InstagramContext {
+  instagramAccountId: string;  // UUID from instagram_accounts table
+  userId: string;              // Clerk user ID
+}
 
 // Types for Rube MCP
 interface RubeMCPRequest {
@@ -74,9 +86,14 @@ export interface PublishingQuota {
 }
 
 /**
- * Check if Rube is configured
+ * Check if Rube is configured (either global token or can use multi-tenant)
  */
-export const isRubeConfigured = (): boolean => {
+export const isRubeConfigured = (context?: InstagramContext): boolean => {
+  // If context provided, assume it's valid (will be checked by proxy)
+  if (context?.instagramAccountId && context?.userId) {
+    return true;
+  }
+  // Fallback to global token check
   return Boolean(getToken());
 };
 
@@ -106,10 +123,14 @@ const parseSSEResponse = (text: string): any => {
 
 /**
  * Core MCP call function
+ * @param toolName - The MCP tool to call
+ * @param args - Tool arguments
+ * @param context - Optional multi-tenant context for user-specific tokens
  */
 export const callRubeMCP = async (
   toolName: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  context?: InstagramContext
 ): Promise<any> => {
   const request: RubeMCPRequest = {
     jsonrpc: '2.0',
@@ -120,18 +141,30 @@ export const callRubeMCP = async (
 
   console.log(`[Rube MCP] Calling ${toolName}...`, args);
 
+  // Build request body - include multi-tenant context if provided
+  const requestBody = context
+    ? {
+        ...request,
+        instagram_account_id: context.instagramAccountId,
+        user_id: context.userId
+      }
+    : request;
+
   // Uses proxy which adds Authorization header
   const response = await fetch(MCP_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(request)
+    body: JSON.stringify(requestBody)
   });
 
   if (!response.ok) {
     if (response.status === 401) {
       throw new Error('Autenticacao Rube falhou. Verifique seu RUBE_TOKEN.');
+    }
+    if (response.status === 403) {
+      throw new Error('Conta Instagram não encontrada ou sem permissão.');
     }
     if (response.status === 429) {
       throw new Error('Limite de publicacoes atingido (25/dia). Tente novamente mais tarde.');
@@ -153,11 +186,16 @@ export const callRubeMCP = async (
 
 /**
  * Execute a tool via RUBE_MULTI_EXECUTE_TOOL
+ * @param toolSlug - The Instagram tool to execute
+ * @param args - Tool arguments
+ * @param sessionId - Session ID for the tool execution
+ * @param context - Optional multi-tenant context for user-specific tokens
  */
 export const executeInstagramTool = async (
   toolSlug: string,
   args: Record<string, unknown>,
-  sessionId: string = 'zulu'
+  sessionId: string = 'zulu',
+  context?: InstagramContext
 ): Promise<any> => {
   const result = await callRubeMCP('RUBE_MULTI_EXECUTE_TOOL', {
     tools: [{
@@ -168,7 +206,7 @@ export const executeInstagramTool = async (
     memory: {},
     session_id: sessionId,
     thought: `Executing ${toolSlug} for Instagram publishing`
-  });
+  }, context);
 
   // Parse the deeply nested Rube MCP response
   // Structure: result.data.data.results[0].response.data
@@ -204,13 +242,26 @@ export const executeInstagramTool = async (
 
 /**
  * Check publishing quota (25 posts per 24 hours)
+ * @param context - Optional multi-tenant context
  */
-export const checkPublishingQuota = async (): Promise<PublishingQuota> => {
+export const checkPublishingQuota = async (context?: InstagramContext): Promise<PublishingQuota> => {
   try {
-    const result = await executeInstagramTool('INSTAGRAM_GET_IG_USER_CONTENT_PUBLISHING_LIMIT', {
-      ig_user_id: getInstagramUserId(),
+    // In multi-tenant mode, ig_user_id is injected by the proxy
+    const args: Record<string, unknown> = {
       fields: 'quota_usage,config'
-    });
+    };
+
+    // Only include ig_user_id in single-tenant mode
+    if (!context) {
+      args.ig_user_id = getInstagramUserId();
+    }
+
+    const result = await executeInstagramTool(
+      'INSTAGRAM_GET_IG_USER_CONTENT_PUBLISHING_LIMIT',
+      args,
+      'zulu',
+      context
+    );
 
     // Result can be an array or object
     const quotaData = Array.isArray(result?.data) ? result.data[0] : (Array.isArray(result) ? result[0] : result);
@@ -230,15 +281,20 @@ export const checkPublishingQuota = async (): Promise<PublishingQuota> => {
 
 /**
  * Create media container for photo/video/reel
+ * @param context - Optional multi-tenant context
  */
 export const createMediaContainer = async (
   contentType: 'photo' | 'video' | 'reel' | 'story',
   mediaUrl: string,
-  caption: string
+  caption: string,
+  context?: InstagramContext
 ): Promise<string> => {
-  const args: Record<string, unknown> = {
-    ig_user_id: getInstagramUserId(),
-  };
+  const args: Record<string, unknown> = {};
+
+  // Only include ig_user_id in single-tenant mode (proxy injects it in multi-tenant)
+  if (!context) {
+    args.ig_user_id = getInstagramUserId();
+  }
 
   // Stories don't support captions
   if (contentType !== 'story') {
@@ -258,7 +314,7 @@ export const createMediaContainer = async (
     args.video_url = mediaUrl;
   }
 
-  const result = await executeInstagramTool('INSTAGRAM_CREATE_MEDIA_CONTAINER', args);
+  const result = await executeInstagramTool('INSTAGRAM_CREATE_MEDIA_CONTAINER', args, 'zulu', context);
 
   console.log('[Rube MCP] createMediaContainer result:', JSON.stringify(result, null, 2));
 
@@ -281,10 +337,12 @@ export const createMediaContainer = async (
 
 /**
  * Create carousel container with multiple items
+ * @param context - Optional multi-tenant context
  */
 export const createCarouselContainer = async (
   mediaUrls: string[],
-  caption: string
+  caption: string,
+  context?: InstagramContext
 ): Promise<string> => {
   // First, create individual carousel items
   const itemIds: string[] = [];
@@ -292,10 +350,14 @@ export const createCarouselContainer = async (
   for (const url of mediaUrls) {
     const isVideo = url.includes('.mp4') || url.includes('.mov') || url.includes('video');
     const args: Record<string, unknown> = {
-      ig_user_id: getInstagramUserId(),
       content_type: 'carousel_item',
       is_carousel_item: true
     };
+
+    // Only include ig_user_id in single-tenant mode
+    if (!context) {
+      args.ig_user_id = getInstagramUserId();
+    }
 
     if (isVideo) {
       args.video_url = url;
@@ -303,7 +365,7 @@ export const createCarouselContainer = async (
       args.image_url = url;
     }
 
-    const result = await executeInstagramTool('INSTAGRAM_CREATE_MEDIA_CONTAINER', args);
+    const result = await executeInstagramTool('INSTAGRAM_CREATE_MEDIA_CONTAINER', args, 'zulu', context);
     const itemId = result.id || result.data?.id;
     if (itemId) {
       itemIds.push(itemId);
@@ -315,46 +377,64 @@ export const createCarouselContainer = async (
   }
 
   // Now create the carousel container
-  const result = await executeInstagramTool('INSTAGRAM_CREATE_CAROUSEL_CONTAINER', {
-    ig_user_id: getInstagramUserId(),
+  const carouselArgs: Record<string, unknown> = {
     caption: caption,
     children: itemIds
-  });
+  };
+
+  if (!context) {
+    carouselArgs.ig_user_id = getInstagramUserId();
+  }
+
+  const result = await executeInstagramTool('INSTAGRAM_CREATE_CAROUSEL_CONTAINER', carouselArgs, 'zulu', context);
 
   return result.id || result.data?.id;
 };
 
 /**
  * Check container processing status
+ * @param context - Optional multi-tenant context
  */
-export const getContainerStatus = async (containerId: string): Promise<string> => {
+export const getContainerStatus = async (containerId: string, context?: InstagramContext): Promise<string> => {
   const result = await executeInstagramTool('INSTAGRAM_GET_POST_STATUS', {
     creation_id: containerId
-  });
+  }, 'zulu', context);
 
   return result.status_code || result.data?.status_code || result.status || 'IN_PROGRESS';
 };
 
 /**
  * Publish a container (photo, video, reel)
+ * @param context - Optional multi-tenant context
  */
-export const publishContainer = async (containerId: string): Promise<string> => {
-  const result = await executeInstagramTool('INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH', {
-    ig_user_id: getInstagramUserId(),
+export const publishContainer = async (containerId: string, context?: InstagramContext): Promise<string> => {
+  const args: Record<string, unknown> = {
     creation_id: containerId
-  });
+  };
+
+  if (!context) {
+    args.ig_user_id = getInstagramUserId();
+  }
+
+  const result = await executeInstagramTool('INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH', args, 'zulu', context);
 
   return result.id || result.data?.id;
 };
 
 /**
  * Publish a carousel
+ * @param context - Optional multi-tenant context
  */
-export const publishCarousel = async (containerId: string): Promise<string> => {
-  const result = await executeInstagramTool('INSTAGRAM_CREATE_POST', {
-    ig_user_id: getInstagramUserId(),
+export const publishCarousel = async (containerId: string, context?: InstagramContext): Promise<string> => {
+  const args: Record<string, unknown> = {
     creation_id: containerId
-  });
+  };
+
+  if (!context) {
+    args.ig_user_id = getInstagramUserId();
+  }
+
+  const result = await executeInstagramTool('INSTAGRAM_CREATE_POST', args, 'zulu', context);
 
   return result.id || result.data?.id;
 };
@@ -370,17 +450,23 @@ export const uploadImageForInstagram = async (dataUrl: string): Promise<string> 
 
 /**
  * Main function to publish to Instagram with progress tracking
+ * @param imageUrl - Image URL or data URL to publish
+ * @param caption - Post caption
+ * @param contentType - Type of Instagram content
+ * @param onProgress - Progress callback
+ * @param context - Optional multi-tenant context for user-specific tokens
  */
 export const publishToInstagram = async (
   imageUrl: string,
   caption: string,
   contentType: InstagramContentType = 'photo',
-  onProgress?: (progress: PublishProgress) => void
+  onProgress?: (progress: PublishProgress) => void,
+  context?: InstagramContext
 ): Promise<InstagramPublishResult> => {
   try {
     // Step 1: Check quota
     onProgress?.({ step: 'uploading_image', message: 'Verificando limite de publicacoes...', progress: 5 });
-    const quota = await checkPublishingQuota();
+    const quota = await checkPublishingQuota(context);
     if (quota.remaining <= 0) {
       throw new Error(`Limite de 25 publicacoes/dia atingido. Restam ${quota.remaining}.`);
     }
@@ -391,24 +477,25 @@ export const publishToInstagram = async (
     console.log(`[Rube MCP] Image uploaded: ${httpImageUrl}`);
 
     let containerId: string;
-    let publishFn: (id: string) => Promise<string>;
+    let publishFn: (id: string, ctx?: InstagramContext) => Promise<string>;
 
     // Step 3: Create appropriate container based on content type
     onProgress?.({ step: 'creating_container', message: `Criando ${contentType}...`, progress: 30 });
 
     if (contentType === 'carousel') {
       // For carousel, we need multiple URLs - for now just use single image
-      containerId = await createCarouselContainer([httpImageUrl], caption);
+      containerId = await createCarouselContainer([httpImageUrl], caption, context);
       publishFn = publishCarousel;
     } else if (contentType === 'story') {
       // Stories use media_type: 'STORIES'
-      containerId = await createMediaContainer('story', httpImageUrl, caption);
+      containerId = await createMediaContainer('story', httpImageUrl, caption, context);
       publishFn = publishContainer;
     } else {
       containerId = await createMediaContainer(
         contentType === 'reel' ? 'reel' : contentType === 'video' ? 'video' : 'photo',
         httpImageUrl,
-        caption
+        caption,
+        context
       );
       publishFn = publishContainer;
     }
@@ -424,7 +511,7 @@ export const publishToInstagram = async (
     while (status === 'IN_PROGRESS' && attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       try {
-        status = await getContainerStatus(containerId);
+        status = await getContainerStatus(containerId, context);
       } catch (e) {
         // Status check might fail, continue polling
         console.warn('[Rube MCP] Status check failed, retrying...', e);
@@ -443,7 +530,7 @@ export const publishToInstagram = async (
 
     // Step 5: Publish
     onProgress?.({ step: 'publishing', message: 'Publicando no Instagram...', progress: 80 });
-    const mediaId = await publishFn(containerId);
+    const mediaId = await publishFn(containerId, context);
     console.log(`[Rube MCP] Published! Media ID: ${mediaId}`);
 
     onProgress?.({ step: 'completed', message: 'Publicado com sucesso!', progress: 100 });
@@ -466,12 +553,17 @@ export const publishToInstagram = async (
 
 /**
  * Get Instagram user info
+ * @param context - Optional multi-tenant context
  */
-export const getInstagramUserInfo = async (): Promise<{ id: string; username: string }> => {
+export const getInstagramUserInfo = async (context?: InstagramContext): Promise<{ id: string; username: string }> => {
   try {
-    const result = await executeInstagramTool('INSTAGRAM_GET_USER_INFO', {
-      ig_user_id: getInstagramUserId()
-    });
+    const args: Record<string, unknown> = {};
+
+    if (!context) {
+      args.ig_user_id = getInstagramUserId();
+    }
+
+    const result = await executeInstagramTool('INSTAGRAM_GET_USER_INFO', args, 'zulu', context);
     return {
       id: result.id || getInstagramUserId(),
       username: result.username || getInstagramUsername()

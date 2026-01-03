@@ -227,6 +227,7 @@ export interface ScheduledPost {
   instagramContentType?: InstagramContentType; // photo, video, reel, story, carousel
   instagramMediaId?: string;
   instagramContainerId?: string;
+  instagramAccountId?: string; // Multi-tenant: which account to publish to
   publishAttempts?: number;
   lastPublishAttempt?: number;
 }
@@ -246,6 +247,26 @@ export interface InstagramPublishState {
   message: string;
   progress: number;
   postId?: string;
+}
+
+// Instagram Account (Multi-tenant Rube MCP)
+export interface InstagramAccount {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  instagram_user_id: string;
+  instagram_username: string;
+  is_active: boolean;
+  connected_at: string;
+  last_used_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Context for multi-tenant Instagram operations
+export interface InstagramContext {
+  instagramAccountId: string;
+  userId: string;
 }
 
 export interface ScheduleNotification {
