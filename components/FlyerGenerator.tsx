@@ -353,14 +353,16 @@ const TournamentEventCard: React.FC<{
   useEffect(() => {
     const unsubComplete = onJobComplete((job: ActiveJob) => {
       if (job.context === jobContext && job.result_url) {
-        const newImage = onAddImageToGallery({
+        // Use the gallery ID from the job (already saved by backend) instead of creating new entry
+        const newImage: GalleryImage = {
+          id: job.result_gallery_id || `temp-${Date.now()}`,
           src: job.result_url,
           prompt: "",
           source: "Flyer",
           model,
           aspectRatio,
           imageSize,
-        });
+        };
         setGeneratedFlyers((prev) =>
           prev.map((f) => (f === "loading" ? newImage : f)),
         );
@@ -385,7 +387,6 @@ const TournamentEventCard: React.FC<{
     jobContext,
     onJobComplete,
     onJobFailed,
-    onAddImageToGallery,
     model,
     aspectRatio,
     imageSize,
@@ -701,14 +702,16 @@ const PeriodCardRow: React.FC<{
   useEffect(() => {
     const unsubComplete = onJobComplete((job: ActiveJob) => {
       if (job.context === jobContext && job.result_url) {
-        const newImage = onAddImageToGallery({
+        // Use the gallery ID from the job (already saved by backend) instead of creating new entry
+        const newImage: GalleryImage = {
+          id: job.result_gallery_id || `temp-${Date.now()}`,
           src: job.result_url,
           prompt: "",
           source: "Flyer Diário",
           model,
           aspectRatio,
           imageSize,
-        });
+        };
         setGeneratedFlyers((prev) =>
           prev.map((f) => (f === "loading" ? newImage : f)),
         );
@@ -732,7 +735,6 @@ const PeriodCardRow: React.FC<{
     jobContext,
     onJobComplete,
     onJobFailed,
-    onAddImageToGallery,
     model,
     aspectRatio,
     imageSize,
@@ -1114,14 +1116,16 @@ const PeriodCard: React.FC<{
   useEffect(() => {
     const unsubComplete = onJobComplete((job: ActiveJob) => {
       if (job.context === jobContext && job.result_url) {
-        const newImage = onAddImageToGallery({
+        // Use the gallery ID from the job (already saved by backend) instead of creating new entry
+        const newImage: GalleryImage = {
+          id: job.result_gallery_id || `temp-${Date.now()}`,
           src: job.result_url,
           prompt: "",
           source: "Flyer Diário",
           model,
           aspectRatio,
           imageSize,
-        });
+        };
         setGeneratedFlyers((prev) =>
           prev.map((f) => (f === "loading" ? newImage : f)),
         );
@@ -1144,7 +1148,6 @@ const PeriodCard: React.FC<{
     jobContext,
     onJobComplete,
     onJobFailed,
-    onAddImageToGallery,
     model,
     aspectRatio,
     imageSize,

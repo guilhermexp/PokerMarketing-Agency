@@ -30,6 +30,44 @@ import {
 
 config();
 
+/**
+ * Helper: Convert URL or data URL to base64 string
+ * - If already base64 or data URL, extracts the base64 part
+ * - If HTTP URL, fetches the image and converts to base64
+ */
+async function urlToBase64(input) {
+  if (!input) return null;
+
+  // Already base64 (no prefix)
+  if (!input.startsWith('data:') && !input.startsWith('http')) {
+    return input;
+  }
+
+  // Data URL - extract base64 part
+  if (input.startsWith('data:')) {
+    return input.split(',')[1];
+  }
+
+  // HTTP URL - fetch and convert
+  if (input.startsWith('http')) {
+    try {
+      const response = await fetch(input);
+      if (!response.ok) {
+        console.error(`[urlToBase64] Failed to fetch ${input}: ${response.status}`);
+        return null;
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      return base64;
+    } catch (error) {
+      console.error(`[urlToBase64] Error fetching ${input}:`, error.message);
+      return null;
+    }
+  }
+
+  return input;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -618,38 +656,40 @@ const processGenerationJob = async (job) => {
       { text: `DADOS DO FLYER PARA INSERIR NA ARTE:\n${prompt}` },
     ];
 
-    // Add logo if provided
+    // Add logo if provided (handles data URLs, HTTP URLs, and raw base64)
     if (config.logo) {
-      const logoData = config.logo.startsWith("data:")
-        ? config.logo.split(",")[1]
-        : config.logo;
-      parts.push({ inlineData: { data: logoData, mimeType: "image/png" } });
+      const logoData = await urlToBase64(config.logo);
+      if (logoData) {
+        parts.push({ inlineData: { data: logoData, mimeType: "image/png" } });
+      }
     }
 
     // Add collab logo if provided
     if (config.collabLogo) {
-      const collabData = config.collabLogo.startsWith("data:")
-        ? config.collabLogo.split(",")[1]
-        : config.collabLogo;
-      parts.push({ inlineData: { data: collabData, mimeType: "image/png" } });
+      const collabData = await urlToBase64(config.collabLogo);
+      if (collabData) {
+        parts.push({ inlineData: { data: collabData, mimeType: "image/png" } });
+      }
     }
 
     // Add style reference if provided
     if (config.styleReference) {
-      parts.push({ text: "USE ESTA IMAGEM COMO REFERÊNCIA DE LAYOUT E FONTES:" });
-      const refData = config.styleReference.startsWith("data:")
-        ? config.styleReference.split(",")[1]
-        : config.styleReference;
-      parts.push({ inlineData: { data: refData, mimeType: "image/png" } });
+      const refData = await urlToBase64(config.styleReference);
+      if (refData) {
+        parts.push({ text: "USE ESTA IMAGEM COMO REFERÊNCIA DE LAYOUT E FONTES:" });
+        parts.push({ inlineData: { data: refData, mimeType: "image/png" } });
+      }
     }
 
     // Add composition assets
     if (config.compositionAssets && config.compositionAssets.length > 0) {
-      config.compositionAssets.forEach((asset, i) => {
-        parts.push({ text: `Ativo de composição ${i + 1}:` });
-        const assetData = asset.startsWith("data:") ? asset.split(",")[1] : asset;
-        parts.push({ inlineData: { data: assetData, mimeType: "image/png" } });
-      });
+      for (let i = 0; i < config.compositionAssets.length; i++) {
+        const assetData = await urlToBase64(config.compositionAssets[i]);
+        if (assetData) {
+          parts.push({ text: `Ativo de composição ${i + 1}:` });
+          parts.push({ inlineData: { data: assetData, mimeType: "image/png" } });
+        }
+      }
     }
 
     job.updateProgress(30);
@@ -3146,6 +3186,39 @@ app.post("/api/ai/video", async (req, res) => {
     console.error('[Video API] Error:', error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to generate video',
+    });
+  }
+});
+
+// ============================================================================
+// RUBE MCP PROXY - For Instagram Publishing
+// ============================================================================
+
+const RUBE_MCP_URL = 'https://rube.app/mcp';
+
+app.post("/api/rube", async (req, res) => {
+  const token = process.env.RUBE_TOKEN;
+  if (!token) {
+    return res.status(500).json({ error: 'RUBE_TOKEN not configured' });
+  }
+
+  try {
+    const response = await fetch(RUBE_MCP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(req.body),
+    });
+
+    const text = await response.text();
+    res.status(response.status).send(text);
+  } catch (error) {
+    console.error('[Rube Proxy] Error:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
