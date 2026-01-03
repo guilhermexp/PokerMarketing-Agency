@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { BrandProfileSetup } from "./components/BrandProfileSetup";
 import { Dashboard } from "./components/Dashboard";
 import { SettingsModal } from "./components/settings/SettingsModal";
+import { useInstagramAccounts } from "./components/settings/ConnectInstagramModal";
 import { Loader } from "./components/common/Loader";
 import {
   generateCampaign,
@@ -15,6 +16,7 @@ import {
   publishToInstagram,
   uploadImageForInstagram,
   type InstagramContentType,
+  type InstagramContext,
 } from "./services/rubeService";
 import { uploadDataUrlToBlob } from "./services/blobService";
 import type {
@@ -244,6 +246,31 @@ function AppContent() {
     userId,
     organizationId,
   );
+
+  // Instagram accounts for multi-tenant publishing
+  const {
+    accounts: instagramAccounts,
+    fetchAccounts: fetchInstagramAccounts,
+  } = useInstagramAccounts(userId || '', organizationId);
+
+  // Fetch Instagram accounts on mount
+  useEffect(() => {
+    if (userId) {
+      fetchInstagramAccounts();
+    }
+  }, [userId, organizationId]);
+
+  // Get active Instagram context (first active account)
+  const getInstagramContext = (): InstagramContext | undefined => {
+    const activeAccount = instagramAccounts.find(a => a.is_active);
+    if (activeAccount && userId) {
+      return {
+        instagramAccountId: activeAccount.id,
+        userId: userId
+      };
+    }
+    return undefined;
+  };
 
   const [tournamentEvents, setTournamentEvents] = useState<TournamentEvent[]>(
     [],
@@ -844,6 +871,11 @@ function AppContent() {
         post.instagramContentType || "photo";
 
       // Step 4: Publish to Instagram with progress tracking
+      const instagramContext = getInstagramContext();
+      if (!instagramContext) {
+        throw new Error('Conecte sua conta Instagram em Configurações → Integrações para publicar.');
+      }
+
       const result = await publishToInstagram(
         imageUrl,
         fullCaption,
@@ -854,6 +886,7 @@ function AppContent() {
             [postId]: progress,
           }));
         },
+        instagramContext
       );
 
       if (result.success) {
@@ -1728,6 +1761,7 @@ function AppContent() {
                 }
               }
             }}
+            instagramContext={getInstagramContext()}
             onUpdateCreativeModel={async (model: CreativeModel) => {
               // Update local state immediately
               setBrandProfile((prev) =>

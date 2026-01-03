@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import type { GalleryImage, BrandProfile, Post } from '../../types';
 import { generateQuickPostText } from '../../services/geminiService';
-import { publishToInstagram, type InstagramContentType, type PublishProgress } from '../../services/rubeService';
+import { publishToInstagram, type InstagramContentType, type PublishProgress, type InstagramContext } from '../../services/rubeService';
 import { markGalleryImagePublished } from '../../services/apiClient';
 import { Button } from './Button';
 import { Icon } from './Icon';
@@ -38,6 +38,7 @@ export interface QuickPostModalProps {
     brandProfile: BrandProfile;
     context?: string;
     onImagePublished?: (imageId: string) => void;  // Callback to update gallery state
+    instagramContext?: InstagramContext;  // Required for publishing
 }
 
 export const QuickPostModal: React.FC<QuickPostModalProps> = ({
@@ -46,7 +47,8 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
     image,
     brandProfile,
     context = '',
-    onImagePublished
+    onImagePublished,
+    instagramContext
 }) => {
     const [post, setPost] = useState<Post | null>(null);
     const [editedContent, setEditedContent] = useState('');
@@ -138,6 +140,13 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
     const handlePublishNow = async () => {
         // For feed posts, we need the caption generated. For stories, we don't
         if (contentType === 'photo' && !post) return;
+
+        // Check for Instagram connection
+        if (!instagramContext) {
+            setPublishError('Conecte sua conta Instagram em Configurações → Integrações para publicar.');
+            return;
+        }
+
         setIsPublishing(true);
         setPublishError(null);
 
@@ -150,6 +159,7 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                 image.src,
                 fullCaption,
                 contentType as InstagramContentType,
+                instagramContext,
                 (progress) => setPublishProgress(progress)
             );
 

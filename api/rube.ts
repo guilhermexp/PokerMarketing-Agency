@@ -59,46 +59,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Check if request includes instagram_account_id for multi-tenant
     const { instagram_account_id, user_id, ...mcpRequest } = req.body;
 
-    if (instagram_account_id && user_id) {
-      // Multi-tenant mode: fetch token from database
-      const accountData = await getRubeTokenForAccount(instagram_account_id, user_id);
-      if (!accountData) {
-        return res.status(403).json({
-          error: 'Conta Instagram não encontrada ou sem permissão de acesso.'
-        });
-      }
-      token = accountData.token;
-      instagramUserId = accountData.instagramUserId;
-      mcpRequestBody = mcpRequest;
+    // Multi-tenant ONLY - no fallback to global token
+    if (!instagram_account_id || !user_id) {
+      return res.status(400).json({
+        error: 'Conecte sua conta Instagram em Configurações → Integrações para publicar.'
+      });
+    }
 
-      // Inject the correct instagram_user_id into the request if it's an Instagram tool
-      if (mcpRequestBody.params?.arguments) {
-        // Check if this is a RUBE_MULTI_EXECUTE_TOOL call
-        if (mcpRequestBody.params.name === 'RUBE_MULTI_EXECUTE_TOOL') {
-          const tools = mcpRequestBody.params.arguments.tools;
-          if (Array.isArray(tools)) {
-            for (const tool of tools) {
-              // Inject ig_user_id for Instagram tools
-              if (tool.tool_slug?.startsWith('INSTAGRAM_') && tool.arguments) {
-                tool.arguments.ig_user_id = instagramUserId;
-              }
+    // Fetch token from database for this user's account
+    const accountData = await getRubeTokenForAccount(instagram_account_id, user_id);
+    if (!accountData) {
+      return res.status(403).json({
+        error: 'Conta Instagram não encontrada ou sem permissão de acesso. Reconecte em Configurações → Integrações.'
+      });
+    }
+
+    token = accountData.token;
+    instagramUserId = accountData.instagramUserId;
+    mcpRequestBody = mcpRequest;
+
+    // Inject the correct instagram_user_id into the request if it's an Instagram tool
+    if (mcpRequestBody.params?.arguments) {
+      // Check if this is a RUBE_MULTI_EXECUTE_TOOL call
+      if (mcpRequestBody.params.name === 'RUBE_MULTI_EXECUTE_TOOL') {
+        const tools = mcpRequestBody.params.arguments.tools;
+        if (Array.isArray(tools)) {
+          for (const tool of tools) {
+            // Inject ig_user_id for Instagram tools
+            if (tool.tool_slug?.startsWith('INSTAGRAM_') && tool.arguments) {
+              tool.arguments.ig_user_id = instagramUserId;
             }
           }
         }
-        // Direct tool call
-        else if (mcpRequestBody.params.name?.startsWith('INSTAGRAM_')) {
-          mcpRequestBody.params.arguments.ig_user_id = instagramUserId;
-        }
       }
-    } else {
-      // Fallback to global token (dev mode)
-      token = process.env.RUBE_TOKEN;
-    }
-
-    if (!token) {
-      return res.status(500).json({
-        error: 'Token não configurado. Conecte uma conta Instagram ou configure RUBE_TOKEN.'
-      });
+      // Direct tool call
+      else if (mcpRequestBody.params.name?.startsWith('INSTAGRAM_')) {
+        mcpRequestBody.params.arguments.ig_user_id = instagramUserId;
+      }
     }
 
     const response = await fetch(MCP_URL, {

@@ -17,6 +17,7 @@ import type {
   CampaignSummary,
   CreativeModel,
 } from "../types";
+import type { InstagramContext } from "../services/rubeService";
 import type { WeekScheduleWithCount } from "../services/apiClient";
 import { UploadForm } from "./UploadForm";
 import { ClipsTab } from "./tabs/ClipsTab";
@@ -112,6 +113,8 @@ interface DashboardProps {
   onDeleteSchedule?: (scheduleId: string) => void;
   // Creative Model
   onUpdateCreativeModel?: (model: CreativeModel) => void;
+  // Instagram Multi-tenant
+  instagramContext?: InstagramContext;
 }
 
 type Tab = "clips" | "posts" | "ads";
@@ -201,6 +204,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     onSelectSchedule,
     onDeleteSchedule,
     onMarkGalleryImagePublished,
+    instagramContext,
   } = props;
 
   const { signOut } = useClerk();
@@ -680,6 +684,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 allSchedules={allSchedules}
                 currentScheduleId={currentScheduleId}
                 onSelectSchedule={onSelectSchedule}
+                instagramContext={instagramContext}
               />
             </div>
           </div>
@@ -789,6 +794,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           brandProfile={brandProfile}
           context={quickPostImage.prompt || "Imagem da galeria"}
           onImagePublished={onMarkGalleryImagePublished}
+          instagramContext={instagramContext}
         />
       )}
     </div>

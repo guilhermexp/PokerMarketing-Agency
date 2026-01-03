@@ -19,14 +19,8 @@ import type { InstagramPublishState } from '../types';
 import { getEnv } from "../utils/env";
 
 // MCP Configuration
-// Use proxy in dev/browser to avoid CORS, direct URL in prod/serverless
+// Use proxy to avoid CORS - proxy handles token from database
 const MCP_URL = '/api/rube';
-// Instagram User ID from environment or fallback (used in dev/single-tenant mode)
-const getInstagramUserId = () => getEnv("VITE_INSTAGRAM_USER_ID") || getEnv("INSTAGRAM_USER_ID") || '25281402468195799';
-const getInstagramUsername = () => getEnv("VITE_INSTAGRAM_USERNAME") || getEnv("INSTAGRAM_USERNAME") || 'default_user';
-
-// Get token - only needed for serverless function, browser uses proxy
-const getToken = () => getEnv("VITE_RUBE_TOKEN") || getEnv("RUBE_TOKEN");
 
 // Generate unique JSON-RPC ID
 const generateId = () => `rube_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -86,15 +80,11 @@ export interface PublishingQuota {
 }
 
 /**
- * Check if Rube is configured (either global token or can use multi-tenant)
+ * Check if Rube is configured (requires InstagramContext - no fallback)
  */
 export const isRubeConfigured = (context?: InstagramContext): boolean => {
-  // If context provided, assume it's valid (will be checked by proxy)
-  if (context?.instagramAccountId && context?.userId) {
-    return true;
-  }
-  // Fallback to global token check
-  return Boolean(getToken());
+  // Requires valid context - no fallback to global token
+  return Boolean(context?.instagramAccountId && context?.userId);
 };
 
 /**
@@ -125,13 +115,17 @@ const parseSSEResponse = (text: string): any => {
  * Core MCP call function
  * @param toolName - The MCP tool to call
  * @param args - Tool arguments
- * @param context - Optional multi-tenant context for user-specific tokens
+ * @param context - Required multi-tenant context for user-specific tokens
  */
 export const callRubeMCP = async (
   toolName: string,
   args: Record<string, unknown>,
-  context?: InstagramContext
+  context: InstagramContext
 ): Promise<any> => {
+  if (!context?.instagramAccountId || !context?.userId) {
+    throw new Error('Conecte sua conta Instagram em Configurações → Integrações para publicar.');
+  }
+
   const request: RubeMCPRequest = {
     jsonrpc: '2.0',
     id: generateId(),
@@ -141,16 +135,14 @@ export const callRubeMCP = async (
 
   console.log(`[Rube MCP] Calling ${toolName}...`, args);
 
-  // Build request body - include multi-tenant context if provided
-  const requestBody = context
-    ? {
-        ...request,
-        instagram_account_id: context.instagramAccountId,
-        user_id: context.userId
-      }
-    : request;
+  // Build request body with multi-tenant context
+  const requestBody = {
+    ...request,
+    instagram_account_id: context.instagramAccountId,
+    user_id: context.userId
+  };
 
-  // Uses proxy which adds Authorization header
+  // Uses proxy which handles token from database
   const response = await fetch(MCP_URL, {
     method: 'POST',
     headers: {
@@ -160,14 +152,17 @@ export const callRubeMCP = async (
   });
 
   if (!response.ok) {
+    if (response.status === 400) {
+      throw new Error('Conecte sua conta Instagram em Configurações → Integrações.');
+    }
     if (response.status === 401) {
-      throw new Error('Autenticacao Rube falhou. Verifique seu RUBE_TOKEN.');
+      throw new Error('Token expirado. Reconecte sua conta Instagram em Configurações → Integrações.');
     }
     if (response.status === 403) {
-      throw new Error('Conta Instagram não encontrada ou sem permissão.');
+      throw new Error('Conta Instagram não encontrada ou sem permissão. Reconecte em Configurações → Integrações.');
     }
     if (response.status === 429) {
-      throw new Error('Limite de publicacoes atingido (25/dia). Tente novamente mais tarde.');
+      throw new Error('Limite de publicações atingido (25/dia). Tente novamente mais tarde.');
     }
     throw new Error(`Erro Rube MCP: ${response.status} ${response.statusText}`);
   }
@@ -454,7 +449,7 @@ export const uploadImageForInstagram = async (dataUrl: string): Promise<string> 
  * @param caption - Post caption
  * @param contentType - Type of Instagram content
  * @param onProgress - Progress callback
- * @param context - Optional multi-tenant context for user-specific tokens
+ * @param context - Required multi-tenant context for user-specific tokens
  */
 export const publishToInstagram = async (
   imageUrl: string,
@@ -463,6 +458,13 @@ export const publishToInstagram = async (
   onProgress?: (progress: PublishProgress) => void,
   context?: InstagramContext
 ): Promise<InstagramPublishResult> => {
+  // Require context - no fallback
+  if (!context?.instagramAccountId || !context?.userId) {
+    return {
+      success: false,
+      errorMessage: 'Conecte sua conta Instagram em Configurações → Integrações para publicar.'
+    };
+  }
   try {
     // Step 1: Check quota
     onProgress?.({ step: 'uploading_image', message: 'Verificando limite de publicacoes...', progress: 5 });

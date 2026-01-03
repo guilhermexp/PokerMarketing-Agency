@@ -9,6 +9,7 @@ import type {
   WeekScheduleInfo,
   StyleReference,
 } from "../types";
+import type { InstagramContext } from "../services/rubeService";
 import { Card } from "./common/Card";
 import { Button } from "./common/Button";
 import { Loader } from "./common/Loader";
@@ -64,6 +65,8 @@ interface FlyerGeneratorProps {
   allSchedules?: WeekScheduleWithCount[];
   currentScheduleId?: string | null;
   onSelectSchedule?: (schedule: WeekScheduleWithCount) => void;
+  // Instagram Multi-tenant
+  instagramContext?: InstagramContext;
 }
 
 const formatCurrencyValue = (val: string, currency: Currency): string => {
@@ -316,6 +319,7 @@ const TournamentEventCard: React.FC<{
   styleReference: GalleryImage | null;
   onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
   userId?: string | null;
+  instagramContext?: InstagramContext;
 }> = ({
   event,
   brandProfile,
@@ -334,6 +338,7 @@ const TournamentEventCard: React.FC<{
   styleReference,
   onPublishToCampaign,
   userId,
+  instagramContext,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   // Auto-expand if there are already generated flyers
@@ -629,6 +634,7 @@ const TournamentEventCard: React.FC<{
           image={quickPostFlyer}
           brandProfile={brandProfile}
           context={`Torneio: ${event.name}, ${event.times?.["-3"]}, GTD: ${formatCurrencyValue(event.gtd, currency)}`}
+          instagramContext={instagramContext}
         />
       )}
     </div>
@@ -661,6 +667,7 @@ const PeriodCardRow: React.FC<{
   collabLogo: string | null;
   onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
   userId?: string | null;
+  instagramContext?: InstagramContext;
 }> = ({
   period,
   label,
@@ -683,6 +690,7 @@ const PeriodCardRow: React.FC<{
   collabLogo,
   onPublishToCampaign,
   userId,
+  instagramContext,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   // Auto-expand if there are already generated flyers
@@ -1046,6 +1054,7 @@ const PeriodCardRow: React.FC<{
           image={quickPostFlyer}
           brandProfile={brandProfile}
           context={`Sessão: ${label}. Grade:\n${events.map((e) => e.name).join(", ")}`}
+          instagramContext={instagramContext}
         />
       )}
     </div>
@@ -1078,6 +1087,7 @@ const PeriodCard: React.FC<{
   collabLogo: string | null;
   onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
   userId?: string | null;
+  instagramContext?: InstagramContext;
 }> = ({
   period,
   label,
@@ -1100,6 +1110,7 @@ const PeriodCard: React.FC<{
   collabLogo,
   onPublishToCampaign,
   userId,
+  instagramContext,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingFlyer, setEditingFlyer] = useState<GalleryImage | null>(null);
@@ -1479,6 +1490,7 @@ const PeriodCard: React.FC<{
           image={quickPostFlyer}
           brandProfile={brandProfile}
           context={`Sessão: ${label}. Grade:\n${events.map((e) => e.name).join(", ")}`}
+          instagramContext={instagramContext}
         />
       )}
     </div>
@@ -1768,6 +1780,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   allSchedules = [],
   currentScheduleId,
   onSelectSchedule,
+  instagramContext,
 }) => {
   const daysMap = [
     "SUNDAY",
@@ -2781,6 +2794,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   compositionAssets={compositionAssets}
                   onPublishToCampaign={onPublishToCampaign}
                   userId={userId}
+                  instagramContext={instagramContext}
                 />
               ))}
             </div>
@@ -2833,6 +2847,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                               compositionAssets={compositionAssets}
                               onPublishToCampaign={onPublishToCampaign}
                               userId={userId}
+                              instagramContext={instagramContext}
                             />
                           ))}
                         </div>
@@ -2866,6 +2881,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         compositionAssets={compositionAssets}
                         onPublishToCampaign={onPublishToCampaign}
                         userId={userId}
+                        instagramContext={instagramContext}
                       />
                     ))
                   ) : pastEvents.length > 0 ? (
