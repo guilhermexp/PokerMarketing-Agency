@@ -396,13 +396,13 @@ export async function checkAndPublishScheduledPosts() {
 
   try {
     const sql = getSql();
-    const now = new Date().toISOString();
+    const nowMs = Date.now(); // scheduled_timestamp is BIGINT (milliseconds)
 
     // Get posts due for publishing
     const duePosts = await sql`
       SELECT * FROM scheduled_posts
       WHERE status = 'scheduled'
-        AND scheduled_timestamp <= ${now}::timestamptz
+        AND scheduled_timestamp <= ${nowMs}
       ORDER BY scheduled_timestamp ASC
       LIMIT 5
     `;
