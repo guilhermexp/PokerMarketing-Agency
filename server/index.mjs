@@ -3475,7 +3475,7 @@ app.post("/api/ai/video", async (req, res) => {
 // RUBE MCP PROXY - For Instagram Publishing
 // ============================================================================
 
-const RUBE_MCP_URL = 'https://rube.app/mcp';
+// RUBE_MCP_URL already defined above at line 1752
 
 app.post("/api/rube", async (req, res) => {
   const token = process.env.RUBE_TOKEN;
