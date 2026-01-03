@@ -1028,8 +1028,16 @@ app.post("/api/db/users", async (req, res) => {
       await sql`SELECT * FROM users WHERE email = ${email} AND deleted_at IS NULL LIMIT 1`;
 
     if (existing.length > 0) {
-      await sql`UPDATE users SET last_login_at = NOW() WHERE id = ${existing[0].id}`;
-      return res.json(existing[0]);
+      // Update auth_provider info and last_login
+      const updated = await sql`
+        UPDATE users
+        SET last_login_at = NOW(),
+            auth_provider = COALESCE(${auth_provider}, auth_provider),
+            auth_provider_id = COALESCE(${auth_provider_id}, auth_provider_id)
+        WHERE id = ${existing[0].id}
+        RETURNING *
+      `;
+      return res.json(updated[0]);
     }
 
     const result = await sql`
