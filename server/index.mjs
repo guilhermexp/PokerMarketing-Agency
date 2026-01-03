@@ -1851,7 +1851,7 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
     }
 
     // Resolve Clerk ID to DB UUID
-    const userResult = await sql`SELECT id FROM users WHERE clerk_id = ${user_id} LIMIT 1`;
+    const userResult = await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
     const resolvedUserId = userResult[0]?.id;
     if (!resolvedUserId) {
       return res.json([]);
@@ -1891,7 +1891,7 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
     }
 
     // Resolve Clerk ID to DB UUID
-    const userResult = await sql`SELECT id FROM users WHERE clerk_id = ${user_id} LIMIT 1`;
+    const userResult = await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
     const resolvedUserId = userResult[0]?.id;
     if (!resolvedUserId) {
       return res.status(400).json({ error: 'User not found' });
