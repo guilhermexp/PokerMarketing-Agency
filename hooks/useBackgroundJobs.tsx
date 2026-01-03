@@ -76,9 +76,26 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
   const completeListeners = useRef<Set<(job: ActiveJob) => void>>(new Set());
   const failListeners = useRef<Set<(job: ActiveJob) => void>>(new Set());
 
-  // Track which jobs we've already notified about
+  // Track which jobs we've already notified about (persisted to localStorage)
   const notifiedComplete = useRef<Set<string>>(new Set());
   const notifiedFailed = useRef<Set<string>>(new Set());
+  const notifiedLoadedRef = useRef(false);
+  const NOTIFIED_STORAGE_KEY = 'backgroundJobsNotified';
+
+  // Load notified jobs from localStorage on mount (synchronously to avoid race)
+  if (typeof window !== 'undefined' && !notifiedLoadedRef.current) {
+    notifiedLoadedRef.current = true;
+    try {
+      const stored = localStorage.getItem(NOTIFIED_STORAGE_KEY);
+      if (stored) {
+        const { completed, failed } = JSON.parse(stored);
+        if (Array.isArray(completed)) notifiedComplete.current = new Set(completed);
+        if (Array.isArray(failed)) notifiedFailed.current = new Set(failed);
+      }
+    } catch (e) {
+      console.warn('[BackgroundJobs] Failed to load notified state:', e);
+    }
+  }
 
   // Derived state
   const pendingJobs = jobs.filter(j => j.status === 'queued' || j.status === 'processing');
@@ -103,16 +120,31 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
       });
 
       // Check for newly completed/failed jobs and emit events
+      let hasNewNotifications = false;
       serverJobs.forEach(job => {
         if (job.status === 'completed' && !notifiedComplete.current.has(job.id)) {
           notifiedComplete.current.add(job.id);
+          hasNewNotifications = true;
           completeListeners.current.forEach(listener => listener(job));
         }
         if (job.status === 'failed' && !notifiedFailed.current.has(job.id)) {
           notifiedFailed.current.add(job.id);
+          hasNewNotifications = true;
           failListeners.current.forEach(listener => listener(job));
         }
       });
+
+      // Persist notified state to localStorage
+      if (hasNewNotifications && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(NOTIFIED_STORAGE_KEY, JSON.stringify({
+            completed: Array.from(notifiedComplete.current).slice(-200), // Keep last 200
+            failed: Array.from(notifiedFailed.current).slice(-100),
+          }));
+        } catch (e) {
+          console.warn('[BackgroundJobs] Failed to persist notified state:', e);
+        }
+      }
     } catch (error) {
       console.error('[BackgroundJobs] Failed to refresh jobs:', error);
     }
