@@ -325,46 +325,47 @@ CMD ["node", "server/index.mjs"]
 
 A aplicacao tem dois modos de desenvolvimento:
 
-| Modo | Comando | Redis | Jobs |
-|------|---------|-------|------|
-| **Simples** | `npm run dev` | Nao | Nao processam |
-| **Completo** | `npm run dev:full` | Sim | Funcionam |
+| Modo | Comando | Redis | Descricao |
+|------|---------|-------|-----------|
+| **Padrao** | `npm run dev` | Railway (remoto) | Usa Redis do Railway, recomendado |
+| **Local** | `npm run dev:local` | Docker (local) | Usa Redis local, funciona offline |
 
-### Modo Simples
+### Modo Padrao (Railway Redis)
 
 ```bash
 npm run dev
 ```
 
 - Roda `dev-api.mjs` (porta 3002) + Vite (porta 5173)
-- APIs de banco funcionam normalmente
-- Jobs ficam em "queued" para sempre (nao processa)
-- Bom para desenvolver UI sem Redis
+- Usa Redis do Railway (mesmo da producao)
+- Jobs em background funcionam normalmente
+- Requer `REDIS_URL` ou `REDIS_PRIVATE_URL` no `.env`
 
-### Modo Completo
+### Modo Local (Docker Redis)
 
 ```bash
-# Iniciar Redis via Docker
-npm run dev:redis
-
-# Iniciar aplicacao completa
-npm run dev:full
+npm run dev:local
 ```
 
-- Roda `server/index.mjs` (porta 8080) + Vite (porta 5173)
-- Comportamento identico a producao
-- Processa jobs em background via BullMQ
+- Roda Docker Redis (porta 6380) + `dev-api.mjs` + Vite
+- Nao depende de servicos externos
+- Bom para desenvolvimento offline
+- Requer Docker instalado
 
-### docker-compose.yml
-
-O arquivo `docker-compose.yml` fornece Redis para desenvolvimento:
+### Comandos Uteis
 
 ```bash
-# Iniciar
+# Desenvolvimento padrao
+npm run dev
+
+# Desenvolvimento local (Docker)
+npm run dev:local
+
+# Iniciar apenas Redis local
 npm run dev:redis
 
-# Parar
-npm run dev:redis:stop
+# Parar containers
+npm run dev:stop
 ```
 
 ---

@@ -136,14 +136,13 @@ npm install
 
 # Configurar variáveis de ambiente
 cp .env.example .env
-# Editar .env com suas chaves
+# Editar .env com suas chaves (incluindo REDIS_URL do Railway)
 
-# Modo simples (sem Redis, jobs nao processam)
+# Modo padrao (Railway Redis)
 npm run dev
 
-# Modo completo (com Redis, identico a producao)
-npm run dev:redis     # Inicia Redis via Docker
-npm run dev:full      # Inicia app completo
+# Modo local (Docker Redis, funciona offline)
+npm run dev:local
 ```
 
 Veja [DEVELOPMENT.md](./DEVELOPMENT.md) para detalhes sobre os modos de desenvolvimento.
