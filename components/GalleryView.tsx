@@ -284,6 +284,20 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     }
   };
 
+  // Deduplicate images by src URL (keep the first/newest occurrence)
+  const deduplicatedImages = React.useMemo(() => {
+    const seen = new Set<string>();
+    return images.filter((img) => {
+      // Use src as the dedup key
+      const key = img.src;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }, [images]);
+
   // Check if image was created today
   const isToday = (dateString?: string) => {
     if (!dateString) return false;
@@ -297,8 +311,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   };
 
   // Separate images into today and older
-  const todayImages = images.filter((img) => isToday(img.created_at));
-  const olderImages = images.filter((img) => !isToday(img.created_at));
+  const todayImages = deduplicatedImages.filter((img) => isToday(img.created_at));
+  const olderImages = deduplicatedImages.filter((img) => !isToday(img.created_at));
 
   return (
     <>
@@ -321,7 +335,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             </h2>
             <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
               {viewMode === "gallery"
-                ? `${images.length} itens • Flyers, Posts e Anúncios`
+                ? `${deduplicatedImages.length} itens • Flyers, Posts e Anúncios`
                 : `${styleReferences.length} itens salvos`}
             </p>
           </div>
@@ -351,7 +365,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
         {viewMode === "gallery" ? (
           /* Gallery View - Masonry Layout */
-          images.length > 0 ? (
+          deduplicatedImages.length > 0 ? (
             <div className="space-y-6">
               {/* Today's Images Section */}
               {todayImages.length > 0 && (

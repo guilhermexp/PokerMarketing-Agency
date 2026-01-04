@@ -109,6 +109,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'User not found' });
       }
 
+      // Check for duplicate src_url created in last 30 seconds (prevent double-inserts)
+      const existingCheck = await sql`
+        SELECT id, src_url, created_at FROM gallery_images
+        WHERE user_id = ${resolvedUserId}
+          AND src_url = ${src_url}
+          AND created_at > NOW() - INTERVAL '30 seconds'
+          AND deleted_at IS NULL
+        LIMIT 1
+      `;
+
+      if (existingCheck.length > 0) {
+        console.log(`[Gallery API] Duplicate detected, returning existing image: ${existingCheck[0].id}`);
+        return res.status(200).json(existingCheck[0]);
+      }
+
       const result = await sql`
         INSERT INTO gallery_images (
           user_id, organization_id, src_url, prompt, source, model,
