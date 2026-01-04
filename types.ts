@@ -24,6 +24,8 @@ export interface ContentInput {
   transcript: string;
   productImages: { base64: string; mimeType: string }[] | null;
   inspirationImages: { base64: string; mimeType: string }[] | null;
+  collabLogo?: { base64: string; mimeType: string } | null;
+  compositionAssets?: { base64: string; mimeType: string }[] | null;
 }
 
 export interface VideoClipScript {

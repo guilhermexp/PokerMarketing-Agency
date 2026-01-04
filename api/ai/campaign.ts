@@ -34,6 +34,8 @@ interface CampaignGenerationRequest {
   options: GenerationOptions;
   productImages?: ImageFile[];
   inspirationImages?: ImageFile[];
+  collabLogo?: ImageFile | null;
+  compositionAssets?: ImageFile[];
 }
 
 // Schema for campaign generation
@@ -173,7 +175,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const { brandProfile, transcript, options, productImages, inspirationImages } = body;
+    const { brandProfile, transcript, options, productImages, inspirationImages, collabLogo, compositionAssets } = body;
 
     console.log('[Campaign API] Generating campaign...');
 
@@ -197,14 +199,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (productImages && productImages.length > 0) {
       imageContext += '\n\n**LOGO/PRODUTO:** Imagens do logo ou produto da marca foram fornecidas. Use-as como referência visual para identidade.';
     }
+    if (collabLogo) {
+      imageContext += '\n\n**LOGO PARCEIRO:** Logo de colaboração/parceiro fornecido. Use como logo secundário ou em conjunto com o logo principal.';
+    }
     if (inspirationImages && inspirationImages.length > 0) {
       imageContext += '\n\n**REFERÊNCIA VISUAL:** Imagens de inspiração foram fornecidas. Use o estilo visual destas imagens como referência para os prompts de imagem que você gerar.';
+    }
+    if (compositionAssets && compositionAssets.length > 0) {
+      imageContext += '\n\n**ATIVOS DE COMPOSIÇÃO:** Mockups, elementos visuais e/ou pessoas foram fornecidos. Incorpore estes elementos nos prompts de imagem quando apropriado.';
     }
 
     const prompt = buildCampaignPrompt(brandProfile, transcript, quantityInstructions) + imageContext;
 
     // Combine all images
-    const allImages = [...(productImages || []), ...(inspirationImages || [])];
+    const allImages = [
+      ...(productImages || []),
+      ...(collabLogo ? [collabLogo] : []),
+      ...(inspirationImages || []),
+      ...(compositionAssets || []),
+    ];
 
     // Track the AI operation
     const result = await trackAIOperation(
@@ -248,6 +261,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           videoClipScriptsCount: options.videoClipScripts.count,
           productImagesCount: productImages?.length || 0,
           inspirationImagesCount: inspirationImages?.length || 0,
+          hasCollabLogo: !!collabLogo,
+          compositionAssetsCount: compositionAssets?.length || 0,
         },
       })
     );

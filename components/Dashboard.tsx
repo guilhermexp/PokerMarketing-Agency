@@ -514,6 +514,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 onUpdateCreativeModel={
                   props.onUpdateCreativeModel || (() => {})
                 }
+                styleReferences={styleReferences}
+                selectedStyleReference={selectedStyleReference}
+                onSelectStyleReference={onSelectStyleReference}
+                onClearSelectedStyleReference={onClearSelectedStyleReference}
               />
             )}
             {isGenerating && (
