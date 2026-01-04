@@ -2010,6 +2010,25 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     }
   }, [selectedStyleReference]);
 
+  // Clear generated flyers when day changes
+  const prevSelectedDayRef = React.useRef(selectedDay);
+  useEffect(() => {
+    if (prevSelectedDayRef.current !== selectedDay) {
+      console.log(`[FlyerGenerator] Day changed from ${prevSelectedDayRef.current} to ${selectedDay}, clearing flyers`);
+      // Clear individual event flyers
+      setFlyerState({});
+      // Clear period flyers
+      setDailyFlyerState({
+        ALL: [],
+        MORNING: [],
+        AFTERNOON: [],
+        NIGHT: [],
+        HIGHLIGHTS: [],
+      });
+      prevSelectedDayRef.current = selectedDay;
+    }
+  }, [selectedDay, setFlyerState, setDailyFlyerState]);
+
   // Handler para quando uma imagem é selecionada como modelo (sincroniza UI e estado de geração)
   const handleSetStyleReference = (image: GalleryImage) => {
     setGlobalStyleReference(image);
