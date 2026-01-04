@@ -29,6 +29,7 @@ interface CampaignGenerationRequest {
   transcript: string;
   options: GenerationOptions;
   productImages?: ImageFile[];
+  inspirationImages?: ImageFile[];
 }
 
 // Schema for campaign generation
@@ -168,7 +169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const { brandProfile, transcript, options, productImages } = body;
+    const { brandProfile, transcript, options, productImages, inspirationImages } = body;
 
     console.log('[Campaign API] Generating campaign...');
 
@@ -177,20 +178,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const isOpenRouter = model.includes('/');
 
     const quantityInstructions = buildQuantityInstructions(options);
-    const prompt = buildCampaignPrompt(brandProfile, transcript, quantityInstructions);
+
+    // Add context about images if provided
+    let imageContext = '';
+    if (productImages && productImages.length > 0) {
+      imageContext += '\n\n**LOGO/PRODUTO:** Imagens do logo ou produto da marca foram fornecidas. Use-as como referência visual para identidade.';
+    }
+    if (inspirationImages && inspirationImages.length > 0) {
+      imageContext += '\n\n**REFERÊNCIA VISUAL:** Imagens de inspiração foram fornecidas. Use o estilo visual destas imagens como referência para os prompts de imagem que você gerar.';
+    }
+
+    const prompt = buildCampaignPrompt(brandProfile, transcript, quantityInstructions) + imageContext;
+
+    // Combine all images
+    const allImages = [...(productImages || []), ...(inspirationImages || [])];
 
     let result: string;
 
     if (isOpenRouter) {
       // Use OpenRouter (GPT/Grok)
       const textParts = [prompt];
-      const imageParts = productImages || [];
 
-      if (imageParts.length > 0) {
+      if (allImages.length > 0) {
         result = await generateTextWithOpenRouterVision(
           model as CreativeModel,
           textParts,
-          imageParts,
+          allImages,
           0.7
         );
       } else {
@@ -201,13 +214,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Use Gemini
       const parts: any[] = [{ text: prompt }];
 
-      if (productImages) {
-        productImages.forEach((img) => {
-          parts.push({
-            inlineData: { mimeType: img.mimeType, data: img.base64 },
-          });
+      // Add all images (product/logo + inspiration)
+      allImages.forEach((img) => {
+        parts.push({
+          inlineData: { mimeType: img.mimeType, data: img.base64 },
         });
-      }
+      });
 
       result = await generateStructuredContent(model, parts, campaignSchema, 0.7);
     }

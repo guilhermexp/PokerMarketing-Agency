@@ -59,6 +59,7 @@ export const generateCampaign = async (
     transcript: input.transcript,
     options,
     productImages: input.productImages,
+    inspirationImages: input.inspirationImages,
   });
 
   return response.campaign;
