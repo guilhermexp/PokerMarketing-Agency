@@ -201,37 +201,110 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
       </div>
 
       {/* Summary Footer */}
-      <div className="border-t border-white/5 p-3 bg-black/40 flex-shrink-0 overflow-x-auto">
-        <div className="grid grid-cols-8 gap-2 min-w-[720px]">
-          <div className="text-[8px] font-black text-white/20 uppercase text-center">
-            Total
+      <div className="border-t border-white/5 bg-black/40 flex-shrink-0 overflow-x-auto">
+        <div className="grid grid-cols-8 min-w-[720px]">
+          {/* Label column */}
+          <div className="p-3 border-r border-white/5 flex flex-col justify-center">
+            <div className="text-[8px] font-black text-white/20 uppercase tracking-wider text-center">
+              Resumo
+            </div>
           </div>
+          {/* Day columns */}
           {weekDays.map((day) => {
             const posts = getPostsForDate(day.date);
-            const scheduled = posts.filter(
-              (p) => p.status === "scheduled",
-            ).length;
-            const published = posts.filter(
-              (p) => p.status === "published",
-            ).length;
+            const scheduled = posts.filter((p) => p.status === "scheduled").length;
+            const publishing = posts.filter((p) => p.status === "publishing").length;
+            const published = posts.filter((p) => p.status === "published").length;
+            const failed = posts.filter((p) => p.status === "failed").length;
+            const total = posts.length;
+
+            // Get next scheduled post for this day
+            const nextPost = posts.find((p) => p.status === "scheduled");
+            const hasUpcoming = scheduled > 0;
+            const hasActivity = total > 0;
 
             return (
-              <div key={day.date} className="text-center">
-                {posts.length > 0 ? (
-                  <div className="flex items-center justify-center gap-2">
-                    {scheduled > 0 && (
-                      <span className="text-[9px] font-bold text-amber-500">
-                        {scheduled}
-                      </span>
+              <div
+                key={day.date}
+                className={`p-2 border-r border-white/5 last:border-r-0 min-h-[80px] ${
+                  day.isToday ? "bg-primary/5" : ""
+                }`}
+              >
+                {hasActivity ? (
+                  <div className="space-y-1.5">
+                    {/* Status badges */}
+                    <div className="flex flex-wrap items-center justify-center gap-1">
+                      {published > 0 && (
+                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-green-500/20 rounded">
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                          <span className="text-[8px] font-bold text-green-400">
+                            {published}
+                          </span>
+                        </div>
+                      )}
+                      {failed > 0 && (
+                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-red-500/20 rounded">
+                          <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                          <span className="text-[8px] font-bold text-red-400">
+                            {failed}
+                          </span>
+                        </div>
+                      )}
+                      {publishing > 0 && (
+                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/20 rounded">
+                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          <span className="text-[8px] font-bold text-amber-400">
+                            {publishing}
+                          </span>
+                        </div>
+                      )}
+                      {scheduled > 0 && (
+                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/10 rounded">
+                          <div className="w-1.5 h-1.5 rounded-full bg-white/40" />
+                          <span className="text-[8px] font-bold text-white/60">
+                            {scheduled}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Next scheduled info */}
+                    {nextPost && (
+                      <div className="text-center">
+                        <div className="text-[7px] text-white/30 uppercase tracking-wider">
+                          Próximo
+                        </div>
+                        <div className="text-[9px] font-bold text-white/50">
+                          {nextPost.scheduledTime}
+                        </div>
+                      </div>
                     )}
-                    {published > 0 && (
-                      <span className="text-[9px] font-bold text-green-500">
-                        {published}
-                      </span>
+
+                    {/* All published indicator */}
+                    {published === total && total > 0 && (
+                      <div className="text-center">
+                        <div className="text-[8px] font-bold text-green-400/80">
+                          ✓ Todos publicados
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Has failures indicator */}
+                    {failed > 0 && (
+                      <div className="text-center">
+                        <div className="text-[8px] font-bold text-red-400/80">
+                          ✗ {failed} {failed === 1 ? "falhou" : "falharam"}
+                        </div>
+                      </div>
                     )}
                   </div>
                 ) : (
-                  <span className="text-[9px] text-white/10">-</span>
+                  <div className="flex flex-col items-center justify-center h-full py-2">
+                    <div className="w-6 h-6 rounded-full border border-dashed border-white/10 flex items-center justify-center mb-1">
+                      <span className="text-[10px] text-white/20">—</span>
+                    </div>
+                    <span className="text-[8px] text-white/20">Sem posts</span>
+                  </div>
                 )}
               </div>
             );
