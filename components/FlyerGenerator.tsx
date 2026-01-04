@@ -668,6 +668,7 @@ const TournamentEventCard: React.FC<{
 const PeriodCardRow: React.FC<{
   period: TimePeriod;
   label: string;
+  dayInfo: string;
   events: TournamentEvent[];
   brandProfile: BrandProfile;
   aspectRatio: string;
@@ -697,6 +698,7 @@ const PeriodCardRow: React.FC<{
 }> = ({
   period,
   label,
+  dayInfo,
   events,
   brandProfile,
   aspectRatio,
@@ -855,14 +857,15 @@ const PeriodCardRow: React.FC<{
         `
         : `
         TIPO: Grade de Programação com Destaque Principal
-        TÍTULO: ${label.toUpperCase()} - ${events.length} torneios
+        TÍTULO: ${label.toUpperCase()}
+        DATA: ${dayInfo}
 
         DESTAQUE PRINCIPAL (maior GTD): ${topEventText}
 
         LISTA DOS DEMAIS TORNEIOS:
         ${otherEventsList}
 
-        DESIGN: Logo no topo, título "${label}", GTD em ${brandProfile.secondaryColor}, fundo ${brandProfile.primaryColor}
+        DESIGN: Logo no topo, título "${label}", data "${dayInfo}" em tamanho discreto, GTD em ${brandProfile.secondaryColor}, fundo ${brandProfile.primaryColor}
         `;
 
       // Use background job if userId is available AND we're not in dev mode
@@ -1103,6 +1106,7 @@ const PeriodCardRow: React.FC<{
 const PeriodCard: React.FC<{
   period: TimePeriod;
   label: string;
+  dayInfo: string;
   events: TournamentEvent[];
   brandProfile: BrandProfile;
   aspectRatio: string;
@@ -1132,6 +1136,7 @@ const PeriodCard: React.FC<{
 }> = ({
   period,
   label,
+  dayInfo,
   events,
   brandProfile,
   aspectRatio,
@@ -1306,7 +1311,6 @@ const PeriodCard: React.FC<{
         : `
         TIPO: Grade de Programação com Destaque Principal
         TÍTULO DA SESSÃO: ${label.toUpperCase()}
-        TOTAL: ${events.length} torneios
 
         ESTRUTURA OBRIGATÓRIA - 2 SEÇÕES DISTINTAS:
 

@@ -24,6 +24,14 @@ interface GalleryViewProps {
 }
 
 type ViewMode = "gallery" | "references";
+type SourceFilter = "all" | "flyer" | "campaign" | "post" | "video";
+
+const SOURCE_FILTERS: { value: SourceFilter; label: string; sources: string[] }[] = [
+  { value: "all", label: "Todos", sources: [] },
+  { value: "flyer", label: "Flyers", sources: ["Flyer", "Flyer Diário"] },
+  { value: "campaign", label: "Campanhas", sources: ["Anúncio", "Post"] },
+  { value: "video", label: "Vídeos", sources: ["Video Final", "Clipe"] },
+];
 
 const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -207,6 +215,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 }) => {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("gallery");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleImageUpdate = (newSrc: string) => {
@@ -298,6 +307,19 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     });
   }, [images]);
 
+  // Apply source filter
+  const filteredImages = React.useMemo(() => {
+    if (sourceFilter === "all") {
+      return deduplicatedImages;
+    }
+    const filterConfig = SOURCE_FILTERS.find((f) => f.value === sourceFilter);
+    if (!filterConfig) return deduplicatedImages;
+
+    return deduplicatedImages.filter((img) =>
+      filterConfig.sources.some((source) => img.source === source)
+    );
+  }, [deduplicatedImages, sourceFilter]);
+
   // Check if image was created today
   const isToday = (dateString?: string) => {
     if (!dateString) return false;
@@ -311,8 +333,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   };
 
   // Separate images into today and older
-  const todayImages = deduplicatedImages.filter((img) => isToday(img.created_at));
-  const olderImages = deduplicatedImages.filter((img) => !isToday(img.created_at));
+  const todayImages = filteredImages.filter((img) => isToday(img.created_at));
+  const olderImages = filteredImages.filter((img) => !isToday(img.created_at));
 
   return (
     <>
@@ -335,7 +357,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             </h2>
             <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
               {viewMode === "gallery"
-                ? `${deduplicatedImages.length} itens • Flyers, Posts e Anúncios`
+                ? `${filteredImages.length} itens${sourceFilter !== "all" ? ` (${deduplicatedImages.length} total)` : ""}`
                 : `${styleReferences.length} itens salvos`}
             </p>
           </div>
@@ -363,9 +385,39 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           </div>
         </div>
 
+        {/* Source Filter Tabs - only show in gallery mode */}
+        {viewMode === "gallery" && deduplicatedImages.length > 0 && (
+          <div className="flex gap-1 overflow-x-auto pb-2">
+            {SOURCE_FILTERS.map((filter) => {
+              const count = filter.value === "all"
+                ? deduplicatedImages.length
+                : deduplicatedImages.filter((img) =>
+                    filter.sources.some((source) => img.source === source)
+                  ).length;
+
+              if (filter.value !== "all" && count === 0) return null;
+
+              return (
+                <button
+                  key={filter.value}
+                  onClick={() => setSourceFilter(filter.value)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
+                    sourceFilter === filter.value
+                      ? "bg-primary text-black"
+                      : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {filter.label}
+                  <span className="ml-1.5 opacity-60">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {viewMode === "gallery" ? (
           /* Gallery View - Masonry Layout */
-          deduplicatedImages.length > 0 ? (
+          filteredImages.length > 0 ? (
             <div className="space-y-6">
               {/* Today's Images Section */}
               {todayImages.length > 0 && (
