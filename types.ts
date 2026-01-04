@@ -6,7 +6,7 @@ export type ToneOfVoice = 'Profissional' | 'Espirituoso' | 'Casual' | 'Inspirado
 export type ToneTarget = 'campaigns' | 'posts' | 'images' | 'flyers' | 'videos';
 
 // Modelos criativos para geração de texto (campanhas, posts, prompts)
-export type CreativeModel = 'gemini-3-pro' | 'gemini-3-flash' | 'openai/gpt-5.2' | 'x-ai/grok-4.1-fast';
+export type CreativeModel = 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'openai/gpt-5.2' | 'x-ai/grok-4.1-fast';
 
 export interface BrandProfile {
   name: string;

@@ -48,8 +48,8 @@ const toneTargetLabels: Record<ToneTarget, string> = {
 
 // Modelos criativos disponíveis
 const creativeModels: { id: CreativeModel; label: string; provider: string }[] = [
-  { id: 'gemini-3-pro', label: 'Gemini 3 Pro', provider: 'Google' },
-  { id: 'gemini-3-flash', label: 'Gemini 3 Flash', provider: 'Google' },
+  { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro', provider: 'Google' },
+  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash', provider: 'Google' },
   { id: 'openai/gpt-5.2', label: 'GPT-5.2', provider: 'OpenAI' },
   { id: 'x-ai/grok-4.1-fast', label: 'Grok 4.1 Fast', provider: 'xAI' },
 ];
@@ -170,7 +170,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
     tertiaryColor: brandProfile.tertiaryColor || '',
     toneOfVoice: brandProfile.toneOfVoice || 'Casual',
     toneTargets: brandProfile.toneTargets || defaultToneTargets,
-    creativeModel: brandProfile.creativeModel || 'gemini-3-pro',
+    creativeModel: brandProfile.creativeModel || 'gemini-3-pro-preview',
   });
   const [isAnalyzingLogo, setIsAnalyzingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(brandProfile.logo || null);
@@ -188,7 +188,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
       tertiaryColor: brandProfile.tertiaryColor || '',
       toneOfVoice: brandProfile.toneOfVoice || 'Casual',
       toneTargets: brandProfile.toneTargets || defaultToneTargets,
-      creativeModel: brandProfile.creativeModel || 'gemini-3-pro',
+      creativeModel: brandProfile.creativeModel || 'gemini-3-pro-preview',
     });
     setLogoPreview(brandProfile.logo || null);
   }, [brandProfile]);
@@ -534,7 +534,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     {creativeModels.map((model) => {
-                      const isActive = (profile.creativeModel || 'gemini-3-pro') === model.id;
+                      const isActive = (profile.creativeModel || 'gemini-3-pro-preview') === model.id;
                       return (
                         <button
                           key={model.id}

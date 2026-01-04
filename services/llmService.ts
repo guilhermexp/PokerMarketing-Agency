@@ -74,15 +74,15 @@ export const generateCreativeText = async (
  * Helper para verificar se o modelo atual é OpenRouter
  */
 export const isOpenRouterModel = (model: CreativeModel): boolean => {
-  return model !== 'gemini-3-pro' && model !== 'gemini-3-flash';
+  return model !== 'gemini-3-pro-preview' && model !== 'gemini-3-flash-preview';
 };
 
 /**
  * Labels para exibição na UI
  */
 export const creativeModelLabels: Record<CreativeModel, { label: string; provider: string }> = {
-  'gemini-3-pro': { label: 'Gemini 3 Pro', provider: 'Google' },
-  'gemini-3-flash': { label: 'Gemini 3 Flash', provider: 'Google' },
+  'gemini-3-pro-preview': { label: 'Gemini 3 Pro', provider: 'Google' },
+  'gemini-3-flash-preview': { label: 'Gemini 3 Flash', provider: 'Google' },
   'openai/gpt-5.2': { label: 'GPT-5.2', provider: 'OpenAI' },
   'x-ai/grok-4.1-fast': { label: 'Grok 4.1 Fast', provider: 'xAI' }
 };

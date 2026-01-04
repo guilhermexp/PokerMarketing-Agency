@@ -6,7 +6,7 @@ import { Button } from './common/Button';
 import { GenerationOptionsModal } from './GenerationOptionsModal';
 import { creativeModelLabels } from '../services/llmService';
 
-const creativeModelOptions: CreativeModel[] = ['gemini-3-pro', 'gemini-3-flash', 'openai/gpt-5.2', 'x-ai/grok-4.1-fast'];
+const creativeModelOptions: CreativeModel[] = ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'openai/gpt-5.2', 'x-ai/grok-4.1-fast'];
 
 interface ImageFile {
   base64: string;
@@ -180,7 +180,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({ onGenerate, isGenerating
                 >
                   <Icon name="zap" className="w-3.5 h-3.5" />
                   <span className="text-[10px] font-bold uppercase">
-                    {creativeModelLabels[brandProfile.creativeModel || 'gemini-3-pro']?.label || 'Gemini 3 Pro'}
+                    {creativeModelLabels[brandProfile.creativeModel || 'gemini-3-pro-preview']?.label || 'Gemini 3 Pro'}
                   </span>
                   <Icon name="chevron-down" className="w-3 h-3 ml-1" />
                 </button>
@@ -196,7 +196,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({ onGenerate, isGenerating
                           setIsModelSelectorOpen(false);
                         }}
                         className={`w-full px-3 py-2 text-left text-xs transition-colors flex items-center justify-between ${
-                          brandProfile.creativeModel === model || (!brandProfile.creativeModel && model === 'gemini-3-pro')
+                          brandProfile.creativeModel === model || (!brandProfile.creativeModel && model === 'gemini-3-pro-preview')
                             ? 'bg-white/10 text-white'
                             : 'text-white/60 hover:bg-white/5 hover:text-white/80'
                         }`}
