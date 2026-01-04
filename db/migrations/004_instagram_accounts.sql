@@ -47,9 +47,5 @@ CREATE TRIGGER update_instagram_accounts_updated_at
     BEFORE UPDATE ON instagram_accounts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Enable RLS
-ALTER TABLE instagram_accounts ENABLE ROW LEVEL SECURITY;
-
--- RLS Policy
-CREATE POLICY "Users can manage own instagram accounts" ON instagram_accounts
-    FOR ALL USING (user_id = auth.uid());
+-- Note: Security is enforced at the application layer via Clerk JWT validation.
+-- API endpoints filter by user_id/organization_id after token verification.
