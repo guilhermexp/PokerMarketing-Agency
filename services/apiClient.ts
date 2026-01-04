@@ -324,6 +324,7 @@ export async function createScheduledPost(
     timezone: string;
     platforms: string;
     instagram_content_type?: string;
+    instagram_account_id?: string;
     created_from?: string;
     organization_id?: string | null;
   },

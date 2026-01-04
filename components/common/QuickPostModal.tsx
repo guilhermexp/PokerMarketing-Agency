@@ -159,8 +159,8 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                 image.src,
                 fullCaption,
                 contentType as InstagramContentType,
-                instagramContext,
-                (progress) => setPublishProgress(progress)
+                (progress) => setPublishProgress(progress),
+                instagramContext
             );
 
             if (result.success) {

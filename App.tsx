@@ -715,6 +715,7 @@ function AppContent() {
 
     try {
       // 1. Create post in database
+      const instagramContext = getInstagramContext();
       const payload = {
         content_type: post.type,
         content_id: post.contentId,
@@ -727,6 +728,7 @@ function AppContent() {
         timezone: post.timezone,
         platforms: post.platforms,
         instagram_content_type: post.instagramContentType,
+        instagram_account_id: instagramContext?.instagramAccountId,
         created_from: post.createdFrom,
         organization_id: organizationId,
       };

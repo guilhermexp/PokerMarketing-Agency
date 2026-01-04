@@ -1,15 +1,15 @@
 /**
  * Scheduled Post Publisher
  * Checks for due posts and publishes them to Instagram via Rube MCP
+ * Supports multi-tenant mode via instagram_account_id
  */
 
 import { neon } from "@neondatabase/serverless";
 import { put } from "@vercel/blob";
 
 const DATABASE_URL = process.env.DATABASE_URL;
-const RUBE_TOKEN = process.env.RUBE_TOKEN;
+const RUBE_TOKEN = process.env.RUBE_TOKEN; // Fallback for legacy posts
 const MCP_URL = 'https://rube.app/mcp';
-const INSTAGRAM_USER_ID = process.env.INSTAGRAM_USER_ID || '25281402468195799';
 
 /**
  * Get database connection
@@ -51,11 +51,32 @@ const parseSSEResponse = (text) => {
 };
 
 /**
- * Call Rube MCP
+ * Get Instagram account credentials from database
  */
-async function callRubeMCP(toolName, args) {
-  if (!RUBE_TOKEN) {
-    throw new Error('RUBE_TOKEN not configured');
+async function getInstagramCredentials(instagramAccountId) {
+  if (!instagramAccountId) return null;
+
+  try {
+    const sql = getSql();
+    const result = await sql`
+      SELECT rube_token, instagram_user_id FROM instagram_accounts
+      WHERE id = ${instagramAccountId} AND is_active = TRUE
+      LIMIT 1
+    `;
+    return result[0] || null;
+  } catch (error) {
+    console.error('[Publisher] Failed to get Instagram credentials:', error);
+    return null;
+  }
+}
+
+/**
+ * Call Rube MCP
+ * @param token - Optional custom token (for multi-tenant)
+ */
+async function callRubeMCP(toolName, args, token = RUBE_TOKEN) {
+  if (!token) {
+    throw new Error('No Rube token available');
   }
 
   const request = {
@@ -72,7 +93,7 @@ async function callRubeMCP(toolName, args) {
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json, text/event-stream',
-      'Authorization': `Bearer ${RUBE_TOKEN}`,
+      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify(request)
   });
@@ -99,8 +120,9 @@ async function callRubeMCP(toolName, args) {
 
 /**
  * Execute Instagram tool
+ * @param token - Optional custom token (for multi-tenant)
  */
-async function executeInstagramTool(toolSlug, args) {
+async function executeInstagramTool(toolSlug, args, token = RUBE_TOKEN) {
   const result = await callRubeMCP('RUBE_MULTI_EXECUTE_TOOL', {
     tools: [{
       tool_slug: toolSlug,
@@ -110,13 +132,16 @@ async function executeInstagramTool(toolSlug, args) {
     memory: {},
     session_id: 'scheduled_publisher',
     thought: `Auto-publishing: ${toolSlug}`
-  });
+  }, token);
 
   const nestedData = result?.data?.data;
   if (nestedData?.results && nestedData.results.length > 0) {
     const toolResult = nestedData.results[0];
     if (toolResult?.response?.error) {
       throw new Error(toolResult.response.error);
+    }
+    if (toolResult?.error) {
+      throw new Error(toolResult.error);
     }
     return toolResult?.response?.data;
   }
@@ -165,10 +190,12 @@ async function ensureHttpUrl(imageUrl) {
 
 /**
  * Create media container
+ * @param credentials - { token, instagramUserId }
  */
-async function createMediaContainer(contentType, mediaUrl, caption) {
+async function createMediaContainer(contentType, mediaUrl, caption, credentials) {
+  const { token, instagramUserId } = credentials;
   const args = {
-    ig_user_id: INSTAGRAM_USER_ID,
+    ig_user_id: instagramUserId,
   };
 
   if (contentType !== 'story') {
@@ -185,7 +212,7 @@ async function createMediaContainer(contentType, mediaUrl, caption) {
     args.image_url = mediaUrl;
   }
 
-  const result = await executeInstagramTool('INSTAGRAM_CREATE_MEDIA_CONTAINER', args);
+  const result = await executeInstagramTool('INSTAGRAM_CREATE_MEDIA_CONTAINER', args, token);
   const containerId = result?.id || result?.creation_id || result?.container_id || result?.data?.id;
 
   if (!containerId) {
@@ -197,31 +224,60 @@ async function createMediaContainer(contentType, mediaUrl, caption) {
 
 /**
  * Get container status
+ * @param credentials - { token }
  */
-async function getContainerStatus(containerId) {
+async function getContainerStatus(containerId, credentials) {
+  const { token } = credentials;
   const result = await executeInstagramTool('INSTAGRAM_GET_POST_STATUS', {
     creation_id: containerId
-  });
+  }, token);
   return result?.status_code || result?.status || 'IN_PROGRESS';
 }
 
 /**
  * Publish container
+ * @param credentials - { token, instagramUserId }
  */
-async function publishContainer(containerId) {
+async function publishContainer(containerId, credentials) {
+  const { token, instagramUserId } = credentials;
   const result = await executeInstagramTool('INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH', {
-    ig_user_id: INSTAGRAM_USER_ID,
+    ig_user_id: instagramUserId,
     creation_id: containerId
-  });
+  }, token);
   return result?.id || result?.data?.id;
 }
 
 /**
  * Publish a single post
+ * Fetches Instagram credentials from database if instagram_account_id is set
  */
 async function publishPost(post) {
   try {
     console.log(`[Publisher] Publishing post ${post.id}...`);
+
+    // Get credentials - from database if instagram_account_id, else fallback to global
+    let credentials;
+    if (post.instagram_account_id) {
+      const dbCredentials = await getInstagramCredentials(post.instagram_account_id);
+      if (!dbCredentials) {
+        throw new Error('Instagram account not found or inactive. Please reconnect in Settings → Integrations.');
+      }
+      credentials = {
+        token: dbCredentials.rube_token,
+        instagramUserId: dbCredentials.instagram_user_id
+      };
+      console.log(`[Publisher] Using user token for Instagram: ${credentials.instagramUserId}`);
+    } else {
+      // Legacy: no instagram_account_id - use global token (should not happen for new posts)
+      if (!RUBE_TOKEN) {
+        throw new Error('No Instagram account connected. Please connect in Settings → Integrations.');
+      }
+      credentials = {
+        token: RUBE_TOKEN,
+        instagramUserId: process.env.INSTAGRAM_USER_ID || '25281402468195799'
+      };
+      console.log('[Publisher] Warning: Using legacy global token');
+    }
 
     // Ensure HTTP URL
     const httpUrl = await ensureHttpUrl(post.image_url);
@@ -237,7 +293,8 @@ async function publishPost(post) {
     const containerId = await createMediaContainer(
       post.instagram_content_type || 'photo',
       httpUrl,
-      fullCaption
+      fullCaption,
+      credentials
     );
     console.log(`[Publisher] Container created: ${containerId}`);
 
@@ -247,7 +304,7 @@ async function publishPost(post) {
     while (status === 'IN_PROGRESS' && attempts < 60) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       try {
-        status = await getContainerStatus(containerId);
+        status = await getContainerStatus(containerId, credentials);
       } catch (e) {
         console.warn('[Publisher] Status check failed, retrying...');
       }
@@ -259,7 +316,7 @@ async function publishPost(post) {
     }
 
     // Publish
-    const mediaId = await publishContainer(containerId);
+    const mediaId = await publishContainer(containerId, credentials);
     console.log(`[Publisher] Published! Media ID: ${mediaId}`);
 
     return { success: true, mediaId };

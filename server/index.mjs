@@ -1559,6 +1559,7 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
       timezone,
       platforms,
       instagram_content_type,
+      instagram_account_id,
       created_from,
     } = req.body;
 
@@ -1600,12 +1601,12 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
       INSERT INTO scheduled_posts (
         user_id, organization_id, content_type, content_id, image_url, caption, hashtags,
         scheduled_date, scheduled_time, scheduled_timestamp, timezone,
-        platforms, instagram_content_type, created_from
+        platforms, instagram_content_type, instagram_account_id, created_from
       ) VALUES (
         ${resolvedUserId}, ${organization_id || null}, ${content_type || "flyer"}, ${content_id || null}, ${image_url}, ${caption || ""},
         ${hashtags || []}, ${scheduled_date}, ${scheduled_time}, ${timestampMs},
         ${timezone || "America/Sao_Paulo"}, ${platforms || "instagram"},
-        ${instagram_content_type || "photo"}, ${created_from || null}
+        ${instagram_content_type || "photo"}, ${instagram_account_id || null}, ${created_from || null}
       )
       RETURNING *
     `;
@@ -3486,12 +3487,72 @@ app.post("/api/ai/video", async (req, res) => {
 // RUBE_MCP_URL already defined above at line 1752
 
 app.post("/api/rube", async (req, res) => {
-  const token = process.env.RUBE_TOKEN;
-  if (!token) {
-    return res.status(500).json({ error: 'RUBE_TOKEN not configured' });
-  }
-
   try {
+    const sql = getSql();
+    const { instagram_account_id, user_id, ...mcpRequest } = req.body;
+
+    let token;
+    let instagramUserId;
+
+    // Multi-tenant mode: use user's token from database
+    if (instagram_account_id && user_id) {
+      console.log('[Rube Proxy] Multi-tenant mode - fetching token for account:', instagram_account_id);
+
+      // Resolve user_id: can be DB UUID or Clerk ID
+      let resolvedUserId = user_id;
+      if (user_id.startsWith('user_')) {
+        const userResult = await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
+        resolvedUserId = userResult[0]?.id;
+        if (!resolvedUserId) {
+          console.log('[Rube Proxy] User not found for Clerk ID:', user_id);
+          return res.status(400).json({ error: 'User not found' });
+        }
+      }
+
+      // Fetch account token and instagram_user_id
+      const accountResult = await sql`
+        SELECT rube_token, instagram_user_id FROM instagram_accounts
+        WHERE id = ${instagram_account_id} AND user_id = ${resolvedUserId} AND is_active = TRUE
+        LIMIT 1
+      `;
+
+      if (accountResult.length === 0) {
+        console.log('[Rube Proxy] Instagram account not found or not active');
+        return res.status(403).json({ error: 'Instagram account not found or inactive' });
+      }
+
+      token = accountResult[0].rube_token;
+      instagramUserId = accountResult[0].instagram_user_id;
+      console.log('[Rube Proxy] Using token for Instagram user:', instagramUserId);
+
+      // Update last_used_at
+      await sql`UPDATE instagram_accounts SET last_used_at = NOW() WHERE id = ${instagram_account_id}`;
+    } else {
+      // Fallback to global token (dev mode)
+      token = process.env.RUBE_TOKEN;
+      if (!token) {
+        return res.status(500).json({ error: 'RUBE_TOKEN not configured' });
+      }
+      console.log('[Rube Proxy] Using global RUBE_TOKEN (dev mode)');
+    }
+
+    // Inject ig_user_id into tool arguments if we have it
+    if (instagramUserId && mcpRequest.params?.arguments) {
+      // For RUBE_MULTI_EXECUTE_TOOL, inject into each tool's arguments
+      if (mcpRequest.params.arguments.tools && Array.isArray(mcpRequest.params.arguments.tools)) {
+        mcpRequest.params.arguments.tools.forEach(tool => {
+          if (tool.arguments) {
+            tool.arguments.ig_user_id = instagramUserId;
+          }
+        });
+        console.log('[Rube Proxy] Injected ig_user_id into', mcpRequest.params.arguments.tools.length, 'tools');
+      } else {
+        // For direct tool calls
+        mcpRequest.params.arguments.ig_user_id = instagramUserId;
+        console.log('[Rube Proxy] Injected ig_user_id directly');
+      }
+    }
+
     const response = await fetch(RUBE_MCP_URL, {
       method: 'POST',
       headers: {
@@ -3499,7 +3560,7 @@ app.post("/api/rube", async (req, res) => {
         'Accept': 'application/json, text/event-stream',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify(req.body),
+      body: JSON.stringify(mcpRequest),
     });
 
     const text = await response.text();
@@ -3586,6 +3647,13 @@ async function runAutoMigrations() {
       )
     `;
     console.log("[Migration] ✓ Ensured instagram_accounts table exists");
+
+    // Add instagram_account_id column to scheduled_posts if not exists
+    await sql`
+      ALTER TABLE scheduled_posts
+      ADD COLUMN IF NOT EXISTS instagram_account_id UUID REFERENCES instagram_accounts(id) ON DELETE SET NULL
+    `;
+    console.log("[Migration] ✓ Ensured instagram_account_id column in scheduled_posts");
 
   } catch (error) {
     console.error("[Migration] Error:", error.message);

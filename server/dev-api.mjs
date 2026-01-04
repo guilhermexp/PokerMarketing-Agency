@@ -1067,6 +1067,7 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
       timezone,
       platforms,
       instagram_content_type,
+      instagram_account_id,
       created_from,
     } = req.body;
 
@@ -1111,12 +1112,12 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
       INSERT INTO scheduled_posts (
         user_id, organization_id, content_type, content_id, image_url, caption, hashtags,
         scheduled_date, scheduled_time, scheduled_timestamp, timezone,
-        platforms, instagram_content_type, created_from
+        platforms, instagram_content_type, instagram_account_id, created_from
       ) VALUES (
         ${resolvedUserId}, ${organization_id || null}, ${content_type || "flyer"}, ${content_id || null}, ${image_url}, ${caption || ""},
         ${hashtags || []}, ${scheduled_date}, ${scheduled_time}, ${timestampMs},
         ${timezone || "America/Sao_Paulo"}, ${platforms || "instagram"},
-        ${instagram_content_type || "photo"}, ${created_from || null}
+        ${instagram_content_type || "photo"}, ${instagram_account_id || null}, ${created_from || null}
       )
       RETURNING *
     `;
@@ -2182,6 +2183,383 @@ app.post("/api/ai/video", async (req, res) => {
     logError('Video API', error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to generate video',
+    });
+  }
+});
+
+// ============================================================================
+// INSTAGRAM ACCOUNTS API (Multi-tenant Rube MCP)
+// ============================================================================
+
+const RUBE_MCP_URL = 'https://rube.app/mcp';
+
+// Validate Rube token by calling Instagram API
+async function validateRubeToken(rubeToken) {
+  try {
+    const request = {
+      jsonrpc: '2.0',
+      id: `validate_${Date.now()}`,
+      method: 'tools/call',
+      params: {
+        name: 'RUBE_MULTI_EXECUTE_TOOL',
+        arguments: {
+          tools: [{
+            tool_slug: 'INSTAGRAM_GET_USER_INFO',
+            arguments: { fields: 'id,username' }
+          }],
+          sync_response_to_workbench: false,
+          memory: {},
+          session_id: 'validate',
+          thought: 'Validating Instagram connection'
+        }
+      }
+    };
+
+    console.log('[Instagram] Validating token with Rube MCP...');
+    const response = await fetch(RUBE_MCP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'Authorization': `Bearer ${rubeToken}`
+      },
+      body: JSON.stringify(request)
+    });
+
+    const text = await response.text();
+    console.log('[Instagram] Rube response status:', response.status);
+    console.log('[Instagram] Rube response (first 500 chars):', text.substring(0, 500));
+
+    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+      return { success: false, error: 'Token inválido ou expirado. Gere um novo token no Rube.' };
+    }
+
+    if (!response.ok) {
+      return { success: false, error: `Erro ao validar token (${response.status})` };
+    }
+
+    // Parse SSE response
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try {
+          const json = JSON.parse(line.substring(6));
+          console.log('[Instagram] Parsed SSE data:', JSON.stringify(json, null, 2).substring(0, 500));
+          if (json?.error) {
+            return { success: false, error: 'Instagram não conectado no Rube.' };
+          }
+          const nestedData = json?.result?.content?.[0]?.text;
+          if (nestedData) {
+            const parsed = JSON.parse(nestedData);
+            console.log('[Instagram] Nested data:', JSON.stringify(parsed, null, 2).substring(0, 500));
+            if (parsed?.error || parsed?.data?.error) {
+              return { success: false, error: 'Instagram não conectado no Rube.' };
+            }
+            const results = parsed?.data?.data?.results || parsed?.data?.results;
+            if (results && results.length > 0) {
+              const userData = results[0]?.response?.data;
+              if (userData?.id) {
+                console.log('[Instagram] Found user:', userData.username, userData.id);
+                return {
+                  success: true,
+                  instagramUserId: String(userData.id),
+                  instagramUsername: userData.username || 'unknown'
+                };
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[Instagram] Parse error:', e);
+        }
+      }
+    }
+    return { success: false, error: 'Instagram não conectado no Rube.' };
+  } catch (error) {
+    console.error('[Instagram] Validation error:', error);
+    return { success: false, error: error.message || 'Erro ao validar token' };
+  }
+}
+
+// GET - List Instagram accounts
+app.get("/api/db/instagram-accounts", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { user_id, organization_id, id } = req.query;
+
+    if (id) {
+      const result = await sql`
+        SELECT id, user_id, organization_id, instagram_user_id, instagram_username,
+               is_active, connected_at, last_used_at, created_at, updated_at
+        FROM instagram_accounts WHERE id = ${id}
+      `;
+      return res.json(result[0] || null);
+    }
+
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    // user_id can be either DB UUID or Clerk ID - try both
+    let resolvedUserId = user_id;
+
+    // Check if it's a Clerk ID (starts with 'user_')
+    if (user_id.startsWith('user_')) {
+      const userResult = await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
+      resolvedUserId = userResult[0]?.id;
+      if (!resolvedUserId) {
+        console.log('[Instagram] User not found for Clerk ID:', user_id);
+        return res.json([]);
+      }
+    } else {
+      // Assume it's a DB UUID - verify it exists
+      const userResult = await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
+      if (userResult.length === 0) {
+        console.log('[Instagram] User not found for DB UUID:', user_id);
+        return res.json([]);
+      }
+    }
+    console.log('[Instagram] Resolved user ID:', resolvedUserId);
+
+    const result = organization_id
+      ? await sql`
+          SELECT id, user_id, organization_id, instagram_user_id, instagram_username,
+                 is_active, connected_at, last_used_at, created_at, updated_at
+          FROM instagram_accounts
+          WHERE organization_id = ${organization_id} AND is_active = TRUE
+          ORDER BY connected_at DESC
+        `
+      : await sql`
+          SELECT id, user_id, organization_id, instagram_user_id, instagram_username,
+                 is_active, connected_at, last_used_at, created_at, updated_at
+          FROM instagram_accounts
+          WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND is_active = TRUE
+          ORDER BY connected_at DESC
+        `;
+
+    res.json(result);
+  } catch (error) {
+    console.error("[Instagram Accounts API] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST - Connect new Instagram account
+app.post("/api/db/instagram-accounts", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { user_id, organization_id, rube_token } = req.body;
+
+    console.log('[Instagram] POST request:', { user_id, organization_id, hasToken: !!rube_token });
+
+    if (!user_id || !rube_token) {
+      return res.status(400).json({ error: 'user_id and rube_token are required' });
+    }
+
+    // user_id can be either DB UUID or Clerk ID - try both
+    let resolvedUserId = user_id;
+
+    if (user_id.startsWith('user_')) {
+      const userResult = await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
+      resolvedUserId = userResult[0]?.id;
+      if (!resolvedUserId) {
+        console.log('[Instagram] User not found for Clerk ID:', user_id);
+        return res.status(400).json({ error: 'User not found' });
+      }
+    } else {
+      const userResult = await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
+      if (userResult.length === 0) {
+        console.log('[Instagram] User not found for DB UUID:', user_id);
+        return res.status(400).json({ error: 'User not found' });
+      }
+    }
+    console.log('[Instagram] Resolved user ID:', resolvedUserId);
+
+    // Validate the Rube token
+    const validation = await validateRubeToken(rube_token);
+    console.log('[Instagram] Validation result:', validation);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error || 'Token inválido' });
+    }
+
+    const { instagramUserId, instagramUsername } = validation;
+
+    // Check if already connected
+    const existing = await sql`
+      SELECT id FROM instagram_accounts
+      WHERE user_id = ${resolvedUserId} AND instagram_user_id = ${instagramUserId}
+    `;
+
+    if (existing.length > 0) {
+      // Update existing
+      const result = await sql`
+        UPDATE instagram_accounts
+        SET rube_token = ${rube_token}, instagram_username = ${instagramUsername},
+            is_active = TRUE, connected_at = NOW(), updated_at = NOW()
+        WHERE id = ${existing[0].id}
+        RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
+                  is_active, connected_at, last_used_at, created_at, updated_at
+      `;
+      return res.json({ success: true, account: result[0], message: 'Conta reconectada!' });
+    }
+
+    // Create new
+    const result = await sql`
+      INSERT INTO instagram_accounts (user_id, organization_id, instagram_user_id, instagram_username, rube_token)
+      VALUES (${resolvedUserId}, ${organization_id || null}, ${instagramUserId}, ${instagramUsername}, ${rube_token})
+      RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
+                is_active, connected_at, last_used_at, created_at, updated_at
+    `;
+
+    res.status(201).json({ success: true, account: result[0], message: `Conta @${instagramUsername} conectada!` });
+  } catch (error) {
+    console.error("[Instagram Accounts API] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT - Update Instagram account token
+app.put("/api/db/instagram-accounts", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { id } = req.query;
+    const { rube_token } = req.body;
+
+    if (!id || !rube_token) {
+      return res.status(400).json({ error: 'id and rube_token are required' });
+    }
+
+    const validation = await validateRubeToken(rube_token);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    const result = await sql`
+      UPDATE instagram_accounts
+      SET rube_token = ${rube_token}, instagram_username = ${validation.instagramUsername},
+          updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
+                is_active, connected_at, last_used_at, created_at, updated_at
+    `;
+
+    res.json({ success: true, account: result[0], message: 'Token atualizado!' });
+  } catch (error) {
+    console.error("[Instagram Accounts API] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE - Disconnect Instagram account (soft delete)
+app.delete("/api/db/instagram-accounts", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { id } = req.query;
+
+    if (!id) {
+      return res.status(400).json({ error: 'id is required' });
+    }
+
+    await sql`UPDATE instagram_accounts SET is_active = FALSE, updated_at = NOW() WHERE id = ${id}`;
+    res.json({ success: true, message: 'Conta desconectada.' });
+  } catch (error) {
+    console.error("[Instagram Accounts API] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// RUBE MCP PROXY - For Instagram Publishing (multi-tenant)
+// ============================================================================
+
+// RUBE_MCP_URL already defined above
+
+app.post("/api/rube", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { instagram_account_id, user_id, ...mcpRequest } = req.body;
+
+    let token;
+    let instagramUserId;
+
+    // Multi-tenant mode: use user's token from database
+    if (instagram_account_id && user_id) {
+      console.log('[Rube Proxy] Multi-tenant mode - fetching token for account:', instagram_account_id);
+
+      // Resolve user_id: can be DB UUID or Clerk ID
+      let resolvedUserId = user_id;
+      if (user_id.startsWith('user_')) {
+        const userResult = await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
+        resolvedUserId = userResult[0]?.id;
+        if (!resolvedUserId) {
+          console.log('[Rube Proxy] User not found for Clerk ID:', user_id);
+          return res.status(400).json({ error: 'User not found' });
+        }
+        console.log('[Rube Proxy] Resolved Clerk ID to DB UUID:', resolvedUserId);
+      }
+
+      // Fetch account token and instagram_user_id
+      const accountResult = await sql`
+        SELECT rube_token, instagram_user_id FROM instagram_accounts
+        WHERE id = ${instagram_account_id} AND user_id = ${resolvedUserId} AND is_active = TRUE
+        LIMIT 1
+      `;
+
+      if (accountResult.length === 0) {
+        console.log('[Rube Proxy] Instagram account not found or not active');
+        return res.status(403).json({ error: 'Instagram account not found or inactive' });
+      }
+
+      token = accountResult[0].rube_token;
+      instagramUserId = accountResult[0].instagram_user_id;
+      console.log('[Rube Proxy] Using token for Instagram user:', instagramUserId);
+
+      // Update last_used_at
+      await sql`UPDATE instagram_accounts SET last_used_at = NOW() WHERE id = ${instagram_account_id}`;
+    } else {
+      // Fallback to global token (dev mode)
+      token = process.env.RUBE_TOKEN;
+      if (!token) {
+        return res.status(500).json({ error: 'RUBE_TOKEN not configured' });
+      }
+      console.log('[Rube Proxy] Using global RUBE_TOKEN (dev mode)');
+    }
+
+    // Inject ig_user_id into tool arguments if we have it
+    if (instagramUserId && mcpRequest.params?.arguments) {
+      // For RUBE_MULTI_EXECUTE_TOOL, inject into each tool's arguments
+      if (mcpRequest.params.arguments.tools && Array.isArray(mcpRequest.params.arguments.tools)) {
+        mcpRequest.params.arguments.tools.forEach(tool => {
+          if (tool.arguments) {
+            tool.arguments.ig_user_id = instagramUserId;
+          }
+        });
+        console.log('[Rube Proxy] Injected ig_user_id into', mcpRequest.params.arguments.tools.length, 'tools');
+      } else {
+        // For direct tool calls
+        mcpRequest.params.arguments.ig_user_id = instagramUserId;
+        console.log('[Rube Proxy] Injected ig_user_id directly');
+      }
+    }
+
+    console.log('[Rube Proxy] Calling Rube MCP:', mcpRequest.params?.name);
+
+    const response = await fetch(RUBE_MCP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(mcpRequest),
+    });
+
+    const text = await response.text();
+    console.log('[Rube Proxy] Response status:', response.status);
+    res.status(response.status).send(text);
+  } catch (error) {
+    console.error('[Rube Proxy] Error:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });

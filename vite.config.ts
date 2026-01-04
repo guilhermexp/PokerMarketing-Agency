@@ -57,18 +57,8 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         },
         "/api/rube": {
-          target: "https://rube.app",
+          target: "http://localhost:3002",
           changeOrigin: true,
-          rewrite: (path) => "/mcp",
-          configure: (proxy) => {
-            proxy.on("proxyReq", (proxyReq) => {
-              proxyReq.setHeader("Authorization", `Bearer ${env.RUBE_TOKEN}`);
-              proxyReq.setHeader(
-                "Accept",
-                "application/json, text/event-stream",
-              );
-            });
-          },
         },
       },
     },
