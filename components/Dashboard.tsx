@@ -62,6 +62,10 @@ interface DashboardProps {
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onDeleteGalleryImage?: (imageId: string) => void;
   onMarkGalleryImagePublished?: (imageId: string) => void;
+  // Gallery Pagination
+  onGalleryLoadMore?: () => void;
+  galleryIsLoadingMore?: boolean;
+  galleryHasMore?: boolean;
   tournamentEvents: TournamentEvent[];
   weekScheduleInfo: WeekScheduleInfo | null;
   onTournamentFileUpload: (file: File) => Promise<void>;
@@ -181,6 +185,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     onViewChange,
     onPublishToCampaign,
     onDeleteGalleryImage,
+    onGalleryLoadMore,
+    galleryIsLoadingMore,
+    galleryHasMore,
     styleReferences,
     onAddStyleReference,
     onRemoveStyleReference,
@@ -704,6 +711,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
               onSelectStyleReference={onSelectStyleReference}
               onPublishToCampaign={onPublishToCampaign}
               onQuickPost={setQuickPostImage}
+              onLoadMore={onGalleryLoadMore}
+              isLoadingMore={galleryIsLoadingMore}
+              hasMore={galleryHasMore}
               onSchedulePost={(image) => {
                 // Create scheduled post for tomorrow at noon
                 const tomorrow = new Date();

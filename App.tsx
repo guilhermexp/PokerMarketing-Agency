@@ -225,6 +225,9 @@ function AppContent() {
     addImage: swrAddGalleryImage,
     removeImage: swrRemoveGalleryImage,
     updateImage: swrUpdateGalleryImage,
+    loadMore: galleryLoadMore,
+    isLoadingMore: galleryIsLoadingMore,
+    hasMore: galleryHasMore,
   } = useGalleryImages(userId, organizationId);
 
   const {
@@ -1688,6 +1691,9 @@ function AppContent() {
             onUpdateGalleryImage={handleUpdateGalleryImage}
             onDeleteGalleryImage={handleDeleteGalleryImage}
             onMarkGalleryImagePublished={handleMarkGalleryImagePublished}
+            onGalleryLoadMore={galleryLoadMore}
+            galleryIsLoadingMore={galleryIsLoadingMore}
+            galleryHasMore={galleryHasMore}
             tournamentEvents={tournamentEvents}
             weekScheduleInfo={weekScheduleInfo}
             onTournamentFileUpload={handleTournamentFileUpload}

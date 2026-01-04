@@ -4,6 +4,7 @@
  * This reduces 6 separate API calls to 1, dramatically reducing network transfer
  */
 
+import React from "react";
 import useSWR, { SWRConfiguration, mutate as globalMutate } from "swr";
 import {
   getInitialData,
@@ -175,11 +176,56 @@ export function useGalleryImages(
     },
   );
 
+  // Track pagination state
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(true);
+
+  // Load more images from API
+  const loadMore = async () => {
+    if (!userId || isLoadingMore || !hasMore) return;
+
+    setIsLoadingMore(true);
+    try {
+      const currentCount = data?.length || 0;
+      const params = new URLSearchParams({
+        user_id: userId,
+        limit: '50',
+        offset: currentCount.toString(),
+      });
+      if (organizationId) {
+        params.set('organization_id', organizationId);
+      }
+
+      const response = await fetch(`/api/db/gallery?${params}`);
+      if (!response.ok) throw new Error('Failed to load more images');
+
+      const newImages: DbGalleryImage[] = await response.json();
+
+      // If we got fewer than 50, there are no more images
+      if (newImages.length < 50) {
+        setHasMore(false);
+      }
+
+      // Append new images to cache
+      if (newImages.length > 0) {
+        mutate((current) => [...(current || []), ...newImages], false);
+      }
+    } catch (err) {
+      console.error('[useGalleryImages] Failed to load more:', err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
   return {
     images: data ?? EMPTY_GALLERY,
     isLoading,
     error,
     refresh: () => mutate(),
+    // Pagination
+    loadMore,
+    isLoadingMore,
+    hasMore,
     // Optimistic update for adding image
     addImage: (image: DbGalleryImage) => {
       mutate((current) => (current ? [image, ...current] : [image]), false);

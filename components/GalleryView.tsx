@@ -17,6 +17,10 @@ interface GalleryViewProps {
   onQuickPost?: (image: GalleryImage) => void;
   onPublishToCampaign?: (text: string, image: GalleryImage) => void;
   onSchedulePost?: (image: GalleryImage) => void;
+  // Pagination
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
+  hasMore?: boolean;
 }
 
 type ViewMode = "gallery" | "references";
@@ -197,6 +201,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   onQuickPost,
   onPublishToCampaign,
   onSchedulePost,
+  onLoadMore,
+  isLoadingMore = false,
+  hasMore = true,
 }) => {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("gallery");
@@ -406,6 +413,29 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       className="break-inside-avoid mb-3"
                     />
                   ))}
+                </div>
+              )}
+
+              {/* Load More Button */}
+              {onLoadMore && hasMore && images.length > 0 && (
+                <div className="flex justify-center pt-6 pb-2">
+                  <Button
+                    variant="secondary"
+                    onClick={onLoadMore}
+                    isLoading={isLoadingMore}
+                    icon={isLoadingMore ? undefined : "chevron-down"}
+                  >
+                    {isLoadingMore ? "Carregando..." : "Carregar Mais"}
+                  </Button>
+                </div>
+              )}
+
+              {/* No more images indicator */}
+              {onLoadMore && !hasMore && images.length > 0 && (
+                <div className="flex justify-center pt-6 pb-2">
+                  <span className="text-[10px] text-white/30 font-bold uppercase tracking-wider">
+                    Todas as imagens carregadas
+                  </span>
                 </div>
               )}
 
