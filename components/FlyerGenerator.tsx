@@ -18,6 +18,7 @@ import { EmptyState } from "./common/EmptyState";
 import { generateFlyer } from "../services/geminiService";
 import { ImagePreviewModal } from "./common/ImagePreviewModal";
 import { QuickPostModal } from "./common/QuickPostModal";
+import { SchedulePostModal } from "./calendar/SchedulePostModal";
 import { useBackgroundJobs, type ActiveJob } from "../hooks/useBackgroundJobs";
 import type {
   GenerationJobConfig,
@@ -67,6 +68,9 @@ interface FlyerGeneratorProps {
   onSelectSchedule?: (schedule: WeekScheduleWithCount) => void;
   // Instagram Multi-tenant
   instagramContext?: InstagramContext;
+  // Scheduling
+  galleryImages?: GalleryImage[];
+  onSchedulePost?: (post: Omit<import("../types").ScheduledPost, "id" | "createdAt" | "updatedAt">) => void;
 }
 
 const formatCurrencyValue = (val: string, currency: Currency): string => {
@@ -145,6 +149,7 @@ const FlyerThumbStrip: React.FC<{
   images: (GalleryImage | "loading")[];
   onEdit: (image: GalleryImage) => void;
   onQuickPost: (image: GalleryImage) => void;
+  onSchedule?: (image: GalleryImage) => void;
   onPublish: (image: GalleryImage) => void;
   onDownload: (image: GalleryImage, index: number) => void;
   onCloneStyle?: (image: GalleryImage) => void;
@@ -155,6 +160,7 @@ const FlyerThumbStrip: React.FC<{
   images,
   onEdit,
   onQuickPost,
+  onSchedule,
   onPublish,
   onDownload,
   onCloneStyle,
@@ -237,13 +243,24 @@ const FlyerThumbStrip: React.FC<{
                   onClick={() => onEdit(flyer)}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-2 gap-1.5">
-                  <button
-                    onClick={() => onQuickPost(flyer)}
-                    className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-primary hover:bg-primary/90 rounded-lg text-black font-bold text-[9px] uppercase tracking-wide transition-all"
-                  >
-                    <Icon name="zap" className="w-3 h-3" />
-                    QuickPost
-                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => onQuickPost(flyer)}
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-primary hover:bg-primary/90 rounded-lg text-black font-bold text-[8px] uppercase tracking-wide transition-all"
+                    >
+                      <Icon name="zap" className="w-2.5 h-2.5" />
+                      Publicar
+                    </button>
+                    {onSchedule && (
+                      <button
+                        onClick={() => onSchedule(flyer)}
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                      >
+                        <Icon name="calendar" className="w-2.5 h-2.5" />
+                        Agendar
+                      </button>
+                    )}
+                  </div>
                   <div className="flex gap-1.5">
                     <button
                       onClick={() => onEdit(flyer)}
@@ -320,6 +337,8 @@ const TournamentEventCard: React.FC<{
   onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
   userId?: string | null;
   instagramContext?: InstagramContext;
+  galleryImages?: GalleryImage[];
+  onSchedulePost?: (post: Omit<import("../types").ScheduledPost, "id" | "createdAt" | "updatedAt">) => void;
 }> = ({
   event,
   brandProfile,
@@ -339,6 +358,8 @@ const TournamentEventCard: React.FC<{
   onPublishToCampaign,
   userId,
   instagramContext,
+  galleryImages = [],
+  onSchedulePost,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   // Auto-expand if there are already generated flyers
@@ -348,6 +369,7 @@ const TournamentEventCard: React.FC<{
   const [quickPostFlyer, setQuickPostFlyer] = useState<GalleryImage | null>(
     null,
   );
+  const [scheduleFlyer, setScheduleFlyer] = useState<GalleryImage | null>(null);
 
   const { queueJob, onJobComplete, onJobFailed, getJobByContext } =
     useBackgroundJobs();
@@ -597,6 +619,7 @@ const TournamentEventCard: React.FC<{
             images={generatedFlyers}
             onEdit={setEditingFlyer}
             onQuickPost={setQuickPostFlyer}
+            onSchedule={onSchedulePost ? setScheduleFlyer : undefined}
             onDownload={(f, index) =>
               handleDownloadFlyer(f.src, `flyer-${event.id}-${index}.png`)
             }
@@ -637,6 +660,15 @@ const TournamentEventCard: React.FC<{
           instagramContext={instagramContext}
         />
       )}
+      {scheduleFlyer && onSchedulePost && (
+        <SchedulePostModal
+          isOpen={!!scheduleFlyer}
+          onClose={() => setScheduleFlyer(null)}
+          galleryImages={galleryImages}
+          onSchedulePost={onSchedulePost}
+          initialImage={scheduleFlyer}
+        />
+      )}
     </div>
   );
 };
@@ -668,6 +700,8 @@ const PeriodCardRow: React.FC<{
   onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
   userId?: string | null;
   instagramContext?: InstagramContext;
+  galleryImages?: GalleryImage[];
+  onSchedulePost?: (post: Omit<import("../types").ScheduledPost, "id" | "createdAt" | "updatedAt">) => void;
 }> = ({
   period,
   label,
@@ -691,6 +725,8 @@ const PeriodCardRow: React.FC<{
   onPublishToCampaign,
   userId,
   instagramContext,
+  galleryImages = [],
+  onSchedulePost,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   // Auto-expand if there are already generated flyers
@@ -700,6 +736,7 @@ const PeriodCardRow: React.FC<{
   const [quickPostFlyer, setQuickPostFlyer] = useState<GalleryImage | null>(
     null,
   );
+  const [scheduleFlyer, setScheduleFlyer] = useState<GalleryImage | null>(null);
 
   const { queueJob, onJobComplete, onJobFailed, getJobByContext } =
     useBackgroundJobs();
@@ -1014,6 +1051,7 @@ const PeriodCardRow: React.FC<{
             images={generatedFlyers}
             onEdit={setEditingFlyer}
             onQuickPost={setQuickPostFlyer}
+            onSchedule={onSchedulePost ? setScheduleFlyer : undefined}
             onPublish={(f) =>
               onPublishToCampaign(`Campanha para grade ${label}`, f)
             }
@@ -1057,6 +1095,15 @@ const PeriodCardRow: React.FC<{
           instagramContext={instagramContext}
         />
       )}
+      {scheduleFlyer && onSchedulePost && (
+        <SchedulePostModal
+          isOpen={!!scheduleFlyer}
+          onClose={() => setScheduleFlyer(null)}
+          galleryImages={galleryImages}
+          onSchedulePost={onSchedulePost}
+          initialImage={scheduleFlyer}
+        />
+      )}
     </div>
   );
 };
@@ -1088,6 +1135,8 @@ const PeriodCard: React.FC<{
   onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
   userId?: string | null;
   instagramContext?: InstagramContext;
+  galleryImages?: GalleryImage[];
+  onSchedulePost?: (post: Omit<import("../types").ScheduledPost, "id" | "createdAt" | "updatedAt">) => void;
 }> = ({
   period,
   label,
@@ -1111,12 +1160,15 @@ const PeriodCard: React.FC<{
   onPublishToCampaign,
   userId,
   instagramContext,
+  galleryImages = [],
+  onSchedulePost,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingFlyer, setEditingFlyer] = useState<GalleryImage | null>(null);
   const [quickPostFlyer, setQuickPostFlyer] = useState<GalleryImage | null>(
     null,
   );
+  const [scheduleFlyer, setScheduleFlyer] = useState<GalleryImage | null>(null);
 
   const { queueJob, onJobComplete, onJobFailed, getJobByContext } =
     useBackgroundJobs();
@@ -1451,6 +1503,7 @@ const PeriodCard: React.FC<{
           images={generatedFlyers}
           onEdit={setEditingFlyer}
           onQuickPost={setQuickPostFlyer}
+          onSchedule={onSchedulePost ? setScheduleFlyer : undefined}
           onPublish={(f) =>
             onPublishToCampaign(`Campanha para grade ${label}`, f)
           }
@@ -1491,6 +1544,15 @@ const PeriodCard: React.FC<{
           brandProfile={brandProfile}
           context={`Sessão: ${label}. Grade:\n${events.map((e) => e.name).join(", ")}`}
           instagramContext={instagramContext}
+        />
+      )}
+      {scheduleFlyer && onSchedulePost && (
+        <SchedulePostModal
+          isOpen={!!scheduleFlyer}
+          onClose={() => setScheduleFlyer(null)}
+          galleryImages={galleryImages}
+          onSchedulePost={onSchedulePost}
+          initialImage={scheduleFlyer}
         />
       )}
     </div>
@@ -1781,6 +1843,8 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   currentScheduleId,
   onSelectSchedule,
   instagramContext,
+  galleryImages = [],
+  onSchedulePost,
 }) => {
   const daysMap = [
     "SUNDAY",
@@ -2795,6 +2859,8 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   onPublishToCampaign={onPublishToCampaign}
                   userId={userId}
                   instagramContext={instagramContext}
+                  galleryImages={galleryImages}
+                  onSchedulePost={onSchedulePost}
                 />
               ))}
             </div>
@@ -2848,6 +2914,8 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                               onPublishToCampaign={onPublishToCampaign}
                               userId={userId}
                               instagramContext={instagramContext}
+                              galleryImages={galleryImages}
+                              onSchedulePost={onSchedulePost}
                             />
                           ))}
                         </div>
@@ -2882,6 +2950,8 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         onPublishToCampaign={onPublishToCampaign}
                         userId={userId}
                         instagramContext={instagramContext}
+                        galleryImages={galleryImages}
+                        onSchedulePost={onSchedulePost}
                       />
                     ))
                   ) : pastEvents.length > 0 ? (

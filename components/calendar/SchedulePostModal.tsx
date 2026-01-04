@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { ScheduledPost, GalleryImage, SchedulingPlatform, InstagramContentType } from '../../types';
 import { Icon } from '../common/Icon';
 
@@ -8,6 +8,7 @@ interface SchedulePostModalProps {
   onSchedule: (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => void;
   galleryImages: GalleryImage[];
   initialDate?: string | null;
+  initialImage?: GalleryImage | null;
 }
 
 // Check if gallery item is a video
@@ -36,7 +37,8 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   onClose,
   onSchedule,
   galleryImages,
-  initialDate
+  initialDate,
+  initialImage
 }) => {
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -54,6 +56,19 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [caption, setCaption] = useState('');
   const [hashtags, setHashtags] = useState('');
+
+  // Set initial image when modal opens with a pre-selected image
+  useEffect(() => {
+    if (isOpen && initialImage) {
+      setSelectedImages([initialImage]);
+      setCaption(initialImage.prompt || '');
+    } else if (!isOpen) {
+      // Reset when modal closes
+      setSelectedImages([]);
+      setCaption('');
+      setHashtags('');
+    }
+  }, [isOpen, initialImage]);
   const [scheduledDate, setScheduledDate] = useState(initialDate || todayStr);
   const [scheduledTime, setScheduledTime] = useState(getDefaultTime());
   const [platforms] = useState<SchedulingPlatform>('instagram');

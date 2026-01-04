@@ -685,6 +685,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 currentScheduleId={currentScheduleId}
                 onSelectSchedule={onSelectSchedule}
                 instagramContext={instagramContext}
+                galleryImages={galleryImages}
+                onSchedulePost={onSchedulePost}
               />
             </div>
           </div>
