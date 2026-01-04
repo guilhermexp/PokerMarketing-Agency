@@ -1311,6 +1311,7 @@ const PeriodCard: React.FC<{
         : `
         TIPO: Grade de Programação com Destaque Principal
         TÍTULO DA SESSÃO: ${label.toUpperCase()}
+        DATA: ${dayInfo}
 
         ESTRUTURA OBRIGATÓRIA - 2 SEÇÕES DISTINTAS:
 
@@ -1350,6 +1351,7 @@ const PeriodCard: React.FC<{
         ═══════════════════════════════════════════
         - Logo da marca no topo
         - Título "${label}" logo após o logo
+        - Data "${dayInfo}" em tamanho discreto (menor que o título)
         - Fundo baseado em ${brandProfile.primaryColor}
         - Contraste forte entre o DESTAQUE (topo) e a GRADE (inferior)
         - Visual profissional e premium
@@ -2852,6 +2854,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   key={p}
                   period={p}
                   label={periodLabels[selectedLanguage][p]}
+                  dayInfo={`${dayTranslations[selectedDay]} ${getDayDate(selectedDay)}`}
                   events={getEventsByPeriod(p)}
                   brandProfile={brandProfile}
                   aspectRatio={selectedAspectRatio}
