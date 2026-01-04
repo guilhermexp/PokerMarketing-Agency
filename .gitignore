@@ -9,8 +9,10 @@ lerna-debug.log*
 
 node_modules
 package-lock.json
+bun.lock
 dist
 dist-ssr
+dev-dist
 *.local
 
 # Editor directories and files
