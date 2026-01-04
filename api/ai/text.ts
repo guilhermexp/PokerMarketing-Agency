@@ -17,10 +17,14 @@ import {
   generateTextWithOpenRouter,
   generateTextWithOpenRouterVision,
   buildQuickPostPrompt,
+  trackAIOperation,
+  createUsageContext,
+  estimateTokens,
   Type,
   type BrandProfile,
   type CreativeModel,
   type ImageFile,
+  type AIProvider,
 } from './_helpers/index';
 
 interface TextGenerationRequest {
@@ -86,92 +90,121 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Determine which model to use based on brandProfile.creativeModel
     const model = brandProfile.creativeModel || 'gemini-3-pro-preview';
     const isOpenRouter = model.includes('/'); // OpenRouter models have "/" in name
+    const provider: AIProvider = isOpenRouter ? 'openrouter' : 'google';
 
-    let result: string;
+    // Create usage context for tracking
+    const usageContext = createUsageContext(
+      auth.userId,
+      auth.orgId,
+      '/api/ai/text',
+      'text'
+    );
 
+    // Build the prompt text for token estimation
+    let promptText = '';
     if (type === 'quickPost') {
       if (!context) {
         return res.status(400).json({ error: 'context is required for quickPost' });
       }
-
-      const prompt = buildQuickPostPrompt(brandProfile, context);
-
-      if (isOpenRouter) {
-        const parts = [prompt];
-        if (image) {
-          result = await generateTextWithOpenRouterVision(
-            model as CreativeModel,
-            parts,
-            [image],
-            temperature
-          );
-        } else {
-          result = await generateTextWithOpenRouter(
-            model as CreativeModel,
-            '',
-            prompt,
-            temperature
-          );
-        }
-      } else {
-        // Gemini
-        const parts: any[] = [{ text: prompt }];
-        if (image) {
-          parts.push({
-            inlineData: {
-              mimeType: image.mimeType,
-              data: image.base64,
-            },
-          });
-        }
-        result = await generateStructuredContent(model, parts, quickPostSchema, temperature);
-      }
+      promptText = buildQuickPostPrompt(brandProfile, context);
     } else {
-      // Custom text generation
       if (!systemPrompt && !userPrompt) {
         return res.status(400).json({ error: 'systemPrompt or userPrompt is required for custom text' });
       }
-
-      if (isOpenRouter) {
-        if (image) {
-          const parts = userPrompt ? [userPrompt] : [];
-          result = await generateTextWithOpenRouterVision(
-            model as CreativeModel,
-            parts,
-            [image],
-            temperature
-          );
-        } else {
-          result = await generateTextWithOpenRouter(
-            model as CreativeModel,
-            systemPrompt || '',
-            userPrompt || '',
-            temperature
-          );
-        }
-      } else {
-        // Gemini
-        const parts: any[] = [];
-        if (userPrompt) {
-          parts.push({ text: userPrompt });
-        }
-        if (image) {
-          parts.push({
-            inlineData: {
-              mimeType: image.mimeType,
-              data: image.base64,
-            },
-          });
-        }
-
-        result = await generateStructuredContent(
-          model,
-          parts,
-          responseSchema || quickPostSchema,
-          temperature
-        );
-      }
+      promptText = (systemPrompt || '') + (userPrompt || '');
     }
+
+    // Track the AI operation
+    const result = await trackAIOperation(
+      usageContext,
+      provider,
+      model,
+      async () => {
+        if (type === 'quickPost') {
+          const prompt = buildQuickPostPrompt(brandProfile, context!);
+
+          if (isOpenRouter) {
+            const parts = [prompt];
+            if (image) {
+              return await generateTextWithOpenRouterVision(
+                model as CreativeModel,
+                parts,
+                [image],
+                temperature
+              );
+            } else {
+              return await generateTextWithOpenRouter(
+                model as CreativeModel,
+                '',
+                prompt,
+                temperature
+              );
+            }
+          } else {
+            // Gemini
+            const parts: any[] = [{ text: prompt }];
+            if (image) {
+              parts.push({
+                inlineData: {
+                  mimeType: image.mimeType,
+                  data: image.base64,
+                },
+              });
+            }
+            return await generateStructuredContent(model, parts, quickPostSchema, temperature);
+          }
+        } else {
+          // Custom text generation
+          if (isOpenRouter) {
+            if (image) {
+              const parts = userPrompt ? [userPrompt] : [];
+              return await generateTextWithOpenRouterVision(
+                model as CreativeModel,
+                parts,
+                [image],
+                temperature
+              );
+            } else {
+              return await generateTextWithOpenRouter(
+                model as CreativeModel,
+                systemPrompt || '',
+                userPrompt || '',
+                temperature
+              );
+            }
+          } else {
+            // Gemini
+            const parts: any[] = [];
+            if (userPrompt) {
+              parts.push({ text: userPrompt });
+            }
+            if (image) {
+              parts.push({
+                inlineData: {
+                  mimeType: image.mimeType,
+                  data: image.base64,
+                },
+              });
+            }
+
+            return await generateStructuredContent(
+              model,
+              parts,
+              responseSchema || quickPostSchema,
+              temperature
+            );
+          }
+        }
+      },
+      (resultText, _latencyMs) => ({
+        inputTokens: estimateTokens(promptText),
+        outputTokens: estimateTokens(resultText),
+        metadata: {
+          type,
+          hasImage: !!image,
+        },
+      })
+    );
 
     console.log('[Text API] Text generated successfully');
 

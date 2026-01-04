@@ -60,3 +60,20 @@ export {
   invalidateUserCache,
   invalidateBrandProfileCache,
 } from './cache.js';
+
+// Activity logging helpers
+export {
+  logActivity,
+  logActivityAsync,
+  logCrudOperation,
+  logError,
+  logAIGeneration,
+  logPublishing,
+  logAdminAction,
+  createLogContext,
+  extractRequestContext,
+  ACTIONS,
+  type ActivityLogEntry,
+  type ActivityCategory,
+  type ActivitySeverity,
+} from './activity-logger.js';

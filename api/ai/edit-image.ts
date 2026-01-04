@@ -12,7 +12,13 @@ import {
   applyRateLimit,
   createRateLimitKey,
 } from '../db/_helpers';
-import { editGeminiImage, buildEditImagePrompt, type ImageFile } from './_helpers/index';
+import {
+  editGeminiImage,
+  buildEditImagePrompt,
+  trackAIOperation,
+  createUsageContext,
+  type ImageFile,
+} from './_helpers/index';
 
 interface EditImageRequest {
   image: ImageFile;
@@ -49,14 +55,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('[Edit Image API] Editing image...');
 
+    // Create usage context for tracking
+    const usageContext = createUsageContext(
+      auth.userId,
+      auth.orgId,
+      '/api/ai/edit-image',
+      'edit_image'
+    );
+
     const instructionPrompt = buildEditImagePrompt(prompt);
 
-    const editedImageDataUrl = await editGeminiImage(
-      image.base64,
-      image.mimeType,
-      instructionPrompt,
-      mask,
-      referenceImage
+    // Track the AI operation
+    const editedImageDataUrl = await trackAIOperation(
+      usageContext,
+      'google',
+      'gemini-3-pro-image-preview',
+      async () => {
+        return await editGeminiImage(
+          image.base64,
+          image.mimeType,
+          instructionPrompt,
+          mask,
+          referenceImage
+        );
+      },
+      (_result, _latencyMs) => ({
+        imageCount: 1,
+        metadata: {
+          hasMask: !!mask,
+          hasReferenceImage: !!referenceImage,
+        },
+      })
     );
 
     console.log('[Edit Image API] Image edited successfully');

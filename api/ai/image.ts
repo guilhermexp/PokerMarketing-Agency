@@ -16,6 +16,8 @@ import {
   generateGeminiImage,
   generateImagenImage,
   buildImagePrompt,
+  trackAIOperation,
+  createUsageContext,
   type BrandProfile,
   type ImageFile,
 } from './_helpers/index';
@@ -66,24 +68,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}`);
 
-    let imageDataUrl: string;
+    // Create usage context for tracking
+    const usageContext = createUsageContext(
+      auth.userId,
+      auth.orgId,
+      '/api/ai/image',
+      'image'
+    );
 
-    if (model === 'imagen-4.0-generate-001') {
-      // Use Imagen 4
-      const fullPrompt = buildImagePrompt(prompt, brandProfile, !!styleReferenceImage);
-      imageDataUrl = await generateImagenImage(fullPrompt, aspectRatio);
-    } else {
-      // Use Gemini
-      const fullPrompt = buildImagePrompt(prompt, brandProfile, !!styleReferenceImage);
-      imageDataUrl = await generateGeminiImage(
-        fullPrompt,
-        aspectRatio,
-        model,
+    const fullPrompt = buildImagePrompt(prompt, brandProfile, !!styleReferenceImage);
+
+    // Track the AI operation
+    const imageDataUrl = await trackAIOperation(
+      usageContext,
+      'google',
+      model,
+      async () => {
+        if (model === 'imagen-4.0-generate-001') {
+          return await generateImagenImage(fullPrompt, aspectRatio);
+        } else {
+          return await generateGeminiImage(
+            fullPrompt,
+            aspectRatio,
+            model,
+            imageSize,
+            productImages,
+            styleReferenceImage
+          );
+        }
+      },
+      (_result, _latencyMs) => ({
+        imageCount: 1,
         imageSize,
-        productImages,
-        styleReferenceImage
-      );
-    }
+        aspectRatio,
+        metadata: {
+          hasProductImages: !!productImages?.length,
+          hasStyleRef: !!styleReferenceImage,
+        },
+      })
+    );
 
     console.log('[Image API] Image generated successfully');
 

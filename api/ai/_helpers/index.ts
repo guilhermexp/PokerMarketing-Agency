@@ -62,3 +62,18 @@ export type {
   AdCreative,
   MarketingCampaign,
 } from './types';
+
+// Usage Tracking
+export {
+  logUsage,
+  trackAIOperation,
+  generateRequestId,
+  createUsageContext,
+  calculateCost,
+  estimateTokens,
+  type UsageContext,
+  type UsageMetrics,
+  type AIProvider,
+  type AIOperation,
+  type UsageStatus,
+} from './usage-tracker';

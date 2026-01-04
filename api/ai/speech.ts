@@ -12,7 +12,11 @@ import {
   applyRateLimit,
   createRateLimitKey,
 } from '../db/_helpers';
-import { generateGeminiSpeech } from './_helpers/index';
+import {
+  generateGeminiSpeech,
+  trackAIOperation,
+  createUsageContext,
+} from './_helpers/index';
 
 interface SpeechGenerationRequest {
   script: string;
@@ -47,11 +51,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`[Speech API] Generating speech with voice: ${voiceName}`);
 
-    const audioBase64 = await generateGeminiSpeech(script, voiceName);
+    // Create usage context for tracking
+    const usageContext = createUsageContext(
+      auth.userId,
+      auth.orgId,
+      '/api/ai/speech',
+      'speech'
+    );
 
-    if (!audioBase64) {
-      throw new Error('Failed to generate speech audio');
-    }
+    // Track the AI operation
+    const audioBase64 = await trackAIOperation(
+      usageContext,
+      'google',
+      'gemini-2.5-flash-preview-tts',
+      async () => {
+        const result = await generateGeminiSpeech(script, voiceName);
+        if (!result) {
+          throw new Error('Failed to generate speech audio');
+        }
+        return result;
+      },
+      (_result, _latencyMs) => ({
+        characterCount: script.length,
+        metadata: {
+          voiceName,
+        },
+      })
+    );
 
     console.log('[Speech API] Speech generated successfully');
 

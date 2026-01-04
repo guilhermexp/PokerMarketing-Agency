@@ -16,12 +16,16 @@ import {
   generateStructuredContent,
   generateTextWithOpenRouterVision,
   buildCampaignPrompt,
+  trackAIOperation,
+  createUsageContext,
+  estimateTokens,
   Type,
   type BrandProfile,
   type CreativeModel,
   type GenerationOptions,
   type ImageFile,
   type MarketingCampaign,
+  type AIProvider,
 } from './_helpers/index';
 
 interface CampaignGenerationRequest {
@@ -176,6 +180,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Determine which model to use
     const model = brandProfile.creativeModel || 'gemini-3-pro-preview';
     const isOpenRouter = model.includes('/');
+    const provider: AIProvider = isOpenRouter ? 'openrouter' : 'google';
+
+    // Create usage context for tracking
+    const usageContext = createUsageContext(
+      auth.userId,
+      auth.orgId,
+      '/api/ai/campaign',
+      'campaign'
+    );
 
     const quantityInstructions = buildQuantityInstructions(options);
 
@@ -193,36 +206,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Combine all images
     const allImages = [...(productImages || []), ...(inspirationImages || [])];
 
-    let result: string;
+    // Track the AI operation
+    const result = await trackAIOperation(
+      usageContext,
+      provider,
+      model,
+      async () => {
+        if (isOpenRouter) {
+          // Use OpenRouter (GPT/Grok)
+          const textParts = [prompt];
 
-    if (isOpenRouter) {
-      // Use OpenRouter (GPT/Grok)
-      const textParts = [prompt];
+          if (allImages.length > 0) {
+            return await generateTextWithOpenRouterVision(
+              model as CreativeModel,
+              textParts,
+              allImages,
+              0.7
+            );
+          } else {
+            const { generateTextWithOpenRouter } = await import('./_helpers/openrouter');
+            return await generateTextWithOpenRouter(model as CreativeModel, '', prompt, 0.7);
+          }
+        } else {
+          // Use Gemini
+          const parts: any[] = [{ text: prompt }];
 
-      if (allImages.length > 0) {
-        result = await generateTextWithOpenRouterVision(
-          model as CreativeModel,
-          textParts,
-          allImages,
-          0.7
-        );
-      } else {
-        const { generateTextWithOpenRouter } = await import('./_helpers/openrouter');
-        result = await generateTextWithOpenRouter(model as CreativeModel, '', prompt, 0.7);
-      }
-    } else {
-      // Use Gemini
-      const parts: any[] = [{ text: prompt }];
+          // Add all images (product/logo + inspiration)
+          allImages.forEach((img) => {
+            parts.push({
+              inlineData: { mimeType: img.mimeType, data: img.base64 },
+            });
+          });
 
-      // Add all images (product/logo + inspiration)
-      allImages.forEach((img) => {
-        parts.push({
-          inlineData: { mimeType: img.mimeType, data: img.base64 },
-        });
-      });
-
-      result = await generateStructuredContent(model, parts, campaignSchema, 0.7);
-    }
+          return await generateStructuredContent(model, parts, campaignSchema, 0.7);
+        }
+      },
+      (resultText, _latencyMs) => ({
+        inputTokens: estimateTokens(prompt + transcript),
+        outputTokens: estimateTokens(resultText),
+        metadata: {
+          videoClipScriptsCount: options.videoClipScripts.count,
+          productImagesCount: productImages?.length || 0,
+          inspirationImagesCount: inspirationImages?.length || 0,
+        },
+      })
+    );
 
     const campaign: MarketingCampaign = JSON.parse(result);
 
