@@ -29,17 +29,20 @@ export const generateTextWithOpenRouter = async (
 ): Promise<string> => {
   const openrouter = getOpenRouter();
 
-  const response = await (openrouter.chat as any).completions.create({
+  const messages: any[] = [];
+  if (systemPrompt) {
+    messages.push({ role: 'system', content: systemPrompt });
+  }
+  messages.push({ role: 'user', content: userPrompt });
+
+  const response = await openrouter.chat.send({
     model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
+    messages,
     response_format: { type: 'json_object' },
     temperature,
   });
 
-  const content = response.choices[0]?.message?.content;
+  const content = response.choices?.[0]?.message?.content;
   if (!content) {
     throw new Error(`OpenRouter (${model}) não retornou conteúdo`);
   }
@@ -71,14 +74,14 @@ export const generateTextWithOpenRouterVision = async (
     });
   }
 
-  const response = await (openrouter.chat as any).completions.create({
+  const response = await openrouter.chat.send({
     model,
     messages: [{ role: 'user', content }],
     response_format: { type: 'json_object' },
     temperature,
   });
 
-  const result = response.choices[0]?.message?.content;
+  const result = response.choices?.[0]?.message?.content;
   if (!result) {
     throw new Error(`OpenRouter (${model}) não retornou conteúdo`);
   }
