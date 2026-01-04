@@ -96,9 +96,22 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   const isPost = (img: GalleryImage) =>
     img.source === 'Post' || img.source === 'Anúncio';
 
+  // Deduplicate images by src URL (keep the first/newest occurrence)
+  const deduplicatedImages = useMemo(() => {
+    const seen = new Set<string>();
+    return galleryImages.filter((img) => {
+      const key = img.src;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }, [galleryImages]);
+
   // Filter media based on content type and gallery filter
   const eligibleImages = useMemo(() => {
-    return galleryImages.filter(img => {
+    return deduplicatedImages.filter(img => {
       const isAudio = isAudioItem(img);
       const isVideo = isVideoItem(img);
 
@@ -116,7 +129,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
       return true;
     });
-  }, [galleryImages, isReel, galleryFilter]);
+  }, [deduplicatedImages, isReel, galleryFilter]);
 
   // Check if image was created today
   const isToday = (dateString?: string) => {
