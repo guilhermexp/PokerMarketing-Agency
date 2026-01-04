@@ -26,8 +26,8 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
 
   const statusColors = {
     scheduled: 'bg-white/10 border-white/20 text-white/70',
-    publishing: 'bg-white/10 border-white/20 text-white/70',
-    published: 'bg-white/10 border-white/30 text-white/80',
+    publishing: 'bg-amber-500/10 border-amber-500/20 text-amber-400/80',
+    published: 'bg-green-500/10 border-green-500/20 text-green-400/80',
     failed: 'bg-red-500/10 border-red-500/20 text-red-400/80',
     cancelled: 'bg-white/5 border-white/10 text-white/30'
   };
