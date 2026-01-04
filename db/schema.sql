@@ -113,6 +113,7 @@ CREATE INDEX idx_users_auth_provider ON users(auth_provider, auth_provider_id);
 CREATE TABLE brand_profiles (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id VARCHAR(50),  -- Clerk organization ID
 
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -133,6 +134,7 @@ CREATE TABLE brand_profiles (
 );
 
 CREATE INDEX idx_brand_profiles_user ON brand_profiles(user_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_brand_profiles_org ON brand_profiles(organization_id) WHERE deleted_at IS NULL;
 
 -- ============================================================================
 -- CAMPAIGNS TABLE
@@ -142,6 +144,7 @@ CREATE TABLE campaigns (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     brand_profile_id UUID REFERENCES brand_profiles(id) ON DELETE SET NULL,
+    organization_id VARCHAR(50),  -- Clerk organization ID
 
     name VARCHAR(255),
     description TEXT,
@@ -167,6 +170,7 @@ CREATE TABLE campaigns (
 
 CREATE INDEX idx_campaigns_user ON campaigns(user_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_campaigns_brand ON campaigns(brand_profile_id);
+CREATE INDEX idx_campaigns_org ON campaigns(organization_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_campaigns_status ON campaigns(status) WHERE deleted_at IS NULL;
 CREATE INDEX idx_campaigns_created ON campaigns(created_at DESC);
 
@@ -178,6 +182,7 @@ CREATE TABLE video_clip_scripts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id VARCHAR(50),  -- Clerk organization ID
 
     title VARCHAR(500) NOT NULL,
     hook TEXT NOT NULL,
@@ -208,6 +213,7 @@ CREATE TABLE video_clip_scripts (
 
 CREATE INDEX idx_video_scripts_campaign ON video_clip_scripts(campaign_id);
 CREATE INDEX idx_video_scripts_user ON video_clip_scripts(user_id);
+CREATE INDEX idx_video_scripts_org ON video_clip_scripts(organization_id);
 
 -- ============================================================================
 -- POSTS TABLE
@@ -217,6 +223,7 @@ CREATE TABLE posts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     campaign_id UUID REFERENCES campaigns(id) ON DELETE SET NULL,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id VARCHAR(50),  -- Clerk organization ID
 
     platform social_platform NOT NULL,
     content TEXT NOT NULL,
@@ -248,6 +255,7 @@ CREATE TABLE posts (
 
 CREATE INDEX idx_posts_campaign ON posts(campaign_id);
 CREATE INDEX idx_posts_user ON posts(user_id);
+CREATE INDEX idx_posts_org ON posts(organization_id);
 CREATE INDEX idx_posts_platform ON posts(platform);
 CREATE INDEX idx_posts_published ON posts(is_published, published_at DESC);
 
@@ -259,6 +267,7 @@ CREATE TABLE ad_creatives (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     campaign_id UUID REFERENCES campaigns(id) ON DELETE SET NULL,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id VARCHAR(50),  -- Clerk organization ID
 
     platform ad_platform NOT NULL,
     headline VARCHAR(500) NOT NULL,
@@ -290,6 +299,7 @@ CREATE TABLE ad_creatives (
 
 CREATE INDEX idx_ad_creatives_campaign ON ad_creatives(campaign_id);
 CREATE INDEX idx_ad_creatives_user ON ad_creatives(user_id);
+CREATE INDEX idx_ad_creatives_org ON ad_creatives(organization_id);
 CREATE INDEX idx_ad_creatives_platform ON ad_creatives(platform);
 
 -- ============================================================================
@@ -299,6 +309,7 @@ CREATE INDEX idx_ad_creatives_platform ON ad_creatives(platform);
 CREATE TABLE gallery_images (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id VARCHAR(50),  -- Clerk organization ID
 
     src_url TEXT NOT NULL,
     prompt TEXT,
@@ -325,6 +336,7 @@ CREATE TABLE gallery_images (
 );
 
 CREATE INDEX idx_gallery_images_user ON gallery_images(user_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_gallery_images_org ON gallery_images(organization_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_gallery_images_source ON gallery_images(source);
 CREATE INDEX idx_gallery_images_style_ref ON gallery_images(user_id, is_style_reference)
     WHERE is_style_reference = TRUE AND deleted_at IS NULL;
@@ -337,6 +349,7 @@ CREATE INDEX idx_gallery_images_created ON gallery_images(created_at DESC);
 CREATE TABLE scheduled_posts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id VARCHAR(50),  -- Clerk organization ID
 
     -- Content reference
     content_type post_content_type NOT NULL,
@@ -377,6 +390,7 @@ CREATE TABLE scheduled_posts (
 );
 
 CREATE INDEX idx_scheduled_posts_user ON scheduled_posts(user_id);
+CREATE INDEX idx_scheduled_posts_org ON scheduled_posts(organization_id);
 CREATE INDEX idx_scheduled_posts_date ON scheduled_posts(scheduled_date, scheduled_time);
 CREATE INDEX idx_scheduled_posts_status ON scheduled_posts(status);
 CREATE INDEX idx_scheduled_posts_timestamp ON scheduled_posts(scheduled_timestamp)
@@ -428,6 +442,7 @@ CREATE INDEX idx_scheduled_posts_instagram ON scheduled_posts(instagram_account_
 CREATE TABLE tournament_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id VARCHAR(50),  -- Clerk organization ID
 
     week_schedule_id UUID,
 
@@ -456,6 +471,7 @@ CREATE TABLE tournament_events (
 );
 
 CREATE INDEX idx_tournament_events_user ON tournament_events(user_id);
+CREATE INDEX idx_tournament_events_org ON tournament_events(organization_id);
 CREATE INDEX idx_tournament_events_week ON tournament_events(week_schedule_id);
 CREATE INDEX idx_tournament_events_day ON tournament_events(day_of_week);
 CREATE INDEX idx_tournament_events_date ON tournament_events(event_date);
@@ -467,6 +483,7 @@ CREATE INDEX idx_tournament_events_date ON tournament_events(event_date);
 CREATE TABLE week_schedules (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id VARCHAR(50),  -- Clerk organization ID
 
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
@@ -481,6 +498,7 @@ CREATE TABLE week_schedules (
 );
 
 CREATE INDEX idx_week_schedules_user ON week_schedules(user_id);
+CREATE INDEX idx_week_schedules_org ON week_schedules(organization_id);
 CREATE INDEX idx_week_schedules_dates ON week_schedules(start_date, end_date);
 
 ALTER TABLE tournament_events
@@ -494,6 +512,7 @@ ALTER TABLE tournament_events
 CREATE TABLE chat_sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id VARCHAR(50),  -- Clerk organization ID
 
     title VARCHAR(255),
     is_active BOOLEAN DEFAULT TRUE,
@@ -507,6 +526,7 @@ CREATE TABLE chat_sessions (
 );
 
 CREATE INDEX idx_chat_sessions_user ON chat_sessions(user_id, is_active);
+CREATE INDEX idx_chat_sessions_org ON chat_sessions(organization_id);
 
 -- ============================================================================
 -- CHAT MESSAGES TABLE
@@ -555,9 +575,12 @@ CREATE TYPE generation_job_type AS ENUM (
     'clip'
 );
 
+-- Note: 'clip' value added for video clip generation support
+
 CREATE TABLE generation_jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id VARCHAR(50),  -- Clerk organization ID
 
     -- Job configuration
     job_type generation_job_type NOT NULL,
@@ -592,6 +615,7 @@ CREATE TABLE generation_jobs (
 );
 
 CREATE INDEX idx_generation_jobs_user ON generation_jobs(user_id);
+CREATE INDEX idx_generation_jobs_org ON generation_jobs(organization_id);
 CREATE INDEX idx_generation_jobs_status ON generation_jobs(status) WHERE status IN ('queued', 'processing');
 CREATE INDEX idx_generation_jobs_created ON generation_jobs(created_at DESC);
 
@@ -768,76 +792,17 @@ CREATE TRIGGER update_analytics_platform_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================================
--- ROW LEVEL SECURITY (RLS) POLICIES
+-- SECURITY NOTE
 -- ============================================================================
-
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE brand_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
-ALTER TABLE video_clip_scripts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ad_creatives ENABLE ROW LEVEL SECURITY;
-ALTER TABLE gallery_images ENABLE ROW LEVEL SECURITY;
-ALTER TABLE scheduled_posts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE instagram_accounts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tournament_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE week_schedules ENABLE ROW LEVEL SECURITY;
-ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE chat_sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE analytics_daily ENABLE ROW LEVEL SECURITY;
-ALTER TABLE analytics_platform ENABLE ROW LEVEL SECURITY;
-
--- Note: RLS policies use auth.uid() which is Supabase Auth specific
--- For Neon without Supabase, you'll need to implement auth differently
--- These policies are provided as a template
-
-CREATE POLICY "Users can view own profile" ON users
-    FOR SELECT USING (id = auth.uid());
-
-CREATE POLICY "Users can update own profile" ON users
-    FOR UPDATE USING (id = auth.uid());
-
-CREATE POLICY "Users can manage own brand profiles" ON brand_profiles
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can manage own campaigns" ON campaigns
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can manage own video scripts" ON video_clip_scripts
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can manage own posts" ON posts
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can manage own ad creatives" ON ad_creatives
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can manage own gallery images" ON gallery_images
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can manage own scheduled posts" ON scheduled_posts
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can manage own instagram accounts" ON instagram_accounts
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can manage own tournament events" ON tournament_events
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can manage own week schedules" ON week_schedules
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can manage own chat messages" ON chat_messages
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can manage own chat sessions" ON chat_sessions
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can view own analytics" ON analytics_daily
-    FOR SELECT USING (user_id = auth.uid());
-
-CREATE POLICY "Users can view own platform analytics" ON analytics_platform
-    FOR SELECT USING (user_id = auth.uid());
+-- This application uses Clerk for authentication.
+-- Row-level security is enforced at the application layer (API endpoints)
+-- by validating Clerk JWT tokens and filtering by user_id/organization_id.
+--
+-- All API endpoints use requireAuth() middleware which:
+-- 1. Validates the Clerk JWT token
+-- 2. Extracts user_id and organization_id
+-- 3. Filters queries by these identifiers
+-- ============================================================================
 
 -- ============================================================================
 -- VIEWS
@@ -883,3 +848,285 @@ SELECT
 FROM analytics_daily
 GROUP BY user_id, DATE_TRUNC('week', date)
 ORDER BY week DESC;
+
+-- ============================================================================
+-- ADMIN TRACKING SYSTEM
+-- AI usage tracking, activity logging, and admin features
+-- ============================================================================
+
+-- Admin tracking enums
+CREATE TYPE ai_provider AS ENUM (
+    'google',      -- Gemini and Imagen
+    'openrouter',  -- GPT-5.2, Grok 4.1, Claude
+    'fal'          -- Sora 2, Veo 3.1
+);
+
+CREATE TYPE ai_operation AS ENUM (
+    'text',        -- Text generation
+    'image',       -- Image generation
+    'video',       -- Video generation
+    'speech',      -- TTS
+    'flyer',       -- Flyer generation
+    'edit_image',  -- Image editing
+    'campaign'     -- Full campaign generation
+);
+
+CREATE TYPE usage_status AS ENUM (
+    'success',
+    'failed',
+    'timeout',
+    'rate_limited'
+);
+
+CREATE TYPE activity_category AS ENUM (
+    'auth',           -- Login, logout, session events
+    'crud',           -- Create, read, update, delete operations
+    'ai_generation',  -- AI content generation requests
+    'publishing',     -- Instagram/social media publishing
+    'settings',       -- User/org settings changes
+    'admin',          -- Admin actions
+    'system',         -- System events, cron jobs
+    'error'           -- Error events
+);
+
+CREATE TYPE activity_severity AS ENUM (
+    'info',      -- Normal operations
+    'warning',   -- Potential issues
+    'error',     -- Failed operations
+    'critical'   -- Critical failures
+);
+
+-- ============================================================================
+-- MODEL PRICING TABLE
+-- ============================================================================
+
+CREATE TABLE model_pricing (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+    -- Model identification
+    provider ai_provider NOT NULL,
+    model_id VARCHAR(100) NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+
+    -- Pricing (in USD cents for precision)
+    input_cost_per_million_tokens INTEGER,
+    output_cost_per_million_tokens INTEGER,
+    cost_per_image_cents INTEGER,
+    cost_per_second_cents INTEGER,
+    cost_per_generation_cents INTEGER,
+    cost_per_million_characters INTEGER,
+
+    -- Metadata
+    is_active BOOLEAN DEFAULT TRUE,
+    effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
+    effective_until DATE,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    UNIQUE(provider, model_id, effective_from)
+);
+
+CREATE INDEX idx_model_pricing_lookup ON model_pricing(provider, model_id, is_active);
+
+-- ============================================================================
+-- API USAGE LOGS TABLE
+-- ============================================================================
+
+CREATE TABLE api_usage_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+    -- User context
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    organization_id VARCHAR(50),
+
+    -- Request identification
+    request_id VARCHAR(64) NOT NULL,
+    endpoint VARCHAR(50) NOT NULL,
+    operation ai_operation NOT NULL,
+
+    -- Model info
+    provider ai_provider NOT NULL,
+    model_id VARCHAR(100) NOT NULL,
+
+    -- Usage metrics
+    input_tokens INTEGER,
+    output_tokens INTEGER,
+    total_tokens INTEGER,
+    image_count INTEGER DEFAULT 1,
+    image_size VARCHAR(10),
+    aspect_ratio VARCHAR(10),
+    video_duration_seconds INTEGER,
+    audio_duration_seconds INTEGER,
+    character_count INTEGER,
+
+    -- Cost calculation (in USD cents)
+    estimated_cost_cents INTEGER NOT NULL DEFAULT 0,
+
+    -- Performance metrics
+    latency_ms INTEGER,
+
+    -- Status
+    status usage_status NOT NULL DEFAULT 'success',
+    error_message TEXT,
+
+    -- Additional context
+    metadata JSONB DEFAULT '{}',
+
+    -- Timestamp
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_usage_logs_user ON api_usage_logs(user_id, created_at DESC);
+CREATE INDEX idx_usage_logs_org ON api_usage_logs(organization_id, created_at DESC);
+CREATE INDEX idx_usage_logs_operation ON api_usage_logs(operation, created_at DESC);
+CREATE INDEX idx_usage_logs_provider ON api_usage_logs(provider, created_at DESC);
+CREATE INDEX idx_usage_logs_date ON api_usage_logs((created_at::DATE));
+
+-- ============================================================================
+-- AGGREGATED USAGE TABLE
+-- ============================================================================
+
+CREATE TABLE aggregated_usage (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+    -- Aggregation dimensions
+    date DATE NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    organization_id VARCHAR(50),
+    provider ai_provider NOT NULL,
+    model_id VARCHAR(100) NOT NULL,
+    operation ai_operation NOT NULL,
+
+    -- Aggregated metrics
+    request_count INTEGER NOT NULL DEFAULT 0,
+    success_count INTEGER NOT NULL DEFAULT 0,
+    failed_count INTEGER NOT NULL DEFAULT 0,
+
+    -- Token usage
+    total_input_tokens BIGINT DEFAULT 0,
+    total_output_tokens BIGINT DEFAULT 0,
+
+    -- Media counts
+    total_images INTEGER DEFAULT 0,
+    total_video_seconds INTEGER DEFAULT 0,
+    total_audio_seconds INTEGER DEFAULT 0,
+    total_characters BIGINT DEFAULT 0,
+
+    -- Cost
+    total_cost_cents INTEGER NOT NULL DEFAULT 0,
+
+    -- Performance
+    avg_latency_ms INTEGER,
+    max_latency_ms INTEGER,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    UNIQUE(date, user_id, organization_id, provider, model_id, operation)
+);
+
+CREATE INDEX idx_aggregated_usage_date ON aggregated_usage(date DESC);
+CREATE INDEX idx_aggregated_usage_user ON aggregated_usage(user_id, date DESC);
+CREATE INDEX idx_aggregated_usage_org ON aggregated_usage(organization_id, date DESC);
+
+-- ============================================================================
+-- ACTIVITY LOGS TABLE
+-- ============================================================================
+
+CREATE TABLE activity_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+    -- WHO
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    organization_id VARCHAR(50),
+    actor_email VARCHAR(255),
+    actor_name VARCHAR(255),
+
+    -- WHAT
+    category activity_category NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(100),
+    entity_id UUID,
+    entity_name VARCHAR(255),
+
+    -- DETAILS
+    details JSONB DEFAULT '{}',
+    before_state JSONB,
+    after_state JSONB,
+
+    -- WHERE
+    ip_address INET,
+    user_agent TEXT,
+    request_id VARCHAR(100),
+
+    -- STATUS
+    severity activity_severity NOT NULL DEFAULT 'info',
+    success BOOLEAN NOT NULL DEFAULT TRUE,
+    error_message TEXT,
+    error_stack TEXT,
+
+    -- PERFORMANCE
+    duration_ms INTEGER,
+
+    -- TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_activity_logs_user ON activity_logs(user_id, created_at DESC);
+CREATE INDEX idx_activity_logs_org ON activity_logs(organization_id, created_at DESC);
+CREATE INDEX idx_activity_logs_category ON activity_logs(category, created_at DESC);
+CREATE INDEX idx_activity_logs_severity ON activity_logs(severity) WHERE severity IN ('error', 'critical');
+
+-- ============================================================================
+-- MONTHLY USAGE SUMMARY VIEW
+-- ============================================================================
+
+CREATE VIEW monthly_usage_summary AS
+SELECT
+    DATE_TRUNC('month', date) AS month,
+    organization_id,
+    provider,
+    SUM(request_count) AS total_requests,
+    SUM(success_count) AS successful_requests,
+    SUM(total_cost_cents) AS total_cost_cents,
+    SUM(total_cost_cents) / 100.0 AS total_cost_usd,
+    SUM(total_input_tokens) AS total_input_tokens,
+    SUM(total_output_tokens) AS total_output_tokens,
+    SUM(total_images) AS total_images,
+    SUM(total_video_seconds) AS total_video_seconds
+FROM aggregated_usage
+GROUP BY DATE_TRUNC('month', date), organization_id, provider;
+
+-- Triggers for admin tables
+CREATE TRIGGER update_model_pricing_updated_at
+    BEFORE UPDATE ON model_pricing
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_aggregated_usage_updated_at
+    BEFORE UPDATE ON aggregated_usage
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- SEED DATA: Model Pricing
+-- ============================================================================
+
+INSERT INTO model_pricing (provider, model_id, display_name, input_cost_per_million_tokens, output_cost_per_million_tokens, cost_per_image_cents, cost_per_second_cents, cost_per_million_characters) VALUES
+-- Google
+('google', 'gemini-3-pro-preview', 'Gemini 3 Pro', 125, 500, NULL, NULL, NULL),
+('google', 'gemini-3-pro-image-preview', 'Gemini 3 Pro Image', NULL, NULL, 4, NULL, NULL),
+('google', 'imagen-4.0-generate-001', 'Imagen 4', NULL, NULL, 4, NULL, NULL),
+('google', 'gemini-2.5-flash-preview-tts', 'Gemini TTS', NULL, NULL, NULL, NULL, 1500),
+-- OpenRouter
+('openrouter', 'openai/gpt-5.2', 'GPT-5.2', 500, 1500, NULL, NULL, NULL),
+('openrouter', 'x-ai/grok-4.1', 'Grok 4.1', 300, 900, NULL, NULL, NULL),
+('openrouter', 'anthropic/claude-opus-4', 'Claude Opus 4', 1500, 7500, NULL, NULL, NULL),
+('openrouter', 'anthropic/claude-sonnet-4', 'Claude Sonnet 4', 300, 1500, NULL, NULL, NULL),
+-- FAL.ai
+('fal', 'fal-ai/sora-2/text-to-video', 'Sora 2', NULL, NULL, NULL, 10, NULL),
+('fal', 'fal-ai/sora-2/image-to-video', 'Sora 2 (img2vid)', NULL, NULL, NULL, 10, NULL),
+('fal', 'fal-ai/veo3.1/fast', 'Veo 3.1 Fast', NULL, NULL, NULL, 8, NULL),
+('fal', 'fal-ai/veo3.1/fast/image-to-video', 'Veo 3.1 Fast (img2vid)', NULL, NULL, NULL, 8, NULL)
+ON CONFLICT (provider, model_id, effective_from) DO NOTHING;
