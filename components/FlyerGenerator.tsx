@@ -242,67 +242,59 @@ const FlyerThumbStrip: React.FC<{
                   className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
                   onClick={() => onEdit(flyer)}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-2 gap-1.5">
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={() => onQuickPost(flyer)}
-                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-primary hover:bg-primary/90 rounded-lg text-black font-bold text-[8px] uppercase tracking-wide transition-all"
-                    >
-                      <Icon name="zap" className="w-2.5 h-2.5" />
-                      Publicar
-                    </button>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-2 gap-1">
+                  {/* Primary action */}
+                  <button
+                    onClick={() => onQuickPost(flyer)}
+                    className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-primary hover:bg-primary/90 rounded-lg text-black font-bold text-[8px] uppercase tracking-wide transition-all"
+                  >
+                    <Icon name="zap" className="w-2.5 h-2.5" />
+                    Publicar
+                  </button>
+                  {/* Secondary actions - compact icons */}
+                  <div className="flex gap-1 justify-center">
                     {onSchedule && (
                       <button
                         onClick={() => onSchedule(flyer)}
-                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                        className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
+                        title="Agendar"
                       >
-                        <Icon name="calendar" className="w-2.5 h-2.5" />
-                        Agendar
+                        <Icon name="calendar" className="w-3 h-3" />
                       </button>
                     )}
-                  </div>
-                  <div className="flex gap-1.5">
                     <button
                       onClick={() => onEdit(flyer)}
-                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                      className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
+                      title="Visualizar"
                     >
-                      <Icon name="eye" className="w-2.5 h-2.5" />
-                      View
+                      <Icon name="eye" className="w-3 h-3" />
                     </button>
                     <button
                       onClick={() => onDownload(flyer, index)}
-                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                      className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
+                      title="Download"
                     >
-                      <Icon name="download" className="w-2.5 h-2.5" />
+                      <Icon name="download" className="w-3 h-3" />
                     </button>
-                  </div>
-                  {onCloneStyle && showPublish && (
-                    <div className="flex gap-1.5">
+                    {showPublish && (
                       <button
                         onClick={() => onPublish(flyer)}
-                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                        className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
+                        title="Campanha"
                       >
-                        <Icon name="users" className="w-2.5 h-2.5" />
-                        Campanha
+                        <Icon name="users" className="w-3 h-3" />
                       </button>
+                    )}
+                    {onCloneStyle && (
                       <button
                         onClick={() => onCloneStyle(flyer)}
-                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
+                        className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
+                        title="Usar como modelo"
                       >
-                        <Icon name="copy" className="w-2.5 h-2.5" />
-                        Modelo
+                        <Icon name="copy" className="w-3 h-3" />
                       </button>
-                    </div>
-                  )}
-                  {!onCloneStyle && showPublish && (
-                    <button
-                      onClick={() => onPublish(flyer)}
-                      className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold text-[8px] uppercase tracking-wide transition-all"
-                    >
-                      <Icon name="users" className="w-2.5 h-2.5" />
-                      Campanha
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
               </>
             )}
