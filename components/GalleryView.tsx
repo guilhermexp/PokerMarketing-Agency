@@ -433,7 +433,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       </span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3">
                     {todayImages.map((image) => (
                       <GalleryItem
                         key={image.id}
@@ -445,6 +445,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                         onToggleFavorite={handleToggleFavorite}
                         onSelect={setSelectedImage}
                         onDelete={onDeleteImage}
+                        className="break-inside-avoid mb-3"
                       />
                     ))}
                   </div>

@@ -178,30 +178,34 @@ ${quantityInstructions}
 
 **REGRAS CRÍTICAS PARA GERAÇÃO DE IMAGE_PROMPT (OBRIGATÓRIO):**
 
-1. **ALINHAMENTO CONTEÚDO-IMAGEM (REGRA INVIOLÁVEL):**
+1. **IDIOMA (REGRA INVIOLÁVEL):**
+   - TODOS os image_prompts DEVEM ser escritos em PORTUGUÊS
+   - QUALQUER texto que apareça na imagem (títulos, CTAs, valores, frases) DEVE estar em PORTUGUÊS
+   - PROIBIDO usar inglês nos textos da imagem
+
+2. **ALINHAMENTO CONTEÚDO-IMAGEM (REGRA INVIOLÁVEL):**
    - O image_prompt de CADA post DEVE refletir EXATAMENTE o tema/assunto da legenda (content)
-   - Se a legenda fala de "torneio de poker às 20h", a imagem DEVE mostrar cena de torneio de poker
-   - Se a legenda fala de "promoção de fichas grátis", a imagem DEVE mostrar fichas ou bônus
+   - A imagem DEVE ilustrar visualmente o que a legenda comunica
    - NUNCA gere prompts genéricos desconectados do conteúdo textual
 
-2. **CONSISTÊNCIA COM SOLICITAÇÃO ORIGINAL:**
+3. **CONSISTÊNCIA COM SOLICITAÇÃO ORIGINAL:**
    - TODOS os image_prompts devem estar relacionados ao CONTEÚDO ORIGINAL fornecido acima
    - Não invente temas novos - extraia elementos visuais do conteúdo solicitado
 
-3. **ESPECIFICAÇÕES POR PLATAFORMA (POSTS):**
+4. **ESPECIFICAÇÕES POR PLATAFORMA (POSTS):**
    - **Instagram**: Visuais impactantes, narrativos, com elementos que chamam atenção no feed (1:1)
    - **Facebook**: Visuais versáteis e informativos, com destaque para textos/valores importantes
    - **Twitter**: Visuais concisos e diretos, que complementam mensagens curtas
    - **LinkedIn**: Visuais profissionais e corporativos, tom executivo
 
-4. **ESPECIFICAÇÕES PARA AD CREATIVES (ANÚNCIOS):**
+5. **ESPECIFICAÇÕES PARA AD CREATIVES (ANÚNCIOS):**
    - **Facebook Ads**: Visual que DESTACA o headline e o CTA, com imagem impactante e texto legível
    - **Google Ads**: Visual limpo, profissional, com foco no produto/serviço e CTA claro
    - O image_prompt do ad DEVE refletir a mensagem do headline + body
    - Incluir elementos visuais que reforcem o CTA (call-to-action)
    - Anúncios devem ser visualmente distintos de posts orgânicos (mais comerciais)
 
-5. **ELEMENTOS OBRIGATÓRIOS NO IMAGE_PROMPT:**
+6. **ELEMENTOS OBRIGATÓRIOS NO IMAGE_PROMPT:**
    - Mencionar cores da marca (${brandProfile.primaryColor}, ${brandProfile.secondaryColor})
    - Incluir o nome/logo "${brandProfile.name}" quando apropriado
    - Estilo cinematográfico, luxuoso e premium

@@ -2369,7 +2369,23 @@ ${transcript}
 **QUANTIDADES EXATAS A GERAR (OBRIGATÓRIO SEGUIR):**
 ${quantityInstructions}
 
-**MISSÃO:** Gere uma campanha completa em JSON com as QUANTIDADES EXATAS especificadas acima. Use prompts cinematográficos para imagens.`;
+**REGRAS CRÍTICAS PARA IMAGE_PROMPT (OBRIGATÓRIO):**
+
+1. **IDIOMA (REGRA INVIOLÁVEL):**
+   - TODOS os image_prompts DEVEM ser escritos em PORTUGUÊS
+   - QUALQUER texto que apareça na imagem (títulos, CTAs, valores) DEVE estar em PORTUGUÊS
+   - PROIBIDO usar inglês nos textos da imagem
+
+2. **ALINHAMENTO CONTEÚDO-IMAGEM:**
+   - O image_prompt DEVE refletir o tema da legenda (content)
+   - NUNCA gere prompts genéricos desconectados do conteúdo
+
+3. **ELEMENTOS OBRIGATÓRIOS:**
+   - Cores da marca (${brandProfile.primaryColor}, ${brandProfile.secondaryColor})
+   - Estilo cinematográfico, luxuoso e premium
+   - Textos em fonte bold condensed sans-serif
+
+**MISSÃO:** Gere uma campanha completa em JSON com as QUANTIDADES EXATAS especificadas. Cada image_prompt DEVE ser em PORTUGUÊS e alinhado com seu content.`;
 };
 
 // Build quantity instructions for campaign
