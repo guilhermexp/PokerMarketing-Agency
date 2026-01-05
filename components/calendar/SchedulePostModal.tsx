@@ -59,6 +59,14 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   const [caption, setCaption] = useState('');
   const [hashtags, setHashtags] = useState('');
 
+  const [scheduledDate, setScheduledDate] = useState(initialDate || todayStr);
+  const [scheduledTime, setScheduledTime] = useState(initialTime || getDefaultTime());
+  const [platforms] = useState<SchedulingPlatform>('instagram');
+  const [contentType, setContentType] = useState<InstagramContentType>('photo');
+  const [publishNow, setPublishNow] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [galleryFilter, setGalleryFilter] = useState<'all' | 'flyers' | 'posts' | 'videos'>('all');
+
   // Set initial image when modal opens with a pre-selected image
   useEffect(() => {
     if (isOpen && initialImage) {
@@ -79,13 +87,6 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       if (initialTime) setScheduledTime(initialTime);
     }
   }, [isOpen, initialDate, initialTime]);
-  const [scheduledDate, setScheduledDate] = useState(initialDate || todayStr);
-  const [scheduledTime, setScheduledTime] = useState(initialTime || getDefaultTime());
-  const [platforms] = useState<SchedulingPlatform>('instagram');
-  const [contentType, setContentType] = useState<InstagramContentType>('photo');
-  const [publishNow, setPublishNow] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [galleryFilter, setGalleryFilter] = useState<'all' | 'flyers' | 'posts' | 'videos'>('all');
 
   const isCarousel = contentType === 'carousel';
   const isReel = contentType === 'reel';
