@@ -716,6 +716,8 @@ const ClipCard: React.FC<ClipCardProps> = ({
   const [promptPreview, setPromptPreview] = useState<{
     sceneNumber: number;
     prompt: string;
+    extraInstructions: string;
+    type: 'scene' | 'thumbnail';
   } | null>(null);
   const [previewSlide, setPreviewSlide] = useState<"video" | "thumbnail">(
     "thumbnail",
@@ -1454,7 +1456,7 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
   const handleShowPrompt = (sceneNumber: number) => {
     // Show Veo prompt by default (more complete)
     const prompt = buildPromptForVeo(sceneNumber);
-    setPromptPreview({ sceneNumber, prompt });
+    setPromptPreview({ sceneNumber, prompt, extraInstructions: '', type: 'scene' });
   };
 
   // Returns whether fallback was used (for batch operations to skip Gemini on subsequent calls)
@@ -1826,7 +1828,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
   };
 
   // Generate single scene image
-  const handleGenerateSingleSceneImage = async (sceneNumber: number) => {
+  const handleGenerateSingleSceneImage = async (sceneNumber: number, extraInstructions?: string) => {
     if (!thumbnail) {
       alert(
         "Por favor, gere a capa primeiro para usar como referência de estilo.",
@@ -1855,12 +1857,18 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         [sceneNumber]: { dataUrl: "", isUploading: true },
       }));
 
-      const prompt = `CENA ${scene.sceneNumber} DE UM VÍDEO - DEVE USAR A MESMA TIPOGRAFIA DA IMAGEM DE REFERÊNCIA
+      let prompt = `CENA ${scene.sceneNumber} DE UM VÍDEO - DEVE USAR A MESMA TIPOGRAFIA DA IMAGEM DE REFERÊNCIA
 
 Descrição visual: ${scene.visual}
 Texto/Narração para incluir: ${scene.narration}
 
 IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, cor, efeitos) DEVE ser IDÊNTICA à imagem de referência anexada. NÃO use fontes diferentes.`;
+
+      // Append extra instructions if provided
+      if (extraInstructions && extraInstructions.trim()) {
+        prompt += `\n\nInstruções extras: ${extraInstructions.trim()}`;
+      }
+
       const imageDataUrl = await generateImage(prompt, brandProfile, {
         aspectRatio: "9:16",
         model: "gemini-3-pro-image-preview",
@@ -5077,12 +5085,37 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 <Icon name="x" className="w-3 h-3" />
               </button>
             </div>
-            <div className="p-4 overflow-y-auto max-h-[60vh]">
-              <pre className="text-[11px] text-white/70 whitespace-pre-wrap font-mono bg-black/30 rounded-xl p-4 border border-white/5">
-                {promptPreview.prompt}
-              </pre>
+            <div className="p-4 overflow-y-auto max-h-[60vh] space-y-4">
+              {/* Prompt original - READ ONLY */}
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2 block">
+                  Prompt Original
+                </label>
+                <pre className="text-[11px] text-white/70 whitespace-pre-wrap font-mono bg-black/30 rounded-xl p-4 border border-white/5">
+                  {promptPreview.prompt}
+                </pre>
+              </div>
+
+              {/* Campo de instruções extras */}
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2 block">
+                  Instruções Extras (opcional)
+                </label>
+                <textarea
+                  value={promptPreview.extraInstructions}
+                  onChange={(e) => setPromptPreview(prev => prev ? ({
+                    ...prev,
+                    extraInstructions: e.target.value
+                  }) : null)}
+                  placeholder="Adicione detalhes extras para a regeneração... Ex: 'mais vibrante', 'adicionar texto X', 'mudar cor para azul'"
+                  className="w-full h-24 text-[11px] text-white/80 bg-black/30 rounded-xl p-4 border border-white/10 focus:border-primary/50 focus:outline-none resize-none placeholder:text-white/20"
+                />
+                <p className="text-[9px] text-white/30 mt-1">
+                  As instruções extras serão anexadas ao prompt original na regeneração.
+                </p>
+              </div>
             </div>
-            <div className="px-4 py-3 border-t border-white/5 flex justify-end gap-2">
+            <div className="px-4 py-3 border-t border-white/5 flex justify-between">
               <Button
                 size="small"
                 variant="secondary"
@@ -5093,9 +5126,26 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               >
                 Copiar
               </Button>
-              <Button size="small" onClick={() => setPromptPreview(null)}>
-                Fechar
-              </Button>
+              <div className="flex gap-2">
+                <Button size="small" variant="secondary" onClick={() => setPromptPreview(null)}>
+                  Fechar
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    const { sceneNumber, extraInstructions, type } = promptPreview;
+                    setPromptPreview(null);
+                    if (type === 'scene') {
+                      handleGenerateSingleSceneImage(sceneNumber, extraInstructions || undefined);
+                    }
+                  }}
+                  icon="refresh"
+                  disabled={!promptPreview.extraInstructions?.trim()}
+                  title={!promptPreview.extraInstructions?.trim() ? "Adicione instruções extras para regenerar" : "Regenerar com instruções extras"}
+                >
+                  Regenerar
+                </Button>
+              </div>
             </div>
           </div>
         </div>

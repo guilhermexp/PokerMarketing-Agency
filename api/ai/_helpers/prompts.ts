@@ -176,7 +176,31 @@ ${transcript}
 **QUANTIDADES EXATAS A GERAR (OBRIGATÓRIO SEGUIR):**
 ${quantityInstructions}
 
-**MISSÃO:** Gere uma campanha completa em JSON com as QUANTIDADES EXATAS especificadas acima. Use prompts cinematográficos para imagens.`;
+**REGRAS CRÍTICAS PARA GERAÇÃO DE IMAGE_PROMPT (OBRIGATÓRIO):**
+
+1. **ALINHAMENTO CONTEÚDO-IMAGEM (REGRA INVIOLÁVEL):**
+   - O image_prompt de CADA post DEVE refletir EXATAMENTE o tema/assunto da legenda (content)
+   - Se a legenda fala de "torneio de poker às 20h", a imagem DEVE mostrar cena de torneio de poker
+   - Se a legenda fala de "promoção de fichas grátis", a imagem DEVE mostrar fichas ou bônus
+   - NUNCA gere prompts genéricos desconectados do conteúdo textual
+
+2. **CONSISTÊNCIA COM SOLICITAÇÃO ORIGINAL:**
+   - TODOS os image_prompts devem estar relacionados ao CONTEÚDO ORIGINAL fornecido acima
+   - Não invente temas novos - extraia elementos visuais do conteúdo solicitado
+
+3. **ESPECIFICAÇÕES POR PLATAFORMA:**
+   - **Instagram**: Visuais impactantes, narrativos, com elementos que chamam atenção no feed (1:1)
+   - **Facebook**: Visuais versáteis e informativos, com destaque para textos/valores importantes
+   - **Twitter**: Visuais concisos e diretos, que complementam mensagens curtas
+   - **LinkedIn**: Visuais profissionais e corporativos, tom executivo
+
+4. **ELEMENTOS OBRIGATÓRIOS NO IMAGE_PROMPT:**
+   - Mencionar cores da marca (${brandProfile.primaryColor}, ${brandProfile.secondaryColor})
+   - Incluir o nome/logo "${brandProfile.name}" quando apropriado
+   - Estilo cinematográfico, luxuoso e premium
+   - Textos legíveis com fonte bold condensed sans-serif
+
+**MISSÃO:** Gere uma campanha completa em JSON com as QUANTIDADES EXATAS especificadas. Cada image_prompt DEVE ser específico e alinhado com seu respectivo content/legenda.`;
 };
 
 /**
