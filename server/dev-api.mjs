@@ -10,6 +10,8 @@ import { put } from "@vercel/blob";
 import { config } from "dotenv";
 import { fal } from "@fal-ai/client";
 import { clerkMiddleware, getAuth } from "@clerk/express";
+import { GoogleGenAI } from "@google/genai";
+import { OpenRouter } from "@openrouter/sdk";
 import {
   hasPermission,
   PERMISSIONS,
@@ -2046,6 +2048,1022 @@ app.post("/api/upload", async (req, res) => {
     return res.status(500).json({
       error: error instanceof Error ? error.message : "Unknown error",
     });
+  }
+});
+
+// ============================================================================
+// AI HELPER FUNCTIONS
+// ============================================================================
+
+// Gemini client
+const getGeminiAi = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY not configured");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+// OpenRouter client
+const getOpenRouter = () => {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY not configured");
+  }
+  return new OpenRouter({ apiKey });
+};
+
+// Retry helper for 503 errors
+const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      const isRetryable =
+        error?.message?.includes("503") ||
+        error?.message?.includes("overloaded") ||
+        error?.message?.includes("UNAVAILABLE") ||
+        error?.status === 503;
+
+      if (isRetryable && attempt < maxRetries) {
+        console.log(`[Gemini] Retry ${attempt}/${maxRetries} after ${delayMs}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+};
+
+// Map aspect ratios
+const mapAspectRatio = (ratio) => {
+  const map = {
+    "1:1": "1:1",
+    "9:16": "9:16",
+    "16:9": "16:9",
+    "1.91:1": "16:9",
+    "4:5": "4:5",
+    "3:4": "3:4",
+    "4:3": "4:3",
+    "2:3": "2:3",
+    "3:2": "3:2",
+  };
+  return map[ratio] || "1:1";
+};
+
+// Generate image with Gemini
+const generateGeminiImage = async (prompt, aspectRatio, model = "gemini-3-pro-image-preview", imageSize = "1K", productImages, styleReferenceImage) => {
+  const ai = getGeminiAi();
+  const parts = [{ text: prompt }];
+
+  if (styleReferenceImage) {
+    parts.push({
+      inlineData: {
+        data: styleReferenceImage.base64,
+        mimeType: styleReferenceImage.mimeType,
+      },
+    });
+  }
+
+  if (productImages) {
+    productImages.forEach((img) => {
+      parts.push({
+        inlineData: { data: img.base64, mimeType: img.mimeType },
+      });
+    });
+  }
+
+  const response = await withRetry(() =>
+    ai.models.generateContent({
+      model,
+      contents: { parts },
+      config: {
+        imageConfig: {
+          aspectRatio: mapAspectRatio(aspectRatio),
+          imageSize,
+        },
+      },
+    })
+  );
+
+  for (const part of response.candidates[0].content.parts) {
+    if (part.inlineData) {
+      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+    }
+  }
+
+  throw new Error("Failed to generate image");
+};
+
+// Generate image with Imagen 4
+const generateImagenImage = async (prompt, aspectRatio) => {
+  const ai = getGeminiAi();
+
+  const response = await withRetry(() =>
+    ai.models.generateImages({
+      model: "imagen-4.0-generate-001",
+      prompt,
+      config: {
+        numberOfImages: 1,
+        outputMimeType: "image/png",
+        aspectRatio,
+      },
+    })
+  );
+
+  return `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
+};
+
+// Generate structured content with Gemini
+const generateStructuredContent = async (model, parts, responseSchema, temperature = 0.7) => {
+  const ai = getGeminiAi();
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: { parts },
+    config: {
+      responseMimeType: "application/json",
+      responseSchema,
+      temperature,
+    },
+  });
+
+  return response.text.trim();
+};
+
+// Generate text with OpenRouter
+const generateTextWithOpenRouter = async (model, systemPrompt, userPrompt, temperature = 0.7) => {
+  const openrouter = getOpenRouter();
+
+  const response = await openrouter.chat.completions.create({
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    response_format: { type: "json_object" },
+    temperature,
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error(`OpenRouter (${model}) no content returned`);
+  }
+
+  return content;
+};
+
+// Generate text with OpenRouter + Vision
+const generateTextWithOpenRouterVision = async (model, textParts, imageParts, temperature = 0.7) => {
+  const openrouter = getOpenRouter();
+
+  const content = textParts.map((text) => ({ type: "text", text }));
+
+  for (const img of imageParts) {
+    content.push({
+      type: "image_url",
+      image_url: {
+        url: `data:${img.mimeType};base64,${img.base64}`,
+      },
+    });
+  }
+
+  const response = await openrouter.chat.completions.create({
+    model,
+    messages: [{ role: "user", content }],
+    response_format: { type: "json_object" },
+    temperature,
+  });
+
+  const result = response.choices[0]?.message?.content;
+  if (!result) {
+    throw new Error(`OpenRouter (${model}) no content returned`);
+  }
+
+  return result;
+};
+
+// Schema Type constants
+const Type = {
+  OBJECT: "OBJECT",
+  ARRAY: "ARRAY",
+  STRING: "STRING",
+  INTEGER: "INTEGER",
+  BOOLEAN: "BOOLEAN",
+  NUMBER: "NUMBER",
+};
+
+// Prompt builders
+const shouldUseTone = (brandProfile, target) => {
+  const targets = brandProfile.toneTargets || ["campaigns", "posts", "images", "flyers"];
+  return targets.includes(target);
+};
+
+const getToneText = (brandProfile, target) => {
+  return shouldUseTone(brandProfile, target) ? brandProfile.toneOfVoice : "";
+};
+
+const buildImagePrompt = (prompt, brandProfile, hasStyleReference = false) => {
+  const toneText = getToneText(brandProfile, "images");
+  let fullPrompt = `PROMPT TÉCNICO: ${prompt}
+ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
+
+  if (hasStyleReference) {
+    fullPrompt += `
+
+**TIPOGRAFIA OBRIGATÓRIA PARA CENAS (REGRA INVIOLÁVEL):**
+- Use EXCLUSIVAMENTE fonte BOLD CONDENSED SANS-SERIF (estilo Bebas Neue, Oswald, Impact, ou similar)
+- TODOS os textos devem usar a MESMA família tipográfica - PROIBIDO misturar estilos
+- Títulos em MAIÚSCULAS com peso BLACK ou EXTRA-BOLD
+- PROIBIDO: fontes script/cursivas, serifadas clássicas, handwriting, ou fontes finas/light`;
+  }
+
+  return fullPrompt;
+};
+
+const buildFlyerPrompt = (brandProfile) => {
+  const toneText = getToneText(brandProfile, "flyers");
+
+  return `
+**PERSONA:** Você é Diretor de Arte Sênior de uma agência de publicidade internacional de elite.
+
+**MISSÃO CRÍTICA:**
+Crie materiais visuais de alta qualidade que representem fielmente a marca e comuniquem a mensagem de forma impactante.
+Se houver valores ou informações importantes no conteúdo, destaque-os visualmente (fonte negrito, cor vibrante ou tamanho maior).
+
+**REGRAS DE CONTEÚDO:**
+1. Destaque informações importantes (valores, datas, horários) de forma clara e legível.
+2. Use a marca ${brandProfile.name}.
+3. Siga a identidade visual da marca em todos os elementos.
+
+**IDENTIDADE DA MARCA - ${brandProfile.name}:**
+${brandProfile.description ? `- Descrição: ${brandProfile.description}` : ""}
+${toneText ? `- Tom de Comunicação: ${toneText}` : ""}
+- Cor Primária (dominante): ${brandProfile.primaryColor}
+- Cor de Acento (destaques, CTAs): ${brandProfile.secondaryColor}
+
+**PRINCÍPIOS DE DESIGN PROFISSIONAL:**
+
+1. HARMONIA CROMÁTICA:
+   - Use APENAS as cores da marca: ${brandProfile.primaryColor} (primária) e ${brandProfile.secondaryColor} (acento)
+   - Crie variações tonais dessas cores para profundidade
+   - Evite introduzir cores aleatórias
+
+2. RESPIRAÇÃO VISUAL (Anti-Poluição):
+   - Menos é mais: priorize espaços negativos estratégicos
+   - Não sobrecarregue com elementos decorativos desnecessários
+   - Hierarquia visual clara
+
+3. TIPOGRAFIA CINEMATOGRÁFICA:
+   - Máximo 2-3 famílias tipográficas diferentes
+   - Contraste forte entre títulos (bold/black) e corpo (regular/medium)
+
+4. ESTÉTICA PREMIUM SEM CLICHÊS:
+   - Evite excesso de efeitos (brilhos, sombras, neons chamativos)
+   - Prefira elegância sutil a ostentação visual
+
+**ATMOSFERA FINAL:**
+- Alta classe, luxo e sofisticação
+- Cinematográfico mas não exagerado
+- Profissional mas criativo
+- Impactante mas elegante`;
+};
+
+const buildQuickPostPrompt = (brandProfile, context) => {
+  const toneText = getToneText(brandProfile, "posts");
+
+  return `
+Você é Social Media Manager de elite. Crie um post de INSTAGRAM de alta performance.
+
+**CONTEXTO:**
+${context}
+
+**MARCA:** ${brandProfile.name}${brandProfile.description ? ` - ${brandProfile.description}` : ""}${toneText ? ` | **TOM:** ${toneText}` : ""}
+
+**REGRAS DE OURO:**
+1. GANCHO EXPLOSIVO com emojis relevantes ao tema.
+2. DESTAQUE informações importantes (valores, datas, ofertas).
+3. CTA FORTE (ex: Link na Bio, Saiba Mais).
+4. 5-8 Hashtags estratégicas relevantes à marca e ao conteúdo.
+
+Responda apenas JSON:
+{ "platform": "Instagram", "content": "Texto Legenda", "hashtags": ["tag1", "tag2"], "image_prompt": "descrição visual" }`;
+};
+
+const buildCampaignPrompt = (brandProfile, transcript, quantityInstructions) => {
+  const toneText = getToneText(brandProfile, "campaigns");
+
+  return `
+**PERFIL DA MARCA:**
+- Nome: ${brandProfile.name}
+- Descrição: ${brandProfile.description}
+${toneText ? `- Tom de Voz: ${toneText}` : ""}
+- Cores Oficiais: Primária ${brandProfile.primaryColor}, Secundária ${brandProfile.secondaryColor}
+
+**CONTEÚDO PARA ESTRUTURAR:**
+${transcript}
+
+**QUANTIDADES EXATAS A GERAR (OBRIGATÓRIO SEGUIR):**
+${quantityInstructions}
+
+**MISSÃO:** Gere uma campanha completa em JSON com as QUANTIDADES EXATAS especificadas acima. Use prompts cinematográficos para imagens.`;
+};
+
+// Build quantity instructions for campaign
+const buildQuantityInstructions = (options) => {
+  const quantities = [];
+
+  if (options.videoClipScripts.generate && options.videoClipScripts.count > 0) {
+    quantities.push(`- Roteiros de vídeo (videoClipScripts): EXATAMENTE ${options.videoClipScripts.count} roteiro(s)`);
+  } else {
+    quantities.push(`- Roteiros de vídeo (videoClipScripts): 0 (array vazio)`);
+  }
+
+  const postPlatforms = [];
+  if (options.posts.instagram?.generate && options.posts.instagram.count > 0) {
+    postPlatforms.push(`${options.posts.instagram.count}x Instagram`);
+  }
+  if (options.posts.facebook?.generate && options.posts.facebook.count > 0) {
+    postPlatforms.push(`${options.posts.facebook.count}x Facebook`);
+  }
+  if (options.posts.twitter?.generate && options.posts.twitter.count > 0) {
+    postPlatforms.push(`${options.posts.twitter.count}x Twitter`);
+  }
+  if (options.posts.linkedin?.generate && options.posts.linkedin.count > 0) {
+    postPlatforms.push(`${options.posts.linkedin.count}x LinkedIn`);
+  }
+  if (postPlatforms.length > 0) {
+    quantities.push(`- Posts (posts): ${postPlatforms.join(", ")}`);
+  } else {
+    quantities.push(`- Posts (posts): 0 (array vazio)`);
+  }
+
+  const adPlatforms = [];
+  if (options.adCreatives.facebook?.generate && options.adCreatives.facebook.count > 0) {
+    adPlatforms.push(`${options.adCreatives.facebook.count}x Facebook`);
+  }
+  if (options.adCreatives.google?.generate && options.adCreatives.google.count > 0) {
+    adPlatforms.push(`${options.adCreatives.google.count}x Google`);
+  }
+  if (adPlatforms.length > 0) {
+    quantities.push(`- Anúncios (adCreatives): ${adPlatforms.join(", ")}`);
+  } else {
+    quantities.push(`- Anúncios (adCreatives): 0 (array vazio)`);
+  }
+
+  return quantities.join("\n    ");
+};
+
+// Campaign schema for structured generation
+const campaignSchema = {
+  type: Type.OBJECT,
+  properties: {
+    videoClipScripts: {
+      type: Type.ARRAY,
+      description: "Roteiros para vídeos curtos (Reels/Shorts/TikTok).",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          hook: { type: Type.STRING },
+          scenes: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                scene: { type: Type.INTEGER },
+                visual: { type: Type.STRING },
+                narration: { type: Type.STRING },
+                duration_seconds: { type: Type.INTEGER },
+              },
+              required: ["scene", "visual", "narration", "duration_seconds"],
+            },
+          },
+          image_prompt: { type: Type.STRING },
+          audio_script: { type: Type.STRING },
+        },
+        required: ["title", "hook", "scenes", "image_prompt", "audio_script"],
+      },
+    },
+    posts: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          platform: { type: Type.STRING },
+          content: { type: Type.STRING },
+          hashtags: { type: Type.ARRAY, items: { type: Type.STRING } },
+          image_prompt: { type: Type.STRING },
+        },
+        required: ["platform", "content", "hashtags", "image_prompt"],
+      },
+    },
+    adCreatives: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          platform: { type: Type.STRING },
+          headline: { type: Type.STRING },
+          body: { type: Type.STRING },
+          cta: { type: Type.STRING },
+          image_prompt: { type: Type.STRING },
+        },
+        required: ["platform", "headline", "body", "cta", "image_prompt"],
+      },
+    },
+  },
+  required: ["videoClipScripts", "posts", "adCreatives"],
+};
+
+// Quick post schema
+const quickPostSchema = {
+  type: Type.OBJECT,
+  properties: {
+    platform: { type: Type.STRING },
+    content: { type: Type.STRING },
+    hashtags: { type: Type.ARRAY, items: { type: Type.STRING } },
+    image_prompt: { type: Type.STRING },
+  },
+  required: ["platform", "content", "hashtags", "image_prompt"],
+};
+
+// ============================================================================
+// AI GENERATION ENDPOINTS
+// ============================================================================
+
+// AI Campaign Generation
+app.post("/api/ai/campaign", async (req, res) => {
+  try {
+    const { brandProfile, transcript, options, productImages } = req.body;
+
+    if (!brandProfile || !transcript || !options) {
+      return res.status(400).json({
+        error: "brandProfile, transcript, and options are required",
+      });
+    }
+
+    console.log("[Campaign API] Generating campaign...");
+
+    const model = brandProfile.creativeModel || "gemini-3-pro-preview";
+    const isOpenRouter = model.includes("/");
+
+    const quantityInstructions = buildQuantityInstructions(options);
+    const prompt = buildCampaignPrompt(brandProfile, transcript, quantityInstructions);
+
+    let result;
+
+    if (isOpenRouter) {
+      const textParts = [prompt];
+      const imageParts = productImages || [];
+
+      if (imageParts.length > 0) {
+        result = await generateTextWithOpenRouterVision(model, textParts, imageParts, 0.7);
+      } else {
+        result = await generateTextWithOpenRouter(model, "", prompt, 0.7);
+      }
+    } else {
+      const parts = [{ text: prompt }];
+
+      if (productImages) {
+        productImages.forEach((img) => {
+          parts.push({
+            inlineData: { mimeType: img.mimeType, data: img.base64 },
+          });
+        });
+      }
+
+      result = await generateStructuredContent(model, parts, campaignSchema, 0.7);
+    }
+
+    const campaign = JSON.parse(result);
+
+    console.log("[Campaign API] Campaign generated successfully");
+
+    res.json({
+      success: true,
+      campaign,
+      model,
+    });
+  } catch (error) {
+    console.error("[Campaign API] Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to generate campaign" });
+  }
+});
+
+// AI Flyer Generation
+app.post("/api/ai/flyer", async (req, res) => {
+  try {
+    const {
+      prompt,
+      brandProfile,
+      logo,
+      referenceImage,
+      aspectRatio = "9:16",
+      collabLogo,
+      imageSize = "1K",
+      compositionAssets,
+    } = req.body;
+
+    if (!prompt || !brandProfile) {
+      return res.status(400).json({ error: "prompt and brandProfile are required" });
+    }
+
+    console.log(`[Flyer API] Generating flyer, aspect ratio: ${aspectRatio}`);
+
+    const ai = getGeminiAi();
+    const brandingInstruction = buildFlyerPrompt(brandProfile);
+
+    const parts = [
+      { text: brandingInstruction },
+      { text: `DADOS DO FLYER PARA INSERIR NA ARTE:\n${prompt}` },
+    ];
+
+    if (logo) {
+      parts.push({ inlineData: { data: logo.base64, mimeType: logo.mimeType } });
+    }
+
+    if (collabLogo) {
+      parts.push({
+        inlineData: { data: collabLogo.base64, mimeType: collabLogo.mimeType },
+      });
+    }
+
+    if (referenceImage) {
+      parts.push({ text: "USE ESTA IMAGEM COMO REFERÊNCIA DE LAYOUT E FONTES:" });
+      parts.push({
+        inlineData: {
+          data: referenceImage.base64,
+          mimeType: referenceImage.mimeType,
+        },
+      });
+    }
+
+    if (compositionAssets) {
+      compositionAssets.forEach((asset, i) => {
+        parts.push({ text: `Ativo de composição ${i + 1}:` });
+        parts.push({
+          inlineData: { data: asset.base64, mimeType: asset.mimeType },
+        });
+      });
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-image-preview",
+      contents: { parts },
+      config: {
+        imageConfig: {
+          aspectRatio: mapAspectRatio(aspectRatio),
+          imageSize,
+        },
+      },
+    });
+
+    let imageDataUrl = null;
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        break;
+      }
+    }
+
+    if (!imageDataUrl) {
+      throw new Error("A IA falhou em produzir o Flyer.");
+    }
+
+    console.log("[Flyer API] Flyer generated successfully");
+
+    res.json({
+      success: true,
+      imageUrl: imageDataUrl,
+    });
+  } catch (error) {
+    console.error("[Flyer API] Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to generate flyer" });
+  }
+});
+
+// AI Image Generation
+app.post("/api/ai/image", async (req, res) => {
+  try {
+    const {
+      prompt,
+      brandProfile,
+      aspectRatio = "1:1",
+      model = "gemini-3-pro-image-preview",
+      imageSize = "1K",
+      productImages,
+      styleReferenceImage,
+    } = req.body;
+
+    if (!prompt || !brandProfile) {
+      return res.status(400).json({ error: "prompt and brandProfile are required" });
+    }
+
+    console.log(`[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}`);
+
+    let imageDataUrl;
+
+    if (model === "imagen-4.0-generate-001") {
+      const fullPrompt = buildImagePrompt(prompt, brandProfile, !!styleReferenceImage);
+      imageDataUrl = await generateImagenImage(fullPrompt, aspectRatio);
+    } else {
+      const fullPrompt = buildImagePrompt(prompt, brandProfile, !!styleReferenceImage);
+      imageDataUrl = await generateGeminiImage(
+        fullPrompt,
+        aspectRatio,
+        model,
+        imageSize,
+        productImages,
+        styleReferenceImage
+      );
+    }
+
+    console.log("[Image API] Image generated successfully");
+
+    res.json({
+      success: true,
+      imageUrl: imageDataUrl,
+      model,
+    });
+  } catch (error) {
+    console.error("[Image API] Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to generate image" });
+  }
+});
+
+// AI Text Generation
+app.post("/api/ai/text", async (req, res) => {
+  try {
+    const {
+      type,
+      brandProfile,
+      context,
+      systemPrompt,
+      userPrompt,
+      image,
+      temperature = 0.7,
+      responseSchema,
+    } = req.body;
+
+    if (!brandProfile) {
+      return res.status(400).json({ error: "brandProfile is required" });
+    }
+
+    console.log(`[Text API] Generating ${type} text...`);
+
+    const model = brandProfile.creativeModel || "gemini-3-pro-preview";
+    const isOpenRouter = model.includes("/");
+
+    let result;
+
+    if (type === "quickPost") {
+      if (!context) {
+        return res.status(400).json({ error: "context is required for quickPost" });
+      }
+
+      const prompt = buildQuickPostPrompt(brandProfile, context);
+
+      if (isOpenRouter) {
+        const parts = [prompt];
+        if (image) {
+          result = await generateTextWithOpenRouterVision(model, parts, [image], temperature);
+        } else {
+          result = await generateTextWithOpenRouter(model, "", prompt, temperature);
+        }
+      } else {
+        const parts = [{ text: prompt }];
+        if (image) {
+          parts.push({
+            inlineData: {
+              mimeType: image.mimeType,
+              data: image.base64,
+            },
+          });
+        }
+        result = await generateStructuredContent(model, parts, quickPostSchema, temperature);
+      }
+    } else {
+      if (!systemPrompt && !userPrompt) {
+        return res.status(400).json({ error: "systemPrompt or userPrompt is required for custom text" });
+      }
+
+      if (isOpenRouter) {
+        if (image) {
+          const parts = userPrompt ? [userPrompt] : [];
+          result = await generateTextWithOpenRouterVision(model, parts, [image], temperature);
+        } else {
+          result = await generateTextWithOpenRouter(model, systemPrompt || "", userPrompt || "", temperature);
+        }
+      } else {
+        const parts = [];
+        if (userPrompt) {
+          parts.push({ text: userPrompt });
+        }
+        if (image) {
+          parts.push({
+            inlineData: {
+              mimeType: image.mimeType,
+              data: image.base64,
+            },
+          });
+        }
+
+        result = await generateStructuredContent(
+          model,
+          parts,
+          responseSchema || quickPostSchema,
+          temperature
+        );
+      }
+    }
+
+    console.log("[Text API] Text generated successfully");
+
+    res.json({
+      success: true,
+      result: JSON.parse(result),
+      model,
+    });
+  } catch (error) {
+    console.error("[Text API] Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to generate text" });
+  }
+});
+
+// AI Edit Image
+app.post("/api/ai/edit-image", async (req, res) => {
+  try {
+    const { image, prompt, mask, referenceImage } = req.body;
+
+    if (!image || !prompt) {
+      return res.status(400).json({ error: "image and prompt are required" });
+    }
+
+    console.log("[Edit Image API] Editing image...");
+
+    const ai = getGeminiAi();
+    const instructionPrompt = `DESIGNER SÊNIOR: Execute alteração profissional: ${prompt}. Texto original e logos são SAGRADOS, preserve informações importantes visíveis.`;
+
+    const parts = [
+      { text: instructionPrompt },
+      { inlineData: { data: image.base64, mimeType: image.mimeType } },
+    ];
+
+    if (mask) {
+      parts.push({ inlineData: { data: mask.base64, mimeType: mask.mimeType } });
+    }
+    if (referenceImage) {
+      parts.push({ inlineData: { data: referenceImage.base64, mimeType: referenceImage.mimeType } });
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-image-preview",
+      contents: { parts },
+      config: { imageConfig: { imageSize: "1K" } },
+    });
+
+    let imageDataUrl = null;
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        break;
+      }
+    }
+
+    if (!imageDataUrl) {
+      throw new Error("Failed to edit image");
+    }
+
+    console.log("[Edit Image API] Image edited successfully");
+
+    res.json({
+      success: true,
+      imageUrl: imageDataUrl,
+    });
+  } catch (error) {
+    console.error("[Edit Image API] Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to edit image" });
+  }
+});
+
+// AI Extract Colors from Logo
+app.post("/api/ai/extract-colors", async (req, res) => {
+  try {
+    const { logo } = req.body;
+
+    if (!logo) {
+      return res.status(400).json({ error: "logo is required" });
+    }
+
+    console.log("[Extract Colors API] Analyzing logo...");
+
+    const ai = getGeminiAi();
+
+    const colorSchema = {
+      type: Type.OBJECT,
+      properties: {
+        primaryColor: { type: Type.STRING },
+        secondaryColor: { type: Type.STRING, nullable: true },
+        tertiaryColor: { type: Type.STRING, nullable: true },
+      },
+      required: ["primaryColor"],
+    };
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: {
+        parts: [
+          {
+            text: `Analise este logo e extraia APENAS as cores que REALMENTE existem na imagem visível.
+
+REGRAS IMPORTANTES:
+- Extraia somente cores que você pode ver nos pixels da imagem
+- NÃO invente cores que não existem
+- Ignore áreas transparentes (não conte transparência como cor)
+- Se o logo tiver apenas 1 cor visível, retorne null para secondaryColor e tertiaryColor
+- Se o logo tiver apenas 2 cores visíveis, retorne null para tertiaryColor
+
+PRIORIDADE DAS CORES:
+- primaryColor: A cor mais dominante/presente no logo (maior área)
+- secondaryColor: A segunda cor mais presente (se existir), ou null
+- tertiaryColor: Uma terceira cor de destaque/acento (se existir), ou null
+
+Retorne as cores em formato hexadecimal (#RRGGBB).`,
+          },
+          { inlineData: { mimeType: logo.mimeType, data: logo.base64 } },
+        ],
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: colorSchema,
+      },
+    });
+
+    const colors = JSON.parse(response.text.trim());
+
+    console.log("[Extract Colors API] Colors extracted:", colors);
+
+    res.json(colors);
+  } catch (error) {
+    console.error("[Extract Colors API] Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to extract colors" });
+  }
+});
+
+// AI Speech Generation (TTS)
+app.post("/api/ai/speech", async (req, res) => {
+  try {
+    const { script, voiceName = "Orus" } = req.body;
+
+    if (!script) {
+      return res.status(400).json({ error: "script is required" });
+    }
+
+    console.log("[Speech API] Generating speech...");
+
+    const ai = getGeminiAi();
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: script }] }],
+      config: {
+        responseModalities: ["AUDIO"],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName } },
+        },
+      },
+    });
+
+    const audioBase64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
+
+    if (!audioBase64) {
+      throw new Error("Failed to generate speech");
+    }
+
+    console.log("[Speech API] Speech generated successfully");
+
+    res.json({
+      success: true,
+      audioBase64,
+    });
+  } catch (error) {
+    console.error("[Speech API] Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to generate speech" });
+  }
+});
+
+// AI Assistant Streaming Endpoint
+app.post("/api/ai/assistant", async (req, res) => {
+  try {
+    const { history, brandProfile } = req.body;
+
+    if (!history) {
+      return res.status(400).json({ error: "history is required" });
+    }
+
+    console.log("[Assistant API] Starting streaming conversation...");
+
+    const ai = getGeminiAi();
+
+    const assistantTools = {
+      functionDeclarations: [
+        {
+          name: "create_image",
+          description: "Gera uma nova imagem de marketing do zero.",
+          parameters: {
+            type: Type.OBJECT,
+            properties: {
+              description: {
+                type: Type.STRING,
+                description: "Descrição técnica detalhada para a IA de imagem.",
+              },
+              aspect_ratio: {
+                type: Type.STRING,
+                enum: ["1:1", "9:16", "16:9"],
+                description: "Proporção da imagem.",
+              }
+            },
+            required: ["description"],
+          },
+        },
+        {
+          name: "edit_referenced_image",
+          description: "Edita a imagem atualmente em foco.",
+          parameters: {
+            type: Type.OBJECT,
+            properties: {
+              prompt: {
+                type: Type.STRING,
+                description: "Descrição exata da alteração desejada.",
+              },
+            },
+            required: ["prompt"],
+          },
+        },
+        {
+          name: "create_brand_logo",
+          description: "Cria um novo logo para a marca.",
+          parameters: {
+            type: Type.OBJECT,
+            properties: {
+              prompt: { type: Type.STRING, description: "Descrição do logo." },
+            },
+            required: ["prompt"],
+          },
+        }
+      ],
+    };
+
+    const systemInstruction = `Você é o Diretor de Criação Sênior da DirectorAi. Especialista em Branding e Design de alta performance.
+
+SUAS CAPACIDADES CORE:
+1. CRIAÇÃO E ITERAÇÃO: Crie imagens do zero e continue editando-as até o usuário aprovar.
+2. REFERÊNCIAS: Use imagens de referência enviadas no chat para guiar o estilo das suas criações.
+3. BRANDING: Você conhece a marca: ${JSON.stringify(brandProfile)}. Sempre use a paleta de cores e o tom de voz oficial.
+
+Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
+
+    // Set headers for SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const stream = await ai.models.generateContentStream({
+      model: 'gemini-3-pro-preview',
+      contents: history,
+      config: {
+        systemInstruction,
+        tools: [assistantTools],
+        temperature: 0.5,
+      },
+    });
+
+    for await (const chunk of stream) {
+      const text = chunk.text || '';
+      const functionCall = chunk.candidates?.[0]?.content?.parts?.find(p => p.functionCall)?.functionCall;
+
+      const data = { text };
+      if (functionCall) {
+        data.functionCall = functionCall;
+      }
+
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+
+    console.log("[Assistant API] Streaming completed");
+  } catch (error) {
+    console.error("[Assistant API] Error:", error);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: error.message || "Failed to run assistant" });
+    }
+    res.end();
   }
 });
 

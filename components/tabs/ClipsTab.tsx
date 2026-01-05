@@ -4429,7 +4429,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           /* Normal View */
           <div className="flex flex-col lg:flex-row">
             {/* Preview Carousel - Thumbnail / Merged Video */}
-            <div className="flex-shrink-0 p-4 bg-[#0d0d0d] border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col">
+            <div className="flex-shrink-0 p-4 lg:pt-14 bg-[#0d0d0d] border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col">
               <div className="w-64 aspect-[9/16] bg-[#080808] rounded-xl overflow-hidden relative border border-white/5">
                 {/* Merged Video Slide */}
                 {previewSlide === "video" && (mergedVideoUrl || isMerging) && (
