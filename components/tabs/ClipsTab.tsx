@@ -698,6 +698,10 @@ const ClipCard: React.FC<ClipCardProps> = ({
   const [editingThumbnail, setEditingThumbnail] = useState<GalleryImage | null>(
     null,
   );
+  const [editingSceneImage, setEditingSceneImage] = useState<{
+    sceneNumber: number;
+    image: GalleryImage;
+  } | null>(null);
   const [audioState, setAudioState] = useState<{
     url?: string;
     isLoading: boolean;
@@ -1982,6 +1986,27 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     if (thumbnail) {
       onUpdateGalleryImage(thumbnail.id, newSrc);
       setEditingThumbnail((prev) => (prev ? { ...prev, src: newSrc } : null));
+    }
+  };
+
+  const handleSceneImageUpdate = (newSrc: string) => {
+    if (editingSceneImage) {
+      const { sceneNumber, image } = editingSceneImage;
+      // Update in gallery if it has an ID
+      if (image.id && !image.id.startsWith('temp-')) {
+        onUpdateGalleryImage(image.id, newSrc);
+      }
+      // Update local state
+      setSceneImages((prev) => ({
+        ...prev,
+        [sceneNumber]: {
+          ...prev[sceneNumber],
+          dataUrl: newSrc,
+          httpUrl: newSrc.startsWith('http') ? newSrc : prev[sceneNumber]?.httpUrl,
+        },
+      }));
+      // Update modal image
+      setEditingSceneImage((prev) => prev ? { ...prev, image: { ...prev.image, src: newSrc } } : null);
     }
   };
 
@@ -4773,17 +4798,34 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                 <img
                                   src={sceneImage.dataUrl}
                                   alt={`Referência cena ${scene.sceneNumber}`}
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-full object-cover cursor-pointer"
+                                  onClick={() => {
+                                    // Find the gallery image for this scene
+                                    const galleryImage = galleryImages?.find(
+                                      (img) => img.src === sceneImage.dataUrl || img.src === sceneImage.httpUrl
+                                    );
+                                    setEditingSceneImage({
+                                      sceneNumber: scene.sceneNumber,
+                                      image: galleryImage || {
+                                        id: `scene-${scene.sceneNumber}`,
+                                        src: sceneImage.dataUrl,
+                                        prompt: scene.visual,
+                                        source: `Cena-${scene.sceneNumber}` as const,
+                                        model: "gemini-3-pro-image-preview" as const,
+                                      },
+                                    });
+                                  }}
                                 />
                                 {/* Hover overlay to regenerate image */}
-                                <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center">
+                                <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center pointer-events-none">
                                   <button
-                                    onClick={() =>
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       handleGenerateSingleSceneImage(
                                         scene.sceneNumber,
-                                      )
-                                    }
-                                    className="w-8 h-8 rounded-lg bg-white/10 hover:bg-primary/20 flex items-center justify-center text-white/70 hover:text-primary transition-colors"
+                                      );
+                                    }}
+                                    className="w-8 h-8 rounded-lg bg-white/10 hover:bg-primary/20 flex items-center justify-center text-white/70 hover:text-primary transition-colors pointer-events-auto"
                                     title="Regenerar imagem"
                                   >
                                     <Icon name="refresh" className="w-4 h-4" />
@@ -4987,6 +5029,16 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           onImageUpdate={handleThumbnailUpdate}
           onSetChatReference={onSetChatReference}
           downloadFilename={`thumbnail-${clip.title.toLowerCase().replace(/\s+/g, "_")}.png`}
+        />
+      )}
+
+      {editingSceneImage && (
+        <ImagePreviewModal
+          image={editingSceneImage.image}
+          onClose={() => setEditingSceneImage(null)}
+          onImageUpdate={handleSceneImageUpdate}
+          onSetChatReference={onSetChatReference}
+          downloadFilename={`cena-${editingSceneImage.sceneNumber}-${clip.title.toLowerCase().replace(/\s+/g, "_")}.png`}
         />
       )}
 
