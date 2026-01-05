@@ -3537,6 +3537,25 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             >
               <Icon name="settings" className="w-4 h-4" />
             </button>
+            {/* Audio Button */}
+            {!audioState.url && !audioState.isLoading && (
+              <Button
+                onClick={handleGenerateAudio}
+                isLoading={audioState.isLoading}
+                size="small"
+                icon="mic"
+                className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
+                title="Gerar narração de áudio"
+              >
+                Áudio
+              </Button>
+            )}
+            {audioState.isLoading && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-[#0a0a0a] rounded-lg border border-white/10">
+                <Loader />
+                <span className="text-[9px] text-white/50">Áudio...</span>
+              </div>
+            )}
             {/* Action Buttons */}
             {onGenerateAllClipImages && (
               <Button
@@ -4551,28 +4570,15 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 </div>
               )}
 
-              {/* Audio */}
-              <div className="mt-4 pt-4 border-t border-white/5">
-                <h4 className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2">
-                  Narração
-                </h4>
-                {audioState.isLoading ? (
-                  <div className="flex items-center gap-2 p-2 bg-[#080808] rounded-lg">
-                    <Loader />
-                    <span className="text-[8px] text-white/30">Gerando...</span>
-                  </div>
-                ) : audioState.url ? (
+              {/* Audio Player - only show when audio exists */}
+              {audioState.url && (
+                <div className="mt-4 pt-4 border-t border-white/5">
+                  <h4 className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2">
+                    Narração
+                  </h4>
                   <audio controls src={audioState.url} className="w-full h-8" />
-                ) : (
-                  <Button
-                    onClick={handleGenerateAudio}
-                    size="small"
-                    className="w-full !rounded-lg !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
-                  >
-                    Gerar Áudio
-                  </Button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Scenes Horizontal Carousel */}
