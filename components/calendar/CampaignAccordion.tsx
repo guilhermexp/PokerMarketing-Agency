@@ -111,7 +111,15 @@ export const CampaignAccordion: React.FC<CampaignAccordionProps> = ({
               <div className="p-3 pt-0 border-t border-white/5">
                 {campaign.images.length === 0 ? (
                   <div className="py-6 text-center">
-                    <p className="text-xs text-white/30">Nenhuma imagem gerada</p>
+                    <Icon name="image" className="w-8 h-8 text-white/20 mx-auto mb-2" />
+                    <p className="text-xs text-white/30">
+                      {campaign.imageCount > 0
+                        ? 'Imagens ainda não foram geradas para esta campanha'
+                        : 'Nenhuma imagem gerada'}
+                    </p>
+                    <p className="text-[10px] text-white/20 mt-1">
+                      Gere as imagens na aba de Campanhas
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 gap-2 mt-3 max-h-[350px] overflow-y-auto pr-1">

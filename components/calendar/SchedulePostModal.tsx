@@ -175,30 +175,35 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   const campaignsWithImages = useMemo((): CampaignWithImages[] => {
     if (galleryFilter !== 'posts') return [];
 
-    // Get campaign images (with campaign_id)
-    const campaignImages = eligibleImages.filter(img => img.campaign_id);
+    // Build campaign list from campaigns data (which has counts and previews)
+    // and associate images that have campaign_id
+    const campaignImages = deduplicatedImages.filter(img =>
+      img.campaign_id && (img.source === 'Post' || img.source === 'Anúncio')
+    );
 
-    // Group by campaign_id
-    const grouped = new Map<string, GalleryImage[]>();
+    // Group images by campaign_id
+    const imagesByCampaign = new Map<string, GalleryImage[]>();
     campaignImages.forEach(img => {
-      const existing = grouped.get(img.campaign_id!) || [];
-      grouped.set(img.campaign_id!, [...existing, img]);
+      const existing = imagesByCampaign.get(img.campaign_id!) || [];
+      imagesByCampaign.set(img.campaign_id!, [...existing, img]);
     });
 
-    // Map to CampaignWithImages format
-    return Array.from(grouped.entries())
-      .map(([campaignId, images]) => {
-        const campaignData = campaigns.find(c => c.id === campaignId);
+    // Use campaigns list as base (they have counts and previews even without gallery images)
+    return campaigns
+      .filter(c => (c.posts_count || 0) > 0 || (c.ads_count || 0) > 0)
+      .map(campaign => {
+        const images = imagesByCampaign.get(campaign.id) || [];
+        const totalCount = (campaign.posts_count || 0) + (campaign.ads_count || 0);
         return {
-          id: campaignId,
-          name: campaignData?.name || 'Campanha sem nome',
-          imageCount: images.length,
-          previewUrl: images[0]?.src || null,
+          id: campaign.id,
+          name: campaign.name || 'Campanha sem nome',
+          imageCount: images.length > 0 ? images.length : totalCount,
+          previewUrl: images[0]?.src || campaign.post_preview_url || campaign.ad_preview_url || null,
           images,
         };
       })
-      .sort((a, b) => b.imageCount - a.imageCount); // Most images first
-  }, [eligibleImages, galleryFilter, campaigns]);
+      .sort((a, b) => b.imageCount - a.imageCount);
+  }, [deduplicatedImages, galleryFilter, campaigns]);
 
   const handleSelectImage = (image: GalleryImage) => {
     // Pause video when changing selection
