@@ -1,15 +1,15 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useUser, useOrganization } from '@clerk/clerk-react';
 import type { ScheduledPost, GalleryImage, SchedulingPlatform, InstagramContentType } from '../../types';
 import { Icon } from '../common/Icon';
 import { CampaignAccordion, type CampaignWithImages } from './CampaignAccordion';
-import { useCampaigns } from '../../hooks/useAppData';
+import type { DbCampaign } from '../../services/apiClient';
 
 interface SchedulePostModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSchedule: (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => void;
   galleryImages: GalleryImage[];
+  campaigns?: DbCampaign[];
   initialDate?: string | null;
   initialTime?: string | null;
   initialImage?: GalleryImage | null;
@@ -41,6 +41,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   onClose,
   onSchedule,
   galleryImages,
+  campaigns = [],
   initialDate,
   initialTime,
   initialImage
@@ -70,15 +71,6 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [galleryFilter, setGalleryFilter] = useState<'all' | 'flyers' | 'posts' | 'videos'>('all');
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
-
-  // Get user and organization for campaigns hook
-  const { user } = useUser();
-  const { organization } = useOrganization();
-  const userId = user?.id || null;
-  const organizationId = organization?.id || null;
-
-  // Get campaigns data for grouping images
-  const { campaigns } = useCampaigns(userId, organizationId);
 
   // Set initial image when modal opens with a pre-selected image
   useEffect(() => {

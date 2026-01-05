@@ -19,6 +19,7 @@ import type {
 } from "../types";
 import type { InstagramContext } from "../services/rubeService";
 import type { WeekScheduleWithCount } from "../services/apiClient";
+import { useCampaigns } from "../hooks/useAppData";
 import { UploadForm } from "./UploadForm";
 import { ClipsTab } from "./tabs/ClipsTab";
 import { PostsTab } from "./tabs/PostsTab";
@@ -215,6 +216,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
   } = props;
 
   const { signOut } = useClerk();
+  const { campaigns } = useCampaigns(userId || null, organizationId);
   const [activeTab, setActiveTab] = useState<Tab>("clips");
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -750,6 +752,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
               onUpdateScheduledPost={onUpdateScheduledPost}
               onDeleteScheduledPost={onDeleteScheduledPost}
               galleryImages={galleryImages}
+              campaigns={campaigns}
               onPublishToInstagram={onPublishToInstagram}
               publishingStates={publishingStates}
             />

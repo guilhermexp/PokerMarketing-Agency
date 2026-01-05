@@ -5,6 +5,7 @@ import type {
   GalleryImage,
   InstagramPublishState,
 } from "../../types";
+import type { DbCampaign } from "../../services/apiClient";
 import { Icon } from "../common/Icon";
 import { Button } from "../common/Button";
 import { MonthlyCalendar } from "./MonthlyCalendar";
@@ -23,6 +24,7 @@ interface CalendarViewProps {
   ) => void;
   onDeleteScheduledPost: (postId: string) => void;
   galleryImages: GalleryImage[];
+  campaigns?: DbCampaign[];
   onPublishToInstagram: (post: ScheduledPost) => void;
   publishingStates: Record<string, InstagramPublishState>;
 }
@@ -33,6 +35,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onUpdateScheduledPost,
   onDeleteScheduledPost,
   galleryImages,
+  campaigns = [],
   onPublishToInstagram,
   publishingStates,
 }) => {
@@ -366,6 +369,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           }}
           onSchedule={handleSchedulePost}
           galleryImages={galleryImages}
+          campaigns={campaigns}
           initialDate={selectedDate}
           initialTime={selectedTime}
         />
