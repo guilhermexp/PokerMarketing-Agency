@@ -34,7 +34,9 @@ const apiCall = async (endpoint: string, body: any) => {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: response.statusText }));
+    const error = await response
+      .json()
+      .catch(() => ({ error: response.statusText }));
     throw new Error(error.error || `API call failed: ${response.status}`);
   }
 
@@ -82,16 +84,24 @@ const buildCampaignPrompt = (
   }
 
   const postPlatforms: string[] = [];
-  if (options.posts.instagram.generate) postPlatforms.push(`${options.posts.instagram.count}x Instagram`);
-  if (options.posts.facebook.generate) postPlatforms.push(`${options.posts.facebook.count}x Facebook`);
-  if (options.posts.twitter.generate) postPlatforms.push(`${options.posts.twitter.count}x Twitter`);
-  if (options.posts.linkedin.generate) postPlatforms.push(`${options.posts.linkedin.count}x LinkedIn`);
-  if (postPlatforms.length > 0) quantities.push(`- Posts: ${postPlatforms.join(", ")}`);
+  if (options.posts.instagram.generate)
+    postPlatforms.push(`${options.posts.instagram.count}x Instagram`);
+  if (options.posts.facebook.generate)
+    postPlatforms.push(`${options.posts.facebook.count}x Facebook`);
+  if (options.posts.twitter.generate)
+    postPlatforms.push(`${options.posts.twitter.count}x Twitter`);
+  if (options.posts.linkedin.generate)
+    postPlatforms.push(`${options.posts.linkedin.count}x LinkedIn`);
+  if (postPlatforms.length > 0)
+    quantities.push(`- Posts: ${postPlatforms.join(", ")}`);
 
   const adPlatforms: string[] = [];
-  if (options.adCreatives.facebook.generate) adPlatforms.push(`${options.adCreatives.facebook.count}x Facebook`);
-  if (options.adCreatives.google.generate) adPlatforms.push(`${options.adCreatives.google.count}x Google`);
-  if (adPlatforms.length > 0) quantities.push(`- Anúncios: ${adPlatforms.join(", ")}`);
+  if (options.adCreatives.facebook.generate)
+    adPlatforms.push(`${options.adCreatives.facebook.count}x Facebook`);
+  if (options.adCreatives.google.generate)
+    adPlatforms.push(`${options.adCreatives.google.count}x Google`);
+  if (adPlatforms.length > 0)
+    quantities.push(`- Anúncios: ${adPlatforms.join(", ")}`);
 
   return `
 **MARCA:** ${brandProfile.name} - ${brandProfile.description}
@@ -112,10 +122,12 @@ export const generateQuickPostText = async (
   context: string,
   imageBase64?: string,
 ): Promise<Post> => {
-  const image = imageBase64 ? {
-    base64: imageBase64.split(",")[1] || imageBase64,
-    mimeType: imageBase64.match(/data:(.*?);/)?.[1] || "image/png",
-  } : undefined;
+  const image = imageBase64
+    ? {
+        base64: imageBase64.split(",")[1] || imageBase64,
+        mimeType: imageBase64.match(/data:(.*?);/)?.[1] || "image/png",
+      }
+    : undefined;
 
   const response = await apiCall("/api/ai/text", {
     type: "quickPost",
@@ -195,7 +207,11 @@ export const generateFlyer = async (
 
 export const extractColorsFromLogo = async (
   logo: ImageFile,
-): Promise<{ primaryColor: string; secondaryColor: string | null; tertiaryColor: string | null }> => {
+): Promise<{
+  primaryColor: string;
+  secondaryColor: string | null;
+  tertiaryColor: string | null;
+}> => {
   const response = await apiCall("/api/ai/extract-colors", {
     logo,
   });
@@ -239,6 +255,7 @@ export const generateVideo = async (
   model: VideoModel,
   image?: ImageFile | null,
   useFallbackDirectly: boolean = false,
+  generateAudio: boolean = true,
 ): Promise<GenerateVideoResult> => {
   // Upload image to blob if provided
   let imageUrl: string | undefined;
@@ -253,6 +270,7 @@ export const generateVideo = async (
     aspectRatio,
     model: useFallbackDirectly ? "veo-3.1" : model,
     imageUrl,
+    generateAudio,
   });
 
   return { videoUrl: result, usedFallback: useFallbackDirectly };

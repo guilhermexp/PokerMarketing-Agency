@@ -536,6 +536,20 @@ export async function updateClipThumbnail(
   });
 }
 
+export async function updateSceneImage(
+  clipId: string,
+  sceneNumber: number,
+  imageUrl: string,
+): Promise<DbVideoClipScript> {
+  return fetchApi<DbVideoClipScript>(
+    `/campaigns/scene?clip_id=${clipId}&scene_number=${sceneNumber}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ image_url: imageUrl }),
+    },
+  );
+}
+
 // ============================================================================
 // Health Check
 // ============================================================================
@@ -885,7 +899,14 @@ export async function queueGenerationJob(
   const response = await fetch("/api/generate/queue", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, organizationId, jobType, prompt, config, context }),
+    body: JSON.stringify({
+      userId,
+      organizationId,
+      jobType,
+      prompt,
+      config,
+      context,
+    }),
   });
 
   if (!response.ok) {
@@ -924,7 +945,8 @@ export async function getGenerationJobs(
   options?: { status?: string; limit?: number; organizationId?: string | null },
 ): Promise<{ jobs: GenerationJob[]; total: number }> {
   const params = new URLSearchParams({ userId });
-  if (options?.organizationId) params.append("organizationId", options.organizationId);
+  if (options?.organizationId)
+    params.append("organizationId", options.organizationId);
   if (options?.status) params.append("status", options.status);
   if (options?.limit) params.append("limit", options.limit.toString());
 
@@ -980,7 +1002,9 @@ export async function cancelGenerationJob(jobId: string): Promise<void> {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: "Unknown error" }));
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 }
@@ -996,7 +1020,9 @@ export async function cancelAllGenerationJobs(userId: string): Promise<number> {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: "Unknown error" }));
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 
@@ -1286,6 +1312,7 @@ export async function generateVideo(params: {
   model: ApiVideoModel;
   imageUrl?: string;
   sceneDuration?: number;
+  generateAudio?: boolean;
 }): Promise<string> {
   const response = await fetch("/api/ai/video", {
     method: "POST",
@@ -1295,7 +1322,9 @@ export async function generateVideo(params: {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || `Video generation failed: HTTP ${response.status}`);
+    throw new Error(
+      error.error || `Video generation failed: HTTP ${response.status}`,
+    );
   }
 
   const result: VideoGenerationResult = await response.json();

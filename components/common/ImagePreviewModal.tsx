@@ -251,13 +251,20 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   };
 
   const handleEdit = async () => {
-    if (!editPrompt.trim()) return;
+    console.log('[ImagePreviewModal] handleEdit called with prompt:', editPrompt);
+    if (!editPrompt.trim()) {
+      console.log('[ImagePreviewModal] Empty prompt, returning');
+      return;
+    }
 
     setIsEditing(true);
     setError(null);
     try {
+      console.log('[ImagePreviewModal] Starting image edit...');
         // Convert image URL (data: or http:) to base64
+        console.log('[ImagePreviewModal] Converting image to base64...');
         const { base64: imgBase64, mimeType: imgMimeType } = await urlToBase64(image.src);
+        console.log('[ImagePreviewModal] Image converted, mimeType:', imgMimeType);
 
         const maskCanvas = maskCanvasRef.current;
         let maskData: { base64: string, mimeType: string } | undefined = undefined;
@@ -278,7 +285,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             ? { base64: referenceImage.base64, mimeType: referenceImage.mimeType }
             : undefined;
 
+        console.log('[ImagePreviewModal] Calling editImage API...', { hasMask: !!maskData, hasRef: !!refImageData });
         const editedImageDataUrl = await editImage(imgBase64, imgMimeType, editPrompt, maskData, refImageData);
+        console.log('[ImagePreviewModal] editImage returned:', editedImageDataUrl?.substring(0, 50));
 
         // Upload edited image to blob storage for persistence
         let finalImageUrl = editedImageDataUrl;

@@ -66,6 +66,7 @@ export interface Scene {
   visual: string;
   narration: string;
   duration_seconds: number;
+  image_url?: string; // Saved in database for persistence
 }
 
 export interface VideoClipScript {

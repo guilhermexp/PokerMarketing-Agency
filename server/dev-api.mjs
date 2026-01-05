@@ -81,31 +81,33 @@ const requestLog = new Map();
 
 // ANSI colors for terminal
 const colors = {
-  reset: '\x1b[0m',
-  dim: '\x1b[2m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  cyan: '\x1b[36m',
-  red: '\x1b[31m',
-  magenta: '\x1b[35m',
+  reset: "\x1b[0m",
+  dim: "\x1b[2m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  blue: "\x1b[34m",
+  cyan: "\x1b[36m",
+  red: "\x1b[31m",
+  magenta: "\x1b[35m",
 };
 
 // ============================================================================
 // LOGGING HELPERS
 // ============================================================================
 
-function logExternalAPI(service, action, details = '') {
-  const timestamp = new Date().toLocaleTimeString('pt-BR');
+function logExternalAPI(service, action, details = "") {
+  const timestamp = new Date().toLocaleTimeString("pt-BR");
   console.log(
-    `${colors.magenta}[${service}]${colors.reset} ${colors.cyan}${action}${colors.reset}${details ? ` ${colors.dim}${details}${colors.reset}` : ''}`
+    `${colors.magenta}[${service}]${colors.reset} ${colors.cyan}${action}${colors.reset}${details ? ` ${colors.dim}${details}${colors.reset}` : ""}`,
   );
 }
 
 function logExternalAPIResult(service, action, duration, success = true) {
-  const status = success ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
+  const status = success
+    ? `${colors.green}✓${colors.reset}`
+    : `${colors.red}✗${colors.reset}`;
   console.log(
-    `${colors.magenta}[${service}]${colors.reset} ${status} ${action} ${colors.dim}${duration}ms${colors.reset}`
+    `${colors.magenta}[${service}]${colors.reset} ${status} ${action} ${colors.dim}${duration}ms${colors.reset}`,
   );
 }
 
@@ -116,7 +118,10 @@ function logError(context, error) {
     console.error(`${colors.dim}${error.stack}${colors.reset}`);
   }
   if (error.response?.data) {
-    console.error(`${colors.yellow}Response:${colors.reset}`, JSON.stringify(error.response.data, null, 2));
+    console.error(
+      `${colors.yellow}Response:${colors.reset}`,
+      JSON.stringify(error.response.data, null, 2),
+    );
   }
   console.error(`${colors.red}━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}\n`);
 }
@@ -237,12 +242,12 @@ async function setRLSContext(sql, userId, organizationId = null) {
     await sql`
       SELECT
         set_config('app.user_id', ${userId}, true),
-        set_config('app.organization_id', ${organizationId || ''}, true)
+        set_config('app.organization_id', ${organizationId || ""}, true)
     `;
   } catch (error) {
     // Don't fail the request if RLS context can't be set
     // The application-level security (WHERE clauses) will still work
-    console.warn('[RLS] Failed to set context:', error.message);
+    console.warn("[RLS] Failed to set context:", error.message);
   }
 }
 
@@ -255,7 +260,7 @@ app.use("/api/db", (req, res, next) => {
   const start = Date.now();
 
   // Extract clean endpoint name
-  const endpoint = req.originalUrl.split('?')[0].replace('/api/db/', '');
+  const endpoint = req.originalUrl.split("?")[0].replace("/api/db/", "");
   const method = req.method.padEnd(4);
 
   res.on("finish", () => {
@@ -265,7 +270,7 @@ app.use("/api/db", (req, res, next) => {
     const durationColor = duration > 500 ? colors.yellow : colors.dim;
 
     console.log(
-      `${colors.cyan}${method}${colors.reset} /${endpoint} ${statusColor}${status}${colors.reset} ${durationColor}${duration}ms${colors.reset}`
+      `${colors.cyan}${method}${colors.reset} /${endpoint} ${statusColor}${status}${colors.reset} ${durationColor}${duration}ms${colors.reset}`,
     );
 
     logRequestSummary(reqId, req.originalUrl);
@@ -484,7 +489,7 @@ app.get("/api/db/init", async (req, res) => {
       },
     });
   } catch (error) {
-    logError('Init API', error);
+    logError("Init API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -509,7 +514,7 @@ app.get("/api/db/users", async (req, res) => {
 
     return res.status(400).json({ error: "email or id is required" });
   } catch (error) {
-    logError('Users API', error);
+    logError("Users API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -540,7 +545,7 @@ app.post("/api/db/users", async (req, res) => {
 
     res.status(201).json(result[0]);
   } catch (error) {
-    logError('Users API', error);
+    logError("Users API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -589,7 +594,7 @@ app.get("/api/db/brand-profiles", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Brand Profiles API', error);
+    logError("Brand Profiles API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -647,7 +652,7 @@ app.post("/api/db/brand-profiles", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Brand Profiles API', error);
+    logError("Brand Profiles API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -714,7 +719,7 @@ app.put("/api/db/brand-profiles", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Brand Profiles API', error);
+    logError("Brand Profiles API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -781,7 +786,7 @@ app.get("/api/db/gallery", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Gallery API GET', error);
+    logError("Gallery API GET", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -841,7 +846,7 @@ app.post("/api/db/gallery", async (req, res) => {
               ${aspect_ratio || null}, ${image_size || null},
               ${post_id || null}, ${ad_creative_id || null}, ${video_script_id || null},
               ${is_style_reference || false}, ${style_reference_name || null},
-              ${media_type || 'image'}, ${duration || null})
+              ${media_type || "image"}, ${duration || null})
       RETURNING *
     `;
 
@@ -853,7 +858,7 @@ app.post("/api/db/gallery", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Gallery API POST', error);
+    logError("Gallery API POST", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -883,7 +888,7 @@ app.patch("/api/db/gallery", async (req, res) => {
 
     return res.status(200).json(result[0]);
   } catch (error) {
-    logError('Gallery API PATCH', error);
+    logError("Gallery API PATCH", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -929,7 +934,7 @@ app.delete("/api/db/gallery", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Gallery API', error);
+    logError("Gallery API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -957,7 +962,7 @@ app.patch("/api/db/posts", async (req, res) => {
 
     res.json(result[0]);
   } catch (error) {
-    logError('Posts API', error);
+    logError("Posts API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -985,7 +990,7 @@ app.patch("/api/db/ad-creatives", async (req, res) => {
 
     res.json(result[0]);
   } catch (error) {
-    logError('Ad Creatives API', error);
+    logError("Ad Creatives API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1047,7 +1052,7 @@ app.get("/api/db/scheduled-posts", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Scheduled Posts API', error);
+    logError("Scheduled Posts API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1132,7 +1137,7 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Scheduled Posts API', error);
+    logError("Scheduled Posts API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1191,7 +1196,7 @@ app.put("/api/db/scheduled-posts", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Scheduled Posts API', error);
+    logError("Scheduled Posts API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1237,7 +1242,7 @@ app.delete("/api/db/scheduled-posts", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Scheduled Posts API', error);
+    logError("Scheduled Posts API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1361,7 +1366,7 @@ app.get("/api/db/campaigns", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Campaigns API', error);
+    logError("Campaigns API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1456,7 +1461,7 @@ app.post("/api/db/campaigns", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Campaigns API', error);
+    logError("Campaigns API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1507,7 +1512,86 @@ app.delete("/api/db/campaigns", async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Campaigns API', error);
+    logError("Campaigns API", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Campaigns API - Update clip thumbnail_url
+app.patch("/api/db/campaigns", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { clip_id } = req.query;
+    const { thumbnail_url } = req.body;
+
+    if (!clip_id) {
+      return res.status(400).json({ error: "clip_id is required" });
+    }
+
+    const result = await sql`
+      UPDATE video_clip_scripts
+      SET thumbnail_url = ${thumbnail_url || null},
+          updated_at = NOW()
+      WHERE id = ${clip_id}
+      RETURNING *
+    `;
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Clip not found" });
+    }
+
+    res.json(result[0]);
+  } catch (error) {
+    logError("Campaigns API (PATCH clip)", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Campaigns API - Update scene image_url in scenes JSONB
+app.patch("/api/db/campaigns/scene", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { clip_id, scene_number } = req.query;
+    const { image_url } = req.body;
+
+    if (!clip_id || scene_number === undefined) {
+      return res
+        .status(400)
+        .json({ error: "clip_id and scene_number are required" });
+    }
+
+    const sceneNum = parseInt(scene_number, 10);
+
+    // Get current scenes
+    const [clip] = await sql`
+      SELECT scenes FROM video_clip_scripts WHERE id = ${clip_id}
+    `;
+
+    if (!clip) {
+      return res.status(404).json({ error: "Clip not found" });
+    }
+
+    // Update the specific scene with image_url
+    const scenes = clip.scenes || [];
+    const updatedScenes = scenes.map((scene) => {
+      if (scene.sceneNumber === sceneNum) {
+        return { ...scene, image_url: image_url || null };
+      }
+      return scene;
+    });
+
+    // Save updated scenes back to database
+    const result = await sql`
+      UPDATE video_clip_scripts
+      SET scenes = ${JSON.stringify(updatedScenes)}::jsonb,
+          updated_at = NOW()
+      WHERE id = ${clip_id}
+      RETURNING *
+    `;
+
+    res.json(result[0]);
+  } catch (error) {
+    logError("Campaigns API (PATCH scene)", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1562,7 +1646,7 @@ app.get("/api/db/tournaments/list", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Tournaments API List', error);
+    logError("Tournaments API List", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1632,7 +1716,7 @@ app.get("/api/db/tournaments", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Tournaments API', error);
+    logError("Tournaments API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1719,7 +1803,7 @@ app.post("/api/db/tournaments", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Tournaments API', error);
+    logError("Tournaments API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1767,7 +1851,7 @@ app.delete("/api/db/tournaments", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Tournaments API', error);
+    logError("Tournaments API", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1822,7 +1906,7 @@ app.post("/api/generate/queue", async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    logError('Generate Queue', error);
+    logError("Generate Queue", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1830,7 +1914,13 @@ app.post("/api/generate/queue", async (req, res) => {
 app.get("/api/generate/status", async (req, res) => {
   try {
     const sql = getSql();
-    const { jobId, userId, organizationId, status: filterStatus, limit } = req.query;
+    const {
+      jobId,
+      userId,
+      organizationId,
+      status: filterStatus,
+      limit,
+    } = req.query;
 
     // Single job query
     if (jobId) {
@@ -1914,7 +2004,7 @@ app.get("/api/generate/status", async (req, res) => {
 
     return res.status(400).json({ error: "jobId or userId is required" });
   } catch (error) {
-    logError('Generate Status', error);
+    logError("Generate Status", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1991,7 +2081,7 @@ app.get("/api/proxy-video", async (req, res) => {
     const buffer = await response.arrayBuffer();
     res.send(Buffer.from(buffer));
   } catch (error) {
-    logError('Video Proxy', error);
+    logError("Video Proxy", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -2027,7 +2117,11 @@ app.post("/api/upload", async (req, res) => {
     const uniqueFilename = `${timestamp}-${filename}`;
 
     // Upload to Vercel Blob
-    logExternalAPI('Vercel Blob', 'Upload file', `${contentType} | ${(buffer.length / 1024).toFixed(1)}KB`);
+    logExternalAPI(
+      "Vercel Blob",
+      "Upload file",
+      `${contentType} | ${(buffer.length / 1024).toFixed(1)}KB`,
+    );
     const uploadStart = Date.now();
 
     const blob = await put(uniqueFilename, buffer, {
@@ -2035,7 +2129,11 @@ app.post("/api/upload", async (req, res) => {
       contentType,
     });
 
-    logExternalAPIResult('Vercel Blob', 'Upload file', Date.now() - uploadStart);
+    logExternalAPIResult(
+      "Vercel Blob",
+      "Upload file",
+      Date.now() - uploadStart,
+    );
 
     return res.status(200).json({
       success: true,
@@ -2044,7 +2142,7 @@ app.post("/api/upload", async (req, res) => {
       size: buffer.length,
     });
   } catch (error) {
-    logError('Upload API', error);
+    logError("Upload API", error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : "Unknown error",
     });
@@ -2088,7 +2186,9 @@ const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
         error?.status === 503;
 
       if (isRetryable && attempt < maxRetries) {
-        console.log(`[Gemini] Retry ${attempt}/${maxRetries} after ${delayMs}ms...`);
+        console.log(
+          `[Gemini] Retry ${attempt}/${maxRetries} after ${delayMs}ms...`,
+        );
         await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
         continue;
       }
@@ -2115,7 +2215,14 @@ const mapAspectRatio = (ratio) => {
 };
 
 // Generate image with Gemini
-const generateGeminiImage = async (prompt, aspectRatio, model = "gemini-3-pro-image-preview", imageSize = "1K", productImages, styleReferenceImage) => {
+const generateGeminiImage = async (
+  prompt,
+  aspectRatio,
+  model = "gemini-3-pro-image-preview",
+  imageSize = "1K",
+  productImages,
+  styleReferenceImage,
+) => {
   const ai = getGeminiAi();
   const parts = [{ text: prompt }];
 
@@ -2146,7 +2253,7 @@ const generateGeminiImage = async (prompt, aspectRatio, model = "gemini-3-pro-im
           imageSize,
         },
       },
-    })
+    }),
   );
 
   for (const part of response.candidates[0].content.parts) {
@@ -2171,14 +2278,19 @@ const generateImagenImage = async (prompt, aspectRatio) => {
         outputMimeType: "image/png",
         aspectRatio,
       },
-    })
+    }),
   );
 
   return `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
 };
 
 // Generate structured content with Gemini
-const generateStructuredContent = async (model, parts, responseSchema, temperature = 0.7) => {
+const generateStructuredContent = async (
+  model,
+  parts,
+  responseSchema,
+  temperature = 0.7,
+) => {
   const ai = getGeminiAi();
 
   const response = await ai.models.generateContent({
@@ -2195,7 +2307,12 @@ const generateStructuredContent = async (model, parts, responseSchema, temperatu
 };
 
 // Generate text with OpenRouter
-const generateTextWithOpenRouter = async (model, systemPrompt, userPrompt, temperature = 0.7) => {
+const generateTextWithOpenRouter = async (
+  model,
+  systemPrompt,
+  userPrompt,
+  temperature = 0.7,
+) => {
   const openrouter = getOpenRouter();
 
   const response = await openrouter.chat.send({
@@ -2217,7 +2334,12 @@ const generateTextWithOpenRouter = async (model, systemPrompt, userPrompt, tempe
 };
 
 // Generate text with OpenRouter + Vision
-const generateTextWithOpenRouterVision = async (model, textParts, imageParts, temperature = 0.7) => {
+const generateTextWithOpenRouterVision = async (
+  model,
+  textParts,
+  imageParts,
+  temperature = 0.7,
+) => {
   const openrouter = getOpenRouter();
 
   const content = textParts.map((text) => ({ type: "text", text }));
@@ -2258,7 +2380,12 @@ const Type = {
 
 // Prompt builders
 const shouldUseTone = (brandProfile, target) => {
-  const targets = brandProfile.toneTargets || ["campaigns", "posts", "images", "flyers"];
+  const targets = brandProfile.toneTargets || [
+    "campaigns",
+    "posts",
+    "images",
+    "flyers",
+  ];
   return targets.includes(target);
 };
 
@@ -2375,10 +2502,31 @@ Se o vídeo contiver QUALQUER texto na tela (títulos, legendas, overlays, valor
 - Textos em MAIÚSCULAS com peso BLACK ou EXTRA-BOLD
 - PROIBIDO: fontes script/cursivas, serifadas, handwriting, ou fontes finas/light
 
+**ÁUDIO E NARRAÇÃO (OBRIGATÓRIO):**
+Se o prompt contiver uma NARRAÇÃO ou texto de fala, SEMPRE inclua o campo audio_context no JSON:
+- audio_context.voiceover: o texto exato da narração em português brasileiro
+- audio_context.language: "pt-BR"
+- audio_context.tone: tom da narração (ex: "Exciting, professional, persuasive" ou "Calm, informative, trustworthy")
+- audio_context.style: estilo de entrega (ex: "energetic announcer", "conversational", "dramatic narrator")
+
+Exemplo de audio_context:
+{
+  "audio_context": {
+    "voiceover": "Texto da narração aqui",
+    "language": "pt-BR",
+    "tone": "Exciting, professional, persuasive",
+    "style": "energetic announcer"
+  }
+}
+
 Mantenha a essência do prompt original mas expanda com detalhes visuais cinematográficos.`;
 };
 
-const buildCampaignPrompt = (brandProfile, transcript, quantityInstructions) => {
+const buildCampaignPrompt = (
+  brandProfile,
+  transcript,
+  quantityInstructions,
+) => {
   const toneText = getToneText(brandProfile, "campaigns");
 
   return `
@@ -2418,7 +2566,9 @@ const buildQuantityInstructions = (options) => {
   const quantities = [];
 
   if (options.videoClipScripts.generate && options.videoClipScripts.count > 0) {
-    quantities.push(`- Roteiros de vídeo (videoClipScripts): EXATAMENTE ${options.videoClipScripts.count} roteiro(s)`);
+    quantities.push(
+      `- Roteiros de vídeo (videoClipScripts): EXATAMENTE ${options.videoClipScripts.count} roteiro(s)`,
+    );
   } else {
     quantities.push(`- Roteiros de vídeo (videoClipScripts): 0 (array vazio)`);
   }
@@ -2443,10 +2593,16 @@ const buildQuantityInstructions = (options) => {
   }
 
   const adPlatforms = [];
-  if (options.adCreatives.facebook?.generate && options.adCreatives.facebook.count > 0) {
+  if (
+    options.adCreatives.facebook?.generate &&
+    options.adCreatives.facebook.count > 0
+  ) {
     adPlatforms.push(`${options.adCreatives.facebook.count}x Facebook`);
   }
-  if (options.adCreatives.google?.generate && options.adCreatives.google.count > 0) {
+  if (
+    options.adCreatives.google?.generate &&
+    options.adCreatives.google.count > 0
+  ) {
     adPlatforms.push(`${options.adCreatives.google.count}x Google`);
   }
   if (adPlatforms.length > 0) {
@@ -2555,7 +2711,11 @@ app.post("/api/ai/campaign", async (req, res) => {
     const isOpenRouter = model.includes("/");
 
     const quantityInstructions = buildQuantityInstructions(options);
-    const prompt = buildCampaignPrompt(brandProfile, transcript, quantityInstructions);
+    const prompt = buildCampaignPrompt(
+      brandProfile,
+      transcript,
+      quantityInstructions,
+    );
 
     let result;
 
@@ -2602,9 +2762,19 @@ Responda APENAS com o JSON válido, sem texto adicional.`;
       const imageParts = productImages || [];
 
       if (imageParts.length > 0) {
-        result = await generateTextWithOpenRouterVision(model, textParts, imageParts, 0.7);
+        result = await generateTextWithOpenRouterVision(
+          model,
+          textParts,
+          imageParts,
+          0.7,
+        );
       } else {
-        result = await generateTextWithOpenRouter(model, "", jsonSchemaPrompt, 0.7);
+        result = await generateTextWithOpenRouter(
+          model,
+          "",
+          jsonSchemaPrompt,
+          0.7,
+        );
       }
     } else {
       const parts = [{ text: prompt }];
@@ -2617,7 +2787,12 @@ Responda APENAS com o JSON válido, sem texto adicional.`;
         });
       }
 
-      result = await generateStructuredContent(model, parts, campaignSchema, 0.7);
+      result = await generateStructuredContent(
+        model,
+        parts,
+        campaignSchema,
+        0.7,
+      );
     }
 
     // Clean markdown code blocks if present
@@ -2637,19 +2812,22 @@ Responda APENAS com o JSON válido, sem texto adicional.`;
     // Normalize field names (ensure arrays exist)
     campaign.posts = campaign.posts || [];
     campaign.adCreatives = campaign.adCreatives || campaign.ad_creatives || [];
-    campaign.videoClipScripts = campaign.videoClipScripts || campaign.video_clip_scripts || [];
+    campaign.videoClipScripts =
+      campaign.videoClipScripts || campaign.video_clip_scripts || [];
 
     // Validate videoClipScripts have required fields
-    campaign.videoClipScripts = campaign.videoClipScripts.filter(script =>
-      script && script.title && script.hook && script.scenes
-    ).map(script => ({
-      ...script,
-      title: script.title || "Sem título",
-      hook: script.hook || "",
-      scenes: script.scenes || [],
-      image_prompt: script.image_prompt || "",
-      audio_script: script.audio_script || ""
-    }));
+    campaign.videoClipScripts = campaign.videoClipScripts
+      .filter(
+        (script) => script && script.title && script.hook && script.scenes,
+      )
+      .map((script) => ({
+        ...script,
+        title: script.title || "Sem título",
+        hook: script.hook || "",
+        scenes: script.scenes || [],
+        image_prompt: script.image_prompt || "",
+        audio_script: script.audio_script || "",
+      }));
 
     // Debug: log structure for troubleshooting
     console.log("[Campaign API] Campaign structure:", {
@@ -2659,7 +2837,7 @@ Responda APENAS com o JSON válido, sem texto adicional.`;
       hasAdCreatives: !!campaign.adCreatives,
       adCreativesCount: campaign.adCreatives?.length,
       hasVideoScripts: !!campaign.videoClipScripts,
-      videoScriptsCount: campaign.videoClipScripts?.length
+      videoScriptsCount: campaign.videoClipScripts?.length,
     });
 
     console.log("[Campaign API] Campaign generated successfully");
@@ -2671,7 +2849,9 @@ Responda APENAS com o JSON válido, sem texto adicional.`;
     });
   } catch (error) {
     console.error("[Campaign API] Error:", error);
-    return res.status(500).json({ error: error.message || "Failed to generate campaign" });
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to generate campaign" });
   }
 });
 
@@ -2690,7 +2870,9 @@ app.post("/api/ai/flyer", async (req, res) => {
     } = req.body;
 
     if (!prompt || !brandProfile) {
-      return res.status(400).json({ error: "prompt and brandProfile are required" });
+      return res
+        .status(400)
+        .json({ error: "prompt and brandProfile are required" });
     }
 
     console.log(`[Flyer API] Generating flyer, aspect ratio: ${aspectRatio}`);
@@ -2704,7 +2886,9 @@ app.post("/api/ai/flyer", async (req, res) => {
     ];
 
     if (logo) {
-      parts.push({ inlineData: { data: logo.base64, mimeType: logo.mimeType } });
+      parts.push({
+        inlineData: { data: logo.base64, mimeType: logo.mimeType },
+      });
     }
 
     if (collabLogo) {
@@ -2714,7 +2898,9 @@ app.post("/api/ai/flyer", async (req, res) => {
     }
 
     if (referenceImage) {
-      parts.push({ text: "USE ESTA IMAGEM COMO REFERÊNCIA DE LAYOUT E FONTES:" });
+      parts.push({
+        text: "USE ESTA IMAGEM COMO REFERÊNCIA DE LAYOUT E FONTES:",
+      });
       parts.push({
         inlineData: {
           data: referenceImage.base64,
@@ -2763,7 +2949,9 @@ app.post("/api/ai/flyer", async (req, res) => {
     });
   } catch (error) {
     console.error("[Flyer API] Error:", error);
-    return res.status(500).json({ error: error.message || "Failed to generate flyer" });
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to generate flyer" });
   }
 });
 
@@ -2781,25 +2969,37 @@ app.post("/api/ai/image", async (req, res) => {
     } = req.body;
 
     if (!prompt || !brandProfile) {
-      return res.status(400).json({ error: "prompt and brandProfile are required" });
+      return res
+        .status(400)
+        .json({ error: "prompt and brandProfile are required" });
     }
 
-    console.log(`[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}`);
+    console.log(
+      `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}`,
+    );
 
     let imageDataUrl;
 
     if (model === "imagen-4.0-generate-001") {
-      const fullPrompt = buildImagePrompt(prompt, brandProfile, !!styleReferenceImage);
+      const fullPrompt = buildImagePrompt(
+        prompt,
+        brandProfile,
+        !!styleReferenceImage,
+      );
       imageDataUrl = await generateImagenImage(fullPrompt, aspectRatio);
     } else {
-      const fullPrompt = buildImagePrompt(prompt, brandProfile, !!styleReferenceImage);
+      const fullPrompt = buildImagePrompt(
+        prompt,
+        brandProfile,
+        !!styleReferenceImage,
+      );
       imageDataUrl = await generateGeminiImage(
         fullPrompt,
         aspectRatio,
         model,
         imageSize,
         productImages,
-        styleReferenceImage
+        styleReferenceImage,
       );
     }
 
@@ -2812,7 +3012,9 @@ app.post("/api/ai/image", async (req, res) => {
     });
   } catch (error) {
     console.error("[Image API] Error:", error);
-    return res.status(500).json({ error: error.message || "Failed to generate image" });
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to generate image" });
   }
 });
 
@@ -2825,7 +3027,9 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
       return res.status(400).json({ error: "prompt is required" });
     }
 
-    console.log(`[Convert Prompt API] Converting prompt to JSON, duration: ${duration}s`);
+    console.log(
+      `[Convert Prompt API] Converting prompt to JSON, duration: ${duration}s`,
+    );
 
     const ai = getGeminiAi();
     const systemPrompt = getVideoPromptSystemPrompt(duration, aspectRatio);
@@ -2833,7 +3037,10 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [
-        { role: "user", parts: [{ text: systemPrompt + "\n\nPrompt: " + prompt }] }
+        {
+          role: "user",
+          parts: [{ text: systemPrompt + "\n\nPrompt: " + prompt }],
+        },
       ],
       config: {
         responseMimeType: "application/json",
@@ -2860,7 +3067,9 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
     });
   } catch (error) {
     console.error("[Convert Prompt API] Error:", error);
-    return res.status(500).json({ error: error.message || "Failed to convert prompt" });
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to convert prompt" });
   }
 });
 
@@ -2891,7 +3100,9 @@ app.post("/api/ai/text", async (req, res) => {
 
     if (type === "quickPost") {
       if (!context) {
-        return res.status(400).json({ error: "context is required for quickPost" });
+        return res
+          .status(400)
+          .json({ error: "context is required for quickPost" });
       }
 
       const prompt = buildQuickPostPrompt(brandProfile, context);
@@ -2899,9 +3110,19 @@ app.post("/api/ai/text", async (req, res) => {
       if (isOpenRouter) {
         const parts = [prompt];
         if (image) {
-          result = await generateTextWithOpenRouterVision(model, parts, [image], temperature);
+          result = await generateTextWithOpenRouterVision(
+            model,
+            parts,
+            [image],
+            temperature,
+          );
         } else {
-          result = await generateTextWithOpenRouter(model, "", prompt, temperature);
+          result = await generateTextWithOpenRouter(
+            model,
+            "",
+            prompt,
+            temperature,
+          );
         }
       } else {
         const parts = [{ text: prompt }];
@@ -2913,19 +3134,36 @@ app.post("/api/ai/text", async (req, res) => {
             },
           });
         }
-        result = await generateStructuredContent(model, parts, quickPostSchema, temperature);
+        result = await generateStructuredContent(
+          model,
+          parts,
+          quickPostSchema,
+          temperature,
+        );
       }
     } else {
       if (!systemPrompt && !userPrompt) {
-        return res.status(400).json({ error: "systemPrompt or userPrompt is required for custom text" });
+        return res.status(400).json({
+          error: "systemPrompt or userPrompt is required for custom text",
+        });
       }
 
       if (isOpenRouter) {
         if (image) {
           const parts = userPrompt ? [userPrompt] : [];
-          result = await generateTextWithOpenRouterVision(model, parts, [image], temperature);
+          result = await generateTextWithOpenRouterVision(
+            model,
+            parts,
+            [image],
+            temperature,
+          );
         } else {
-          result = await generateTextWithOpenRouter(model, systemPrompt || "", userPrompt || "", temperature);
+          result = await generateTextWithOpenRouter(
+            model,
+            systemPrompt || "",
+            userPrompt || "",
+            temperature,
+          );
         }
       } else {
         const parts = [];
@@ -2945,7 +3183,7 @@ app.post("/api/ai/text", async (req, res) => {
           model,
           parts,
           responseSchema || quickPostSchema,
-          temperature
+          temperature,
         );
       }
     }
@@ -2959,7 +3197,9 @@ app.post("/api/ai/text", async (req, res) => {
     });
   } catch (error) {
     console.error("[Text API] Error:", error);
-    return res.status(500).json({ error: error.message || "Failed to generate text" });
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to generate text" });
   }
 });
 
@@ -2983,10 +3223,17 @@ app.post("/api/ai/edit-image", async (req, res) => {
     ];
 
     if (mask) {
-      parts.push({ inlineData: { data: mask.base64, mimeType: mask.mimeType } });
+      parts.push({
+        inlineData: { data: mask.base64, mimeType: mask.mimeType },
+      });
     }
     if (referenceImage) {
-      parts.push({ inlineData: { data: referenceImage.base64, mimeType: referenceImage.mimeType } });
+      parts.push({
+        inlineData: {
+          data: referenceImage.base64,
+          mimeType: referenceImage.mimeType,
+        },
+      });
     }
 
     const response = await ai.models.generateContent({
@@ -3015,7 +3262,9 @@ app.post("/api/ai/edit-image", async (req, res) => {
     });
   } catch (error) {
     console.error("[Edit Image API] Error:", error);
-    return res.status(500).json({ error: error.message || "Failed to edit image" });
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to edit image" });
   }
 });
 
@@ -3079,7 +3328,9 @@ Retorne as cores em formato hexadecimal (#RRGGBB).`,
     res.json(colors);
   } catch (error) {
     console.error("[Extract Colors API] Error:", error);
-    return res.status(500).json({ error: error.message || "Failed to extract colors" });
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to extract colors" });
   }
 });
 
@@ -3107,7 +3358,8 @@ app.post("/api/ai/speech", async (req, res) => {
       },
     });
 
-    const audioBase64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
+    const audioBase64 =
+      response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
 
     if (!audioBase64) {
       throw new Error("Failed to generate speech");
@@ -3121,7 +3373,9 @@ app.post("/api/ai/speech", async (req, res) => {
     });
   } catch (error) {
     console.error("[Speech API] Error:", error);
-    return res.status(500).json({ error: error.message || "Failed to generate speech" });
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to generate speech" });
   }
 });
 
@@ -3154,7 +3408,7 @@ app.post("/api/ai/assistant", async (req, res) => {
                 type: Type.STRING,
                 enum: ["1:1", "9:16", "16:9"],
                 description: "Proporção da imagem.",
-              }
+              },
             },
             required: ["description"],
           },
@@ -3183,7 +3437,7 @@ app.post("/api/ai/assistant", async (req, res) => {
             },
             required: ["prompt"],
           },
-        }
+        },
       ],
     };
 
@@ -3197,12 +3451,12 @@ SUAS CAPACIDADES CORE:
 Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
 
     // Set headers for SSE
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
 
     const stream = await ai.models.generateContentStream({
-      model: 'gemini-3-pro-preview',
+      model: "gemini-3-pro-preview",
       contents: history,
       config: {
         systemInstruction,
@@ -3212,8 +3466,10 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
     });
 
     for await (const chunk of stream) {
-      const text = chunk.text || '';
-      const functionCall = chunk.candidates?.[0]?.content?.parts?.find(p => p.functionCall)?.functionCall;
+      const text = chunk.text || "";
+      const functionCall = chunk.candidates?.[0]?.content?.parts?.find(
+        (p) => p.functionCall,
+      )?.functionCall;
 
       const data = { text };
       if (functionCall) {
@@ -3223,131 +3479,282 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
       res.write(`data: ${JSON.stringify(data)}\n\n`);
     }
 
-    res.write('data: [DONE]\n\n');
+    res.write("data: [DONE]\n\n");
     res.end();
 
     console.log("[Assistant API] Streaming completed");
   } catch (error) {
     console.error("[Assistant API] Error:", error);
     if (!res.headersSent) {
-      return res.status(500).json({ error: error.message || "Failed to run assistant" });
+      return res
+        .status(500)
+        .json({ error: error.message || "Failed to run assistant" });
     }
     res.end();
   }
 });
 
 // ============================================================================
-// AI VIDEO GENERATION API (FAL.ai)
-// Server-side video generation to avoid exposing FAL_KEY in browser
+// AI VIDEO GENERATION API (Google Veo + FAL.ai fallback)
+// Server-side video generation - tries Google API first, falls back to FAL.ai
 // ============================================================================
 
 const configureFal = () => {
   const apiKey = process.env.FAL_KEY;
   if (!apiKey) {
-    throw new Error('FAL_KEY environment variable is not configured');
+    throw new Error("FAL_KEY environment variable is not configured");
   }
   fal.config({ credentials: apiKey });
 };
 
-app.post("/api/ai/video", async (req, res) => {
-  try {
-    configureFal();
+// Generate video using Google Veo API directly
+// Nota: Google Veo SDK não suporta duration nem generateAudio
+async function generateVideoWithGoogleVeo(prompt, aspectRatio, imageUrl) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY not configured");
+  }
 
-    const { prompt, aspectRatio, model, imageUrl, sceneDuration } = req.body;
+  const ai = new GoogleGenAI({ apiKey });
+  const isHttpUrl = imageUrl && imageUrl.startsWith("http");
+  const mode = isHttpUrl ? "image-to-video" : "text-to-video";
 
-    if (!prompt || !aspectRatio || !model) {
-      return res.status(400).json({
-        error: 'Missing required fields: prompt, aspectRatio, model',
+  logExternalAPI("Google Veo", `Veo 3.1 ${mode}`, `720p | ${aspectRatio}`);
+  const startTime = Date.now();
+
+  // Build request parameters according to SDK specs
+  const generateParams = {
+    model: "veo-3.1-fast-generate-preview",
+    prompt,
+    config: {
+      numberOfVideos: 1,
+      resolution: "720p",
+      aspectRatio,
+    },
+  };
+
+  // Add image for image-to-video mode
+  if (isHttpUrl) {
+    const imageResponse = await fetch(imageUrl);
+    const imageArrayBuffer = await imageResponse.arrayBuffer();
+    const imageBase64 = Buffer.from(imageArrayBuffer).toString("base64");
+    const contentType =
+      imageResponse.headers.get("content-type") || "image/jpeg";
+
+    generateParams.image = {
+      imageBytes: imageBase64,
+      mimeType: contentType,
+    };
+  }
+
+  // Start video generation (async operation)
+  let operation = await ai.models.generateVideos(generateParams);
+
+  // Poll for completion (max 5 minutes)
+  const maxWaitTime = 5 * 60 * 1000;
+  const pollInterval = 10000;
+  const startPoll = Date.now();
+
+  while (!operation.done) {
+    if (Date.now() - startPoll > maxWaitTime) {
+      throw new Error("Video generation timed out after 5 minutes");
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    operation = await ai.operations.getVideosOperation({ operation });
+  }
+
+  logExternalAPIResult("Google Veo", `Veo 3.1 ${mode}`, Date.now() - startTime);
+
+  // Get video URL from response
+  const generatedVideos = operation.response?.generatedVideos;
+  if (!generatedVideos || generatedVideos.length === 0) {
+    throw new Error("No videos generated by Google Veo");
+  }
+
+  const videoUri = generatedVideos[0].video?.uri;
+  if (!videoUri) {
+    throw new Error("Invalid video response from Google Veo");
+  }
+
+  // Append API key to download the video
+  const videoUrl = `${videoUri}&key=${apiKey}`;
+  return videoUrl;
+}
+
+// Generate video using FAL.ai (fallback)
+async function generateVideoWithFal(
+  prompt,
+  aspectRatio,
+  model,
+  imageUrl,
+  sceneDuration,
+  generateAudio = true,
+) {
+  configureFal();
+
+  const isHttpUrl = imageUrl && imageUrl.startsWith("http");
+  const mode = isHttpUrl ? "image-to-video" : "text-to-video";
+
+  if (model === "sora-2") {
+    // Sora 2 - always use 12 seconds for best quality
+    const duration = 12;
+    const endpoint = isHttpUrl
+      ? "fal-ai/sora-2/image-to-video"
+      : "fal-ai/sora-2/text-to-video";
+
+    logExternalAPI("Fal.ai", `Sora 2 ${mode}`, `${duration}s | ${aspectRatio}`);
+    const startTime = Date.now();
+
+    let result;
+
+    if (isHttpUrl) {
+      result = await fal.subscribe(endpoint, {
+        input: {
+          prompt,
+          image_url: imageUrl,
+          resolution: "720p",
+          aspect_ratio: aspectRatio,
+          duration,
+          delete_video: false,
+        },
+        logs: true,
+      });
+    } else {
+      result = await fal.subscribe(endpoint, {
+        input: {
+          prompt,
+          resolution: "720p",
+          aspect_ratio: aspectRatio,
+          duration,
+          delete_video: false,
+        },
+        logs: true,
       });
     }
 
-    let videoUrl;
-    const isHttpUrl = imageUrl && imageUrl.startsWith('http');
-    const mode = isHttpUrl ? 'image-to-video' : 'text-to-video';
+    logExternalAPIResult("Fal.ai", `Sora 2 ${mode}`, Date.now() - startTime);
+    return result?.data?.video?.url || result?.video?.url || "";
+  } else {
+    // Veo 3.1 Fast via FAL.ai
+    const duration =
+      sceneDuration && sceneDuration <= 4
+        ? "4s"
+        : sceneDuration && sceneDuration <= 6
+          ? "6s"
+          : "8s";
+    const endpoint = isHttpUrl
+      ? "fal-ai/veo3.1/fast/image-to-video"
+      : "fal-ai/veo3.1/fast";
 
-    if (model === 'sora-2') {
-      // Sora 2 - always use 12 seconds for best quality
-      const duration = 12;
-      const endpoint = isHttpUrl ? 'fal-ai/sora-2/image-to-video' : 'fal-ai/sora-2/text-to-video';
+    logExternalAPI("Fal.ai", `Veo 3.1 ${mode}`, `${duration} | ${aspectRatio}`);
+    const startTime = Date.now();
 
-      logExternalAPI('Fal.ai', `Sora 2 ${mode}`, `${duration}s | ${aspectRatio}`);
-      const startTime = Date.now();
+    let result;
 
-      let result;
-
-      if (isHttpUrl) {
-        result = await fal.subscribe(endpoint, {
-          input: {
-            prompt,
-            image_url: imageUrl,
-            resolution: '720p',
-            aspect_ratio: aspectRatio,
-            duration,
-            delete_video: false,
-          },
-          logs: true,
-        });
-      } else {
-        result = await fal.subscribe(endpoint, {
-          input: {
-            prompt,
-            resolution: '720p',
-            aspect_ratio: aspectRatio,
-            duration,
-            delete_video: false,
-          },
-          logs: true,
-        });
-      }
-
-      logExternalAPIResult('Fal.ai', `Sora 2 ${mode}`, Date.now() - startTime);
-      videoUrl = result?.data?.video?.url || result?.video?.url || '';
+    if (isHttpUrl) {
+      result = await fal.subscribe(endpoint, {
+        input: {
+          prompt,
+          image_url: imageUrl,
+          aspect_ratio: aspectRatio,
+          duration,
+          resolution: "720p",
+          generate_audio: generateAudio,
+        },
+        logs: true,
+      });
     } else {
-      // Veo 3.1 Fast
-      const duration = sceneDuration && sceneDuration <= 4 ? '4s' : sceneDuration && sceneDuration <= 6 ? '6s' : '8s';
-      const endpoint = isHttpUrl ? 'fal-ai/veo3.1/fast/image-to-video' : 'fal-ai/veo3.1/fast';
+      result = await fal.subscribe(endpoint, {
+        input: {
+          prompt,
+          aspect_ratio: aspectRatio,
+          duration,
+          resolution: "720p",
+          generate_audio: generateAudio,
+          auto_fix: true,
+        },
+        logs: true,
+      });
+    }
 
-      logExternalAPI('Fal.ai', `Veo 3.1 ${mode}`, `${duration} | ${aspectRatio}`);
-      const startTime = Date.now();
+    logExternalAPIResult("Fal.ai", `Veo 3.1 ${mode}`, Date.now() - startTime);
+    return result?.data?.video?.url || result?.video?.url || "";
+  }
+}
 
-      let result;
+app.post("/api/ai/video", async (req, res) => {
+  try {
+    const {
+      prompt,
+      aspectRatio,
+      model,
+      imageUrl,
+      sceneDuration,
+      generateAudio = true,
+    } = req.body;
 
-      if (isHttpUrl) {
-        result = await fal.subscribe(endpoint, {
-          input: {
-            prompt,
-            image_url: imageUrl,
-            aspect_ratio: aspectRatio,
-            duration,
-            resolution: '720p',
-            generate_audio: true,
-          },
-          logs: true,
-        });
-      } else {
-        result = await fal.subscribe(endpoint, {
-          input: {
-            prompt,
-            aspect_ratio: aspectRatio,
-            duration,
-            resolution: '720p',
-            generate_audio: true,
-            auto_fix: true,
-          },
-          logs: true,
-        });
+    if (!prompt || !aspectRatio || !model) {
+      return res.status(400).json({
+        error: "Missing required fields: prompt, aspectRatio, model",
+      });
+    }
+
+    console.log(
+      `[Video API] Generating video with ${model}, audio: ${generateAudio}`,
+    );
+
+    let videoUrl;
+    let usedProvider = "google";
+
+    // For Veo 3.1, try Google API first, then fallback to FAL.ai
+    if (model === "veo-3.1" || model === "veo-3.1-fast-generate-preview") {
+      try {
+        // Try Google Veo API first
+        videoUrl = await generateVideoWithGoogleVeo(
+          prompt,
+          aspectRatio,
+          imageUrl,
+          sceneDuration,
+          generateAudio,
+        );
+      } catch (googleError) {
+        // Log the Google API error and fallback to FAL.ai
+        console.log(`[Video API] Google Veo failed: ${googleError.message}`);
+        console.log("[Video API] Falling back to FAL.ai...");
+        usedProvider = "fal.ai";
+        videoUrl = await generateVideoWithFal(
+          prompt,
+          aspectRatio,
+          model,
+          imageUrl,
+          sceneDuration,
+          generateAudio,
+        );
       }
-
-      logExternalAPIResult('Fal.ai', `Veo 3.1 ${mode}`, Date.now() - startTime);
-      videoUrl = result?.data?.video?.url || result?.video?.url || '';
+    } else {
+      // For Sora-2 or other models, use FAL.ai directly
+      usedProvider = "fal.ai";
+      videoUrl = await generateVideoWithFal(
+        prompt,
+        aspectRatio,
+        model,
+        imageUrl,
+        sceneDuration,
+        generateAudio,
+      );
     }
 
     if (!videoUrl) {
-      throw new Error('Failed to generate video - invalid response');
+      throw new Error("Failed to generate video - invalid response");
     }
 
     // Download video and upload to Vercel Blob for permanent storage
-    logExternalAPI('Vercel Blob', 'Upload video', model);
+    logExternalAPI(
+      "Vercel Blob",
+      "Upload video",
+      `${model} (via ${usedProvider})`,
+    );
     const uploadStart = Date.now();
 
     const videoResponse = await fetch(videoUrl);
@@ -3355,21 +3762,27 @@ app.post("/api/ai/video", async (req, res) => {
 
     const filename = `${model}-video-${Date.now()}.mp4`;
     const blob = await put(filename, videoBlob, {
-      access: 'public',
-      contentType: 'video/mp4',
+      access: "public",
+      contentType: "video/mp4",
     });
 
-    logExternalAPIResult('Vercel Blob', 'Upload video', Date.now() - uploadStart);
+    logExternalAPIResult(
+      "Vercel Blob",
+      "Upload video",
+      Date.now() - uploadStart,
+    );
 
     return res.status(200).json({
       success: true,
       url: blob.url,
       model,
+      provider: usedProvider,
     });
   } catch (error) {
-    logError('Video API', error);
+    logError("Video API", error);
     return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to generate video',
+      error:
+        error instanceof Error ? error.message : "Failed to generate video",
     });
   }
 });
@@ -3378,92 +3791,120 @@ app.post("/api/ai/video", async (req, res) => {
 // INSTAGRAM ACCOUNTS API (Multi-tenant Rube MCP)
 // ============================================================================
 
-const RUBE_MCP_URL = 'https://rube.app/mcp';
+const RUBE_MCP_URL = "https://rube.app/mcp";
 
 // Validate Rube token by calling Instagram API
 async function validateRubeToken(rubeToken) {
   try {
     const request = {
-      jsonrpc: '2.0',
+      jsonrpc: "2.0",
       id: `validate_${Date.now()}`,
-      method: 'tools/call',
+      method: "tools/call",
       params: {
-        name: 'RUBE_MULTI_EXECUTE_TOOL',
+        name: "RUBE_MULTI_EXECUTE_TOOL",
         arguments: {
-          tools: [{
-            tool_slug: 'INSTAGRAM_GET_USER_INFO',
-            arguments: { fields: 'id,username' }
-          }],
+          tools: [
+            {
+              tool_slug: "INSTAGRAM_GET_USER_INFO",
+              arguments: { fields: "id,username" },
+            },
+          ],
           sync_response_to_workbench: false,
           memory: {},
-          session_id: 'validate',
-          thought: 'Validating Instagram connection'
-        }
-      }
+          session_id: "validate",
+          thought: "Validating Instagram connection",
+        },
+      },
     };
 
-    console.log('[Instagram] Validating token with Rube MCP...');
+    console.log("[Instagram] Validating token with Rube MCP...");
     const response = await fetch(RUBE_MCP_URL, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream',
-        'Authorization': `Bearer ${rubeToken}`
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        Authorization: `Bearer ${rubeToken}`,
       },
-      body: JSON.stringify(request)
+      body: JSON.stringify(request),
     });
 
     const text = await response.text();
-    console.log('[Instagram] Rube response status:', response.status);
-    console.log('[Instagram] Rube response (first 500 chars):', text.substring(0, 500));
+    console.log("[Instagram] Rube response status:", response.status);
+    console.log(
+      "[Instagram] Rube response (first 500 chars):",
+      text.substring(0, 500),
+    );
 
-    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
-      return { success: false, error: 'Token inválido ou expirado. Gere um novo token no Rube.' };
+    if (text.startsWith("<!DOCTYPE") || text.startsWith("<html")) {
+      return {
+        success: false,
+        error: "Token inválido ou expirado. Gere um novo token no Rube.",
+      };
     }
 
     if (!response.ok) {
-      return { success: false, error: `Erro ao validar token (${response.status})` };
+      return {
+        success: false,
+        error: `Erro ao validar token (${response.status})`,
+      };
     }
 
     // Parse SSE response
-    const lines = text.split('\n');
+    const lines = text.split("\n");
     for (const line of lines) {
-      if (line.startsWith('data: ')) {
+      if (line.startsWith("data: ")) {
         try {
           const json = JSON.parse(line.substring(6));
-          console.log('[Instagram] Parsed SSE data:', JSON.stringify(json, null, 2).substring(0, 500));
+          console.log(
+            "[Instagram] Parsed SSE data:",
+            JSON.stringify(json, null, 2).substring(0, 500),
+          );
           if (json?.error) {
-            return { success: false, error: 'Instagram não conectado no Rube.' };
+            return {
+              success: false,
+              error: "Instagram não conectado no Rube.",
+            };
           }
           const nestedData = json?.result?.content?.[0]?.text;
           if (nestedData) {
             const parsed = JSON.parse(nestedData);
-            console.log('[Instagram] Nested data:', JSON.stringify(parsed, null, 2).substring(0, 500));
+            console.log(
+              "[Instagram] Nested data:",
+              JSON.stringify(parsed, null, 2).substring(0, 500),
+            );
             if (parsed?.error || parsed?.data?.error) {
-              return { success: false, error: 'Instagram não conectado no Rube.' };
+              return {
+                success: false,
+                error: "Instagram não conectado no Rube.",
+              };
             }
-            const results = parsed?.data?.data?.results || parsed?.data?.results;
+            const results =
+              parsed?.data?.data?.results || parsed?.data?.results;
             if (results && results.length > 0) {
               const userData = results[0]?.response?.data;
               if (userData?.id) {
-                console.log('[Instagram] Found user:', userData.username, userData.id);
+                console.log(
+                  "[Instagram] Found user:",
+                  userData.username,
+                  userData.id,
+                );
                 return {
                   success: true,
                   instagramUserId: String(userData.id),
-                  instagramUsername: userData.username || 'unknown'
+                  instagramUsername: userData.username || "unknown",
                 };
               }
             }
           }
         } catch (e) {
-          console.error('[Instagram] Parse error:', e);
+          console.error("[Instagram] Parse error:", e);
         }
       }
     }
-    return { success: false, error: 'Instagram não conectado no Rube.' };
+    return { success: false, error: "Instagram não conectado no Rube." };
   } catch (error) {
-    console.error('[Instagram] Validation error:', error);
-    return { success: false, error: error.message || 'Erro ao validar token' };
+    console.error("[Instagram] Validation error:", error);
+    return { success: false, error: error.message || "Erro ao validar token" };
   }
 }
 
@@ -3483,29 +3924,31 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
     }
 
     if (!user_id) {
-      return res.status(400).json({ error: 'user_id is required' });
+      return res.status(400).json({ error: "user_id is required" });
     }
 
     // user_id can be either DB UUID or Clerk ID - try both
     let resolvedUserId = user_id;
 
     // Check if it's a Clerk ID (starts with 'user_')
-    if (user_id.startsWith('user_')) {
-      const userResult = await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
+    if (user_id.startsWith("user_")) {
+      const userResult =
+        await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
       resolvedUserId = userResult[0]?.id;
       if (!resolvedUserId) {
-        console.log('[Instagram] User not found for Clerk ID:', user_id);
+        console.log("[Instagram] User not found for Clerk ID:", user_id);
         return res.json([]);
       }
     } else {
       // Assume it's a DB UUID - verify it exists
-      const userResult = await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
+      const userResult =
+        await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
       if (userResult.length === 0) {
-        console.log('[Instagram] User not found for DB UUID:', user_id);
+        console.log("[Instagram] User not found for DB UUID:", user_id);
         return res.json([]);
       }
     }
-    console.log('[Instagram] Resolved user ID:', resolvedUserId);
+    console.log("[Instagram] Resolved user ID:", resolvedUserId);
 
     const result = organization_id
       ? await sql`
@@ -3536,36 +3979,46 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
     const sql = getSql();
     const { user_id, organization_id, rube_token } = req.body;
 
-    console.log('[Instagram] POST request:', { user_id, organization_id, hasToken: !!rube_token });
+    console.log("[Instagram] POST request:", {
+      user_id,
+      organization_id,
+      hasToken: !!rube_token,
+    });
 
     if (!user_id || !rube_token) {
-      return res.status(400).json({ error: 'user_id and rube_token are required' });
+      return res
+        .status(400)
+        .json({ error: "user_id and rube_token are required" });
     }
 
     // user_id can be either DB UUID or Clerk ID - try both
     let resolvedUserId = user_id;
 
-    if (user_id.startsWith('user_')) {
-      const userResult = await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
+    if (user_id.startsWith("user_")) {
+      const userResult =
+        await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
       resolvedUserId = userResult[0]?.id;
       if (!resolvedUserId) {
-        console.log('[Instagram] User not found for Clerk ID:', user_id);
-        return res.status(400).json({ error: 'User not found' });
+        console.log("[Instagram] User not found for Clerk ID:", user_id);
+        return res.status(400).json({ error: "User not found" });
       }
     } else {
-      const userResult = await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
+      const userResult =
+        await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
       if (userResult.length === 0) {
-        console.log('[Instagram] User not found for DB UUID:', user_id);
-        return res.status(400).json({ error: 'User not found' });
+        console.log("[Instagram] User not found for DB UUID:", user_id);
+        return res.status(400).json({ error: "User not found" });
       }
     }
-    console.log('[Instagram] Resolved user ID:', resolvedUserId);
+    console.log("[Instagram] Resolved user ID:", resolvedUserId);
 
     // Validate the Rube token
     const validation = await validateRubeToken(rube_token);
-    console.log('[Instagram] Validation result:', validation);
+    console.log("[Instagram] Validation result:", validation);
     if (!validation.success) {
-      return res.status(400).json({ error: validation.error || 'Token inválido' });
+      return res
+        .status(400)
+        .json({ error: validation.error || "Token inválido" });
     }
 
     const { instagramUserId, instagramUsername } = validation;
@@ -3586,7 +4039,11 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
         RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
                   is_active, connected_at, last_used_at, created_at, updated_at
       `;
-      return res.json({ success: true, account: result[0], message: 'Conta reconectada!' });
+      return res.json({
+        success: true,
+        account: result[0],
+        message: "Conta reconectada!",
+      });
     }
 
     // Create new
@@ -3597,7 +4054,11 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
                 is_active, connected_at, last_used_at, created_at, updated_at
     `;
 
-    res.status(201).json({ success: true, account: result[0], message: `Conta @${instagramUsername} conectada!` });
+    res.status(201).json({
+      success: true,
+      account: result[0],
+      message: `Conta @${instagramUsername} conectada!`,
+    });
   } catch (error) {
     console.error("[Instagram Accounts API] Error:", error);
     res.status(500).json({ error: error.message });
@@ -3612,7 +4073,7 @@ app.put("/api/db/instagram-accounts", async (req, res) => {
     const { rube_token } = req.body;
 
     if (!id || !rube_token) {
-      return res.status(400).json({ error: 'id and rube_token are required' });
+      return res.status(400).json({ error: "id and rube_token are required" });
     }
 
     const validation = await validateRubeToken(rube_token);
@@ -3629,7 +4090,11 @@ app.put("/api/db/instagram-accounts", async (req, res) => {
                 is_active, connected_at, last_used_at, created_at, updated_at
     `;
 
-    res.json({ success: true, account: result[0], message: 'Token atualizado!' });
+    res.json({
+      success: true,
+      account: result[0],
+      message: "Token atualizado!",
+    });
   } catch (error) {
     console.error("[Instagram Accounts API] Error:", error);
     res.status(500).json({ error: error.message });
@@ -3643,11 +4108,11 @@ app.delete("/api/db/instagram-accounts", async (req, res) => {
     const { id } = req.query;
 
     if (!id) {
-      return res.status(400).json({ error: 'id is required' });
+      return res.status(400).json({ error: "id is required" });
     }
 
     await sql`UPDATE instagram_accounts SET is_active = FALSE, updated_at = NOW() WHERE id = ${id}`;
-    res.json({ success: true, message: 'Conta desconectada.' });
+    res.json({ success: true, message: "Conta desconectada." });
   } catch (error) {
     console.error("[Instagram Accounts API] Error:", error);
     res.status(500).json({ error: error.message });
@@ -3670,18 +4135,25 @@ app.post("/api/rube", async (req, res) => {
 
     // Multi-tenant mode: use user's token from database
     if (instagram_account_id && user_id) {
-      console.log('[Rube Proxy] Multi-tenant mode - fetching token for account:', instagram_account_id);
+      console.log(
+        "[Rube Proxy] Multi-tenant mode - fetching token for account:",
+        instagram_account_id,
+      );
 
       // Resolve user_id: can be DB UUID or Clerk ID
       let resolvedUserId = user_id;
-      if (user_id.startsWith('user_')) {
-        const userResult = await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
+      if (user_id.startsWith("user_")) {
+        const userResult =
+          await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
         resolvedUserId = userResult[0]?.id;
         if (!resolvedUserId) {
-          console.log('[Rube Proxy] User not found for Clerk ID:', user_id);
-          return res.status(400).json({ error: 'User not found' });
+          console.log("[Rube Proxy] User not found for Clerk ID:", user_id);
+          return res.status(400).json({ error: "User not found" });
         }
-        console.log('[Rube Proxy] Resolved Clerk ID to DB UUID:', resolvedUserId);
+        console.log(
+          "[Rube Proxy] Resolved Clerk ID to DB UUID:",
+          resolvedUserId,
+        );
       }
 
       // Fetch account token and instagram_user_id
@@ -3692,13 +4164,18 @@ app.post("/api/rube", async (req, res) => {
       `;
 
       if (accountResult.length === 0) {
-        console.log('[Rube Proxy] Instagram account not found or not active');
-        return res.status(403).json({ error: 'Instagram account not found or inactive' });
+        console.log("[Rube Proxy] Instagram account not found or not active");
+        return res
+          .status(403)
+          .json({ error: "Instagram account not found or inactive" });
       }
 
       token = accountResult[0].rube_token;
       instagramUserId = accountResult[0].instagram_user_id;
-      console.log('[Rube Proxy] Using token for Instagram user:', instagramUserId);
+      console.log(
+        "[Rube Proxy] Using token for Instagram user:",
+        instagramUserId,
+      );
 
       // Update last_used_at
       await sql`UPDATE instagram_accounts SET last_used_at = NOW() WHERE id = ${instagram_account_id}`;
@@ -3706,47 +4183,54 @@ app.post("/api/rube", async (req, res) => {
       // Fallback to global token (dev mode)
       token = process.env.RUBE_TOKEN;
       if (!token) {
-        return res.status(500).json({ error: 'RUBE_TOKEN not configured' });
+        return res.status(500).json({ error: "RUBE_TOKEN not configured" });
       }
-      console.log('[Rube Proxy] Using global RUBE_TOKEN (dev mode)');
+      console.log("[Rube Proxy] Using global RUBE_TOKEN (dev mode)");
     }
 
     // Inject ig_user_id into tool arguments if we have it
     if (instagramUserId && mcpRequest.params?.arguments) {
       // For RUBE_MULTI_EXECUTE_TOOL, inject into each tool's arguments
-      if (mcpRequest.params.arguments.tools && Array.isArray(mcpRequest.params.arguments.tools)) {
-        mcpRequest.params.arguments.tools.forEach(tool => {
+      if (
+        mcpRequest.params.arguments.tools &&
+        Array.isArray(mcpRequest.params.arguments.tools)
+      ) {
+        mcpRequest.params.arguments.tools.forEach((tool) => {
           if (tool.arguments) {
             tool.arguments.ig_user_id = instagramUserId;
           }
         });
-        console.log('[Rube Proxy] Injected ig_user_id into', mcpRequest.params.arguments.tools.length, 'tools');
+        console.log(
+          "[Rube Proxy] Injected ig_user_id into",
+          mcpRequest.params.arguments.tools.length,
+          "tools",
+        );
       } else {
         // For direct tool calls
         mcpRequest.params.arguments.ig_user_id = instagramUserId;
-        console.log('[Rube Proxy] Injected ig_user_id directly');
+        console.log("[Rube Proxy] Injected ig_user_id directly");
       }
     }
 
-    console.log('[Rube Proxy] Calling Rube MCP:', mcpRequest.params?.name);
+    console.log("[Rube Proxy] Calling Rube MCP:", mcpRequest.params?.name);
 
     const response = await fetch(RUBE_MCP_URL, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream',
-        'Authorization': `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(mcpRequest),
     });
 
     const text = await response.text();
-    console.log('[Rube Proxy] Response status:', response.status);
+    console.log("[Rube Proxy] Response status:", response.status);
     res.status(response.status).send(text);
   } catch (error) {
-    console.error('[Rube Proxy] Error:', error);
+    console.error("[Rube Proxy] Error:", error);
     res.status(500).json({
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 });
@@ -3762,12 +4246,20 @@ const startup = async () => {
   }
 
   app.listen(PORT, () => {
-    console.log('');
-    console.log(`${colors.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
-    console.log(`${colors.green}  API Server${colors.reset}  http://localhost:${PORT}`);
-    console.log(`${colors.green}  Database${colors.reset}    ${DATABASE_URL ? `${colors.green}Connected${colors.reset}` : `${colors.red}NOT CONFIGURED${colors.reset}`}`);
-    console.log(`${colors.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
-    console.log('');
+    console.log("");
+    console.log(
+      `${colors.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`,
+    );
+    console.log(
+      `${colors.green}  API Server${colors.reset}  http://localhost:${PORT}`,
+    );
+    console.log(
+      `${colors.green}  Database${colors.reset}    ${DATABASE_URL ? `${colors.green}Connected${colors.reset}` : `${colors.red}NOT CONFIGURED${colors.reset}`}`,
+    );
+    console.log(
+      `${colors.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`,
+    );
+    console.log("");
   });
 };
 

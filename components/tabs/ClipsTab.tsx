@@ -22,6 +22,7 @@ import {
 import {
   generateVideo as generateServerVideo,
   updateClipThumbnail,
+  updateSceneImage,
   type ApiVideoModel,
 } from "../../services/apiClient";
 import { uploadImageToBlob } from "../../services/blobService";
@@ -191,6 +192,7 @@ interface Scene {
   visual: string;
   narration: string;
   duration: number;
+  image_url?: string; // Saved in database for persistence
 }
 
 interface VideoState {
@@ -717,7 +719,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
     sceneNumber: number;
     prompt: string;
     extraInstructions: string;
-    type: 'scene' | 'thumbnail';
+    type: "scene" | "thumbnail";
   } | null>(null);
   const [previewSlide, setPreviewSlide] = useState<"video" | "thumbnail">(
     "thumbnail",
@@ -1315,29 +1317,40 @@ const ClipCard: React.FC<ClipCardProps> = ({
 
   // Initial scene images recovery
   useEffect(() => {
-    if (scenes.length === 0 || !galleryImages || galleryImages.length === 0)
-      return;
+    if (scenes.length === 0) return;
 
-    // Try to recover existing scene images from gallery (only once on mount)
-    // Filter by video_script_id to only load images belonging to this specific clip
+    // Try to recover existing scene images from database or gallery (only once on mount)
+    // Priority: database (scene.image_url) > gallery (by video_script_id)
     if (!hasInitializedSceneImages.current && clip.id) {
       hasInitializedSceneImages.current = true;
       const recoveredSceneImages: Record<number, SceneReferenceImage> = {};
       scenes.forEach((scene) => {
-        // Look for an image that matches this clip's scene (with fallback for legacy data)
-        const newSource = getSceneSource(scene.sceneNumber);
-        const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
-        const existingImage =
-          findGalleryImage(galleryImages, clip.id, newSource) ||
-          findGalleryImage(galleryImages, clip.id, oldSource);
-        if (existingImage) {
-          // Check if src is HTTP URL or data URL
-          const isHttpUrl = existingImage.src.startsWith("http");
+        // Priority 1: Check if scene has image_url from database (most reliable)
+        if (scene.image_url) {
           recoveredSceneImages[scene.sceneNumber] = {
-            dataUrl: existingImage.src, // Works for display (both HTTP and data URL)
-            httpUrl: isHttpUrl ? existingImage.src : undefined, // HTTP URL for fal.ai
+            dataUrl: scene.image_url,
+            httpUrl: scene.image_url,
             isUploading: false,
           };
+          return;
+        }
+
+        // Priority 2: Look for an image in gallery that matches this clip's scene
+        if (galleryImages && galleryImages.length > 0) {
+          const newSource = getSceneSource(scene.sceneNumber);
+          const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
+          const existingImage =
+            findGalleryImage(galleryImages, clip.id, newSource) ||
+            findGalleryImage(galleryImages, clip.id, oldSource);
+          if (existingImage) {
+            // Check if src is HTTP URL or data URL
+            const isHttpUrl = existingImage.src.startsWith("http");
+            recoveredSceneImages[scene.sceneNumber] = {
+              dataUrl: existingImage.src, // Works for display (both HTTP and data URL)
+              httpUrl: isHttpUrl ? existingImage.src : undefined, // HTTP URL for fal.ai
+              isUploading: false,
+            };
+          }
         }
       });
       if (Object.keys(recoveredSceneImages).length > 0) {
@@ -1456,7 +1469,12 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
   const handleShowPrompt = (sceneNumber: number) => {
     // Show Veo prompt by default (more complete)
     const prompt = buildPromptForVeo(sceneNumber);
-    setPromptPreview({ sceneNumber, prompt, extraInstructions: '', type: 'scene' });
+    setPromptPreview({
+      sceneNumber,
+      prompt,
+      extraInstructions: "",
+      type: "scene",
+    });
   };
 
   // Returns whether fallback was used (for batch operations to skip Gemini on subsequent calls)
@@ -1590,12 +1608,14 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
           }
 
           // Pass useFallbackDirectly to skip Gemini if already failed in batch
+          // Pass includeNarration to control audio generation (with voice narration or just ambient)
           const result = await generateVideo(
             jsonPrompt,
             "9:16",
             selectedVideoModel,
             referenceImage,
             useFallbackDirectly,
+            includeNarration,
           );
           videoUrl = result.videoUrl;
           usedFallback = result.usedFallback;
@@ -1637,10 +1657,11 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
           });
         }
 
-        return usedFallback;
+        return { usedFallback, error: null };
       } catch (err: any) {
         setIsGeneratingVideo((prev) => ({ ...prev, [sceneNumber]: false }));
-        return usedFallback;
+        console.error("[ClipsTab] Video generation error:", err);
+        return { usedFallback, error: err.message || "Erro ao gerar vídeo" };
       }
     },
     [
@@ -1663,12 +1684,22 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
       // Only generate if scene has no videos yet
       const sceneVideos = videoStates[scene.sceneNumber] || [];
       if (sceneVideos.length === 0 || !sceneVideos.some((v) => v.url)) {
-        const usedFallback = await handleGenerateVideo(
+        const result = await handleGenerateVideo(
           scene.sceneNumber,
           useFallback,
         );
+
+        // If there was an error, stop and notify user
+        if (result.error) {
+          setIsGeneratingAll(false);
+          alert(
+            `Erro ao gerar vídeo da cena ${scene.sceneNumber}: ${result.error}\n\nGeração interrompida.`,
+          );
+          return;
+        }
+
         // If fallback was used, skip Gemini for all remaining scenes
-        if (usedFallback) {
+        if (result.usedFallback) {
           useFallback = true;
           console.log(
             "[ClipsTab] Gemini failed, using fal.ai directly for remaining scenes",
@@ -1695,12 +1726,19 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
     let useFallback = false; // Track if we should skip Gemini for remaining scenes
 
     for (const scene of scenes) {
-      const usedFallback = await handleGenerateVideo(
-        scene.sceneNumber,
-        useFallback,
-      );
+      const result = await handleGenerateVideo(scene.sceneNumber, useFallback);
+
+      // If there was an error, stop and notify user
+      if (result.error) {
+        setIsGeneratingAll(false);
+        alert(
+          `Erro ao gerar vídeo da cena ${scene.sceneNumber}: ${result.error}\n\nGeração interrompida.`,
+        );
+        return;
+      }
+
       // If fallback was used, skip Gemini for all remaining scenes
-      if (usedFallback) {
+      if (result.usedFallback) {
         useFallback = true;
         console.log(
           "[ClipsTab] Gemini failed, using fal.ai directly for remaining scenes",
@@ -1808,6 +1846,18 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             video_script_id: clip.id, // Link to video_clip_script for campaign filtering
           });
         }
+
+        // Save scene image_url to database for persistence
+        if (clip.id && httpUrl) {
+          try {
+            await updateSceneImage(clip.id, scene.sceneNumber, httpUrl);
+          } catch (err) {
+            console.error(
+              `[ClipsTab] Failed to save scene ${scene.sceneNumber} image to database:`,
+              err,
+            );
+          }
+        }
       } catch (err: any) {
         console.error(
           `Error generating image for scene ${scene.sceneNumber}:`,
@@ -1828,7 +1878,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
   };
 
   // Generate single scene image
-  const handleGenerateSingleSceneImage = async (sceneNumber: number, extraInstructions?: string) => {
+  const handleGenerateSingleSceneImage = async (
+    sceneNumber: number,
+    extraInstructions?: string,
+  ) => {
     if (!thumbnail) {
       alert(
         "Por favor, gere a capa primeiro para usar como referência de estilo.",
@@ -1895,6 +1948,18 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           model: "gemini-3-pro-image-preview",
           video_script_id: clip.id, // Link to video_clip_script for campaign filtering
         });
+      }
+
+      // Save scene image_url to database for persistence
+      if (clip.id && httpUrl) {
+        try {
+          await updateSceneImage(clip.id, sceneNumber, httpUrl);
+        } catch (err) {
+          console.error(
+            `[ClipsTab] Failed to save scene ${sceneNumber} image to database:`,
+            err,
+          );
+        }
       }
     } catch (err: any) {
       setSceneImages((prev) => ({
@@ -2001,7 +2066,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     if (editingSceneImage) {
       const { sceneNumber, image } = editingSceneImage;
       // Update in gallery if it has an ID
-      if (image.id && !image.id.startsWith('temp-')) {
+      if (image.id && !image.id.startsWith("temp-")) {
         onUpdateGalleryImage(image.id, newSrc);
       }
       // Update local state
@@ -2010,11 +2075,15 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         [sceneNumber]: {
           ...prev[sceneNumber],
           dataUrl: newSrc,
-          httpUrl: newSrc.startsWith('http') ? newSrc : prev[sceneNumber]?.httpUrl,
+          httpUrl: newSrc.startsWith("http")
+            ? newSrc
+            : prev[sceneNumber]?.httpUrl,
         },
       }));
       // Update modal image
-      setEditingSceneImage((prev) => prev ? { ...prev, image: { ...prev.image, src: newSrc } } : null);
+      setEditingSceneImage((prev) =>
+        prev ? { ...prev, image: { ...prev.image, src: newSrc } } : null,
+      );
     }
   };
 
@@ -4810,7 +4879,9 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                   onClick={() => {
                                     // Find the gallery image for this scene
                                     const galleryImage = galleryImages?.find(
-                                      (img) => img.src === sceneImage.dataUrl || img.src === sceneImage.httpUrl
+                                      (img) =>
+                                        img.src === sceneImage.dataUrl ||
+                                        img.src === sceneImage.httpUrl,
                                     );
                                     setEditingSceneImage({
                                       sceneNumber: scene.sceneNumber,
@@ -4818,8 +4889,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                                         id: `scene-${scene.sceneNumber}`,
                                         src: sceneImage.dataUrl,
                                         prompt: scene.visual,
-                                        source: `Cena-${scene.sceneNumber}` as const,
-                                        model: "gemini-3-pro-image-preview" as const,
+                                        source:
+                                          `Cena-${scene.sceneNumber}` as const,
+                                        model:
+                                          "gemini-3-pro-image-preview" as const,
                                       },
                                     });
                                   }}
@@ -5103,15 +5176,22 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 </label>
                 <textarea
                   value={promptPreview.extraInstructions}
-                  onChange={(e) => setPromptPreview(prev => prev ? ({
-                    ...prev,
-                    extraInstructions: e.target.value
-                  }) : null)}
+                  onChange={(e) =>
+                    setPromptPreview((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            extraInstructions: e.target.value,
+                          }
+                        : null,
+                    )
+                  }
                   placeholder="Adicione detalhes extras para a regeneração... Ex: 'mais vibrante', 'adicionar texto X', 'mudar cor para azul'"
                   className="w-full h-24 text-[11px] text-white/80 bg-black/30 rounded-xl p-4 border border-white/10 focus:border-primary/50 focus:outline-none resize-none placeholder:text-white/20"
                 />
                 <p className="text-[9px] text-white/30 mt-1">
-                  As instruções extras serão anexadas ao prompt original na regeneração.
+                  As instruções extras serão anexadas ao prompt original na
+                  regeneração.
                 </p>
               </div>
             </div>
@@ -5127,21 +5207,33 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 Copiar
               </Button>
               <div className="flex gap-2">
-                <Button size="small" variant="secondary" onClick={() => setPromptPreview(null)}>
+                <Button
+                  size="small"
+                  variant="secondary"
+                  onClick={() => setPromptPreview(null)}
+                >
                   Fechar
                 </Button>
                 <Button
                   size="small"
                   onClick={() => {
-                    const { sceneNumber, extraInstructions, type } = promptPreview;
+                    const { sceneNumber, extraInstructions, type } =
+                      promptPreview;
                     setPromptPreview(null);
-                    if (type === 'scene') {
-                      handleGenerateSingleSceneImage(sceneNumber, extraInstructions || undefined);
+                    if (type === "scene") {
+                      handleGenerateSingleSceneImage(
+                        sceneNumber,
+                        extraInstructions || undefined,
+                      );
                     }
                   }}
                   icon="refresh"
                   disabled={!promptPreview.extraInstructions?.trim()}
-                  title={!promptPreview.extraInstructions?.trim() ? "Adicione instruções extras para regenerar" : "Regenerar com instruções extras"}
+                  title={
+                    !promptPreview.extraInstructions?.trim()
+                      ? "Adicione instruções extras para regenerar"
+                      : "Regenerar com instruções extras"
+                  }
                 >
                   Regenerar
                 </Button>
@@ -5516,7 +5608,10 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
         // Priority 3: Fallback for legacy data - match by prompt (for thumbnails saved before video_script_id fix)
         if (galleryImages && galleryImages.length > 0 && clip.image_prompt) {
           const legacyMatch = galleryImages.find(
-            (img) => img.source === "Clipe" && !img.video_script_id && img.prompt === clip.image_prompt,
+            (img) =>
+              img.source === "Clipe" &&
+              !img.video_script_id &&
+              img.prompt === clip.image_prompt,
           );
           if (legacyMatch) return legacyMatch;
         }
