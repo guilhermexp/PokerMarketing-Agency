@@ -1856,6 +1856,111 @@ app.delete("/api/db/tournaments", async (req, res) => {
   }
 });
 
+// Tournaments API - Update event flyer_urls
+app.patch("/api/db/tournaments/event-flyer", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { event_id } = req.query;
+    const { flyer_url, action } = req.body; // action: 'add' or 'remove'
+
+    if (!event_id) {
+      return res.status(400).json({ error: "event_id is required" });
+    }
+
+    // Get current flyer_urls
+    const [event] = await sql`
+      SELECT flyer_urls FROM tournament_events WHERE id = ${event_id}
+    `;
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    let flyer_urls = event.flyer_urls || [];
+
+    if (action === "add" && flyer_url) {
+      // Add new flyer URL if not already present
+      if (!flyer_urls.includes(flyer_url)) {
+        flyer_urls = [...flyer_urls, flyer_url];
+      }
+    } else if (action === "remove" && flyer_url) {
+      // Remove flyer URL
+      flyer_urls = flyer_urls.filter((url) => url !== flyer_url);
+    } else if (action === "set" && Array.isArray(req.body.flyer_urls)) {
+      // Replace all flyer URLs
+      flyer_urls = req.body.flyer_urls;
+    }
+
+    // Update database
+    const result = await sql`
+      UPDATE tournament_events
+      SET flyer_urls = ${JSON.stringify(flyer_urls)}::jsonb,
+          updated_at = NOW()
+      WHERE id = ${event_id}
+      RETURNING *
+    `;
+
+    res.json(result[0]);
+  } catch (error) {
+    logError("Tournaments API (PATCH event-flyer)", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Tournaments API - Update daily flyer_urls for week schedule
+app.patch("/api/db/tournaments/daily-flyer", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { schedule_id, period } = req.query; // period: 'MORNING', 'AFTERNOON', 'NIGHT', 'HIGHLIGHTS'
+    const { flyer_url, action } = req.body; // action: 'add' or 'remove'
+
+    if (!schedule_id || !period) {
+      return res.status(400).json({ error: "schedule_id and period are required" });
+    }
+
+    // Get current daily_flyer_urls
+    const [schedule] = await sql`
+      SELECT daily_flyer_urls FROM week_schedules WHERE id = ${schedule_id}
+    `;
+
+    if (!schedule) {
+      return res.status(404).json({ error: "Schedule not found" });
+    }
+
+    let daily_flyer_urls = schedule.daily_flyer_urls || {};
+    let periodUrls = daily_flyer_urls[period] || [];
+
+    if (action === "add" && flyer_url) {
+      // Add new flyer URL if not already present
+      if (!periodUrls.includes(flyer_url)) {
+        periodUrls = [...periodUrls, flyer_url];
+      }
+    } else if (action === "remove" && flyer_url) {
+      // Remove flyer URL
+      periodUrls = periodUrls.filter((url) => url !== flyer_url);
+    } else if (action === "set" && Array.isArray(req.body.flyer_urls)) {
+      // Replace all flyer URLs for this period
+      periodUrls = req.body.flyer_urls;
+    }
+
+    daily_flyer_urls[period] = periodUrls;
+
+    // Update database
+    const result = await sql`
+      UPDATE week_schedules
+      SET daily_flyer_urls = ${JSON.stringify(daily_flyer_urls)}::jsonb,
+          updated_at = NOW()
+      WHERE id = ${schedule_id}
+      RETURNING *
+    `;
+
+    res.json(result[0]);
+  } catch (error) {
+    logError("Tournaments API (PATCH daily-flyer)", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================================
 // Generation Jobs API (Background Processing)
 // Note: In dev mode, QStash callback won't work (needs public URL)

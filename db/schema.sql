@@ -465,6 +465,9 @@ CREATE TABLE tournament_events (
     -- Event date
     event_date DATE,
 
+    -- Generated flyers (array of URLs)
+    flyer_urls JSONB DEFAULT '[]',
+
     -- Timestamps
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -491,6 +494,9 @@ CREATE TABLE week_schedules (
 
     original_filename VARCHAR(255),
     file_hash VARCHAR(64),
+
+    -- Daily flyers by period: { "MORNING": [...urls], "AFTERNOON": [...urls], ... }
+    daily_flyer_urls JSONB DEFAULT '{}',
 
     -- Timestamps
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -108,12 +108,15 @@ export interface TournamentEvent {
   minutes: string;
   structure: string;
   times: Record<string, string>;
+  flyer_urls?: string[]; // Generated flyer URLs for persistence
 }
 
 export interface WeekScheduleInfo {
+  id?: string;
   startDate: string;
   endDate: string;
   filename: string;
+  daily_flyer_urls?: Record<string, string[]>; // { "MORNING": [...urls], "AFTERNOON": [...urls], ... }
 }
 
 export type ImageModel = 'gemini-3-pro-image-preview' | 'imagen-4.0-generate-001';
@@ -150,6 +153,10 @@ export interface GalleryImage {
   ad_creative_id?: string;
   video_script_id?: string;
   campaign_id?: string;  // Derived from post_id or ad_creative_id via JOIN
+  // Database linking for flyers
+  tournament_event_id?: string;
+  week_schedule_id?: string;
+  daily_flyer_period?: string;  // 'MORNING' | 'AFTERNOON' | 'NIGHT' | 'HIGHLIGHTS' for daily flyers
   // Publishing status
   published_at?: string;  // ISO timestamp when published to Instagram
   // Timestamps

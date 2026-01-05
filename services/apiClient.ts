@@ -551,6 +551,58 @@ export async function updateSceneImage(
 }
 
 // ============================================================================
+// Tournament Flyer API
+// ============================================================================
+
+export async function addEventFlyer(
+  eventId: string,
+  flyerUrl: string,
+): Promise<any> {
+  return fetchApi(`/tournaments/event-flyer?event_id=${eventId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ flyer_url: flyerUrl, action: "add" }),
+  });
+}
+
+export async function removeEventFlyer(
+  eventId: string,
+  flyerUrl: string,
+): Promise<any> {
+  return fetchApi(`/tournaments/event-flyer?event_id=${eventId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ flyer_url: flyerUrl, action: "remove" }),
+  });
+}
+
+export async function addDailyFlyer(
+  scheduleId: string,
+  period: string,
+  flyerUrl: string,
+): Promise<any> {
+  return fetchApi(
+    `/tournaments/daily-flyer?schedule_id=${scheduleId}&period=${period}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ flyer_url: flyerUrl, action: "add" }),
+    },
+  );
+}
+
+export async function removeDailyFlyer(
+  scheduleId: string,
+  period: string,
+  flyerUrl: string,
+): Promise<any> {
+  return fetchApi(
+    `/tournaments/daily-flyer?schedule_id=${scheduleId}&period=${period}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ flyer_url: flyerUrl, action: "remove" }),
+    },
+  );
+}
+
+// ============================================================================
 // Health Check
 // ============================================================================
 

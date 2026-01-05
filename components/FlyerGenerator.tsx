@@ -24,6 +24,10 @@ import type {
   GenerationJobConfig,
   WeekScheduleWithCount,
 } from "../services/apiClient";
+import {
+  addEventFlyer,
+  addDailyFlyer,
+} from "../services/apiClient";
 
 // Check if we're in development mode (QStash won't work locally)
 const isDevMode =
@@ -527,11 +531,21 @@ const TournamentEventCard: React.FC<{
         model,
         aspectRatio,
         imageSize,
+        tournament_event_id: event.id, // Link to tournament event for persistence
       });
       setGeneratedFlyers((prev) =>
         prev.map((f) => (f === "loading" ? newImage : f)),
       );
       setIsExpanded(true); // Auto-expand when generation completes
+
+      // Save flyer URL to database for persistence
+      if (event.id && imageUrl) {
+        try {
+          await addEventFlyer(event.id, imageUrl);
+        } catch (err) {
+          console.error("[FlyerGenerator] Failed to save flyer to database:", err);
+        }
+      }
     } catch (err) {
       setGeneratedFlyers((prev) => prev.filter((f) => f !== "loading"));
     } finally {
@@ -677,6 +691,7 @@ const PeriodCardRow: React.FC<{
   imageSize: ImageSize;
   compositionAssets: ImageFile[];
   language: "pt" | "en";
+  scheduleId?: string; // For saving daily flyers to database
   onAddImageToGallery: (image: Omit<GalleryImage, "id">) => GalleryImage;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
@@ -707,6 +722,7 @@ const PeriodCardRow: React.FC<{
   imageSize,
   compositionAssets,
   language,
+  scheduleId,
   onAddImageToGallery,
   onUpdateGalleryImage,
   onSetChatReference,
@@ -934,11 +950,22 @@ const PeriodCardRow: React.FC<{
           model,
           aspectRatio,
           imageSize,
+          week_schedule_id: scheduleId, // Link to schedule for persistence
+          daily_flyer_period: period, // Track which period this flyer is for
         });
         setGeneratedFlyers((prev) =>
           prev.map((f) => (f === "loading" ? newImage : f)),
         );
         setIsExpanded(true); // Auto-expand when generation completes
+
+        // Save daily flyer URL to database for persistence
+        if (scheduleId && imageUrl) {
+          try {
+            await addDailyFlyer(scheduleId, period, imageUrl);
+          } catch (err) {
+            console.error("[FlyerGenerator] Failed to save daily flyer to database:", err);
+          }
+        }
       } catch (err) {
         setGeneratedFlyers((prev) => prev.filter((f) => f !== "loading"));
       } finally {
@@ -955,6 +982,8 @@ const PeriodCardRow: React.FC<{
       aspectRatio,
       currency,
       language,
+      scheduleId,
+      period,
       styleReference,
       onAddImageToGallery,
       setGeneratedFlyers,
@@ -2046,6 +2075,59 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     }
   }, [currentScheduleId]);
 
+  // Recover flyers from database when events change
+  useEffect(() => {
+    // Recover individual event flyers from database
+    const newFlyerState: Record<string, GalleryImage[]> = {};
+    events.forEach((event) => {
+      if (event.flyer_urls && event.flyer_urls.length > 0) {
+        newFlyerState[event.id] = event.flyer_urls.map((url, idx) => ({
+          id: `recovered-${event.id}-${idx}`,
+          src: url,
+          prompt: "",
+          source: "Flyer",
+          model: "gemini-3-pro-image-preview" as const,
+          tournament_event_id: event.id,
+        }));
+      }
+    });
+    if (Object.keys(newFlyerState).length > 0) {
+      console.log("[FlyerGenerator] Recovered event flyers from database:", Object.keys(newFlyerState).length, "events");
+      setFlyerState((prev) => ({ ...prev, ...newFlyerState }));
+    }
+  }, [events, setFlyerState]);
+
+  // Recover daily flyers from database when schedule info changes
+  useEffect(() => {
+    if (weekScheduleInfo?.daily_flyer_urls) {
+      const dailyUrls = weekScheduleInfo.daily_flyer_urls;
+      const newDailyState: Record<string, GalleryImage[]> = {};
+
+      (["MORNING", "AFTERNOON", "NIGHT", "HIGHLIGHTS", "ALL"] as TimePeriod[]).forEach((period) => {
+        const urls = dailyUrls[period];
+        if (urls && urls.length > 0) {
+          newDailyState[period] = urls.map((url, idx) => ({
+            id: `recovered-daily-${period}-${idx}`,
+            src: url,
+            prompt: "",
+            source: "Flyer Diário",
+            model: "gemini-3-pro-image-preview" as const,
+            week_schedule_id: weekScheduleInfo.id,
+            daily_flyer_period: period,
+          }));
+        }
+      });
+
+      if (Object.keys(newDailyState).length > 0) {
+        console.log("[FlyerGenerator] Recovered daily flyers from database:", Object.keys(newDailyState));
+        setDailyFlyerState((prev) => ({
+          ...prev,
+          ...newDailyState,
+        }));
+      }
+    }
+  }, [weekScheduleInfo, setDailyFlyerState]);
+
   // Handler para quando uma imagem é selecionada como modelo (sincroniza UI e estado de geração)
   const handleSetStyleReference = (image: GalleryImage) => {
     setGlobalStyleReference(image);
@@ -2873,6 +2955,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   model={selectedImageModel}
                   imageSize={selectedImageSize}
                   language={selectedLanguage}
+                  scheduleId={weekScheduleInfo?.id}
                   onAddImageToGallery={onAddImageToGallery}
                   onUpdateGalleryImage={onUpdateGalleryImage}
                   onSetChatReference={onSetChatReference}

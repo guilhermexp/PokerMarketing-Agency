@@ -131,7 +131,7 @@ const PostCard: React.FC<{
 
   return (
     <>
-      <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 overflow-hidden h-full flex flex-col">
+      <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-5 py-3 border-b border-white/5 bg-[#0d0d0d] flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center">
@@ -142,7 +142,7 @@ const PostCard: React.FC<{
           </h3>
         </div>
 
-        <div className="flex-1 p-4 space-y-3">
+        <div className="p-4 space-y-3">
           {/* Image */}
           <div className="aspect-square bg-[#080808] rounded-xl flex items-center justify-center relative overflow-hidden border border-white/5">
             {isGenerating ? (
@@ -581,7 +581,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
         {posts.map((post, index) => (
           <PostCard
             key={index}
