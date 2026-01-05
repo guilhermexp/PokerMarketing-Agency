@@ -1,12 +1,17 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import type { ContentInput, GenerationOptions, BrandProfile, CreativeModel, StyleReference } from '../types';
+import type { ContentInput, GenerationOptions, BrandProfile, StyleReference } from '../types';
 import { Icon } from './common/Icon';
 import { Button } from './common/Button';
 import { GenerationOptionsModal } from './GenerationOptionsModal';
-import { creativeModelLabels } from '../services/llmService';
+import { CREATIVE_MODELS_FOR_UI, getDefaultModelId, type CreativeModelId } from '../config/ai-models';
 
-const creativeModelOptions: CreativeModel[] = ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'openai/gpt-5.2', 'x-ai/grok-4.1-fast'];
+// Models from centralized config
+const creativeModelOptions = CREATIVE_MODELS_FOR_UI.map(m => m.id);
+const creativeModelLabels = Object.fromEntries(
+  CREATIVE_MODELS_FOR_UI.map(m => [m.id, { label: m.label, provider: m.provider }])
+);
+const DEFAULT_MODEL = getDefaultModelId();
 
 interface ImageFile {
   base64: string;
@@ -318,7 +323,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                 >
                   <Icon name="zap" className="w-3.5 h-3.5" />
                   <span className="text-[10px] font-bold uppercase">
-                    {creativeModelLabels[brandProfile.creativeModel || 'gemini-3-pro-preview']?.label || 'Gemini 3 Pro'}
+                    {creativeModelLabels[brandProfile.creativeModel || DEFAULT_MODEL]?.label || 'Gemini 3 Pro'}
                   </span>
                   <Icon name="chevron-down" className="w-3 h-3 ml-1" />
                 </button>
@@ -334,7 +339,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                           setIsModelSelectorOpen(false);
                         }}
                         className={`w-full px-3 py-2 text-left text-xs transition-colors flex items-center justify-between ${
-                          brandProfile.creativeModel === model || (!brandProfile.creativeModel && model === 'gemini-3-pro-preview')
+                          brandProfile.creativeModel === model || (!brandProfile.creativeModel && model === DEFAULT_MODEL)
                             ? 'bg-white/10 text-white'
                             : 'text-white/60 hover:bg-white/5 hover:text-white/80'
                         }`}

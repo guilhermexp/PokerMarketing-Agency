@@ -5,8 +5,9 @@ export type ToneOfVoice = 'Profissional' | 'Espirituoso' | 'Casual' | 'Inspirado
 
 export type ToneTarget = 'campaigns' | 'posts' | 'images' | 'flyers' | 'videos';
 
-// Modelos criativos para geração de texto (campanhas, posts, prompts)
-export type CreativeModel = 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'openai/gpt-5.2' | 'x-ai/grok-4.1-fast';
+// Modelos criativos - importar de config/ai-models.ts
+// Para adicionar novos modelos, edite CREATIVE_MODELS em config/ai-models.ts
+export type { CreativeModelId as CreativeModel } from './config/ai-models';
 
 export interface BrandProfile {
   name: string;

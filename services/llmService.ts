@@ -5,6 +5,12 @@
 
 import type { CreativeModel, BrandProfile } from '../types';
 import { getAuthToken } from './authService';
+import {
+  isOpenRouterModel as checkIsOpenRouter,
+  getModelLabel,
+  getModelProvider,
+  CREATIVE_MODELS_FOR_UI
+} from '../config/ai-models';
 
 /**
  * Interface para partes do prompt (compatível com formato Gemini)
@@ -72,17 +78,15 @@ export const generateCreativeText = async (
 
 /**
  * Helper para verificar se o modelo atual é OpenRouter
+ * @deprecated Use isOpenRouterModel from config/ai-models.ts
  */
 export const isOpenRouterModel = (model: CreativeModel): boolean => {
-  return model !== 'gemini-3-pro-preview' && model !== 'gemini-3-flash-preview';
+  return checkIsOpenRouter(model);
 };
 
 /**
  * Labels para exibição na UI
+ * @deprecated Use CREATIVE_MODELS_FOR_UI from config/ai-models.ts
  */
-export const creativeModelLabels: Record<CreativeModel, { label: string; provider: string }> = {
-  'gemini-3-pro-preview': { label: 'Gemini 3 Pro', provider: 'Google' },
-  'gemini-3-flash-preview': { label: 'Gemini 3 Flash', provider: 'Google' },
-  'openai/gpt-5.2': { label: 'GPT-5.2', provider: 'OpenAI' },
-  'x-ai/grok-4.1-fast': { label: 'Grok 4.1 Fast', provider: 'xAI' }
-};
+export const creativeModelLabels: Record<string, { label: string; provider: string }> =
+  Object.fromEntries(CREATIVE_MODELS_FOR_UI.map(m => [m.id, { label: m.label, provider: m.provider }]));

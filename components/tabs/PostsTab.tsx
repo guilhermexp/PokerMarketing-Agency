@@ -289,6 +289,11 @@ export const PostsTab: React.FC<PostsTabProps> = ({
 
   // Initialize images from posts data (only from saved image_url in database)
   useEffect(() => {
+    console.log("[PostsTab] Initializing with posts:", posts.map(p => ({
+      id: p.id,
+      platform: p.platform,
+      image_url: p.image_url,
+    })));
     const length = posts.length;
     const initialImages = posts.map((post, index) => {
       // Only use saved image_url from database - don't recover from gallery

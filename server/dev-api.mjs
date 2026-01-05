@@ -2353,6 +2353,31 @@ Responda apenas JSON:
 { "platform": "Instagram", "content": "Texto Legenda", "hashtags": ["tag1", "tag2"], "image_prompt": "descrição visual" }`;
 };
 
+/**
+ * Video prompt JSON conversion system prompt
+ */
+const getVideoPromptSystemPrompt = (duration, aspectRatio) => {
+  return `Você é um especialista em prompt engineering para vídeo de IA.
+Converta o prompt genérico fornecido em um JSON estruturado e aninhado otimizado para modelos de geração de vídeo (Veo 3, Sora 2).
+
+O JSON deve incluir detalhes ricos sobre:
+- visual_style: estética, paleta de cores, iluminação
+- camera: movimentos de câmera cinematográficos, posições inicial e final
+- subject: personagem/objeto principal, ação, expressão/estado
+- environment: cenário, props relevantes, atmosfera
+- scene_sequence: 2-3 beats de ação para criar dinamismo
+- technical: duração (${duration} seconds), aspect ratio (${aspectRatio}), tokens de qualidade
+
+**TIPOGRAFIA OBRIGATÓRIA (REGRA CRÍTICA PARA CONSISTÊNCIA VISUAL):**
+Se o vídeo contiver QUALQUER texto na tela (títulos, legendas, overlays, valores, CTAs):
+- Use EXCLUSIVAMENTE fonte BOLD CONDENSED SANS-SERIF (estilo Bebas Neue, Oswald, Impact)
+- TODOS os textos devem usar a MESMA família tipográfica
+- Textos em MAIÚSCULAS com peso BLACK ou EXTRA-BOLD
+- PROIBIDO: fontes script/cursivas, serifadas, handwriting, ou fontes finas/light
+
+Mantenha a essência do prompt original mas expanda com detalhes visuais cinematográficos.`;
+};
+
 const buildCampaignPrompt = (brandProfile, transcript, quantityInstructions) => {
   const toneText = getToneText(brandProfile, "campaigns");
 
@@ -2524,6 +2549,8 @@ app.post("/api/ai/campaign", async (req, res) => {
 
     console.log("[Campaign API] Generating campaign...");
 
+    // Model selection - config in config/ai-models.ts
+    // OpenRouter models have "/" in their ID (e.g., "openai/gpt-5.2")
     const model = brandProfile.creativeModel || "gemini-3-pro-preview";
     const isOpenRouter = model.includes("/");
 
@@ -2786,6 +2813,54 @@ app.post("/api/ai/image", async (req, res) => {
   } catch (error) {
     console.error("[Image API] Error:", error);
     return res.status(500).json({ error: error.message || "Failed to generate image" });
+  }
+});
+
+// Convert generic prompt to structured JSON for video generation
+app.post("/api/ai/convert-prompt", async (req, res) => {
+  try {
+    const { prompt, duration = 5, aspectRatio = "16:9" } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: "prompt is required" });
+    }
+
+    console.log(`[Convert Prompt API] Converting prompt to JSON, duration: ${duration}s`);
+
+    const ai = getGeminiAi();
+    const systemPrompt = getVideoPromptSystemPrompt(duration, aspectRatio);
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [
+        { role: "user", parts: [{ text: systemPrompt + "\n\nPrompt: " + prompt }] }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.7,
+      },
+    });
+
+    const text = response.text?.trim() || "";
+
+    // Try to parse as JSON
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      // If not valid JSON, return as-is
+      result = text;
+    }
+
+    console.log("[Convert Prompt API] Conversion successful");
+
+    res.json({
+      success: true,
+      result,
+    });
+  } catch (error) {
+    console.error("[Convert Prompt API] Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to convert prompt" });
   }
 });
 

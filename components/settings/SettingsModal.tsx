@@ -12,6 +12,7 @@ import { Loader } from '../common/Loader';
 import { extractColorsFromLogo } from '../../services/geminiService';
 import { useOrganization, OrganizationProfile, useUser } from '@clerk/clerk-react';
 import { ConnectInstagramModal, useInstagramAccounts } from './ConnectInstagramModal';
+import { CREATIVE_MODELS_FOR_UI, getDefaultModelId } from '../../config/ai-models';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -46,13 +47,9 @@ const toneTargetLabels: Record<ToneTarget, string> = {
   videos: 'Vídeos',
 };
 
-// Modelos criativos disponíveis
-const creativeModels: { id: CreativeModel; label: string; provider: string }[] = [
-  { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro', provider: 'Google' },
-  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash', provider: 'Google' },
-  { id: 'openai/gpt-5.2', label: 'GPT-5.2', provider: 'OpenAI' },
-  { id: 'x-ai/grok-4.1-fast', label: 'Grok 4.1 Fast', provider: 'xAI' },
-];
+// Modelos criativos - configuração em config/ai-models.ts
+const creativeModels = CREATIVE_MODELS_FOR_UI;
+const DEFAULT_MODEL = getDefaultModelId();
 
 // Color Widget
 const ColorWidget: React.FC<{
@@ -170,7 +167,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
     tertiaryColor: brandProfile.tertiaryColor || '',
     toneOfVoice: brandProfile.toneOfVoice || 'Casual',
     toneTargets: brandProfile.toneTargets || defaultToneTargets,
-    creativeModel: brandProfile.creativeModel || 'gemini-3-pro-preview',
+    creativeModel: brandProfile.creativeModel || DEFAULT_MODEL,
   });
   const [isAnalyzingLogo, setIsAnalyzingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(brandProfile.logo || null);
@@ -188,7 +185,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
       tertiaryColor: brandProfile.tertiaryColor || '',
       toneOfVoice: brandProfile.toneOfVoice || 'Casual',
       toneTargets: brandProfile.toneTargets || defaultToneTargets,
-      creativeModel: brandProfile.creativeModel || 'gemini-3-pro-preview',
+      creativeModel: brandProfile.creativeModel || DEFAULT_MODEL,
     });
     setLogoPreview(brandProfile.logo || null);
   }, [brandProfile]);
@@ -534,7 +531,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     {creativeModels.map((model) => {
-                      const isActive = (profile.creativeModel || 'gemini-3-pro-preview') === model.id;
+                      const isActive = (profile.creativeModel || DEFAULT_MODEL) === model.id;
                       return (
                         <button
                           key={model.id}
