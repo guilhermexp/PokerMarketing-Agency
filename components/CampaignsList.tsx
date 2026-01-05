@@ -161,8 +161,11 @@ const CampaignCard: React.FC<{
         hover:-translate-y-0.5
       `}
       style={{
+        animationName: "fadeSlideIn",
+        animationDuration: "0.5s",
+        animationTimingFunction: "ease-out",
+        animationFillMode: "backwards",
         animationDelay: `${index * 80}ms`,
-        animation: "fadeSlideIn 0.5s ease-out backwards",
       }}
     >
       {/* Ambient glow on hover */}
