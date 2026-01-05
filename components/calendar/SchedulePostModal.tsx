@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useUser, useOrganization } from '@clerk/clerk-react';
 import type { ScheduledPost, GalleryImage, SchedulingPlatform, InstagramContentType } from '../../types';
 import { Icon } from '../common/Icon';
+import { CampaignAccordion, type CampaignWithImages } from './CampaignAccordion';
+import { useCampaigns } from '../../hooks/useAppData';
 
 interface SchedulePostModalProps {
   isOpen: boolean;
@@ -66,6 +69,16 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   const [publishNow, setPublishNow] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [galleryFilter, setGalleryFilter] = useState<'all' | 'flyers' | 'posts' | 'videos'>('all');
+  const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
+
+  // Get user and organization for campaigns hook
+  const { user } = useUser();
+  const { organization } = useOrganization();
+  const userId = user?.id || null;
+  const organizationId = organization?.id || null;
+
+  // Get campaigns data for grouping images
+  const { campaigns } = useCampaigns(userId, organizationId);
 
   // Set initial image when modal opens with a pre-selected image
   useEffect(() => {
@@ -157,6 +170,35 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   // Separate images into today and older
   const todayEligibleImages = eligibleImages.filter((img) => isToday(img.created_at));
   const olderEligibleImages = eligibleImages.filter((img) => !isToday(img.created_at));
+
+  // Group images by campaign for the campaigns filter
+  const campaignsWithImages = useMemo((): CampaignWithImages[] => {
+    if (galleryFilter !== 'posts') return [];
+
+    // Get campaign images (with campaign_id)
+    const campaignImages = eligibleImages.filter(img => img.campaign_id);
+
+    // Group by campaign_id
+    const grouped = new Map<string, GalleryImage[]>();
+    campaignImages.forEach(img => {
+      const existing = grouped.get(img.campaign_id!) || [];
+      grouped.set(img.campaign_id!, [...existing, img]);
+    });
+
+    // Map to CampaignWithImages format
+    return Array.from(grouped.entries())
+      .map(([campaignId, images]) => {
+        const campaignData = campaigns.find(c => c.id === campaignId);
+        return {
+          id: campaignId,
+          name: campaignData?.name || 'Campanha sem nome',
+          imageCount: images.length,
+          previewUrl: images[0]?.src || null,
+          images,
+        };
+      })
+      .sort((a, b) => b.imageCount - a.imageCount); // Most images first
+  }, [eligibleImages, galleryFilter, campaigns]);
 
   const handleSelectImage = (image: GalleryImage) => {
     // Pause video when changing selection
@@ -298,7 +340,17 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 pb-4">
-            {eligibleImages.length === 0 ? (
+            {/* Campaigns Accordion View */}
+            {galleryFilter === 'posts' ? (
+              <CampaignAccordion
+                campaigns={campaignsWithImages}
+                expandedId={expandedCampaignId}
+                onExpand={setExpandedCampaignId}
+                onSelectImage={handleSelectImage}
+                selectedImages={selectedImages}
+                isCarousel={isCarousel}
+              />
+            ) : eligibleImages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
                   <Icon name="image" className="w-8 h-8 text-white/20" />

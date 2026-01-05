@@ -78,10 +78,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? sql`SELECT * FROM brand_profiles WHERE organization_id = ${organizationId} AND deleted_at IS NULL LIMIT 1`
         : sql`SELECT * FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`,
 
-      // 2. Gallery Images (limited to 50 most recent)
+      // 2. Gallery Images (limited to 50 most recent) with campaign_id via JOIN
       isOrgContext
-        ? sql`SELECT * FROM gallery_images WHERE organization_id = ${organizationId} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50`
-        : sql`SELECT * FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50`,
+        ? sql`
+          SELECT gi.*, COALESCE(p.campaign_id, ac.campaign_id) as campaign_id
+          FROM gallery_images gi
+          LEFT JOIN posts p ON gi.post_id = p.id
+          LEFT JOIN ad_creatives ac ON gi.ad_creative_id = ac.id
+          WHERE gi.organization_id = ${organizationId} AND gi.deleted_at IS NULL
+          ORDER BY gi.created_at DESC LIMIT 50
+        `
+        : sql`
+          SELECT gi.*, COALESCE(p.campaign_id, ac.campaign_id) as campaign_id
+          FROM gallery_images gi
+          LEFT JOIN posts p ON gi.post_id = p.id
+          LEFT JOIN ad_creatives ac ON gi.ad_creative_id = ac.id
+          WHERE gi.user_id = ${resolvedUserId} AND gi.organization_id IS NULL AND gi.deleted_at IS NULL
+          ORDER BY gi.created_at DESC LIMIT 50
+        `,
 
       // 3. Scheduled Posts
       isOrgContext

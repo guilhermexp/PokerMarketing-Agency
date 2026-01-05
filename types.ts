@@ -147,6 +147,7 @@ export interface GalleryImage {
   post_id?: string;
   ad_creative_id?: string;
   video_script_id?: string;
+  campaign_id?: string;  // Derived from post_id or ad_creative_id via JOIN
   // Publishing status
   published_at?: string;  // ISO timestamp when published to Instagram
   // Timestamps
