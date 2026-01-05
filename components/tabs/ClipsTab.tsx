@@ -5405,6 +5405,14 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
           if (exactMatch) return exactMatch;
         }
 
+        // Priority 3: Fallback for legacy data - match by prompt (for thumbnails saved before video_script_id fix)
+        if (galleryImages && galleryImages.length > 0 && clip.image_prompt) {
+          const legacyMatch = galleryImages.find(
+            (img) => img.source === "Clipe" && !img.video_script_id && img.prompt === clip.image_prompt,
+          );
+          if (legacyMatch) return legacyMatch;
+        }
+
         // No thumbnail found - user will need to generate one
         return null;
       });
