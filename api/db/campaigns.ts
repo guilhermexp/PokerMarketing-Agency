@@ -274,7 +274,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      return res.status(201).json(campaign);
+      // Fetch all created entities with their IDs to return complete campaign
+      const [createdScripts, createdPosts, createdAds] = await Promise.all([
+        sql`SELECT * FROM video_clip_scripts WHERE campaign_id = ${campaign.id} ORDER BY sort_order ASC`,
+        sql`SELECT * FROM posts WHERE campaign_id = ${campaign.id} ORDER BY sort_order ASC`,
+        sql`SELECT * FROM ad_creatives WHERE campaign_id = ${campaign.id} ORDER BY sort_order ASC`,
+      ]);
+
+      return res.status(201).json({
+        ...campaign,
+        video_clip_scripts: createdScripts,
+        posts: createdPosts,
+        ad_creatives: createdAds,
+      });
     }
 
     // PUT - Update campaign

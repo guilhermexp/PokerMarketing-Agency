@@ -5,7 +5,7 @@ import { ScheduledPostCard } from "./ScheduledPostCard";
 interface WeeklyCalendarProps {
   currentDate: Date;
   scheduledPosts: ScheduledPost[];
-  onDayClick: (date: string) => void;
+  onDayClick: (date: string, hour?: number) => void;
   onUpdatePost: (postId: string, updates: Partial<ScheduledPost>) => void;
   onDeletePost: (postId: string) => void;
   onPublishToInstagram: (post: ScheduledPost) => void;
@@ -166,7 +166,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                     return (
                       <div
                         key={`${day.date}-${hour}`}
-                        onClick={() => !isPastSlot && onDayClick(day.date)}
+                        onClick={() => !isPastSlot && onDayClick(day.date, hour)}
                         className={`
                         min-h-[60px] p-1 border-b border-r border-white/5 last:border-r-0
                         transition-colors

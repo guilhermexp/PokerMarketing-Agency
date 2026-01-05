@@ -986,16 +986,39 @@ function AppContent() {
             })),
           });
 
-          // Update campaign with database ID
+          // Update campaign with database IDs (including clip/post/ad IDs for image linking)
           r.id = savedCampaign.id;
           r.name = campaignName;
           r.inputTranscript = input.transcript;
           r.createdAt = savedCampaign.created_at;
 
+          // Map database IDs to local state for video_script_id linking
+          if (savedCampaign.video_clip_scripts && savedCampaign.video_clip_scripts.length > 0) {
+            r.videoClipScripts = r.videoClipScripts.map((clip, index) => ({
+              ...clip,
+              id: savedCampaign.video_clip_scripts[index]?.id,
+            }));
+          }
+          if (savedCampaign.posts && savedCampaign.posts.length > 0) {
+            r.posts = r.posts.map((post, index) => ({
+              ...post,
+              id: savedCampaign.posts[index]?.id,
+            }));
+          }
+          if (savedCampaign.ad_creatives && savedCampaign.ad_creatives.length > 0) {
+            r.adCreatives = r.adCreatives.map((ad, index) => ({
+              ...ad,
+              id: savedCampaign.ad_creatives[index]?.id,
+            }));
+          }
+
           // Update SWR cache for campaigns list
           swrAddCampaign(savedCampaign);
 
-          console.log("[Campaign] Saved to database:", savedCampaign.id);
+          console.log("[Campaign] Saved to database with IDs:", savedCampaign.id,
+            "clips:", r.videoClipScripts.map(c => c.id),
+            "posts:", r.posts.map(p => p.id),
+            "ads:", r.adCreatives.map(a => a.id));
         } catch (saveError) {
           console.error("[Campaign] Failed to save to database:", saveError);
           // Continue even if save fails - campaign is still in memory
@@ -1126,6 +1149,21 @@ function AppContent() {
         mapDbEventToTournamentEvent,
       );
       setTournamentEvents(mappedEvents);
+
+      // Clear daily flyer state when switching schedules to avoid showing old flyers
+      setDailyFlyerState({
+        ALL: [],
+        MORNING: [],
+        AFTERNOON: [],
+        NIGHT: [],
+        HIGHLIGHTS: [],
+      });
+      hasRestoredDailyFlyersRef.current = false;
+
+      // Clear schedule-specific localStorage items for a fresh start
+      localStorage.removeItem("dailyFlyerMapping");
+      localStorage.removeItem("flyer_selectedDay");
+
       setCurrentScheduleId(schedule.id);
 
       // Check if this schedule is expired

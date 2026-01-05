@@ -2035,6 +2035,17 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     }
   }, [selectedDay, setFlyerState, setDailyFlyerState]);
 
+  // Reset selectedDay to current day when schedule changes
+  const prevScheduleIdRef = React.useRef(currentScheduleId);
+  useEffect(() => {
+    if (prevScheduleIdRef.current !== currentScheduleId && currentScheduleId) {
+      console.log(`[FlyerGenerator] Schedule changed from ${prevScheduleIdRef.current} to ${currentScheduleId}, resetting to today`);
+      const todayDayName = daysMap[new Date().getDay()];
+      setSelectedDay(todayDayName);
+      prevScheduleIdRef.current = currentScheduleId;
+    }
+  }, [currentScheduleId]);
+
   // Handler para quando uma imagem é selecionada como modelo (sincroniza UI e estado de geração)
   const handleSetStyleReference = (image: GalleryImage) => {
     setGlobalStyleReference(image);

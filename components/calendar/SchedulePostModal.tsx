@@ -8,6 +8,7 @@ interface SchedulePostModalProps {
   onSchedule: (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => void;
   galleryImages: GalleryImage[];
   initialDate?: string | null;
+  initialTime?: string | null;
   initialImage?: GalleryImage | null;
 }
 
@@ -38,6 +39,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   onSchedule,
   galleryImages,
   initialDate,
+  initialTime,
   initialImage
 }) => {
   const today = new Date();
@@ -69,8 +71,16 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       setHashtags('');
     }
   }, [isOpen, initialImage]);
+
+  // Update date/time when modal opens with initial values
+  useEffect(() => {
+    if (isOpen) {
+      if (initialDate) setScheduledDate(initialDate);
+      if (initialTime) setScheduledTime(initialTime);
+    }
+  }, [isOpen, initialDate, initialTime]);
   const [scheduledDate, setScheduledDate] = useState(initialDate || todayStr);
-  const [scheduledTime, setScheduledTime] = useState(getDefaultTime());
+  const [scheduledTime, setScheduledTime] = useState(initialTime || getDefaultTime());
   const [platforms] = useState<SchedulingPlatform>('instagram');
   const [contentType, setContentType] = useState<InstagramContentType>('photo');
   const [publishNow, setPublishNow] = useState(false);

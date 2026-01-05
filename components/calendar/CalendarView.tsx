@@ -36,10 +36,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onPublishToInstagram,
   publishingStates,
 }) => {
-  const [viewType, setViewType] = useState<CalendarViewType>("monthly");
+  const [viewType, setViewType] = useState<CalendarViewType>("weekly");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [showNotificationBanner, setShowNotificationBanner] = useState(false);
   const [pendingPosts, setPendingPosts] = useState<ScheduledPost[]>([]);
 
@@ -85,8 +86,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setCurrentDate(new Date());
   };
 
-  const handleDayClick = (date: string) => {
+  const handleDayClick = (date: string, hour?: number) => {
     setSelectedDate(date);
+    // Format hour as HH:00 if provided
+    setSelectedTime(hour !== undefined ? `${String(hour).padStart(2, "0")}:00` : null);
     setIsScheduleModalOpen(true);
   };
 
@@ -96,6 +99,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     onSchedulePost(post);
     setIsScheduleModalOpen(false);
     setSelectedDate(null);
+    setSelectedTime(null);
   };
 
   // Stats
@@ -358,10 +362,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           onClose={() => {
             setIsScheduleModalOpen(false);
             setSelectedDate(null);
+            setSelectedTime(null);
           }}
           onSchedule={handleSchedulePost}
           galleryImages={galleryImages}
           initialDate={selectedDate}
+          initialTime={selectedTime}
         />
       )}
     </div>
