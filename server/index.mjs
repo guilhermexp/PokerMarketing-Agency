@@ -292,13 +292,13 @@ const generateStructuredContent = async (model, parts, responseSchema, temperatu
 const generateTextWithOpenRouter = async (model, systemPrompt, userPrompt, temperature = 0.7) => {
   const openrouter = getOpenRouter();
 
-  const response = await openrouter.chat.completions.create({
+  const response = await openrouter.chat.send({
     model,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    response_format: { type: "json_object" },
+    responseFormat: { type: "json_object" },
     temperature,
   });
 
@@ -325,10 +325,10 @@ const generateTextWithOpenRouterVision = async (model, textParts, imageParts, te
     });
   }
 
-  const response = await openrouter.chat.completions.create({
+  const response = await openrouter.chat.send({
     model,
     messages: [{ role: "user", content }],
-    response_format: { type: "json_object" },
+    responseFormat: { type: "json_object" },
     temperature,
   });
 

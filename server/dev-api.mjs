@@ -2198,13 +2198,13 @@ const generateStructuredContent = async (model, parts, responseSchema, temperatu
 const generateTextWithOpenRouter = async (model, systemPrompt, userPrompt, temperature = 0.7) => {
   const openrouter = getOpenRouter();
 
-  const response = await openrouter.chat.completions.create({
+  const response = await openrouter.chat.send({
     model,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    response_format: { type: "json_object" },
+    responseFormat: { type: "json_object" },
     temperature,
   });
 
@@ -2231,10 +2231,10 @@ const generateTextWithOpenRouterVision = async (model, textParts, imageParts, te
     });
   }
 
-  const response = await openrouter.chat.completions.create({
+  const response = await openrouter.chat.send({
     model,
     messages: [{ role: "user", content }],
-    response_format: { type: "json_object" },
+    responseFormat: { type: "json_object" },
     temperature,
   });
 
@@ -2533,13 +2533,51 @@ app.post("/api/ai/campaign", async (req, res) => {
     let result;
 
     if (isOpenRouter) {
-      const textParts = [prompt];
+      // Add explicit JSON schema for OpenRouter models
+      const jsonSchemaPrompt = `${prompt}
+
+**FORMATO JSON OBRIGATÓRIO (siga EXATAMENTE esta estrutura):**
+\`\`\`json
+{
+  "videoClipScripts": [
+    {
+      "title": "Título do vídeo",
+      "hook": "Gancho inicial do vídeo",
+      "scenes": [
+        {"scene": 1, "visual": "descrição visual", "narration": "narração", "duration_seconds": 5}
+      ],
+      "image_prompt": "prompt para thumbnail",
+      "audio_script": "script de áudio completo"
+    }
+  ],
+  "posts": [
+    {
+      "platform": "Instagram|Facebook|Twitter|LinkedIn",
+      "content": "texto do post",
+      "hashtags": ["tag1", "tag2"],
+      "image_prompt": "descrição da imagem"
+    }
+  ],
+  "adCreatives": [
+    {
+      "platform": "Facebook|Google",
+      "headline": "título do anúncio",
+      "body": "corpo do anúncio",
+      "cta": "call to action",
+      "image_prompt": "descrição da imagem"
+    }
+  ]
+}
+\`\`\`
+Responda APENAS com o JSON válido, sem texto adicional.`;
+
+      const textParts = [jsonSchemaPrompt];
       const imageParts = productImages || [];
 
       if (imageParts.length > 0) {
         result = await generateTextWithOpenRouterVision(model, textParts, imageParts, 0.7);
       } else {
-        result = await generateTextWithOpenRouter(model, "", prompt, 0.7);
+        result = await generateTextWithOpenRouter(model, "", jsonSchemaPrompt, 0.7);
       }
     } else {
       const parts = [{ text: prompt }];
@@ -2555,7 +2593,47 @@ app.post("/api/ai/campaign", async (req, res) => {
       result = await generateStructuredContent(model, parts, campaignSchema, 0.7);
     }
 
-    const campaign = JSON.parse(result);
+    // Clean markdown code blocks if present
+    let cleanResult = result.trim();
+    if (cleanResult.startsWith("```json")) {
+      cleanResult = cleanResult.slice(7);
+    } else if (cleanResult.startsWith("```")) {
+      cleanResult = cleanResult.slice(3);
+    }
+    if (cleanResult.endsWith("```")) {
+      cleanResult = cleanResult.slice(0, -3);
+    }
+    cleanResult = cleanResult.trim();
+
+    const campaign = JSON.parse(cleanResult);
+
+    // Normalize field names (ensure arrays exist)
+    campaign.posts = campaign.posts || [];
+    campaign.adCreatives = campaign.adCreatives || campaign.ad_creatives || [];
+    campaign.videoClipScripts = campaign.videoClipScripts || campaign.video_clip_scripts || [];
+
+    // Validate videoClipScripts have required fields
+    campaign.videoClipScripts = campaign.videoClipScripts.filter(script =>
+      script && script.title && script.hook && script.scenes
+    ).map(script => ({
+      ...script,
+      title: script.title || "Sem título",
+      hook: script.hook || "",
+      scenes: script.scenes || [],
+      image_prompt: script.image_prompt || "",
+      audio_script: script.audio_script || ""
+    }));
+
+    // Debug: log structure for troubleshooting
+    console.log("[Campaign API] Campaign structure:", {
+      hasPosts: !!campaign.posts,
+      postsIsArray: Array.isArray(campaign.posts),
+      postsCount: campaign.posts?.length,
+      hasAdCreatives: !!campaign.adCreatives,
+      adCreativesCount: campaign.adCreatives?.length,
+      hasVideoScripts: !!campaign.videoClipScripts,
+      videoScriptsCount: campaign.videoClipScripts?.length
+    });
 
     console.log("[Campaign API] Campaign generated successfully");
 

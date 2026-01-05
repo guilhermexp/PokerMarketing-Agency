@@ -71,6 +71,7 @@ export interface MarketingCampaign {
   adCreatives: AdCreative[];
   createdAt?: string;             // ISO timestamp
   updatedAt?: string;             // ISO timestamp
+  generatedWithModel?: string;    // AI model used to generate
 }
 
 // Summary for campaigns list

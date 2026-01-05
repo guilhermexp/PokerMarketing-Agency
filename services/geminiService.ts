@@ -62,7 +62,11 @@ export const generateCampaign = async (
     inspirationImages: input.inspirationImages,
   });
 
-  return response.campaign;
+  // Include the model used for generation
+  return {
+    ...response.campaign,
+    generatedWithModel: response.model,
+  };
 };
 
 // Helper to build campaign prompt
