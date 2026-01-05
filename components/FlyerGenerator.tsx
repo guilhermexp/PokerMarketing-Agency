@@ -657,7 +657,7 @@ const TournamentEventCard: React.FC<{
           isOpen={!!scheduleFlyer}
           onClose={() => setScheduleFlyer(null)}
           galleryImages={galleryImages}
-          onSchedulePost={onSchedulePost}
+          onSchedule={onSchedulePost}
           initialImage={scheduleFlyer}
         />
       )}
@@ -1095,7 +1095,7 @@ const PeriodCardRow: React.FC<{
           isOpen={!!scheduleFlyer}
           onClose={() => setScheduleFlyer(null)}
           galleryImages={galleryImages}
-          onSchedulePost={onSchedulePost}
+          onSchedule={onSchedulePost}
           initialImage={scheduleFlyer}
         />
       )}
@@ -1549,7 +1549,7 @@ const PeriodCard: React.FC<{
           isOpen={!!scheduleFlyer}
           onClose={() => setScheduleFlyer(null)}
           galleryImages={galleryImages}
-          onSchedulePost={onSchedulePost}
+          onSchedule={onSchedulePost}
           initialImage={scheduleFlyer}
         />
       )}

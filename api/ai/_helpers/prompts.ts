@@ -188,13 +188,20 @@ ${quantityInstructions}
    - TODOS os image_prompts devem estar relacionados ao CONTEÚDO ORIGINAL fornecido acima
    - Não invente temas novos - extraia elementos visuais do conteúdo solicitado
 
-3. **ESPECIFICAÇÕES POR PLATAFORMA:**
+3. **ESPECIFICAÇÕES POR PLATAFORMA (POSTS):**
    - **Instagram**: Visuais impactantes, narrativos, com elementos que chamam atenção no feed (1:1)
    - **Facebook**: Visuais versáteis e informativos, com destaque para textos/valores importantes
    - **Twitter**: Visuais concisos e diretos, que complementam mensagens curtas
    - **LinkedIn**: Visuais profissionais e corporativos, tom executivo
 
-4. **ELEMENTOS OBRIGATÓRIOS NO IMAGE_PROMPT:**
+4. **ESPECIFICAÇÕES PARA AD CREATIVES (ANÚNCIOS):**
+   - **Facebook Ads**: Visual que DESTACA o headline e o CTA, com imagem impactante e texto legível
+   - **Google Ads**: Visual limpo, profissional, com foco no produto/serviço e CTA claro
+   - O image_prompt do ad DEVE refletir a mensagem do headline + body
+   - Incluir elementos visuais que reforcem o CTA (call-to-action)
+   - Anúncios devem ser visualmente distintos de posts orgânicos (mais comerciais)
+
+5. **ELEMENTOS OBRIGATÓRIOS NO IMAGE_PROMPT:**
    - Mencionar cores da marca (${brandProfile.primaryColor}, ${brandProfile.secondaryColor})
    - Incluir o nome/logo "${brandProfile.name}" quando apropriado
    - Estilo cinematográfico, luxuoso e premium
