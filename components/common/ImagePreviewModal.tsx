@@ -129,6 +129,56 @@ const ImageUploader: React.FC<{
     );
 };
 
+// Minimal version of ImageUploader for AI Studio
+const MinimalImageUploader: React.FC<{
+    image: ImageFile | null;
+    onImageChange: (image: ImageFile | null) => void;
+}> = ({ image, onImageChange }) => {
+    const onDrop = useCallback(async (acceptedFiles: File[]) => {
+        if (acceptedFiles.length > 0) {
+            try {
+                const imageData = await fileToImageFile(acceptedFiles[0]);
+                onImageChange(imageData);
+            } catch (e) {
+                console.error("Error processing file:", e);
+            }
+        }
+    }, [onImageChange]);
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: { 'image/*': [] },
+        multiple: false,
+    });
+
+    return (
+        <div
+            {...getRootProps()}
+            className={`relative border border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+                isDragActive ? 'border-white/20 bg-white/[0.02]' : 'border-white/[0.08] hover:border-white/15'
+            }`}
+        >
+            <input {...getInputProps()} />
+            {image ? (
+                <div className="relative">
+                    <img src={image.preview} alt="Ref" className="max-h-20 mx-auto rounded-lg" />
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onImageChange(null); }}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+                    >
+                        <Icon name="x" className="w-2.5 h-2.5 text-white/60" />
+                    </button>
+                </div>
+            ) : (
+                <div className="text-white/20">
+                    <Icon name="upload" className="w-5 h-5 mx-auto mb-1.5" />
+                    <p className="text-[10px]">Arraste ou clique</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
 
 export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   image,
@@ -367,81 +417,73 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center z-[60] p-3 md:p-6"
+      className="fixed inset-0 bg-black/95 flex items-center justify-center z-[60] p-3 md:p-6"
       onClick={onClose}
     >
-      {/* Main Container - Much larger */}
+      {/* Main Container */}
       <div
-        className="bg-[#080808] rounded-3xl shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden border border-white/[0.08] relative"
+        className="bg-[#0a0a0a] rounded-2xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden border border-white/[0.06] relative"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          boxShadow: '0 0 120px rgba(0,0,0,0.8), 0 0 60px rgba(251,146,60,0.05)'
-        }}
       >
-        {/* Floating Header Bar */}
-        <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between">
-          {/* Left - Logo/Title */}
-          <div className="flex items-center gap-3 bg-black/60 backdrop-blur-xl rounded-2xl px-4 py-2.5 border border-white/10">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-orange-600 flex items-center justify-center shadow-lg shadow-primary/30">
-              <Icon name="zap" className="w-4 h-4 text-black" />
+        {/* Minimal Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+          {/* Left - Title */}
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Icon name="zap" className="w-3.5 h-3.5 text-primary" />
             </div>
-            <div>
-              <h2 className="text-xs font-black text-white uppercase tracking-wider">AI Studio</h2>
-              <p className="text-[9px] text-white/40 font-medium">Editor de Imagem</p>
-            </div>
+            <span className="text-xs font-bold text-white/70">AI Studio</span>
           </div>
 
           {/* Center - Quick Actions */}
-          <div className="hidden lg:flex items-center gap-1.5 bg-black/60 backdrop-blur-xl rounded-2xl p-1.5 border border-white/10">
+          <div className="hidden lg:flex items-center gap-1">
             {onQuickPost && (
               <button
                 onClick={() => { onQuickPost(image); onClose(); }}
-                className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 rounded-xl text-black font-bold text-[10px] uppercase tracking-wide transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 rounded-lg text-primary font-semibold text-[10px] transition-all"
               >
-                <Icon name="zap" className="w-3.5 h-3.5" />
+                <Icon name="zap" className="w-3 h-3" />
                 QuickPost
               </button>
             )}
             {onSchedulePost && (
               <button
                 onClick={() => { onSchedulePost(image); onClose(); }}
-                className="flex items-center gap-2 px-4 py-2 hover:bg-white/10 rounded-xl text-white/70 hover:text-white font-bold text-[10px] uppercase tracking-wide transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 rounded-lg text-white/50 hover:text-white/70 font-medium text-[10px] transition-all"
               >
-                <Icon name="calendar" className="w-3.5 h-3.5" />
+                <Icon name="calendar" className="w-3 h-3" />
                 Agendar
               </button>
             )}
             {onPublish && (
               <button
                 onClick={() => { onPublish(image); onClose(); }}
-                className="flex items-center gap-2 px-4 py-2 hover:bg-white/10 rounded-xl text-white/70 hover:text-white font-bold text-[10px] uppercase tracking-wide transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 rounded-lg text-white/50 hover:text-white/70 font-medium text-[10px] transition-all"
               >
-                <Icon name="users" className="w-3.5 h-3.5" />
+                <Icon name="users" className="w-3 h-3" />
                 Campanha
               </button>
             )}
           </div>
 
-          {/* Right - Utility Actions */}
-          <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-xl rounded-2xl p-1.5 border border-white/10">
+          {/* Right - Utility */}
+          <div className="flex items-center gap-1">
             <button
               onClick={handleUseInChat}
-              className="hidden md:flex items-center gap-2 px-3 py-2 hover:bg-white/10 rounded-xl text-white/50 hover:text-white font-medium text-[10px] uppercase tracking-wide transition-all"
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-white/5 rounded-lg text-white/40 hover:text-white/60 text-[10px] transition-all"
             >
-              <Icon name="paperclip" className="w-3.5 h-3.5" />
-              Assistente
+              <Icon name="paperclip" className="w-3 h-3" />
+              Chat
             </button>
             <button
               onClick={handleDownload}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-white/10 rounded-xl text-white/50 hover:text-white font-medium text-[10px] uppercase tracking-wide transition-all"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-white/5 rounded-lg text-white/40 hover:text-white/60 text-[10px] transition-all"
             >
-              <Icon name="download" className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Download</span>
+              <Icon name="download" className="w-3 h-3" />
             </button>
-            <div className="w-px h-6 bg-white/10 mx-1" />
             <button
               onClick={onClose}
-              className="w-9 h-9 flex items-center justify-center hover:bg-white/10 rounded-xl text-white/40 hover:text-white transition-all"
+              className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-lg text-white/30 hover:text-white/60 transition-all ml-1"
               aria-label="Fechar"
             >
               <Icon name="x" className="w-4 h-4" />
@@ -450,43 +492,23 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-grow flex flex-col lg:flex-row overflow-hidden pt-20">
-          {/* Canvas Area - Hero Section */}
-          <div ref={containerRef} className="relative flex-1 flex items-center justify-center p-6 lg:p-12 overflow-hidden">
-            {/* Ambient Background Glow */}
-            <div className="absolute inset-0 bg-gradient-radial from-white/[0.02] via-transparent to-transparent pointer-events-none" />
-
-            {/* Grid Pattern Background */}
-            <div
-              className="absolute inset-0 opacity-[0.03]"
-              style={{
-                backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-                backgroundSize: '40px 40px'
-              }}
-            />
-
+        <div className="flex-grow flex flex-col lg:flex-row overflow-hidden">
+          {/* Canvas Area */}
+          <div ref={containerRef} className="relative flex-1 flex flex-col items-center justify-center p-6 lg:p-10 overflow-hidden bg-[#080808]">
             {/* Canvas/Video Container */}
-            <div className="relative w-full h-full flex items-center justify-center">
+            <div className="relative flex-1 w-full flex items-center justify-center">
               {isVideo ? (
-                /* Video Player */
                 <video
                   src={image.src}
                   controls
                   autoPlay
                   className="max-w-full max-h-full object-contain rounded-lg"
-                  style={{
-                    boxShadow: '0 25px 80px rgba(0,0,0,0.6), 0 0 1px rgba(255,255,255,0.1)'
-                  }}
                 />
               ) : (
-                /* Image Canvas for editing */
                 <>
                   <canvas
                     ref={imageCanvasRef}
-                    className="absolute max-w-full max-h-full object-contain rounded-lg"
-                    style={{
-                      boxShadow: '0 25px 80px rgba(0,0,0,0.6), 0 0 1px rgba(255,255,255,0.1)'
-                    }}
+                    className="absolute max-w-full max-h-full object-contain rounded-lg shadow-2xl"
                   />
                   <canvas
                     ref={maskCanvasRef}
@@ -500,87 +522,46 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                     onTouchEnd={stopDrawing}
                   />
 
-                  {/* Brush Hint */}
-                  {!isDrawing && !isActionRunning && (
-                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-xl px-5 py-3 rounded-2xl border border-white/10 flex items-center gap-3 pointer-events-none">
-                      <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center">
-                        <Icon name="edit" className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-semibold text-white/80">Modo de Pintura</p>
-                        <p className="text-[10px] text-white/40">Desenhe para marcar a área de edição</p>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Processing Overlay */}
                   {isActionRunning && (
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center z-20 rounded-lg">
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-pulse" />
-                        <Loader className="w-16 h-16 mb-6 relative z-10" />
-                      </div>
-                      <p className="text-lg font-bold text-white mb-2">Processando...</p>
-                      <p className="text-sm text-white/50">A IA está trabalhando na sua edição</p>
+                    <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-20 rounded-lg">
+                      <Loader className="w-10 h-10 mb-4" />
+                      <p className="text-sm font-medium text-white/80">Processando...</p>
                     </div>
                   )}
                 </>
               )}
             </div>
+
+            {/* Hint - Below image */}
+            {!isVideo && !isActionRunning && (
+              <div className="mt-4 flex items-center gap-2 text-white/30">
+                <Icon name="edit" className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="text-[10px]">Desenhe para marcar a área desejada, escreva sua alteração e clique em Editar com IA</span>
+              </div>
+            )}
           </div>
 
-          {/* Sidebar - Control Panel */}
-          <div className="w-full lg:w-[380px] flex-shrink-0 bg-gradient-to-b from-[#0c0c0c] to-[#080808] flex flex-col border-t lg:border-t-0 lg:border-l border-white/[0.06] overflow-hidden">
-            <div className="flex-grow overflow-y-auto p-6 space-y-6">
+          {/* Sidebar - Minimal */}
+          <div className="w-full lg:w-[320px] flex-shrink-0 bg-[#0a0a0a] flex flex-col border-t lg:border-t-0 lg:border-l border-white/[0.06]">
+            <div className="flex-grow overflow-y-auto p-5 space-y-5">
               {isVideo ? (
-                /* Video Info Section */
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                      <Icon name="video" className="w-3 h-3 text-blue-400" />
-                    </div>
-                    <label className="text-[11px] font-black text-white/60 uppercase tracking-[0.15em]">Informações do Vídeo</label>
-                  </div>
-                  <div className="bg-black/40 border border-white/[0.08] rounded-2xl p-4 space-y-3">
-                    <div>
-                      <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Fonte</p>
-                      <p className="text-sm text-white/80 font-medium">{image.source}</p>
-                    </div>
-                    {image.model && (
-                      <div>
-                        <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Modelo</p>
-                        <p className="text-sm text-white/80 font-medium">{image.model}</p>
-                      </div>
-                    )}
-                    {image.prompt && (
-                      <div>
-                        <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Prompt</p>
-                        <p className="text-xs text-white/60 leading-relaxed">{image.prompt}</p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-start gap-3 px-1 py-2 bg-white/[0.02] rounded-xl">
-                    <Icon name="info" className="w-4 h-4 text-blue-400/60 mt-0.5 flex-shrink-0" />
-                    <p className="text-[11px] text-white/40 leading-relaxed">
-                      <span className="text-white/60 font-semibold">Dica:</span> Use os controles do player para navegar pelo vídeo.
-                    </p>
+                <section className="space-y-3">
+                  <label className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">Informações</label>
+                  <div className="space-y-2 text-xs text-white/60">
+                    <p><span className="text-white/30">Fonte:</span> {image.source}</p>
+                    {image.model && <p><span className="text-white/30">Modelo:</span> {image.model}</p>}
                   </div>
                 </section>
               ) : (
-                /* Image Editing Section */
                 <>
-                  <section className="space-y-4">
+                  <section className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center">
-                          <Icon name="zap" className="w-3 h-3 text-primary" />
-                        </div>
-                        <label className="text-[11px] font-black text-white/60 uppercase tracking-[0.15em]">Prompt de Edição</label>
-                      </div>
+                      <label className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">Edição</label>
                       {editPrompt && (
                         <button
                           onClick={() => setEditPrompt('')}
-                          className="text-[10px] font-bold text-primary/70 hover:text-primary transition-colors uppercase tracking-wider"
+                          className="text-[9px] text-white/30 hover:text-white/50 transition-colors"
                         >
                           Limpar
                         </button>
@@ -589,127 +570,88 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                     <textarea
                       value={editPrompt}
                       onChange={(e) => setEditPrompt(e.target.value)}
-                      rows={5}
-                      className="w-full bg-black/40 border border-white/[0.08] rounded-2xl p-4 text-sm text-white focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all resize-none placeholder:text-white/20 leading-relaxed"
-                      placeholder="Descreva o que deseja alterar na imagem...
-
-Ex: 'Substitua o fundo por um cenário luxuoso' ou 'Adicione efeitos de luz neon'"
+                      rows={4}
+                      className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 text-sm text-white/80 focus:border-white/10 focus:outline-none transition-all resize-none placeholder:text-white/20"
+                      placeholder="Descreva a edição desejada..."
                     />
-                    <div className="flex items-start gap-3 px-1 py-2 bg-white/[0.02] rounded-xl">
-                      <Icon name="zap" className="w-4 h-4 text-primary/60 mt-0.5 flex-shrink-0" />
-                      <p className="text-[11px] text-white/40 leading-relaxed">
-                        <span className="text-white/60 font-semibold">Dica:</span> Pinte na imagem para indicar áreas específicas. A IA focará nessas regiões.
-                      </p>
-                    </div>
                   </section>
 
-                  <section>
-                    <ImageUploader image={referenceImage} onImageChange={setReferenceImage} title="Referência Visual" />
+                  <section className="space-y-3">
+                    <label className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">Referência</label>
+                    <MinimalImageUploader image={referenceImage} onImageChange={setReferenceImage} />
                   </section>
                 </>
               )}
 
-              {/* Error Display */}
               {error && (
-                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex gap-3 animate-shake">
-                  <div className="w-8 h-8 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
-                    <Icon name="alert-circle" className="w-4 h-4 text-red-400" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-red-400 mb-1">Erro na Edição</p>
-                    <p className="text-[11px] text-red-400/70 leading-relaxed">{error}</p>
-                  </div>
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+                  <p className="text-[11px] text-red-400">{error}</p>
                 </div>
               )}
             </div>
 
-            {/* Bottom Actions */}
-            <div className="p-6 border-t border-white/[0.06] bg-black/40 space-y-3">
-              {!isVideo && (
-                <>
-                  {/* Secondary Actions */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={clearMask}
-                      disabled={isActionRunning}
-                      className="h-11 px-4 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl text-[10px] font-bold text-white/50 hover:text-white/80 uppercase tracking-wider transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      <Icon name="x" className="w-3.5 h-3.5" />
-                      Limpar Pintura
-                    </button>
-                    <button
-                      onClick={handleRemoveBackground}
-                      disabled={isActionRunning}
-                      className="h-11 px-4 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl text-[10px] font-bold text-white/50 hover:text-white/80 uppercase tracking-wider transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {isRemovingBackground ? (
-                        <Loader className="w-3.5 h-3.5" />
-                      ) : (
-                        <Icon name="scissors" className="w-3.5 h-3.5" />
-                      )}
-                      <span>Remover BG</span>
-                    </button>
-                  </div>
+            {/* Bottom Actions - Minimal */}
+            {!isVideo && (
+              <div className="p-5 border-t border-white/[0.06] space-y-2">
+                <div className="flex gap-2">
+                  <button
+                    onClick={clearMask}
+                    disabled={isActionRunning}
+                    className="flex-1 h-9 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
+                  >
+                    <Icon name="x" className="w-3 h-3" />
+                    Limpar
+                  </button>
+                  <button
+                    onClick={handleRemoveBackground}
+                    disabled={isActionRunning}
+                    className="flex-1 h-9 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
+                  >
+                    {isRemovingBackground ? <Loader className="w-3 h-3" /> : <Icon name="scissors" className="w-3 h-3" />}
+                    Remove BG
+                  </button>
+                </div>
 
-                  {/* Primary Action */}
-                  <button
-                    onClick={handleEdit}
-                    disabled={!editPrompt.trim() || isActionRunning}
-                    className="w-full h-14 bg-gradient-to-r from-primary to-orange-500 hover:from-primary/90 hover:to-orange-500/90 disabled:from-white/5 disabled:to-white/5 disabled:text-white/20 rounded-2xl text-sm font-black text-black disabled:cursor-not-allowed uppercase tracking-wider transition-all flex items-center justify-center gap-3 shadow-lg shadow-primary/20 disabled:shadow-none"
-                  >
-                    {isEditing ? (
-                      <>
-                        <Loader className="w-5 h-5" />
-                        <span>Processando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Icon name="zap" className="w-5 h-5" />
-                        <span>Aplicar Edição Mágica</span>
-                      </>
-                    )}
-                  </button>
-                </>
-              )}
-
-              {/* Mobile Quick Actions */}
-              <div className="lg:hidden grid grid-cols-3 gap-2 pt-2">
-                {onQuickPost && (
-                  <button
-                    onClick={() => { onQuickPost(image); onClose(); }}
-                    className="h-10 bg-primary/20 hover:bg-primary/30 rounded-xl text-[9px] font-bold text-primary uppercase tracking-wide transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <Icon name="zap" className="w-3 h-3" />
-                    Post
-                  </button>
-                )}
-                {onSchedulePost && (
-                  <button
-                    onClick={() => { onSchedulePost(image); onClose(); }}
-                    className="h-10 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-bold text-white/60 uppercase tracking-wide transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <Icon name="calendar" className="w-3 h-3" />
-                    Agendar
-                  </button>
-                )}
-                {onPublish && (
-                  <button
-                    onClick={() => { onPublish(image); onClose(); }}
-                    className="h-10 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-bold text-white/60 uppercase tracking-wide transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <Icon name="users" className="w-3 h-3" />
-                    Camp.
-                  </button>
-                )}
+                <button
+                  onClick={handleEdit}
+                  disabled={!editPrompt.trim() || isActionRunning}
+                  className="w-full h-11 bg-primary hover:bg-primary/90 disabled:bg-white/[0.03] disabled:text-white/20 rounded-xl text-xs font-bold text-black disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                >
+                  {isEditing ? (
+                    <>
+                      <Loader className="w-4 h-4" />
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="zap" className="w-4 h-4" />
+                      Editar com IA
+                    </>
+                  )}
+                </button>
               </div>
+            )}
 
-              {/* Close Link */}
-              <button
-                onClick={onClose}
-                className="w-full py-3 text-[10px] font-bold text-white/20 hover:text-white/40 transition-colors uppercase tracking-[0.2em]"
-              >
-                Pressione ESC para fechar
-              </button>
+            {/* Mobile Quick Actions */}
+            <div className="lg:hidden flex gap-2 p-5 pt-0">
+              {onQuickPost && (
+                <button
+                  onClick={() => { onQuickPost(image); onClose(); }}
+                  className="flex-1 h-9 bg-primary/10 hover:bg-primary/20 rounded-lg text-[9px] font-semibold text-primary transition-all flex items-center justify-center gap-1"
+                >
+                  <Icon name="zap" className="w-3 h-3" />
+                  Post
+                </button>
+              )}
+              {onSchedulePost && (
+                <button
+                  onClick={() => { onSchedulePost(image); onClose(); }}
+                  className="flex-1 h-9 bg-white/[0.03] hover:bg-white/[0.06] rounded-lg text-[9px] font-medium text-white/50 transition-all flex items-center justify-center gap-1"
+                >
+                  <Icon name="calendar" className="w-3 h-3" />
+                  Agendar
+                </button>
+              )}
             </div>
           </div>
         </div>
