@@ -714,6 +714,7 @@ export interface DbWeekSchedule {
   end_date: string;
   filename: string | null;
   original_filename: string | null;
+  daily_flyer_urls?: Record<string, string[]>;
   created_at: string;
   updated_at: string;
 }

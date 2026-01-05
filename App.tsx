@@ -532,9 +532,11 @@ function AppContent() {
       const startDate = parseDateOnly(schedule.start_date);
       const endDateInfo = parseDateOnly(schedule.end_date);
       setWeekScheduleInfo({
+        id: schedule.id,
         startDate: `${String(startDate.getDate()).padStart(2, "0")}/${String(startDate.getMonth() + 1).padStart(2, "0")}`,
         endDate: `${String(endDateInfo.getDate()).padStart(2, "0")}/${String(endDateInfo.getMonth() + 1).padStart(2, "0")}`,
         filename: schedule.filename || "Planilha carregada",
+        daily_flyer_urls: schedule.daily_flyer_urls,
       });
     }
   }, [swrTournamentSchedule]);
@@ -1161,9 +1163,11 @@ function AppContent() {
       const startDate = parseDateOnly(schedule.start_date);
       const endDateInfo = parseDateOnly(schedule.end_date);
       setWeekScheduleInfo({
+        id: schedule.id,
         startDate: `${String(startDate.getDate()).padStart(2, "0")}/${String(startDate.getMonth() + 1).padStart(2, "0")}`,
         endDate: `${String(endDateInfo.getDate()).padStart(2, "0")}/${String(endDateInfo.getMonth() + 1).padStart(2, "0")}`,
         filename: schedule.filename || "Planilha carregada",
+        daily_flyer_urls: schedule.daily_flyer_urls,
       });
 
       console.log(

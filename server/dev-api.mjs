@@ -476,6 +476,7 @@ app.get("/api/db/init", async (req, res) => {
             start_date: tournamentData.start_date,
             end_date: tournamentData.end_date,
             filename: tournamentData.filename,
+            daily_flyer_urls: tournamentData.daily_flyer_urls || {},
             created_at: tournamentData.created_at,
             updated_at: tournamentData.updated_at,
           }
