@@ -25,4 +25,24 @@ root.render(
   </React.StrictMode>,
 );
 
-registerSW({ immediate: true });
+// Register service worker with auto-update
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    // Auto-reload when new version is available
+    console.log('[PWA] Nova versão disponível, recarregando...');
+    updateSW(true);
+  },
+  onOfflineReady() {
+    console.log('[PWA] App pronto para uso offline');
+  },
+  onRegistered(registration) {
+    console.log('[PWA] Service Worker registrado');
+    // Check for updates every 5 minutes
+    if (registration) {
+      setInterval(() => {
+        registration.update();
+      }, 5 * 60 * 1000);
+    }
+  },
+});

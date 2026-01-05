@@ -99,6 +99,13 @@ export default defineConfig(({ mode }) => {
         workbox: {
           navigateFallback: "/index.html",
           globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff2}"],
+          // Force immediate update - don't wait for user to close all tabs
+          skipWaiting: true,
+          clientsClaim: true,
+          // Clean old caches on update
+          cleanupOutdatedCaches: true,
+          // Add cache busting - use revision based on build time
+          additionalManifestEntries: [],
         },
         devOptions: {
           enabled: true,
