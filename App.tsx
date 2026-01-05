@@ -386,15 +386,10 @@ function AppContent() {
   const [flyerState, setFlyerState] = useState<
     Record<string, (GalleryImage | "loading")[]>
   >({});
+  // Daily flyer state: { DAY: { PERIOD: [flyers] } }
   const [dailyFlyerState, setDailyFlyerState] = useState<
-    Record<TimePeriod, (GalleryImage | "loading")[]>
-  >({
-    ALL: [],
-    MORNING: [],
-    AFTERNOON: [],
-    NIGHT: [],
-    HIGHLIGHTS: [],
-  });
+    Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>
+  >({});
 
   const [theme, setTheme] = useState<Theme>("dark");
   const [styleReferences, setStyleReferences] = useState<StyleReference[]>([]);

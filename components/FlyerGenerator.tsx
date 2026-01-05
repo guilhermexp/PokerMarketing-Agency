@@ -52,9 +52,9 @@ interface FlyerGeneratorProps {
   setFlyerState: React.Dispatch<
     React.SetStateAction<Record<string, (GalleryImage | "loading")[]>>
   >;
-  dailyFlyerState: Record<TimePeriod, (GalleryImage | "loading")[]>;
+  dailyFlyerState: Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>;
   setDailyFlyerState: React.Dispatch<
-    React.SetStateAction<Record<TimePeriod, (GalleryImage | "loading")[]>>
+    React.SetStateAction<Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>>
   >;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
@@ -1071,7 +1071,7 @@ const PeriodCardRow: React.FC<{
           </div>
           <div>
             <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider block mb-1">
-              Período
+              Período • <span className="text-white/50">{dayInfo}</span>
             </span>
             <span className="text-sm font-semibold text-white">
               {period === "ALL"
@@ -2143,24 +2143,14 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     }
   }, [selectedStyleReference]);
 
-  // Clear generated flyers when day changes
+  // Track selected day (no longer clearing flyers - each day has its own state now)
   const prevSelectedDayRef = React.useRef(selectedDay);
   useEffect(() => {
     if (prevSelectedDayRef.current !== selectedDay) {
-      console.log(`[FlyerGenerator] Day changed from ${prevSelectedDayRef.current} to ${selectedDay}, clearing flyers`);
-      // Clear individual event flyers
-      setFlyerState({});
-      // Clear period flyers
-      setDailyFlyerState({
-        ALL: [],
-        MORNING: [],
-        AFTERNOON: [],
-        NIGHT: [],
-        HIGHLIGHTS: [],
-      });
+      console.log(`[FlyerGenerator] Day changed from ${prevSelectedDayRef.current} to ${selectedDay}`);
       prevSelectedDayRef.current = selectedDay;
     }
-  }, [selectedDay, setFlyerState, setDailyFlyerState]);
+  }, [selectedDay]);
 
   // Reset selectedDay to current day when schedule changes
   const prevScheduleIdRef = React.useRef(currentScheduleId);
@@ -2196,33 +2186,50 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   }, [events, setFlyerState]);
 
   // Recover daily flyers from database when schedule info changes
+  // TODO: Update backend to store flyers by day+period to enable proper recovery
   useEffect(() => {
     if (weekScheduleInfo?.daily_flyer_urls) {
       const dailyUrls = weekScheduleInfo.daily_flyer_urls;
-      const newDailyState: Record<string, GalleryImage[]> = {};
 
-      (["MORNING", "AFTERNOON", "NIGHT", "HIGHLIGHTS", "ALL"] as TimePeriod[]).forEach((period) => {
-        const urls = dailyUrls[period];
-        if (urls && urls.length > 0) {
-          newDailyState[period] = urls.map((url, idx) => ({
-            id: `recovered-daily-${period}-${idx}`,
-            src: url,
-            prompt: "",
-            source: "Flyer Diário",
-            model: "gemini-3-pro-image-preview" as const,
-            week_schedule_id: weekScheduleInfo.id,
-            daily_flyer_period: period,
+      // Check if the data has the new structure (by day) or old structure (by period only)
+      const firstKey = Object.keys(dailyUrls)[0];
+      const isNewStructure = firstKey && dayOrder.includes(firstKey);
+
+      if (isNewStructure) {
+        // New structure: { DAY: { PERIOD: [urls] } }
+        const newDailyState: Record<string, Record<string, GalleryImage[]>> = {};
+
+        dayOrder.forEach((day) => {
+          const dayData = dailyUrls[day];
+          if (dayData && typeof dayData === 'object') {
+            newDailyState[day] = {};
+            (["MORNING", "AFTERNOON", "NIGHT", "HIGHLIGHTS", "ALL"] as TimePeriod[]).forEach((period) => {
+              const urls = dayData[period];
+              if (urls && Array.isArray(urls) && urls.length > 0) {
+                newDailyState[day][period] = urls.map((url: string, idx: number) => ({
+                  id: `recovered-daily-${day}-${period}-${idx}`,
+                  src: url,
+                  prompt: "",
+                  source: "Flyer Diário",
+                  model: "gemini-3-pro-image-preview" as const,
+                  week_schedule_id: weekScheduleInfo.id,
+                  daily_flyer_period: period,
+                  daily_flyer_day: day,
+                }));
+              }
+            });
+          }
+        });
+
+        if (Object.keys(newDailyState).length > 0) {
+          console.log("[FlyerGenerator] Recovered daily flyers (new structure) from database:", Object.keys(newDailyState));
+          setDailyFlyerState((prev) => ({
+            ...prev,
+            ...newDailyState,
           }));
         }
-      });
-
-      if (Object.keys(newDailyState).length > 0) {
-        console.log("[FlyerGenerator] Recovered daily flyers from database:", Object.keys(newDailyState));
-        setDailyFlyerState((prev) => ({
-          ...prev,
-          ...newDailyState,
-        }));
       }
+      // Old structure is ignored to prevent mixing flyers between days
     }
   }, [weekScheduleInfo, setDailyFlyerState]);
 
@@ -2769,13 +2776,17 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 size="small"
                 onClick={() => {
                   setIsBatchGenerating(true);
-                  setDailyFlyerState({
-                    ALL: [],
-                    MORNING: [],
-                    AFTERNOON: [],
-                    NIGHT: [],
-                    HIGHLIGHTS: [],
-                  });
+                  // Clear only the current day's flyers
+                  setDailyFlyerState(prev => ({
+                    ...prev,
+                    [selectedDay]: {
+                      ALL: [],
+                      MORNING: [],
+                      AFTERNOON: [],
+                      NIGHT: [],
+                      HIGHLIGHTS: [],
+                    }
+                  }));
                   setBatchTrigger(true);
                   setTimeout(() => {
                     setBatchTrigger(false);
@@ -3081,9 +3092,15 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   onAddImageToGallery={onAddImageToGallery}
                   onUpdateGalleryImage={onUpdateGalleryImage}
                   onSetChatReference={onSetChatReference}
-                  generatedFlyers={dailyFlyerState[p]}
+                  generatedFlyers={dailyFlyerState[selectedDay]?.[p] || []}
                   setGeneratedFlyers={(u) =>
-                    setDailyFlyerState((prev) => ({ ...prev, [p]: u(prev[p]) }))
+                    setDailyFlyerState((prev) => ({
+                      ...prev,
+                      [selectedDay]: {
+                        ...(prev[selectedDay] || { ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: [] }),
+                        [p]: u(prev[selectedDay]?.[p] || [])
+                      }
+                    }))
                   }
                   triggerBatch={batchTrigger}
                   styleReference={globalStyleReference}
