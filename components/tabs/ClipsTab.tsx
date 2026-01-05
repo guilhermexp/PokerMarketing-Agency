@@ -2447,6 +2447,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         });
 
         console.log("[ClipsTab] Video saved to gallery:", videoUrl);
+
+        // Update preview to use remote URL (blob URL may become invalid)
+        URL.revokeObjectURL(previewUrl);
+        setMergedVideoUrl(videoUrl);
       } catch (uploadError) {
         console.error(
           "[ClipsTab] Failed to upload video to gallery:",
@@ -4526,13 +4530,28 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                         </div>
                       </div>
                     ) : mergedVideoUrl ? (
-                      <video
-                        src={getVideoDisplayUrl(mergedVideoUrl)}
-                        controls
-                        crossOrigin="anonymous"
-                        className="w-full h-full object-cover"
-                        autoPlay
-                      />
+                      <>
+                        {console.log(
+                          "[ClipsTab] Final video URL:",
+                          mergedVideoUrl,
+                        )}
+                        <video
+                          src={getVideoDisplayUrl(mergedVideoUrl)}
+                          controls
+                          crossOrigin="anonymous"
+                          className="w-full h-full object-cover"
+                          autoPlay
+                          onError={(e) =>
+                            console.error(
+                              "[ClipsTab] Final video load error:",
+                              e,
+                            )
+                          }
+                          onLoadedData={() =>
+                            console.log("[ClipsTab] Final video loaded OK")
+                          }
+                        />
+                      </>
                     ) : null}
                     {/* Video Badge */}
                     <div className="absolute top-2 left-2">
