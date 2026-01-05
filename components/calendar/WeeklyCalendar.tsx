@@ -1,6 +1,7 @@
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef, useEffect, useState } from "react";
 import type { ScheduledPost, InstagramPublishState } from "../../types";
 import { ScheduledPostCard } from "./ScheduledPostCard";
+import { Icon } from "../common/Icon";
 
 interface WeeklyCalendarProps {
   currentDate: Date;
@@ -34,17 +35,24 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const currentHourRef = useRef<HTMLDivElement>(null);
 
+  // State for day summary modal
+  const [selectedDaySummary, setSelectedDaySummary] = useState<{
+    date: string;
+    dayName: string;
+    dayNumber: number;
+    month: string;
+  } | null>(null);
+
   // Get current time info
   const now = new Date();
   const currentHour = now.getHours();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-  // Generate hours starting from current hour (for today) or from 6am
+  // Generate all hours of the day (6am to 23pm) to see full schedule
   const hours = useMemo(() => {
-    // Show from current hour onwards, minimum starting at 6am
-    const startHour = Math.max(0, currentHour - 1); // Show 1 hour before current
+    const startHour = 6; // Start from 6am
     return Array.from({ length: 24 - startHour }, (_, i) => startHour + i);
-  }, [currentHour]);
+  }, []);
 
   // Auto-scroll to current hour on mount
   useEffect(() => {
@@ -226,9 +234,15 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
             return (
               <div
                 key={day.date}
+                onClick={() => hasActivity && setSelectedDaySummary({
+                  date: day.date,
+                  dayName: day.dayName,
+                  dayNumber: day.dayNumber,
+                  month: day.month,
+                })}
                 className={`p-2 border-r border-white/5 last:border-r-0 min-h-[80px] ${
                   day.isToday ? "bg-primary/5" : ""
-                }`}
+                } ${hasActivity ? "cursor-pointer hover:bg-white/5 transition-colors" : ""}`}
               >
                 {hasActivity ? (
                   <div className="space-y-1.5">
@@ -311,6 +325,65 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
           })}
         </div>
       </div>
+
+      {/* Day Summary Modal */}
+      {selectedDaySummary && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedDaySummary(null)}
+        >
+          <div
+            className="bg-[#111111] border border-white/10 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden animate-fade-in-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-white/5">
+              <div>
+                <h3 className="text-lg font-black text-white">
+                  {selectedDaySummary.dayName}, {selectedDaySummary.dayNumber} {selectedDaySummary.month}
+                </h3>
+                <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-0.5">
+                  {getPostsForDate(selectedDaySummary.date).length} agendamento(s)
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedDaySummary(null)}
+                className="p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+              >
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-4 overflow-y-auto max-h-[60vh] space-y-3">
+              {getPostsForDate(selectedDaySummary.date).map((post) => (
+                <ScheduledPostCard
+                  key={post.id}
+                  post={post}
+                  variant="default"
+                  onUpdate={onUpdatePost}
+                  onDelete={onDeletePost}
+                  onPublishToInstagram={onPublishToInstagram}
+                  publishingState={publishingStates[post.id] || null}
+                />
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-white/5 flex justify-end">
+              <button
+                onClick={() => {
+                  setSelectedDaySummary(null);
+                  onDayClick(selectedDaySummary.date);
+                }}
+                className="px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors"
+              >
+                + Agendar novo post
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

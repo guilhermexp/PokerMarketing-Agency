@@ -254,10 +254,14 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
     const finalTime = publishNow ? getDefaultTime() : scheduledTime;
     const scheduledTimestamp = publishNow ? Date.now() : new Date(`${finalDate}T${finalTime}`).getTime();
 
+    // Don't send temporary IDs (they start with "temp-") - send empty string instead
+    const imageId = selectedImage?.id || '';
+    const validContentId = imageId.startsWith('temp-') ? '' : imageId;
+
     onSchedule({
       type: selectedImage?.source === 'Post' ? 'campaign_post' :
             selectedImage?.source === 'Anúncio' ? 'ad_creative' : 'flyer',
-      contentId: selectedImage?.id || '',
+      contentId: validContentId,
       imageUrl: selectedImage?.src || '',
       caption,
       hashtags: hashtagsArray,
@@ -270,6 +274,9 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       createdFrom: 'gallery',
       instagramContentType: contentType
     });
+
+    // Close modal after scheduling
+    onClose();
   };
 
   if (!isOpen) return null;

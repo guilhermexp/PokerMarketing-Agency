@@ -366,6 +366,7 @@ const TournamentEventCard: React.FC<{
     null,
   );
   const [scheduleFlyer, setScheduleFlyer] = useState<GalleryImage | null>(null);
+  const [scheduledUrls, setScheduledUrls] = useState<Set<string>>(new Set());
 
   const { queueJob, onJobComplete, onJobFailed, getJobByContext } =
     useBackgroundJobs();
@@ -601,7 +602,28 @@ const TournamentEventCard: React.FC<{
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-3 ml-4">
+        <div className="flex items-center gap-2 ml-4">
+          {/* Schedule button - only show if there are generated flyers */}
+          {onSchedulePost && generatedFlyers.some(f => f !== "loading") && (() => {
+            const firstFlyer = generatedFlyers.find(f => f !== "loading") as GalleryImage;
+            const isScheduled = firstFlyer && scheduledUrls.has(firstFlyer.src);
+            return isScheduled ? (
+              <span className="px-2 py-1 text-[9px] font-bold text-green-400 bg-green-500/10 rounded-lg">
+                Agendado
+              </span>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (firstFlyer) setScheduleFlyer(firstFlyer);
+                }}
+                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                title="Agendar publicação"
+              >
+                <Icon name="calendar" className="w-4 h-4 text-white/60" />
+              </button>
+            );
+          })()}
           <Button
             size="small"
             variant="primary"
@@ -625,7 +647,7 @@ const TournamentEventCard: React.FC<{
             images={generatedFlyers}
             onEdit={setEditingFlyer}
             onQuickPost={setQuickPostFlyer}
-            onSchedule={onSchedulePost ? setScheduleFlyer : undefined}
+            onSchedule={undefined}
             onDownload={(f, index) =>
               handleDownloadFlyer(f.src, `flyer-${event.id}-${index}.png`)
             }
@@ -671,7 +693,13 @@ const TournamentEventCard: React.FC<{
           isOpen={!!scheduleFlyer}
           onClose={() => setScheduleFlyer(null)}
           galleryImages={galleryImages}
-          onSchedule={onSchedulePost}
+          onSchedule={(post) => {
+            onSchedulePost(post);
+            // Mark as scheduled
+            if (scheduleFlyer?.src) {
+              setScheduledUrls(prev => new Set(prev).add(scheduleFlyer.src));
+            }
+          }}
           initialImage={scheduleFlyer}
         />
       )}
@@ -679,10 +707,23 @@ const TournamentEventCard: React.FC<{
   );
 };
 
+// Helper to get initial time based on period
+const getInitialTimeForPeriod = (period: TimePeriod): string => {
+  switch (period) {
+    case "MORNING": return "06:00";
+    case "AFTERNOON": return "12:00";
+    case "NIGHT": return "18:00";
+    case "HIGHLIGHTS": return "19:00";
+    case "ALL": return "08:00";
+    default: return "09:00";
+  }
+};
+
 const PeriodCardRow: React.FC<{
   period: TimePeriod;
   label: string;
   dayInfo: string;
+  scheduleDate?: string; // YYYY-MM-DD format for scheduling
   events: TournamentEvent[];
   brandProfile: BrandProfile;
   aspectRatio: string;
@@ -714,6 +755,7 @@ const PeriodCardRow: React.FC<{
   period,
   label,
   dayInfo,
+  scheduleDate,
   events,
   brandProfile,
   aspectRatio,
@@ -747,6 +789,7 @@ const PeriodCardRow: React.FC<{
     null,
   );
   const [scheduleFlyer, setScheduleFlyer] = useState<GalleryImage | null>(null);
+  const [scheduledUrls, setScheduledUrls] = useState<Set<string>>(new Set());
 
   const { queueJob, onJobComplete, onJobFailed, getJobByContext } =
     useBackgroundJobs();
@@ -1051,7 +1094,28 @@ const PeriodCardRow: React.FC<{
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-3 ml-4">
+        <div className="flex items-center gap-2 ml-4">
+          {/* Schedule button - only show if there are generated flyers */}
+          {onSchedulePost && generatedFlyers.some(f => f !== "loading") && (() => {
+            const firstFlyer = generatedFlyers.find(f => f !== "loading") as GalleryImage;
+            const isScheduled = firstFlyer && scheduledUrls.has(firstFlyer.src);
+            return isScheduled ? (
+              <span className="px-2 py-1 text-[9px] font-bold text-green-400 bg-green-500/10 rounded-lg">
+                Agendado
+              </span>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (firstFlyer) setScheduleFlyer(firstFlyer);
+                }}
+                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                title="Agendar publicação"
+              >
+                <Icon name="calendar" className="w-4 h-4 text-white/60" />
+              </button>
+            );
+          })()}
           <Button
             size="small"
             variant={events.length > 0 ? "primary" : "secondary"}
@@ -1076,7 +1140,7 @@ const PeriodCardRow: React.FC<{
             images={generatedFlyers}
             onEdit={setEditingFlyer}
             onQuickPost={setQuickPostFlyer}
-            onSchedule={onSchedulePost ? setScheduleFlyer : undefined}
+            onSchedule={undefined}
             onPublish={(f) =>
               onPublishToCampaign(`Campanha para grade ${label}`, f)
             }
@@ -1125,8 +1189,16 @@ const PeriodCardRow: React.FC<{
           isOpen={!!scheduleFlyer}
           onClose={() => setScheduleFlyer(null)}
           galleryImages={galleryImages}
-          onSchedule={onSchedulePost}
+          onSchedule={(post) => {
+            onSchedulePost(post);
+            // Mark as scheduled
+            if (scheduleFlyer?.src) {
+              setScheduledUrls(prev => new Set(prev).add(scheduleFlyer.src));
+            }
+          }}
           initialImage={scheduleFlyer}
+          initialDate={scheduleDate}
+          initialTime={getInitialTimeForPeriod(period)}
         />
       )}
     </div>
@@ -1137,6 +1209,7 @@ const PeriodCard: React.FC<{
   period: TimePeriod;
   label: string;
   dayInfo: string;
+  scheduleDate?: string; // YYYY-MM-DD format for scheduling
   events: TournamentEvent[];
   brandProfile: BrandProfile;
   aspectRatio: string;
@@ -1167,6 +1240,7 @@ const PeriodCard: React.FC<{
   period,
   label,
   dayInfo,
+  scheduleDate,
   events,
   brandProfile,
   aspectRatio,
@@ -1196,6 +1270,7 @@ const PeriodCard: React.FC<{
     null,
   );
   const [scheduleFlyer, setScheduleFlyer] = useState<GalleryImage | null>(null);
+  const [scheduledUrls, setScheduledUrls] = useState<Set<string>>(new Set());
 
   const { queueJob, onJobComplete, onJobFailed, getJobByContext } =
     useBackgroundJobs();
@@ -1506,23 +1581,46 @@ const PeriodCard: React.FC<{
             </p>
           </div>
         </div>
-        <Button
-          size="small"
-          variant={events.length > 0 ? "primary" : "secondary"}
-          onClick={() => handleGenerate(true)}
-          isLoading={isGenerating}
-          disabled={events.length === 0}
-          icon="zap"
-        >
-          Gerar
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Schedule button - only show if there are generated flyers */}
+          {onSchedulePost && generatedFlyers.some(f => f !== "loading") && (() => {
+            const firstFlyer = generatedFlyers.find(f => f !== "loading") as GalleryImage;
+            const isScheduled = firstFlyer && scheduledUrls.has(firstFlyer.src);
+            return isScheduled ? (
+              <span className="px-2 py-1 text-[9px] font-bold text-green-400 bg-green-500/10 rounded-lg">
+                Agendado
+              </span>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (firstFlyer) setScheduleFlyer(firstFlyer);
+                }}
+                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                title="Agendar publicação"
+              >
+                <Icon name="calendar" className="w-4 h-4 text-white/60" />
+              </button>
+            );
+          })()}
+          <Button
+            size="small"
+            variant={events.length > 0 ? "primary" : "secondary"}
+            onClick={() => handleGenerate(true)}
+            isLoading={isGenerating}
+            disabled={events.length === 0}
+            icon="zap"
+          >
+            Gerar
+          </Button>
+        </div>
       </div>
       <div className="flex-1 p-4 relative min-h-[300px] bg-black/40">
         <FlyerThumbStrip
           images={generatedFlyers}
           onEdit={setEditingFlyer}
           onQuickPost={setQuickPostFlyer}
-          onSchedule={onSchedulePost ? setScheduleFlyer : undefined}
+          onSchedule={undefined}
           onPublish={(f) =>
             onPublishToCampaign(`Campanha para grade ${label}`, f)
           }
@@ -1570,8 +1668,16 @@ const PeriodCard: React.FC<{
           isOpen={!!scheduleFlyer}
           onClose={() => setScheduleFlyer(null)}
           galleryImages={galleryImages}
-          onSchedule={onSchedulePost}
+          onSchedule={(post) => {
+            onSchedulePost(post);
+            // Mark as scheduled
+            if (scheduleFlyer?.src) {
+              setScheduledUrls(prev => new Set(prev).add(scheduleFlyer.src));
+            }
+          }}
           initialImage={scheduleFlyer}
+          initialDate={scheduleDate}
+          initialTime={getInitialTimeForPeriod(period)}
         />
       )}
     </div>
@@ -2250,6 +2356,29 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     const resultDay = startDate.getDate();
     const resultMonth = startDate.getMonth() + 1;
     return `${String(resultDay).padStart(2, "0")}/${String(resultMonth).padStart(2, "0")}`;
+  };
+
+  // Get schedule date in YYYY-MM-DD format for scheduling modal
+  const getScheduleDate = (day: string): string => {
+    if (!weekScheduleInfo) return "";
+    const [startDay, startMonth] = weekScheduleInfo.startDate
+      .split("/")
+      .map(Number);
+    const dayIndex = dayOrder.indexOf(day);
+    const startDayIndex = dayOrder.indexOf("MONDAY");
+    const diff = dayIndex - startDayIndex;
+
+    const currentYear = new Date().getFullYear();
+    const startYear = startMonth === 12 && new Date().getMonth() === 0
+      ? currentYear - 1
+      : currentYear;
+    const startDate = new Date(startYear, startMonth - 1, startDay);
+    startDate.setDate(startDate.getDate() + diff);
+
+    const resultYear = startDate.getFullYear();
+    const resultMonth = startDate.getMonth() + 1;
+    const resultDay = startDate.getDate();
+    return `${resultYear}-${String(resultMonth).padStart(2, "0")}-${String(resultDay).padStart(2, "0")}`;
   };
 
   const getEventsByPeriod = (period: TimePeriod): TournamentEvent[] => {
@@ -2940,6 +3069,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   period={p}
                   label={periodLabels[selectedLanguage][p]}
                   dayInfo={`${dayTranslations[selectedDay]} ${getDayDate(selectedDay)}`}
+                  scheduleDate={getScheduleDate(selectedDay)}
                   events={getEventsByPeriod(p)}
                   brandProfile={brandProfile}
                   aspectRatio={selectedAspectRatio}
