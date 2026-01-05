@@ -842,58 +842,6 @@ export async function deleteWeekSchedule(
 }
 
 // ============================================================================
-// QStash Scheduling API
-// ============================================================================
-
-export interface QStashScheduleResult {
-  success: boolean;
-  messageId: string;
-  scheduledFor: string;
-  delaySeconds: number;
-}
-
-/**
- * Schedule a post for publication via QStash
- * This will trigger automatic publication at the scheduled time
- */
-export async function schedulePostWithQStash(
-  postId: string,
-  userId: string,
-  scheduledTimestamp: number | string,
-): Promise<QStashScheduleResult> {
-  const response = await fetch("/api/qstash/schedule", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ postId, userId, scheduledTimestamp }),
-  });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `HTTP ${response.status}`);
-  }
-
-  return response.json();
-}
-
-/**
- * Cancel a scheduled post in QStash
- */
-export async function cancelQStashSchedule(messageId: string): Promise<void> {
-  const response = await fetch(`/api/qstash/schedule?messageId=${messageId}`, {
-    method: "DELETE",
-  });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `HTTP ${response.status}`);
-  }
-}
-
-// ============================================================================
 // Background Generation API
 // ============================================================================
 

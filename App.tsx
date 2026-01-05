@@ -60,7 +60,6 @@ import {
   deleteWeekSchedule,
   getScheduleEvents,
   getWeekSchedulesList,
-  schedulePostWithQStash,
   deleteGalleryImage,
   updateGalleryImage,
   type DbCampaign,
@@ -777,23 +776,8 @@ function AppContent() {
           handlePublishToInstagram(newPost);
         }, 100);
       } else {
-        // 3. Schedule with QStash for future automatic publication
-        try {
-          const qstashResult = await schedulePostWithQStash(
-            dbPost.id,
-            userId,
-            post.scheduledTimestamp,
-          );
-          console.log(
-            `[QStash] Post ${dbPost.id} scheduled for ${qstashResult.scheduledFor}`,
-          );
-        } catch (qstashError) {
-          console.warn(
-            "[QStash] Failed to schedule, will rely on manual publish:",
-            qstashError,
-          );
-          // Don't fail the whole operation - post is saved, just won't auto-publish
-        }
+        // Post is saved and scheduled - will need manual publish when time comes
+        console.log(`[Schedule] Post ${dbPost.id} scheduled for ${new Date(post.scheduledTimestamp).toISOString()}`);
       }
     } catch (e) {
       console.error("Failed to schedule post:", e);

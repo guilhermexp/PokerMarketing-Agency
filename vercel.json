@@ -7,9 +7,6 @@
     "api/generate/**/*.ts": {
       "maxDuration": 300
     },
-    "api/qstash/**/*.ts": {
-      "maxDuration": 300
-    },
     "api/db/**/*.ts": {
       "maxDuration": 30
     }

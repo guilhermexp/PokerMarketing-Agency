@@ -91,38 +91,60 @@ async function generateFlyer(
     { text: `DADOS DO FLYER PARA INSERIR NA ARTE:\n${prompt}` }
   ];
 
+  // Helper to convert URL or data URL to base64
+  const toBase64 = async (src: string): Promise<{ data: string; mimeType: string } | null> => {
+    if (src.startsWith('data:')) {
+      const match = src.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) return { data: match[2], mimeType: match[1] };
+    } else if (src.startsWith('http')) {
+      try {
+        const response = await fetch(src);
+        const arrayBuffer = await response.arrayBuffer();
+        return {
+          data: Buffer.from(arrayBuffer).toString('base64'),
+          mimeType: response.headers.get('content-type') || 'image/png'
+        };
+      } catch (e) {
+        console.error('[Generate Process] Failed to fetch image:', e);
+      }
+    }
+    return null;
+  };
+
   // Add logo if provided
   if (config.logo) {
-    const logoData = config.logo.startsWith('data:')
-      ? config.logo.split(',')[1]
-      : config.logo;
-    parts.push({ inlineData: { data: logoData, mimeType: 'image/png' } });
+    const logoData = await toBase64(config.logo);
+    if (logoData) {
+      parts.push({ inlineData: { data: logoData.data, mimeType: logoData.mimeType } });
+    }
   }
 
   // Add collab logo if provided
   if (config.collabLogo) {
-    const collabData = config.collabLogo.startsWith('data:')
-      ? config.collabLogo.split(',')[1]
-      : config.collabLogo;
-    parts.push({ inlineData: { data: collabData, mimeType: 'image/png' } });
+    const collabData = await toBase64(config.collabLogo);
+    if (collabData) {
+      parts.push({ inlineData: { data: collabData.data, mimeType: collabData.mimeType } });
+    }
   }
 
   // Add style reference if provided
   if (config.styleReference) {
-    parts.push({ text: "USE ESTA IMAGEM COMO REFERÊNCIA DE LAYOUT E FONTES:" });
-    const refData = config.styleReference.startsWith('data:')
-      ? config.styleReference.split(',')[1]
-      : config.styleReference;
-    parts.push({ inlineData: { data: refData, mimeType: 'image/png' } });
+    const refData = await toBase64(config.styleReference);
+    if (refData) {
+      parts.push({ text: "USE ESTA IMAGEM COMO REFERÊNCIA DE LAYOUT E FONTES:" });
+      parts.push({ inlineData: { data: refData.data, mimeType: refData.mimeType } });
+    }
   }
 
   // Add composition assets
   if (config.compositionAssets && config.compositionAssets.length > 0) {
-    config.compositionAssets.forEach((asset: string, i: number) => {
-      parts.push({ text: `Ativo de composição ${i + 1}:` });
-      const assetData = asset.startsWith('data:') ? asset.split(',')[1] : asset;
-      parts.push({ inlineData: { data: assetData, mimeType: 'image/png' } });
-    });
+    for (let i = 0; i < config.compositionAssets.length; i++) {
+      const assetData = await toBase64(config.compositionAssets[i]);
+      if (assetData) {
+        parts.push({ text: `Ativo de composição ${i + 1}:` });
+        parts.push({ inlineData: { data: assetData.data, mimeType: assetData.mimeType } });
+      }
+    }
   }
 
   const response = await ai.models.generateContent({
