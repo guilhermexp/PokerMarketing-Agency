@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ScheduledPost, InstagramPublishState } from '../../types';
 import { Icon } from '../common/Icon';
 import { isRubeConfigured } from '../../services/rubeService';
@@ -21,7 +21,16 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
   publishingState
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isEditingDate, setIsEditingDate] = useState(false);
+  const [editDate, setEditDate] = useState(post.scheduledDate);
+  const [editTime, setEditTime] = useState(post.scheduledTime);
   const canPublishToInstagram = isRubeConfigured() && (post.platforms === 'instagram' || post.platforms === 'both');
+
+  // Sync state when post prop changes
+  useEffect(() => {
+    setEditDate(post.scheduledDate);
+    setEditTime(post.scheduledTime);
+  }, [post.scheduledDate, post.scheduledTime]);
   const isPublishing = publishingState && publishingState.step !== 'idle' && publishingState.step !== 'completed' && publishingState.step !== 'failed';
 
   const statusColors = {
@@ -60,6 +69,17 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
 
   const handleMarkAsPublished = () => {
     onUpdate(post.id, { status: 'published', publishedAt: Date.now() });
+  };
+
+  const handleSaveDate = () => {
+    onUpdate(post.id, { scheduledDate: editDate, scheduledTime: editTime });
+    setIsEditingDate(false);
+  };
+
+  const handleCancelEditDate = () => {
+    setEditDate(post.scheduledDate);
+    setEditTime(post.scheduledTime);
+    setIsEditingDate(false);
   };
 
   if (variant === 'compact') {
@@ -168,6 +188,44 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                 </div>
               )}
 
+              {/* Edit Date Form */}
+              {isEditingDate && post.status === 'scheduled' && (
+                <div className="px-3 py-3 bg-white/5 border-t border-white/5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon name="calendar" className="w-3 h-3 text-primary" />
+                    <span className="text-[9px] font-bold text-white/70 uppercase">Editar Data</span>
+                  </div>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      className="flex-1 px-2 py-1.5 bg-black/30 border border-white/10 rounded-lg text-[10px] text-white/80 focus:outline-none focus:border-primary/50"
+                    />
+                    <input
+                      type="time"
+                      value={editTime}
+                      onChange={(e) => setEditTime(e.target.value)}
+                      className="w-24 px-2 py-1.5 bg-black/30 border border-white/10 rounded-lg text-[10px] text-white/80 focus:outline-none focus:border-primary/50"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveDate}
+                      className="flex-1 px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary text-[9px] font-bold uppercase rounded-lg transition-colors"
+                    >
+                      Salvar
+                    </button>
+                    <button
+                      onClick={handleCancelEditDate}
+                      className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white/50 text-[9px] font-bold uppercase rounded-lg transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Actions - Compact */}
               <div className="p-3 flex gap-2">
                 {post.status === 'scheduled' && (
@@ -196,6 +254,13 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                       title="Copiar"
                     >
                       <Icon name="copy" className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setIsEditingDate(!isEditingDate)}
+                      className={`p-2 rounded-lg transition-colors ${isEditingDate ? 'bg-primary/20 text-primary' : 'bg-white/5 hover:bg-white/10 text-white/50'}`}
+                      title="Editar data"
+                    >
+                      <Icon name="calendar" className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleOpenPlatform('instagram')}
@@ -239,8 +304,8 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
 
   // Full variant (for list views)
   return (
-    <div className={`p-4 rounded-xl border ${statusColors[post.status]} bg-[#0a0a0a]`}>
-      <div className="flex items-start gap-4">
+    <div className={`rounded-xl border ${statusColors[post.status]} bg-[#0a0a0a] overflow-hidden`}>
+      <div className="p-4 flex items-start gap-4">
         {/* Image Thumbnail */}
         {post.imageUrl && (
           <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-white/10">
@@ -291,6 +356,13 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                 <Icon name="copy" className="w-4 h-4" />
               </button>
               <button
+                onClick={() => setIsEditingDate(!isEditingDate)}
+                className={`p-2 rounded-lg transition-colors ${isEditingDate ? 'text-primary bg-primary/10' : 'text-white/30 hover:text-white hover:bg-white/5'}`}
+                title="Editar data"
+              >
+                <Icon name="calendar" className="w-4 h-4" />
+              </button>
+              <button
                 onClick={handleMarkAsPublished}
                 className="p-2 text-white/30 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                 title="Marcar como publicado"
@@ -308,6 +380,42 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Edit Date Form - Full Variant */}
+      {isEditingDate && post.status === 'scheduled' && (
+        <div className="px-4 py-3 bg-white/5 border-t border-white/5">
+          <div className="flex items-center gap-2 mb-2">
+            <Icon name="calendar" className="w-3 h-3 text-primary" />
+            <span className="text-[9px] font-bold text-white/70 uppercase">Editar Data do Agendamento</span>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={editDate}
+              onChange={(e) => setEditDate(e.target.value)}
+              className="flex-1 px-3 py-2 bg-black/30 border border-white/10 rounded-lg text-xs text-white/80 focus:outline-none focus:border-primary/50"
+            />
+            <input
+              type="time"
+              value={editTime}
+              onChange={(e) => setEditTime(e.target.value)}
+              className="w-28 px-3 py-2 bg-black/30 border border-white/10 rounded-lg text-xs text-white/80 focus:outline-none focus:border-primary/50"
+            />
+            <button
+              onClick={handleSaveDate}
+              className="px-4 py-2 bg-primary/20 hover:bg-primary/30 text-primary text-xs font-bold uppercase rounded-lg transition-colors"
+            >
+              Salvar
+            </button>
+            <button
+              onClick={handleCancelEditDate}
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white/50 text-xs font-bold uppercase rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -205,7 +205,7 @@ const FlyerThumbStrip: React.FC<{
           <button
             type="button"
             onClick={() => scrollStrip("prev")}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-white hover:bg-primary hover:text-black transition-all"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/[0.06] flex items-center justify-center text-white hover:bg-primary hover:text-black transition-all"
             aria-label="Anterior"
           >
             <Icon name="chevron-up" className="w-3.5 h-3.5 -rotate-90" />
@@ -213,7 +213,7 @@ const FlyerThumbStrip: React.FC<{
           <button
             type="button"
             onClick={() => scrollStrip("next")}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-white hover:bg-primary hover:text-black transition-all"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/[0.06] flex items-center justify-center text-white hover:bg-primary hover:text-black transition-all"
             aria-label="Próximo"
           >
             <Icon name="chevron-up" className="w-3.5 h-3.5 rotate-90" />
@@ -561,43 +561,37 @@ const TournamentEventCard: React.FC<{
 
   return (
     <div
-      className={`bg-[#0d0d0d] border rounded-xl overflow-hidden transition-all mb-2 ${isGenerating ? "border-primary/50 animate-pulse" : "border-white/[0.06] hover:border-white/10"}`}
+      className={`bg-[#0a0a0a] border rounded-lg overflow-hidden transition-all mb-1.5 ${isGenerating ? "border-primary/30 animate-pulse" : "border-white/[0.05]"}`}
     >
       <div
-        className="px-5 py-4 flex items-center justify-between cursor-pointer"
+        className="px-4 py-3 flex items-center justify-between cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-6 items-center text-left">
-          <div className="flex items-center gap-3">
-            {isGenerating && <Loader className="w-4 h-4 flex-shrink-0" />}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-4 items-center text-left">
+          <div className="flex items-center gap-2">
+            {isGenerating && <Loader className="w-3.5 h-3.5 flex-shrink-0" />}
             <div>
-              <h3 className="text-xs font-bold text-white tracking-wide">
+              <h3 className="text-[11px] font-semibold text-white">
                 {event.name}
               </h3>
-              <p className="text-[10px] text-white/30 mt-0.5">
+              <p className="text-[9px] text-white/30 mt-0.5">
                 {isGenerating
-                  ? "Gerando flyer..."
+                  ? "Gerando..."
                   : `${event.game} • ${event.structure}`}
               </p>
             </div>
           </div>
           <div>
-            <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider block mb-1">
-              Time
+            <span className="text-[11px] font-medium text-white/70">
+              {event.times?.["-3"]}
             </span>
-            <span className="text-sm font-semibold text-white">
-              {event.times?.["-3"]}{" "}
-              <span className="text-white/40 text-xs">(GMT-3)</span>
-            </span>
+            <span className="text-white/30 text-[9px] ml-1">(GMT-3)</span>
           </div>
           <div>
-            <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider block mb-1">
-              Value
-            </span>
-            <span className="text-sm font-bold text-primary">
+            <span className="text-[11px] font-semibold text-primary/80">
               GTD: {gtdValue}
             </span>
-            <span className="text-[10px] text-white/40 block mt-0.5">
+            <span className="text-[9px] text-white/30 block">
               BI: {buyInValue}
             </span>
           </div>
@@ -1049,7 +1043,7 @@ const PeriodCardRow: React.FC<{
 
   return (
     <div
-      className={`bg-[#0d0d0d] border rounded-xl overflow-hidden transition-all mb-2 ${isGenerating ? "border-primary/50 animate-pulse" : "border-white/[0.06] hover:border-white/10"}`}
+      className={`bg-[#0a0a0a] border rounded-xl overflow-hidden transition-all mb-2 ${isGenerating ? "border-primary/30 animate-pulse" : "border-white/[0.05] hover:border-white/[0.08]"}`}
     >
       <div
         className="px-5 py-4 flex items-center justify-between cursor-pointer"
@@ -1558,12 +1552,12 @@ const PeriodCard: React.FC<{
 
   return (
     <div
-      className={`bg-[#111111] border rounded-2xl overflow-hidden flex flex-col h-full transition-all hover:border-white/10 ${styleReference ? "border-primary/30" : "border-white/5"}`}
+      className={`bg-[#0a0a0a] border rounded-xl overflow-hidden flex flex-col h-full transition-all ${styleReference ? "border-primary/20" : "border-white/[0.05]"}`}
     >
-      <div className="px-4 py-3 border-b border-white/5 flex justify-between items-center bg-[#0d0d0d]">
+      <div className="px-4 py-2.5 flex justify-between items-center">
         <div className="text-left flex items-center gap-2">
           {styleReference && (
-            <div className="w-8 h-8 rounded-md overflow-hidden border border-primary/30 flex-shrink-0">
+            <div className="w-6 h-6 rounded overflow-hidden border border-primary/20 flex-shrink-0">
               <img
                 src={styleReference.src}
                 className="w-full h-full object-cover"
@@ -1571,13 +1565,13 @@ const PeriodCard: React.FC<{
             </div>
           )}
           <div>
-            <h4 className="text-[10px] font-black text-white uppercase tracking-wide">
+            <h4 className="text-[11px] font-semibold text-white">
               {label}
             </h4>
             <p
-              className={`text-[8px] uppercase font-bold ${events.length > 0 ? "text-primary" : "text-white/20"}`}
+              className={`text-[9px] ${events.length > 0 ? "text-white/40" : "text-white/20"}`}
             >
-              {events.length} Torneios
+              {events.length} torneios
             </p>
           </div>
         </div>
@@ -1727,16 +1721,16 @@ const ManualEventModal: React.FC<{
   if (!isOpen) return null;
 
   const inputClass =
-    "w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-primary/50 placeholder:text-white/20";
+    "w-full bg-transparent border border-white/[0.06] rounded-md px-3 py-2 text-xs text-white outline-none focus:border-primary/30 placeholder:text-white/20";
   const labelClass =
-    "text-[9px] font-black text-white/30 uppercase tracking-wide";
+    "text-[9px] text-white/30";
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl border-white/10 bg-[#080808] overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center bg-[#0d0d0d]">
-          <h3 className="text-[10px] font-black text-white uppercase tracking-wide">
-            Adicionar Torneio Manual
+      <Card className="w-full max-w-2xl border-white/[0.05] bg-[#0a0a0a] overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="px-4 py-3 flex justify-between items-center">
+          <h3 className="text-[13px] font-semibold text-white">
+            Adicionar Torneio
           </h3>
           <button
             onClick={onClose}
@@ -1908,7 +1902,7 @@ const ManualEventModal: React.FC<{
             </div>
           </div>
         </div>
-        <div className="p-5 border-t border-white/5 flex gap-3 bg-[#0a0a0a]">
+        <div className="px-4 py-3 flex gap-2">
           <Button
             onClick={() => {
               resetForm();
@@ -2524,7 +2518,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   {/* Week stats card */}
                   <button
                     onClick={() => setIsSchedulesPanelOpen(!isSchedulesPanelOpen)}
-                    className="flex items-center gap-3 px-3 py-2 bg-[#0a0a0a] border border-white/5 rounded-xl hover:border-white/10 transition-all"
+                    className="flex items-center gap-2 px-2.5 py-1.5 bg-transparent border border-white/[0.06] rounded-md hover:border-white/[0.1] transition-all"
                   >
                     <Icon name="calendar" className="w-3.5 h-3.5 text-white/30" />
                     <span className="text-[9px] font-bold text-white/50 uppercase">
@@ -2546,26 +2540,29 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button
+              <button
                 onClick={() =>
                   setShowIndividualTournaments(!showIndividualTournaments)
                 }
-                variant={showIndividualTournaments ? "primary" : "secondary"}
-                icon={showIndividualTournaments ? "zap" : "calendar"}
-                size="small"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${
+                  showIndividualTournaments
+                    ? "bg-primary/10 text-primary/80 border border-primary/20"
+                    : "bg-transparent border border-white/[0.06] text-white/50 hover:border-white/[0.1] hover:text-white/70"
+                }`}
               >
+                <Icon name={showIndividualTournaments ? "zap" : "calendar"} className="w-3 h-3" />
                 {showIndividualTournaments
                   ? "Grades de Período"
                   : "Torneios Individuais"}
-              </Button>
+              </button>
               {showIndividualTournaments && (
                 <>
                   <button
                     onClick={() => setShowOnlyWithGtd(!showOnlyWithGtd)}
-                    className={`px-3 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all ${
+                    className={`px-2.5 py-1.5 rounded-md text-[9px] font-medium transition-all ${
                       showOnlyWithGtd
-                        ? "bg-primary/20 text-primary border border-primary/30"
-                        : "bg-[#0a0a0a] text-white/40 border border-white/10 hover:text-white/60"
+                        ? "bg-primary/10 text-primary/80 border border-primary/20"
+                        : "bg-transparent text-white/40 border border-white/[0.06] hover:text-white/60"
                     }`}
                   >
                     {showOnlyWithGtd
@@ -2577,27 +2574,26 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     onChange={(e) =>
                       setSortBy(e.target.value as "time" | "gtd")
                     }
-                    className="px-3 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider bg-[#0a0a0a] text-white/60 border border-white/10 outline-none cursor-pointer"
+                    className="px-2.5 py-1.5 rounded-md text-[9px] bg-transparent text-white/50 border border-white/[0.06] outline-none cursor-pointer"
                   >
                     <option value="time">Por Horário</option>
                     <option value="gtd">Por GTD ↓</option>
                   </select>
                 </>
               )}
-              <Button
+              <button
                 onClick={() => setIsManualModalOpen(true)}
-                variant="secondary"
-                icon="edit"
-                size="small"
+                className="flex items-center gap-1.5 px-3 py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all"
               >
+                <Icon name="edit" className="w-3 h-3" />
                 Add Manual
-              </Button>
+              </button>
               {/* Upload Spreadsheet - only show when no schedule is loaded */}
               {!weekScheduleInfo && (
                 <label className="cursor-pointer group">
-                  <div className="bg-white text-black font-black px-4 py-2.5 rounded-xl flex items-center space-x-2 transition-all active:scale-95 text-[10px] tracking-wide uppercase hover:bg-white/90">
-                    <Icon name="upload" className="w-3.5 h-3.5" />
-                    <span>Upload Spreadsheet</span>
+                  <div className="bg-transparent border border-white/[0.06] text-white/50 font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all active:scale-95 text-[10px] tracking-wide uppercase hover:border-white/[0.1] hover:text-white/70">
+                    <Icon name="upload" className="w-3 h-3" />
+                    <span>Nova Planilha</span>
                   </div>
                   <input
                     type="file"
@@ -2612,10 +2608,10 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               {/* Settings button */}
               <button
                 onClick={() => setIsSettingsModalOpen(true)}
-                className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center transition-all active:scale-95 hover:bg-white/90"
+                className="w-9 h-9 rounded-lg bg-transparent border border-white/[0.06] text-white/40 flex items-center justify-center transition-all active:scale-95 hover:border-white/[0.1] hover:text-white/60"
                 title="Configurações"
               >
-                <Icon name="settings" className="w-4 h-4" />
+                <Icon name="settings" className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -2690,8 +2686,8 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                           : isCurrentWeek
                             ? "bg-green-500/10 border-green-500/20 hover:border-green-500/40"
                             : isExpired
-                              ? "bg-white/[0.02] border-white/5 hover:border-white/10 opacity-60"
-                              : "bg-white/[0.02] border-white/5 hover:border-white/10"
+                              ? "bg-white/[0.02] border-white/[0.05] hover:border-white/[0.08] opacity-60"
+                              : "bg-white/[0.02] border-white/[0.05] hover:border-white/[0.08]"
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -2761,7 +2757,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 <select
                   value={selectedDay}
                   onChange={(e) => setSelectedDay(e.target.value)}
-                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-primary/50 appearance-none cursor-pointer"
+                  className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2.5 text-xs text-white outline-none focus:border-primary/30 appearance-none cursor-pointer"
                 >
                   {Object.keys(dayTranslations).map((d) => (
                     <option key={d} value={d}>
@@ -2819,7 +2815,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               {activeHelpTooltip === "logo" && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setActiveHelpTooltip(null)} />
-                  <div className="absolute top-full left-0 mt-1 z-50 bg-[#1a1a1a] border border-white/10 rounded-xl p-3 w-64 shadow-xl">
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-[#111] border border-white/[0.06] rounded-lg p-3 w-64 shadow-xl">
                     <p className="text-[10px] font-bold text-white mb-1">Logo de Colaborador</p>
                     <p className="text-[9px] text-white/50 leading-relaxed mb-2">
                       Adicione o logo de um parceiro ou patrocinador que aparecerá junto ao logo principal da marca nos flyers.
@@ -2830,7 +2826,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   </div>
                 </>
               )}
-              <label className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white flex items-center gap-2 cursor-pointer hover:border-white/20 transition-colors group">
+              <label className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2.5 text-xs text-white flex items-center gap-2 cursor-pointer hover:border-white/[0.1] transition-colors group">
                 {collabLogo ? (
                   <>
                     <img
@@ -2887,7 +2883,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               {activeHelpTooltip === "ref" && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setActiveHelpTooltip(null)} />
-                  <div className="absolute top-full left-0 mt-1 z-50 bg-[#1a1a1a] border border-white/10 rounded-xl p-3 w-64 shadow-xl">
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-[#111] border border-white/[0.06] rounded-lg p-3 w-64 shadow-xl">
                     <p className="text-[10px] font-bold text-white mb-1">Imagem de Referência</p>
                     <p className="text-[9px] text-white/50 leading-relaxed mb-2">
                       Envie uma imagem para servir como guia de estilo visual. A IA analisará cores, composição e estética para criar flyers similares.
@@ -2898,7 +2894,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   </div>
                 </>
               )}
-              <label className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white flex items-center gap-2 cursor-pointer hover:border-white/20 transition-colors group">
+              <label className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2.5 text-xs text-white flex items-center gap-2 cursor-pointer hover:border-white/[0.1] transition-colors group">
                 {manualStyleRef ? (
                   <>
                     <img
@@ -2963,7 +2959,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               {activeHelpTooltip === "assets" && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setActiveHelpTooltip(null)} />
-                  <div className="absolute top-full left-0 mt-1 z-50 bg-[#1a1a1a] border border-white/10 rounded-xl p-3 w-64 shadow-xl">
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-[#111] border border-white/[0.06] rounded-lg p-3 w-64 shadow-xl">
                     <p className="text-[10px] font-bold text-white mb-1">Ativos de Composição</p>
                     <p className="text-[9px] text-white/50 leading-relaxed mb-2">
                       Adicione elementos visuais como mockups de celular, fotos de pessoas, fichas de poker ou outros assets que serão incorporados na composição do flyer.
@@ -2974,7 +2970,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   </div>
                 </>
               )}
-              <label className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white flex items-center gap-2 cursor-pointer hover:border-white/20 transition-colors">
+              <label className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2.5 text-xs text-white flex items-center gap-2 cursor-pointer hover:border-white/[0.1] transition-colors">
                 {compositionAssets.length > 0 ? (
                   <>
                     <div className="flex -space-x-1">
@@ -3041,7 +3037,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               {activeHelpTooltip === "favs" && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setActiveHelpTooltip(null)} />
-                  <div className="absolute top-full right-0 mt-1 z-50 bg-[#1a1a1a] border border-white/10 rounded-xl p-3 w-64 shadow-xl">
+                  <div className="absolute top-full right-0 mt-1 z-50 bg-[#111] border border-white/[0.06] rounded-lg p-3 w-64 shadow-xl">
                     <p className="text-[10px] font-bold text-white mb-1">Estilos Favoritos</p>
                     <p className="text-[9px] text-white/50 leading-relaxed mb-2">
                       Acesse sua biblioteca de estilos salvos. Favorite flyers da galeria para reutilizar como referência em novas gerações.
@@ -3054,7 +3050,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               )}
               <button
                 onClick={() => setIsStylePanelOpen(!isStylePanelOpen)}
-                className={`w-full bg-[#0a0a0a] border rounded-xl px-3 py-2.5 text-xs flex items-center gap-2 transition-colors ${isStylePanelOpen ? "border-primary/50 text-primary" : "border-white/10 text-white/30 hover:border-white/20"}`}
+                className={`w-full bg-[#0a0a0a] border rounded-lg px-3 py-2.5 text-xs flex items-center gap-2 transition-colors ${isStylePanelOpen ? "border-primary/30 text-primary" : "border-white/[0.06] text-white/30 hover:border-white/[0.1]"}`}
               >
                 <Icon name="layout" className="w-4 h-4" />
                 <span>{styleReferences.length} estilos salvos</span>
@@ -3124,7 +3120,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     <div className="mb-4">
                       <button
                         onClick={() => setShowPastTournaments(!showPastTournaments)}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-[#0a0a0a] border border-white/5 rounded-xl hover:border-white/10 transition-all"
+                        className="w-full flex items-center justify-between px-4 py-3 bg-[#0a0a0a] border border-white/[0.05] rounded-lg hover:border-white/[0.08] transition-all"
                       >
                         <div className="flex items-center gap-2">
                           <Icon name="clock" className="w-3.5 h-3.5 text-white/30" />
@@ -3228,8 +3224,8 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
           {/* Settings Modal */}
           {isSettingsModalOpen && (
             <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
-              <Card className="w-full max-w-md border-white/10 bg-[#080808] overflow-hidden">
-                <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center bg-[#0d0d0d]">
+              <Card className="w-full max-w-md border-white/[0.06] bg-[#0a0a0a] overflow-hidden">
+                <div className="px-5 py-3 border-b border-white/[0.05] flex justify-between items-center">
                   <h3 className="text-[10px] font-black text-white uppercase tracking-wide">
                     Configurações de Geração
                   </h3>
@@ -3253,7 +3249,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                           className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all border ${
                             enabledPeriods[period]
                               ? "bg-primary/10 border-primary/30 text-white"
-                              : "bg-[#0a0a0a] border-white/5 text-white/40 hover:border-white/10"
+                              : "bg-[#0a0a0a] border-white/[0.05] text-white/40 hover:border-white/[0.08]"
                           }`}
                         >
                           <input
@@ -3288,7 +3284,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         <select
                           value={selectedAspectRatio}
                           onChange={(e) => setSelectedAspectRatio(e.target.value)}
-                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
+                          className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
                         >
                           <option value="9:16">Vertical (9:16)</option>
                           <option value="1:1">Quadrado (1:1)</option>
@@ -3303,7 +3299,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                           value={selectedImageSize}
                           onChange={(e) => setSelectedImageSize(e.target.value as ImageSize)}
                           disabled={selectedImageModel === "imagen-4.0-generate-001"}
-                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer disabled:opacity-20"
+                          className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer disabled:opacity-20"
                         >
                           <option value="1K">HD (1K)</option>
                           <option value="2K">QuadHD (2K)</option>
@@ -3317,7 +3313,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         <select
                           value={selectedImageModel}
                           onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
-                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
+                          className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
                         >
                           <option value="gemini-3-pro-image-preview">Gemini 3 Pro</option>
                           <option value="imagen-4.0-generate-001">Imagen 4.0</option>
@@ -3330,7 +3326,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         <select
                           value={selectedCurrency}
                           onChange={(e) => setSelectedCurrency(e.target.value as Currency)}
-                          className="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
+                          className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
                         >
                           <option value="BRL">Real (R$)</option>
                           <option value="USD">Dólar ($)</option>
@@ -3347,7 +3343,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     <select
                       value={selectedLanguage}
                       onChange={(e) => setSelectedLanguage(e.target.value as "pt" | "en")}
-                      className="w-full bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
+                      className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
                     >
                       <option value="pt">Português (BR)</option>
                       <option value="en">English (US)</option>
@@ -3447,7 +3443,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         className={`group relative w-full aspect-[4/3] rounded-xl overflow-hidden transition-all cursor-pointer ${
                           isSelected
                             ? "ring-2 ring-primary ring-offset-2 ring-offset-[#070707] scale-[1.02]"
-                            : "border border-white/10 hover:border-primary/30 hover:scale-[1.01]"
+                            : "border border-white/[0.06] hover:border-primary/20 hover:scale-[1.01]"
                         }`}
                       >
                         <img

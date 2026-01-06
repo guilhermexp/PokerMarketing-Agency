@@ -473,63 +473,63 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
             <button
               onClick={() => productInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/70 transition-all text-xs"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all text-[10px] font-bold uppercase tracking-wide"
             >
-              <Icon name="image" className="w-3.5 h-3.5" />
+              <Icon name="image" className="w-3 h-3" />
               <span>Logo / Produto</span>
             </button>
 
             <button
               onClick={() => collabLogoInputRef.current?.click()}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all text-xs ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[10px] font-bold uppercase tracking-wide ${
                 collabLogo
-                  ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
-                  : 'border-white/10 bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/70'
+                  ? 'border-blue-500/20 bg-blue-500/10 text-blue-400'
+                  : 'border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70'
               }`}
             >
-              <Icon name="users" className="w-3.5 h-3.5" />
+              <Icon name="users" className="w-3 h-3" />
               <span>Logo Colab</span>
             </button>
 
             <button
               onClick={() => inspirationInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/70 transition-all text-xs"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all text-[10px] font-bold uppercase tracking-wide"
             >
-              <Icon name="copy" className="w-3.5 h-3.5" />
+              <Icon name="copy" className="w-3 h-3" />
               <span>Referência</span>
             </button>
 
             <button
               onClick={() => assetsInputRef.current?.click()}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all text-xs ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[10px] font-bold uppercase tracking-wide ${
                 compositionAssets.length > 0
-                  ? 'border-green-500/30 bg-green-500/10 text-green-400'
-                  : 'border-white/10 bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/70'
+                  ? 'border-green-500/20 bg-green-500/10 text-green-400'
+                  : 'border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70'
               }`}
             >
-              <Icon name="layers" className="w-3.5 h-3.5" />
+              <Icon name="layers" className="w-3 h-3" />
               <span>Ativos</span>
             </button>
 
             {styleReferences.length > 0 && (
               <button
                 onClick={() => setIsFavoritesOpen(!isFavoritesOpen)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all text-xs ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${
                   isFavoritesOpen || selectedStyleReference
-                    ? 'border-primary/50 bg-primary/10 text-primary'
-                    : 'border-white/10 bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/70'
+                    ? 'border-primary/20 bg-primary/10 text-primary/80 border'
+                    : 'border border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70'
                 }`}
               >
-                <Icon name="heart" className="w-3.5 h-3.5" />
+                <Icon name="heart" className="w-3 h-3" />
                 <span>Favoritos</span>
               </button>
             )}
 
             <button
               onClick={() => setIsOptionsModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/70 transition-all text-xs"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all text-[10px] font-bold uppercase tracking-wide"
             >
-              <Icon name="settings" className="w-3.5 h-3.5" />
+              <Icon name="settings" className="w-3 h-3" />
               <span>Opções</span>
             </button>
           </div>

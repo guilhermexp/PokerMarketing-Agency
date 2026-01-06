@@ -23,11 +23,17 @@ import {
   generateVideo as generateServerVideo,
   updateClipThumbnail,
   updateSceneImage,
+  queueVideoJob,
   type ApiVideoModel,
+  type VideoJobConfig,
 } from "../../services/apiClient";
 import { uploadImageToBlob } from "../../services/blobService";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import { ExportVideoModal } from "../common/ExportVideoModal";
+import { QuickPostModal } from "../common/QuickPostModal";
+import { SchedulePostModal } from "../calendar/SchedulePostModal";
+import type { InstagramContext } from "../../services/rubeService";
+import type { ScheduledPost } from "../../types";
 import {
   concatenateVideos,
   downloadBlob,
@@ -185,6 +191,9 @@ interface ClipsTabProps {
   userId?: string | null;
   galleryImages?: GalleryImage[];
   campaignId?: string;
+  // Instagram & Scheduling
+  instagramContext?: InstagramContext;
+  onSchedulePost?: (post: Omit<ScheduledPost, "id" | "createdAt" | "updatedAt">) => void;
 }
 
 interface Scene {
@@ -520,6 +529,11 @@ interface ClipCardProps {
   campaignId?: string;
   onGenerateAllClipImages?: () => void; // Generate thumbnail + all scene images for this clip
   isGeneratingAllClipImages?: boolean;
+  // QuickPost & Schedule
+  onQuickPost?: (image: GalleryImage) => void;
+  onSchedulePost?: (image: GalleryImage) => void;
+  // Background jobs
+  userId?: string | null;
 }
 
 const ClipSettingsModal: React.FC<{
@@ -673,7 +687,13 @@ const ClipCard: React.FC<ClipCardProps> = ({
   campaignId,
   onGenerateAllClipImages,
   isGeneratingAllClipImages,
+  onQuickPost,
+  onSchedulePost,
+  userId,
 }) => {
+  // Background jobs for video generation
+  const { onJobComplete, onJobFailed } = useBackgroundJobs();
+
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [videoStates, setVideoStates] = useState<Record<number, VideoState[]>>(
     {},
@@ -781,6 +801,127 @@ const ClipCard: React.FC<ClipCardProps> = ({
     progress: number; // 0-1
     type: TransitionType;
   } | null>(null);
+
+  // Listen for video job completions (background jobs)
+  // Note: This effect handles persistence to gallery when videos complete via background jobs
+  useEffect(() => {
+    const videoContextPrefix = `video-${clip.id}-scene-`;
+
+    const unsubComplete = onJobComplete(async (job) => {
+      // Only handle video jobs for this clip
+      if (!job.context?.startsWith(videoContextPrefix)) return;
+      if (job.job_type !== "video") return;
+
+      // Extract scene number from context: "video-{clipId}-scene-{sceneNumber}"
+      const sceneNumberStr = job.context.replace(videoContextPrefix, "");
+      const sceneNumber = parseInt(sceneNumberStr, 10);
+
+      if (isNaN(sceneNumber)) {
+        console.warn(`[ClipCard] Invalid scene number in job context: ${job.context}`);
+        return;
+      }
+
+      console.log(`[ClipCard] Video job completed for scene ${sceneNumber}:`, job.result_url);
+
+      // Update video states with the completed video
+      if (job.result_url) {
+        setVideoStates((prev) => {
+          const existing = prev[sceneNumber] || [];
+          // Add new video to the beginning
+          return {
+            ...prev,
+            [sceneNumber]: [
+              {
+                url: job.result_url,
+                isLoading: false,
+                model: selectedVideoModel,
+              },
+              ...existing,
+            ],
+          };
+        });
+
+        // Update the video index to show the new video
+        setSceneVideoIndex((prev) => ({
+          ...prev,
+          [sceneNumber]: 0,
+        }));
+
+        // Save video to gallery for persistence (same as sync generation)
+        // This ensures the video is linked to this clip/campaign
+        if (onAddImageToGallery) {
+          // Find the scene to get the visual description for the prompt
+          const currentScene = scenes.find((s) => s.sceneNumber === sceneNumber);
+          const visualDescription = currentScene?.visual || `Cena ${sceneNumber}`;
+
+          // Build source identifier (max 50 chars)
+          const truncatedTitle = clip.title.substring(0, 20);
+          const videoSource = `Video-${truncatedTitle}-${sceneNumber}`;
+
+          console.log(
+            "[ClipCard] Saving background job video to gallery:",
+            videoSource,
+            "model:",
+            selectedVideoModel,
+          );
+
+          onAddImageToGallery({
+            src: job.result_url,
+            prompt: `[VIDEO:${selectedVideoModel}] ${visualDescription}`,
+            source: videoSource as any,
+            model: "gemini-3-pro-image-preview", // Fallback - DB enum doesn't support video models
+            video_script_id: clip.id, // Link to video_clip_script for campaign filtering
+          });
+        }
+      }
+
+      // Clear loading state for this scene
+      setIsGeneratingVideo((prev) => ({
+        ...prev,
+        [sceneNumber]: false,
+      }));
+    });
+
+    const unsubFailed = onJobFailed((job) => {
+      // Only handle video jobs for this clip
+      if (!job.context?.startsWith(videoContextPrefix)) return;
+      if (job.job_type !== "video") return;
+
+      // Extract scene number from context
+      const sceneNumberStr = job.context.replace(videoContextPrefix, "");
+      const sceneNumber = parseInt(sceneNumberStr, 10);
+
+      if (isNaN(sceneNumber)) return;
+
+      console.error(`[ClipCard] Video job failed for scene ${sceneNumber}:`, job.error_message);
+
+      // Clear loading state and set error
+      setIsGeneratingVideo((prev) => ({
+        ...prev,
+        [sceneNumber]: false,
+      }));
+
+      // Update video state with error
+      setVideoStates((prev) => {
+        const existing = prev[sceneNumber] || [];
+        return {
+          ...prev,
+          [sceneNumber]: [
+            {
+              isLoading: false,
+              error: job.error_message || "Falha na geração do vídeo",
+            },
+            ...existing,
+          ],
+        };
+      });
+    });
+
+    return () => {
+      unsubComplete();
+      unsubFailed();
+    };
+  }, [onJobComplete, onJobFailed, clip.id, clip.title, selectedVideoModel, scenes, onAddImageToGallery]);
 
   useEffect(() => {
     editorStateRef.current = editorState;
@@ -1482,7 +1623,7 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
     async (
       sceneNumber: number,
       useFallbackDirectly: boolean = false,
-    ): Promise<boolean> => {
+    ): Promise<{ usedFallback: boolean; error: string | null }> => {
       // Set loading state for this scene
       setIsGeneratingVideo((prev) => ({ ...prev, [sceneNumber]: true }));
       let usedFallback = false;
@@ -1505,33 +1646,87 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
           );
         }
 
-        let videoUrl: string;
         const modelUsed = selectedVideoModel;
 
+        // Build JSON prompt (needed for both sync and async)
+        const genericPrompt = isFalModel(selectedVideoModel)
+          ? buildPromptForSora(sceneNumber)
+          : buildPromptForVeo(sceneNumber);
+
+        console.log(
+          `[ClipsTab] Generic prompt para cena ${sceneNumber}:`,
+          genericPrompt,
+        );
+
+        const jsonPrompt = await convertToJsonPrompt(
+          genericPrompt,
+          currentScene.duration,
+          "9:16",
+        );
+
+        console.log(
+          `[ClipsTab] JSON prompt para cena ${sceneNumber}:`,
+          jsonPrompt,
+        );
+
+        // Get HTTP URL for reference image (needed for background jobs)
+        let imageUrl = sceneImage?.httpUrl || undefined;
+
+        // If we have data URL but no HTTP URL, upload it first
+        if (!imageUrl && hasReferenceImage && sceneImage?.dataUrl) {
+          const isDataUrl = sceneImage.dataUrl.startsWith("data:");
+          if (isDataUrl) {
+            try {
+              console.log(`[ClipsTab] Uploading scene image to blob for background job...`);
+              const uploadedUrl = await uploadImageToBlob(sceneImage.dataUrl);
+              imageUrl = uploadedUrl;
+            } catch (uploadErr) {
+              console.warn("[ClipsTab] Failed to upload scene image:", uploadErr);
+            }
+          } else {
+            // Already an HTTP URL
+            imageUrl = sceneImage.dataUrl;
+          }
+        }
+
+        // Map model name to API format
+        const apiModel: "veo-3.1" | "sora-2" = selectedVideoModel.includes("sora")
+          ? "sora-2"
+          : "veo-3.1";
+
+        // Try to use background jobs if available
+        if (userId && !isDevMode) {
+          try {
+            console.log(`[ClipsTab] Queueing video job for scene ${sceneNumber}...`);
+            const jobConfig: VideoJobConfig = {
+              model: apiModel,
+              aspectRatio: "9:16",
+              imageUrl,
+              sceneDuration: currentScene.duration,
+            };
+
+            await queueVideoJob(
+              userId,
+              jsonPrompt,
+              jobConfig,
+              `video-${clip.id}-scene-${sceneNumber}`,
+            );
+
+            console.log(`[ClipsTab] Video job queued for scene ${sceneNumber}`);
+            // Job is queued - loading state will be cleared when job completes
+            // Return immediately, don't wait for result
+            return { usedFallback: false, error: null };
+          } catch (queueErr) {
+            console.error("[ClipsTab] Failed to queue video job, falling back to sync:", queueErr);
+            // Fall through to synchronous generation
+          }
+        }
+
+        // Synchronous generation (dev mode or queue failed)
+        let videoUrl: string;
+
         if (isFalModel(selectedVideoModel)) {
-          // Use fal.ai (Sora 2) - includes narration context
-          const genericPrompt = buildPromptForSora(sceneNumber);
-          const imageUrl = sceneImage?.httpUrl || undefined;
-
-          // Converter prompt genérico para JSON estruturado
-          console.log(
-            `[ClipsTab] Sora prompt genérico para cena ${sceneNumber}:`,
-            genericPrompt,
-          );
-          const jsonPrompt = await convertToJsonPrompt(
-            genericPrompt,
-            currentScene.duration,
-            "9:16",
-          );
-          console.log(
-            `[ClipsTab] Sora JSON prompt para cena ${sceneNumber}:`,
-            jsonPrompt,
-          );
-
-          // Map model name to API format
-          const apiModel: ApiVideoModel = selectedVideoModel.includes("sora")
-            ? "sora-2"
-            : "veo-3.1";
+          // Use fal.ai (Sora 2) via server API
           videoUrl = await generateServerVideo({
             prompt: jsonPrompt,
             aspectRatio: "9:16",
@@ -1540,28 +1735,11 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
             sceneDuration: currentScene.duration,
           });
         } else {
-          // Use Veo 3.1 - includes narration for audio generation
-          const genericPrompt = buildPromptForVeo(sceneNumber);
-
-          // Converter prompt genérico para JSON estruturado
-          console.log(
-            `[ClipsTab] Veo prompt genérico para cena ${sceneNumber}:`,
-            genericPrompt,
-          );
-          const jsonPrompt = await convertToJsonPrompt(
-            genericPrompt,
-            currentScene.duration,
-            "9:16",
-          );
-          console.log(
-            `[ClipsTab] Veo JSON prompt para cena ${sceneNumber}:`,
-            jsonPrompt,
-          );
-
+          // Use Veo 3.1 via geminiService (for local/sync generation)
           // Prioritize scene reference image, fallback to logo
           let referenceImage: ImageFile | null = null;
 
-          if (hasReferenceImage && sceneImage.dataUrl) {
+          if (hasReferenceImage && sceneImage?.dataUrl) {
             // Check if it's a data URL or HTTP URL
             const isDataUrl = sceneImage.dataUrl.startsWith("data:");
             if (isDataUrl) {
@@ -1672,7 +1850,11 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
       selectedVideoModel,
       sceneImages,
       onAddImageToGallery,
+      clip.id,
       clip.title,
+      userId,
+      includeNarration,
+      videoStates,
     ],
   );
 
@@ -3638,28 +3820,22 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
   return (
     <>
-      <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 overflow-hidden">
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-white/5 bg-[#0d0d0d] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Icon name="play" className="w-4 h-4 text-primary" />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-white uppercase tracking-wide">
-                {clip.title}
-              </h3>
-              <p className="text-[10px] text-white/40">
-                {scenes.length} cenas • {totalDuration}s •{" "}
-                <span className="text-white/50 italic">"{clip.hook}"</span>
-              </p>
-            </div>
+      <div className="bg-[#0a0a0a] rounded-xl border border-white/[0.05] overflow-hidden">
+        {/* Header - Minimal */}
+        <div className="px-4 py-3 flex items-center justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[13px] font-semibold text-white truncate">
+              {clip.title}
+            </h3>
+            <p className="text-[10px] text-white/30 mt-0.5">
+              {scenes.length} cenas • {totalDuration}s
+            </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className="w-9 h-9 rounded-lg border border-white/10 bg-white/[0.03] text-white/50 hover:text-white hover:bg-white/[0.06] transition-all flex items-center justify-center"
-              title="Configurações do clip"
+              className="p-1.5 rounded-md text-white/30 hover:text-white/60 hover:bg-white/5 transition-all"
+              title="Configurações"
             >
               <Icon name="settings" className="w-4 h-4" />
             </button>
@@ -3670,16 +3846,16 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 isLoading={audioState.isLoading}
                 size="small"
                 icon="mic"
-                className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
+                className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
                 title="Gerar narração de áudio"
               >
                 Áudio
               </Button>
             )}
             {audioState.isLoading && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-[#0a0a0a] rounded-lg border border-white/10">
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-white/[0.06]">
                 <Loader />
-                <span className="text-[9px] text-white/50">Áudio...</span>
+                <span className="text-[9px] text-white/40">Áudio...</span>
               </div>
             )}
             {/* Action Buttons */}
@@ -3694,7 +3870,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 }
                 size="small"
                 icon="zap"
-                className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-primary/20 !text-primary !border !border-primary/30 hover:!bg-primary/30"
+                className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-primary/10 !text-primary/80 !border !border-primary/20 hover:!bg-primary/20"
                 title="Gerar capa + todas as imagens de referência deste clip"
               >
                 Gerar Todas
@@ -3706,7 +3882,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               disabled={isGeneratingImages || !thumbnail}
               size="small"
               icon="image"
-              className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
+              className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
               title={!thumbnail ? "Gere a capa primeiro" : undefined}
             >
               Imagens ({generatedImagesCount}/{scenes.length})
@@ -3719,7 +3895,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               }
               size="small"
               icon="zap"
-              className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
+              className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
             >
               Vídeos ({generatedVideosCount}/{scenes.length})
             </Button>
@@ -3730,7 +3906,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                 disabled={isGeneratingAll}
                 size="small"
                 icon="refresh"
-                className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
+                className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
                 title="Regenerar todos os vídeos com o modelo selecionado"
               >
                 Regenerar
@@ -3743,10 +3919,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   disabled={isGeneratingAll || isMerging}
                   size="small"
                   icon={hasSavedSession ? "play" : "edit"}
-                  className={`!rounded-lg !px-3 !py-2 !text-[9px] !border !border-white/10 hover:!text-white ${
+                  className={`!rounded-md !px-2.5 !py-1.5 !text-[9px] !border hover:!text-white/70 ${
                     hasSavedSession
-                      ? "!bg-primary/20 !text-primary hover:!bg-primary/30"
-                      : "!bg-[#0a0a0a] !text-white/70 hover:!bg-[#111]"
+                      ? "!bg-primary/10 !text-primary/80 !border-primary/20 hover:!bg-primary/20"
+                      : "!bg-transparent !text-white/40 !border-white/[0.06] hover:!bg-white/[0.03]"
                   }`}
                   title={
                     hasSavedSession
@@ -3762,7 +3938,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                     disabled={isGeneratingAll || isMerging}
                     size="small"
                     icon="plus"
-                    className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
+                    className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
                     title="Descartar edição salva e começar do zero"
                   >
                     Novo
@@ -3778,7 +3954,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               isLoading={isMerging}
               size="small"
               icon="video"
-              className="!rounded-lg !px-3 !py-2 !text-[9px] !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
+              className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
             >
               Juntar ({generatedVideosCount})
             </Button>
@@ -3789,7 +3965,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               disabled={
                 isGeneratingAll || (!mergedVideoUrl && !hasGeneratedVideos)
               }
-              className="px-3 py-2 rounded-lg bg-primary text-black hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1.5 rounded-md bg-primary/80 text-black hover:bg-primary transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               title="Exportar"
             >
               <Icon name="download" className="w-3.5 h-3.5" />
@@ -3801,20 +3977,17 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         {isEditing && editorState ? (
           <div className="flex flex-col min-h-[500px]">
             {/* Editor Header */}
-            <div className="px-5 py-3 border-b border-white/5 bg-[#0d0d0d] flex items-center justify-between">
+            <div className="px-4 py-3 border-t border-white/[0.05] flex items-center justify-between">
               <button
                 onClick={handleExitEditMode}
-                className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
+                className="flex items-center gap-1.5 text-white/40 hover:text-white/70 transition-colors"
               >
-                <Icon name="arrow-left" className="w-4 h-4" />
-                <span className="text-sm font-medium">Voltar</span>
+                <Icon name="arrow-left" className="w-3.5 h-3.5" />
+                <span className="text-[11px] font-medium">Voltar</span>
               </button>
-              <div className="flex items-center gap-2">
-                <Icon name="edit" className="w-4 h-4 text-primary" />
-                <span className="text-sm font-bold text-white">
-                  Editando Timeline
-                </span>
-              </div>
+              <span className="text-[11px] font-medium text-white/50">
+                Editando Timeline
+              </span>
               <Button
                 onClick={handleSaveEdit}
                 size="small"
@@ -4806,7 +4979,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   return (
                     <div
                       key={scene.sceneNumber}
-                      className="bg-[#0a0a0a] rounded-xl border border-white/5 overflow-hidden flex flex-col flex-shrink-0 w-72"
+                      className="bg-[#0a0a0a] rounded-lg border border-white/[0.05] overflow-hidden flex flex-col flex-shrink-0 w-72"
                     >
                       {/* Scene Preview - Carousel */}
                       <div className="aspect-[9/16] bg-black relative">
@@ -5149,6 +5322,8 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           onImageUpdate={handleThumbnailUpdate}
           onSetChatReference={onSetChatReference}
           downloadFilename={`thumbnail-${clip.title.toLowerCase().replace(/\s+/g, "_")}.png`}
+          onQuickPost={onQuickPost}
+          onSchedulePost={onSchedulePost}
         />
       )}
 
@@ -5159,6 +5334,8 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           onImageUpdate={handleSceneImageUpdate}
           onSetChatReference={onSetChatReference}
           downloadFilename={`cena-${editingSceneImage.sceneNumber}-${clip.title.toLowerCase().replace(/\s+/g, "_")}.png`}
+          onQuickPost={onQuickPost}
+          onSchedulePost={onSchedulePost}
         />
       )}
 
@@ -5588,8 +5765,13 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
   userId,
   galleryImages,
   campaignId,
+  instagramContext,
+  onSchedulePost,
 }) => {
   const [thumbnails, setThumbnails] = useState<(GalleryImage | null)[]>([]);
+  // QuickPost and Schedule modals
+  const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(null);
+  const [scheduleImage, setScheduleImage] = useState<GalleryImage | null>(null);
   const [extraInstructions, setExtraInstructions] = useState<string[]>([]);
   const [generationState, setGenerationState] = useState<{
     isGenerating: boolean[];
@@ -5676,9 +5858,10 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
     );
   }, [videoClipScripts, galleryImages]);
 
-  // Listen for job completions
+  // Listen for job completions (thumbnails only - video jobs are handled in ClipCard)
   useEffect(() => {
     const unsubComplete = onJobComplete(async (job: ActiveJob) => {
+      // Handle thumbnail (clip-) jobs
       if (job.context?.startsWith("clip-") && job.result_url) {
         const indexMatch = job.context.match(/clip-(\d+)/);
         if (indexMatch) {
@@ -5714,9 +5897,13 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
           }
         }
       }
+
+      // Note: Video job completions are handled in ClipCard component
+      // which has access to the video state for each clip
     });
 
     const unsubFailed = onJobFailed((job: ActiveJob) => {
+      // Handle thumbnail (clip-) job failures
       if (job.context?.startsWith("clip-")) {
         const indexMatch = job.context.match(/clip-(\d+)/);
         if (indexMatch) {
@@ -5730,6 +5917,8 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
           });
         }
       }
+
+      // Note: Video job failures are handled in ClipCard component
     });
 
     return () => {
@@ -5815,14 +6004,28 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
         });
       }
 
-      const generatedImageUrl = await generateImage(prompt, brandProfile, {
+      const generatedImageDataUrl = await generateImage(prompt, brandProfile, {
         aspectRatio: "9:16",
         model: selectedImageModel,
         productImages: productImages.length > 0 ? productImages : undefined,
       });
 
+      // Upload to Vercel Blob to get persistent HTTP URL
+      let httpUrl = generatedImageDataUrl;
+      if (generatedImageDataUrl.startsWith("data:")) {
+        const base64Data = generatedImageDataUrl.split(",")[1];
+        const mimeType = generatedImageDataUrl.match(/data:(.*?);/)?.[1] || "image/png";
+        try {
+          httpUrl = await uploadImageToBlob(base64Data, mimeType);
+          console.log("[ClipsTab] Uploaded thumbnail to blob:", httpUrl);
+        } catch (uploadErr) {
+          console.error("[ClipsTab] Failed to upload thumbnail to blob:", uploadErr);
+          // Fall back to data URL (won't persist but will show)
+        }
+      }
+
       const galleryImage = onAddImageToGallery({
-        src: generatedImageUrl,
+        src: httpUrl,
         prompt: clip.image_prompt,
         source: "Clipe",
         model: selectedImageModel,
@@ -5836,7 +6039,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
       // Update clip thumbnail_url in database for campaign previews
       if (clip.id) {
         try {
-          await updateClipThumbnail(clip.id, generatedImageUrl);
+          await updateClipThumbnail(clip.id, httpUrl);
         } catch (err) {
           console.error(
             "[ClipsTab] Failed to update clip thumbnail in database:",
@@ -5917,8 +6120,37 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
           campaignId={campaignId}
           onGenerateAllClipImages={() => handleGenerateAllForClip(index)}
           isGeneratingAllClipImages={generatingAllForClip === index}
+          onQuickPost={setQuickPostImage}
+          onSchedulePost={onSchedulePost ? setScheduleImage : undefined}
+          userId={userId}
         />
       ))}
+
+      {/* QuickPost Modal */}
+      {quickPostImage && (
+        <QuickPostModal
+          isOpen={!!quickPostImage}
+          onClose={() => setQuickPostImage(null)}
+          image={quickPostImage}
+          brandProfile={brandProfile}
+          context={quickPostImage.prompt || "Imagem do clip"}
+          instagramContext={instagramContext}
+        />
+      )}
+
+      {/* Schedule Modal */}
+      {scheduleImage && onSchedulePost && (
+        <SchedulePostModal
+          isOpen={!!scheduleImage}
+          onClose={() => setScheduleImage(null)}
+          onSchedule={(post) => {
+            onSchedulePost(post);
+            setScheduleImage(null);
+          }}
+          galleryImages={galleryImages || []}
+          initialImage={scheduleImage}
+        />
+      )}
     </div>
   );
 };

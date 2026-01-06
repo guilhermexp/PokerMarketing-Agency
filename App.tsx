@@ -849,6 +849,22 @@ function AppContent() {
         dbUpdates.last_publish_attempt = new Date(
           updates.lastPublishAttempt,
         ).toISOString();
+      if (updates.scheduledDate !== undefined)
+        dbUpdates.scheduled_date = updates.scheduledDate;
+      if (updates.scheduledTime !== undefined)
+        dbUpdates.scheduled_time = updates.scheduledTime;
+
+      // If date or time changed, recalculate the timestamp
+      if (updates.scheduledDate !== undefined || updates.scheduledTime !== undefined) {
+        // Find current post to get existing date/time if one is missing
+        const currentPost = swrScheduledPosts?.find(p => p.id === postId);
+        const newDate = updates.scheduledDate ?? currentPost?.scheduled_date;
+        const newTime = updates.scheduledTime ?? currentPost?.scheduled_time;
+        if (newDate && newTime) {
+          const timestamp = new Date(`${newDate}T${newTime}:00`);
+          dbUpdates.scheduled_timestamp = timestamp.toISOString();
+        }
+      }
 
       await updateScheduledPostApi(postId, dbUpdates);
       // Update SWR cache

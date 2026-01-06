@@ -363,25 +363,27 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           </div>
           <div className="flex flex-wrap gap-2">
             {viewMode === "references" && (
-              <Button
+              <button
                 onClick={() => fileInputRef.current?.click()}
-                variant="secondary"
-                size="small"
-                icon="upload"
+                className="flex items-center gap-1.5 px-3 py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all"
               >
+                <Icon name="upload" className="w-3 h-3" />
                 Adicionar
-              </Button>
+              </button>
             )}
-            <Button
+            <button
               onClick={() =>
                 setViewMode(viewMode === "gallery" ? "references" : "gallery")
               }
-              variant={viewMode === "references" ? "primary" : "secondary"}
-              size="small"
-              icon={viewMode === "gallery" ? "heart" : "layout"}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${
+                viewMode === "references"
+                  ? "bg-primary/10 text-primary/80 border border-primary/20"
+                  : "bg-transparent border border-white/[0.06] text-white/50 hover:border-white/[0.1] hover:text-white/70"
+              }`}
             >
+              <Icon name={viewMode === "gallery" ? "heart" : "layout"} className="w-3 h-3" />
               {viewMode === "gallery" ? "Favoritos" : "Galeria de Assets"}
-            </Button>
+            </button>
           </div>
         </div>
 

@@ -214,17 +214,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </>
             )}
           </div>
-          <Button
+          <button
             onClick={() => {
               setSelectedDate(null);
               setIsScheduleModalOpen(true);
             }}
-            variant="secondary"
-            icon="plus"
-            size="small"
+            className="flex items-center gap-1.5 px-3 py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all"
           >
+            <Icon name="plus" className="w-3 h-3" />
             Agendar Post
-          </Button>
+          </button>
         </div>
       </div>
 

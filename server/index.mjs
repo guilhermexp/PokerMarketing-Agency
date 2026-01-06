@@ -663,6 +663,89 @@ async function resolveUserId(sql, userId) {
 // ============================================================================
 
 /**
+ * Process video generation jobs
+ */
+const processVideoGenerationJob = async (job, jobId, prompt, config, sql) => {
+  console.log(`[JobProcessor] Processing VIDEO job ${jobId}`);
+
+  const { model, aspectRatio, imageUrl, sceneDuration } = config;
+
+  job.updateProgress(20);
+
+  let videoUrl;
+  let result;
+
+  // Use fal.ai for video generation
+  if (model === 'sora-2') {
+    // Sora model
+    if (imageUrl) {
+      result = await fal.subscribe('fal-ai/sora-2/image-to-video', {
+        input: {
+          prompt,
+          image_url: imageUrl,
+          duration: sceneDuration || 5,
+          aspect_ratio: aspectRatio || '9:16',
+          delete_video: false,
+        },
+      });
+    } else {
+      result = await fal.subscribe('fal-ai/sora-2/text-to-video', {
+        input: {
+          prompt,
+          duration: sceneDuration || 5,
+          aspect_ratio: aspectRatio || '9:16',
+          delete_video: false,
+        },
+      });
+    }
+    videoUrl = result?.data?.video?.url || result?.video?.url || '';
+  } else {
+    // Veo 3.1 model (default)
+    if (imageUrl) {
+      result = await fal.subscribe('fal-ai/veo3.1/fast/image-to-video', {
+        input: {
+          prompt,
+          image_url: imageUrl,
+          duration: sceneDuration ? String(sceneDuration) : '5',
+          aspect_ratio: aspectRatio || '9:16',
+        },
+      });
+    } else {
+      result = await fal.subscribe('fal-ai/veo3.1/fast', {
+        input: {
+          prompt,
+          duration: sceneDuration ? String(sceneDuration) : '5',
+          aspect_ratio: aspectRatio || '9:16',
+        },
+      });
+    }
+    videoUrl = result?.data?.video?.url || result?.video?.url || '';
+  }
+
+  job.updateProgress(70);
+
+  if (!videoUrl) {
+    throw new Error('Failed to generate video - invalid response');
+  }
+
+  console.log(`[JobProcessor] Video generated: ${videoUrl}`);
+
+  // Download video and upload to Vercel Blob for persistence
+  const videoResponse = await fetch(videoUrl);
+  const videoBlob = await videoResponse.blob();
+
+  const filename = `${model || 'veo'}-video-${jobId}.mp4`;
+  const blob = await put(filename, videoBlob, {
+    access: 'public',
+    contentType: 'video/mp4',
+  });
+
+  job.updateProgress(90);
+
+  return { resultUrl: blob.url };
+};
+
+/**
  * Process image generation jobs from BullMQ queue
  */
 const processGenerationJob = async (job) => {
@@ -672,6 +755,17 @@ const processGenerationJob = async (job) => {
   console.log(`[JobProcessor] Processing job ${jobId}`);
 
   try {
+    // Get job type from database
+    const jobRecord = await sql`
+      SELECT job_type, user_id, organization_id FROM generation_jobs WHERE id = ${jobId}
+    `;
+
+    if (jobRecord.length === 0) {
+      throw new Error("Job record not found");
+    }
+
+    const jobType = jobRecord[0].job_type;
+
     // Mark as processing
     await sql`
       UPDATE generation_jobs
@@ -682,6 +776,26 @@ const processGenerationJob = async (job) => {
     `;
 
     job.updateProgress(10);
+
+    // Handle video jobs differently
+    if (jobType === 'video') {
+      const { resultUrl } = await processVideoGenerationJob(job, jobId, prompt, config, sql);
+
+      // Mark as completed
+      await sql`
+        UPDATE generation_jobs
+        SET status = 'completed',
+            result_url = ${resultUrl},
+            completed_at = NOW(),
+            progress = 100
+        WHERE id = ${jobId}
+      `;
+
+      console.log(`[JobProcessor] Completed VIDEO job ${jobId}`);
+      return { success: true, resultUrl };
+    }
+
+    // Continue with image generation for other job types...
 
     // Build brand profile object for helpers
     const brandProfile = {
@@ -3771,6 +3885,15 @@ async function runAutoMigrations() {
     } catch (enumError) {
       // Might already exist or different PG version
       console.log("[Migration] Note: clip enum might already exist");
+    }
+
+    // Add 'video' to generation_job_type enum if not exists
+    try {
+      await sql`ALTER TYPE generation_job_type ADD VALUE IF NOT EXISTS 'video'`;
+      console.log("[Migration] ✓ Ensured 'video' job type exists");
+    } catch (enumError) {
+      // Might already exist or different PG version
+      console.log("[Migration] Note: video enum might already exist");
     }
 
     // Create instagram_accounts table if not exists

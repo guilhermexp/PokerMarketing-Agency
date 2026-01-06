@@ -132,20 +132,17 @@ const PostCard: React.FC<{
 
   return (
     <>
-      <div className="bg-[#0a0a0a] rounded-2xl border border-white/5 overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="px-5 py-3 border-b border-white/5 bg-[#0d0d0d] flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center">
-            <Icon name={icon} className="w-3 h-3 text-primary" />
-          </div>
-          <h3 className="text-xs font-black text-white uppercase tracking-wide">
+      <div className="bg-[#0a0a0a] rounded-xl border border-white/[0.05] overflow-hidden flex flex-col">
+        {/* Header - Minimal */}
+        <div className="px-4 py-2.5 flex items-center justify-between">
+          <span className="text-[11px] font-medium text-white/70">
             {post.platform}
-          </h3>
+          </span>
         </div>
 
-        <div className="p-4 space-y-3">
+        <div className="px-4 pb-4 space-y-3">
           {/* Image */}
-          <div className="aspect-square bg-[#080808] rounded-xl flex items-center justify-center relative overflow-hidden border border-white/5">
+          <div className="aspect-square bg-black/30 rounded-lg flex items-center justify-center relative overflow-hidden">
             {isGenerating ? (
               <Loader />
             ) : image ? (
@@ -212,13 +209,13 @@ const PostCard: React.FC<{
         </div>
 
         {/* Actions */}
-        <div className="p-4 pt-0 flex gap-2">
+        <div className="px-4 pb-4 pt-0 flex gap-2">
           {post.image_prompt && !image && (
             <Button
               onClick={onGenerate}
               isLoading={isGenerating}
               size="small"
-              className="flex-1 !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
+              className="flex-1 !rounded-md !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
               icon="image"
             >
               Gerar
@@ -228,7 +225,7 @@ const PostCard: React.FC<{
             <Button
               onClick={handleShare}
               size="small"
-              className="flex-1 !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
+              className="flex-1 !rounded-md !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
               icon="share-alt"
             >
               {isCopied ? "Copiado!" : "Copiar"}
@@ -619,8 +616,8 @@ export const PostsTab: React.FC<PostsTabProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Controls Bar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-5 bg-[#0a0a0a] rounded-2xl border border-white/5">
+      {/* Controls Bar - Minimal */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 px-4 py-3 bg-[#0a0a0a] rounded-xl border border-white/[0.05]">
         <Button
           onClick={handleGenerateAll}
           isLoading={isGeneratingAll}
@@ -629,24 +626,21 @@ export const PostsTab: React.FC<PostsTabProps> = ({
           }
           icon="zap"
           size="small"
+          className="!rounded-md !px-3 !py-1.5 !text-[10px] !bg-primary/10 !text-primary/80 !border !border-primary/20 hover:!bg-primary/20"
         >
-          Gerar Todas Imagens
+          Gerar Todas
         </Button>
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] font-black uppercase tracking-[0.15em] text-white/30">
-            Modelo:
-          </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] text-white/30">Modelo:</span>
           <select
             id="model-select-posts"
             value={selectedImageModel}
             onChange={(e) =>
               setSelectedImageModel(e.target.value as ImageModel)
             }
-            className="bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-primary/30 focus:border-primary/50 outline-none transition-all"
+            className="bg-transparent border border-white/[0.06] rounded-md px-2.5 py-1.5 text-[10px] text-white/60 focus:ring-1 focus:ring-primary/30 focus:border-primary/30 outline-none transition-all"
           >
-            <option value="gemini-3-pro-image-preview">
-              Gemini 3 Pro Image
-            </option>
+            <option value="gemini-3-pro-image-preview">Gemini 3 Pro</option>
             <option value="gemini-2.5-flash-image">Gemini 2.5 Flash</option>
             <option value="imagen-4.0-generate-001">Imagen 4.0</option>
           </select>

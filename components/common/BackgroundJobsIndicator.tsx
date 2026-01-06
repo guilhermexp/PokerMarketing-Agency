@@ -137,6 +137,7 @@ export const BackgroundJobsIndicator: React.FC = () => {
       post: "Post",
       ad: "Anúncio",
       clip: "Capa de Clipe",
+      video: "Vídeo",
     };
     return labels[type] || type;
   };

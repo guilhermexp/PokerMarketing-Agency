@@ -572,25 +572,23 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2 rounded-md text-[9px] font-black uppercase tracking-wider transition-all duration-200 ${
+                        className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all duration-200 ${
                           activeTab === tab.id
-                            ? "bg-white text-black"
-                            : "bg-white/5 text-white/40 hover:text-white hover:bg-white/10 border border-white/5"
+                            ? "bg-primary/10 text-primary/80 border border-primary/20"
+                            : "bg-transparent text-white/50 hover:text-white/70 hover:border-white/[0.1] border border-white/[0.06]"
                         }`}
                       >
                         {tab.label}
                       </button>
                     ))}
-                    <div className="w-px h-6 bg-white/10 mx-1"></div>
-                    <Button
+                    <div className="w-px h-6 bg-white/[0.06] mx-1"></div>
+                    <button
                       onClick={onResetCampaign}
-                      variant="secondary"
-                      icon="zap"
-                      size="small"
-                      className="rounded-md"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all"
                     >
+                      <Icon name="zap" className="w-3 h-3" />
                       Nova Campanha
-                    </Button>
+                    </button>
                   </div>
                 </div>
 
@@ -609,6 +607,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       userId={userId}
                       galleryImages={galleryImages}
                       campaignId={campaign.id}
+                      instagramContext={instagramContext}
+                      onSchedulePost={onSchedulePost}
                     />
                   )}
                   {activeTab === "carrossel" && (
@@ -800,7 +800,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
       <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
         <button
           onClick={onToggleAssistant}
-          className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-105 ${isAssistantOpen ? "bg-white/10 backdrop-blur-xl text-white border border-white/10" : "bg-white/10 backdrop-blur-xl text-white/60 hover:text-white border border-white/5"}`}
+          className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-105 ${isAssistantOpen ? "bg-white/10 backdrop-blur-xl text-white border border-white/10" : "bg-white/10 backdrop-blur-xl text-white/60 hover:text-white border border-white/5"}`}
         >
           <Icon name={isAssistantOpen ? "x" : "zap"} className="w-5 h-5" />
         </button>

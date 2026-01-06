@@ -865,7 +865,7 @@ export interface GenerationJobConfig {
 export interface GenerationJob {
   id: string;
   user_id: string;
-  job_type: "flyer" | "flyer_daily" | "post" | "ad" | "clip";
+  job_type: "flyer" | "flyer_daily" | "post" | "ad" | "clip" | "video";
   status: "queued" | "processing" | "completed" | "failed";
   progress: number;
   result_url: string | null;
@@ -875,7 +875,14 @@ export interface GenerationJob {
   started_at: string | null;
   completed_at: string | null;
   attempts: number;
-  context?: string; // Used to match job with UI component (e.g., "flyer-period-ALL")
+  context?: string; // Used to match job with UI component (e.g., "flyer-period-ALL", "video-scene-0")
+}
+
+export interface VideoJobConfig {
+  model: "veo-3.1" | "sora-2";
+  aspectRatio: string;
+  imageUrl?: string;
+  sceneDuration?: number;
 }
 
 export interface QueueJobResult {
@@ -891,9 +898,9 @@ export interface QueueJobResult {
  */
 export async function queueGenerationJob(
   userId: string,
-  jobType: "flyer" | "flyer_daily" | "post" | "ad" | "clip",
+  jobType: "flyer" | "flyer_daily" | "post" | "ad" | "clip" | "video",
   prompt: string,
-  config: GenerationJobConfig,
+  config: GenerationJobConfig | VideoJobConfig,
   context?: string,
   organizationId?: string | null,
 ): Promise<QueueJobResult> {
@@ -918,6 +925,20 @@ export async function queueGenerationJob(
   }
 
   return response.json();
+}
+
+/**
+ * Queue a video generation job for background processing
+ * Returns immediately, job runs in background via BullMQ
+ */
+export async function queueVideoJob(
+  userId: string,
+  prompt: string,
+  config: VideoJobConfig,
+  context: string,
+  organizationId?: string | null,
+): Promise<QueueJobResult> {
+  return queueGenerationJob(userId, "video", prompt, config, context, organizationId);
 }
 
 /**
