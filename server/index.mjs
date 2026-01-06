@@ -2456,9 +2456,10 @@ app.patch("/api/db/campaigns/scene", async (req, res) => {
     }
 
     // Update the specific scene with image_url
+    // Note: In DB, the field is "scene" not "sceneNumber"
     const scenes = clip.scenes || [];
     const updatedScenes = scenes.map((scene) => {
-      if (scene.sceneNumber === sceneNum) {
+      if (scene.scene === sceneNum) {
         return { ...scene, image_url: image_url || null };
       }
       return scene;
