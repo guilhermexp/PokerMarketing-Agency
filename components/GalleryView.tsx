@@ -55,6 +55,7 @@ interface GalleryItemProps {
   formatDuration: (seconds: number) => string;
   onToggleFavorite: (img: GalleryImage) => void;
   onSelect: (img: GalleryImage | null) => void;
+  getVideoPoster: (img: GalleryImage) => string | undefined;
   onDelete?: (id: string) => void;
   className?: string;
 }
@@ -67,6 +68,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
   formatDuration,
   onToggleFavorite,
   onSelect,
+  getVideoPoster,
   onDelete,
   className = "",
 }) => (
@@ -106,10 +108,11 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
     ) : isVideo(image) ? (
       <video
         src={image.src}
+        poster={getVideoPoster(image)}
         className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
         muted
         playsInline
-        preload="none"
+        preload={getVideoPoster(image) ? "none" : "metadata"}
         onMouseEnter={(e) => e.currentTarget.play()}
         onMouseLeave={(e) => {
           e.currentTarget.pause();
@@ -365,6 +368,25 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     });
   }, [pagedImages]);
 
+  const clipPosterByScriptId = React.useMemo(() => {
+    const map = new Map<string, string>();
+    images.forEach((img) => {
+      if (img.source !== "Clipe") return;
+      if (!img.video_script_id || !img.src) return;
+      if (!map.has(img.video_script_id)) {
+        map.set(img.video_script_id, img.src);
+      }
+    });
+    return map;
+  }, [images]);
+
+  const getVideoPoster = (image: GalleryImage): string | undefined => {
+    if (image.source === "Video Final" && image.video_script_id) {
+      return clipPosterByScriptId.get(image.video_script_id);
+    }
+    return undefined;
+  };
+
   return (
     <>
       {/* Hidden file input - outside main container */}
@@ -469,6 +491,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       formatDuration={formatDuration}
                       onToggleFavorite={handleToggleFavorite}
                       onSelect={setSelectedImage}
+                      getVideoPoster={getVideoPoster}
                       onDelete={onDeleteImage}
                       className="break-inside-avoid mb-3"
                     />
