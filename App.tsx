@@ -387,9 +387,36 @@ function AppContent() {
     Record<string, (GalleryImage | "loading")[]>
   >({});
   // Daily flyer state: { DAY: { PERIOD: [flyers] } }
+  // Persisted to localStorage per schedule
   const [dailyFlyerState, setDailyFlyerState] = useState<
     Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>
-  >({});
+  >(() => {
+    // Load from localStorage on init
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('dailyFlyerState');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Filter out "loading" items (they shouldn't be persisted)
+          const filtered: Record<string, Record<string, GalleryImage[]>> = {};
+          Object.entries(parsed).forEach(([day, periods]) => {
+            if (periods && typeof periods === 'object') {
+              filtered[day] = {};
+              Object.entries(periods as Record<string, unknown[]>).forEach(([period, flyers]) => {
+                if (Array.isArray(flyers)) {
+                  filtered[day][period] = flyers.filter(f => f !== "loading") as GalleryImage[];
+                }
+              });
+            }
+          });
+          return filtered as Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>;
+        }
+      } catch (e) {
+        console.warn('[App] Failed to load dailyFlyerState from localStorage:', e);
+      }
+    }
+    return {};
+  });
 
   const [theme, setTheme] = useState<Theme>("dark");
   const [styleReferences, setStyleReferences] = useState<StyleReference[]>([]);
@@ -440,6 +467,7 @@ function AppContent() {
 
   // Load daily flyer state from localStorage and match with gallery images
   const hasRestoredDailyFlyersRef = useRef(false);
+  // Restore daily flyer state from localStorage (new structure: { DAY: { PERIOD: [ids] } })
   useEffect(() => {
     if (!galleryImages.length || hasRestoredDailyFlyersRef.current) return;
 
@@ -447,28 +475,37 @@ function AppContent() {
     if (!savedDailyFlyers) return;
 
     try {
-      const mapping: Record<TimePeriod, string[]> = JSON.parse(savedDailyFlyers);
-      const newState: Record<TimePeriod, GalleryImage[]> = {
-        ALL: [],
-        MORNING: [],
-        AFTERNOON: [],
-        NIGHT: [],
-        HIGHLIGHTS: [],
-      };
+      const mapping = JSON.parse(savedDailyFlyers);
+      const newState: Record<string, Record<TimePeriod, GalleryImage[]>> = {};
 
-      // Match saved IDs with actual gallery images
-      Object.entries(mapping).forEach(([period, ids]) => {
-        const periodKey = period as TimePeriod;
-        ids.forEach((id) => {
-          const image = galleryImages.find((img) => img.id === id);
-          if (image) {
-            newState[periodKey].push(image);
+      // Check if it's the new structure (by day) or old structure (by period only)
+      const firstKey = Object.keys(mapping)[0];
+      const dayOrder = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+      const isNewStructure = firstKey && dayOrder.includes(firstKey);
+
+      if (isNewStructure) {
+        // New structure: { DAY: { PERIOD: [ids] } }
+        Object.entries(mapping).forEach(([day, periods]) => {
+          if (periods && typeof periods === 'object') {
+            newState[day] = { ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: [] };
+            Object.entries(periods as Record<string, string[]>).forEach(([period, ids]) => {
+              if (Array.isArray(ids)) {
+                ids.forEach((id) => {
+                  const image = galleryImages.find((img) => img.id === id);
+                  if (image) {
+                    newState[day][period as TimePeriod].push(image);
+                  }
+                });
+              }
+            });
           }
         });
-      });
+      }
 
       // Only update if we found any matches
-      const hasImages = Object.values(newState).some((arr) => arr.length > 0);
+      const hasImages = Object.values(newState).some((dayData) =>
+        Object.values(dayData).some((arr) => arr.length > 0)
+      );
       if (hasImages) {
         hasRestoredDailyFlyersRef.current = true;
         setDailyFlyerState(newState);
@@ -479,13 +516,15 @@ function AppContent() {
     }
   }, [galleryImages]);
 
-  // Save daily flyer state to localStorage when it changes
+  // Save daily flyer state to localStorage when it changes (new structure: { DAY: { PERIOD: [ids] } })
   useEffect(() => {
     // Don't save during initial restore
     if (!hasRestoredDailyFlyersRef.current) {
       // Check if there's something to save (user generated new flyers)
-      const hasRealImages = Object.values(dailyFlyerState).some(
-        (arr) => arr.some((item) => item !== "loading" && typeof item === "object")
+      const hasRealImages = Object.values(dailyFlyerState).some((dayData) =>
+        dayData && typeof dayData === 'object' && Object.values(dayData).some(
+          (arr) => Array.isArray(arr) && arr.some((item) => item !== "loading" && typeof item === "object")
+        )
       );
       if (hasRealImages) {
         hasRestoredDailyFlyersRef.current = true; // Mark as ready to save
@@ -494,16 +533,25 @@ function AppContent() {
       }
     }
 
-    // Extract just the IDs for each period
-    const mapping: Record<string, string[]> = {};
-    Object.entries(dailyFlyerState).forEach(([period, images]) => {
-      mapping[period] = images
-        .filter((img): img is GalleryImage => img !== "loading" && typeof img === "object")
-        .map((img) => img.id);
+    // Extract just the IDs for each day/period
+    const mapping: Record<string, Record<string, string[]>> = {};
+    Object.entries(dailyFlyerState).forEach(([day, periods]) => {
+      if (periods && typeof periods === 'object') {
+        mapping[day] = {};
+        Object.entries(periods).forEach(([period, images]) => {
+          if (Array.isArray(images)) {
+            mapping[day][period] = images
+              .filter((img): img is GalleryImage => img !== "loading" && typeof img === "object")
+              .map((img) => img.id);
+          }
+        });
+      }
     });
 
     // Only save if there's at least one image
-    const hasAnyImages = Object.values(mapping).some((ids) => ids.length > 0);
+    const hasAnyImages = Object.values(mapping).some((dayData) =>
+      Object.values(dayData).some((ids) => ids.length > 0)
+    );
     if (hasAnyImages) {
       localStorage.setItem("dailyFlyerMapping", JSON.stringify(mapping));
       console.log("[App] Saved daily flyer mapping to localStorage");
