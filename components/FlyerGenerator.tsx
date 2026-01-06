@@ -24,10 +24,8 @@ import type {
   GenerationJobConfig,
   WeekScheduleWithCount,
 } from "../services/apiClient";
-import {
-  addEventFlyer,
-  addDailyFlyer,
-} from "../services/apiClient";
+import { urlToBase64 } from "../utils/imageHelpers";
+import { addEventFlyer, addDailyFlyer } from "../services/apiClient";
 
 // Check if we're in development mode (QStash won't work locally)
 const isDevMode =
@@ -52,9 +50,14 @@ interface FlyerGeneratorProps {
   setFlyerState: React.Dispatch<
     React.SetStateAction<Record<string, (GalleryImage | "loading")[]>>
   >;
-  dailyFlyerState: Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>;
+  dailyFlyerState: Record<
+    string,
+    Record<TimePeriod, (GalleryImage | "loading")[]>
+  >;
   setDailyFlyerState: React.Dispatch<
-    React.SetStateAction<Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>>
+    React.SetStateAction<
+      Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>
+    >
   >;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
@@ -74,7 +77,12 @@ interface FlyerGeneratorProps {
   instagramContext?: InstagramContext;
   // Scheduling
   galleryImages?: GalleryImage[];
-  onSchedulePost?: (post: Omit<import("../types").ScheduledPost, "id" | "createdAt" | "updatedAt">) => void;
+  onSchedulePost?: (
+    post: Omit<
+      import("../types").ScheduledPost,
+      "id" | "createdAt" | "updatedAt"
+    >,
+  ) => void;
 }
 
 const formatCurrencyValue = (val: string, currency: Currency): string => {
@@ -99,46 +107,7 @@ const fileToBase64 = (
     reader.onerror = (error) => reject(error);
   });
 
-// Convert URL (HTTP or data URL) to base64 with mimeType
-const urlToBase64 = async (
-  src: string,
-): Promise<{ base64: string; mimeType: string } | null> => {
-  if (!src) return null;
-
-  // Already a data URL - extract base64
-  if (src.startsWith("data:")) {
-    const match = src.match(/^data:([^;]+);base64,(.+)$/);
-    if (match) {
-      return { base64: match[2], mimeType: match[1] };
-    }
-    // Fallback for malformed data URLs
-    const parts = src.split(",");
-    return { base64: parts[1] || "", mimeType: "image/png" };
-  }
-
-  // HTTP URL - fetch and convert to base64
-  try {
-    const response = await fetch(src);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-        if (match) {
-          resolve({ base64: match[2], mimeType: match[1] });
-        } else {
-          resolve({ base64: dataUrl.split(",")[1] || "", mimeType: blob.type || "image/png" });
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error("[urlToBase64] Failed to convert URL:", src, error);
-    return null;
-  }
-};
+// urlToBase64 imported from utils/imageHelpers
 
 const handleDownloadFlyer = (src: string, filename: string) => {
   const link = document.createElement("a");
@@ -225,86 +194,86 @@ const FlyerThumbStrip: React.FC<{
         className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent scroll-smooth px-4"
         style={{ scrollSnapType: "x mandatory" }}
       >
-      {images.map((flyer, index) => (
-        <div
-          key={flyer === "loading" ? `loading-${index}` : flyer.id}
-          className="flex-shrink-0 w-[140px] group"
-          style={{ scrollSnapAlign: "start" }}
-        >
-          <div className="aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border border-white/5 relative">
-            {flyer === "loading" ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
-                <Loader className="w-6 h-6 mb-2 text-primary" />
-                <p className="text-[8px] font-black text-white/40 uppercase tracking-widest animate-pulse">
-                  Gerando...
-                </p>
-              </div>
-            ) : (
-              <>
-                <img
-                  src={flyer.src}
-                  className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
-                  onClick={() => onEdit(flyer)}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-2 gap-1">
-                  {/* Primary action */}
-                  <button
-                    onClick={() => onQuickPost(flyer)}
-                    className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-primary hover:bg-primary/90 rounded-lg text-black font-bold text-[8px] uppercase tracking-wide transition-all"
-                  >
-                    <Icon name="zap" className="w-2.5 h-2.5" />
-                    Publicar
-                  </button>
-                  {/* Secondary actions - compact icons */}
-                  <div className="flex gap-1 justify-center">
-                    {onSchedule && (
-                      <button
-                        onClick={() => onSchedule(flyer)}
-                        className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
-                        title="Agendar"
-                      >
-                        <Icon name="calendar" className="w-3 h-3" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => onEdit(flyer)}
-                      className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
-                      title="Visualizar"
-                    >
-                      <Icon name="eye" className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => onDownload(flyer, index)}
-                      className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
-                      title="Download"
-                    >
-                      <Icon name="download" className="w-3 h-3" />
-                    </button>
-                    {showPublish && (
-                      <button
-                        onClick={() => onPublish(flyer)}
-                        className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
-                        title="Campanha"
-                      >
-                        <Icon name="users" className="w-3 h-3" />
-                      </button>
-                    )}
-                    {onCloneStyle && (
-                      <button
-                        onClick={() => onCloneStyle(flyer)}
-                        className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
-                        title="Usar como modelo"
-                      >
-                        <Icon name="copy" className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
+        {images.map((flyer, index) => (
+          <div
+            key={flyer === "loading" ? `loading-${index}` : flyer.id}
+            className="flex-shrink-0 w-[140px] group"
+            style={{ scrollSnapAlign: "start" }}
+          >
+            <div className="aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border border-white/5 relative">
+              {flyer === "loading" ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
+                  <Loader className="w-6 h-6 mb-2 text-primary" />
+                  <p className="text-[8px] font-black text-white/40 uppercase tracking-widest animate-pulse">
+                    Gerando...
+                  </p>
                 </div>
-              </>
-            )}
+              ) : (
+                <>
+                  <img
+                    src={flyer.src}
+                    className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
+                    onClick={() => onEdit(flyer)}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-2 gap-1">
+                    {/* Primary action */}
+                    <button
+                      onClick={() => onQuickPost(flyer)}
+                      className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-primary hover:bg-primary/90 rounded-lg text-black font-bold text-[8px] uppercase tracking-wide transition-all"
+                    >
+                      <Icon name="zap" className="w-2.5 h-2.5" />
+                      Publicar
+                    </button>
+                    {/* Secondary actions - compact icons */}
+                    <div className="flex gap-1 justify-center">
+                      {onSchedule && (
+                        <button
+                          onClick={() => onSchedule(flyer)}
+                          className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
+                          title="Agendar"
+                        >
+                          <Icon name="calendar" className="w-3 h-3" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onEdit(flyer)}
+                        className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
+                        title="Visualizar"
+                      >
+                        <Icon name="eye" className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => onDownload(flyer, index)}
+                        className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
+                        title="Download"
+                      >
+                        <Icon name="download" className="w-3 h-3" />
+                      </button>
+                      {showPublish && (
+                        <button
+                          onClick={() => onPublish(flyer)}
+                          className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
+                          title="Campanha"
+                        >
+                          <Icon name="users" className="w-3 h-3" />
+                        </button>
+                      )}
+                      {onCloneStyle && (
+                        <button
+                          onClick={() => onCloneStyle(flyer)}
+                          className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
+                          title="Usar como modelo"
+                        >
+                          <Icon name="copy" className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
       </div>
     </div>
   );
@@ -334,7 +303,12 @@ const TournamentEventCard: React.FC<{
   userId?: string | null;
   instagramContext?: InstagramContext;
   galleryImages?: GalleryImage[];
-  onSchedulePost?: (post: Omit<import("../types").ScheduledPost, "id" | "createdAt" | "updatedAt">) => void;
+  onSchedulePost?: (
+    post: Omit<
+      import("../types").ScheduledPost,
+      "id" | "createdAt" | "updatedAt"
+    >,
+  ) => void;
 }> = ({
   event,
   brandProfile,
@@ -544,7 +518,10 @@ const TournamentEventCard: React.FC<{
         try {
           await addEventFlyer(event.id, imageUrl);
         } catch (err) {
-          console.error("[FlyerGenerator] Failed to save flyer to database:", err);
+          console.error(
+            "[FlyerGenerator] Failed to save flyer to database:",
+            err,
+          );
         }
       }
     } catch (err) {
@@ -598,26 +575,31 @@ const TournamentEventCard: React.FC<{
         </div>
         <div className="flex items-center gap-2 ml-4">
           {/* Schedule button - only show if there are generated flyers */}
-          {onSchedulePost && generatedFlyers.some(f => f !== "loading") && (() => {
-            const firstFlyer = generatedFlyers.find(f => f !== "loading") as GalleryImage;
-            const isScheduled = firstFlyer && scheduledUrls.has(firstFlyer.src);
-            return isScheduled ? (
-              <span className="px-2 py-1 text-[9px] font-bold text-green-400 bg-green-500/10 rounded-lg">
-                Agendado
-              </span>
-            ) : (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (firstFlyer) setScheduleFlyer(firstFlyer);
-                }}
-                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
-                title="Agendar publicação"
-              >
-                <Icon name="calendar" className="w-4 h-4 text-white/60" />
-              </button>
-            );
-          })()}
+          {onSchedulePost &&
+            generatedFlyers.some((f) => f !== "loading") &&
+            (() => {
+              const firstFlyer = generatedFlyers.find(
+                (f) => f !== "loading",
+              ) as GalleryImage;
+              const isScheduled =
+                firstFlyer && scheduledUrls.has(firstFlyer.src);
+              return isScheduled ? (
+                <span className="px-2 py-1 text-[9px] font-bold text-green-400 bg-green-500/10 rounded-lg">
+                  Agendado
+                </span>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (firstFlyer) setScheduleFlyer(firstFlyer);
+                  }}
+                  className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                  title="Agendar publicação"
+                >
+                  <Icon name="calendar" className="w-4 h-4 text-white/60" />
+                </button>
+              );
+            })()}
           <Button
             size="small"
             variant="primary"
@@ -691,7 +673,7 @@ const TournamentEventCard: React.FC<{
             onSchedulePost(post);
             // Mark as scheduled
             if (scheduleFlyer?.src) {
-              setScheduledUrls(prev => new Set(prev).add(scheduleFlyer.src));
+              setScheduledUrls((prev) => new Set(prev).add(scheduleFlyer.src));
             }
           }}
           initialImage={scheduleFlyer}
@@ -704,12 +686,18 @@ const TournamentEventCard: React.FC<{
 // Helper to get initial time based on period
 const getInitialTimeForPeriod = (period: TimePeriod): string => {
   switch (period) {
-    case "MORNING": return "06:00";
-    case "AFTERNOON": return "12:00";
-    case "NIGHT": return "18:00";
-    case "HIGHLIGHTS": return "19:00";
-    case "ALL": return "08:00";
-    default: return "09:00";
+    case "MORNING":
+      return "06:00";
+    case "AFTERNOON":
+      return "12:00";
+    case "NIGHT":
+      return "18:00";
+    case "HIGHLIGHTS":
+      return "19:00";
+    case "ALL":
+      return "08:00";
+    default:
+      return "09:00";
   }
 };
 
@@ -744,7 +732,12 @@ const PeriodCardRow: React.FC<{
   userId?: string | null;
   instagramContext?: InstagramContext;
   galleryImages?: GalleryImage[];
-  onSchedulePost?: (post: Omit<import("../types").ScheduledPost, "id" | "createdAt" | "updatedAt">) => void;
+  onSchedulePost?: (
+    post: Omit<
+      import("../types").ScheduledPost,
+      "id" | "createdAt" | "updatedAt"
+    >,
+  ) => void;
 }> = ({
   period,
   label,
@@ -1001,7 +994,10 @@ const PeriodCardRow: React.FC<{
           try {
             await addDailyFlyer(scheduleId, period, imageUrl);
           } catch (err) {
-            console.error("[FlyerGenerator] Failed to save daily flyer to database:", err);
+            console.error(
+              "[FlyerGenerator] Failed to save daily flyer to database:",
+              err,
+            );
           }
         }
       } catch (err) {
@@ -1090,26 +1086,31 @@ const PeriodCardRow: React.FC<{
         </div>
         <div className="flex items-center gap-2 ml-4">
           {/* Schedule button - only show if there are generated flyers */}
-          {onSchedulePost && generatedFlyers.some(f => f !== "loading") && (() => {
-            const firstFlyer = generatedFlyers.find(f => f !== "loading") as GalleryImage;
-            const isScheduled = firstFlyer && scheduledUrls.has(firstFlyer.src);
-            return isScheduled ? (
-              <span className="px-2 py-1 text-[9px] font-bold text-green-400 bg-green-500/10 rounded-lg">
-                Agendado
-              </span>
-            ) : (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (firstFlyer) setScheduleFlyer(firstFlyer);
-                }}
-                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
-                title="Agendar publicação"
-              >
-                <Icon name="calendar" className="w-4 h-4 text-white/60" />
-              </button>
-            );
-          })()}
+          {onSchedulePost &&
+            generatedFlyers.some((f) => f !== "loading") &&
+            (() => {
+              const firstFlyer = generatedFlyers.find(
+                (f) => f !== "loading",
+              ) as GalleryImage;
+              const isScheduled =
+                firstFlyer && scheduledUrls.has(firstFlyer.src);
+              return isScheduled ? (
+                <span className="px-2 py-1 text-[9px] font-bold text-green-400 bg-green-500/10 rounded-lg">
+                  Agendado
+                </span>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (firstFlyer) setScheduleFlyer(firstFlyer);
+                  }}
+                  className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                  title="Agendar publicação"
+                >
+                  <Icon name="calendar" className="w-4 h-4 text-white/60" />
+                </button>
+              );
+            })()}
           <Button
             size="small"
             variant={events.length > 0 ? "primary" : "secondary"}
@@ -1187,7 +1188,7 @@ const PeriodCardRow: React.FC<{
             onSchedulePost(post);
             // Mark as scheduled
             if (scheduleFlyer?.src) {
-              setScheduledUrls(prev => new Set(prev).add(scheduleFlyer.src));
+              setScheduledUrls((prev) => new Set(prev).add(scheduleFlyer.src));
             }
           }}
           initialImage={scheduleFlyer}
@@ -1229,7 +1230,12 @@ const PeriodCard: React.FC<{
   userId?: string | null;
   instagramContext?: InstagramContext;
   galleryImages?: GalleryImage[];
-  onSchedulePost?: (post: Omit<import("../types").ScheduledPost, "id" | "createdAt" | "updatedAt">) => void;
+  onSchedulePost?: (
+    post: Omit<
+      import("../types").ScheduledPost,
+      "id" | "createdAt" | "updatedAt"
+    >,
+  ) => void;
 }> = ({
   period,
   label,
@@ -1565,9 +1571,7 @@ const PeriodCard: React.FC<{
             </div>
           )}
           <div>
-            <h4 className="text-[11px] font-semibold text-white">
-              {label}
-            </h4>
+            <h4 className="text-[11px] font-semibold text-white">{label}</h4>
             <p
               className={`text-[9px] ${events.length > 0 ? "text-white/40" : "text-white/20"}`}
             >
@@ -1577,26 +1581,31 @@ const PeriodCard: React.FC<{
         </div>
         <div className="flex items-center gap-2">
           {/* Schedule button - only show if there are generated flyers */}
-          {onSchedulePost && generatedFlyers.some(f => f !== "loading") && (() => {
-            const firstFlyer = generatedFlyers.find(f => f !== "loading") as GalleryImage;
-            const isScheduled = firstFlyer && scheduledUrls.has(firstFlyer.src);
-            return isScheduled ? (
-              <span className="px-2 py-1 text-[9px] font-bold text-green-400 bg-green-500/10 rounded-lg">
-                Agendado
-              </span>
-            ) : (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (firstFlyer) setScheduleFlyer(firstFlyer);
-                }}
-                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
-                title="Agendar publicação"
-              >
-                <Icon name="calendar" className="w-4 h-4 text-white/60" />
-              </button>
-            );
-          })()}
+          {onSchedulePost &&
+            generatedFlyers.some((f) => f !== "loading") &&
+            (() => {
+              const firstFlyer = generatedFlyers.find(
+                (f) => f !== "loading",
+              ) as GalleryImage;
+              const isScheduled =
+                firstFlyer && scheduledUrls.has(firstFlyer.src);
+              return isScheduled ? (
+                <span className="px-2 py-1 text-[9px] font-bold text-green-400 bg-green-500/10 rounded-lg">
+                  Agendado
+                </span>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (firstFlyer) setScheduleFlyer(firstFlyer);
+                  }}
+                  className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                  title="Agendar publicação"
+                >
+                  <Icon name="calendar" className="w-4 h-4 text-white/60" />
+                </button>
+              );
+            })()}
           <Button
             size="small"
             variant={events.length > 0 ? "primary" : "secondary"}
@@ -1666,7 +1675,7 @@ const PeriodCard: React.FC<{
             onSchedulePost(post);
             // Mark as scheduled
             if (scheduleFlyer?.src) {
-              setScheduledUrls(prev => new Set(prev).add(scheduleFlyer.src));
+              setScheduledUrls((prev) => new Set(prev).add(scheduleFlyer.src));
             }
           }}
           initialImage={scheduleFlyer}
@@ -1722,8 +1731,7 @@ const ManualEventModal: React.FC<{
 
   const inputClass =
     "w-full bg-transparent border border-white/[0.06] rounded-md px-3 py-2 text-xs text-white outline-none focus:border-primary/30 placeholder:text-white/20";
-  const labelClass =
-    "text-[9px] text-white/30";
+  const labelClass = "text-[9px] text-white/30";
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
@@ -2004,19 +2012,35 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     false, // Always start with "Grades de Período" view
   );
   const [showPastTournaments, setShowPastTournaments] = useState(false); // Collapsed by default
-  const [enabledPeriods, setEnabledPeriods] = useState<Record<TimePeriod, boolean>>(() => {
+  const [enabledPeriods, setEnabledPeriods] = useState<
+    Record<TimePeriod, boolean>
+  >(() => {
     const saved = localStorage.getItem("flyer_enabledPeriods");
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch {
-        return { ALL: true, MORNING: true, AFTERNOON: true, NIGHT: true, HIGHLIGHTS: true };
+        return {
+          ALL: true,
+          MORNING: true,
+          AFTERNOON: true,
+          NIGHT: true,
+          HIGHLIGHTS: true,
+        };
       }
     }
-    return { ALL: true, MORNING: true, AFTERNOON: true, NIGHT: true, HIGHLIGHTS: true };
+    return {
+      ALL: true,
+      MORNING: true,
+      AFTERNOON: true,
+      NIGHT: true,
+      HIGHLIGHTS: true,
+    };
   });
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [activeHelpTooltip, setActiveHelpTooltip] = useState<string | null>(null);
+  const [activeHelpTooltip, setActiveHelpTooltip] = useState<string | null>(
+    null,
+  );
   const [showOnlyWithGtd, setShowOnlyWithGtd] = useState(() => {
     return localStorage.getItem("flyer_showOnlyWithGtd") === "true";
   });
@@ -2066,7 +2090,10 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     localStorage.setItem("flyer_sortBy", sortBy);
   }, [sortBy]);
   useEffect(() => {
-    localStorage.setItem("flyer_enabledPeriods", JSON.stringify(enabledPeriods));
+    localStorage.setItem(
+      "flyer_enabledPeriods",
+      JSON.stringify(enabledPeriods),
+    );
   }, [enabledPeriods]);
   useEffect(() => {
     try {
@@ -2141,7 +2168,9 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   const prevSelectedDayRef = React.useRef(selectedDay);
   useEffect(() => {
     if (prevSelectedDayRef.current !== selectedDay) {
-      console.log(`[FlyerGenerator] Day changed from ${prevSelectedDayRef.current} to ${selectedDay}`);
+      console.log(
+        `[FlyerGenerator] Day changed from ${prevSelectedDayRef.current} to ${selectedDay}`,
+      );
       prevSelectedDayRef.current = selectedDay;
     }
   }, [selectedDay]);
@@ -2150,7 +2179,9 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   const prevScheduleIdRef = React.useRef(currentScheduleId);
   useEffect(() => {
     if (prevScheduleIdRef.current !== currentScheduleId && currentScheduleId) {
-      console.log(`[FlyerGenerator] Schedule changed from ${prevScheduleIdRef.current} to ${currentScheduleId}, resetting to today`);
+      console.log(
+        `[FlyerGenerator] Schedule changed from ${prevScheduleIdRef.current} to ${currentScheduleId}, resetting to today`,
+      );
       const todayDayName = daysMap[new Date().getDay()];
       setSelectedDay(todayDayName);
       prevScheduleIdRef.current = currentScheduleId;
@@ -2174,7 +2205,11 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
       }
     });
     if (Object.keys(newFlyerState).length > 0) {
-      console.log("[FlyerGenerator] Recovered event flyers from database:", Object.keys(newFlyerState).length, "events");
+      console.log(
+        "[FlyerGenerator] Recovered event flyers from database:",
+        Object.keys(newFlyerState).length,
+        "events",
+      );
       setFlyerState((prev) => ({ ...prev, ...newFlyerState }));
     }
   }, [events, setFlyerState]);
@@ -2191,32 +2226,48 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
 
       if (isNewStructure) {
         // New structure: { DAY: { PERIOD: [urls] } }
-        const newDailyState: Record<string, Record<string, GalleryImage[]>> = {};
+        const newDailyState: Record<
+          string,
+          Record<string, GalleryImage[]>
+        > = {};
 
         dayOrder.forEach((day) => {
           const dayData = dailyUrls[day];
-          if (dayData && typeof dayData === 'object') {
+          if (dayData && typeof dayData === "object") {
             newDailyState[day] = {};
-            (["MORNING", "AFTERNOON", "NIGHT", "HIGHLIGHTS", "ALL"] as TimePeriod[]).forEach((period) => {
+            (
+              [
+                "MORNING",
+                "AFTERNOON",
+                "NIGHT",
+                "HIGHLIGHTS",
+                "ALL",
+              ] as TimePeriod[]
+            ).forEach((period) => {
               const urls = dayData[period];
               if (urls && Array.isArray(urls) && urls.length > 0) {
-                newDailyState[day][period] = urls.map((url: string, idx: number) => ({
-                  id: `recovered-daily-${day}-${period}-${idx}`,
-                  src: url,
-                  prompt: "",
-                  source: "Flyer Diário",
-                  model: "gemini-3-pro-image-preview" as const,
-                  week_schedule_id: weekScheduleInfo.id,
-                  daily_flyer_period: period,
-                  daily_flyer_day: day,
-                }));
+                newDailyState[day][period] = urls.map(
+                  (url: string, idx: number) => ({
+                    id: `recovered-daily-${day}-${period}-${idx}`,
+                    src: url,
+                    prompt: "",
+                    source: "Flyer Diário",
+                    model: "gemini-3-pro-image-preview" as const,
+                    week_schedule_id: weekScheduleInfo.id,
+                    daily_flyer_period: period,
+                    daily_flyer_day: day,
+                  }),
+                );
               }
             });
           }
         });
 
         if (Object.keys(newDailyState).length > 0) {
-          console.log("[FlyerGenerator] Recovered daily flyers (new structure) from database:", Object.keys(newDailyState));
+          console.log(
+            "[FlyerGenerator] Recovered daily flyers (new structure) from database:",
+            Object.keys(newDailyState),
+          );
           setDailyFlyerState((prev) => ({
             ...prev,
             ...newDailyState,
@@ -2348,9 +2399,10 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     // Use Date object to handle month/year transitions correctly
     const currentYear = new Date().getFullYear();
     // Determine the correct year for the start date
-    const startYear = startMonth === 12 && new Date().getMonth() === 0
-      ? currentYear - 1
-      : currentYear;
+    const startYear =
+      startMonth === 12 && new Date().getMonth() === 0
+        ? currentYear - 1
+        : currentYear;
     const startDate = new Date(startYear, startMonth - 1, startDay);
     startDate.setDate(startDate.getDate() + diff);
 
@@ -2370,9 +2422,10 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     const diff = dayIndex - startDayIndex;
 
     const currentYear = new Date().getFullYear();
-    const startYear = startMonth === 12 && new Date().getMonth() === 0
-      ? currentYear - 1
-      : currentYear;
+    const startYear =
+      startMonth === 12 && new Date().getMonth() === 0
+        ? currentYear - 1
+        : currentYear;
     const startDate = new Date(startYear, startMonth - 1, startDay);
     startDate.setDate(startDate.getDate() + diff);
 
@@ -2517,22 +2570,33 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 <div className="hidden md:flex items-center gap-2">
                   {/* Week stats card */}
                   <button
-                    onClick={() => setIsSchedulesPanelOpen(!isSchedulesPanelOpen)}
+                    onClick={() =>
+                      setIsSchedulesPanelOpen(!isSchedulesPanelOpen)
+                    }
                     className="flex items-center gap-2 px-2.5 py-1.5 bg-transparent border border-white/[0.06] rounded-md hover:border-white/[0.1] transition-all"
                   >
-                    <Icon name="calendar" className="w-3.5 h-3.5 text-white/30" />
+                    <Icon
+                      name="calendar"
+                      className="w-3.5 h-3.5 text-white/30"
+                    />
                     <span className="text-[9px] font-bold text-white/50 uppercase">
-                      Semana {weekScheduleInfo.startDate} a {weekScheduleInfo.endDate}
+                      Semana {weekScheduleInfo.startDate} a{" "}
+                      {weekScheduleInfo.endDate}
                     </span>
                     <div className="h-3 w-px bg-white/10" />
                     <span className="text-[9px] font-black text-white/50 uppercase">
                       {weekStats.totalTournaments} torneios
                     </span>
                     <span className="text-[9px] font-black text-primary/70 uppercase">
-                      {formatCurrencyValue(String(weekStats.totalGtd), selectedCurrency)}
+                      {formatCurrencyValue(
+                        String(weekStats.totalGtd),
+                        selectedCurrency,
+                      )}
                     </span>
                     <Icon
-                      name={isSchedulesPanelOpen ? "chevron-up" : "chevron-down"}
+                      name={
+                        isSchedulesPanelOpen ? "chevron-up" : "chevron-down"
+                      }
                       className="w-3 h-3 text-white/30"
                     />
                   </button>
@@ -2550,7 +2614,10 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     : "bg-transparent border border-white/[0.06] text-white/50 hover:border-white/[0.1] hover:text-white/70"
                 }`}
               >
-                <Icon name={showIndividualTournaments ? "zap" : "calendar"} className="w-3 h-3" />
+                <Icon
+                  name={showIndividualTournaments ? "zap" : "calendar"}
+                  className="w-3 h-3"
+                />
                 {showIndividualTournaments
                   ? "Grades de Período"
                   : "Torneios Individuais"}
@@ -2773,7 +2840,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 onClick={() => {
                   setIsBatchGenerating(true);
                   // Clear only the current day's flyers
-                  setDailyFlyerState(prev => ({
+                  setDailyFlyerState((prev) => ({
                     ...prev,
                     [selectedDay]: {
                       ALL: [],
@@ -2781,7 +2848,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                       AFTERNOON: [],
                       NIGHT: [],
                       HIGHLIGHTS: [],
-                    }
+                    },
                   }));
                   setBatchTrigger(true);
                   setTimeout(() => {
@@ -2806,7 +2873,11 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   Logo Colab
                 </label>
                 <button
-                  onClick={() => setActiveHelpTooltip(activeHelpTooltip === "logo" ? null : "logo")}
+                  onClick={() =>
+                    setActiveHelpTooltip(
+                      activeHelpTooltip === "logo" ? null : "logo",
+                    )
+                  }
                   className="w-4 h-4 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[8px] font-bold text-white/30 hover:text-white/50 transition-all"
                 >
                   ?
@@ -2814,14 +2885,21 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               </div>
               {activeHelpTooltip === "logo" && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setActiveHelpTooltip(null)} />
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setActiveHelpTooltip(null)}
+                  />
                   <div className="absolute top-full left-0 mt-1 z-50 bg-[#111] border border-white/[0.06] rounded-lg p-3 w-64 shadow-xl">
-                    <p className="text-[10px] font-bold text-white mb-1">Logo de Colaborador</p>
+                    <p className="text-[10px] font-bold text-white mb-1">
+                      Logo de Colaborador
+                    </p>
                     <p className="text-[9px] text-white/50 leading-relaxed mb-2">
-                      Adicione o logo de um parceiro ou patrocinador que aparecerá junto ao logo principal da marca nos flyers.
+                      Adicione o logo de um parceiro ou patrocinador que
+                      aparecerá junto ao logo principal da marca nos flyers.
                     </p>
                     <p className="text-[8px] text-primary/70 font-medium">
-                      Resultado: Logo exibido no canto do flyer, ao lado do logo principal.
+                      Resultado: Logo exibido no canto do flyer, ao lado do logo
+                      principal.
                     </p>
                   </div>
                 </>
@@ -2874,7 +2952,11 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   Referência
                 </label>
                 <button
-                  onClick={() => setActiveHelpTooltip(activeHelpTooltip === "ref" ? null : "ref")}
+                  onClick={() =>
+                    setActiveHelpTooltip(
+                      activeHelpTooltip === "ref" ? null : "ref",
+                    )
+                  }
                   className="w-4 h-4 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[8px] font-bold text-white/30 hover:text-white/50 transition-all"
                 >
                   ?
@@ -2882,14 +2964,22 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               </div>
               {activeHelpTooltip === "ref" && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setActiveHelpTooltip(null)} />
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setActiveHelpTooltip(null)}
+                  />
                   <div className="absolute top-full left-0 mt-1 z-50 bg-[#111] border border-white/[0.06] rounded-lg p-3 w-64 shadow-xl">
-                    <p className="text-[10px] font-bold text-white mb-1">Imagem de Referência</p>
+                    <p className="text-[10px] font-bold text-white mb-1">
+                      Imagem de Referência
+                    </p>
                     <p className="text-[9px] text-white/50 leading-relaxed mb-2">
-                      Envie uma imagem para servir como guia de estilo visual. A IA analisará cores, composição e estética para criar flyers similares.
+                      Envie uma imagem para servir como guia de estilo visual. A
+                      IA analisará cores, composição e estética para criar
+                      flyers similares.
                     </p>
                     <p className="text-[8px] text-primary/70 font-medium">
-                      Resultado: Flyers com visual e estilo inspirados na referência.
+                      Resultado: Flyers com visual e estilo inspirados na
+                      referência.
                     </p>
                   </div>
                 </>
@@ -2950,7 +3040,11 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   Ativos
                 </label>
                 <button
-                  onClick={() => setActiveHelpTooltip(activeHelpTooltip === "assets" ? null : "assets")}
+                  onClick={() =>
+                    setActiveHelpTooltip(
+                      activeHelpTooltip === "assets" ? null : "assets",
+                    )
+                  }
                   className="w-4 h-4 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[8px] font-bold text-white/30 hover:text-white/50 transition-all"
                 >
                   ?
@@ -2958,14 +3052,22 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               </div>
               {activeHelpTooltip === "assets" && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setActiveHelpTooltip(null)} />
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setActiveHelpTooltip(null)}
+                  />
                   <div className="absolute top-full left-0 mt-1 z-50 bg-[#111] border border-white/[0.06] rounded-lg p-3 w-64 shadow-xl">
-                    <p className="text-[10px] font-bold text-white mb-1">Ativos de Composição</p>
+                    <p className="text-[10px] font-bold text-white mb-1">
+                      Ativos de Composição
+                    </p>
                     <p className="text-[9px] text-white/50 leading-relaxed mb-2">
-                      Adicione elementos visuais como mockups de celular, fotos de pessoas, fichas de poker ou outros assets que serão incorporados na composição do flyer.
+                      Adicione elementos visuais como mockups de celular, fotos
+                      de pessoas, fichas de poker ou outros assets que serão
+                      incorporados na composição do flyer.
                     </p>
                     <p className="text-[8px] text-primary/70 font-medium">
-                      Resultado: Elementos integrados harmoniosamente no design final.
+                      Resultado: Elementos integrados harmoniosamente no design
+                      final.
                     </p>
                   </div>
                 </>
@@ -3028,7 +3130,11 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   Favoritos
                 </label>
                 <button
-                  onClick={() => setActiveHelpTooltip(activeHelpTooltip === "favs" ? null : "favs")}
+                  onClick={() =>
+                    setActiveHelpTooltip(
+                      activeHelpTooltip === "favs" ? null : "favs",
+                    )
+                  }
                   className="w-4 h-4 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[8px] font-bold text-white/30 hover:text-white/50 transition-all"
                 >
                   ?
@@ -3036,14 +3142,22 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               </div>
               {activeHelpTooltip === "favs" && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setActiveHelpTooltip(null)} />
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setActiveHelpTooltip(null)}
+                  />
                   <div className="absolute top-full right-0 mt-1 z-50 bg-[#111] border border-white/[0.06] rounded-lg p-3 w-64 shadow-xl">
-                    <p className="text-[10px] font-bold text-white mb-1">Estilos Favoritos</p>
+                    <p className="text-[10px] font-bold text-white mb-1">
+                      Estilos Favoritos
+                    </p>
                     <p className="text-[9px] text-white/50 leading-relaxed mb-2">
-                      Acesse sua biblioteca de estilos salvos. Favorite flyers da galeria para reutilizar como referência em novas gerações.
+                      Acesse sua biblioteca de estilos salvos. Favorite flyers
+                      da galeria para reutilizar como referência em novas
+                      gerações.
                     </p>
                     <p className="text-[8px] text-primary/70 font-medium">
-                      Resultado: Aplique estilos consistentes em todas as suas criações.
+                      Resultado: Aplique estilos consistentes em todas as suas
+                      criações.
                     </p>
                   </div>
                 </>
@@ -3071,45 +3185,51 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               )
                 .filter((p) => enabledPeriods[p])
                 .map((p) => (
-                <PeriodCardRow
-                  key={p}
-                  period={p}
-                  label={periodLabels[selectedLanguage][p]}
-                  dayInfo={`${dayTranslations[selectedDay]} ${getDayDate(selectedDay)}`}
-                  scheduleDate={getScheduleDate(selectedDay)}
-                  events={getEventsByPeriod(p)}
-                  brandProfile={brandProfile}
-                  aspectRatio={selectedAspectRatio}
-                  currency={selectedCurrency}
-                  model={selectedImageModel}
-                  imageSize={selectedImageSize}
-                  language={selectedLanguage}
-                  scheduleId={weekScheduleInfo?.id}
-                  onAddImageToGallery={onAddImageToGallery}
-                  onUpdateGalleryImage={onUpdateGalleryImage}
-                  onSetChatReference={onSetChatReference}
-                  generatedFlyers={dailyFlyerState[selectedDay]?.[p] || []}
-                  setGeneratedFlyers={(u) =>
-                    setDailyFlyerState((prev) => ({
-                      ...prev,
-                      [selectedDay]: {
-                        ...(prev[selectedDay] || { ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: [] }),
-                        [p]: u(prev[selectedDay]?.[p] || [])
-                      }
-                    }))
-                  }
-                  triggerBatch={batchTrigger}
-                  styleReference={globalStyleReference}
-                  onCloneStyle={handleSetStyleReference}
-                  collabLogo={collabLogo}
-                  compositionAssets={compositionAssets}
-                  onPublishToCampaign={onPublishToCampaign}
-                  userId={userId}
-                  instagramContext={instagramContext}
-                  galleryImages={galleryImages}
-                  onSchedulePost={onSchedulePost}
-                />
-              ))}
+                  <PeriodCardRow
+                    key={p}
+                    period={p}
+                    label={periodLabels[selectedLanguage][p]}
+                    dayInfo={`${dayTranslations[selectedDay]} ${getDayDate(selectedDay)}`}
+                    scheduleDate={getScheduleDate(selectedDay)}
+                    events={getEventsByPeriod(p)}
+                    brandProfile={brandProfile}
+                    aspectRatio={selectedAspectRatio}
+                    currency={selectedCurrency}
+                    model={selectedImageModel}
+                    imageSize={selectedImageSize}
+                    language={selectedLanguage}
+                    scheduleId={weekScheduleInfo?.id}
+                    onAddImageToGallery={onAddImageToGallery}
+                    onUpdateGalleryImage={onUpdateGalleryImage}
+                    onSetChatReference={onSetChatReference}
+                    generatedFlyers={dailyFlyerState[selectedDay]?.[p] || []}
+                    setGeneratedFlyers={(u) =>
+                      setDailyFlyerState((prev) => ({
+                        ...prev,
+                        [selectedDay]: {
+                          ...(prev[selectedDay] || {
+                            ALL: [],
+                            MORNING: [],
+                            AFTERNOON: [],
+                            NIGHT: [],
+                            HIGHLIGHTS: [],
+                          }),
+                          [p]: u(prev[selectedDay]?.[p] || []),
+                        },
+                      }))
+                    }
+                    triggerBatch={batchTrigger}
+                    styleReference={globalStyleReference}
+                    onCloneStyle={handleSetStyleReference}
+                    collabLogo={collabLogo}
+                    compositionAssets={compositionAssets}
+                    onPublishToCampaign={onPublishToCampaign}
+                    userId={userId}
+                    instagramContext={instagramContext}
+                    galleryImages={galleryImages}
+                    onSchedulePost={onSchedulePost}
+                  />
+                ))}
             </div>
           ) : (
             <div className="space-y-2">
@@ -3119,17 +3239,26 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   {pastEvents.length > 0 && (
                     <div className="mb-4">
                       <button
-                        onClick={() => setShowPastTournaments(!showPastTournaments)}
+                        onClick={() =>
+                          setShowPastTournaments(!showPastTournaments)
+                        }
                         className="w-full flex items-center justify-between px-4 py-3 bg-[#0a0a0a] border border-white/[0.05] rounded-lg hover:border-white/[0.08] transition-all"
                       >
                         <div className="flex items-center gap-2">
-                          <Icon name="clock" className="w-3.5 h-3.5 text-white/30" />
+                          <Icon
+                            name="clock"
+                            className="w-3.5 h-3.5 text-white/30"
+                          />
                           <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">
-                            {pastEvents.length} torneio{pastEvents.length > 1 ? "s" : ""} já iniciado{pastEvents.length > 1 ? "s" : ""}
+                            {pastEvents.length} torneio
+                            {pastEvents.length > 1 ? "s" : ""} já iniciado
+                            {pastEvents.length > 1 ? "s" : ""}
                           </span>
                         </div>
                         <Icon
-                          name={showPastTournaments ? "chevron-up" : "chevron-down"}
+                          name={
+                            showPastTournaments ? "chevron-up" : "chevron-down"
+                          }
                           className="w-4 h-4 text-white/30"
                         />
                       </button>
@@ -3243,7 +3372,15 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                       Grades a Gerar
                     </p>
                     <div className="grid grid-cols-2 gap-2">
-                      {(["ALL", "MORNING", "AFTERNOON", "NIGHT", "HIGHLIGHTS"] as TimePeriod[]).map((period) => (
+                      {(
+                        [
+                          "ALL",
+                          "MORNING",
+                          "AFTERNOON",
+                          "NIGHT",
+                          "HIGHLIGHTS",
+                        ] as TimePeriod[]
+                      ).map((period) => (
                         <label
                           key={period}
                           className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all border ${
@@ -3283,7 +3420,9 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         </label>
                         <select
                           value={selectedAspectRatio}
-                          onChange={(e) => setSelectedAspectRatio(e.target.value)}
+                          onChange={(e) =>
+                            setSelectedAspectRatio(e.target.value)
+                          }
                           className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
                         >
                           <option value="9:16">Vertical (9:16)</option>
@@ -3297,8 +3436,12 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         </label>
                         <select
                           value={selectedImageSize}
-                          onChange={(e) => setSelectedImageSize(e.target.value as ImageSize)}
-                          disabled={selectedImageModel === "imagen-4.0-generate-001"}
+                          onChange={(e) =>
+                            setSelectedImageSize(e.target.value as ImageSize)
+                          }
+                          disabled={
+                            selectedImageModel === "imagen-4.0-generate-001"
+                          }
                           className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer disabled:opacity-20"
                         >
                           <option value="1K">HD (1K)</option>
@@ -3312,11 +3455,17 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         </label>
                         <select
                           value={selectedImageModel}
-                          onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
+                          onChange={(e) =>
+                            setSelectedImageModel(e.target.value as ImageModel)
+                          }
                           className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
                         >
-                          <option value="gemini-3-pro-image-preview">Gemini 3 Pro</option>
-                          <option value="imagen-4.0-generate-001">Imagen 4.0</option>
+                          <option value="gemini-3-pro-image-preview">
+                            Gemini 3 Pro
+                          </option>
+                          <option value="imagen-4.0-generate-001">
+                            Imagen 4.0
+                          </option>
                         </select>
                       </div>
                       <div className="space-y-1.5">
@@ -3325,7 +3474,9 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         </label>
                         <select
                           value={selectedCurrency}
-                          onChange={(e) => setSelectedCurrency(e.target.value as Currency)}
+                          onChange={(e) =>
+                            setSelectedCurrency(e.target.value as Currency)
+                          }
                           className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
                         >
                           <option value="BRL">Real (R$)</option>
@@ -3342,7 +3493,9 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     </label>
                     <select
                       value={selectedLanguage}
-                      onChange={(e) => setSelectedLanguage(e.target.value as "pt" | "en")}
+                      onChange={(e) =>
+                        setSelectedLanguage(e.target.value as "pt" | "en")
+                      }
                       className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer"
                     >
                       <option value="pt">Português (BR)</option>

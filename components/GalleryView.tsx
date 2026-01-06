@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import type { GalleryImage, StyleReference } from "../types";
 import { Icon } from "./common/Icon";
 import { Button } from "./common/Button";
@@ -25,12 +25,17 @@ interface GalleryViewProps {
 
 type ViewMode = "gallery" | "references";
 type SourceFilter = "all" | "flyer" | "campaign" | "post" | "video";
+const PAGE_SIZE = 20;
 
-const SOURCE_FILTERS: { value: SourceFilter; label: string; sources: string[] }[] = [
+const SOURCE_FILTERS: {
+  value: SourceFilter;
+  label: string;
+  sources: string[];
+}[] = [
   { value: "all", label: "Todos", sources: [] },
   { value: "flyer", label: "Flyers", sources: ["Flyer", "Flyer Diário"] },
   { value: "campaign", label: "Campanhas", sources: ["Anúncio", "Post"] },
-  { value: "video", label: "Vídeos", sources: ["Video Final", "Clipe"] },
+  { value: "video", label: "Vídeos", sources: ["Video Final"] },
 ];
 
 const fileToBase64 = (file: File): Promise<string> =>
@@ -82,7 +87,12 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
             {formatDuration(image.duration)}
           </span>
         )}
-        <audio src={image.src} className="w-full h-7" controls preload="metadata" />
+        <audio
+          src={image.src}
+          className="w-full h-7"
+          controls
+          preload="metadata"
+        />
         <a
           href={image.src}
           download={`narracao-${image.id.substring(0, 8)}.mp3`}
@@ -99,7 +109,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
         className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
         muted
         playsInline
-        preload="metadata"
+        preload="none"
         onMouseEnter={(e) => e.currentTarget.play()}
         onMouseLeave={(e) => {
           e.currentTarget.pause();
@@ -111,6 +121,9 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
         src={image.src}
         alt={image.prompt}
         className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+        loading="lazy"
+        decoding="async"
+        fetchPriority="low"
       />
     )}
 
@@ -149,7 +162,11 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
               onToggleFavorite(image);
             }}
             className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all backdrop-blur-sm ${isFavorite(image) ? "bg-primary text-black shadow-lg shadow-primary/30" : "bg-black/60 text-white/80 hover:bg-black/80 hover:text-primary"}`}
-            title={isFavorite(image) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+            title={
+              isFavorite(image)
+                ? "Remover dos favoritos"
+                : "Adicionar aos favoritos"
+            }
           >
             <Icon name="heart" className="w-3.5 h-3.5" />
           </button>
@@ -169,7 +186,13 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            if (confirm(isAudio(image) ? "Tem certeza que deseja excluir este áudio?" : "Tem certeza que deseja excluir esta imagem?"))
+            if (
+              confirm(
+                isAudio(image)
+                  ? "Tem certeza que deseja excluir este áudio?"
+                  : "Tem certeza que deseja excluir esta imagem?",
+              )
+            )
               onDelete(image.id);
           }}
           className="w-7 h-7 rounded-lg bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/80 hover:bg-red-500/80 hover:text-white transition-all"
@@ -216,6 +239,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("gallery");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleImageUpdate = (newSrc: string) => {
@@ -255,7 +279,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       image.mediaType === "video" ||
       image.src?.endsWith(".mp4") ||
       image.src?.includes("video") ||
-      image.source?.startsWith("Video-")
+      image.source?.startsWith("Video-") ||
+      image.source === "Video Final"
     );
   };
 
@@ -312,29 +337,33 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     if (sourceFilter === "all") {
       return deduplicatedImages;
     }
+    if (sourceFilter === "video") {
+      return deduplicatedImages.filter((img) => isVideo(img));
+    }
     const filterConfig = SOURCE_FILTERS.find((f) => f.value === sourceFilter);
     if (!filterConfig) return deduplicatedImages;
 
     return deduplicatedImages.filter((img) =>
-      filterConfig.sources.some((source) => img.source === source)
+      filterConfig.sources.some((source) => img.source === source),
     );
   }, [deduplicatedImages, sourceFilter]);
 
-  // Check if image was created today
-  const isToday = (dateString?: string) => {
-    if (!dateString) return false;
-    const imageDate = new Date(dateString);
-    const today = new Date();
-    return (
-      imageDate.getDate() === today.getDate() &&
-      imageDate.getMonth() === today.getMonth() &&
-      imageDate.getFullYear() === today.getFullYear()
-    );
-  };
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [viewMode, sourceFilter, images.length]);
 
-  // Separate images into today and older
-  const todayImages = filteredImages.filter((img) => isToday(img.created_at));
-  const olderImages = filteredImages.filter((img) => !isToday(img.created_at));
+  const totalPages = Math.max(1, Math.ceil(filteredImages.length / PAGE_SIZE));
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageEnd = pageStart + PAGE_SIZE;
+  const pagedImages = filteredImages.slice(pageStart, pageEnd);
+
+  const sortedImages = React.useMemo(() => {
+    return [...pagedImages].sort((a, b) => {
+      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bTime - aTime;
+    });
+  }, [pagedImages]);
 
   return (
     <>
@@ -381,7 +410,10 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                   : "bg-transparent border border-white/[0.06] text-white/50 hover:border-white/[0.1] hover:text-white/70"
               }`}
             >
-              <Icon name={viewMode === "gallery" ? "heart" : "layout"} className="w-3 h-3" />
+              <Icon
+                name={viewMode === "gallery" ? "heart" : "layout"}
+                className="w-3 h-3"
+              />
               {viewMode === "gallery" ? "Favoritos" : "Galeria de Assets"}
             </button>
           </div>
@@ -391,11 +423,14 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
         {viewMode === "gallery" && deduplicatedImages.length > 0 && (
           <div className="flex gap-1 overflow-x-auto pb-2">
             {SOURCE_FILTERS.map((filter) => {
-              const count = filter.value === "all"
-                ? deduplicatedImages.length
-                : deduplicatedImages.filter((img) =>
-                    filter.sources.some((source) => img.source === source)
-                  ).length;
+              const count =
+                filter.value === "all"
+                  ? deduplicatedImages.length
+                  : filter.value === "video"
+                    ? deduplicatedImages.filter((img) => isVideo(img)).length
+                    : deduplicatedImages.filter((img) =>
+                        filter.sources.some((source) => img.source === source),
+                      ).length;
 
               if (filter.value !== "all" && count === 0) return null;
 
@@ -421,54 +456,10 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           /* Gallery View - Masonry Layout */
           filteredImages.length > 0 ? (
             <div className="space-y-6">
-              {/* Today's Images Section */}
-              {todayImages.length > 0 && (
-                <div className="bg-gradient-to-br from-primary/5 via-transparent to-transparent rounded-2xl p-4 border border-primary/10">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                      <h3 className="text-xs font-black text-primary uppercase tracking-wider">
-                        Gerados Hoje
-                      </h3>
-                      <span className="text-[9px] text-white/40 font-bold">
-                        {todayImages.length} {todayImages.length === 1 ? 'item' : 'itens'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3">
-                    {todayImages.map((image) => (
-                      <GalleryItem
-                        key={image.id}
-                        image={image}
-                        isAudio={isAudio}
-                        isVideo={isVideo}
-                        isFavorite={isFavorite}
-                        formatDuration={formatDuration}
-                        onToggleFavorite={handleToggleFavorite}
-                        onSelect={setSelectedImage}
-                        onDelete={onDeleteImage}
-                        className="break-inside-avoid mb-3"
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Divider - only show if both sections have content */}
-              {todayImages.length > 0 && olderImages.length > 0 && (
-                <div className="flex items-center gap-4 py-2">
-                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-                  <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider">
-                    Anteriores
-                  </span>
-                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-                </div>
-              )}
-
-              {/* Older Images Section */}
-              {olderImages.length > 0 && (
+              {/* Gallery Grid */}
+              {sortedImages.length > 0 && (
                 <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3">
-                  {olderImages.map((image) => (
+                  {sortedImages.map((image) => (
                     <GalleryItem
                       key={image.id}
                       image={image}
@@ -486,28 +477,62 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               )}
 
               {/* Load More Button */}
-              {onLoadMore && hasMore && images.length > 0 && (
-                <div className="flex justify-center pt-6 pb-2">
+              {onLoadMore &&
+                hasMore &&
+                images.length > 0 &&
+                currentPage === totalPages && (
+                  <div className="flex justify-center pt-6 pb-2">
+                    <Button
+                      variant="secondary"
+                      onClick={onLoadMore}
+                      isLoading={isLoadingMore}
+                      icon={isLoadingMore ? undefined : "chevron-down"}
+                    >
+                      {isLoadingMore ? "Carregando..." : "Carregar Mais"}
+                    </Button>
+                  </div>
+                )}
+
+              {/* No more images indicator */}
+              {onLoadMore &&
+                !hasMore &&
+                images.length > 0 &&
+                currentPage === totalPages && (
+                  <div className="flex justify-center pt-6 pb-2">
+                    <span className="text-[10px] text-white/30 font-bold uppercase tracking-wider">
+                      Todas as imagens carregadas
+                    </span>
+                  </div>
+                )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-3 pt-4 pb-2">
                   <Button
                     variant="secondary"
-                    onClick={onLoadMore}
-                    isLoading={isLoadingMore}
-                    icon={isLoadingMore ? undefined : "chevron-down"}
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(1, prev - 1))
+                    }
+                    disabled={currentPage === 1}
+                    icon="chevron-left"
                   >
-                    {isLoadingMore ? "Carregando..." : "Carregar Mais"}
+                    Anterior
+                  </Button>
+                  <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                    icon="chevron-right"
+                  >
+                    Próxima
                   </Button>
                 </div>
               )}
-
-              {/* No more images indicator */}
-              {onLoadMore && !hasMore && images.length > 0 && (
-                <div className="flex justify-center pt-6 pb-2">
-                  <span className="text-[10px] text-white/30 font-bold uppercase tracking-wider">
-                    Todas as imagens carregadas
-                  </span>
-                </div>
-              )}
-
             </div>
           ) : (
             <EmptyState

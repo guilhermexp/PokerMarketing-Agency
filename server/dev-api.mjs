@@ -19,6 +19,10 @@ import {
   OrganizationAccessError,
   createOrgContext,
 } from "./helpers/organization-context.mjs";
+import {
+  buildCampaignPrompt,
+  buildQuantityInstructions,
+} from "./helpers/campaign-prompts.mjs";
 
 config();
 
@@ -1917,7 +1921,9 @@ app.patch("/api/db/tournaments/daily-flyer", async (req, res) => {
     const { flyer_url, action } = req.body; // action: 'add' or 'remove'
 
     if (!schedule_id || !period) {
-      return res.status(400).json({ error: "schedule_id and period are required" });
+      return res
+        .status(400)
+        .json({ error: "schedule_id and period are required" });
     }
 
     // Get current daily_flyer_urls
@@ -2629,98 +2635,6 @@ Exemplo de audio_context:
 Mantenha a essência do prompt original mas expanda com detalhes visuais cinematográficos.`;
 };
 
-const buildCampaignPrompt = (
-  brandProfile,
-  transcript,
-  quantityInstructions,
-) => {
-  const toneText = getToneText(brandProfile, "campaigns");
-
-  return `
-**PERFIL DA MARCA:**
-- Nome: ${brandProfile.name}
-- Descrição: ${brandProfile.description}
-${toneText ? `- Tom de Voz: ${toneText}` : ""}
-- Cores Oficiais: Primária ${brandProfile.primaryColor}, Secundária ${brandProfile.secondaryColor}
-
-**CONTEÚDO PARA ESTRUTURAR:**
-${transcript}
-
-**QUANTIDADES EXATAS A GERAR (OBRIGATÓRIO SEGUIR):**
-${quantityInstructions}
-
-**REGRAS CRÍTICAS PARA IMAGE_PROMPT (OBRIGATÓRIO):**
-
-1. **IDIOMA (REGRA INVIOLÁVEL):**
-   - TODOS os image_prompts DEVEM ser escritos em PORTUGUÊS
-   - QUALQUER texto que apareça na imagem (títulos, CTAs, valores) DEVE estar em PORTUGUÊS
-   - PROIBIDO usar inglês nos textos da imagem
-
-2. **ALINHAMENTO CONTEÚDO-IMAGEM:**
-   - O image_prompt DEVE refletir o tema da legenda (content)
-   - NUNCA gere prompts genéricos desconectados do conteúdo
-
-3. **ELEMENTOS OBRIGATÓRIOS:**
-   - Cores da marca (${brandProfile.primaryColor}, ${brandProfile.secondaryColor})
-   - Estilo cinematográfico, luxuoso e premium
-   - Textos em fonte bold condensed sans-serif
-
-**MISSÃO:** Gere uma campanha completa em JSON com as QUANTIDADES EXATAS especificadas. Cada image_prompt DEVE ser em PORTUGUÊS e alinhado com seu content.`;
-};
-
-// Build quantity instructions for campaign
-const buildQuantityInstructions = (options) => {
-  const quantities = [];
-
-  if (options.videoClipScripts.generate && options.videoClipScripts.count > 0) {
-    quantities.push(
-      `- Roteiros de vídeo (videoClipScripts): EXATAMENTE ${options.videoClipScripts.count} roteiro(s)`,
-    );
-  } else {
-    quantities.push(`- Roteiros de vídeo (videoClipScripts): 0 (array vazio)`);
-  }
-
-  const postPlatforms = [];
-  if (options.posts.instagram?.generate && options.posts.instagram.count > 0) {
-    postPlatforms.push(`${options.posts.instagram.count}x Instagram`);
-  }
-  if (options.posts.facebook?.generate && options.posts.facebook.count > 0) {
-    postPlatforms.push(`${options.posts.facebook.count}x Facebook`);
-  }
-  if (options.posts.twitter?.generate && options.posts.twitter.count > 0) {
-    postPlatforms.push(`${options.posts.twitter.count}x Twitter`);
-  }
-  if (options.posts.linkedin?.generate && options.posts.linkedin.count > 0) {
-    postPlatforms.push(`${options.posts.linkedin.count}x LinkedIn`);
-  }
-  if (postPlatforms.length > 0) {
-    quantities.push(`- Posts (posts): ${postPlatforms.join(", ")}`);
-  } else {
-    quantities.push(`- Posts (posts): 0 (array vazio)`);
-  }
-
-  const adPlatforms = [];
-  if (
-    options.adCreatives.facebook?.generate &&
-    options.adCreatives.facebook.count > 0
-  ) {
-    adPlatforms.push(`${options.adCreatives.facebook.count}x Facebook`);
-  }
-  if (
-    options.adCreatives.google?.generate &&
-    options.adCreatives.google.count > 0
-  ) {
-    adPlatforms.push(`${options.adCreatives.google.count}x Google`);
-  }
-  if (adPlatforms.length > 0) {
-    quantities.push(`- Anúncios (adCreatives): ${adPlatforms.join(", ")}`);
-  } else {
-    quantities.push(`- Anúncios (adCreatives): 0 (array vazio)`);
-  }
-
-  return quantities.join("\n    ");
-};
-
 // Campaign schema for structured generation
 const campaignSchema = {
   type: Type.OBJECT,
@@ -2817,11 +2731,12 @@ app.post("/api/ai/campaign", async (req, res) => {
     const model = brandProfile.creativeModel || "gemini-3-pro-preview";
     const isOpenRouter = model.includes("/");
 
-    const quantityInstructions = buildQuantityInstructions(options);
+    const quantityInstructions = buildQuantityInstructions(options, "dev");
     const prompt = buildCampaignPrompt(
       brandProfile,
       transcript,
       quantityInstructions,
+      getToneText(brandProfile, "campaigns"),
     );
 
     let result;

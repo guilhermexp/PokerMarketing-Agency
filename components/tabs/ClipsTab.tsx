@@ -34,6 +34,7 @@ import { QuickPostModal } from "../common/QuickPostModal";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";
 import type { InstagramContext } from "../../services/rubeService";
 import type { ScheduledPost } from "../../types";
+import { urlToBase64 } from "../../utils/imageHelpers";
 import {
   concatenateVideos,
   downloadBlob,
@@ -133,49 +134,7 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
-// Convert URL (HTTP or data URL) to base64 with mimeType for use as style reference
-const urlToBase64 = async (
-  src: string,
-): Promise<{ base64: string; mimeType: string } | null> => {
-  if (!src) return null;
-
-  // Handle data URLs
-  if (src.startsWith("data:")) {
-    const match = src.match(/^data:([^;]+);base64,(.+)$/);
-    if (match) {
-      return { base64: match[2], mimeType: match[1] };
-    }
-    // Fallback for malformed data URLs
-    const parts = src.split(",");
-    return { base64: parts[1] || "", mimeType: "image/png" };
-  }
-
-  // Handle HTTP URLs - fetch and convert to base64
-  try {
-    const response = await fetch(src);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-        if (match) {
-          resolve({ base64: match[2], mimeType: match[1] });
-        } else {
-          resolve({
-            base64: dataUrl.split(",")[1] || "",
-            mimeType: blob.type || "image/png",
-          });
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error("[urlToBase64] Failed to convert URL:", src, error);
-    return null;
-  }
-};
+// urlToBase64 imported from utils/imageHelpers
 
 // --- Component Interfaces ---
 
@@ -193,7 +152,9 @@ interface ClipsTabProps {
   campaignId?: string;
   // Instagram & Scheduling
   instagramContext?: InstagramContext;
-  onSchedulePost?: (post: Omit<ScheduledPost, "id" | "createdAt" | "updatedAt">) => void;
+  onSchedulePost?: (
+    post: Omit<ScheduledPost, "id" | "createdAt" | "updatedAt">,
+  ) => void;
 }
 
 interface Scene {
@@ -817,11 +778,16 @@ const ClipCard: React.FC<ClipCardProps> = ({
       const sceneNumber = parseInt(sceneNumberStr, 10);
 
       if (isNaN(sceneNumber)) {
-        console.warn(`[ClipCard] Invalid scene number in job context: ${job.context}`);
+        console.warn(
+          `[ClipCard] Invalid scene number in job context: ${job.context}`,
+        );
         return;
       }
 
-      console.log(`[ClipCard] Video job completed for scene ${sceneNumber}:`, job.result_url);
+      console.log(
+        `[ClipCard] Video job completed for scene ${sceneNumber}:`,
+        job.result_url,
+      );
 
       // Update video states with the completed video
       if (job.result_url) {
@@ -851,8 +817,11 @@ const ClipCard: React.FC<ClipCardProps> = ({
         // This ensures the video is linked to this clip/campaign
         if (onAddImageToGallery) {
           // Find the scene to get the visual description for the prompt
-          const currentScene = scenes.find((s) => s.sceneNumber === sceneNumber);
-          const visualDescription = currentScene?.visual || `Cena ${sceneNumber}`;
+          const currentScene = scenes.find(
+            (s) => s.sceneNumber === sceneNumber,
+          );
+          const visualDescription =
+            currentScene?.visual || `Cena ${sceneNumber}`;
 
           // Build source identifier (max 50 chars)
           const truncatedTitle = clip.title.substring(0, 20);
@@ -893,7 +862,10 @@ const ClipCard: React.FC<ClipCardProps> = ({
 
       if (isNaN(sceneNumber)) return;
 
-      console.error(`[ClipCard] Video job failed for scene ${sceneNumber}:`, job.error_message);
+      console.error(
+        `[ClipCard] Video job failed for scene ${sceneNumber}:`,
+        job.error_message,
+      );
 
       // Clear loading state and set error
       setIsGeneratingVideo((prev) => ({
@@ -921,7 +893,15 @@ const ClipCard: React.FC<ClipCardProps> = ({
       unsubComplete();
       unsubFailed();
     };
-  }, [onJobComplete, onJobFailed, clip.id, clip.title, selectedVideoModel, scenes, onAddImageToGallery]);
+  }, [
+    onJobComplete,
+    onJobFailed,
+    clip.id,
+    clip.title,
+    selectedVideoModel,
+    scenes,
+    onAddImageToGallery,
+  ]);
 
   useEffect(() => {
     editorStateRef.current = editorState;
@@ -1371,7 +1351,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
       setVideoStates((prev) => {
         const currentVideos = prev[scene.sceneNumber] || [];
         const newVideos = galleryVideos.filter(
-          (gv) => !currentVideos.some((cv) => cv.url === gv.src)
+          (gv) => !currentVideos.some((cv) => cv.url === gv.src),
         );
 
         if (newVideos.length === 0) return prev;
@@ -1670,11 +1650,16 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
           const isDataUrl = sceneImage.dataUrl.startsWith("data:");
           if (isDataUrl) {
             try {
-              console.log(`[ClipsTab] Uploading scene image to blob for background job...`);
+              console.log(
+                `[ClipsTab] Uploading scene image to blob for background job...`,
+              );
               const uploadedUrl = await uploadImageToBlob(sceneImage.dataUrl);
               imageUrl = uploadedUrl;
             } catch (uploadErr) {
-              console.warn("[ClipsTab] Failed to upload scene image:", uploadErr);
+              console.warn(
+                "[ClipsTab] Failed to upload scene image:",
+                uploadErr,
+              );
             }
           } else {
             // Already an HTTP URL
@@ -1683,14 +1668,18 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
         }
 
         // Map model name to API format
-        const apiModel: "veo-3.1" | "sora-2" = selectedVideoModel.includes("sora")
+        const apiModel: "veo-3.1" | "sora-2" = selectedVideoModel.includes(
+          "sora",
+        )
           ? "sora-2"
           : "veo-3.1";
 
         // Try to use background jobs if available
         if (userId && !isDevMode) {
           try {
-            console.log(`[ClipsTab] Queueing video job for scene ${sceneNumber}...`);
+            console.log(
+              `[ClipsTab] Queueing video job for scene ${sceneNumber}...`,
+            );
             const jobConfig: VideoJobConfig = {
               model: apiModel,
               aspectRatio: "9:16",
@@ -1710,7 +1699,10 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
             // Return immediately, don't wait for result
             return { usedFallback: false, error: null };
           } catch (queueErr) {
-            console.error("[ClipsTab] Failed to queue video job, falling back to sync:", queueErr);
+            console.error(
+              "[ClipsTab] Failed to queue video job, falling back to sync:",
+              queueErr,
+            );
             // Fall through to synchronous generation
           }
         }
@@ -2241,7 +2233,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           await updateClipThumbnail(clip.id, newSrc);
           console.log("[ClipsTab] Updated thumbnail in database:", clip.id);
         } catch (err) {
-          console.error("[ClipsTab] Failed to update thumbnail in database:", err);
+          console.error(
+            "[ClipsTab] Failed to update thumbnail in database:",
+            err,
+          );
         }
       }
     }
@@ -2274,9 +2269,16 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       if (clip.id) {
         try {
           await updateSceneImage(clip.id, sceneNumber, newSrc);
-          console.log("[ClipsTab] Updated scene image in database:", clip.id, sceneNumber);
+          console.log(
+            "[ClipsTab] Updated scene image in database:",
+            clip.id,
+            sceneNumber,
+          );
         } catch (err) {
-          console.error("[ClipsTab] Failed to update scene image in database:", err);
+          console.error(
+            "[ClipsTab] Failed to update scene image in database:",
+            err,
+          );
         }
       }
     }
@@ -5744,7 +5746,9 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
 }) => {
   const [thumbnails, setThumbnails] = useState<(GalleryImage | null)[]>([]);
   // QuickPost and Schedule modals
-  const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(null);
+  const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(
+    null,
+  );
   const [scheduleImage, setScheduleImage] = useState<GalleryImage | null>(null);
   const [extraInstructions, setExtraInstructions] = useState<string[]>([]);
   const [generationState, setGenerationState] = useState<{
@@ -5988,12 +5992,16 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
       let httpUrl = generatedImageDataUrl;
       if (generatedImageDataUrl.startsWith("data:")) {
         const base64Data = generatedImageDataUrl.split(",")[1];
-        const mimeType = generatedImageDataUrl.match(/data:(.*?);/)?.[1] || "image/png";
+        const mimeType =
+          generatedImageDataUrl.match(/data:(.*?);/)?.[1] || "image/png";
         try {
           httpUrl = await uploadImageToBlob(base64Data, mimeType);
           console.log("[ClipsTab] Uploaded thumbnail to blob:", httpUrl);
         } catch (uploadErr) {
-          console.error("[ClipsTab] Failed to upload thumbnail to blob:", uploadErr);
+          console.error(
+            "[ClipsTab] Failed to upload thumbnail to blob:",
+            uploadErr,
+          );
           // Fall back to data URL (won't persist but will show)
         }
       }

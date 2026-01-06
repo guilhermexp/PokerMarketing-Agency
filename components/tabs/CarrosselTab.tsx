@@ -1,49 +1,17 @@
 import React, { useState, useCallback } from "react";
-import type { VideoClipScript, GalleryImage, BrandProfile, ImageFile } from "../../types";
+import type {
+  VideoClipScript,
+  GalleryImage,
+  BrandProfile,
+  ImageFile,
+} from "../../types";
 import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
 import { generateImage } from "../../services/geminiService";
 import { uploadImageToBlob } from "../../services/blobService";
+import { urlToBase64 } from "../../utils/imageHelpers";
 
-// Convert URL or data URL to base64
-const urlToBase64 = async (
-  src: string,
-): Promise<{ base64: string; mimeType: string } | null> => {
-  if (!src) return null;
-
-  // Already a data URL - extract base64
-  if (src.startsWith("data:")) {
-    const match = src.match(/^data:([^;]+);base64,(.+)$/);
-    if (match) {
-      return { base64: match[2], mimeType: match[1] };
-    }
-    const parts = src.split(",");
-    return { base64: parts[1] || "", mimeType: "image/png" };
-  }
-
-  // HTTP URL - fetch and convert to base64
-  try {
-    const response = await fetch(src);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-        if (match) {
-          resolve({ base64: match[2], mimeType: match[1] });
-        } else {
-          resolve({ base64: dataUrl.split(",")[1] || "", mimeType: blob.type || "image/png" });
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error("[urlToBase64] Failed to convert URL:", src, error);
-    return null;
-  }
-};
+// urlToBase64 imported from utils/imageHelpers
 
 // Carousel Preview Component - Instagram-style preview
 interface CarouselPreviewProps {
@@ -52,7 +20,11 @@ interface CarouselPreviewProps {
   clipTitle: string;
 }
 
-const CarouselPreview: React.FC<CarouselPreviewProps> = ({ images, onReorder, clipTitle }) => {
+const CarouselPreview: React.FC<CarouselPreviewProps> = ({
+  images,
+  onReorder,
+  clipTitle,
+}) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -74,7 +46,11 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({ images, onReorder, cl
   };
 
   const handleDragEnd = () => {
-    if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
+    if (
+      draggedIndex !== null &&
+      dragOverIndex !== null &&
+      draggedIndex !== dragOverIndex
+    ) {
       const newImages = [...images];
       const [removed] = newImages.splice(draggedIndex, 1);
       newImages.splice(dragOverIndex, 0, removed);
@@ -103,7 +79,9 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({ images, onReorder, cl
                 <span className="text-[8px] font-bold text-white">CPC</span>
               </div>
               <div className="flex-1">
-                <p className="text-[10px] font-semibold text-white">cpc_poker</p>
+                <p className="text-[10px] font-semibold text-white">
+                  cpc_poker
+                </p>
                 <p className="text-[8px] text-white/40">Patrocinado</p>
               </div>
               <Icon name="more-horizontal" className="w-4 h-4 text-white/60" />
@@ -174,8 +152,7 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({ images, onReorder, cl
             {/* Caption Preview */}
             <div className="px-3 pb-3">
               <p className="text-[10px] text-white/90 line-clamp-2">
-                <span className="font-semibold">cpc_poker</span>{" "}
-                {clipTitle}
+                <span className="font-semibold">cpc_poker</span> {clipTitle}
               </p>
             </div>
           </div>
@@ -239,7 +216,9 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   // Track which images are being generated: { "clipId-sceneNumber": true }
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
   // Track custom order for each clip: { clipId: [image1, image2, ...] }
-  const [customOrders, setCustomOrders] = useState<Record<string, GalleryImage[]>>({});
+  const [customOrders, setCustomOrders] = useState<
+    Record<string, GalleryImage[]>
+  >({});
   // Track collapsed clips (all start expanded by default)
   const [collapsedClips, setCollapsedClips] = useState<Set<string>>(new Set());
 
@@ -257,7 +236,7 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   // Helper to find gallery images with fallback for legacy data
   const findGalleryImage = (
     clipId: string | undefined,
-    source: string
+    source: string,
   ): GalleryImage | undefined => {
     if (!galleryImages || galleryImages.length === 0) return undefined;
 
@@ -266,7 +245,7 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
         (img) =>
           img.source === source &&
           img.video_script_id === clipId &&
-          img.mediaType !== "audio"
+          img.mediaType !== "audio",
       );
       if (exactMatch) return exactMatch;
     }
@@ -275,50 +254,59 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
       (img) =>
         img.source === source &&
         !img.video_script_id &&
-        img.mediaType !== "audio"
+        img.mediaType !== "audio",
     );
   };
 
   // Get truncated title for scene source
   const getSceneSource = (clipTitle: string, sceneNumber: number) => {
     const maxLen = 50 - "Cena--99".length;
-    const truncated = clipTitle.length > maxLen ? clipTitle.slice(0, maxLen) : clipTitle;
+    const truncated =
+      clipTitle.length > maxLen ? clipTitle.slice(0, maxLen) : clipTitle;
     return `Cena-${truncated}-${sceneNumber}`;
   };
 
   // Get all images for carousel preview - uses 4:5 if available, falls back to 9:16 original
-  const getCarrosselImages = useCallback((clip: VideoClipScript): GalleryImage[] => {
-    if (!clip.scenes || clip.scenes.length === 0) return [];
+  const getCarrosselImages = useCallback(
+    (clip: VideoClipScript): GalleryImage[] => {
+      if (!clip.scenes || clip.scenes.length === 0) return [];
 
-    const images: GalleryImage[] = [];
-    for (const scene of clip.scenes) {
-      // Try 4:5 version first
-      const carrosselSource = getCarrosselSource(clip.title, scene.scene);
-      const carrosselImage = findGalleryImage(clip.id, carrosselSource);
+      const images: GalleryImage[] = [];
+      for (const scene of clip.scenes) {
+        // Try 4:5 version first
+        const carrosselSource = getCarrosselSource(clip.title, scene.scene);
+        const carrosselImage = findGalleryImage(clip.id, carrosselSource);
 
-      if (carrosselImage) {
-        images.push(carrosselImage);
-      } else {
-        // Fallback to original 9:16 image
-        const newSource = getSceneSource(clip.title, scene.scene);
-        const oldSource = `Cena-${clip.title}-${scene.scene}`;
-        const originalImage = findGalleryImage(clip.id, newSource) || findGalleryImage(clip.id, oldSource);
-        if (originalImage) {
-          images.push(originalImage);
+        if (carrosselImage) {
+          images.push(carrosselImage);
+        } else {
+          // Fallback to original 9:16 image
+          const newSource = getSceneSource(clip.title, scene.scene);
+          const oldSource = `Cena-${clip.title}-${scene.scene}`;
+          const originalImage =
+            findGalleryImage(clip.id, newSource) ||
+            findGalleryImage(clip.id, oldSource);
+          if (originalImage) {
+            images.push(originalImage);
+          }
         }
       }
-    }
-    return images;
-  }, [galleryImages]);
+      return images;
+    },
+    [galleryImages],
+  );
 
   // Get original 9:16 image for a specific scene
   const getOriginalImageForScene = (
     clip: VideoClipScript,
-    sceneNumber: number
+    sceneNumber: number,
   ): GalleryImage | undefined => {
     const newSource = getSceneSource(clip.title, sceneNumber);
     const oldSource = `Cena-${clip.title}-${sceneNumber}`;
-    return findGalleryImage(clip.id, newSource) || findGalleryImage(clip.id, oldSource);
+    return (
+      findGalleryImage(clip.id, newSource) ||
+      findGalleryImage(clip.id, oldSource)
+    );
   };
 
   // Get all original scene images for a clip
@@ -339,7 +327,7 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   // Get 4:5 carousel image for a specific scene
   const getCarrosselImage = (
     clip: VideoClipScript,
-    sceneNumber: number
+    sceneNumber: number,
   ): GalleryImage | undefined => {
     const source = getCarrosselSource(clip.title, sceneNumber);
     return findGalleryImage(clip.id, source);
@@ -347,7 +335,7 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
 
   // Handle reorder
   const handleReorder = (clipId: string, newOrder: GalleryImage[]) => {
-    setCustomOrders(prev => ({ ...prev, [clipId]: newOrder }));
+    setCustomOrders((prev) => ({ ...prev, [clipId]: newOrder }));
   };
 
   // Generate 4:5 version of a scene
@@ -355,7 +343,7 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
     clip: VideoClipScript,
     sceneNumber: number,
     scene: { visual: string; narration: string },
-    originalImage: GalleryImage
+    originalImage: GalleryImage,
   ) => {
     if (!clip.id) return;
 
@@ -405,7 +393,10 @@ IMPORTANTE:
         });
       }
     } catch (err) {
-      console.error(`Error generating 4:5 image for scene ${sceneNumber}:`, err);
+      console.error(
+        `Error generating 4:5 image for scene ${sceneNumber}:`,
+        err,
+      );
     } finally {
       setGenerating((prev) => ({ ...prev, [key]: false }));
     }
@@ -448,7 +439,7 @@ IMPORTANTE:
         const totalScenes = clip.scenes?.length || 0;
         const allGenerated = carrosselCount === totalScenes;
         const isGeneratingAny = Object.entries(generating).some(
-          ([key, val]) => key.startsWith(`${clip.id}-`) && val
+          ([key, val]) => key.startsWith(`${clip.id}-`) && val,
         );
 
         const clipKey = clip.id || `clip-${index}`;
@@ -464,7 +455,7 @@ IMPORTANTE:
             <div
               className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
               onClick={() => {
-                setCollapsedClips(prev => {
+                setCollapsedClips((prev) => {
                   const next = new Set(prev);
                   if (next.has(clipKey)) {
                     next.delete(clipKey);
@@ -526,7 +517,10 @@ IMPORTANTE:
                   />
                 ) : hasAnyOriginal ? (
                   <div className="text-center py-8">
-                    <Icon name="image" className="w-10 h-10 text-white/20 mx-auto mb-3" />
+                    <Icon
+                      name="image"
+                      className="w-10 h-10 text-white/20 mx-auto mb-3"
+                    />
                     <p className="text-sm text-white/50 mb-4">
                       Gere as imagens 4:5 para visualizar o carrossel
                     </p>
@@ -535,12 +529,17 @@ IMPORTANTE:
                       disabled={isGeneratingAny}
                       className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500 transition-colors disabled:opacity-50"
                     >
-                      {isGeneratingAny ? "Gerando..." : "Gerar Todas as Imagens 4:5"}
+                      {isGeneratingAny
+                        ? "Gerando..."
+                        : "Gerar Todas as Imagens 4:5"}
                     </button>
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <Icon name="image" className="w-10 h-10 text-white/20 mx-auto mb-3" />
+                    <Icon
+                      name="image"
+                      className="w-10 h-10 text-white/20 mx-auto mb-3"
+                    />
                     <p className="text-sm text-white/50">
                       Gere as capas na aba Clips primeiro
                     </p>

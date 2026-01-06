@@ -71,52 +71,6 @@ export const generateCampaign = async (
   };
 };
 
-// Helper to build campaign prompt
-const buildCampaignPrompt = (
-  brandProfile: BrandProfile,
-  transcript: string,
-  options: GenerationOptions,
-): string => {
-  const quantities: string[] = [];
-
-  if (options.videoClipScripts.generate && options.videoClipScripts.count > 0) {
-    quantities.push(`- Roteiros de vídeo: ${options.videoClipScripts.count}`);
-  }
-
-  const postPlatforms: string[] = [];
-  if (options.posts.instagram.generate)
-    postPlatforms.push(`${options.posts.instagram.count}x Instagram`);
-  if (options.posts.facebook.generate)
-    postPlatforms.push(`${options.posts.facebook.count}x Facebook`);
-  if (options.posts.twitter.generate)
-    postPlatforms.push(`${options.posts.twitter.count}x Twitter`);
-  if (options.posts.linkedin.generate)
-    postPlatforms.push(`${options.posts.linkedin.count}x LinkedIn`);
-  if (postPlatforms.length > 0)
-    quantities.push(`- Posts: ${postPlatforms.join(", ")}`);
-
-  const adPlatforms: string[] = [];
-  if (options.adCreatives.facebook.generate)
-    adPlatforms.push(`${options.adCreatives.facebook.count}x Facebook`);
-  if (options.adCreatives.google.generate)
-    adPlatforms.push(`${options.adCreatives.google.count}x Google`);
-  if (adPlatforms.length > 0)
-    quantities.push(`- Anúncios: ${adPlatforms.join(", ")}`);
-
-  return `
-**MARCA:** ${brandProfile.name} - ${brandProfile.description}
-**TOM:** ${brandProfile.toneOfVoice}
-**CORES:** ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}
-
-**CONTEÚDO:**
-${transcript}
-
-**QUANTIDADES:**
-${quantities.join("\n")}
-
-Gere uma campanha completa em JSON.`;
-};
-
 export const generateQuickPostText = async (
   brandProfile: BrandProfile,
   context: string,

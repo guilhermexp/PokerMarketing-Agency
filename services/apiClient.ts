@@ -66,22 +66,39 @@ async function fetchApi<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
+  const method = (options.method || "GET").toUpperCase();
+  const canRetry = method === "GET";
+  const maxAttempts = canRetry ? 2 : 1;
+  let lastError: unknown = null;
 
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      lastError = error;
+      if (!canRetry || attempt === maxAttempts) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
   }
 
-  return response.json();
+  throw lastError;
 }
 
 // ============================================================================
@@ -938,7 +955,14 @@ export async function queueVideoJob(
   context: string,
   organizationId?: string | null,
 ): Promise<QueueJobResult> {
-  return queueGenerationJob(userId, "video", prompt, config, context, organizationId);
+  return queueGenerationJob(
+    userId,
+    "video",
+    prompt,
+    config,
+    context,
+    organizationId,
+  );
 }
 
 /**
