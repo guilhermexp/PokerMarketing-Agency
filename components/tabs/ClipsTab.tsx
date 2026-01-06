@@ -5765,6 +5765,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
   const [generatingAllForClip, setGeneratingAllForClip] = useState<
     number | null
   >(null);
+  const normalizedThumbsRef = useRef<Set<string>>(new Set());
 
   const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
 
@@ -5835,6 +5836,61 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
       prev.length === length ? prev : Array(length).fill(0),
     );
   }, [videoClipScripts, galleryImages]);
+
+  // Ensure thumbnails are persisted as HTTP URLs for campaign previews
+  useEffect(() => {
+    let cancelled = false;
+
+    const normalizeThumbnails = async () => {
+      for (let index = 0; index < videoClipScripts.length; index += 1) {
+        const clip = videoClipScripts[index];
+        const thumbnail = thumbnails[index];
+        if (!clip?.id || !thumbnail?.src) continue;
+
+        const key = `${clip.id}:${thumbnail.src}`;
+        if (normalizedThumbsRef.current.has(key)) continue;
+        normalizedThumbsRef.current.add(key);
+
+        let normalizedUrl = thumbnail.src;
+        if (normalizedUrl.startsWith("data:")) {
+          const imageData = await urlToBase64(normalizedUrl);
+          if (!imageData) continue;
+          try {
+            normalizedUrl = await uploadImageToBlob(
+              imageData.base64,
+              imageData.mimeType,
+            );
+            if (!cancelled) {
+              onUpdateGalleryImage(thumbnail.id, normalizedUrl);
+            }
+          } catch (error) {
+            console.error(
+              "[ClipsTab] Failed to upload thumbnail to blob:",
+              error,
+            );
+            continue;
+          }
+        }
+
+        if (clip.thumbnail_url !== normalizedUrl && !cancelled) {
+          try {
+            await updateClipThumbnail(clip.id, normalizedUrl);
+          } catch (error) {
+            console.error(
+              "[ClipsTab] Failed to update clip thumbnail in database:",
+              error,
+            );
+          }
+        }
+      }
+    };
+
+    normalizeThumbnails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [thumbnails, videoClipScripts, onUpdateGalleryImage]);
 
   // Listen for job completions (thumbnails only - video jobs are handled in ClipCard)
   useEffect(() => {

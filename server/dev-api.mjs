@@ -388,9 +388,30 @@ app.get("/api/db/init", async (req, res) => {
             COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
             COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
             COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
-            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
-            (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url
+            COALESCE(
+              (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1),
+              (SELECT src_url FROM gallery_images
+               WHERE video_script_id IN (SELECT id FROM video_clip_scripts WHERE campaign_id = c.id)
+                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
+               ORDER BY created_at DESC
+               LIMIT 1)
+            ) as clip_preview_url,
+            COALESCE(
+              (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
+              (SELECT src_url FROM gallery_images
+               WHERE post_id IN (SELECT id FROM posts WHERE campaign_id = c.id)
+                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
+               ORDER BY created_at DESC
+               LIMIT 1)
+            ) as post_preview_url,
+            COALESCE(
+              (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
+              (SELECT src_url FROM gallery_images
+               WHERE ad_creative_id IN (SELECT id FROM ad_creatives WHERE campaign_id = c.id)
+                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
+               ORDER BY created_at DESC
+               LIMIT 1)
+            ) as ad_preview_url
           FROM campaigns c
           WHERE c.organization_id = ${organization_id} AND c.deleted_at IS NULL
           ORDER BY c.created_at DESC
@@ -402,9 +423,30 @@ app.get("/api/db/init", async (req, res) => {
             COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
             COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
             COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
-            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
-            (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url
+            COALESCE(
+              (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1),
+              (SELECT src_url FROM gallery_images
+               WHERE video_script_id IN (SELECT id FROM video_clip_scripts WHERE campaign_id = c.id)
+                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
+               ORDER BY created_at DESC
+               LIMIT 1)
+            ) as clip_preview_url,
+            COALESCE(
+              (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
+              (SELECT src_url FROM gallery_images
+               WHERE post_id IN (SELECT id FROM posts WHERE campaign_id = c.id)
+                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
+               ORDER BY created_at DESC
+               LIMIT 1)
+            ) as post_preview_url,
+            COALESCE(
+              (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
+              (SELECT src_url FROM gallery_images
+               WHERE ad_creative_id IN (SELECT id FROM ad_creatives WHERE campaign_id = c.id)
+                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
+               ORDER BY created_at DESC
+               LIMIT 1)
+            ) as ad_preview_url
           FROM campaigns c
           WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL
           ORDER BY c.created_at DESC
