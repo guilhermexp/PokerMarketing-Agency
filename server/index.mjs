@@ -3935,14 +3935,19 @@ async function runAutoMigrations() {
 }
 
 async function startServer() {
-  // Run migrations first
-  await runAutoMigrations();
-
+  // Start server first (so healthcheck passes)
   app.listen(PORT, () => {
     console.log(`[Production Server] Running on port ${PORT}`);
     console.log(`[Production Server] Database: ${DATABASE_URL ? "Connected" : "NOT CONFIGURED"}`);
     console.log(`[Production Server] Environment: ${process.env.NODE_ENV || "development"}`);
   });
+
+  // Run migrations in background (non-blocking)
+  try {
+    await runAutoMigrations();
+  } catch (migrationError) {
+    console.error("[Migration] Failed but server is running:", migrationError.message);
+  }
 }
 
 startServer();
