@@ -828,11 +828,11 @@ const processGenerationJob = async (job) => {
     job.updateProgress(90);
 
     // Get user_id from job record
-    const jobRecord = await sql`
+    const jobOwner = await sql`
       SELECT user_id, organization_id FROM generation_jobs WHERE id = ${jobId}
     `;
 
-    if (jobRecord.length === 0) {
+    if (jobOwner.length === 0) {
       throw new Error("Job record not found");
     }
 
@@ -840,8 +840,8 @@ const processGenerationJob = async (job) => {
     const galleryResult = await sql`
       INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, source, model, aspect_ratio, image_size)
       VALUES (
-        ${jobRecord[0].user_id},
-        ${jobRecord[0].organization_id},
+        ${jobOwner[0].user_id},
+        ${jobOwner[0].organization_id},
         ${blob.url},
         ${prompt},
         ${config.source || "Flyer"},
