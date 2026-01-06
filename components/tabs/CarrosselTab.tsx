@@ -240,8 +240,8 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
   // Track custom order for each clip: { clipId: [image1, image2, ...] }
   const [customOrders, setCustomOrders] = useState<Record<string, GalleryImage[]>>({});
-  // Track expanded preview state
-  const [expandedClip, setExpandedClip] = useState<string | null>(null);
+  // Track collapsed clips (all start expanded by default)
+  const [collapsedClips, setCollapsedClips] = useState<Set<string>>(new Set());
 
   // Get truncated title for source (max 50 chars in DB)
   const getTruncatedTitle = (title: string) => {
@@ -452,7 +452,7 @@ IMPORTANTE:
         );
 
         const clipKey = clip.id || `clip-${index}`;
-        const isExpanded = expandedClip === clipKey;
+        const isExpanded = !collapsedClips.has(clipKey);
         const orderedImages = customOrders[clipKey] || carrosselImages;
 
         return (
@@ -463,7 +463,17 @@ IMPORTANTE:
             {/* Header */}
             <div
               className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
-              onClick={() => setExpandedClip(isExpanded ? null : clipKey)}
+              onClick={() => {
+                setCollapsedClips(prev => {
+                  const next = new Set(prev);
+                  if (next.has(clipKey)) {
+                    next.delete(clipKey);
+                  } else {
+                    next.add(clipKey);
+                  }
+                  return next;
+                });
+              }}
             >
               <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white/60">
                 {index + 1}

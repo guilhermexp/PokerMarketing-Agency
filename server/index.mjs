@@ -519,32 +519,32 @@ const buildQuantityInstructions = (options) => {
 
   const postPlatforms = [];
   if (options.posts.instagram?.generate && options.posts.instagram.count > 0) {
-    postPlatforms.push(`${options.posts.instagram.count}x Instagram`);
+    postPlatforms.push(`EXATAMENTE ${options.posts.instagram.count} post(s) Instagram`);
   }
   if (options.posts.facebook?.generate && options.posts.facebook.count > 0) {
-    postPlatforms.push(`${options.posts.facebook.count}x Facebook`);
+    postPlatforms.push(`EXATAMENTE ${options.posts.facebook.count} post(s) Facebook`);
   }
   if (options.posts.twitter?.generate && options.posts.twitter.count > 0) {
-    postPlatforms.push(`${options.posts.twitter.count}x Twitter`);
+    postPlatforms.push(`EXATAMENTE ${options.posts.twitter.count} post(s) Twitter`);
   }
   if (options.posts.linkedin?.generate && options.posts.linkedin.count > 0) {
-    postPlatforms.push(`${options.posts.linkedin.count}x LinkedIn`);
+    postPlatforms.push(`EXATAMENTE ${options.posts.linkedin.count} post(s) LinkedIn`);
   }
   if (postPlatforms.length > 0) {
-    quantities.push(`- Posts (posts): ${postPlatforms.join(", ")}`);
+    quantities.push(`- Posts (posts): ${postPlatforms.join(", ")} - NÃO GERE MAIS NEM MENOS`);
   } else {
     quantities.push(`- Posts (posts): 0 (array vazio)`);
   }
 
   const adPlatforms = [];
   if (options.adCreatives.facebook?.generate && options.adCreatives.facebook.count > 0) {
-    adPlatforms.push(`${options.adCreatives.facebook.count}x Facebook`);
+    adPlatforms.push(`EXATAMENTE ${options.adCreatives.facebook.count} anúncio(s) Facebook`);
   }
   if (options.adCreatives.google?.generate && options.adCreatives.google.count > 0) {
-    adPlatforms.push(`${options.adCreatives.google.count}x Google`);
+    adPlatforms.push(`EXATAMENTE ${options.adCreatives.google.count} anúncio(s) Google`);
   }
   if (adPlatforms.length > 0) {
-    quantities.push(`- Anúncios (adCreatives): ${adPlatforms.join(", ")}`);
+    quantities.push(`- Anúncios (adCreatives): ${adPlatforms.join(", ")} - NÃO GERE MAIS NEM MENOS`);
   } else {
     quantities.push(`- Anúncios (adCreatives): 0 (array vazio)`);
   }
