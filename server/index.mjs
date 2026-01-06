@@ -971,7 +971,12 @@ if (REDIS_URL) {
 // API ROUTES
 // ============================================================================
 
-// Health check
+// Simple health check (no DB dependency - for Railway healthcheck)
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// DB Health check
 app.get("/api/db/health", async (req, res) => {
   try {
     const sql = getSql();
