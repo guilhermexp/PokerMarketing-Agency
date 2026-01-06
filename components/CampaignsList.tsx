@@ -281,96 +281,78 @@ const CampaignCard: React.FC<{
 
       {/* Content */}
       <div className="relative p-5 space-y-4">
-        {/* Stats Grid with Previews */}
+        {/* Preview Images Grid */}
         {totalAssets > 0 ? (
-          <div className="grid grid-cols-3 gap-3">
-            {campaign.clipsCount > 0 && (
-              <div className="relative overflow-hidden rounded-xl border border-white/[0.04] aspect-square group/stat">
-                {campaign.clipPreviewUrl ? (
-                  <>
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              {campaign.clipsCount > 0 && (
+                <div className="relative overflow-hidden rounded-xl border border-white/[0.04] aspect-square group/stat">
+                  {campaign.clipPreviewUrl ? (
                     <img
                       src={campaign.clipPreviewUrl}
                       alt="Clip preview"
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover/stat:scale-110"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20" />
-                  </>
-                ) : (
-                  <div className="absolute inset-0 bg-white/[0.02] flex items-center justify-center">
-                    <Icon name="film" className="w-6 h-6 text-white/10" />
-                  </div>
-                )}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
-                  <div className="text-xl font-black text-white tabular-nums drop-shadow-lg">
-                    <AnimatedNumber
-                      value={campaign.clipsCount}
-                      delay={index * 80}
-                    />
-                  </div>
-                  <div className="text-[8px] text-white/60 uppercase tracking-wider font-semibold mt-0.5">
-                    Clips
-                  </div>
+                  ) : (
+                    <div className="absolute inset-0 bg-white/[0.02] flex items-center justify-center">
+                      <Icon name="film" className="w-5 h-5 text-white/10" />
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-            {campaign.postsCount > 0 && (
-              <div className="relative overflow-hidden rounded-xl border border-white/[0.04] aspect-square group/stat">
-                {campaign.postPreviewUrl ? (
-                  <>
+              )}
+              {campaign.postsCount > 0 && (
+                <div className="relative overflow-hidden rounded-xl border border-white/[0.04] aspect-square group/stat">
+                  {campaign.postPreviewUrl ? (
                     <img
                       src={campaign.postPreviewUrl}
                       alt="Post preview"
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover/stat:scale-110"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20" />
-                  </>
-                ) : (
-                  <div className="absolute inset-0 bg-white/[0.02] flex items-center justify-center">
-                    <Icon name="image" className="w-6 h-6 text-white/10" />
-                  </div>
-                )}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
-                  <div className="text-xl font-black text-white tabular-nums drop-shadow-lg">
-                    <AnimatedNumber
-                      value={campaign.postsCount}
-                      delay={index * 80 + 100}
-                    />
-                  </div>
-                  <div className="text-[8px] text-white/60 uppercase tracking-wider font-semibold mt-0.5">
-                    Posts
-                  </div>
+                  ) : (
+                    <div className="absolute inset-0 bg-white/[0.02] flex items-center justify-center">
+                      <Icon name="image" className="w-5 h-5 text-white/10" />
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-            {campaign.adsCount > 0 && (
-              <div className="relative overflow-hidden rounded-xl border border-white/[0.04] aspect-square group/stat">
-                {campaign.adPreviewUrl ? (
-                  <>
+              )}
+              {campaign.adsCount > 0 && (
+                <div className="relative overflow-hidden rounded-xl border border-white/[0.04] aspect-square group/stat">
+                  {campaign.adPreviewUrl ? (
                     <img
                       src={campaign.adPreviewUrl}
                       alt="Ad preview"
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover/stat:scale-110"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20" />
-                  </>
-                ) : (
-                  <div className="absolute inset-0 bg-white/[0.02] flex items-center justify-center">
-                    <Icon name="zap" className="w-6 h-6 text-white/10" />
-                  </div>
-                )}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
-                  <div className="text-xl font-black text-white tabular-nums drop-shadow-lg">
-                    <AnimatedNumber
-                      value={campaign.adsCount}
-                      delay={index * 80 + 200}
-                    />
-                  </div>
-                  <div className="text-[8px] text-white/60 uppercase tracking-wider font-semibold mt-0.5">
-                    Ads
-                  </div>
+                  ) : (
+                    <div className="absolute inset-0 bg-white/[0.02] flex items-center justify-center">
+                      <Icon name="zap" className="w-5 h-5 text-white/10" />
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+
+            {/* Discrete counts at bottom */}
+            <div className="flex items-center gap-3 text-[9px] text-white/30">
+              {campaign.clipsCount > 0 && (
+                <span className="flex items-center gap-1">
+                  <Icon name="film" className="w-3 h-3" />
+                  {campaign.clipsCount} clip{campaign.clipsCount !== 1 ? 's' : ''}
+                </span>
+              )}
+              {campaign.postsCount > 0 && (
+                <span className="flex items-center gap-1">
+                  <Icon name="image" className="w-3 h-3" />
+                  {campaign.postsCount} post{campaign.postsCount !== 1 ? 's' : ''}
+                </span>
+              )}
+              {campaign.adsCount > 0 && (
+                <span className="flex items-center gap-1">
+                  <Icon name="zap" className="w-3 h-3" />
+                  {campaign.adsCount} ad{campaign.adsCount !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
           </div>
         ) : (
           <div className="text-center py-4">
@@ -378,33 +360,6 @@ const CampaignCard: React.FC<{
               <Icon name="inbox" className="w-4 h-4 text-white/20" />
             </div>
             <p className="text-[11px] text-white/20 italic">Campanha vazia</p>
-          </div>
-        )}
-
-        {/* Platform breakdown */}
-        {(Object.keys(campaign.postsBreakdown).length > 0 ||
-          Object.keys(campaign.adsBreakdown).length > 0) && (
-          <div className="flex flex-wrap gap-1.5">
-            {Object.entries(campaign.postsBreakdown).map(
-              ([platform, count]) => (
-                <span
-                  key={`post-${platform}`}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.03] text-[9px] text-white/40"
-                >
-                  <Icon name="image" className="w-2.5 h-2.5" />
-                  {count} {platform}
-                </span>
-              ),
-            )}
-            {Object.entries(campaign.adsBreakdown).map(([platform, count]) => (
-              <span
-                key={`ad-${platform}`}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/5 text-[9px] text-primary/60"
-              >
-                <Icon name="zap" className="w-2.5 h-2.5" />
-                {count} {platform}
-              </span>
-            ))}
           </div>
         )}
       </div>
