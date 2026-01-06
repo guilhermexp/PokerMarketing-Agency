@@ -2890,6 +2890,7 @@ app.post("/api/ai/campaign", async (req, res) => {
     }
 
     console.log("[Campaign API] Generating campaign...");
+    console.log("[Campaign API] Options received:", JSON.stringify(options, null, 2));
 
     // Model selection - config in config/ai-models.ts
     // OpenRouter models have "/" in their ID (e.g., "openai/gpt-5.2")
@@ -2897,6 +2898,7 @@ app.post("/api/ai/campaign", async (req, res) => {
     const isOpenRouter = model.includes("/");
 
     const quantityInstructions = buildQuantityInstructions(options);
+    console.log("[Campaign API] Quantity instructions:", quantityInstructions);
     const prompt = buildCampaignPrompt(brandProfile, transcript, quantityInstructions);
 
     let result;

@@ -632,6 +632,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       onRemoveStyleReference={onRemoveStyleReference}
                       userId={userId}
                       galleryImages={galleryImages}
+                      campaignId={campaign.id}
                     />
                   )}
                   {activeTab === "ads" && (
@@ -647,6 +648,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       onRemoveStyleReference={onRemoveStyleReference}
                       userId={userId}
                       galleryImages={galleryImages}
+                      campaignId={campaign.id}
                     />
                   )}
                 </div>

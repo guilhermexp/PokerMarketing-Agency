@@ -164,16 +164,16 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [generationOptions, setGenerationOptions] = useState<GenerationOptions>({
-    videoClipScripts: { generate: true, count: 2 },
+    videoClipScripts: { generate: true, count: 1 },
     posts: {
-      linkedin: { generate: true, count: 1 },
-      twitter: { generate: true, count: 2 },
+      linkedin: { generate: false, count: 1 },
+      twitter: { generate: false, count: 1 },
       instagram: { generate: true, count: 1 },
-      facebook: { generate: true, count: 1 },
+      facebook: { generate: false, count: 1 },
     },
     adCreatives: {
       facebook: { generate: true, count: 1 },
-      google: { generate: true, count: 1 },
+      google: { generate: false, count: 1 },
     },
   });
   const [pendingContentInput, setPendingContentInput] = useState<ContentInput | null>(null);

@@ -38,6 +38,7 @@ interface PostsTabProps {
   onRemoveStyleReference?: (id: string) => void;
   userId?: string | null;
   galleryImages?: GalleryImage[];
+  campaignId?: string; // Campaign ID to filter images correctly
 }
 
 const socialIcons: Record<string, IconName> = {
@@ -261,6 +262,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
   onRemoveStyleReference,
   userId,
   galleryImages,
+  campaignId,
 }) => {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
   const [generationState, setGenerationState] = useState<{
@@ -284,7 +286,12 @@ export const PostsTab: React.FC<PostsTabProps> = ({
   const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
 
   // Helper to generate unique source for a post
+  // Includes campaignId to ensure uniqueness across campaigns
   const getPostSource = (index: number, platform: string) =>
+    campaignId ? `Post-${campaignId.slice(0, 8)}-${platform}-${index}` : `Post-${platform}-${index}`;
+
+  // Legacy source format (for backward compatibility)
+  const getLegacyPostSource = (index: number, platform: string) =>
     `Post-${platform}-${index}`;
 
   // ============================================================================
@@ -300,10 +307,13 @@ export const PostsTab: React.FC<PostsTabProps> = ({
   // Solution: Use 3-tier priority system:
   //   Priority 1: post.image_url from database (most reliable)
   //   Priority 2: galleryImages filtered by post_id (safe, tied to specific post)
-  //   Priority 3: galleryImages filtered by source string (legacy fallback)
+  //   Priority 3: galleryImages filtered by source + campaignId (legacy fallback)
   //
   // WARNING: Do NOT remove the gallery fallback! Users lose their generated
   // images when navigating away and back if this fallback is missing.
+  //
+  // IMPORTANT: Priority 3 now includes campaignId filtering to prevent
+  // images from one campaign appearing in another campaign.
   // ============================================================================
   useEffect(() => {
     const length = posts.length;
@@ -333,11 +343,25 @@ export const PostsTab: React.FC<PostsTabProps> = ({
       }
 
       // Priority 3: Fallback to source matching (for legacy data)
+      // IMPORTANT: Filter by campaignId to prevent cross-campaign image leakage
       if (galleryImages && galleryImages.length > 0) {
-        const source = getPostSource(index, post.platform);
-        const galleryImage = galleryImages.find(img => img.source === source);
+        // Try new source format first (includes campaignId)
+        const newSource = getPostSource(index, post.platform);
+        let galleryImage = galleryImages.find(img => img.source === newSource);
+
+        // Fallback to legacy source format, but ONLY if the image belongs to this campaign
+        if (!galleryImage) {
+          const legacySource = getLegacyPostSource(index, post.platform);
+          galleryImage = galleryImages.find(img =>
+            img.source === legacySource &&
+            // STRICT: Only accept if no campaignId context OR image explicitly matches this campaign
+            // Images without campaign_id are NOT accepted when we have a campaignId context
+            (!campaignId || img.campaign_id === campaignId)
+          );
+        }
+
         if (galleryImage && post.id) {
-          console.log(`[PostsTab] Recovered image from gallery by source: ${source}`);
+          console.log(`[PostsTab] Recovered image from gallery by source for campaign: ${campaignId}`);
           // Also sync to database so previews work in campaign list
           updatePostImage(post.id, galleryImage.src).catch(err =>
             console.error("[PostsTab] Failed to sync recovered image to database:", err)
@@ -353,7 +377,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
       isGenerating: Array(length).fill(false),
       errors: Array(length).fill(null),
     });
-  }, [posts, galleryImages]);
+  }, [posts, galleryImages, campaignId]);
 
   // Listen for job completions
   useEffect(() => {
