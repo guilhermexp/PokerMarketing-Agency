@@ -1339,6 +1339,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
   }, [clip, galleryImages]);
 
   // Separate effect to sync new videos from gallery (after initial load)
+  // NOTE: videoStates intentionally NOT in dependencies to prevent infinite loop
   useEffect(() => {
     if (
       !hasInitializedVideos.current ||
@@ -1349,7 +1350,6 @@ const ClipCard: React.FC<ClipCardProps> = ({
       return;
 
     const truncatedTitle = getTruncatedTitle();
-    let hasNewVideos = false;
 
     scenes.forEach((scene) => {
       const newSource = `Video-${truncatedTitle}-${scene.sceneNumber}`;
@@ -1367,36 +1367,29 @@ const ClipCard: React.FC<ClipCardProps> = ({
         sourceMatches,
       );
 
-      const currentVideos = videoStates[scene.sceneNumber] || [];
+      // Use functional update to check current state without depending on it
+      setVideoStates((prev) => {
+        const currentVideos = prev[scene.sceneNumber] || [];
+        const newVideos = galleryVideos.filter(
+          (gv) => !currentVideos.some((cv) => cv.url === gv.src)
+        );
 
-      // Check if there are videos in gallery that aren't in state
-      galleryVideos.forEach((gv) => {
-        const alreadyInState = currentVideos.some((cv) => cv.url === gv.src);
-        if (!alreadyInState) {
-          hasNewVideos = true;
-          console.log(
-            `[ClipCard] Found new video in gallery for clip ${clip.id} scene ${scene.sceneNumber}:`,
-            gv.source,
-          );
-          setVideoStates((prev) => ({
-            ...prev,
-            [scene.sceneNumber]: [
-              ...(prev[scene.sceneNumber] || []),
-              {
-                url: gv.src,
-                isLoading: false,
-                model: gv.model || "unknown",
-              },
-            ],
-          }));
-        }
+        if (newVideos.length === 0) return prev;
+
+        return {
+          ...prev,
+          [scene.sceneNumber]: [
+            ...currentVideos,
+            ...newVideos.map((gv) => ({
+              url: gv.src,
+              isLoading: false,
+              model: gv.model || "unknown",
+            })),
+          ],
+        };
       });
     });
-
-    if (hasNewVideos) {
-      console.log("[ClipCard] Synced new videos from gallery");
-    }
-  }, [galleryImages, scenes, clip.title, videoStates]);
+  }, [galleryImages, scenes, clip.title, clip.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -5005,30 +4998,11 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                               hasVideo &&
                               currentVideo?.url && (
                                 <>
-                                  {console.log(
-                                    "[ClipsTab] Video display URL:",
-                                    getVideoDisplayUrl(currentVideo.url),
-                                    "Original:",
-                                    currentVideo.url,
-                                  )}
                                   <video
                                     src={getVideoDisplayUrl(currentVideo.url)}
                                     controls
                                     crossOrigin="anonymous"
                                     className="w-full h-full object-cover"
-                                    onError={(e) =>
-                                      console.error(
-                                        "[ClipsTab] Video load error:",
-                                        e,
-                                        "src:",
-                                        (e.target as HTMLVideoElement).src,
-                                      )
-                                    }
-                                    onLoadedData={() =>
-                                      console.log(
-                                        "[ClipsTab] Video loaded successfully",
-                                      )
-                                    }
                                   />
                                   {/* Model tag */}
                                   {currentVideo.model && (
