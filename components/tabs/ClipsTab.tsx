@@ -2055,14 +2055,24 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     }
   };
 
-  const handleThumbnailUpdate = (newSrc: string) => {
+  const handleThumbnailUpdate = async (newSrc: string) => {
     if (thumbnail) {
       onUpdateGalleryImage(thumbnail.id, newSrc);
       setEditingThumbnail((prev) => (prev ? { ...prev, src: newSrc } : null));
+
+      // Also update the database so the edit persists
+      if (clip.id) {
+        try {
+          await updateClipThumbnail(clip.id, newSrc);
+          console.log("[ClipsTab] Updated thumbnail in database:", clip.id);
+        } catch (err) {
+          console.error("[ClipsTab] Failed to update thumbnail in database:", err);
+        }
+      }
     }
   };
 
-  const handleSceneImageUpdate = (newSrc: string) => {
+  const handleSceneImageUpdate = async (newSrc: string) => {
     if (editingSceneImage) {
       const { sceneNumber, image } = editingSceneImage;
       // Update in gallery if it has an ID
@@ -2084,6 +2094,16 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
       setEditingSceneImage((prev) =>
         prev ? { ...prev, image: { ...prev.image, src: newSrc } } : null,
       );
+
+      // Also update the database so the edit persists
+      if (clip.id) {
+        try {
+          await updateSceneImage(clip.id, sceneNumber, newSrc);
+          console.log("[ClipsTab] Updated scene image in database:", clip.id, sceneNumber);
+        } catch (err) {
+          console.error("[ClipsTab] Failed to update scene image in database:", err);
+        }
+      }
     }
   };
 

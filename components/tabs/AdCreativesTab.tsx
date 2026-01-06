@@ -272,11 +272,28 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
   const getAdSource = (index: number, platform: string) =>
     `Ad-${platform}-${index}`;
 
-  // Initialize images from adCreatives data (database first, then gallery fallback)
+  // ============================================================================
+  // IMAGE RECOVERY LOGIC - DO NOT REMOVE THIS FALLBACK!
+  // ============================================================================
+  // Problem: When images are generated, they are saved to:
+  //   1. Gallery (galleryImages) - via onAddImageToGallery()
+  //   2. Database (ad.image_url) - via updateAdCreativeImage()
+  //
+  // Sometimes the database save fails silently, leaving image_url = null.
+  // But the image still exists in the gallery with ad_id or source reference.
+  //
+  // Solution: Use 3-tier priority system:
+  //   Priority 1: ad.image_url from database (most reliable)
+  //   Priority 2: galleryImages filtered by ad_id (safe, tied to specific ad)
+  //   Priority 3: galleryImages filtered by source string (legacy fallback)
+  //
+  // WARNING: Do NOT remove the gallery fallback! Users lose their generated
+  // images when navigating away and back if this fallback is missing.
+  // ============================================================================
   useEffect(() => {
     const length = adCreatives.length;
     const initialImages = adCreatives.map((ad, index) => {
-      // Priority 1: Use saved image_url from database
+      // Priority 1: Use saved image_url from database (most reliable)
       if (ad.image_url) {
         return {
           id: `saved-${ad.id || Date.now()}`,
@@ -292,6 +309,10 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
         const galleryImage = galleryImages.find(img => img.ad_id === ad.id);
         if (galleryImage) {
           console.log(`[AdCreativesTab] Recovered image from gallery for ad: ${ad.id}`);
+          // Also sync to database so previews work in campaign list
+          updateAdCreativeImage(ad.id, galleryImage.src).catch(err =>
+            console.error("[AdCreativesTab] Failed to sync recovered image to database:", err)
+          );
           return galleryImage;
         }
       }
@@ -300,8 +321,12 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
       if (galleryImages && galleryImages.length > 0) {
         const source = getAdSource(index, ad.platform);
         const galleryImage = galleryImages.find(img => img.source === source);
-        if (galleryImage) {
+        if (galleryImage && ad.id) {
           console.log(`[AdCreativesTab] Recovered image from gallery by source: ${source}`);
+          // Also sync to database so previews work in campaign list
+          updateAdCreativeImage(ad.id, galleryImage.src).catch(err =>
+            console.error("[AdCreativesTab] Failed to sync recovered image to database:", err)
+          );
           return galleryImage;
         }
       }

@@ -287,11 +287,28 @@ export const PostsTab: React.FC<PostsTabProps> = ({
   const getPostSource = (index: number, platform: string) =>
     `Post-${platform}-${index}`;
 
-  // Initialize images from posts data (database first, then gallery fallback)
+  // ============================================================================
+  // IMAGE RECOVERY LOGIC - DO NOT REMOVE THIS FALLBACK!
+  // ============================================================================
+  // Problem: When images are generated, they are saved to:
+  //   1. Gallery (galleryImages) - via onAddImageToGallery()
+  //   2. Database (post.image_url) - via updatePostImage()
+  //
+  // Sometimes the database save fails silently, leaving image_url = null.
+  // But the image still exists in the gallery with post_id or source reference.
+  //
+  // Solution: Use 3-tier priority system:
+  //   Priority 1: post.image_url from database (most reliable)
+  //   Priority 2: galleryImages filtered by post_id (safe, tied to specific post)
+  //   Priority 3: galleryImages filtered by source string (legacy fallback)
+  //
+  // WARNING: Do NOT remove the gallery fallback! Users lose their generated
+  // images when navigating away and back if this fallback is missing.
+  // ============================================================================
   useEffect(() => {
     const length = posts.length;
     const initialImages = posts.map((post, index) => {
-      // Priority 1: Use saved image_url from database
+      // Priority 1: Use saved image_url from database (most reliable)
       if (post.image_url) {
         return {
           id: `saved-${post.id || Date.now()}`,
@@ -307,6 +324,10 @@ export const PostsTab: React.FC<PostsTabProps> = ({
         const galleryImage = galleryImages.find(img => img.post_id === post.id);
         if (galleryImage) {
           console.log(`[PostsTab] Recovered image from gallery for post: ${post.id}`);
+          // Also sync to database so previews work in campaign list
+          updatePostImage(post.id, galleryImage.src).catch(err =>
+            console.error("[PostsTab] Failed to sync recovered image to database:", err)
+          );
           return galleryImage;
         }
       }
@@ -315,8 +336,12 @@ export const PostsTab: React.FC<PostsTabProps> = ({
       if (galleryImages && galleryImages.length > 0) {
         const source = getPostSource(index, post.platform);
         const galleryImage = galleryImages.find(img => img.source === source);
-        if (galleryImage) {
+        if (galleryImage && post.id) {
           console.log(`[PostsTab] Recovered image from gallery by source: ${source}`);
+          // Also sync to database so previews work in campaign list
+          updatePostImage(post.id, galleryImage.src).catch(err =>
+            console.error("[PostsTab] Failed to sync recovered image to database:", err)
+          );
           return galleryImage;
         }
       }
