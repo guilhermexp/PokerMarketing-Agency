@@ -272,12 +272,11 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
   const getAdSource = (index: number, platform: string) =>
     `Ad-${platform}-${index}`;
 
-  // Initialize images from adCreatives data (only from saved image_url in database)
+  // Initialize images from adCreatives data (database first, then gallery fallback)
   useEffect(() => {
     const length = adCreatives.length;
     const initialImages = adCreatives.map((ad, index) => {
-      // Only use saved image_url from database - don't recover from gallery
-      // (gallery recovery caused images from other campaigns to appear)
+      // Priority 1: Use saved image_url from database
       if (ad.image_url) {
         return {
           id: `saved-${ad.id || Date.now()}`,
@@ -287,6 +286,26 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
           model: "gemini-3-pro-image-preview" as const,
         };
       }
+
+      // Priority 2: Recover from gallery using ad_id (safe - tied to specific ad)
+      if (ad.id && galleryImages && galleryImages.length > 0) {
+        const galleryImage = galleryImages.find(img => img.ad_id === ad.id);
+        if (galleryImage) {
+          console.log(`[AdCreativesTab] Recovered image from gallery for ad: ${ad.id}`);
+          return galleryImage;
+        }
+      }
+
+      // Priority 3: Fallback to source matching (for legacy data)
+      if (galleryImages && galleryImages.length > 0) {
+        const source = getAdSource(index, ad.platform);
+        const galleryImage = galleryImages.find(img => img.source === source);
+        if (galleryImage) {
+          console.log(`[AdCreativesTab] Recovered image from gallery by source: ${source}`);
+          return galleryImage;
+        }
+      }
+
       return null;
     });
     setImages(initialImages);
@@ -294,7 +313,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
       isGenerating: Array(length).fill(false),
       errors: Array(length).fill(null),
     });
-  }, [adCreatives]);
+  }, [adCreatives, galleryImages]);
 
   // Listen for job completions
   useEffect(() => {

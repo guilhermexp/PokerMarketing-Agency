@@ -287,12 +287,11 @@ export const PostsTab: React.FC<PostsTabProps> = ({
   const getPostSource = (index: number, platform: string) =>
     `Post-${platform}-${index}`;
 
-  // Initialize images from posts data (only from saved image_url in database)
+  // Initialize images from posts data (database first, then gallery fallback)
   useEffect(() => {
     const length = posts.length;
     const initialImages = posts.map((post, index) => {
-      // Only use saved image_url from database - don't recover from gallery
-      // (gallery recovery caused images from other campaigns to appear)
+      // Priority 1: Use saved image_url from database
       if (post.image_url) {
         return {
           id: `saved-${post.id || Date.now()}`,
@@ -302,6 +301,26 @@ export const PostsTab: React.FC<PostsTabProps> = ({
           model: "gemini-3-pro-image-preview" as const,
         };
       }
+
+      // Priority 2: Recover from gallery using post_id (safe - tied to specific post)
+      if (post.id && galleryImages && galleryImages.length > 0) {
+        const galleryImage = galleryImages.find(img => img.post_id === post.id);
+        if (galleryImage) {
+          console.log(`[PostsTab] Recovered image from gallery for post: ${post.id}`);
+          return galleryImage;
+        }
+      }
+
+      // Priority 3: Fallback to source matching (for legacy data)
+      if (galleryImages && galleryImages.length > 0) {
+        const source = getPostSource(index, post.platform);
+        const galleryImage = galleryImages.find(img => img.source === source);
+        if (galleryImage) {
+          console.log(`[PostsTab] Recovered image from gallery by source: ${source}`);
+          return galleryImage;
+        }
+      }
+
       return null;
     });
     setImages(initialImages);
@@ -309,7 +328,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
       isGenerating: Array(length).fill(false),
       errors: Array(length).fill(null),
     });
-  }, [posts]);
+  }, [posts, galleryImages]);
 
   // Listen for job completions
   useEffect(() => {
@@ -488,12 +507,15 @@ export const PostsTab: React.FC<PostsTabProps> = ({
       if (post.id) {
         try {
           await updatePostImage(post.id, httpUrl);
+          console.log("[PostsTab] Saved image to database for post:", post.id);
         } catch (err) {
           console.error(
             "[PostsTab] Failed to update post image in database:",
             err,
           );
         }
+      } else {
+        console.warn("[PostsTab] Post has no ID, cannot save image to database");
       }
     } catch (err: any) {
       setGenerationState((prev) => {

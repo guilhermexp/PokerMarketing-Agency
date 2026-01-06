@@ -1125,6 +1125,8 @@ function AppContent() {
           loadedCampaign.adCreatives.length,
           "ads",
         );
+        console.log("[Campaign] Posts image_urls:", JSON.stringify(loadedCampaign.posts.map(p => ({ id: p.id, image_url: p.image_url }))));
+        console.log("[Campaign] Ads image_urls:", JSON.stringify(loadedCampaign.adCreatives.map(a => ({ id: a.id, image_url: a.image_url }))));
         setCampaign(loadedCampaign);
         setActiveView("campaign");
       } else {

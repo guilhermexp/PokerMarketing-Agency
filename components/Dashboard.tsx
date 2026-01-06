@@ -22,6 +22,7 @@ import type { WeekScheduleWithCount } from "../services/apiClient";
 import { useCampaigns } from "../hooks/useAppData";
 import { UploadForm } from "./UploadForm";
 import { ClipsTab } from "./tabs/ClipsTab";
+import { CarrosselTab } from "./tabs/CarrosselTab";
 import { PostsTab } from "./tabs/PostsTab";
 import { AdCreativesTab } from "./tabs/AdCreativesTab";
 import { Loader } from "./common/Loader";
@@ -122,7 +123,7 @@ interface DashboardProps {
   instagramContext?: InstagramContext;
 }
 
-type Tab = "clips" | "posts" | "ads";
+type Tab = "clips" | "carrossel" | "posts" | "ads";
 
 interface NavItemProps {
   icon: IconName;
@@ -272,6 +273,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "clips", label: "Clips" },
+    { id: "carrossel", label: "Carrossel" },
     { id: "posts", label: "Social" },
     { id: "ads", label: "Ads" },
   ];
@@ -607,6 +609,14 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       userId={userId}
                       galleryImages={galleryImages}
                       campaignId={campaign.id}
+                    />
+                  )}
+                  {activeTab === "carrossel" && (
+                    <CarrosselTab
+                      videoClipScripts={campaign.videoClipScripts}
+                      galleryImages={galleryImages}
+                      brandProfile={brandProfile}
+                      onAddImageToGallery={onAddImageToGallery}
                     />
                   )}
                   {activeTab === "posts" && (
