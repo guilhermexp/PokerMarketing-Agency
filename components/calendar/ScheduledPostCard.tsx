@@ -96,19 +96,24 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
             onMouseLeave={(e) => e.stopPropagation()}
           >
             <div
-              className="bg-[#111111] border border-white/10 rounded-2xl max-w-md w-full mx-4 overflow-hidden max-h-[85vh] overflow-y-auto"
+              className="bg-[#111111] border border-white/10 rounded-2xl max-w-sm w-full mx-4 overflow-hidden"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onMouseMove={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="px-4 py-3 border-b border-white/5 flex justify-between items-center">
+              {/* Header - Minimal */}
+              <div className="px-3 py-2 flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <div className={`px-2 py-1 rounded text-[8px] font-black uppercase ${statusColors[post.status]}`}>
+                  <div className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${statusColors[post.status]}`}>
                     {statusLabels[post.status]}
                   </div>
                   <span className="text-[9px] text-white/40">
-                    {post.scheduledDate} {post.scheduledTime}
+                    {post.scheduledTime}
                   </span>
+                  {post.instagramContentType && (
+                    <span className="text-[8px] text-white/30 uppercase">
+                      {post.instagramContentType === 'story' ? 'Story' : 'Feed'}
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={() => setIsExpanded(false)}
@@ -118,72 +123,23 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                 </button>
               </div>
 
-              {/* Content */}
-              <div className="p-4 space-y-4">
-                {/* Image Preview */}
-                {post.imageUrl && (
-                  <div className="aspect-square w-full max-w-[200px] mx-auto rounded-xl overflow-hidden border border-white/10">
-                    <img src={post.imageUrl} alt="" className="w-full h-full object-cover" />
+              {/* Image Preview - Larger */}
+              {post.imageUrl && (
+                <div className="px-3">
+                  <div className="w-full rounded-xl overflow-hidden border border-white/10">
+                    <img src={post.imageUrl} alt="" className="w-full h-auto object-contain" />
                   </div>
-                )}
-
-                {/* Caption */}
-                {post.caption && (
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-white/30 uppercase tracking-wider">Caption</label>
-                    <p className="text-xs text-white/60 whitespace-pre-wrap">{post.caption}</p>
-                  </div>
-                )}
-
-                {/* Hashtags */}
-                {post.hashtags.length > 0 && (
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-white/30 uppercase tracking-wider">Hashtags</label>
-                    <p className="text-xs text-white/40">{post.hashtags.join(' ')}</p>
-                  </div>
-                )}
-
-                {/* Platform & Content Type */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Icon name={platformIcons[post.platforms] as any} className="w-4 h-4 text-white/40" />
-                    <span className="text-[9px] font-bold text-white/40 uppercase">
-                      {post.platforms === 'both' ? 'Instagram & Facebook' : post.platforms}
-                    </span>
-                  </div>
-                  {post.instagramContentType && post.platforms !== 'facebook' && (
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
-                      <Icon
-                        name={
-                          post.instagramContentType === 'photo' ? 'image' :
-                          post.instagramContentType === 'reel' ? 'film' :
-                          post.instagramContentType === 'story' ? 'circle' :
-                          'layers'
-                        }
-                        className="w-3 h-3 text-white/50"
-                      />
-                      <span className="text-[8px] font-bold text-white/50 uppercase">
-                        {post.instagramContentType === 'photo' ? 'Feed' :
-                         post.instagramContentType === 'reel' ? 'Reel' :
-                         post.instagramContentType === 'story' ? 'Story' :
-                         'Carousel'}
-                      </span>
-                    </div>
-                  )}
                 </div>
-              </div>
+              )}
 
               {/* Progress Bar */}
               {isPublishing && publishingState && (
-                <div className="px-4 py-3 border-t border-white/10 bg-white/5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full animate-spin flex-shrink-0" />
-                    <div className="flex-1">
-                      <span className="text-[10px] font-medium text-white/70 block">{publishingState.message}</span>
-                      <span className="text-[9px] text-white/40">{publishingState.progress}%</span>
-                    </div>
+                <div className="px-3 py-2 bg-white/5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-3 h-3 border-2 border-white/20 border-t-white/60 rounded-full animate-spin flex-shrink-0" />
+                    <span className="text-[9px] text-white/60">{publishingState.progress}%</span>
                   </div>
-                  <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                  <div className="w-full bg-white/10 rounded-full h-1 overflow-hidden">
                     <div
                       className="h-full bg-white/50 transition-all duration-300"
                       style={{ width: `${publishingState.progress}%` }}
@@ -194,121 +150,80 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
 
               {/* Success Message */}
               {publishingState?.step === 'completed' && (
-                <div className="px-4 py-3 border-t border-white/10 bg-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-                      <Icon name="check" className="w-4 h-4 text-white/70" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-[10px] font-bold text-white/80">Publicado com sucesso</p>
-                      <p className="text-[9px] text-white/40 mt-0.5">{publishingState.message}</p>
-                    </div>
+                <div className="px-3 py-2 bg-green-500/5">
+                  <div className="flex items-center gap-2">
+                    <Icon name="check" className="w-3 h-3 text-green-400/70" />
+                    <span className="text-[9px] text-green-400/70">Publicado</span>
                   </div>
-                  <button
-                    onClick={() => window.open('https://www.instagram.com/', '_blank')}
-                    className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[9px] font-bold text-white/60 transition-colors"
-                  >
-                    <Icon name="external-link" className="w-3 h-3" />
-                    Ver no Instagram
-                  </button>
                 </div>
               )}
 
               {/* Error Message */}
               {publishingState?.step === 'failed' && (
-                <div className="px-4 py-3 border-t border-red-500/20 bg-red-500/5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
-                      <Icon name="alert-circle" className="w-4 h-4 text-red-400/70" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-[10px] font-bold text-red-400/80">Falha na publicação</p>
-                      <p className="text-[9px] text-red-400/50 mt-0.5">{publishingState.message}</p>
-                    </div>
+                <div className="px-3 py-2 bg-red-500/5">
+                  <div className="flex items-center gap-2">
+                    <Icon name="alert-circle" className="w-3 h-3 text-red-400/70" />
+                    <span className="text-[9px] text-red-400/70">{publishingState.message}</span>
                   </div>
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="px-4 py-3 border-t border-white/5 space-y-2">
+              {/* Actions - Compact */}
+              <div className="p-3 flex gap-2">
                 {post.status === 'scheduled' && (
                   <>
-                    {/* Primary Action - Publish to Instagram */}
                     {canPublishToInstagram && onPublishToInstagram && (
                       <button
                         onClick={() => onPublishToInstagram(post)}
                         disabled={isPublishing}
-                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[9px] font-bold uppercase transition-all ${
                           isPublishing
                             ? 'bg-white/10 text-white/50 cursor-wait'
-                            : 'bg-white/10 hover:bg-white/20 border border-white/20 text-white/80'
+                            : 'bg-white/10 hover:bg-white/20 text-white/80'
                         }`}
                       >
                         {isPublishing ? (
-                          <>
-                            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Publicando...
-                          </>
+                          <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         ) : (
-                          <>
-                            <Icon name="send" className="w-3.5 h-3.5" />
-                            Publicar no Instagram
-                          </>
+                          <Icon name="send" className="w-3 h-3" />
                         )}
+                        Publicar
                       </button>
                     )}
-
-                    {/* Secondary Actions Row */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={handleCopyCaption}
-                        className="flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-[9px] font-black text-white/60 uppercase tracking-wider transition-colors"
-                      >
-                        <Icon name="copy" className="w-3 h-3" />
-                        Copiar
-                      </button>
-                      {(post.platforms === 'instagram' || post.platforms === 'both') && (
-                        <button
-                          onClick={() => handleOpenPlatform('instagram')}
-                          className="flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-[9px] font-black text-white/60 uppercase tracking-wider transition-colors"
-                        >
-                          <Icon name="external-link" className="w-3 h-3" />
-                          Abrir IG
-                        </button>
-                      )}
-                      {(post.platforms === 'facebook' || post.platforms === 'both') && (
-                        <button
-                          onClick={() => handleOpenPlatform('facebook')}
-                          className="flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-[9px] font-black text-white/60 uppercase tracking-wider transition-colors"
-                        >
-                          <Icon name="external-link" className="w-3 h-3" />
-                          Abrir FB
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Tertiary Actions Row */}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleMarkAsPublished}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-[9px] font-bold text-white/50 uppercase tracking-wider transition-colors"
-                      >
-                        <Icon name="check" className="w-3 h-3" />
-                        Marcar Publicado
-                      </button>
-                      <button
-                        onClick={() => { onDelete(post.id); setIsExpanded(false); }}
-                        className="flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-red-500/10 rounded-lg text-[9px] font-bold text-white/40 hover:text-red-400/80 uppercase tracking-wider transition-colors"
-                      >
-                        <Icon name="trash" className="w-3 h-3" />
-                      </button>
-                    </div>
+                    <button
+                      onClick={handleCopyCaption}
+                      className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/50 transition-colors"
+                      title="Copiar"
+                    >
+                      <Icon name="copy" className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleOpenPlatform('instagram')}
+                      className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/50 transition-colors"
+                      title="Abrir Instagram"
+                    >
+                      <Icon name="external-link" className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={handleMarkAsPublished}
+                      className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/50 transition-colors"
+                      title="Marcar como publicado"
+                    >
+                      <Icon name="check" className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => { onDelete(post.id); setIsExpanded(false); }}
+                      className="p-2 bg-white/5 hover:bg-red-500/10 rounded-lg text-white/40 hover:text-red-400 transition-colors"
+                      title="Excluir"
+                    >
+                      <Icon name="trash" className="w-3.5 h-3.5" />
+                    </button>
                   </>
                 )}
                 {post.status !== 'scheduled' && (
                   <button
                     onClick={() => { onDelete(post.id); setIsExpanded(false); }}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-red-500/10 rounded-lg text-[9px] font-bold text-white/40 hover:text-red-400/80 uppercase tracking-wider transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-red-500/10 rounded-lg text-[9px] font-bold text-white/40 hover:text-red-400 uppercase transition-colors"
                   >
                     <Icon name="trash" className="w-3 h-3" />
                     Excluir
