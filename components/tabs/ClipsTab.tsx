@@ -1205,6 +1205,30 @@ const ClipCard: React.FC<ClipCardProps> = ({
     }
   }, [mergedVideoUrl]);
 
+  // Load final video from gallery if available (filtered by video_script_id)
+  const hasInitializedFinalVideo = useRef(false);
+  useEffect(() => {
+    if (hasInitializedFinalVideo.current || !galleryImages || !clip.id) return;
+
+    // Find final video in gallery linked to this specific clip
+    const finalVideos = filterGalleryImages(
+      galleryImages,
+      clip.id,
+      (source) => source === "Video Final",
+      (img) => !!img.src,
+    );
+
+    if (finalVideos.length > 0 && finalVideos[0].src) {
+      hasInitializedFinalVideo.current = true;
+      setMergedVideoUrl(finalVideos[0].src);
+      console.log(
+        "[ClipsTab] Loaded final video from gallery for clip:",
+        clip.id,
+        finalVideos[0].src,
+      );
+    }
+  }, [galleryImages, clip.id]);
+
   // Load audio from gallery if available (filtered by video_script_id)
   const hasInitializedAudio = useRef(false);
   useEffect(() => {
