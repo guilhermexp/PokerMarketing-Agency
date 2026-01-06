@@ -953,19 +953,8 @@ const processGenerationJob = async (job) => {
   }
 };
 
-// Initialize the BullMQ worker if Redis is configured
+// Redis URL for BullMQ (initialized after server starts)
 const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL;
-if (REDIS_URL) {
-  console.log("[Server] Redis configured, initializing BullMQ worker...");
-  initializeWorker(processGenerationJob);
-
-  // Initialize scheduled posts publisher (exact time + 5min fallback)
-  initializeScheduledPostsChecker(checkAndPublishScheduledPosts, publishScheduledPostById)
-    .then(() => console.log("[Server] Scheduled posts publisher initialized"))
-    .catch((err) => console.error("[Server] Failed to initialize scheduled posts publisher:", err.message));
-} else {
-  console.log("[Server] No Redis URL configured, background jobs will use polling fallback");
-}
 
 // ============================================================================
 // API ROUTES
@@ -3941,6 +3930,20 @@ async function startServer() {
     console.log(`[Production Server] Database: ${DATABASE_URL ? "Connected" : "NOT CONFIGURED"}`);
     console.log(`[Production Server] Environment: ${process.env.NODE_ENV || "development"}`);
   });
+
+  // Initialize BullMQ workers after server starts (non-blocking)
+  if (REDIS_URL) {
+    console.log("[Server] Redis configured, initializing BullMQ worker...");
+    try {
+      initializeWorker(processGenerationJob);
+      await initializeScheduledPostsChecker(checkAndPublishScheduledPosts, publishScheduledPostById);
+      console.log("[Server] Scheduled posts publisher initialized");
+    } catch (err) {
+      console.error("[Server] Failed to initialize BullMQ:", err.message);
+    }
+  } else {
+    console.log("[Server] No Redis URL configured, background jobs will use polling fallback");
+  }
 
   // Run migrations in background (non-blocking)
   try {
