@@ -509,6 +509,8 @@ const ClipSettingsModal: React.FC<{
   onToggleNarration: () => void;
   removeSilence: boolean;
   onToggleRemoveSilence: () => void;
+  useFrameInterpolation: boolean;
+  onToggleFrameInterpolation: () => void;
 }> = ({
   isOpen,
   onClose,
@@ -520,6 +522,8 @@ const ClipSettingsModal: React.FC<{
   onToggleNarration,
   removeSilence,
   onToggleRemoveSilence,
+  useFrameInterpolation,
+  onToggleFrameInterpolation,
 }) => {
   if (!isOpen) return null;
 
@@ -615,6 +619,32 @@ const ClipSettingsModal: React.FC<{
               </button>
             </div>
           </div>
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider">
+              Experimental
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={onToggleFrameInterpolation}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[9px] font-black uppercase tracking-wider ${
+                  useFrameInterpolation
+                    ? "bg-purple-500/10 border-purple-500/30 text-purple-400"
+                    : "bg-[#0a0a0a] border-white/10 text-white/40 hover:text-white/60"
+                }`}
+                title="Interpola entre a capa da cena atual e a próxima (Veo 3.1 only, 8s)"
+              >
+                <Icon name="layers" className="w-3 h-3" />
+                <span>
+                  {useFrameInterpolation ? "First & Last Frame" : "Modo Padrão"}
+                </span>
+              </button>
+            </div>
+            {useFrameInterpolation && (
+              <p className="text-[9px] text-purple-400/60 mt-1">
+                Cada vídeo interpola entre a capa atual e a próxima (8s, Veo 3.1)
+              </p>
+            )}
+          </div>
           <div className="flex justify-end">
             <button
               onClick={onClose}
@@ -678,6 +708,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
   );
   const [includeNarration, setIncludeNarration] = useState(true); // Include narration in prompts
   const [removeSilence, setRemoveSilence] = useState(true); // Trim silence between clips when exporting
+  const [useFrameInterpolation, setUseFrameInterpolation] = useState(false); // First & Last Frame mode for Veo 3.1
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [editingThumbnail, setEditingThumbnail] = useState<GalleryImage | null>(
     null,
@@ -1699,6 +1730,50 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
           ? "sora-2"
           : "veo-3.1";
 
+        // Calculate lastFrameUrl for first/last frame interpolation
+        let lastFrameUrl: string | undefined;
+        const isVeoModel = apiModel === "veo-3.1";
+
+        if (useFrameInterpolation && isVeoModel) {
+          // Find the next scene
+          const currentIndex = scenes.findIndex(
+            (s) => s.sceneNumber === sceneNumber,
+          );
+          const nextScene = scenes[currentIndex + 1];
+
+          if (nextScene) {
+            const nextSceneImage = sceneImages[nextScene.sceneNumber];
+            if (nextSceneImage?.httpUrl) {
+              lastFrameUrl = nextSceneImage.httpUrl;
+              console.log(
+                `[ClipsTab] Using next scene image as last frame: ${lastFrameUrl}`,
+              );
+            } else if (nextSceneImage?.dataUrl) {
+              // Upload to blob if needed
+              const isDataUrl = nextSceneImage.dataUrl.startsWith("data:");
+              if (isDataUrl) {
+                try {
+                  console.log(
+                    `[ClipsTab] Uploading next scene image to blob for interpolation...`,
+                  );
+                  lastFrameUrl = await uploadImageToBlob(nextSceneImage.dataUrl);
+                } catch (uploadErr) {
+                  console.warn(
+                    "[ClipsTab] Failed to upload next scene image:",
+                    uploadErr,
+                  );
+                }
+              } else {
+                lastFrameUrl = nextSceneImage.dataUrl;
+              }
+            }
+          } else {
+            console.log(
+              `[ClipsTab] Last scene - no interpolation (no next scene)`,
+            );
+          }
+        }
+
         // Try to use background jobs if available
         if (userId && !isDevMode) {
           try {
@@ -1709,7 +1784,9 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
               model: apiModel,
               aspectRatio: "9:16",
               imageUrl,
-              sceneDuration: currentScene.duration,
+              lastFrameUrl,
+              sceneDuration: useFrameInterpolation && lastFrameUrl ? 8 : currentScene.duration,
+              useInterpolation: useFrameInterpolation && !!lastFrameUrl,
             };
 
             await queueVideoJob(
@@ -1743,6 +1820,20 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
             model: apiModel,
             imageUrl,
             sceneDuration: currentScene.duration,
+          });
+        } else if (useFrameInterpolation && lastFrameUrl) {
+          // Use Veo 3.1 with first/last frame interpolation via server API
+          console.log(
+            `[ClipsTab] Using first/last frame interpolation for scene ${sceneNumber}`,
+          );
+          videoUrl = await generateServerVideo({
+            prompt: jsonPrompt,
+            aspectRatio: "9:16",
+            model: apiModel,
+            imageUrl,
+            lastFrameUrl,
+            sceneDuration: 8, // Required for interpolation
+            useInterpolation: true,
           });
         } else {
           // Use Veo 3.1 via geminiService (for local/sync generation)
@@ -1864,6 +1955,7 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
       clip.title,
       userId,
       includeNarration,
+      useFrameInterpolation,
       videoStates,
     ],
   );
@@ -5747,6 +5839,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         onToggleNarration={() => setIncludeNarration(!includeNarration)}
         removeSilence={removeSilence}
         onToggleRemoveSilence={() => setRemoveSilence(!removeSilence)}
+        useFrameInterpolation={useFrameInterpolation}
+        onToggleFrameInterpolation={() =>
+          setUseFrameInterpolation(!useFrameInterpolation)
+        }
       />
     </>
   );

@@ -899,7 +899,9 @@ export interface VideoJobConfig {
   model: "veo-3.1" | "sora-2";
   aspectRatio: string;
   imageUrl?: string;
+  lastFrameUrl?: string;
   sceneDuration?: number;
+  useInterpolation?: boolean;
 }
 
 export interface QueueJobResult {
@@ -1357,8 +1359,10 @@ export async function generateVideo(params: {
   aspectRatio: "16:9" | "9:16";
   model: ApiVideoModel;
   imageUrl?: string;
+  lastFrameUrl?: string;
   sceneDuration?: number;
   generateAudio?: boolean;
+  useInterpolation?: boolean;
 }): Promise<string> {
   const response = await fetch("/api/ai/video", {
     method: "POST",

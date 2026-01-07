@@ -3573,7 +3573,13 @@ const configureFal = () => {
 
 // Generate video using Google Veo API directly
 // Nota: Google Veo SDK não suporta duration nem generateAudio
-async function generateVideoWithGoogleVeo(prompt, aspectRatio, imageUrl) {
+// lastFrameUrl enables first/last frame interpolation mode (requires durationSeconds: 8)
+async function generateVideoWithGoogleVeo(
+  prompt,
+  aspectRatio,
+  imageUrl,
+  lastFrameUrl = null,
+) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY not configured");
@@ -3581,7 +3587,12 @@ async function generateVideoWithGoogleVeo(prompt, aspectRatio, imageUrl) {
 
   const ai = new GoogleGenAI({ apiKey });
   const isHttpUrl = imageUrl && imageUrl.startsWith("http");
-  const mode = isHttpUrl ? "image-to-video" : "text-to-video";
+  const hasLastFrame = lastFrameUrl && lastFrameUrl.startsWith("http");
+  const mode = hasLastFrame
+    ? "first-last-frame"
+    : isHttpUrl
+      ? "image-to-video"
+      : "text-to-video";
 
   logExternalAPI("Google Veo", `Veo 3.1 ${mode}`, `720p | ${aspectRatio}`);
   const startTime = Date.now();
@@ -3594,10 +3605,14 @@ async function generateVideoWithGoogleVeo(prompt, aspectRatio, imageUrl) {
       numberOfVideos: 1,
       resolution: "720p",
       aspectRatio,
+      // First/last frame interpolation requires 8 seconds duration
+      ...(hasLastFrame && { durationSeconds: 8 }),
+      // Required for person generation in interpolation mode
+      ...(hasLastFrame && { personGeneration: "allow_adult" }),
     },
   };
 
-  // Add image for image-to-video mode
+  // Add first frame (image) for image-to-video or interpolation mode
   if (isHttpUrl) {
     const imageResponse = await fetch(imageUrl);
     const imageArrayBuffer = await imageResponse.arrayBuffer();
@@ -3608,6 +3623,20 @@ async function generateVideoWithGoogleVeo(prompt, aspectRatio, imageUrl) {
     generateParams.image = {
       imageBytes: imageBase64,
       mimeType: contentType,
+    };
+  }
+
+  // Add last frame for interpolation mode
+  if (hasLastFrame) {
+    const lastFrameResponse = await fetch(lastFrameUrl);
+    const lastFrameArrayBuffer = await lastFrameResponse.arrayBuffer();
+    const lastFrameBase64 = Buffer.from(lastFrameArrayBuffer).toString("base64");
+    const lastFrameContentType =
+      lastFrameResponse.headers.get("content-type") || "image/jpeg";
+
+    generateParams.lastFrame = {
+      imageBytes: lastFrameBase64,
+      mimeType: lastFrameContentType,
     };
   }
 
@@ -3754,8 +3783,10 @@ app.post("/api/ai/video", async (req, res) => {
       aspectRatio,
       model,
       imageUrl,
+      lastFrameUrl,
       sceneDuration,
       generateAudio = true,
+      useInterpolation = false,
     } = req.body;
 
     if (!prompt || !aspectRatio || !model) {
@@ -3764,8 +3795,9 @@ app.post("/api/ai/video", async (req, res) => {
       });
     }
 
+    const isInterpolationMode = useInterpolation && lastFrameUrl;
     console.log(
-      `[Video API] Generating video with ${model}, audio: ${generateAudio}`,
+      `[Video API] Generating video with ${model}, audio: ${generateAudio}, interpolation: ${isInterpolationMode}`,
     );
 
     let videoUrl;
@@ -3774,19 +3806,19 @@ app.post("/api/ai/video", async (req, res) => {
     // For Veo 3.1, try Google API first, then fallback to FAL.ai
     if (model === "veo-3.1" || model === "veo-3.1-fast-generate-preview") {
       try {
-        // Try Google Veo API first
+        // Try Google Veo API first (supports first/last frame interpolation)
         videoUrl = await generateVideoWithGoogleVeo(
           prompt,
           aspectRatio,
           imageUrl,
-          sceneDuration,
-          generateAudio,
+          isInterpolationMode ? lastFrameUrl : null,
         );
       } catch (googleError) {
         // Log the Google API error and fallback to FAL.ai
         console.log(`[Video API] Google Veo failed: ${googleError.message}`);
         console.log("[Video API] Falling back to FAL.ai...");
         usedProvider = "fal.ai";
+        // FAL.ai doesn't support first/last frame, use standard image-to-video
         videoUrl = await generateVideoWithFal(
           prompt,
           aspectRatio,
