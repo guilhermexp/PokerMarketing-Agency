@@ -18,7 +18,11 @@ import {
 } from "../../services/apiClient";
 import { Icon } from "./Icon";
 
-export const BackgroundJobsIndicator: React.FC = () => {
+interface BackgroundJobsIndicatorProps {
+  isAssistantOpen?: boolean;
+}
+
+export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = ({ isAssistantOpen = false }) => {
   const {
     pendingJobs,
     completedJobs,
@@ -160,7 +164,7 @@ export const BackgroundJobsIndicator: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-4 right-16 sm:bottom-6 sm:right-20 z-40">
+    <div className={`fixed bottom-4 sm:bottom-6 z-40 transition-all duration-300 ${isAssistantOpen ? "right-[400px] sm:right-[420px]" : "right-16 sm:right-20"}`}>
       {/* Notification Toast */}
       {showNotification && (
         <div className={`absolute bottom-full right-0 mb-2 px-4 py-2 backdrop-blur-md rounded-lg shadow-xl animate-fade-in-up ${
@@ -410,16 +414,16 @@ export const BackgroundJobsIndicator: React.FC = () => {
             <div className="relative">
               <Icon
                 name="zap"
-                className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-pulse"
+                className="w-5 h-5 animate-pulse"
               />
-              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-black text-amber-500 text-[8px] font-black rounded-full flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-black text-amber-500 text-[9px] font-black rounded-full flex items-center justify-center">
                 {pendingJobs.length + pendingScheduledPosts.length}
               </span>
             </div>
           ) : scheduledPostNotifications.some(n => n.status === "failed") ? (
-            <Icon name="alertTriangle" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <Icon name="alertTriangle" className="w-5 h-5" />
           ) : (
-            <Icon name="check" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <Icon name="check" className="w-5 h-5" />
           )}
         </button>
       </div>

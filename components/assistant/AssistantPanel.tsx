@@ -108,7 +108,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
 }) => {
   const [input, setInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -135,38 +135,31 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <aside
-      className={`fixed bottom-20 right-3 sm:bottom-24 sm:right-6 z-40 w-[92vw] sm:w-[450px] max-w-[calc(100vw-1.5rem)] sm:max-w-[calc(100vw-3rem)] h-[70vh] sm:h-[750px] max-h-[calc(100vh-7rem)] sm:max-h-[calc(100vh-8rem)] bg-[#080808]/98 backdrop-blur-3xl rounded-[2rem] sm:rounded-[3rem] shadow-[0_40px_120px_rgba(0,0,0,0.9)] border border-white/10 flex flex-col origin-bottom-right transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${isOpen ? "opacity-100 scale-100" : "opacity-0 scale-90 translate-y-10 pointer-events-none"}`}
-    >
-      {/* Header com Engine Status */}
-      <div className="flex-shrink-0 h-20 sm:h-24 flex items-center justify-between px-6 sm:px-10 border-b border-white/5">
-        <div className="flex items-center space-x-5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center shadow-inner">
-            <Icon name="bot" className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-sm font-black text-white uppercase tracking-[0.25em]">
-              Aura Creative Agent
-            </h2>
-            <div className="flex items-center space-x-2 mt-1">
-              <span className="flex h-1.5 w-1.5 rounded-full bg-primary animate-pulse"></span>
-              <span className="text-[8px] font-black text-white/20 uppercase tracking-[0.2em]">
-                Gemini 3 Pro • Creative Core Active
-              </span>
-            </div>
-          </div>
+    <aside className="w-full sm:w-[380px] h-full bg-[#080808] border-l border-white/10 flex flex-col flex-shrink-0">
+      {/* Header minimalista */}
+      <div className="flex-shrink-0 h-14 flex items-center justify-between px-4 border-b border-white/10">
+        <h2 className="text-sm font-semibold text-white">Aura</h2>
+        <div className="flex items-center gap-1">
+          <button className="p-2 text-white/40 hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
+            <Icon name="clock" className="w-4 h-4" />
+          </button>
+          <button className="p-2 text-white/40 hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
+            <Icon name="plus" className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onClose}
+            className="p-2 text-white/40 hover:text-white/80 transition-colors rounded-lg hover:bg-white/5"
+          >
+            <Icon name="x" className="w-4 h-4" />
+          </button>
         </div>
-        <button
-          onClick={onClose}
-          className="p-3 text-white/10 hover:text-white transition-all hover:bg-white/5 rounded-2xl"
-        >
-          <Icon name="x" className="w-5 h-5" />
-        </button>
       </div>
 
       {/* Chat Flow */}
-      <div className="flex-grow p-6 sm:p-8 space-y-8 overflow-y-auto scroll-smooth custom-scrollbar">
+      <div className="flex-1 p-4 space-y-4 overflow-y-auto scroll-smooth custom-scrollbar">
         {history.map((msg, index) => (
           <ChatBubble key={index} message={msg} />
         ))}
@@ -183,43 +176,33 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input Ecosystem */}
-      <div className="flex-shrink-0 p-4 sm:p-5 border-t border-white/5 bg-white/[0.01]">
+      {/* Input Area */}
+      <div className="flex-shrink-0 p-4 border-t border-white/10">
         {referenceImage && (
-          <div className="relative mb-3 p-2 bg-primary/10 border border-primary/20 rounded-xl flex items-center gap-3 animate-fade-in-up">
+          <div className="relative mb-3 p-2 bg-primary/10 border border-primary/20 rounded-lg flex items-center gap-3 animate-fade-in-up">
             <img
               src={referenceImage.src}
               alt="Reference"
-              className="w-10 h-10 object-cover rounded-lg border border-white/10"
+              className="w-10 h-10 object-cover rounded-md border border-white/10"
             />
             <div className="flex-1 min-w-0">
-              <p className="text-[8px] font-bold text-primary uppercase tracking-wide">
-                Referência Ativa
+              <p className="text-[10px] font-medium text-primary">
+                Referência anexada
               </p>
-              <p className="text-[9px] text-white/40 truncate">
+              <p className="text-[10px] text-white/40 truncate">
                 {referenceImage.id.substring(0, 8)}
               </p>
             </div>
             <button
               onClick={onClearReference}
-              className="w-7 h-7 rounded-lg bg-black/40 text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-all flex items-center justify-center"
+              className="w-6 h-6 rounded-md bg-black/40 text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-all flex items-center justify-center"
             >
               <Icon name="x" className="w-3 h-3" />
             </button>
           </div>
         )}
 
-        <form
-          onSubmit={handleSend}
-          className="relative flex items-center gap-2"
-        >
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex-shrink-0 w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-white/30 hover:text-white/60 hover:border-white/20 transition-all flex items-center justify-center"
-          >
-            <Icon name="paperclip" className="w-4 h-4" />
-          </button>
+        <form onSubmit={handleSend} className="relative">
           <input
             type="file"
             ref={fileInputRef}
@@ -228,23 +211,38 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
             accept="image/*"
           />
 
-          <div className="relative flex-grow">
-            <input
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden focus-within:border-white/20 transition-colors">
+            <textarea
               ref={inputRef}
-              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Crie ou edite ativos visuais..."
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-4 pr-11 text-xs text-white placeholder:text-white/20 focus:border-white/20 transition-all outline-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend(e);
+                }
+              }}
+              placeholder="Pergunte, pesquise ou converse..."
+              className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-white placeholder:text-white/30 outline-none resize-none min-h-[80px] max-h-[200px]"
               disabled={isLoading}
+              rows={2}
             />
-            <button
-              type="submit"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-white/10 text-white/50 hover:bg-primary hover:text-black disabled:opacity-20 transition-all flex items-center justify-center"
-              disabled={isLoading || (!input.trim() && !referenceImage)}
-            >
-              <Icon name="send" className="w-3.5 h-3.5" />
-            </button>
+            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-7 h-7 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all flex items-center justify-center"
+              >
+                <Icon name="plus" className="w-4 h-4" />
+              </button>
+              <button
+                type="submit"
+                className="w-7 h-7 rounded-lg text-white/30 hover:text-white/60 disabled:text-white/10 transition-all flex items-center justify-center"
+                disabled={isLoading || (!input.trim() && !referenceImage)}
+              >
+                <Icon name="arrow-up" className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </form>
       </div>

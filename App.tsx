@@ -591,7 +591,7 @@ function AppContent() {
           role: "model",
           parts: [
             {
-              text: `Sistema Online. Olá Diretor! Sou o seu Agente Criativo de Elite. O que vamos forjar hoje?`,
+              text: `Olá Diretor! Sou o seu Agente Criativo de Elite. O que vamos forjar hoje?`,
             },
           ],
         },
@@ -1887,6 +1887,7 @@ function AppContent() {
           />
         </>
       )}
+      <BackgroundJobsIndicator isAssistantOpen={isAssistantOpen} />
     </>
   );
 }
@@ -1898,7 +1899,6 @@ function AppWithBackgroundJobs() {
   return (
     <BackgroundJobsProvider userId={userId} organizationId={organization?.id}>
       <AppContent />
-      <BackgroundJobsIndicator />
     </BackgroundJobsProvider>
   );
 }

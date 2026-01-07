@@ -797,14 +797,16 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         referenceImage={chatReferenceImage}
         onClearReference={() => onSetChatReference(null)}
       />
-      <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
-        <button
-          onClick={onToggleAssistant}
-          className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-105 ${isAssistantOpen ? "bg-white/10 backdrop-blur-xl text-white border border-white/10" : "bg-white/10 backdrop-blur-xl text-white/60 hover:text-white border border-white/5"}`}
-        >
-          <Icon name={isAssistantOpen ? "x" : "zap"} className="w-5 h-5" />
-        </button>
-      </div>
+      {!isAssistantOpen && (
+        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
+          <button
+            onClick={onToggleAssistant}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-105 bg-white/10 backdrop-blur-xl text-white/60 hover:text-white border border-white/5"
+          >
+            <Icon name="zap" className="w-5 h-5" />
+          </button>
+        </div>
+      )}
       {isMobile && !sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(true)}
