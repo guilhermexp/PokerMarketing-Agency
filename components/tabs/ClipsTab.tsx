@@ -51,7 +51,8 @@ import type { GenerationJobConfig } from "../../services/apiClient";
 
 // Check if we're in development mode (QStash won't work locally)
 const isDevMode =
-  typeof window !== "undefined" && window.location.hostname === "localhost";
+  import.meta.env.DEV ||
+  (typeof window !== "undefined" && window.location.hostname === "localhost");
 
 // --- Helper Functions for Audio Processing ---
 
@@ -6050,6 +6051,11 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
         console.error("[ClipsTab] Failed to queue job:", err);
         // Fall through to local generation
       }
+    } else {
+      console.log("[ClipsTab] Background job skipped for thumbnail", {
+        hasUserId: !!userId,
+        isDevMode,
+      });
     }
 
     // Local generation (dev mode or no userId or queue failed)
