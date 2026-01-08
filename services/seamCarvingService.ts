@@ -18,7 +18,7 @@ const PROTECTION_ENERGY = 1000000;
 function getPixel(img: ImageData, x: number, y: number): Color {
   const idx = (y * img.width + x) * 4;
   return [
-    img.data[idx],     // R
+    img.data[idx], // R
     img.data[idx + 1], // G
     img.data[idx + 2], // B
     img.data[idx + 3], // A
@@ -29,7 +29,7 @@ function getPixel(img: ImageData, x: number, y: number): Color {
 function getPixelEnergy(
   left: Color | null,
   middle: Color,
-  right: Color | null
+  right: Color | null,
 ): number {
   let energy = 0;
 
@@ -51,7 +51,7 @@ function getPixelEnergy(
 // Calculate energy map for vertical seams (left-right neighbors)
 function calculateEnergyMapVertical(
   img: ImageData,
-  protectionMask?: ProtectionMask
+  protectionMask?: ProtectionMask,
 ): EnergyMap {
   const { width, height } = img;
   const energyMap: EnergyMap = [];
@@ -79,7 +79,7 @@ function calculateEnergyMapVertical(
 // Calculate energy map for horizontal seams (top-bottom neighbors)
 function calculateEnergyMapHorizontal(
   img: ImageData,
-  protectionMask?: ProtectionMask
+  protectionMask?: ProtectionMask,
 ): EnergyMap {
   const { width, height } = img;
   const energyMap: EnergyMap = [];
@@ -267,7 +267,7 @@ function deleteHorizontalSeam(img: ImageData, seam: Seam): ImageData {
 // Delete vertical seam from protection mask (reduces width by 1)
 function deleteVerticalSeamFromMask(
   mask: ProtectionMask,
-  seam: Seam
+  seam: Seam,
 ): ProtectionMask {
   const height = mask.length;
   const newMask: ProtectionMask = [];
@@ -290,7 +290,7 @@ function deleteVerticalSeamFromMask(
 // Delete horizontal seam from protection mask (reduces height by 1)
 function deleteHorizontalSeamFromMask(
   mask: ProtectionMask,
-  seam: Seam
+  seam: Seam,
 ): ProtectionMask {
   const width = mask[0]?.length || 0;
   const newMask: ProtectionMask = [];
@@ -362,7 +362,7 @@ export async function resizeImageContentAware(
   targetWidth: number,
   targetHeight: number,
   onProgress?: (percent: number) => void,
-  protectionMask?: ProtectionMask
+  protectionMask?: ProtectionMask,
 ): Promise<ImageData> {
   let currentImage = imageData;
   let currentMask = protectionMask;
@@ -433,6 +433,18 @@ export async function resizeImageContentAware(
 
 // Helper: Load image from URL and get ImageData
 export async function loadImageData(imageUrl: string): Promise<ImageData> {
+  const imageSrc = await (async () => {
+    if (!imageUrl.startsWith("data:")) {
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to load image (${response.status})`);
+      }
+      const blob = await response.blob();
+      return { src: URL.createObjectURL(blob), revoke: true };
+    }
+    return { src: imageUrl, revoke: false };
+  })();
+
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -442,22 +454,27 @@ export async function loadImageData(imageUrl: string): Promise<ImageData> {
       canvas.height = img.naturalHeight;
       const ctx = canvas.getContext("2d");
       if (!ctx) {
+        if (imageSrc.revoke) URL.revokeObjectURL(imageSrc.src);
         reject(new Error("Failed to get canvas context"));
         return;
       }
       ctx.drawImage(img, 0, 0);
+      if (imageSrc.revoke) URL.revokeObjectURL(imageSrc.src);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       resolve(imageData);
     };
-    img.onerror = () => reject(new Error("Failed to load image"));
-    img.src = imageUrl;
+    img.onerror = () => {
+      if (imageSrc.revoke) URL.revokeObjectURL(imageSrc.src);
+      reject(new Error("Failed to load image"));
+    };
+    img.src = imageSrc.src;
   });
 }
 
 // Helper: Convert ImageData to data URL
 export function imageDataToDataUrl(
   imageData: ImageData,
-  mimeType: string = "image/png"
+  mimeType: string = "image/png",
 ): string {
   const canvas = document.createElement("canvas");
   canvas.width = imageData.width;
@@ -473,7 +490,7 @@ export function imageDataToDataUrl(
 // Helper: Convert ImageData to base64
 export function imageDataToBase64(
   imageData: ImageData,
-  mimeType: string = "image/png"
+  mimeType: string = "image/png",
 ): { base64: string; mimeType: string } {
   const dataUrl = imageDataToDataUrl(imageData, mimeType);
   const base64 = dataUrl.split(",")[1];
@@ -482,7 +499,7 @@ export function imageDataToBase64(
 
 // Helper: Create protection mask from canvas
 export function createProtectionMaskFromCanvas(
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
 ): ProtectionMask | null {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;

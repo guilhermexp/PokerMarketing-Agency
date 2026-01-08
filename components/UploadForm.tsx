@@ -550,7 +550,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all text-[10px] font-bold uppercase tracking-wide"
             >
               <Icon name="image" className="w-3 h-3" />
-              <span>Logo / Produto</span>
+              <span>Produto</span>
             </button>
 
             <button

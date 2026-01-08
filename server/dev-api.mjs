@@ -1467,40 +1467,55 @@ app.post("/api/db/campaigns", async (req, res) => {
 
     const campaign = result[0];
 
-    // Create video clip scripts if provided
+    // Insert and collect video clip scripts with their IDs
+    const createdVideoClipScripts = [];
     if (video_clip_scripts && Array.isArray(video_clip_scripts)) {
       for (let i = 0; i < video_clip_scripts.length; i++) {
         const script = video_clip_scripts[i];
-        await sql`
+        const result = await sql`
           INSERT INTO video_clip_scripts (campaign_id, user_id, organization_id, title, hook, image_prompt, audio_script, scenes, sort_order)
           VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${script.title}, ${script.hook}, ${script.image_prompt || null}, ${script.audio_script || null}, ${JSON.stringify(script.scenes || [])}, ${i})
+          RETURNING *
         `;
+        createdVideoClipScripts.push(result[0]);
       }
     }
 
-    // Create posts if provided
+    // Insert and collect posts with their IDs
+    const createdPosts = [];
     if (posts && Array.isArray(posts)) {
       for (let i = 0; i < posts.length; i++) {
         const post = posts[i];
-        await sql`
+        const result = await sql`
           INSERT INTO posts (campaign_id, user_id, organization_id, platform, content, hashtags, image_prompt, sort_order)
           VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${post.platform}, ${post.content}, ${post.hashtags || []}, ${post.image_prompt || null}, ${i})
+          RETURNING *
         `;
+        createdPosts.push(result[0]);
       }
     }
 
-    // Create ad creatives if provided
+    // Insert and collect ad creatives with their IDs
+    const createdAdCreatives = [];
     if (ad_creatives && Array.isArray(ad_creatives)) {
       for (let i = 0; i < ad_creatives.length; i++) {
         const ad = ad_creatives[i];
-        await sql`
+        const result = await sql`
           INSERT INTO ad_creatives (campaign_id, user_id, organization_id, platform, headline, body, cta, image_prompt, sort_order)
           VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${ad.platform}, ${ad.headline}, ${ad.body}, ${ad.cta}, ${ad.image_prompt || null}, ${i})
+          RETURNING *
         `;
+        createdAdCreatives.push(result[0]);
       }
     }
 
-    res.status(201).json(campaign);
+    // Return campaign with all created items including their IDs
+    res.status(201).json({
+      ...campaign,
+      video_clip_scripts: createdVideoClipScripts,
+      posts: createdPosts,
+      ad_creatives: createdAdCreatives,
+    });
   } catch (error) {
     if (
       error instanceof OrganizationAccessError ||
@@ -2327,10 +2342,10 @@ const getOpenRouter = () => {
 };
 
 // Model defaults
-const DEFAULT_TEXT_MODEL = "gemini-3-pro-preview";
+const DEFAULT_TEXT_MODEL = "gemini-3-flash-preview";
 const DEFAULT_FAST_TEXT_MODEL = "gemini-3-flash-preview";
 const DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview";
-const DEFAULT_ASSISTANT_MODEL = "gemini-3-pro-preview";
+const DEFAULT_ASSISTANT_MODEL = "gemini-3-flash-preview";
 
 // Retry helper for 503 errors
 const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
@@ -2489,7 +2504,7 @@ const generateTextWithOpenRouterVision = async (
   for (const img of imageParts) {
     content.push({
       type: "image_url",
-      image_url: {
+      imageUrl: {
         url: `data:${img.mimeType};base64,${img.base64}`,
       },
     });

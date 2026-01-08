@@ -168,7 +168,7 @@ export function getModelsByProvider(provider: string): CreativeModelConfig[] {
  * Get default model ID
  */
 export function getDefaultModelId(): CreativeModelId {
-  return 'gemini-3-pro-preview';
+  return 'gemini-3-flash-preview';
 }
 
 // ============================================================================

@@ -43,6 +43,7 @@ type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar";
 interface DashboardProps {
   brandProfile: BrandProfile;
   campaign: MarketingCampaign | null;
+  productImages?: { base64: string; mimeType: string }[] | null;
   onGenerate: (input: ContentInput, options: GenerationOptions) => void;
   isGenerating: boolean;
   onEditProfile: () => void;
@@ -129,6 +130,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
   const {
     brandProfile,
     campaign,
+    productImages,
     onGenerate,
     isGenerating,
     onEditProfile,
@@ -183,6 +185,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     onMarkGalleryImagePublished,
     instagramContext,
   } = props;
+
+  // Debug log for productImages
+  console.log("[Dashboard] productImages:", productImages ? `${productImages.length} image(s)` : "null");
 
   const { signOut } = useClerk();
   const { campaigns } = useCampaigns(userId || null, organizationId);
@@ -383,7 +388,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     <PostsTab
                       posts={campaign.posts}
                       brandProfile={brandProfile}
-                      referenceImage={null}
+                      referenceImage={productImages?.[0] || null}
                       onAddImageToGallery={onAddImageToGallery}
                       onUpdateGalleryImage={onUpdateGalleryImage}
                       onSetChatReference={onSetChatReference}
@@ -393,13 +398,30 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       userId={userId}
                       galleryImages={galleryImages}
                       campaignId={campaign.id}
+                      onQuickPost={setQuickPostImage}
+                      onSchedulePost={(image) => {
+                        const tomorrow = new Date();
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        tomorrow.setHours(12, 0, 0, 0);
+                        const dateStr = tomorrow.toISOString().split("T")[0];
+                        onSchedulePost({
+                          type: "flyer",
+                          contentId: image.id,
+                          imageUrl: image.src,
+                          title: image.prompt?.substring(0, 50) || "Post Social",
+                          description: image.prompt || "",
+                          scheduledDate: dateStr,
+                          scheduledTime: "12:00",
+                          status: "scheduled",
+                        });
+                      }}
                     />
                   )}
                   {activeTab === "ads" && (
                     <AdCreativesTab
                       adCreatives={campaign.adCreatives}
                       brandProfile={brandProfile}
-                      referenceImage={null}
+                      referenceImage={productImages?.[0] || null}
                       onAddImageToGallery={onAddImageToGallery}
                       onUpdateGalleryImage={onUpdateGalleryImage}
                       onSetChatReference={onSetChatReference}
@@ -409,6 +431,23 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       userId={userId}
                       galleryImages={galleryImages}
                       campaignId={campaign.id}
+                      onQuickPost={setQuickPostImage}
+                      onSchedulePost={(image) => {
+                        const tomorrow = new Date();
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        tomorrow.setHours(12, 0, 0, 0);
+                        const dateStr = tomorrow.toISOString().split("T")[0];
+                        onSchedulePost({
+                          type: "flyer",
+                          contentId: image.id,
+                          imageUrl: image.src,
+                          title: image.prompt?.substring(0, 50) || "Anúncio",
+                          description: image.prompt || "",
+                          scheduledDate: dateStr,
+                          scheduledTime: "12:00",
+                          status: "scheduled",
+                        });
+                      }}
                     />
                   )}
                 </div>

@@ -14,6 +14,8 @@ import { Loader } from "../common/Loader";
 import { generateImage } from "../../services/geminiService";
 import { uploadImageToBlob } from "../../services/blobService";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
+import { FacebookAdPreview } from "../common/FacebookAdPreview";
+import { GoogleAdPreview } from "../common/GoogleAdPreview";
 import {
   useBackgroundJobs,
   type ActiveJob,
@@ -38,6 +40,8 @@ interface AdCreativesTabProps {
   userId?: string | null;
   galleryImages?: GalleryImage[];
   campaignId?: string; // Campaign ID to filter images correctly
+  onQuickPost?: (image: GalleryImage) => void;
+  onSchedulePost?: (image: GalleryImage) => void;
 }
 
 const AdCard: React.FC<{
@@ -245,6 +249,8 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
   userId,
   galleryImages,
   campaignId,
+  onQuickPost,
+  onSchedulePost,
 }) => {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
   const [generationState, setGenerationState] = useState<{
@@ -258,6 +264,11 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
   const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>(
     "gemini-3-pro-image-preview",
   );
+  const [editingAdImage, setEditingAdImage] = useState<{
+    image: GalleryImage;
+    index: number;
+    platform: string;
+  } | null>(null);
   const galleryImagesRef = useRef(galleryImages);
 
   // Keep ref updated
@@ -375,6 +386,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
             source: getAdSource(index, ad?.platform || "Unknown") as any,
             model: selectedImageModel,
             ad_creative_id: ad?.id, // Link to ad for campaign previews
+            campaign_id: campaignId, // Link to campaign for recovery
           });
           setImages((prev) => {
             const newImages = [...prev];
@@ -430,6 +442,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
   ]);
 
   const handleGenerate = async (index: number) => {
+    console.log("[AdCreativesTab] handleGenerate called, referenceImage:", referenceImage ? "present" : "null");
     if (selectedImageModel === "gemini-3-pro-image-preview") {
       if (
         window.aistudio &&
@@ -517,6 +530,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
         source: getAdSource(index, ad.platform) as any,
         model: selectedImageModel,
         ad_creative_id: ad.id, // Link to ad for campaign previews
+        campaign_id: campaignId, // Link to campaign for recovery
       });
       setImages((prev) => {
         const newImages = [...prev];
@@ -622,22 +636,83 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {adCreatives.map((ad, index) => (
-          <AdCard
-            key={index}
-            ad={ad}
-            image={images[index]}
-            isGenerating={generationState.isGenerating[index]}
-            error={generationState.errors[index]}
-            onGenerate={() => handleGenerate(index)}
-            onImageUpdate={(newSrc) => handleImageUpdate(index, newSrc)}
-            onSetChatReference={onSetChatReference}
-            styleReferences={styleReferences}
-            onAddStyleReference={onAddStyleReference}
-            onRemoveStyleReference={onRemoveStyleReference}
-          />
-        ))}
+        {adCreatives.map((ad, index) => {
+          const image = images[index];
+
+          // Use Facebook Ad Preview for Facebook ads
+          if (ad.platform === "Facebook") {
+            return (
+              <FacebookAdPreview
+                key={index}
+                image={image?.src || null}
+                headline={ad.headline}
+                body={ad.body}
+                cta={ad.cta}
+                username={brandProfile.name}
+                isGenerating={generationState.isGenerating[index]}
+                onGenerate={() => handleGenerate(index)}
+                onImageClick={image ? () => setEditingAdImage({ image, index, platform: ad.platform }) : undefined}
+                imagePrompt={ad.image_prompt}
+                error={generationState.errors[index]}
+              />
+            );
+          }
+
+          // Use Google Ad Preview for Google ads
+          if (ad.platform === "Google") {
+            return (
+              <GoogleAdPreview
+                key={index}
+                image={image?.src || null}
+                headline={ad.headline}
+                body={ad.body}
+                cta={ad.cta}
+                username={brandProfile.name}
+                isGenerating={generationState.isGenerating[index]}
+                onGenerate={() => handleGenerate(index)}
+                onImageClick={image ? () => setEditingAdImage({ image, index, platform: ad.platform }) : undefined}
+                imagePrompt={ad.image_prompt}
+                error={generationState.errors[index]}
+              />
+            );
+          }
+
+          // Fallback to original AdCard for unknown platforms
+          return (
+            <AdCard
+              key={index}
+              ad={ad}
+              image={images[index]}
+              isGenerating={generationState.isGenerating[index]}
+              error={generationState.errors[index]}
+              onGenerate={() => handleGenerate(index)}
+              onImageUpdate={(newSrc) => handleImageUpdate(index, newSrc)}
+              onSetChatReference={onSetChatReference}
+              styleReferences={styleReferences}
+              onAddStyleReference={onAddStyleReference}
+              onRemoveStyleReference={onRemoveStyleReference}
+            />
+          );
+        })}
       </div>
+
+      {/* Ad Image Editor Modal */}
+      {editingAdImage && (
+        <ImagePreviewModal
+          image={editingAdImage.image}
+          onClose={() => setEditingAdImage(null)}
+          onImageUpdate={(newSrc) => {
+            handleImageUpdate(editingAdImage.index, newSrc);
+            setEditingAdImage((prev) =>
+              prev ? { ...prev, image: { ...prev.image, src: newSrc } } : null
+            );
+          }}
+          onSetChatReference={onSetChatReference}
+          downloadFilename={`ad-${editingAdImage.platform.toLowerCase()}.png`}
+          onQuickPost={onQuickPost}
+          onSchedulePost={onSchedulePost}
+        />
+      )}
     </div>
   );
 };

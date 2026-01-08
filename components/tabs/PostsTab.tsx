@@ -15,6 +15,10 @@ import { Loader } from "../common/Loader";
 import { generateImage } from "../../services/geminiService";
 import { uploadImageToBlob } from "../../services/blobService";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
+import { InstagramPostPreview } from "../common/InstagramPostPreview";
+import { TwitterPostPreview } from "../common/TwitterPostPreview";
+import { LinkedInPostPreview } from "../common/LinkedInPostPreview";
+import { FacebookPostPreview } from "../common/FacebookPostPreview";
 import {
   useBackgroundJobs,
   type ActiveJob,
@@ -39,6 +43,8 @@ interface PostsTabProps {
   userId?: string | null;
   galleryImages?: GalleryImage[];
   campaignId?: string; // Campaign ID to filter images correctly
+  onQuickPost?: (image: GalleryImage) => void;
+  onSchedulePost?: (image: GalleryImage) => void;
 }
 
 const socialIcons: Record<string, IconName> = {
@@ -132,7 +138,7 @@ const PostCard: React.FC<{
 
   return (
     <>
-      <div className="bg-[#0a0a0a] rounded-xl border border-white/[0.05] overflow-hidden flex flex-col">
+      <div className="bg-[#0a0a0a] rounded-xl border border-white/[0.05] overflow-hidden flex flex-col h-full">
         {/* Header - Minimal */}
         <div className="px-4 py-2.5 flex items-center justify-between">
           <span className="text-[11px] font-medium text-white/70">
@@ -140,7 +146,7 @@ const PostCard: React.FC<{
           </span>
         </div>
 
-        <div className="px-4 pb-4 space-y-3">
+        <div className="px-4 pb-4 space-y-3 flex-1 flex flex-col">
           {/* Image */}
           <div className="aspect-square bg-black/30 rounded-lg flex items-center justify-center relative overflow-hidden">
             {isGenerating ? (
@@ -191,7 +197,7 @@ const PostCard: React.FC<{
           </p>
 
           {/* Hashtags */}
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 mt-auto">
             {post.hashtags.slice(0, 4).map((tag, i) => (
               <span
                 key={i}
@@ -260,6 +266,8 @@ export const PostsTab: React.FC<PostsTabProps> = ({
   userId,
   galleryImages,
   campaignId,
+  onQuickPost,
+  onSchedulePost,
 }) => {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
   const [generationState, setGenerationState] = useState<{
@@ -273,6 +281,22 @@ export const PostsTab: React.FC<PostsTabProps> = ({
   const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>(
     "gemini-3-pro-image-preview",
   );
+  const [editingInstagramImage, setEditingInstagramImage] = useState<{
+    image: GalleryImage;
+    index: number;
+  } | null>(null);
+  const [editingTwitterImage, setEditingTwitterImage] = useState<{
+    image: GalleryImage;
+    index: number;
+  } | null>(null);
+  const [editingLinkedInImage, setEditingLinkedInImage] = useState<{
+    image: GalleryImage;
+    index: number;
+  } | null>(null);
+  const [editingFacebookImage, setEditingFacebookImage] = useState<{
+    image: GalleryImage;
+    index: number;
+  } | null>(null);
   const galleryImagesRef = useRef(galleryImages);
 
   // Keep ref updated
@@ -390,6 +414,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
             source: getPostSource(index, post?.platform || "Unknown") as any,
             model: selectedImageModel,
             post_id: post?.id, // Link to post for campaign previews
+            campaign_id: campaignId, // Link to campaign for recovery
           });
           setImages((prev) => {
             const newImages = [...prev];
@@ -542,6 +567,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
         source: source as any,
         model: selectedImageModel,
         post_id: post.id, // Link to post for campaign previews
+        campaign_id: campaignId, // Link to campaign for recovery
       });
       setImages((prev) => {
         const newImages = [...prev];
@@ -646,23 +672,175 @@ export const PostsTab: React.FC<PostsTabProps> = ({
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
-        {posts.map((post, index) => (
-          <PostCard
-            key={index}
-            post={post}
-            image={images[index]}
-            isGenerating={generationState.isGenerating[index]}
-            error={generationState.errors[index]}
-            onGenerate={() => handleGenerate(index)}
-            onImageUpdate={(newSrc) => handleImageUpdate(index, newSrc)}
-            onSetChatReference={onSetChatReference}
-            styleReferences={styleReferences}
-            onAddStyleReference={onAddStyleReference}
-            onRemoveStyleReference={onRemoveStyleReference}
-          />
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {posts.map((post, index) => {
+          // Use Instagram Preview for Instagram posts
+          if (post.platform === "Instagram") {
+            const image = images[index];
+            return (
+              <InstagramPostPreview
+                key={index}
+                image={image?.src || null}
+                caption={post.content}
+                hashtags={post.hashtags}
+                username={brandProfile.name}
+                isGenerating={generationState.isGenerating[index]}
+                onGenerate={() => handleGenerate(index)}
+                onImageClick={image ? () => setEditingInstagramImage({ image, index }) : undefined}
+                imagePrompt={post.image_prompt}
+                error={generationState.errors[index]}
+              />
+            );
+          }
+
+          // Use Facebook Preview for Facebook posts
+          if (post.platform === "Facebook") {
+            const image = images[index];
+            return (
+              <FacebookPostPreview
+                key={index}
+                image={image?.src || null}
+                content={post.content}
+                hashtags={post.hashtags}
+                username={brandProfile.name}
+                isGenerating={generationState.isGenerating[index]}
+                onGenerate={() => handleGenerate(index)}
+                onImageClick={image ? () => setEditingFacebookImage({ image, index }) : undefined}
+                imagePrompt={post.image_prompt}
+                error={generationState.errors[index]}
+              />
+            );
+          }
+
+          // Use Twitter Preview for Twitter posts
+          if (post.platform === "Twitter") {
+            const image = images[index];
+            return (
+              <TwitterPostPreview
+                key={index}
+                image={image?.src || null}
+                content={post.content}
+                hashtags={post.hashtags}
+                username={brandProfile.name}
+                isGenerating={generationState.isGenerating[index]}
+                onGenerate={() => handleGenerate(index)}
+                onImageClick={image ? () => setEditingTwitterImage({ image, index }) : undefined}
+                imagePrompt={post.image_prompt}
+                error={generationState.errors[index]}
+              />
+            );
+          }
+
+          // Use LinkedIn Preview for LinkedIn posts
+          if (post.platform === "LinkedIn") {
+            const image = images[index];
+            return (
+              <LinkedInPostPreview
+                key={index}
+                image={image?.src || null}
+                content={post.content}
+                hashtags={post.hashtags}
+                username={brandProfile.name}
+                headline={brandProfile.industry || "Empresa"}
+                isGenerating={generationState.isGenerating[index]}
+                onGenerate={() => handleGenerate(index)}
+                onImageClick={image ? () => setEditingLinkedInImage({ image, index }) : undefined}
+                imagePrompt={post.image_prompt}
+                error={generationState.errors[index]}
+              />
+            );
+          }
+
+          // Use PostCard for other platforms
+          return (
+            <PostCard
+              key={index}
+              post={post}
+              image={images[index]}
+              isGenerating={generationState.isGenerating[index]}
+              error={generationState.errors[index]}
+              onGenerate={() => handleGenerate(index)}
+              onImageUpdate={(newSrc) => handleImageUpdate(index, newSrc)}
+              onSetChatReference={onSetChatReference}
+              styleReferences={styleReferences}
+              onAddStyleReference={onAddStyleReference}
+              onRemoveStyleReference={onRemoveStyleReference}
+            />
+          );
+        })}
       </div>
+
+      {/* Instagram Image Editor Modal */}
+      {editingInstagramImage && (
+        <ImagePreviewModal
+          image={editingInstagramImage.image}
+          onClose={() => setEditingInstagramImage(null)}
+          onImageUpdate={(newSrc) => {
+            handleImageUpdate(editingInstagramImage.index, newSrc);
+            setEditingInstagramImage((prev) =>
+              prev ? { ...prev, image: { ...prev.image, src: newSrc } } : null
+            );
+          }}
+          onSetChatReference={onSetChatReference}
+          downloadFilename="post-instagram.png"
+          onQuickPost={onQuickPost}
+          onSchedulePost={onSchedulePost}
+        />
+      )}
+
+      {/* Twitter Image Editor Modal */}
+      {editingTwitterImage && (
+        <ImagePreviewModal
+          image={editingTwitterImage.image}
+          onClose={() => setEditingTwitterImage(null)}
+          onImageUpdate={(newSrc) => {
+            handleImageUpdate(editingTwitterImage.index, newSrc);
+            setEditingTwitterImage((prev) =>
+              prev ? { ...prev, image: { ...prev.image, src: newSrc } } : null
+            );
+          }}
+          onSetChatReference={onSetChatReference}
+          downloadFilename="post-twitter.png"
+          onQuickPost={onQuickPost}
+          onSchedulePost={onSchedulePost}
+        />
+      )}
+
+      {/* LinkedIn Image Editor Modal */}
+      {editingLinkedInImage && (
+        <ImagePreviewModal
+          image={editingLinkedInImage.image}
+          onClose={() => setEditingLinkedInImage(null)}
+          onImageUpdate={(newSrc) => {
+            handleImageUpdate(editingLinkedInImage.index, newSrc);
+            setEditingLinkedInImage((prev) =>
+              prev ? { ...prev, image: { ...prev.image, src: newSrc } } : null
+            );
+          }}
+          onSetChatReference={onSetChatReference}
+          downloadFilename="post-linkedin.png"
+          onQuickPost={onQuickPost}
+          onSchedulePost={onSchedulePost}
+        />
+      )}
+
+      {/* Facebook Image Editor Modal */}
+      {editingFacebookImage && (
+        <ImagePreviewModal
+          image={editingFacebookImage.image}
+          onClose={() => setEditingFacebookImage(null)}
+          onImageUpdate={(newSrc) => {
+            handleImageUpdate(editingFacebookImage.index, newSrc);
+            setEditingFacebookImage((prev) =>
+              prev ? { ...prev, image: { ...prev.image, src: newSrc } } : null
+            );
+          }}
+          onSetChatReference={onSetChatReference}
+          downloadFilename="post-facebook.png"
+          onQuickPost={onQuickPost}
+          onSchedulePost={onSchedulePost}
+        />
+      )}
     </div>
   );
 };

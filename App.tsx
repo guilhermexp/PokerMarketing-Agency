@@ -218,6 +218,36 @@ function AppContent() {
 
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [campaign, setCampaign] = useState<MarketingCampaign | null>(null);
+  const [campaignProductImages, setCampaignProductImages] = useState<
+    { base64: string; mimeType: string }[] | null
+  >(null);
+
+  // Helper to save productImages to localStorage
+  const saveProductImagesToStorage = (campaignId: string, images: { base64: string; mimeType: string }[] | null) => {
+    if (images && images.length > 0) {
+      try {
+        localStorage.setItem(`productImages_${campaignId}`, JSON.stringify(images));
+        console.log("[App] Saved productImages to localStorage for campaign:", campaignId);
+      } catch (e) {
+        console.warn("[App] Failed to save productImages to localStorage:", e);
+      }
+    }
+  };
+
+  // Helper to load productImages from localStorage
+  const loadProductImagesFromStorage = (campaignId: string): { base64: string; mimeType: string }[] | null => {
+    try {
+      const stored = localStorage.getItem(`productImages_${campaignId}`);
+      if (stored) {
+        const images = JSON.parse(stored);
+        console.log("[App] Loaded productImages from localStorage for campaign:", campaignId);
+        return images;
+      }
+    } catch (e) {
+      console.warn("[App] Failed to load productImages from localStorage:", e);
+    }
+    return null;
+  };
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -1058,6 +1088,9 @@ function AppContent() {
     setIsGenerating(true);
     setError(null);
     setActiveView("campaign");
+    // Store product images for use in PostsTab and AdCreativesTab
+    console.log("[App] Storing productImages:", input.productImages ? `${input.productImages.length} image(s)` : "null");
+    setCampaignProductImages(input.productImages);
     try {
       const r = await generateCampaign(brandProfile!, input, options);
 
@@ -1143,6 +1176,11 @@ function AppContent() {
             "ads:",
             r.adCreatives.map((a) => a.id),
           );
+
+          // Persist productImages to localStorage for this campaign
+          if (input.productImages && input.productImages.length > 0) {
+            saveProductImagesToStorage(savedCampaign.id, input.productImages);
+          }
         } catch (saveError) {
           console.error("[Campaign] Failed to save to database:", saveError);
           // Continue even if save fails - campaign is still in memory
@@ -1222,6 +1260,10 @@ function AppContent() {
         );
         setCampaign(loadedCampaign);
         setActiveView("campaign");
+
+        // Restore productImages from localStorage for this campaign
+        const storedProductImages = loadProductImagesFromStorage(campaignId);
+        setCampaignProductImages(storedProductImages);
       } else {
         console.error("[Campaign] API returned null for campaign:", campaignId);
         setError("Campanha não encontrada");
@@ -1829,10 +1871,14 @@ function AppContent() {
           <Dashboard
             brandProfile={brandProfile!}
             campaign={campaign}
+            productImages={campaignProductImages}
             onGenerate={handleGenerateCampaign}
             isGenerating={isGenerating}
             onEditProfile={() => setIsEditingProfile(true)}
-            onResetCampaign={() => setCampaign(null)}
+            onResetCampaign={() => {
+              setCampaign(null);
+              setCampaignProductImages(null);
+            }}
             isAssistantOpen={isAssistantOpen}
             onToggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
             assistantHistory={chatHistory}
