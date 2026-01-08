@@ -38,6 +38,7 @@ import { urlToBase64 } from "../../utils/imageHelpers";
 import {
   concatenateVideos,
   downloadBlob,
+  extractLastFrameFromVideo,
   type ExportProgress,
   type VideoInput,
   type AudioInput,
@@ -112,7 +113,9 @@ const getWavHeader = (
 
 const pcmToWavBlob = (pcmData: Uint8Array): Blob => {
   const header = getWavHeader(pcmData.length, 24000, 1, 16);
-  return new Blob([header as BlobPart, pcmData as BlobPart], { type: "audio/wav" });
+  return new Blob([header as BlobPart, pcmData as BlobPart], {
+    type: "audio/wav",
+  });
 };
 
 const pcmToWavDataUrl = (pcmData: Uint8Array): string => {
@@ -640,7 +643,8 @@ const ClipSettingsModal: React.FC<{
             </div>
             {useFrameInterpolation && (
               <p className="text-[9px] text-purple-400/60 mt-1">
-                Cada vídeo interpola entre a capa atual e a próxima (8s, Veo 3.1)
+                Cada vídeo interpola entre a capa atual e a próxima (8s, Veo
+                3.1)
               </p>
             )}
           </div>
@@ -697,6 +701,9 @@ const ClipCard: React.FC<ClipCardProps> = ({
   >({}); // Loading state per scene
   const [sceneImages, setSceneImages] = useState<
     Record<number, SceneReferenceImage>
+  >({});
+  const [sceneStartFrameOverrides, setSceneStartFrameOverrides] = useState<
+    Record<number, string>
   >({});
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>(
@@ -1432,19 +1439,21 @@ const ClipCard: React.FC<ClipCardProps> = ({
     const pending: Array<{ sceneNumber: number; index: number; url: string }> =
       [];
 
-    Object.entries(videoStates).forEach(([sceneKey, videos]: [string, VideoState[]]) => {
-      const sceneNumber = Number(sceneKey);
-      videos.forEach((video: VideoState, index: number) => {
-        if (
-          video.url &&
-          video.duration == null &&
-          !durationRequestsRef.current.has(video.url)
-        ) {
-          durationRequestsRef.current.add(video.url);
-          pending.push({ sceneNumber, index, url: video.url });
-        }
-      });
-    });
+    Object.entries(videoStates).forEach(
+      ([sceneKey, videos]: [string, VideoState[]]) => {
+        const sceneNumber = Number(sceneKey);
+        videos.forEach((video: VideoState, index: number) => {
+          if (
+            video.url &&
+            video.duration == null &&
+            !durationRequestsRef.current.has(video.url)
+          ) {
+            durationRequestsRef.current.add(video.url);
+            pending.push({ sceneNumber, index, url: video.url });
+          }
+        });
+      },
+    );
 
     if (pending.length === 0) return () => {};
 
@@ -1734,6 +1743,17 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
         let lastFrameUrl: string | undefined;
         const isVeoModel = apiModel === "veo-3.1";
 
+        if (
+          useFrameInterpolation &&
+          isVeoModel &&
+          sceneStartFrameOverrides[sceneNumber]
+        ) {
+          imageUrl = sceneStartFrameOverrides[sceneNumber];
+          console.log(
+            `[ClipsTab] Using previous last frame as first frame: ${imageUrl}`,
+          );
+        }
+
         if (useFrameInterpolation && isVeoModel) {
           // Find the next scene
           const currentIndex = scenes.findIndex(
@@ -1756,7 +1776,9 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
                   console.log(
                     `[ClipsTab] Uploading next scene image to blob for interpolation...`,
                   );
-                  lastFrameUrl = await uploadImageToBlob(nextSceneImage.dataUrl);
+                  lastFrameUrl = await uploadImageToBlob(
+                    nextSceneImage.dataUrl,
+                  );
                 } catch (uploadErr) {
                   console.warn(
                     "[ClipsTab] Failed to upload next scene image:",
@@ -1775,7 +1797,7 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
         }
 
         // Try to use background jobs if available
-        if (userId && !isDevMode) {
+        if (userId && !isDevMode && !(useFrameInterpolation && isVeoModel)) {
           try {
             console.log(
               `[ClipsTab] Queueing video job for scene ${sceneNumber}...`,
@@ -1785,7 +1807,10 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
               aspectRatio: "9:16",
               imageUrl,
               lastFrameUrl,
-              sceneDuration: useFrameInterpolation && lastFrameUrl ? 8 : currentScene.duration,
+              sceneDuration:
+                useFrameInterpolation && lastFrameUrl
+                  ? 8
+                  : currentScene.duration,
               useInterpolation: useFrameInterpolation && !!lastFrameUrl,
             };
 
@@ -1937,6 +1962,37 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
           });
         }
 
+        if (useFrameInterpolation && isVeoModel) {
+          const currentIndex = scenes.findIndex(
+            (s) => s.sceneNumber === sceneNumber,
+          );
+          const nextScene = scenes[currentIndex + 1];
+          if (nextScene) {
+            try {
+              console.log(
+                `[ClipsTab] Extracting last frame for scene ${sceneNumber}...`,
+              );
+              const extracted = await extractLastFrameFromVideo(videoUrl);
+              const lastFrameUploadUrl = await uploadImageToBlob(
+                extracted.base64,
+                extracted.mimeType,
+              );
+              setSceneStartFrameOverrides((prev) => ({
+                ...prev,
+                [nextScene.sceneNumber]: lastFrameUploadUrl,
+              }));
+              console.log(
+                `[ClipsTab] Last frame uploaded for scene ${sceneNumber} -> next scene ${nextScene.sceneNumber}: ${lastFrameUploadUrl}`,
+              );
+            } catch (extractErr) {
+              console.warn(
+                "[ClipsTab] Failed to extract/upload last frame:",
+                extractErr,
+              );
+            }
+          }
+        }
+
         return { usedFallback, error: null };
       } catch (err: any) {
         setIsGeneratingVideo((prev) => ({ ...prev, [sceneNumber]: false }));
@@ -1958,6 +2014,7 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
       includeNarration,
       useFrameInterpolation,
       videoStates,
+      sceneStartFrameOverrides,
     ],
   );
 
@@ -3961,11 +4018,11 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
   };
 
   // Count scenes that have at least one video with a URL
-  const hasGeneratedVideos = Object.values(videoStates).some((videos: VideoState[]) =>
-    videos.some((v: VideoState) => v.url),
+  const hasGeneratedVideos = Object.values(videoStates).some(
+    (videos: VideoState[]) => videos.some((v: VideoState) => v.url),
   );
-  const generatedVideosCount = Object.values(videoStates).filter((videos: VideoState[]) =>
-    videos.some((v: VideoState) => v.url),
+  const generatedVideosCount = Object.values(videoStates).filter(
+    (videos: VideoState[]) => videos.some((v: VideoState) => v.url),
   ).length;
   const generatedImagesCount = Object.values(sceneImages).filter(
     (img: SceneReferenceImage) => img.dataUrl,
