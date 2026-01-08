@@ -30,6 +30,7 @@
     "@upstash/redis": "^1.36.0",
     "@vercel/blob": "^2.0.0",
     "bullmq": "^5.66.4",
+    "cloudinary": "^2.8.0",
     "framer-motion": "^12.24.10",
     "ioredis": "^5.8.2",
     "react": "^19.1.1",

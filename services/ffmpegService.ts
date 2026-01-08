@@ -114,10 +114,21 @@ export const initFFmpeg = async (
  * Convert blob URL to ArrayBuffer
  */
 const blobUrlToArrayBuffer = async (blobUrl: string): Promise<Uint8Array> => {
-  const response = await fetch(blobUrl);
-  const blob = await response.blob();
-  const arrayBuffer = await blob.arrayBuffer();
-  return new Uint8Array(arrayBuffer);
+  try {
+    const response = await fetch(blobUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    if (blob.size === 0) {
+      throw new Error('Arquivo de vídeo vazio');
+    }
+    const arrayBuffer = await blob.arrayBuffer();
+    return new Uint8Array(arrayBuffer);
+  } catch (error) {
+    const urlPreview = blobUrl.length > 80 ? `${blobUrl.substring(0, 80)}...` : blobUrl;
+    throw new Error(`Falha ao carregar vídeo (${urlPreview}): ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+  }
 };
 
 /**

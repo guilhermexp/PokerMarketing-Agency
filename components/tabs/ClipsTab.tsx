@@ -2516,6 +2516,51 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
 
       const previewUrl = URL.createObjectURL(outputBlob);
       setMergedVideoUrl(previewUrl);
+
+      // Upload to Vercel Blob and save to gallery
+      setExportProgress({
+        phase: "finalizing",
+        progress: 95,
+        message: "Salvando na galeria...",
+      });
+
+      try {
+        const totalDuration = generatedVideos.reduce(
+          (acc, v) => acc + (v.duration || 0),
+          0,
+        );
+        const videoUrl = await uploadVideo(
+          outputBlob,
+          `video-final-${Date.now()}.mp4`,
+        );
+
+        // Add to gallery as a video (linked to clip for filtering)
+        if (onAddImageToGallery) {
+          onAddImageToGallery({
+            src: videoUrl,
+            prompt: `Video com ${generatedVideos.length} cenas`,
+            source: "Video Final",
+            model: "video-export" as any,
+            mediaType: "video",
+            duration: totalDuration,
+            aspectRatio: "9:16",
+            video_script_id: clip.id,
+          });
+        }
+
+        console.log("[ClipsTab] Merged video saved to gallery:", videoUrl);
+
+        // Update preview to use remote URL (blob URL may become invalid)
+        URL.revokeObjectURL(previewUrl);
+        setMergedVideoUrl(videoUrl);
+      } catch (uploadError) {
+        console.error(
+          "[ClipsTab] Failed to upload merged video to gallery:",
+          uploadError,
+        );
+        // Continue anyway - video is still available locally
+      }
+
       setExportProgress(null);
     } catch (error) {
       console.error("Merge failed:", error);
