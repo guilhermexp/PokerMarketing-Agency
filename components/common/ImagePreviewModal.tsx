@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { editImage } from "../../services/geminiService";
 import { uploadImageToBlob } from "../../services/blobService";
+import {
+  resizeImageContentAware,
+  loadImageData,
+  imageDataToBase64,
+} from "../../services/seamCarvingService";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
 import { Loader } from "./Loader";
@@ -204,6 +209,22 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasPayedKey] = useState(true);
 
+  // Resize state
+  const [originalDimensions, setOriginalDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
+  const [widthPercent, setWidthPercent] = useState(100);
+  const [heightPercent, setHeightPercent] = useState(100);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeProgress, setResizeProgress] = useState(0);
+  const [resizedPreview, setResizedPreview] = useState<{
+    dataUrl: string;
+    width: number;
+    height: number;
+  } | null>(null);
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -225,6 +246,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       if (!imageCanvas || !maskCanvas || !container) return;
 
       const { naturalWidth, naturalHeight } = img;
+
+      // Store original dimensions
+      setOriginalDimensions({ width: naturalWidth, height: naturalHeight });
 
       imageCanvas.width = naturalWidth;
       imageCanvas.height = naturalHeight;
@@ -474,12 +498,139 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     document.body.removeChild(link);
   };
 
+  // Handle seam carving resize - creates preview only, doesn't save
+  const handleResize = useCallback(
+    async (newWidthPercent: number, newHeightPercent: number) => {
+      // Clear any pending resize
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
+
+      // Update state immediately
+      setWidthPercent(newWidthPercent);
+      setHeightPercent(newHeightPercent);
+
+      // Clear preview if both are 100%
+      if (newWidthPercent === 100 && newHeightPercent === 100) {
+        setResizedPreview(null);
+        return;
+      }
+
+      // Validate percentages
+      if (
+        newWidthPercent < 10 ||
+        newWidthPercent > 100 ||
+        newHeightPercent < 10 ||
+        newHeightPercent > 100
+      ) {
+        return;
+      }
+
+      // Debounce resize operation
+      resizeTimeoutRef.current = setTimeout(async () => {
+        setIsResizing(true);
+        setResizeProgress(0);
+        setError(null);
+
+        try {
+          // Load image data
+          const imageData = await loadImageData(image.src);
+
+          // Calculate target dimensions
+          const targetWidth = Math.round(
+            (imageData.width * newWidthPercent) / 100
+          );
+          const targetHeight = Math.round(
+            (imageData.height * newHeightPercent) / 100
+          );
+
+          console.log(
+            `[Seam Carving] Resizing from ${imageData.width}x${imageData.height} to ${targetWidth}x${targetHeight}`
+          );
+
+          // Perform seam carving
+          const resizedImageData = await resizeImageContentAware(
+            imageData,
+            targetWidth,
+            targetHeight,
+            (progress) => setResizeProgress(progress)
+          );
+
+          // Convert to data URL for preview (don't upload yet)
+          const canvas = document.createElement("canvas");
+          canvas.width = resizedImageData.width;
+          canvas.height = resizedImageData.height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.putImageData(resizedImageData, 0, 0);
+            const dataUrl = canvas.toDataURL("image/png");
+            setResizedPreview({
+              dataUrl,
+              width: resizedImageData.width,
+              height: resizedImageData.height,
+            });
+          }
+
+          console.log(
+            `[Seam Carving] Preview ready: ${resizedImageData.width}x${resizedImageData.height}`
+          );
+        } catch (err: any) {
+          console.error("[Seam Carving] Error:", err);
+          setError(err.message || "Falha ao redimensionar a imagem.");
+        } finally {
+          setIsResizing(false);
+          setResizeProgress(0);
+        }
+      }, 500); // 500ms debounce
+    },
+    [image.src]
+  );
+
+  // Save the resized image
+  const handleSaveResize = useCallback(async () => {
+    if (!resizedPreview) return;
+
+    setIsResizing(true);
+    setError(null);
+
+    try {
+      // Extract base64 from data URL
+      const base64 = resizedPreview.dataUrl.split(",")[1];
+      const newImageUrl = await uploadImageToBlob(base64, "image/png");
+
+      console.log("[Seam Carving] Resized image saved:", newImageUrl);
+
+      // Update image
+      onImageUpdate(newImageUrl);
+
+      // Reset state
+      setWidthPercent(100);
+      setHeightPercent(100);
+      setResizedPreview(null);
+
+      // Redraw canvas with new image
+      setTimeout(() => drawCanvases(), 100);
+    } catch (err: any) {
+      console.error("[Seam Carving] Save error:", err);
+      setError(err.message || "Falha ao salvar a imagem.");
+    } finally {
+      setIsResizing(false);
+    }
+  }, [resizedPreview, onImageUpdate, drawCanvases]);
+
+  // Discard the resized preview
+  const handleDiscardResize = useCallback(() => {
+    setResizedPreview(null);
+    setWidthPercent(100);
+    setHeightPercent(100);
+  }, []);
+
   const handleUseInChat = () => {
     onSetChatReference(image);
     onClose();
   };
 
-  const isActionRunning = isEditing || isRemovingBackground;
+  const isActionRunning = isEditing || isRemovingBackground || isResizing;
 
   return (
     <div
@@ -582,7 +733,46 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                   autoPlay
                   className="max-w-full max-h-full object-contain rounded-lg"
                 />
+              ) : resizedPreview ? (
+                /* Side-by-side comparison view */
+                <div className="flex gap-4 items-center justify-center w-full h-full">
+                  {/* Original Image */}
+                  <div className="flex flex-col items-center flex-1 max-w-[45%]">
+                    <span className="text-[10px] text-white/40 mb-2 uppercase tracking-wider">
+                      Original
+                    </span>
+                    <img
+                      src={image.src}
+                      alt="Original"
+                      className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-2xl border border-white/10"
+                    />
+                    <span className="text-[9px] text-white/30 mt-2">
+                      {originalDimensions.width} × {originalDimensions.height}
+                    </span>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="flex-shrink-0 text-white/20">
+                    <Icon name="arrow-right" className="w-6 h-6" />
+                  </div>
+
+                  {/* Resized Image */}
+                  <div className="flex flex-col items-center flex-1 max-w-[45%]">
+                    <span className="text-[10px] text-primary mb-2 uppercase tracking-wider font-semibold">
+                      Redimensionada
+                    </span>
+                    <img
+                      src={resizedPreview.dataUrl}
+                      alt="Redimensionada"
+                      className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-2xl border border-primary/30"
+                    />
+                    <span className="text-[9px] text-primary/70 mt-2">
+                      {resizedPreview.width} × {resizedPreview.height}
+                    </span>
+                  </div>
+                </div>
               ) : (
+                /* Normal canvas view */
                 <>
                   <canvas
                     ref={imageCanvasRef}
@@ -605,8 +795,18 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                     <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-20 rounded-lg">
                       <Loader className="w-10 h-10 mb-4" />
                       <p className="text-sm font-medium text-white/80">
-                        Processando...
+                        {isResizing
+                          ? `Redimensionando... ${resizeProgress}%`
+                          : "Processando..."}
                       </p>
+                      {isResizing && (
+                        <div className="w-48 h-1.5 bg-white/10 rounded-full mt-3 overflow-hidden">
+                          <div
+                            className="h-full bg-primary transition-all duration-150"
+                            style={{ width: `${resizeProgress}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
@@ -648,6 +848,98 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                 </section>
               ) : (
                 <>
+                  {/* Dimensions / Resize Section */}
+                  <section className="space-y-3">
+                    <label className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">
+                      Dimensões
+                    </label>
+                    <div className="text-xs text-white/50 mb-2">
+                      {originalDimensions.width} × {originalDimensions.height} px
+                    </div>
+                    <div className="flex gap-3 items-end">
+                      <div className="flex-1">
+                        <label className="text-[9px] text-white/30 mb-1 block">
+                          Largura
+                        </label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min={10}
+                            max={100}
+                            value={widthPercent}
+                            onChange={(e) =>
+                              handleResize(
+                                Number(e.target.value),
+                                heightPercent
+                              )
+                            }
+                            disabled={isResizing}
+                            className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-2 py-1.5 text-sm text-white/80 focus:border-white/10 focus:outline-none transition-all disabled:opacity-50"
+                          />
+                          <span className="text-[10px] text-white/30">%</span>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[9px] text-white/30 mb-1 block">
+                          Altura
+                        </label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min={10}
+                            max={100}
+                            value={heightPercent}
+                            onChange={(e) =>
+                              handleResize(
+                                widthPercent,
+                                Number(e.target.value)
+                              )
+                            }
+                            disabled={isResizing}
+                            className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-2 py-1.5 text-sm text-white/80 focus:border-white/10 focus:outline-none transition-all disabled:opacity-50"
+                          />
+                          <span className="text-[10px] text-white/30">%</span>
+                        </div>
+                      </div>
+                    </div>
+                    {isResizing && (
+                      <div className="mt-2">
+                        <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary transition-all duration-150"
+                            style={{ width: `${resizeProgress}%` }}
+                          />
+                        </div>
+                        <span className="text-[9px] text-white/30 mt-1 block">
+                          Redimensionando... {resizeProgress}%
+                        </span>
+                      </div>
+                    )}
+                    {resizedPreview && !isResizing && (
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={handleDiscardResize}
+                          className="flex-1 h-8 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Icon name="x" className="w-3 h-3" />
+                          Descartar
+                        </button>
+                        <button
+                          onClick={handleSaveResize}
+                          className="flex-1 h-8 bg-primary hover:bg-primary/90 rounded-lg text-[10px] font-bold text-black transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Icon name="check" className="w-3 h-3" />
+                          Salvar
+                        </button>
+                      </div>
+                    )}
+                    {!resizedPreview && (
+                      <p className="text-[9px] text-white/20">
+                        Seam Carving: redimensiona sem perder conteúdo importante
+                      </p>
+                    )}
+                  </section>
+
                   <section className="space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">
