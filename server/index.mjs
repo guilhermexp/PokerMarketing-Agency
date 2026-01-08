@@ -2027,13 +2027,28 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
       return res.status(400).json({ error: "user_id is required" });
     }
 
-    // Resolve Clerk ID to DB UUID
-    const userResult =
-      await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
-    const resolvedUserId = userResult[0]?.id;
-    if (!resolvedUserId) {
-      return res.json([]);
+    // user_id can be either DB UUID or Clerk ID - try both
+    let resolvedUserId = user_id;
+
+    // Check if it's a Clerk ID (starts with 'user_')
+    if (user_id.startsWith("user_")) {
+      const userResult =
+        await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
+      resolvedUserId = userResult[0]?.id;
+      if (!resolvedUserId) {
+        console.log("[Instagram] User not found for Clerk ID:", user_id);
+        return res.json([]);
+      }
+    } else {
+      // Assume it's a DB UUID - verify it exists
+      const userResult =
+        await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
+      if (userResult.length === 0) {
+        console.log("[Instagram] User not found for DB UUID:", user_id);
+        return res.json([]);
+      }
     }
+    console.log("[Instagram] Resolved user ID:", resolvedUserId);
 
     const result = organization_id
       ? await sql`
