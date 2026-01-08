@@ -179,8 +179,6 @@ export function getDefaultModelId(): CreativeModelId {
 export const IMAGE_GENERATION_MODELS = {
   /** Primary image generation model */
   PRIMARY: 'gemini-3-pro-image-preview',
-  /** Alternative: Google Imagen */
-  IMAGEN: 'imagen-4.0-generate-001',
 } as const;
 
 /** Models for video generation */

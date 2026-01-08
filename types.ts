@@ -1,5 +1,6 @@
 
 import type { IconName } from './components/common/Icon';
+import type { CreativeModelId } from './config/ai-models';
 
 export type ToneOfVoice = 'Profissional' | 'Espirituoso' | 'Casual' | 'Inspirador' | 'Técnico';
 
@@ -7,7 +8,7 @@ export type ToneTarget = 'campaigns' | 'posts' | 'images' | 'flyers' | 'videos';
 
 // Modelos criativos - importar de config/ai-models.ts
 // Para adicionar novos modelos, edite CREATIVE_MODELS em config/ai-models.ts
-export type { CreativeModelId as CreativeModel } from './config/ai-models';
+export type CreativeModel = CreativeModelId;
 
 export interface BrandProfile {
   name: string;
@@ -119,7 +120,7 @@ export interface WeekScheduleInfo {
   daily_flyer_urls?: Record<string, string[]>; // { "MORNING": [...urls], "AFTERNOON": [...urls], ... }
 }
 
-export type ImageModel = 'gemini-3-pro-image-preview' | 'imagen-4.0-generate-001';
+export type ImageModel = 'gemini-3-pro-image-preview';
 export type ImageSize = '1K' | '2K' | '4K';
 
 // Video Models

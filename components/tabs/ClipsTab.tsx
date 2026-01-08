@@ -112,7 +112,7 @@ const getWavHeader = (
 
 const pcmToWavBlob = (pcmData: Uint8Array): Blob => {
   const header = getWavHeader(pcmData.length, 24000, 1, 16);
-  return new Blob([header, pcmData], { type: "audio/wav" });
+  return new Blob([header as BlobPart, pcmData as BlobPart], { type: "audio/wav" });
 };
 
 const pcmToWavDataUrl = (pcmData: Uint8Array): string => {
@@ -567,7 +567,6 @@ const ClipSettingsModal: React.FC<{
                   className="mt-1 w-full bg-[#080808] border border-white/10 rounded-lg px-2 py-2 text-[10px] text-white/70 focus:border-primary/50 outline-none transition-all"
                 >
                   <option value="gemini-3-pro-image-preview">Gemini 3</option>
-                  <option value="imagen-4.0-generate-001">Imagen 4</option>
                 </select>
               </label>
               <label className="text-[10px] text-white/40">
@@ -1432,9 +1431,9 @@ const ClipCard: React.FC<ClipCardProps> = ({
     const pending: Array<{ sceneNumber: number; index: number; url: string }> =
       [];
 
-    Object.entries(videoStates).forEach(([sceneKey, videos]) => {
+    Object.entries(videoStates).forEach(([sceneKey, videos]: [string, VideoState[]]) => {
       const sceneNumber = Number(sceneKey);
-      videos.forEach((video, index) => {
+      videos.forEach((video: VideoState, index: number) => {
         if (
           video.url &&
           video.duration == null &&
@@ -2620,6 +2619,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           video: {
             url: finalVideo.src,
             model: "video-export",
+            isLoading: false,
           },
           duration: finalVideo.duration || 10, // Use saved duration or fallback
           videoIndex: idx,
@@ -3914,14 +3914,14 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
   };
 
   // Count scenes that have at least one video with a URL
-  const hasGeneratedVideos = Object.values(videoStates).some((videos) =>
-    videos.some((v) => v.url),
+  const hasGeneratedVideos = Object.values(videoStates).some((videos: VideoState[]) =>
+    videos.some((v: VideoState) => v.url),
   );
-  const generatedVideosCount = Object.values(videoStates).filter((videos) =>
-    videos.some((v) => v.url),
+  const generatedVideosCount = Object.values(videoStates).filter((videos: VideoState[]) =>
+    videos.some((v: VideoState) => v.url),
   ).length;
   const generatedImagesCount = Object.values(sceneImages).filter(
-    (img) => img.dataUrl,
+    (img: SceneReferenceImage) => img.dataUrl,
   ).length;
   const hasAllImages =
     generatedImagesCount === scenes.length && scenes.length > 0;

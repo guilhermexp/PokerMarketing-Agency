@@ -95,8 +95,8 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
   const nothingSelected = !options.videoClipScripts.generate && !postsEnabled && !adsEnabled;
 
   const totalCount = (options.videoClipScripts.generate ? options.videoClipScripts.count : 0) +
-    Object.entries(options.posts).reduce((sum, [, s]) => sum + (s.generate ? s.count : 0), 0) +
-    Object.entries(options.adCreatives).reduce((sum, [, s]) => sum + (s.generate ? s.count : 0), 0);
+    Object.entries(options.posts).reduce((sum, [, s]: [string, GenerationSetting]) => sum + (s.generate ? s.count : 0), 0) +
+    Object.entries(options.adCreatives).reduce((sum, [, s]: [string, GenerationSetting]) => sum + (s.generate ? s.count : 0), 0);
 
   const togglePosts = () => {
     const newEnabled = !postsEnabled;
@@ -166,8 +166,8 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
     });
   };
 
-  const getPostsCount = () => Object.values(options.posts).find(s => s.generate)?.count || 1;
-  const getAdsCount = () => Object.values(options.adCreatives).find(s => s.generate)?.count || 1;
+  const getPostsCount = () => (Object.values(options.posts) as GenerationSetting[]).find(s => s.generate)?.count || 1;
+  const getAdsCount = () => (Object.values(options.adCreatives) as GenerationSetting[]).find(s => s.generate)?.count || 1;
 
   return (
     <div

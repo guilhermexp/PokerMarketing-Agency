@@ -142,7 +142,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
           </span>
           {image.model && (
             <span className="text-[8px] text-primary font-bold bg-primary/20 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
-              {image.model === "imagen-4.0-generate-001" ? "Imagen" : "Gemini"}
+              Gemini
             </span>
           )}
           {image.published_at && (
@@ -255,7 +255,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      for (const file of Array.from(files)) {
+      for (const file of Array.from(files) as File[]) {
         const dataUrl = await fileToBase64(file);
         onAddStyleReference({
           src: dataUrl,

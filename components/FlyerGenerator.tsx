@@ -3439,9 +3439,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                           onChange={(e) =>
                             setSelectedImageSize(e.target.value as ImageSize)
                           }
-                          disabled={
-                            selectedImageModel === "imagen-4.0-generate-001"
-                          }
+                          disabled={false}
                           className="w-full bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white outline-none appearance-none cursor-pointer disabled:opacity-20"
                         >
                           <option value="1K">HD (1K)</option>
@@ -3462,9 +3460,6 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         >
                           <option value="gemini-3-pro-image-preview">
                             Gemini 3 Pro
-                          </option>
-                          <option value="imagen-4.0-generate-001">
-                            Imagen 4.0
                           </option>
                         </select>
                       </div>

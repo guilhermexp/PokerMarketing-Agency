@@ -158,7 +158,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
     onDrop,
     accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.svg'] },
     multiple: false
-  });
+  } as any);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

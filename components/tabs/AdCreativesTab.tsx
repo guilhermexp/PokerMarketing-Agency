@@ -613,8 +613,6 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
             className="bg-transparent border border-white/[0.06] rounded-md px-2.5 py-1.5 text-[10px] text-white/60 focus:ring-1 focus:ring-primary/30 focus:border-primary/30 outline-none transition-all"
           >
             <option value="gemini-3-pro-image-preview">Gemini 3 Pro</option>
-            <option value="gemini-2.5-flash-image">Gemini 2.5 Flash</option>
-            <option value="imagen-4.0-generate-001">Imagen 4.0</option>
           </select>
         </div>
       </div>

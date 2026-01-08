@@ -555,7 +555,7 @@ export const concatenateVideos = async (
       message: 'Exportacao concluida!',
     });
 
-    return new Blob([outputData], { type: `video/${outputFormat}` });
+    return new Blob([outputData as BlobPart], { type: `video/${outputFormat}` });
 
   } catch (error) {
     // Remove progress handler on error to prevent memory leaks

@@ -1319,7 +1319,7 @@ function AppContent() {
           src: logoUrl,
           prompt: args.prompt,
           source: "Logo",
-          model: "imagen-3.0-generate-002",
+          model: "gemini-3-pro-image-preview",
         });
         setToolImageReference({ id: newImg.id, src: newImg.src });
         return {
@@ -1379,10 +1379,7 @@ function AppContent() {
             return next;
           });
         }
-        const fc = chunk.candidates?.[0]?.content?.parts?.find(
-          (p) => p.functionCall,
-        )?.functionCall;
-        if (fc) functionCall = fc;
+        if (chunk.functionCall) functionCall = chunk.functionCall;
       }
       if (functionCall) {
         const modelMsg: ChatMessage = {

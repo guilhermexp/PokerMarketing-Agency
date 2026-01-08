@@ -76,7 +76,7 @@ interface UploadFormProps {
   onGenerate: (input: ContentInput, options: GenerationOptions) => void;
   isGenerating: boolean;
   brandProfile: BrandProfile;
-  onUpdateCreativeModel: (model: CreativeModel) => void;
+  onUpdateCreativeModel: (model: CreativeModelId) => void;
   // Favoritos (Style References)
   styleReferences?: StyleReference[];
   selectedStyleReference?: StyleReference | null;

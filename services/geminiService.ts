@@ -14,7 +14,13 @@ import type {
   ImageSize,
   Post,
 } from "../types";
-import { generateVideo as generateServerVideo } from "./apiClient";
+import { generateVideo as generateServerVideo, type ApiVideoModel } from "./apiClient";
+
+// Convert VideoModel to ApiVideoModel for server calls
+const toApiVideoModel = (model: VideoModel): ApiVideoModel => {
+  if (model.includes("sora")) return "sora-2";
+  return "veo-3.1";
+};
 import { getAuthToken } from "./authService";
 
 // API base URL - empty for same-origin requests
@@ -183,7 +189,7 @@ export const generateLogo = async (prompt: string): Promise<string> => {
       toneOfVoice: "Profissional",
     },
     aspectRatio: "1:1",
-    model: "imagen-4.0-generate-001",
+    model: "gemini-3-pro-image-preview",
   });
 
   return response.imageUrl;
@@ -222,7 +228,7 @@ export const generateVideo = async (
   const result = await generateServerVideo({
     prompt,
     aspectRatio,
-    model: useFallbackDirectly ? "veo-3.1" : model,
+    model: useFallbackDirectly ? "veo-3.1" : toApiVideoModel(model),
     imageUrl,
     generateAudio,
   });

@@ -498,8 +498,8 @@ export async function createCampaign(
       image_prompt?: string;
     }>;
   },
-): Promise<DbCampaign> {
-  return fetchApi<DbCampaign>("/campaigns", {
+): Promise<DbCampaignFull> {
+  return fetchApi<DbCampaignFull>("/campaigns", {
     method: "POST",
     body: JSON.stringify({ user_id: userId, ...data }),
   });
@@ -1199,7 +1199,7 @@ export async function generateAiImage(
     prompt: string;
     brandProfile: AiBrandProfile;
     aspectRatio?: string;
-    model?: "gemini-3-pro-image-preview" | "imagen-4.0-generate-001";
+    model?: "gemini-3-pro-image-preview";
     imageSize?: "1K" | "2K" | "4K";
     productImages?: AiImageFile[];
     styleReferenceImage?: AiImageFile;

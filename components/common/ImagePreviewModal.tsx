@@ -70,7 +70,7 @@ const ImageUploader: React.FC<{
     onDrop,
     accept: { "image/*": [] },
     multiple: false,
-  });
+  } as any);
 
   return (
     <div>
@@ -146,7 +146,7 @@ const MinimalImageUploader: React.FC<{
     onDrop,
     accept: { "image/*": [] },
     multiple: false,
-  });
+  } as any);
 
   return (
     <div

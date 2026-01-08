@@ -3042,30 +3042,19 @@ app.post("/api/ai/image", async (req, res) => {
       `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}`,
     );
 
-    let imageDataUrl;
-
-    if (model === "imagen-4.0-generate-001") {
-      const fullPrompt = buildImagePrompt(
-        prompt,
-        brandProfile,
-        !!styleReferenceImage,
-      );
-      imageDataUrl = await generateImagenImage(fullPrompt, aspectRatio);
-    } else {
-      const fullPrompt = buildImagePrompt(
-        prompt,
-        brandProfile,
-        !!styleReferenceImage,
-      );
-      imageDataUrl = await generateGeminiImage(
-        fullPrompt,
-        aspectRatio,
-        model,
-        imageSize,
-        productImages,
-        styleReferenceImage,
-      );
-    }
+    const fullPrompt = buildImagePrompt(
+      prompt,
+      brandProfile,
+      !!styleReferenceImage,
+    );
+    const imageDataUrl = await generateGeminiImage(
+      fullPrompt,
+      aspectRatio,
+      model,
+      imageSize,
+      productImages,
+      styleReferenceImage,
+    );
 
     console.log("[Image API] Image generated successfully");
 

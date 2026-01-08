@@ -87,6 +87,16 @@ export const isRubeConfigured = (context?: InstagramContext): boolean => {
   return Boolean(context?.instagramAccountId && context?.userId);
 };
 
+// Dev-mode fallback helpers for single-tenant mode (deprecated)
+// In production, always use InstagramContext
+const getInstagramUserId = (): string => {
+  return getEnv("VITE_INSTAGRAM_USER_ID") || "";
+};
+
+const getInstagramUsername = (): string => {
+  return getEnv("VITE_INSTAGRAM_USERNAME") || "";
+};
+
 /**
  * Parse SSE response from Rube MCP
  */

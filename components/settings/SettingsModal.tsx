@@ -3,7 +3,7 @@
  * Modal for managing brand profile and team settings
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import type { BrandProfile, ToneOfVoice, ToneTarget, CreativeModel } from '../../types';
 import { Button } from '../common/Button';
@@ -35,7 +35,7 @@ const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string; d
     reader.onerror = (error) => reject(error);
   });
 
-const tones: ToneOfVoice[] = ['Profissional', 'Espirituoso', 'Casual', 'Inspirador', 'Tecnico'];
+const tones: ToneOfVoice[] = ['Profissional', 'Espirituoso', 'Casual', 'Inspirador', 'Técnico'];
 
 const defaultToneTargets: ToneTarget[] = ['campaigns', 'posts', 'images', 'flyers'];
 
@@ -238,7 +238,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
     onDrop,
     accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.svg'] },
     multiple: false,
-  });
+  } as any);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
