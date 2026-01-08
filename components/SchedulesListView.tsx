@@ -1,7 +1,6 @@
 import React from "react";
 import { Icon } from "./common/Icon";
 import { Button } from "./common/Button";
-import { EmptyState } from "./common/EmptyState";
 import { Loader } from "./common/Loader";
 import type { WeekScheduleWithCount } from "../services/apiClient";
 
@@ -71,27 +70,23 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
   if (schedules.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 animate-fade-in-up">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="text-left">
-            <h2 className="text-2xl font-black text-white uppercase tracking-tight">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+          <div>
+            <h1 className="text-2xl font-black text-white uppercase tracking-tight">
               Lista de Torneios
-            </h2>
-            <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
+            </h1>
+            <p className="text-[11px] text-white/30 uppercase tracking-wider mt-1">
               0 semanas salvas
             </p>
           </div>
           <label
             className={`cursor-pointer ${isUploading ? "pointer-events-none opacity-70" : ""}`}
           >
-            <Button
-              as="span"
-              variant="secondary"
-              size="small"
-              icon="upload"
-              isLoading={isUploading}
-            >
+            <span className="flex items-center gap-1.5 px-3 py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all">
+              <Icon name="upload" className="w-3 h-3" />
               {isUploading ? "Carregando..." : "Nova Planilha"}
-            </Button>
+            </span>
             <input
               type="file"
               className="hidden"
@@ -102,36 +97,20 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
           </label>
         </div>
 
-        <EmptyState
-          icon="calendar"
-          title="Nenhuma Planilha"
-          description="Carregue sua primeira planilha de torneios para começar a gerar flyers."
-          subtitle="Formatos suportados: .xlsx, .xls"
-          size="large"
-          className="w-full"
-        >
-          <label
-            className={`cursor-pointer group inline-block ${isUploading ? "pointer-events-none opacity-70" : ""}`}
-          >
-            <div className="bg-primary text-black font-black px-6 py-3 rounded-xl flex items-center justify-center space-x-3 transition-all hover:bg-primary/90 active:scale-95">
-              {isUploading ? (
-                <Loader className="w-4 h-4" />
-              ) : (
-                <Icon name="upload" className="w-4 h-4" />
-              )}
-              <span className="text-sm uppercase tracking-wide">
-                {isUploading ? "Carregando..." : "Carregar Planilha Excel"}
-              </span>
+        {/* Empty State */}
+        <div className="flex items-center justify-center w-full min-h-[60vh]">
+          <div className="bg-[#111] border border-white/[0.06] rounded-2xl px-16 py-20 flex flex-col items-center justify-center text-center min-w-[320px]">
+            <div className="grid grid-cols-2 gap-1.5 mb-6">
+              <div className="w-6 h-6 rounded border border-white/20" />
+              <div className="w-6 h-6 rounded border border-white/20" />
+              <div className="w-6 h-6 rounded border border-white/20" />
+              <div className="w-6 h-6 rounded border border-white/20" />
             </div>
-            <input
-              type="file"
-              className="hidden"
-              accept=".xlsx,.xls"
-              onChange={handleFileChange}
-              disabled={isUploading}
-            />
-          </label>
-        </EmptyState>
+            <p className="text-white/40 text-sm">
+              Nenhuma planilha ainda
+            </p>
+          </div>
+        </div>
       </div>
     );
   }

@@ -520,10 +520,17 @@ function AppContent() {
   }, [initialData?.brandProfile, brandProfile]);
 
   // Load style references from localStorage (local only, not from DB)
+  // Key by organization or user to prevent mixing between brands
+  const styleRefsKey = `styleReferences_${organizationId || userId || "default"}`;
   useEffect(() => {
-    const savedRefs = localStorage.getItem("styleReferences");
-    if (savedRefs) setStyleReferences(JSON.parse(savedRefs));
-  }, []);
+    if (!userId) return;
+    const savedRefs = localStorage.getItem(styleRefsKey);
+    if (savedRefs) {
+      setStyleReferences(JSON.parse(savedRefs));
+    } else {
+      setStyleReferences([]);
+    }
+  }, [styleRefsKey, userId]);
 
   // Load daily flyer state from localStorage and match with gallery images
   const hasRestoredDailyFlyersRef = useRef(false);
@@ -806,7 +813,7 @@ function AppContent() {
     setStyleReferences((prev) => {
       const updated = [newRef, ...prev];
       try {
-        localStorage.setItem("styleReferences", JSON.stringify(updated));
+        localStorage.setItem(styleRefsKey, JSON.stringify(updated));
       } catch (e) {
         console.warn(
           "Não foi possível salvar no localStorage (limite excedido)",
@@ -820,7 +827,7 @@ function AppContent() {
     setStyleReferences((prev) => {
       const updated = prev.filter((r) => r.id !== id);
       try {
-        localStorage.setItem("styleReferences", JSON.stringify(updated));
+        localStorage.setItem(styleRefsKey, JSON.stringify(updated));
       } catch (e) {
         console.warn("Não foi possível salvar no localStorage");
       }

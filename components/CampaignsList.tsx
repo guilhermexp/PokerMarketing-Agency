@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { Icon } from "./common/Icon";
 import { Button } from "./common/Button";
 import { Loader } from "./common/Loader";
-import { EmptyState } from "./common/EmptyState";
 import { deleteCampaign, type DbCampaign } from "../services/apiClient";
 import { useCampaigns } from "../hooks/useAppData";
 
@@ -257,20 +256,21 @@ const CampaignCard: React.FC<{
   );
 };
 
-// Empty state component using reusable EmptyState
-const CampaignsEmptyState: React.FC<{ onNewCampaign: () => void }> = ({
-  onNewCampaign,
-}) => (
-  <EmptyState
-    icon="layers"
-    title="Nenhuma campanha ainda"
-    description="Comece criando sua primeira campanha de marketing e veja a mágica acontecer."
-    actionLabel="Criar Primeira Campanha"
-    actionIcon="plus"
-    onAction={onNewCampaign}
-    size="large"
-    className="w-full"
-  />
+// Empty state component - minimal version
+const CampaignsEmptyState: React.FC = () => (
+  <div className="flex items-center justify-center w-full min-h-[60vh]">
+    <div className="bg-[#111] border border-white/[0.06] rounded-2xl px-16 py-20 flex flex-col items-center justify-center text-center min-w-[320px]">
+      <div className="grid grid-cols-2 gap-1.5 mb-6">
+        <div className="w-6 h-6 rounded border border-white/20" />
+        <div className="w-6 h-6 rounded border border-white/20" />
+        <div className="w-6 h-6 rounded border border-white/20" />
+        <div className="w-6 h-6 rounded border border-white/20" />
+      </div>
+      <p className="text-white/40 text-sm">
+        Nenhuma campanha ainda
+      </p>
+    </div>
+  </div>
 );
 
 // Loading skeleton - minimal
@@ -412,7 +412,7 @@ export function CampaignsList({
       {isLoading ? (
         <LoadingSkeleton />
       ) : campaigns.length === 0 ? (
-        <CampaignsEmptyState onNewCampaign={onNewCampaign} />
+        <CampaignsEmptyState />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {campaigns.map((campaign, index) => (

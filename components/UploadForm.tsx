@@ -344,39 +344,39 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
         {/* Main Input Box */}
         <div className="w-full max-w-3xl relative">
-          <div className="bg-[#111111] border border-white/10 rounded-2xl transition-all focus-within:border-white/20">
+          <div className="bg-[#080808] border border-white/[0.06] rounded-2xl transition-all focus-within:border-white/12 focus-within:bg-[#0a0a0a]">
             {/* Textarea */}
             <textarea
               ref={textareaRef}
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="w-full bg-transparent px-5 pt-5 pb-3 text-white text-sm placeholder:text-white/30 outline-none resize-none min-h-[100px] rounded-t-2xl"
+              className="w-full bg-transparent px-5 pt-4 pb-3 text-white text-[14px] placeholder:text-white/25 outline-none resize-none min-h-[90px]"
               placeholder="Cole a transcrição do seu vídeo, post de blog ou descreva sua campanha..."
               rows={3}
             />
 
             {/* Bottom Bar */}
-            <div className="px-4 py-3 flex items-center justify-between border-t border-white/5 rounded-b-2xl">
+            <div className="px-4 pb-3 flex items-center justify-between">
               {/* Model Selector */}
               <div className="relative" ref={modelSelectorRef}>
                 <button
                   type="button"
                   onClick={() => setIsModelSelectorOpen(!isModelSelectorOpen)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-white/30 hover:text-white/50 hover:bg-white/[0.04] transition-all cursor-pointer"
                 >
-                  <Icon name="zap" className="w-3.5 h-3.5" />
-                  <span className="text-[10px] font-bold uppercase">
+                  <Icon name="zap" className="w-3 h-3" />
+                  <span className="text-[10px] font-medium uppercase tracking-wide">
                     {creativeModelLabels[
                       brandProfile.creativeModel || DEFAULT_MODEL
                     ]?.label || "Gemini 3 Pro"}
                   </span>
-                  <Icon name="chevron-down" className="w-3 h-3 ml-1" />
+                  <Icon name="chevron-down" className="w-2.5 h-2.5" />
                 </button>
 
                 {/* Model Dropdown */}
                 {isModelSelectorOpen && (
-                  <div className="absolute top-full left-0 mt-1 py-1 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl z-50 min-w-[180px]">
+                  <div className="absolute top-full left-0 mt-1 py-1 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 min-w-[200px] backdrop-blur-xl">
                     {creativeModelOptions.map((model) => (
                       <button
                         key={model}
@@ -384,16 +384,16 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                           onUpdateCreativeModel(model);
                           setIsModelSelectorOpen(false);
                         }}
-                        className={`w-full px-3 py-2 text-left text-xs transition-colors flex items-center justify-between ${
+                        className={`w-full px-3 py-2.5 text-left text-xs transition-colors flex items-center justify-between ${
                           brandProfile.creativeModel === model ||
                           (!brandProfile.creativeModel &&
                             model === DEFAULT_MODEL)
-                            ? "bg-white/10 text-white"
-                            : "text-white/60 hover:bg-white/5 hover:text-white/80"
+                            ? "bg-white/[0.08] text-white"
+                            : "text-white/50 hover:bg-white/[0.04] hover:text-white/70"
                         }`}
                       >
                         <span>{creativeModelLabels[model]?.label}</span>
-                        <span className="text-[9px] text-white/30">
+                        <span className="text-[9px] text-white/25">
                           {creativeModelLabels[model]?.provider}
                         </span>
                       </button>
@@ -406,16 +406,16 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               <button
                 onClick={handleGenerateClick}
                 disabled={!canGenerate}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
                   canGenerate
-                    ? "bg-white text-black hover:bg-white/90"
-                    : "bg-white/10 text-white/20 cursor-not-allowed"
+                    ? "bg-white text-black hover:bg-white/90 hover:scale-105"
+                    : "bg-white/[0.06] text-white/15 cursor-not-allowed"
                 }`}
               >
                 {isGenerating ? (
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <Icon name="chevron-up" className="w-5 h-5" />
+                  <Icon name="chevron-up" className="w-4 h-4" />
                 )}
               </button>
             </div>
@@ -423,91 +423,6 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
           {error && (
             <p className="text-red-400 text-xs mt-3 text-center">{error}</p>
-          )}
-
-          {/* Attachments Preview - Below Input */}
-          {hasAttachments && (
-            <div className="mt-4 flex items-center justify-center gap-3 flex-wrap">
-              {productImages.map((img, i) => (
-                <div key={`product-${i}`} className="relative group">
-                  <div className="flex items-center gap-2 px-2 py-1.5 bg-white/5 rounded-full border border-white/10">
-                    <img
-                      src={img.preview}
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
-                    <span className="text-[9px] text-white/50 font-medium">
-                      Logo
-                    </span>
-                    <button
-                      onClick={() => handleRemoveImage(i, "product")}
-                      className="w-4 h-4 rounded-full bg-white/10 hover:bg-red-500/50 flex items-center justify-center transition-colors"
-                    >
-                      <Icon name="x" className="w-2.5 h-2.5 text-white/50" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {collabLogo && (
-                <div className="relative group">
-                  <div className="flex items-center gap-2 px-2 py-1.5 bg-blue-500/10 rounded-full border border-blue-500/20">
-                    <img
-                      src={collabLogo}
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
-                    <span className="text-[9px] text-blue-400/70 font-medium">
-                      Colab
-                    </span>
-                    <button
-                      onClick={() => setCollabLogo(null)}
-                      className="w-4 h-4 rounded-full bg-blue-500/20 hover:bg-red-500/50 flex items-center justify-center transition-colors"
-                    >
-                      <Icon name="x" className="w-2.5 h-2.5 text-blue-400/70" />
-                    </button>
-                  </div>
-                </div>
-              )}
-              {inspirationImages.map((img, i) => (
-                <div key={`inspiration-${i}`} className="relative group">
-                  <div className="flex items-center gap-2 px-2 py-1.5 bg-primary/10 rounded-full border border-primary/20">
-                    <img
-                      src={img.preview}
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
-                    <span className="text-[9px] text-primary/70 font-medium">
-                      Ref
-                    </span>
-                    <button
-                      onClick={() => handleRemoveImage(i, "inspiration")}
-                      className="w-4 h-4 rounded-full bg-primary/20 hover:bg-red-500/50 flex items-center justify-center transition-colors"
-                    >
-                      <Icon name="x" className="w-2.5 h-2.5 text-primary/70" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {compositionAssets.map((img, i) => (
-                <div key={`asset-${i}`} className="relative group">
-                  <div className="flex items-center gap-2 px-2 py-1.5 bg-green-500/10 rounded-full border border-green-500/20">
-                    <img
-                      src={img.preview}
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
-                    <span className="text-[9px] text-green-400/70 font-medium">
-                      Ativo
-                    </span>
-                    <button
-                      onClick={() => handleRemoveImage(i, "assets")}
-                      className="w-4 h-4 rounded-full bg-green-500/20 hover:bg-red-500/50 flex items-center justify-center transition-colors"
-                    >
-                      <Icon
-                        name="x"
-                        className="w-2.5 h-2.5 text-green-400/70"
-                      />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
           )}
 
           {/* Attachment Options */}
@@ -607,6 +522,94 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               <span>Opções</span>
             </button>
           </div>
+
+          {/* Attachments Panel */}
+          {hasAttachments && (
+            <div className="mt-4 bg-[#0a0a0a] border border-white/10 rounded-xl p-4 max-w-2xl mx-auto">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold text-white/70">
+                  Anexos
+                </h4>
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
+                {productImages.map((img, i) => (
+                  <button
+                    key={`product-${i}`}
+                    onClick={() => handleRemoveImage(i, "product")}
+                    className="relative aspect-square rounded-lg overflow-hidden border-2 border-white/10 hover:border-red-500/50 transition-all group"
+                  >
+                    <img
+                      src={img.preview}
+                      alt="Produto"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Icon name="x" className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="absolute bottom-0.5 left-0.5 text-[7px] font-bold text-white bg-black/70 px-1 rounded">
+                      Produto
+                    </span>
+                  </button>
+                ))}
+                {collabLogo && (
+                  <button
+                    onClick={() => setCollabLogo(null)}
+                    className="relative aspect-square rounded-lg overflow-hidden border-2 border-blue-500/30 hover:border-red-500/50 transition-all group"
+                  >
+                    <img
+                      src={collabLogo}
+                      alt="Colab"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Icon name="x" className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="absolute bottom-0.5 left-0.5 text-[7px] font-bold text-blue-400 bg-black/70 px-1 rounded">
+                      Colab
+                    </span>
+                  </button>
+                )}
+                {inspirationImages.map((img, i) => (
+                  <button
+                    key={`inspiration-${i}`}
+                    onClick={() => handleRemoveImage(i, "inspiration")}
+                    className="relative aspect-square rounded-lg overflow-hidden border-2 border-primary/30 hover:border-red-500/50 transition-all group"
+                  >
+                    <img
+                      src={img.preview}
+                      alt="Referência"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Icon name="x" className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="absolute bottom-0.5 left-0.5 text-[7px] font-bold text-primary bg-black/70 px-1 rounded">
+                      Ref
+                    </span>
+                  </button>
+                ))}
+                {compositionAssets.map((img, i) => (
+                  <button
+                    key={`asset-${i}`}
+                    onClick={() => handleRemoveImage(i, "assets")}
+                    className="relative aspect-square rounded-lg overflow-hidden border-2 border-green-500/30 hover:border-red-500/50 transition-all group"
+                  >
+                    <img
+                      src={img.preview}
+                      alt="Ativo"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Icon name="x" className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="absolute bottom-0.5 left-0.5 text-[7px] font-bold text-green-400 bg-black/70 px-1 rounded">
+                      Ativo
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Favorites Panel */}
           {isFavoritesOpen && styleReferences.length > 0 && (
