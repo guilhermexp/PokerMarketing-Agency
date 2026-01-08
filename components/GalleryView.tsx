@@ -35,7 +35,7 @@ const SOURCE_FILTERS: {
   { value: "all", label: "Todos", sources: [] },
   { value: "flyer", label: "Flyers", sources: ["Flyer", "Flyer Diário"] },
   { value: "campaign", label: "Campanhas", sources: ["Anúncio", "Post"] },
-  { value: "video", label: "Vídeos", sources: ["Video Final"] },
+  { value: "video", label: "Vídeos", sources: ["Video Final", "Video-"] }, // Video- is a prefix match
 ];
 
 const fileToBase64 = (file: File): Promise<string> =>
@@ -71,55 +71,75 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
   getVideoPoster,
   onDelete,
   className = "",
-}) => (
-  <div
-    onClick={() => !isAudio(image) && onSelect(image)}
-    className={`group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 ${isAudio(image) ? "" : "cursor-pointer"} ${className}`}
-  >
-    {isAudio(image) ? (
-      <div className="w-full aspect-[4/3] bg-gradient-to-br from-primary/20 via-[#1a1a1a] to-[#111] flex flex-col items-center justify-center p-4">
-        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-2">
-          <Icon name="volume-2" className="w-6 h-6 text-primary" />
+}) => {
+  const [videoError, setVideoError] = React.useState(false);
+  const poster = getVideoPoster(image);
+
+  return (
+    <div
+      onClick={() => !isAudio(image) && onSelect(image)}
+      className={`group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 ${isAudio(image) ? "" : "cursor-pointer"} ${className}`}
+    >
+      {isAudio(image) ? (
+        <div className="w-full aspect-[4/3] bg-gradient-to-br from-primary/20 via-[#1a1a1a] to-[#111] flex flex-col items-center justify-center p-4">
+          <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-2">
+            <Icon name="volume-2" className="w-6 h-6 text-primary" />
+          </div>
+          <p className="text-[9px] text-white/60 font-bold uppercase tracking-wide mb-1">
+            Narração
+          </p>
+          {image.duration && (
+            <span className="text-[10px] text-white/40 font-mono mb-2">
+              {formatDuration(image.duration)}
+            </span>
+          )}
+          <audio
+            src={image.src}
+            className="w-full h-7"
+            controls
+            preload="metadata"
+          />
+          <a
+            href={image.src}
+            download={`narracao-${image.id.substring(0, 8)}.mp3`}
+            className="mt-2 text-[9px] text-primary hover:text-primary/80 font-bold uppercase tracking-wide flex items-center gap-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Icon name="download" className="w-3 h-3" />
+            Download
+          </a>
         </div>
-        <p className="text-[9px] text-white/60 font-bold uppercase tracking-wide mb-1">
-          Narração
-        </p>
-        {image.duration && (
-          <span className="text-[10px] text-white/40 font-mono mb-2">
-            {formatDuration(image.duration)}
-          </span>
-        )}
-        <audio
-          src={image.src}
-          className="w-full h-7"
-          controls
-          preload="metadata"
-        />
-        <a
-          href={image.src}
-          download={`narracao-${image.id.substring(0, 8)}.mp3`}
-          className="mt-2 text-[9px] text-primary hover:text-primary/80 font-bold uppercase tracking-wide flex items-center gap-1"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Icon name="download" className="w-3 h-3" />
-          Download
-        </a>
-      </div>
-    ) : isVideo(image) ? (
-      <video
-        src={image.src}
-        poster={getVideoPoster(image)}
-        className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-        muted
-        playsInline
-        preload={getVideoPoster(image) ? "none" : "metadata"}
-        onMouseEnter={(e) => e.currentTarget.play()}
-        onMouseLeave={(e) => {
-          e.currentTarget.pause();
-          e.currentTarget.currentTime = 0;
-        }}
-      />
-    ) : (
+      ) : isVideo(image) ? (
+        videoError ? (
+          // Fallback when video fails to load
+          <div className="w-full aspect-[9/16] bg-gradient-to-br from-red-500/10 via-[#1a1a1a] to-[#111] flex flex-col items-center justify-center p-4">
+            <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mb-2">
+              <Icon name="alert-triangle" className="w-6 h-6 text-red-400" />
+            </div>
+            <p className="text-[10px] text-white/60 font-bold uppercase tracking-wide text-center">
+              Vídeo indisponível
+            </p>
+            <p className="text-[8px] text-white/40 mt-1 text-center">
+              O arquivo pode ter expirado
+            </p>
+          </div>
+        ) : (
+          <video
+            src={image.src}
+            poster={poster}
+            className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+            muted
+            playsInline
+            preload={poster ? "none" : "metadata"}
+            onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+            onMouseLeave={(e) => {
+              e.currentTarget.pause();
+              e.currentTarget.currentTime = 0;
+            }}
+            onError={() => setVideoError(true)}
+          />
+        )
+      ) : (
       <img
         src={image.src}
         alt={image.prompt}
@@ -213,15 +233,16 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
       </div>
     )}
 
-    {/* Video indicator */}
-    {isVideo(image) && (
-      <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
-        <Icon name="video" className="w-3 h-3 text-white" />
-        <span className="text-[8px] font-bold text-white uppercase">Vídeo</span>
-      </div>
-    )}
-  </div>
-);
+      {/* Video indicator */}
+      {isVideo(image) && !videoError && (
+        <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+          <Icon name="video" className="w-3 h-3 text-white" />
+          <span className="text-[8px] font-bold text-white uppercase">Vídeo</span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const GalleryView: React.FC<GalleryViewProps> = ({
   images,
@@ -368,22 +389,60 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     });
   }, [pagedImages]);
 
-  const clipPosterByScriptId = React.useMemo(() => {
-    const map = new Map<string, string>();
+  // Build maps for video posters: clip thumbnails and scene images by video_script_id
+  const { clipPosterByScriptId, scenePosterByScriptId } = React.useMemo(() => {
+    const clipMap = new Map<string, string>();
+    const sceneMap = new Map<string, Map<number, string>>(); // video_script_id -> sceneNumber -> src
+
     images.forEach((img) => {
-      if (img.source !== "Clipe") return;
       if (!img.video_script_id || !img.src) return;
-      if (!map.has(img.video_script_id)) {
-        map.set(img.video_script_id, img.src);
+
+      // Clip thumbnails
+      if (img.source === "Clipe" && !clipMap.has(img.video_script_id)) {
+        clipMap.set(img.video_script_id, img.src);
+      }
+
+      // Scene images (source: Cena-{title}-{sceneNumber})
+      if (img.source?.startsWith("Cena-")) {
+        const sceneMatch = img.source.match(/-(\d+)$/);
+        if (sceneMatch) {
+          const sceneNum = parseInt(sceneMatch[1], 10);
+          if (!sceneMap.has(img.video_script_id)) {
+            sceneMap.set(img.video_script_id, new Map());
+          }
+          const scriptScenes = sceneMap.get(img.video_script_id)!;
+          if (!scriptScenes.has(sceneNum)) {
+            scriptScenes.set(sceneNum, img.src);
+          }
+        }
       }
     });
-    return map;
+
+    return { clipPosterByScriptId: clipMap, scenePosterByScriptId: sceneMap };
   }, [images]);
 
   const getVideoPoster = (image: GalleryImage): string | undefined => {
-    if (image.source === "Video Final" && image.video_script_id) {
+    if (!image.video_script_id) return undefined;
+
+    // For "Video Final", use clip thumbnail
+    if (image.source === "Video Final") {
       return clipPosterByScriptId.get(image.video_script_id);
     }
+
+    // For individual scene videos (Video-{title}-{sceneNumber}...), use corresponding scene image
+    if (image.source?.startsWith("Video-")) {
+      const sceneMatch = image.source.match(/Video-[^-]+-(\d+)/);
+      if (sceneMatch) {
+        const sceneNum = parseInt(sceneMatch[1], 10);
+        const scriptScenes = scenePosterByScriptId.get(image.video_script_id);
+        if (scriptScenes?.has(sceneNum)) {
+          return scriptScenes.get(sceneNum);
+        }
+      }
+      // Fallback to clip thumbnail if no scene image found
+      return clipPosterByScriptId.get(image.video_script_id);
+    }
+
     return undefined;
   };
 

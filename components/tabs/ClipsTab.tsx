@@ -870,6 +870,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
             prompt: `[VIDEO:${selectedVideoModel}] ${visualDescription}`,
             source: videoSource as any,
             model: "gemini-3-pro-image-preview", // Fallback - DB enum doesn't support video models
+            mediaType: "video",
             video_script_id: clip.id, // Link to video_clip_script for campaign filtering
           });
         }
@@ -1931,6 +1932,7 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
             prompt: `[VIDEO:${modelUsed}] ${currentScene.visual}`,
             source: videoSource as any,
             model: "gemini-3-pro-image-preview", // Fallback - DB enum doesn't support video models
+            mediaType: "video",
             video_script_id: clip.id, // Link to video_clip_script for campaign filtering
           });
         }
