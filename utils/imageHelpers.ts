@@ -16,6 +16,19 @@ const readBlobAsDataUrl = (blob: Blob): Promise<string> =>
     reader.readAsDataURL(blob);
   });
 
+export const urlToDataUrl = async (src: string): Promise<string | null> => {
+  if (!src) return null;
+  if (src.startsWith("data:")) return src;
+  try {
+    const response = await fetch(src);
+    const blob = await response.blob();
+    return await readBlobAsDataUrl(blob);
+  } catch (error) {
+    console.error("[urlToDataUrl] Failed to convert URL:", src, error);
+    return null;
+  }
+};
+
 export const urlToBase64 = async (
   src: string,
 ): Promise<{ base64: string; mimeType: string } | null> => {

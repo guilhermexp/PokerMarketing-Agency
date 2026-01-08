@@ -1700,6 +1700,7 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
       content_type,
       content_id,
       image_url,
+      carousel_image_urls,
       caption,
       hashtags,
       scheduled_date,
@@ -1748,11 +1749,11 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
 
     const result = await sql`
       INSERT INTO scheduled_posts (
-        user_id, organization_id, content_type, content_id, image_url, caption, hashtags,
+        user_id, organization_id, content_type, content_id, image_url, carousel_image_urls, caption, hashtags,
         scheduled_date, scheduled_time, scheduled_timestamp, timezone,
         platforms, instagram_content_type, instagram_account_id, created_from
       ) VALUES (
-        ${resolvedUserId}, ${organization_id || null}, ${content_type || "flyer"}, ${content_id || null}, ${image_url}, ${caption || ""},
+        ${resolvedUserId}, ${organization_id || null}, ${content_type || "flyer"}, ${content_id || null}, ${image_url}, ${carousel_image_urls || null}, ${caption || ""},
         ${hashtags || []}, ${scheduled_date}, ${scheduled_time}, ${timestampMs},
         ${timezone || "America/Sao_Paulo"}, ${platforms || "instagram"},
         ${instagram_content_type || "photo"}, ${instagram_account_id || null}, ${created_from || null}

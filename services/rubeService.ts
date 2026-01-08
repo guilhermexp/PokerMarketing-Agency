@@ -342,6 +342,7 @@ export const createMediaContainer = async (
 
 /**
  * Create carousel container with multiple items
+ * Uses Rube's simplified API with child_image_urls
  * @param context - Optional multi-tenant context
  */
 export const createCarouselContainer = async (
@@ -349,51 +350,52 @@ export const createCarouselContainer = async (
   caption: string,
   context?: InstagramContext
 ): Promise<string> => {
-  // First, create individual carousel items
-  const itemIds: string[] = [];
+  // Separate images and videos
+  const imageUrls: string[] = [];
+  const videoUrls: string[] = [];
 
   for (const url of mediaUrls) {
     const isVideo = url.includes('.mp4') || url.includes('.mov') || url.includes('video');
-    const args: Record<string, unknown> = {
-      content_type: 'carousel_item',
-      is_carousel_item: true
-    };
-
-    // Only include ig_user_id in single-tenant mode
-    if (!context) {
-      args.ig_user_id = getInstagramUserId();
-    }
-
     if (isVideo) {
-      args.video_url = url;
+      videoUrls.push(url);
     } else {
-      args.image_url = url;
-    }
-
-    const result = await executeInstagramTool('INSTAGRAM_CREATE_MEDIA_CONTAINER', args, 'zulu', context);
-    const itemId = result.id || result.data?.id;
-    if (itemId) {
-      itemIds.push(itemId);
+      imageUrls.push(url);
     }
   }
 
-  if (itemIds.length === 0) {
-    throw new Error('Falha ao criar itens do carousel');
+  if (imageUrls.length + videoUrls.length < 2) {
+    throw new Error('Carousel requer pelo menos 2 itens');
   }
 
-  // Now create the carousel container
+  // Use Rube's simplified carousel API with child_image_urls
   const carouselArgs: Record<string, unknown> = {
-    caption: caption,
-    children: itemIds
+    caption: caption
   };
 
+  // Only include ig_user_id in single-tenant mode
   if (!context) {
     carouselArgs.ig_user_id = getInstagramUserId();
   }
 
+  if (imageUrls.length > 0) {
+    carouselArgs.child_image_urls = imageUrls;
+  }
+  if (videoUrls.length > 0) {
+    carouselArgs.child_video_urls = videoUrls;
+  }
+
+  console.log('[Rube MCP] Creating carousel with', imageUrls.length, 'images and', videoUrls.length, 'videos');
   const result = await executeInstagramTool('INSTAGRAM_CREATE_CAROUSEL_CONTAINER', carouselArgs, 'zulu', context);
 
-  return result.id || result.data?.id;
+  const containerId = result?.id || result?.data?.id || result?.creation_id || result?.container_id;
+
+  if (!containerId) {
+    console.error('[Rube MCP] Could not find carousel container ID in result:', result);
+    throw new Error(`Falha ao criar carousel container: ${JSON.stringify(result)}`);
+  }
+
+  console.log('[Rube MCP] Carousel container created:', containerId);
+  return containerId;
 };
 
 /**
@@ -460,13 +462,15 @@ export const uploadImageForInstagram = async (dataUrl: string): Promise<string> 
  * @param contentType - Type of Instagram content
  * @param onProgress - Progress callback
  * @param context - Required multi-tenant context for user-specific tokens
+ * @param carouselImageUrls - Optional array of URLs for carousel posts
  */
 export const publishToInstagram = async (
   imageUrl: string,
   caption: string,
   contentType: InstagramContentType = 'photo',
   onProgress?: (progress: PublishProgress) => void,
-  context?: InstagramContext
+  context?: InstagramContext,
+  carouselImageUrls?: string[]
 ): Promise<InstagramPublishResult> => {
   // Require context - no fallback
   if (!context?.instagramAccountId || !context?.userId) {
@@ -483,10 +487,8 @@ export const publishToInstagram = async (
       throw new Error(`Limite de 25 publicacoes/dia atingido. Restam ${quota.remaining}.`);
     }
 
-    // Step 2: Upload image to get HTTP URL
+    // Step 2: Upload image(s) to get HTTP URL(s)
     onProgress?.({ step: 'uploading_image', message: 'Fazendo upload da imagem...', progress: 15 });
-    const httpImageUrl = await uploadImageForInstagram(imageUrl);
-    console.log(`[Rube MCP] Image uploaded: ${httpImageUrl}`);
 
     let containerId: string;
     let publishFn: (id: string, ctx?: InstagramContext) => Promise<string>;
@@ -494,22 +496,35 @@ export const publishToInstagram = async (
     // Step 3: Create appropriate container based on content type
     onProgress?.({ step: 'creating_container', message: `Criando ${contentType}...`, progress: 30 });
 
-    if (contentType === 'carousel') {
-      // For carousel, we need multiple URLs - for now just use single image
-      containerId = await createCarouselContainer([httpImageUrl], caption, context);
+    if (contentType === 'carousel' && carouselImageUrls && carouselImageUrls.length >= 2) {
+      // Upload all carousel images
+      const httpUrls: string[] = [];
+      for (let i = 0; i < carouselImageUrls.length; i++) {
+        onProgress?.({ step: 'uploading_image', message: `Fazendo upload ${i + 1}/${carouselImageUrls.length}...`, progress: 15 + (i * 10 / carouselImageUrls.length) });
+        const httpUrl = await uploadImageForInstagram(carouselImageUrls[i]);
+        httpUrls.push(httpUrl);
+        console.log(`[Rube MCP] Carousel image ${i + 1} uploaded: ${httpUrl}`);
+      }
+      containerId = await createCarouselContainer(httpUrls, caption, context);
       publishFn = publishCarousel;
-    } else if (contentType === 'story') {
-      // Stories use media_type: 'STORIES'
-      containerId = await createMediaContainer('story', httpImageUrl, caption, context);
-      publishFn = publishContainer;
     } else {
-      containerId = await createMediaContainer(
-        contentType === 'reel' ? 'reel' : contentType === 'video' ? 'video' : 'photo',
-        httpImageUrl,
-        caption,
-        context
-      );
-      publishFn = publishContainer;
+      // Single image - upload first
+      const httpImageUrl = await uploadImageForInstagram(imageUrl);
+      console.log(`[Rube MCP] Image uploaded: ${httpImageUrl}`);
+
+      if (contentType === 'story') {
+        // Stories use media_type: 'STORIES'
+        containerId = await createMediaContainer('story', httpImageUrl, caption, context);
+        publishFn = publishContainer;
+      } else {
+        containerId = await createMediaContainer(
+          contentType === 'reel' ? 'reel' : contentType === 'video' ? 'video' : 'photo',
+          httpImageUrl,
+          caption,
+          context
+        );
+        publishFn = publishContainer;
+      }
     }
 
     console.log(`[Rube MCP] Container created: ${containerId}`);

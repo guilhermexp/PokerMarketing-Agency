@@ -223,6 +223,7 @@ export interface ScheduledPost {
   type: 'flyer' | 'campaign_post' | 'ad_creative';
   contentId: string;
   imageUrl: string;
+  carouselImageUrls?: string[];  // All URLs for carousel posts (in order)
   caption: string;
   hashtags: string[];
   scheduledDate: string;     // YYYY-MM-DD

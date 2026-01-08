@@ -8,6 +8,11 @@ import {
   imageDataToBase64,
   createProtectionMaskFromCanvas,
 } from "../../services/seamCarvingService";
+import {
+  detectTextRegions,
+  drawTextRegionsOnCanvas,
+  mergeNearbyRegions,
+} from "../../services/ocrService";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
 import { Loader } from "./Loader";
@@ -228,6 +233,11 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   const [useProtectionMask, setUseProtectionMask] = useState(false);
   const [isDrawingProtection, setIsDrawingProtection] = useState(false);
   const protectionCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDetectingText, setIsDetectingText] = useState(false);
+  const [detectProgress, setDetectProgress] = useState(0);
+  const [drawMode, setDrawMode] = useState<"brush" | "rectangle">("rectangle");
+  const [rectStart, setRectStart] = useState<{ x: number; y: number } | null>(null);
+  const [tempCanvas, setTempCanvas] = useState<HTMLCanvasElement | null>(null);
 
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -386,10 +396,27 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   ) => {
     setIsDrawingProtection(true);
     const { x, y } = getProtectionCoords(e);
-    const ctx = protectionCanvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+
+    if (drawMode === "rectangle") {
+      // Store starting point for rectangle
+      setRectStart({ x, y });
+      // Save current canvas state
+      const canvas = protectionCanvasRef.current;
+      if (canvas) {
+        const temp = document.createElement("canvas");
+        temp.width = canvas.width;
+        temp.height = canvas.height;
+        const tempCtx = temp.getContext("2d");
+        tempCtx?.drawImage(canvas, 0, 0);
+        setTempCanvas(temp);
+      }
+    } else {
+      // Brush mode
+      const ctx = protectionCanvasRef.current?.getContext("2d");
+      if (!ctx) return;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    }
   };
 
   const drawProtection = (
@@ -399,19 +426,40 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   ) => {
     if (!isDrawingProtection) return;
     const { x, y } = getProtectionCoords(e);
-    const ctx = protectionCanvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    ctx.lineTo(x, y);
-    ctx.strokeStyle = "rgba(0, 255, 100, 0.6)";
-    ctx.lineWidth = 80;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.stroke();
+    const canvas = protectionCanvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!ctx || !canvas) return;
+
+    if (drawMode === "rectangle" && rectStart && tempCanvas) {
+      // Clear and restore previous state
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(tempCanvas, 0, 0);
+
+      // Draw preview rectangle
+      ctx.fillStyle = "rgba(0, 255, 100, 0.6)";
+      const width = x - rectStart.x;
+      const height = y - rectStart.y;
+      ctx.fillRect(rectStart.x, rectStart.y, width, height);
+    } else {
+      // Brush mode
+      ctx.lineTo(x, y);
+      ctx.strokeStyle = "rgba(0, 255, 100, 0.6)";
+      ctx.lineWidth = 80;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.stroke();
+    }
   };
 
   const stopProtectionDrawing = () => {
-    const ctx = protectionCanvasRef.current?.getContext("2d");
-    ctx?.closePath();
+    if (drawMode === "rectangle") {
+      // Rectangle is already drawn, just clean up
+      setRectStart(null);
+      setTempCanvas(null);
+    } else {
+      const ctx = protectionCanvasRef.current?.getContext("2d");
+      ctx?.closePath();
+    }
     setIsDrawingProtection(false);
   };
 
@@ -430,6 +478,42 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     return data.some((channel) => channel !== 0);
   }, []);
+
+  // Auto-detect text using OCR
+  const handleAutoDetectText = useCallback(async () => {
+    setIsDetectingText(true);
+    setDetectProgress(0);
+    setUseProtectionMask(true);
+    setError(null);
+
+    try {
+      // Detect text regions using OCR
+      const regions = await detectTextRegions(image.src, (progress) => {
+        setDetectProgress(progress);
+      });
+
+      console.log(`[OCR] Detected ${regions.length} text regions`);
+
+      // Merge only very close regions (same line of text)
+      const mergedRegions = mergeNearbyRegions(regions, 15);
+      console.log(`[OCR] Merged into ${mergedRegions.length} regions`);
+
+      // Draw regions on protection canvas with moderate padding
+      const canvas = protectionCanvasRef.current;
+      if (canvas && mergedRegions.length > 0) {
+        drawTextRegionsOnCanvas(canvas, mergedRegions, 20);
+        console.log("[OCR] Protection mask created from text regions");
+      } else if (mergedRegions.length === 0) {
+        setError("Nenhum texto detectado na imagem. Use o modo Manual para pintar.");
+      }
+    } catch (err: any) {
+      console.error("[OCR] Error:", err);
+      setError(err.message || "Falha ao detectar texto na imagem");
+    } finally {
+      setIsDetectingText(false);
+      setDetectProgress(0);
+    }
+  }, [image.src]);
 
   const handleEdit = async () => {
     console.log(
@@ -942,7 +1026,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                 />
                 <span className="text-[10px]">
                   {useProtectionMask
-                    ? "Pinte as áreas com texto/logotipos que devem ser protegidas durante o redimensionamento"
+                    ? drawMode === "rectangle"
+                      ? "Clique e arraste para desenhar retângulos sobre textos/logotipos a proteger"
+                      : "Pinte livremente sobre textos/logotipos que devem ser protegidos"
                     : "Desenhe para marcar a área desejada, escreva sua alteração e clique em Editar com IA"}
                 </span>
               </div>
@@ -1027,28 +1113,23 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                       </div>
                     </div>
 
+                    {/* Preset buttons */}
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => handleResize(100, 80)}
+                        disabled={isResizing}
+                        className="flex-1 px-2 py-1.5 text-[10px] font-medium rounded-lg bg-white/[0.06] text-white/60 hover:bg-white/10 hover:text-white/80 border border-white/[0.08] transition-all disabled:opacity-50"
+                      >
+                        Feed Instagram (4:5)
+                      </button>
+                    </div>
+
                     {/* Protection Mask Toggle */}
                     <div className="pt-2 border-t border-white/[0.04]">
-                      <div className="flex items-center justify-between">
-                        <button
-                          onClick={() => {
-                            setUseProtectionMask(!useProtectionMask);
-                            if (!useProtectionMask) {
-                              // When enabling, clear any resize preview
-                              setResizedPreview(null);
-                              setWidthPercent(100);
-                              setHeightPercent(100);
-                            }
-                          }}
-                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all ${
-                            useProtectionMask
-                              ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                              : "bg-white/[0.03] text-white/40 hover:text-white/60 border border-white/[0.06]"
-                          }`}
-                        >
-                          <Icon name="shield" className="w-3 h-3" />
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[9px] text-white/40 uppercase tracking-wider">
                           Proteger Texto
-                        </button>
+                        </span>
                         {useProtectionMask && (
                           <button
                             onClick={clearProtectionMask}
@@ -1059,7 +1140,86 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                           </button>
                         )}
                       </div>
-                      {useProtectionMask && (
+
+                      <div className="flex items-center gap-1.5">
+                        {/* Rectangle mode */}
+                        <button
+                          onClick={() => {
+                            setUseProtectionMask(true);
+                            setDrawMode("rectangle");
+                            setResizedPreview(null);
+                            setWidthPercent(100);
+                            setHeightPercent(100);
+                          }}
+                          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-all ${
+                            useProtectionMask && drawMode === "rectangle"
+                              ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                              : "bg-white/[0.03] text-white/40 hover:text-white/60 border border-white/[0.06]"
+                          }`}
+                        >
+                          <Icon name="square" className="w-3 h-3" />
+                          Retângulo
+                        </button>
+
+                        {/* Brush mode */}
+                        <button
+                          onClick={() => {
+                            setUseProtectionMask(true);
+                            setDrawMode("brush");
+                            setResizedPreview(null);
+                            setWidthPercent(100);
+                            setHeightPercent(100);
+                          }}
+                          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-all ${
+                            useProtectionMask && drawMode === "brush"
+                              ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                              : "bg-white/[0.03] text-white/40 hover:text-white/60 border border-white/[0.06]"
+                          }`}
+                        >
+                          <Icon name="edit" className="w-3 h-3" />
+                          Pincel
+                        </button>
+
+                        {/* Auto-detect button */}
+                        <button
+                          onClick={handleAutoDetectText}
+                          disabled={isDetectingText}
+                          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-all ${
+                            isDetectingText
+                              ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                              : "bg-white/[0.03] text-white/40 hover:text-blue-400 hover:bg-blue-500/10 border border-white/[0.06]"
+                          }`}
+                        >
+                          {isDetectingText ? (
+                            <>
+                              <Loader className="w-3 h-3" />
+                              {detectProgress}%
+                            </>
+                          ) : (
+                            <>
+                              <Icon name="eye" className="w-3 h-3" />
+                              Auto
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Detection progress */}
+                      {isDetectingText && (
+                        <div className="mt-2">
+                          <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-blue-500 transition-all duration-150"
+                              style={{ width: `${detectProgress}%` }}
+                            />
+                          </div>
+                          <span className="text-[9px] text-blue-400 mt-1 block">
+                            Detectando texto com OCR...
+                          </span>
+                        </div>
+                      )}
+
+                      {useProtectionMask && !isDetectingText && (
                         <p className="text-[9px] text-green-400/60 mt-2">
                           Pinte sobre textos e logotipos na imagem para protegê-los do redimensionamento
                         </p>

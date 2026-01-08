@@ -767,6 +767,7 @@ function AppContent() {
         content_type: post.type,
         content_id: post.contentId,
         image_url: post.imageUrl,
+        carousel_image_urls: post.carouselImageUrls,
         caption: post.caption,
         hashtags: post.hashtags,
         scheduled_date: post.scheduledDate,
@@ -794,6 +795,8 @@ function AppContent() {
         type: dbPost.content_type as ScheduledPost["type"],
         contentId: dbPost.content_id || "",
         imageUrl: dbPost.image_url,
+        // Use original post data as fallback if DB doesn't return array
+        carouselImageUrls: dbPost.carousel_image_urls || post.carouselImageUrls,
         caption: dbPost.caption,
         hashtags: dbPost.hashtags || [],
         scheduledDate: dbPost.scheduled_date,
@@ -936,7 +939,8 @@ function AppContent() {
             [postId]: progress,
           }));
         },
-        instagramContext
+        instagramContext,
+        post.carouselImageUrls
       );
 
       if (result.success) {

@@ -192,6 +192,36 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     null,
   );
 
+  // Handler to publish carousel directly to Instagram
+  const handlePublishCarousel = async (imageUrls: string[], caption: string) => {
+    if (!instagramContext?.instagramAccountId) {
+      alert('Conecte uma conta do Instagram em Configurações → Integrações');
+      return;
+    }
+
+    // Create scheduled post for immediate publishing
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    onSchedulePost({
+      type: 'flyer',
+      contentId: '',
+      imageUrl: imageUrls[0],
+      carouselImageUrls: imageUrls,
+      caption,
+      hashtags: [],
+      scheduledDate: dateStr,
+      scheduledTime: timeStr,
+      scheduledTimestamp: Date.now(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      platforms: 'instagram',
+      status: 'scheduled',
+      createdFrom: 'campaign',
+      instagramContentType: 'carousel',
+    });
+  };
+
   // Format date string (handles both ISO and DD/MM formats)
   const formatDateDisplay = (dateStr: string) => {
     if (!dateStr) return "";
@@ -346,6 +376,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       onAddImageToGallery={onAddImageToGallery}
                       onUpdateGalleryImage={onUpdateGalleryImage}
                       onSetChatReference={onSetChatReference}
+                      onPublishCarousel={instagramContext?.instagramAccountId ? handlePublishCarousel : undefined}
                     />
                   )}
                   {activeTab === "posts" && (

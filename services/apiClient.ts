@@ -289,6 +289,7 @@ export interface DbScheduledPost {
   content_type: string;
   content_id: string | null;
   image_url: string;
+  carousel_image_urls?: string[] | null;  // Array of URLs for carousel posts
   caption: string;
   hashtags: string[];
   scheduled_date: string;
@@ -333,6 +334,7 @@ export async function createScheduledPost(
     content_type: string;
     content_id?: string;
     image_url: string;
+    carousel_image_urls?: string[];
     caption: string;
     hashtags: string[];
     scheduled_date: string;

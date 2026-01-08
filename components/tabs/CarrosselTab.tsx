@@ -8,9 +8,9 @@ import type {
 import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
-import { generateImage } from "../../services/geminiService";
+import { generateImage, generateQuickPostText } from "../../services/geminiService";
 import { uploadImageToBlob } from "../../services/blobService";
-import { urlToBase64 } from "../../utils/imageHelpers";
+import { urlToBase64, urlToDataUrl } from "../../utils/imageHelpers";
 
 // urlToBase64 imported from utils/imageHelpers
 
@@ -20,6 +20,10 @@ interface CarouselPreviewProps {
   onReorder: (newOrder: GalleryImage[]) => void;
   clipTitle: string;
   onOpenEditor?: (image: GalleryImage) => void;
+  caption?: string;
+  onCaptionChange?: (caption: string) => void;
+  onGenerateCaption?: () => void;
+  isGeneratingCaption?: boolean;
 }
 
 const CarouselPreview: React.FC<CarouselPreviewProps> = ({
@@ -27,6 +31,10 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
   onReorder,
   clipTitle,
   onOpenEditor,
+  caption = "",
+  onCaptionChange,
+  onGenerateCaption,
+  isGeneratingCaption = false,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -98,10 +106,16 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
   if (images.length === 0) return null;
 
   return (
-    <div className="flex gap-6 items-start">
+    <div className="flex gap-6 items-center">
       {/* Instagram Phone Preview */}
       <div className="flex-shrink-0">
-        <div className="w-[280px] bg-black rounded-[32px] p-2 shadow-2xl border border-white/10">
+        {/* Format label */}
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <span className="px-2 py-0.5 rounded bg-white/10 text-[10px] font-medium text-white/60 border border-white/10">
+            Feed Instagram 4:5
+          </span>
+        </div>
+        <div className="w-[320px] bg-black rounded-[32px] p-2 shadow-2xl border border-white/10">
           {/* Phone notch */}
           <div className="w-24 h-6 bg-black rounded-full mx-auto mb-1" />
 
@@ -210,14 +224,46 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
             {/* Caption Preview */}
             <div className="px-3 pb-3">
               <p className="text-[10px] text-white/90 line-clamp-2">
-                <span className="font-semibold">cpc_poker</span> {clipTitle}
+                <span className="font-semibold">cpc_poker</span> {caption || clipTitle}
               </p>
             </div>
           </div>
         </div>
+
+        {/* Caption Editor */}
+        <div className="mt-4 w-[320px]">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-medium text-white/60">Legenda</label>
+            {onGenerateCaption && (
+              <button
+                onClick={onGenerateCaption}
+                disabled={isGeneratingCaption}
+                className="px-2 py-1 text-[10px] font-medium rounded bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+              >
+                {isGeneratingCaption ? (
+                  <>
+                    <Loader size={10} />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Icon name="sparkles" className="w-3 h-3" />
+                    Gerar Legenda
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+          <textarea
+            value={caption}
+            onChange={(e) => onCaptionChange?.(e.target.value)}
+            placeholder="Escreva a legenda do carrossel..."
+            className="w-full h-24 px-3 py-2 text-xs text-white/90 bg-white/[0.03] border border-white/[0.06] rounded-lg resize-none focus:outline-none focus:border-amber-500/50 placeholder:text-white/30"
+          />
+        </div>
       </div>
 
-      {/* Reorderable Thumbnails - Same size as preview */}
+      {/* Reorderable Thumbnails */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-4">
           <Icon name="move" className="w-4 h-4 text-white/40" />
@@ -233,7 +279,7 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               onDragEnd={handleDragEnd}
               onClick={() => setCurrentIndex(idx)}
               className={`
-                relative w-[260px] flex-shrink-0 aspect-[4/5] rounded-xl overflow-hidden cursor-move group
+                relative w-[320px] flex-shrink-0 aspect-[4/5] rounded-xl overflow-hidden cursor-move group
                 border-2 transition-all duration-200 shadow-lg
                 ${idx === currentIndex ? "border-amber-500 ring-2 ring-amber-500/30" : "border-white/10"}
                 ${dragOverIndex === idx ? "scale-105 border-blue-500" : ""}
@@ -278,6 +324,7 @@ interface CarrosselTabProps {
   onAddImageToGallery: (image: Omit<GalleryImage, "id">) => GalleryImage;
   onUpdateGalleryImage?: (imageId: string, newImageSrc: string) => void;
   onSetChatReference?: (image: GalleryImage | null) => void;
+  onPublishCarousel?: (imageUrls: string[], caption: string) => Promise<void>;
 }
 
 export const CarrosselTab: React.FC<CarrosselTabProps> = ({
@@ -287,9 +334,12 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   onAddImageToGallery,
   onUpdateGalleryImage,
   onSetChatReference,
+  onPublishCarousel,
 }) => {
   // Track which images are being generated: { "clipId-sceneNumber": true }
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
+  // Track publishing state per clip
+  const [publishing, setPublishing] = useState<Record<string, boolean>>({});
   // Track custom order for each clip: { clipId: [image1, image2, ...] }
   const [customOrders, setCustomOrders] = useState<
     Record<string, GalleryImage[]>
@@ -298,6 +348,10 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   const [collapsedClips, setCollapsedClips] = useState<Set<string>>(new Set());
   // Image editing state
   const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
+  // Caption state per clip
+  const [captions, setCaptions] = useState<Record<string, string>>({});
+  // Track caption generation state
+  const [generatingCaption, setGeneratingCaption] = useState<Record<string, boolean>>({});
 
   // Get truncated title for source (max 50 chars in DB)
   const getTruncatedTitle = (title: string) => {
@@ -493,6 +547,49 @@ IMPORTANTE:
     }
   };
 
+  // Generate caption for carousel
+  const handleGenerateCaption = async (clipKey: string, images: GalleryImage[], clip: VideoClipScript) => {
+    if (images.length === 0) return;
+
+    setGeneratingCaption(prev => ({ ...prev, [clipKey]: true }));
+    try {
+      // Use first image for analysis
+      const firstImage = images[0];
+      const imageDataUrl = await urlToDataUrl(firstImage.src);
+
+      // Build context from clip scenes
+      const scenesContext = clip.scenes?.map(s => s.narration).join('\n') || clip.title;
+      const context = `Carrossel de ${images.length} imagens sobre: ${scenesContext}`;
+
+      const result = await generateQuickPostText(brandProfile, context, imageDataUrl || undefined);
+
+      // Combine content and hashtags
+      const fullCaption = `${result.content}\n\n${result.hashtags.map(h => `#${h}`).join(' ')}`;
+      setCaptions(prev => ({ ...prev, [clipKey]: fullCaption }));
+    } catch (err) {
+      console.error('[CarrosselTab] Failed to generate caption:', err);
+    } finally {
+      setGeneratingCaption(prev => ({ ...prev, [clipKey]: false }));
+    }
+  };
+
+  // Publish carousel to Instagram
+  const handlePublishCarousel = async (clipKey: string, images: GalleryImage[], title: string) => {
+    if (!onPublishCarousel || images.length < 2) return;
+
+    setPublishing(prev => ({ ...prev, [clipKey]: true }));
+    try {
+      const imageUrls = images.map(img => img.src);
+      // Use generated caption or fallback to title
+      const caption = captions[clipKey] || title;
+      await onPublishCarousel(imageUrls, caption);
+    } catch (err) {
+      console.error('[CarrosselTab] Failed to publish carousel:', err);
+    } finally {
+      setPublishing(prev => ({ ...prev, [clipKey]: false }));
+    }
+  };
+
   if (!videoClipScripts || videoClipScripts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-white/40">
@@ -561,7 +658,7 @@ IMPORTANTE:
               </div>
 
               {/* Generate button */}
-              {hasAnyOriginal && !allGenerated && (
+              {hasAnyOriginal && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -570,7 +667,31 @@ IMPORTANTE:
                   disabled={isGeneratingAny}
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors disabled:opacity-50"
                 >
-                  {isGeneratingAny ? "Gerando..." : "Gerar 4:5"}
+                  {isGeneratingAny ? "Gerando..." : allGenerated ? "Regenerar 4:5" : "Gerar 4:5"}
+                </button>
+              )}
+
+              {/* Publish button */}
+              {onPublishCarousel && hasCarrosselImages && orderedImages.length >= 2 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePublishCarousel(clipKey, orderedImages, clip.title);
+                  }}
+                  disabled={publishing[clipKey]}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-white/10 text-white/70 hover:bg-white/15 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {publishing[clipKey] ? (
+                    <>
+                      <Loader size={12} />
+                      Publicando...
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="send" className="w-3.5 h-3.5" />
+                      Publicar
+                    </>
+                  )}
                 </button>
               )}
 
@@ -590,6 +711,10 @@ IMPORTANTE:
                     onReorder={(newOrder) => handleReorder(clipKey, newOrder)}
                     clipTitle={clip.title}
                     onOpenEditor={setEditingImage}
+                    caption={captions[clipKey] || ""}
+                    onCaptionChange={(newCaption) => setCaptions(prev => ({ ...prev, [clipKey]: newCaption }))}
+                    onGenerateCaption={() => handleGenerateCaption(clipKey, orderedImages, clip)}
+                    isGeneratingCaption={generatingCaption[clipKey] || false}
                   />
                 ) : hasAnyOriginal ? (
                   <div className="text-center py-8">

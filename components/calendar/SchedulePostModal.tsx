@@ -258,11 +258,17 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
     const imageId = selectedImage?.id || '';
     const validContentId = imageId.startsWith('temp-') ? '' : imageId;
 
+    // Collect all carousel image URLs in order
+    const carouselUrls = isCarousel && selectedImages.length > 1
+      ? selectedImages.map(img => img.src)
+      : undefined;
+
     onSchedule({
       type: selectedImage?.source === 'Post' ? 'campaign_post' :
             selectedImage?.source === 'Anúncio' ? 'ad_creative' : 'flyer',
       contentId: validContentId,
       imageUrl: selectedImage?.src || '',
+      carouselImageUrls: carouselUrls,
       caption,
       hashtags: hashtagsArray,
       scheduledDate: finalDate,
