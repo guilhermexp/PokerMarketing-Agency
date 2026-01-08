@@ -139,6 +139,12 @@ const getOpenRouter = () => {
   return new OpenRouter({ apiKey });
 };
 
+// Model defaults
+const DEFAULT_TEXT_MODEL = "gemini-3-pro-preview";
+const DEFAULT_FAST_TEXT_MODEL = "gemini-3-flash-preview";
+const DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview";
+const DEFAULT_ASSISTANT_MODEL = "gemini-3-pro-preview";
+
 // Retry helper for 503 errors
 const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
   let lastError = null;
@@ -186,7 +192,7 @@ const mapAspectRatio = (ratio) => {
 const generateGeminiImage = async (
   prompt,
   aspectRatio,
-  model = "gemini-3-pro-image-preview",
+  model = DEFAULT_IMAGE_MODEL,
   imageSize = "1K",
   productImages,
   styleReferenceImage,
@@ -231,25 +237,6 @@ const generateGeminiImage = async (
   }
 
   throw new Error("Failed to generate image");
-};
-
-// Generate image with Imagen 4
-const generateImagenImage = async (prompt, aspectRatio) => {
-  const ai = getGeminiAi();
-
-  const response = await withRetry(() =>
-    ai.models.generateImages({
-      model: "imagen-4.0-generate-001",
-      prompt,
-      config: {
-        numberOfImages: 1,
-        outputMimeType: "image/png",
-        aspectRatio,
-      },
-    }),
-  );
-
-  return `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
 };
 
 // Generate structured content with Gemini
@@ -589,7 +576,14 @@ async function resolveUserId(sql, userId) {
 const processVideoGenerationJob = async (job, jobId, prompt, config, sql) => {
   console.log(`[JobProcessor] Processing VIDEO job ${jobId}`);
 
-  const { model, aspectRatio, imageUrl, lastFrameUrl, sceneDuration, useInterpolation } = config;
+  const {
+    model,
+    aspectRatio,
+    imageUrl,
+    lastFrameUrl,
+    sceneDuration,
+    useInterpolation,
+  } = config;
   const isInterpolationMode = useInterpolation && lastFrameUrl;
 
   job.updateProgress(20);
@@ -631,7 +625,9 @@ const processVideoGenerationJob = async (job, jobId, prompt, config, sql) => {
         lastFrameUrl,
       );
     } catch (googleError) {
-      console.log(`[JobProcessor] Google Veo interpolation failed: ${googleError.message}`);
+      console.log(
+        `[JobProcessor] Google Veo interpolation failed: ${googleError.message}`,
+      );
       console.log("[JobProcessor] Falling back to FAL.ai...");
       result = await fal.subscribe("fal-ai/veo3.1/fast/image-to-video", {
         input: {
@@ -3058,7 +3054,7 @@ app.post("/api/ai/campaign", async (req, res) => {
 
     // Model selection - config in config/ai-models.ts
     // OpenRouter models have "/" in their ID (e.g., "openai/gpt-5.2")
-    const model = brandProfile.creativeModel || "gemini-3-pro-preview";
+    const model = brandProfile.creativeModel || DEFAULT_TEXT_MODEL;
     const isOpenRouter = model.includes("/");
 
     const quantityInstructions = buildQuantityInstructions(options, "prod");
@@ -3186,7 +3182,7 @@ app.post("/api/ai/flyer", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-image-preview",
+      model: DEFAULT_IMAGE_MODEL,
       contents: { parts },
       config: {
         imageConfig: {
@@ -3229,11 +3225,11 @@ app.post("/api/ai/image", async (req, res) => {
       prompt,
       brandProfile,
       aspectRatio = "1:1",
-      model = "gemini-3-pro-image-preview",
       imageSize = "1K",
       productImages,
       styleReferenceImage,
     } = req.body;
+    const model = DEFAULT_IMAGE_MODEL;
 
     if (!prompt || !brandProfile) {
       return res
@@ -3250,10 +3246,11 @@ app.post("/api/ai/image", async (req, res) => {
       brandProfile,
       !!styleReferenceImage,
     );
+
     const imageDataUrl = await generateGeminiImage(
       fullPrompt,
       aspectRatio,
-      model,
+      DEFAULT_IMAGE_MODEL,
       imageSize,
       productImages,
       styleReferenceImage,
@@ -3264,7 +3261,7 @@ app.post("/api/ai/image", async (req, res) => {
     res.json({
       success: true,
       imageUrl: imageDataUrl,
-      model,
+      model: DEFAULT_IMAGE_MODEL,
     });
   } catch (error) {
     console.error("[Image API] Error:", error);
@@ -3291,7 +3288,7 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
     const systemPrompt = getVideoPromptSystemPrompt(duration, aspectRatio);
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: DEFAULT_FAST_TEXT_MODEL,
       contents: [
         {
           role: "user",
@@ -3349,7 +3346,7 @@ app.post("/api/ai/text", async (req, res) => {
 
     console.log(`[Text API] Generating ${type} text...`);
 
-    const model = brandProfile.creativeModel || "gemini-3-pro-preview";
+    const model = brandProfile.creativeModel || DEFAULT_TEXT_MODEL;
     const isOpenRouter = model.includes("/");
 
     let result;
@@ -3493,7 +3490,7 @@ app.post("/api/ai/edit-image", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-image-preview",
+      model: DEFAULT_IMAGE_MODEL,
       contents: { parts },
       config: { imageConfig: { imageSize: "1K" } },
     });
@@ -3548,7 +3545,7 @@ app.post("/api/ai/extract-colors", async (req, res) => {
     };
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: DEFAULT_TEXT_MODEL,
       contents: {
         parts: [
           {
@@ -3712,7 +3709,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
     res.setHeader("Connection", "keep-alive");
 
     const stream = await ai.models.generateContentStream({
-      model: "gemini-3-pro-preview",
+      model: DEFAULT_ASSISTANT_MODEL,
       contents: history,
       config: {
         systemInstruction,
@@ -3802,7 +3799,8 @@ async function generateVideoWithGoogleVeo(
   if (hasLastFrame) {
     const lastFrameResponse = await fetch(lastFrameUrl);
     const lastFrameArrayBuffer = await lastFrameResponse.arrayBuffer();
-    const lastFrameBase64 = Buffer.from(lastFrameArrayBuffer).toString("base64");
+    const lastFrameBase64 =
+      Buffer.from(lastFrameArrayBuffer).toString("base64");
     const lastFrameContentType =
       lastFrameResponse.headers.get("content-type") || "image/jpeg";
     generateParams.lastFrame = {
@@ -3915,17 +3913,20 @@ app.post("/api/ai/video", async (req, res) => {
         );
         console.log("[Video API] Falling back to FAL.ai image-to-video...");
         // Fallback to FAL.ai without interpolation
-        const result = await fal.subscribe("fal-ai/veo3.1/fast/image-to-video", {
-          input: {
-            prompt,
-            image_url: imageUrl,
-            aspect_ratio: aspectRatio,
-            duration: "8s",
-            resolution: "720p",
-            generate_audio: true,
+        const result = await fal.subscribe(
+          "fal-ai/veo3.1/fast/image-to-video",
+          {
+            input: {
+              prompt,
+              image_url: imageUrl,
+              aspect_ratio: aspectRatio,
+              duration: "8s",
+              resolution: "720p",
+              generate_audio: true,
+            },
+            logs: true,
           },
-          logs: true,
-        });
+        );
         videoUrl = result?.data?.video?.url || result?.video?.url || "";
       }
     } else {

@@ -250,10 +250,8 @@ function AppContent() {
   );
 
   // Instagram accounts for multi-tenant publishing
-  const {
-    accounts: instagramAccounts,
-    fetchAccounts: fetchInstagramAccounts,
-  } = useInstagramAccounts(userId || '', organizationId);
+  const { accounts: instagramAccounts, fetchAccounts: fetchInstagramAccounts } =
+    useInstagramAccounts(userId || "", organizationId);
 
   // Fetch Instagram accounts on mount
   useEffect(() => {
@@ -264,11 +262,11 @@ function AppContent() {
 
   // Get active Instagram context (first active account)
   const getInstagramContext = (): InstagramContext | undefined => {
-    const activeAccount = instagramAccounts.find(a => a.is_active);
+    const activeAccount = instagramAccounts.find((a) => a.is_active);
     if (activeAccount && userId) {
       return {
         instagramAccountId: activeAccount.id,
-        userId: userId
+        userId: userId,
       };
     }
     return undefined;
@@ -392,27 +390,37 @@ function AppContent() {
     Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>
   >(() => {
     // Load from localStorage on init
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       try {
-        const saved = localStorage.getItem('dailyFlyerState');
+        const saved = localStorage.getItem("dailyFlyerState");
         if (saved) {
           const parsed = JSON.parse(saved);
           // Filter out "loading" items (they shouldn't be persisted)
           const filtered: Record<string, Record<string, GalleryImage[]>> = {};
           Object.entries(parsed).forEach(([day, periods]) => {
-            if (periods && typeof periods === 'object') {
+            if (periods && typeof periods === "object") {
               filtered[day] = {};
-              Object.entries(periods as Record<string, unknown[]>).forEach(([period, flyers]) => {
-                if (Array.isArray(flyers)) {
-                  filtered[day][period] = flyers.filter(f => f !== "loading") as GalleryImage[];
-                }
-              });
+              Object.entries(periods as Record<string, unknown[]>).forEach(
+                ([period, flyers]) => {
+                  if (Array.isArray(flyers)) {
+                    filtered[day][period] = flyers.filter(
+                      (f) => f !== "loading",
+                    ) as GalleryImage[];
+                  }
+                },
+              );
             }
           });
-          return filtered as Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>;
+          return filtered as Record<
+            string,
+            Record<TimePeriod, (GalleryImage | "loading")[]>
+          >;
         }
       } catch (e) {
-        console.warn('[App] Failed to load dailyFlyerState from localStorage:', e);
+        console.warn(
+          "[App] Failed to load dailyFlyerState from localStorage:",
+          e,
+        );
       }
     }
     return {};
@@ -480,31 +488,47 @@ function AppContent() {
 
       // Check if it's the new structure (by day) or old structure (by period only)
       const firstKey = Object.keys(mapping)[0];
-      const dayOrder = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+      const dayOrder = [
+        "MONDAY",
+        "TUESDAY",
+        "WEDNESDAY",
+        "THURSDAY",
+        "FRIDAY",
+        "SATURDAY",
+        "SUNDAY",
+      ];
       const isNewStructure = firstKey && dayOrder.includes(firstKey);
 
       if (isNewStructure) {
         // New structure: { DAY: { PERIOD: [ids] } }
         Object.entries(mapping).forEach(([day, periods]) => {
-          if (periods && typeof periods === 'object') {
-            newState[day] = { ALL: [], MORNING: [], AFTERNOON: [], NIGHT: [], HIGHLIGHTS: [] };
-            Object.entries(periods as Record<string, string[]>).forEach(([period, ids]) => {
-              if (Array.isArray(ids)) {
-                ids.forEach((id) => {
-                  const image = galleryImages.find((img) => img.id === id);
-                  if (image) {
-                    newState[day][period as TimePeriod].push(image);
-                  }
-                });
-              }
-            });
+          if (periods && typeof periods === "object") {
+            newState[day] = {
+              ALL: [],
+              MORNING: [],
+              AFTERNOON: [],
+              NIGHT: [],
+              HIGHLIGHTS: [],
+            };
+            Object.entries(periods as Record<string, string[]>).forEach(
+              ([period, ids]) => {
+                if (Array.isArray(ids)) {
+                  ids.forEach((id) => {
+                    const image = galleryImages.find((img) => img.id === id);
+                    if (image) {
+                      newState[day][period as TimePeriod].push(image);
+                    }
+                  });
+                }
+              },
+            );
           }
         });
       }
 
       // Only update if we found any matches
       const hasImages = Object.values(newState).some((dayData) =>
-        Object.values(dayData).some((arr) => arr.length > 0)
+        Object.values(dayData).some((arr) => arr.length > 0),
       );
       if (hasImages) {
         hasRestoredDailyFlyersRef.current = true;
@@ -521,10 +545,17 @@ function AppContent() {
     // Don't save during initial restore
     if (!hasRestoredDailyFlyersRef.current) {
       // Check if there's something to save (user generated new flyers)
-      const hasRealImages = Object.values(dailyFlyerState).some((dayData) =>
-        dayData && typeof dayData === 'object' && Object.values(dayData).some(
-          (arr) => Array.isArray(arr) && arr.some((item) => item !== "loading" && typeof item === "object")
-        )
+      const hasRealImages = Object.values(dailyFlyerState).some(
+        (dayData) =>
+          dayData &&
+          typeof dayData === "object" &&
+          Object.values(dayData).some(
+            (arr) =>
+              Array.isArray(arr) &&
+              arr.some(
+                (item) => item !== "loading" && typeof item === "object",
+              ),
+          ),
       );
       if (hasRealImages) {
         hasRestoredDailyFlyersRef.current = true; // Mark as ready to save
@@ -536,12 +567,15 @@ function AppContent() {
     // Extract just the IDs for each day/period
     const mapping: Record<string, Record<string, string[]>> = {};
     Object.entries(dailyFlyerState).forEach(([day, periods]) => {
-      if (periods && typeof periods === 'object') {
+      if (periods && typeof periods === "object") {
         mapping[day] = {};
         Object.entries(periods).forEach(([period, images]) => {
           if (Array.isArray(images)) {
             mapping[day][period] = images
-              .filter((img): img is GalleryImage => img !== "loading" && typeof img === "object")
+              .filter(
+                (img): img is GalleryImage =>
+                  img !== "loading" && typeof img === "object",
+              )
               .map((img) => img.id);
           }
         });
@@ -550,7 +584,7 @@ function AppContent() {
 
     // Only save if there's at least one image
     const hasAnyImages = Object.values(mapping).some((dayData) =>
-      Object.values(dayData).some((ids) => ids.length > 0)
+      Object.values(dayData).some((ids) => ids.length > 0),
     );
     if (hasAnyImages) {
       localStorage.setItem("dailyFlyerMapping", JSON.stringify(mapping));
@@ -825,7 +859,9 @@ function AppContent() {
         }, 100);
       } else {
         // Post is saved and scheduled - will need manual publish when time comes
-        console.log(`[Schedule] Post ${dbPost.id} scheduled for ${new Date(post.scheduledTimestamp).toISOString()}`);
+        console.log(
+          `[Schedule] Post ${dbPost.id} scheduled for ${new Date(post.scheduledTimestamp).toISOString()}`,
+        );
       }
     } catch (e) {
       console.error("Failed to schedule post:", e);
@@ -858,9 +894,12 @@ function AppContent() {
         dbUpdates.scheduled_time = updates.scheduledTime;
 
       // If date or time changed, recalculate the timestamp
-      if (updates.scheduledDate !== undefined || updates.scheduledTime !== undefined) {
+      if (
+        updates.scheduledDate !== undefined ||
+        updates.scheduledTime !== undefined
+      ) {
         // Find current post to get existing date/time if one is missing
-        const currentPost = swrScheduledPosts?.find(p => p.id === postId);
+        const currentPost = swrScheduledPosts?.find((p) => p.id === postId);
         const newDate = updates.scheduledDate ?? currentPost?.scheduled_date;
         const newTime = updates.scheduledTime ?? currentPost?.scheduled_time;
         if (newDate && newTime) {
@@ -926,7 +965,9 @@ function AppContent() {
       // Step 4: Publish to Instagram with progress tracking
       const instagramContext = getInstagramContext();
       if (!instagramContext) {
-        throw new Error('Conecte sua conta Instagram em Configurações → Integrações para publicar.');
+        throw new Error(
+          "Conecte sua conta Instagram em Configurações → Integrações para publicar.",
+        );
       }
 
       const result = await publishToInstagram(
@@ -940,7 +981,7 @@ function AppContent() {
           }));
         },
         instagramContext,
-        post.carouselImageUrls
+        post.carouselImageUrls,
       );
 
       if (result.success) {
@@ -1042,7 +1083,10 @@ function AppContent() {
           r.createdAt = savedCampaign.created_at;
 
           // Map database IDs to local state for video_script_id linking
-          if (savedCampaign.video_clip_scripts && savedCampaign.video_clip_scripts.length > 0) {
+          if (
+            savedCampaign.video_clip_scripts &&
+            savedCampaign.video_clip_scripts.length > 0
+          ) {
             r.videoClipScripts = r.videoClipScripts.map((clip, index) => ({
               ...clip,
               id: savedCampaign.video_clip_scripts[index]?.id,
@@ -1054,7 +1098,10 @@ function AppContent() {
               id: savedCampaign.posts[index]?.id,
             }));
           }
-          if (savedCampaign.ad_creatives && savedCampaign.ad_creatives.length > 0) {
+          if (
+            savedCampaign.ad_creatives &&
+            savedCampaign.ad_creatives.length > 0
+          ) {
             r.adCreatives = r.adCreatives.map((ad, index) => ({
               ...ad,
               id: savedCampaign.ad_creatives[index]?.id,
@@ -1064,10 +1111,16 @@ function AppContent() {
           // Update SWR cache for campaigns list
           swrAddCampaign(savedCampaign);
 
-          console.log("[Campaign] Saved to database with IDs:", savedCampaign.id,
-            "clips:", r.videoClipScripts.map(c => c.id),
-            "posts:", r.posts.map(p => p.id),
-            "ads:", r.adCreatives.map(a => a.id));
+          console.log(
+            "[Campaign] Saved to database with IDs:",
+            savedCampaign.id,
+            "clips:",
+            r.videoClipScripts.map((c) => c.id),
+            "posts:",
+            r.posts.map((p) => p.id),
+            "ads:",
+            r.adCreatives.map((a) => a.id),
+          );
         } catch (saveError) {
           console.error("[Campaign] Failed to save to database:", saveError);
           // Continue even if save fails - campaign is still in memory
