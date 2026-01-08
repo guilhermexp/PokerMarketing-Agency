@@ -258,11 +258,9 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
     );
   };
 
-  // Get truncated title for scene source
+  // Get truncated title for scene source - must match ClipsTab (35 chars)
   const getSceneSource = (clipTitle: string, sceneNumber: number) => {
-    const maxLen = 50 - "Cena--99".length;
-    const truncated =
-      clipTitle.length > maxLen ? clipTitle.slice(0, maxLen) : clipTitle;
+    const truncated = clipTitle.substring(0, 35);
     return `Cena-${truncated}-${sceneNumber}`;
   };
 
