@@ -3056,7 +3056,7 @@ app.post("/api/upload", async (req, res) => {
 // AI Campaign Generation
 app.post("/api/ai/campaign", async (req, res) => {
   try {
-    const { brandProfile, transcript, options, productImages } = req.body;
+    const { brandProfile, transcript, options, productImages, inspirationImages, collabLogo, compositionAssets } = req.body;
 
     if (!brandProfile || !transcript || !options) {
       return res.status(400).json({
@@ -3069,6 +3069,12 @@ app.post("/api/ai/campaign", async (req, res) => {
       "[Campaign API] Options received:",
       JSON.stringify(options, null, 2),
     );
+    console.log("[Campaign API] Images:", {
+      productImages: productImages?.length || 0,
+      inspirationImages: inspirationImages?.length || 0,
+      collabLogo: !!collabLogo,
+      compositionAssets: compositionAssets?.length || 0,
+    });
 
     // Model selection - config in config/ai-models.ts
     // OpenRouter models have "/" in their ID (e.g., "openai/gpt-5.2")
@@ -3084,17 +3090,23 @@ app.post("/api/ai/campaign", async (req, res) => {
       getToneText(brandProfile, "campaigns"),
     );
 
+    // Collect all images for vision models
+    const allImages = [];
+    if (productImages) allImages.push(...productImages);
+    if (inspirationImages) allImages.push(...inspirationImages);
+    if (collabLogo) allImages.push(collabLogo);
+    if (compositionAssets) allImages.push(...compositionAssets);
+
     let result;
 
     if (isOpenRouter) {
       const textParts = [prompt];
-      const imageParts = productImages || [];
 
-      if (imageParts.length > 0) {
+      if (allImages.length > 0) {
         result = await generateTextWithOpenRouterVision(
           model,
           textParts,
-          imageParts,
+          allImages,
           0.7,
         );
       } else {
@@ -3103,8 +3115,8 @@ app.post("/api/ai/campaign", async (req, res) => {
     } else {
       const parts = [{ text: prompt }];
 
-      if (productImages) {
-        productImages.forEach((img) => {
+      if (allImages.length > 0) {
+        allImages.forEach((img) => {
           parts.push({
             inlineData: { mimeType: img.mimeType, data: img.base64 },
           });

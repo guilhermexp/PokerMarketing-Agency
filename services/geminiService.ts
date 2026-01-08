@@ -68,6 +68,8 @@ export const generateCampaign = async (
     options,
     productImages: input.productImages,
     inspirationImages: input.inspirationImages,
+    collabLogo: input.collabLogo,
+    compositionAssets: input.compositionAssets,
   });
 
   // Include the model used for generation

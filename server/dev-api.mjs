@@ -2760,7 +2760,7 @@ const quickPostSchema = {
 // AI Campaign Generation
 app.post("/api/ai/campaign", async (req, res) => {
   try {
-    const { brandProfile, transcript, options, productImages } = req.body;
+    const { brandProfile, transcript, options, productImages, inspirationImages, collabLogo, compositionAssets } = req.body;
 
     if (!brandProfile || !transcript || !options) {
       return res.status(400).json({
@@ -2769,6 +2769,19 @@ app.post("/api/ai/campaign", async (req, res) => {
     }
 
     console.log("[Campaign API] Generating campaign...");
+    console.log("[Campaign API] Images:", {
+      productImages: productImages?.length || 0,
+      inspirationImages: inspirationImages?.length || 0,
+      collabLogo: !!collabLogo,
+      compositionAssets: compositionAssets?.length || 0,
+    });
+
+    // Collect all images for vision models
+    const allImages = [];
+    if (productImages) allImages.push(...productImages);
+    if (inspirationImages) allImages.push(...inspirationImages);
+    if (collabLogo) allImages.push(collabLogo);
+    if (compositionAssets) allImages.push(...compositionAssets);
 
     // Model selection - config in config/ai-models.ts
     // OpenRouter models have "/" in their ID (e.g., "openai/gpt-5.2")
@@ -2825,13 +2838,12 @@ app.post("/api/ai/campaign", async (req, res) => {
 Responda APENAS com o JSON válido, sem texto adicional.`;
 
       const textParts = [jsonSchemaPrompt];
-      const imageParts = productImages || [];
 
-      if (imageParts.length > 0) {
+      if (allImages.length > 0) {
         result = await generateTextWithOpenRouterVision(
           model,
           textParts,
-          imageParts,
+          allImages,
           0.7,
         );
       } else {
@@ -2845,8 +2857,8 @@ Responda APENAS com o JSON válido, sem texto adicional.`;
     } else {
       const parts = [{ text: prompt }];
 
-      if (productImages) {
-        productImages.forEach((img) => {
+      if (allImages.length > 0) {
+        allImages.forEach((img) => {
           parts.push({
             inlineData: { mimeType: img.mimeType, data: img.base64 },
           });
