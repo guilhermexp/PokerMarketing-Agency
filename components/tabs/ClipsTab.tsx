@@ -39,6 +39,7 @@ import {
   concatenateVideos,
   downloadBlob,
   extractLastFrameFromVideo,
+  initFFmpeg,
   type ExportProgress,
   type VideoInput,
   type AudioInput,
@@ -764,6 +765,14 @@ const ClipCard: React.FC<ClipCardProps> = ({
     startTrimEnd: number;
     pxPerSec: number;
   } | null>(null);
+
+  useEffect(() => {
+    if (useFrameInterpolation && selectedVideoModel.includes("veo")) {
+      initFFmpeg().catch((err) => {
+        console.warn("[ClipsTab] Failed to preload FFmpeg:", err);
+      });
+    }
+  }, [useFrameInterpolation, selectedVideoModel]);
 
   const playheadDragRef = useRef<{
     startX: number;
