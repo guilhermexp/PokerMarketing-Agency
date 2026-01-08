@@ -34,8 +34,8 @@ import { GalleryView } from "./GalleryView";
 import { CalendarView } from "./calendar/CalendarView";
 import { CampaignsList } from "./CampaignsList";
 import { SchedulesListView } from "./SchedulesListView";
-import { OrganizationSwitcher } from "@clerk/clerk-react";
 import { QuickPostModal } from "./common/QuickPostModal";
+import { FloatingSidebar } from "./FloatingSidebar";
 import type { ScheduledPost } from "../types";
 
 type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar";
@@ -125,38 +125,6 @@ interface DashboardProps {
 
 type Tab = "clips" | "carrossel" | "posts" | "ads";
 
-interface NavItemProps {
-  icon: IconName;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  collapsed?: boolean;
-}
-
-const NavItem: React.FC<NavItemProps> = ({
-  icon,
-  label,
-  active,
-  onClick,
-  collapsed,
-}) => (
-  <button
-    onClick={onClick}
-    title={collapsed ? label : undefined}
-    className={`w-full flex items-center ${collapsed ? "justify-center" : "gap-3 px-3"} py-2.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-      active
-        ? "bg-white/[0.08] text-white"
-        : "text-white/40 hover:text-white/70 hover:bg-white/[0.04]"
-    }`}
-  >
-    <Icon
-      name={icon}
-      className={`w-4 h-4 flex-shrink-0 ${active ? "text-white" : "text-white/30"}`}
-    />
-    {!collapsed && <span>{label}</span>}
-  </button>
-);
-
 export const Dashboard: React.FC<DashboardProps> = (props) => {
   const {
     brandProfile,
@@ -219,35 +187,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
   const { signOut } = useClerk();
   const { campaigns } = useCampaigns(userId || null, organizationId);
   const [activeTab, setActiveTab] = useState<Tab>("clips");
-  const [isMobile, setIsMobile] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsedDesktop, setSidebarCollapsedDesktop] = useState(true);
   const [isInsideSchedule, setIsInsideSchedule] = useState(false);
   const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(
     null,
   );
-  const sidebarCollapsed = isMobile ? !sidebarOpen : sidebarCollapsedDesktop;
-
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mediaQuery = window.matchMedia("(max-width: 639px)");
-    const handleChange = () => setIsMobile(mediaQuery.matches);
-    handleChange();
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener("change", handleChange);
-      return () => mediaQuery.removeEventListener("change", handleChange);
-    }
-    mediaQuery.addListener(handleChange);
-    return () => mediaQuery.removeListener(handleChange);
-  }, []);
-
-  React.useEffect(() => {
-    if (isMobile) {
-      setSidebarOpen(false);
-    } else {
-      setSidebarOpen(true);
-    }
-  }, [isMobile]);
 
   // Format date string (handles both ISO and DD/MM formats)
   const formatDateDisplay = (dateStr: string) => {
@@ -282,232 +225,16 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
   return (
     <div className="min-h-[100dvh] md:h-screen flex overflow-hidden bg-black text-white font-sans selection:bg-primary selection:text-black">
-      <aside
-        className={`${sidebarCollapsed ? (isMobile ? "w-0 border-r-0 pointer-events-none" : "w-14 border-r border-white/[0.06]") : "w-52 border-r border-white/[0.06]"} bg-[#0a0a0a] flex flex-col flex-shrink-0 overflow-hidden z-20 transition-all duration-300`}
-      >
-        {sidebarCollapsed ? (
-          !isMobile && (
-            <>
-              {/* Collapsed Header */}
-              <div className="h-14 flex items-center justify-center flex-shrink-0 border-b border-white/[0.04]">
-                <button
-                  onClick={() => setSidebarCollapsedDesktop(false)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors overflow-hidden"
-                  title="Abrir menu"
-                >
-                  <img
-                    src="/icon.png"
-                    alt="Socialab"
-                    className="h-8 w-8 rounded-lg"
-                  />
-                </button>
-              </div>
+      {/* Floating Sidebar - Desktop only */}
+      <FloatingSidebar
+        activeView={activeView}
+        onViewChange={onViewChange}
+        brandProfile={brandProfile}
+        onEditProfile={onEditProfile}
+        onSignOut={() => signOut()}
+      />
 
-              {/* Navigation */}
-              <nav className="flex-grow px-2 py-3 space-y-0.5">
-                <NavItem
-                  icon="zap"
-                  label="Direct"
-                  active={activeView === "campaign"}
-                  onClick={() => onViewChange("campaign")}
-                  collapsed
-                />
-                <NavItem
-                  icon="layers"
-                  label="Campanhas"
-                  active={activeView === "campaigns"}
-                  onClick={() => onViewChange("campaigns")}
-                  collapsed
-                />
-                <NavItem
-                  icon="image"
-                  label="Flyers"
-                  active={activeView === "flyer"}
-                  onClick={() => onViewChange("flyer")}
-                  collapsed
-                />
-                <NavItem
-                  icon="calendar"
-                  label="Agenda"
-                  active={activeView === "calendar"}
-                  onClick={() => onViewChange("calendar")}
-                  collapsed
-                />
-                <NavItem
-                  icon="layout"
-                  label="Galeria"
-                  active={activeView === "gallery"}
-                  onClick={() => onViewChange("gallery")}
-                  collapsed
-                />
-              </nav>
-
-              {/* Footer */}
-              <div className="p-2 border-t border-white/[0.04] space-y-1.5">
-                <button
-                  onClick={onEditProfile}
-                  title={brandProfile.name}
-                  className="w-full flex justify-center py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
-                >
-                  {brandProfile.logo ? (
-                    <img
-                      src={brandProfile.logo}
-                      alt="Logo"
-                      className="h-5 w-5 rounded object-cover"
-                    />
-                  ) : (
-                    <span className="text-[9px] font-bold text-white/50">
-                      {brandProfile.name.substring(0, 2).toUpperCase()}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => signOut()}
-                  title="Sair"
-                  className="w-full flex justify-center py-2 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                >
-                  <Icon name="log-out" className="w-4 h-4" />
-                </button>
-              </div>
-            </>
-          )
-        ) : (
-          <>
-            {/* Header */}
-            <div className="h-14 flex items-center justify-between px-3 flex-shrink-0 border-b border-white/[0.04]">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  <img
-                    src="/icon.png"
-                    alt="Socialab"
-                    className="h-9 w-9 rounded-xl"
-                  />
-                </div>
-                <span className="text-sm font-semibold text-white/80">
-                  Socialab
-                </span>
-              </div>
-              <button
-                onClick={() =>
-                  isMobile
-                    ? setSidebarOpen(false)
-                    : setSidebarCollapsedDesktop(true)
-                }
-                className="p-1.5 text-white/20 hover:text-white/50 hover:bg-white/[0.04] rounded-md transition-all"
-              >
-                <Icon name="chevron-left" className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Navigation */}
-            <nav className="flex-grow px-2 py-3 space-y-0.5">
-              <NavItem
-                icon="zap"
-                label="Direct"
-                active={activeView === "campaign"}
-                onClick={() => {
-                  onViewChange("campaign");
-                  if (isMobile) setSidebarOpen(false);
-                }}
-                collapsed={false}
-              />
-              <NavItem
-                icon="layers"
-                label="Campanhas"
-                active={activeView === "campaigns"}
-                onClick={() => {
-                  onViewChange("campaigns");
-                  if (isMobile) setSidebarOpen(false);
-                }}
-                collapsed={false}
-              />
-              <NavItem
-                icon="image"
-                label="Flyers"
-                active={activeView === "flyer"}
-                onClick={() => {
-                  onViewChange("flyer");
-                  if (isMobile) setSidebarOpen(false);
-                }}
-                collapsed={false}
-              />
-              <NavItem
-                icon="calendar"
-                label="Agenda"
-                active={activeView === "calendar"}
-                onClick={() => {
-                  onViewChange("calendar");
-                  if (isMobile) setSidebarOpen(false);
-                }}
-                collapsed={false}
-              />
-              <NavItem
-                icon="layout"
-                label="Galeria"
-                active={activeView === "gallery"}
-                onClick={() => {
-                  onViewChange("gallery");
-                  if (isMobile) setSidebarOpen(false);
-                }}
-                collapsed={false}
-              />
-            </nav>
-
-            {/* Footer */}
-            <div className="p-2 border-t border-white/[0.04] space-y-1.5">
-              <OrganizationSwitcher
-                hidePersonal={false}
-                afterCreateOrganizationUrl="/"
-                afterLeaveOrganizationUrl="/"
-                afterSelectOrganizationUrl="/"
-                appearance={{
-                  elements: {
-                    rootBox: "w-full",
-                    organizationSwitcherTrigger:
-                      "w-full flex items-center gap-2 px-2 py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors text-white/70 text-xs",
-                    organizationSwitcherPopoverCard:
-                      "bg-[#0a0a0a] border border-white/10 rounded-xl shadow-2xl",
-                    organizationSwitcherPopoverActions: "bg-[#0a0a0a]",
-                    organizationSwitcherPopoverActionButton:
-                      "text-white/70 hover:bg-white/5",
-                    organizationPreview: "text-white",
-                    organizationSwitcherPopoverFooter: "border-white/10",
-                  },
-                }}
-              />
-              <button
-                onClick={onEditProfile}
-                className="w-full flex items-center gap-2 py-2 px-2 bg-white/[0.03] hover:bg-white/[0.06] rounded-lg transition-colors"
-              >
-                {brandProfile.logo ? (
-                  <img
-                    src={brandProfile.logo}
-                    alt="Logo"
-                    className="h-6 w-6 rounded object-cover flex-shrink-0"
-                  />
-                ) : (
-                  <div className="h-6 w-6 rounded bg-white/10 flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-white/60">
-                    {brandProfile.name.substring(0, 2).toUpperCase()}
-                  </div>
-                )}
-                <span className="text-[10px] font-medium text-white/50 truncate flex-1 text-left">
-                  {brandProfile.name}
-                </span>
-                <Icon name="settings" className="w-3.5 h-3.5 text-white/20" />
-              </button>
-              <button
-                onClick={() => signOut()}
-                className="w-full flex items-center gap-2 py-2 px-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-              >
-                <Icon name="log-out" className="w-4 h-4" />
-                <span className="text-[10px] font-medium">Sair</span>
-              </button>
-            </div>
-          </>
-        )}
-      </aside>
-
-      <main className="flex-1 overflow-y-auto relative z-10 bg-[#070707] pb-[env(safe-area-inset-bottom)]">
+      <main className="flex-1 overflow-y-auto relative z-10 bg-[#070707] pb-16 sm:pb-[env(safe-area-inset-bottom)] sm:pl-16">
         {activeView === "campaign" && (
           <div className="px-4 py-4 sm:px-6 sm:py-5">
             {showUploadForm && (
@@ -797,8 +524,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         referenceImage={chatReferenceImage}
         onClearReference={() => onSetChatReference(null)}
       />
+      {/* Assistant Toggle Button - Desktop */}
       {!isAssistantOpen && (
-        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
+        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 hidden sm:block">
           <button
             onClick={onToggleAssistant}
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-105 bg-white/10 backdrop-blur-xl text-white/60 hover:text-white border border-white/5"
@@ -807,21 +535,32 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           </button>
         </div>
       )}
-      {isMobile && !sidebarOpen && (
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="fixed top-4 left-4 z-40 w-10 h-10 rounded-xl bg-white/10 backdrop-blur-xl text-white/60 hover:text-white border border-white/5 flex items-center justify-center transition-all sm:hidden"
-        >
-          <Icon name="chevron-right" className="w-4 h-4" />
-        </button>
-      )}
-      {isMobile && sidebarOpen && (
-        <button
-          onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-10 bg-black/60 sm:hidden"
-          aria-label="Fechar menu"
-        />
-      )}
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-[#0a0a0a] border-t border-white/[0.08] safe-area-pb">
+        <div className="flex items-center justify-around px-2 py-2">
+          {[
+            { icon: "zap" as IconName, label: "Direct", key: "campaign" as View },
+            { icon: "layers" as IconName, label: "Campanhas", key: "campaigns" as View },
+            { icon: "image" as IconName, label: "Flyers", key: "flyer" as View },
+            { icon: "calendar" as IconName, label: "Agenda", key: "calendar" as View },
+            { icon: "layout" as IconName, label: "Galeria", key: "gallery" as View },
+          ].map((item) => (
+            <button
+              key={item.key}
+              onClick={() => onViewChange(item.key)}
+              className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-lg transition-all ${
+                activeView === item.key
+                  ? "text-white"
+                  : "text-white/40"
+              }`}
+            >
+              <Icon name={item.icon} className="w-5 h-5" />
+              <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
 
       {/* QuickPost Modal for Gallery */}
       {quickPostImage && (

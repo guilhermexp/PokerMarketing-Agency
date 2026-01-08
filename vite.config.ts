@@ -106,6 +106,8 @@ export default defineConfig(({ mode }) => {
           cleanupOutdatedCaches: true,
           // Add cache busting - use revision based on build time
           additionalManifestEntries: [],
+          // Allow larger files to be cached (default is 2MB)
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
         },
         devOptions: {
           enabled: true,
