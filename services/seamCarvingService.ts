@@ -9,6 +9,10 @@
 type Color = [number, number, number, number]; // RGBA
 type EnergyMap = number[][];
 type Seam = { x: number; y: number }[];
+type ProtectionMask = boolean[][]; // true = protected, false = not protected
+
+// Very high energy value to protect marked areas from removal
+const PROTECTION_ENERGY = 1000000;
 
 // Get pixel color at coordinates
 function getPixel(img: ImageData, x: number, y: number): Color {
@@ -45,7 +49,10 @@ function getPixelEnergy(
 }
 
 // Calculate energy map for vertical seams (left-right neighbors)
-function calculateEnergyMapVertical(img: ImageData): EnergyMap {
+function calculateEnergyMapVertical(
+  img: ImageData,
+  protectionMask?: ProtectionMask
+): EnergyMap {
   const { width, height } = img;
   const energyMap: EnergyMap = [];
 
@@ -55,7 +62,14 @@ function calculateEnergyMapVertical(img: ImageData): EnergyMap {
       const left = x > 0 ? getPixel(img, x - 1, y) : null;
       const middle = getPixel(img, x, y);
       const right = x < width - 1 ? getPixel(img, x + 1, y) : null;
-      energyMap[y][x] = getPixelEnergy(left, middle, right);
+      let energy = getPixelEnergy(left, middle, right);
+
+      // Add protection energy if pixel is protected
+      if (protectionMask && protectionMask[y] && protectionMask[y][x]) {
+        energy += PROTECTION_ENERGY;
+      }
+
+      energyMap[y][x] = energy;
     }
   }
 
@@ -63,7 +77,10 @@ function calculateEnergyMapVertical(img: ImageData): EnergyMap {
 }
 
 // Calculate energy map for horizontal seams (top-bottom neighbors)
-function calculateEnergyMapHorizontal(img: ImageData): EnergyMap {
+function calculateEnergyMapHorizontal(
+  img: ImageData,
+  protectionMask?: ProtectionMask
+): EnergyMap {
   const { width, height } = img;
   const energyMap: EnergyMap = [];
 
@@ -73,7 +90,14 @@ function calculateEnergyMapHorizontal(img: ImageData): EnergyMap {
       const top = y > 0 ? getPixel(img, x, y - 1) : null;
       const middle = getPixel(img, x, y);
       const bottom = y < height - 1 ? getPixel(img, x, y + 1) : null;
-      energyMap[y][x] = getPixelEnergy(top, middle, bottom);
+      let energy = getPixelEnergy(top, middle, bottom);
+
+      // Add protection energy if pixel is protected
+      if (protectionMask && protectionMask[y] && protectionMask[y][x]) {
+        energy += PROTECTION_ENERGY;
+      }
+
+      energyMap[y][x] = energy;
     }
   }
 
@@ -240,14 +264,108 @@ function deleteHorizontalSeam(img: ImageData, seam: Seam): ImageData {
   return new ImageData(newData, width, newHeight);
 }
 
+// Delete vertical seam from protection mask (reduces width by 1)
+function deleteVerticalSeamFromMask(
+  mask: ProtectionMask,
+  seam: Seam
+): ProtectionMask {
+  const height = mask.length;
+  const newMask: ProtectionMask = [];
+
+  for (let y = 0; y < height; y++) {
+    const seamX = seam[y].x;
+    newMask[y] = [];
+    let newX = 0;
+
+    for (let x = 0; x < mask[y].length; x++) {
+      if (x === seamX) continue;
+      newMask[y][newX] = mask[y][x];
+      newX++;
+    }
+  }
+
+  return newMask;
+}
+
+// Delete horizontal seam from protection mask (reduces height by 1)
+function deleteHorizontalSeamFromMask(
+  mask: ProtectionMask,
+  seam: Seam
+): ProtectionMask {
+  const width = mask[0]?.length || 0;
+  const newMask: ProtectionMask = [];
+
+  // Create a set of y coordinates to remove for each x
+  const seamYByX: Map<number, number> = new Map();
+  for (const point of seam) {
+    seamYByX.set(point.x, point.y);
+  }
+
+  // Reconstruct mask without seam rows
+  let newY = 0;
+  for (let y = 0; y < mask.length; y++) {
+    // Check if this row should be removed at any x
+    // For horizontal seams, we need to remove different y for each x
+    const newRow: boolean[] = [];
+    let skipRow = true;
+
+    for (let x = 0; x < width; x++) {
+      const seamY = seamYByX.get(x);
+      if (seamY !== y) {
+        skipRow = false;
+      }
+    }
+
+    if (skipRow) continue;
+
+    // Copy row, skipping seam points
+    for (let x = 0; x < width; x++) {
+      const seamY = seamYByX.get(x);
+      if (seamY === y) {
+        // Skip this point, but we need to handle this differently
+        // For horizontal seams, each column removes a different row
+      }
+      newRow[x] = mask[y]?.[x] || false;
+    }
+    newMask[newY] = newRow;
+    newY++;
+  }
+
+  // Simpler approach: rebuild column by column
+  const height = mask.length;
+  const resultMask: ProtectionMask = [];
+  const newHeight = height - 1;
+
+  for (let y = 0; y < newHeight; y++) {
+    resultMask[y] = [];
+  }
+
+  for (let x = 0; x < width; x++) {
+    const seamY = seamYByX.get(x) ?? -1;
+    let destY = 0;
+
+    for (let y = 0; y < height; y++) {
+      if (y === seamY) continue;
+      if (destY < newHeight) {
+        resultMask[destY][x] = mask[y]?.[x] || false;
+        destY++;
+      }
+    }
+  }
+
+  return resultMask;
+}
+
 // Main function: resize image using seam carving
 export async function resizeImageContentAware(
   imageData: ImageData,
   targetWidth: number,
   targetHeight: number,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  protectionMask?: ProtectionMask
 ): Promise<ImageData> {
   let currentImage = imageData;
+  let currentMask = protectionMask;
   const originalWidth = imageData.width;
   const originalHeight = imageData.height;
 
@@ -265,9 +383,14 @@ export async function resizeImageContentAware(
   // Remove vertical seams (reduce width)
   if (widthDiff > 0) {
     for (let i = 0; i < widthDiff; i++) {
-      const energyMap = calculateEnergyMapVertical(currentImage);
+      const energyMap = calculateEnergyMapVertical(currentImage, currentMask);
       const seam = findLowEnergySeamVertical(energyMap);
       currentImage = deleteVerticalSeam(currentImage, seam);
+
+      // Update protection mask if present
+      if (currentMask) {
+        currentMask = deleteVerticalSeamFromMask(currentMask, seam);
+      }
 
       seamsRemoved++;
       if (onProgress) {
@@ -284,9 +407,14 @@ export async function resizeImageContentAware(
   // Remove horizontal seams (reduce height)
   if (heightDiff > 0) {
     for (let i = 0; i < heightDiff; i++) {
-      const energyMap = calculateEnergyMapHorizontal(currentImage);
+      const energyMap = calculateEnergyMapHorizontal(currentImage, currentMask);
       const seam = findLowEnergySeamHorizontal(energyMap);
       currentImage = deleteHorizontalSeam(currentImage, seam);
+
+      // Update protection mask if present
+      if (currentMask) {
+        currentMask = deleteHorizontalSeamFromMask(currentMask, seam);
+      }
 
       seamsRemoved++;
       if (onProgress) {
@@ -351,3 +479,42 @@ export function imageDataToBase64(
   const base64 = dataUrl.split(",")[1];
   return { base64, mimeType };
 }
+
+// Helper: Create protection mask from canvas
+export function createProtectionMaskFromCanvas(
+  canvas: HTMLCanvasElement
+): ProtectionMask | null {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const { width, height } = canvas;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const { data } = imageData;
+
+  // Check if canvas has any drawing
+  let hasDrawing = false;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] > 0) {
+      hasDrawing = true;
+      break;
+    }
+  }
+
+  if (!hasDrawing) return null;
+
+  // Create protection mask
+  const mask: ProtectionMask = [];
+  for (let y = 0; y < height; y++) {
+    mask[y] = [];
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      // Consider pixel protected if alpha > 0 (any drawing)
+      mask[y][x] = data[idx + 3] > 0;
+    }
+  }
+
+  return mask;
+}
+
+// Export type for external use
+export type { ProtectionMask };

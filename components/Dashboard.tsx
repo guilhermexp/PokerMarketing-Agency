@@ -344,6 +344,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       galleryImages={galleryImages}
                       brandProfile={brandProfile}
                       onAddImageToGallery={onAddImageToGallery}
+                      onUpdateGalleryImage={onUpdateGalleryImage}
+                      onSetChatReference={onSetChatReference}
                     />
                   )}
                   {activeTab === "posts" && (

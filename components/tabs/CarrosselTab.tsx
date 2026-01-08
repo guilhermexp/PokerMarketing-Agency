@@ -7,6 +7,7 @@ import type {
 } from "../../types";
 import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
+import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import { generateImage } from "../../services/geminiService";
 import { uploadImageToBlob } from "../../services/blobService";
 import { urlToBase64 } from "../../utils/imageHelpers";
@@ -18,19 +19,52 @@ interface CarouselPreviewProps {
   images: GalleryImage[];
   onReorder: (newOrder: GalleryImage[]) => void;
   clipTitle: string;
+  onOpenEditor?: (image: GalleryImage) => void;
 }
 
 const CarouselPreview: React.FC<CarouselPreviewProps> = ({
   images,
   onReorder,
   clipTitle,
+  onOpenEditor,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  // Image position offset (for panning) - stored per image index
+  const [imageOffsets, setImageOffsets] = useState<Record<number, number>>({});
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStartY, setPanStartY] = useState(0);
+  const [panStartOffset, setPanStartOffset] = useState(0);
 
   const goToSlide = (index: number) => {
     setCurrentIndex(Math.max(0, Math.min(index, images.length - 1)));
+  };
+
+  // Get current image offset (0-100, where 50 is center)
+  const getCurrentOffset = () => imageOffsets[currentIndex] ?? 50;
+
+  // Pan handlers for the preview image
+  const handlePanStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsPanning(true);
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    setPanStartY(clientY);
+    setPanStartOffset(getCurrentOffset());
+  };
+
+  const handlePanMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isPanning) return;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    const deltaY = clientY - panStartY;
+    // Convert pixel movement to percentage (negative = image moves up, showing bottom)
+    const sensitivity = 0.5; // Adjust sensitivity
+    const newOffset = Math.max(0, Math.min(100, panStartOffset + deltaY * sensitivity));
+    setImageOffsets((prev) => ({ ...prev, [currentIndex]: newOffset }));
+  };
+
+  const handlePanEnd = () => {
+    setIsPanning(false);
   };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -87,29 +121,53 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               <Icon name="more-horizontal" className="w-4 h-4 text-white/60" />
             </div>
 
-            {/* Carousel Image */}
-            <div className="relative aspect-[4/5] bg-black">
+            {/* Carousel Image - Draggable for positioning */}
+            <div
+              className={`relative aspect-[4/5] bg-black overflow-hidden ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
+              onMouseDown={handlePanStart}
+              onMouseMove={handlePanMove}
+              onMouseUp={handlePanEnd}
+              onMouseLeave={handlePanEnd}
+              onTouchStart={handlePanStart}
+              onTouchMove={handlePanMove}
+              onTouchEnd={handlePanEnd}
+            >
               <img
                 src={images[currentIndex]?.src}
                 alt={`Slide ${currentIndex + 1}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover select-none pointer-events-none"
+                style={{ objectPosition: `center ${getCurrentOffset()}%` }}
+                draggable={false}
               />
+              {/* Pan hint */}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-full bg-black/60 backdrop-blur-sm text-[8px] text-white/60 flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+                <Icon name="move" className="w-2.5 h-2.5" />
+                Arraste para ajustar
+              </div>
 
               {/* Navigation Arrows */}
               {images.length > 1 && (
                 <>
                   {currentIndex > 0 && (
                     <button
-                      onClick={() => goToSlide(currentIndex - 1)}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/90 hover:bg-black/80 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        goToSlide(currentIndex - 1);
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/90 hover:bg-black/80 transition-colors z-10"
                     >
                       <Icon name="chevron-left" className="w-3 h-3" />
                     </button>
                   )}
                   {currentIndex < images.length - 1 && (
                     <button
-                      onClick={() => goToSlide(currentIndex + 1)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/90 hover:bg-black/80 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        goToSlide(currentIndex + 1);
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/90 hover:bg-black/80 transition-colors z-10"
                     >
                       <Icon name="chevron-right" className="w-3 h-3" />
                     </button>
@@ -175,7 +233,7 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               onDragEnd={handleDragEnd}
               onClick={() => setCurrentIndex(idx)}
               className={`
-                relative w-[260px] flex-shrink-0 aspect-[4/5] rounded-xl overflow-hidden cursor-move
+                relative w-[260px] flex-shrink-0 aspect-[4/5] rounded-xl overflow-hidden cursor-move group
                 border-2 transition-all duration-200 shadow-lg
                 ${idx === currentIndex ? "border-amber-500 ring-2 ring-amber-500/30" : "border-white/10"}
                 ${dragOverIndex === idx ? "scale-105 border-blue-500" : ""}
@@ -192,6 +250,19 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/70 text-sm text-white font-medium">
                 {idx + 1}
               </div>
+              {/* Edit button - appears on hover */}
+              {onOpenEditor && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenEditor(img);
+                  }}
+                  className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-black/70 hover:bg-primary text-white/70 hover:text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                  title="Editar no AI Studio"
+                >
+                  <Icon name="edit" className="w-4 h-4" />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -205,6 +276,8 @@ interface CarrosselTabProps {
   galleryImages?: GalleryImage[];
   brandProfile: BrandProfile;
   onAddImageToGallery: (image: Omit<GalleryImage, "id">) => GalleryImage;
+  onUpdateGalleryImage?: (imageId: string, newImageSrc: string) => void;
+  onSetChatReference?: (image: GalleryImage | null) => void;
 }
 
 export const CarrosselTab: React.FC<CarrosselTabProps> = ({
@@ -212,6 +285,8 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   galleryImages,
   brandProfile,
   onAddImageToGallery,
+  onUpdateGalleryImage,
+  onSetChatReference,
 }) => {
   // Track which images are being generated: { "clipId-sceneNumber": true }
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
@@ -221,6 +296,8 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   >({});
   // Track collapsed clips (all start expanded by default)
   const [collapsedClips, setCollapsedClips] = useState<Set<string>>(new Set());
+  // Image editing state
+  const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
 
   // Get truncated title for source (max 50 chars in DB)
   const getTruncatedTitle = (title: string) => {
@@ -512,6 +589,7 @@ IMPORTANTE:
                     images={orderedImages}
                     onReorder={(newOrder) => handleReorder(clipKey, newOrder)}
                     clipTitle={clip.title}
+                    onOpenEditor={setEditingImage}
                   />
                 ) : hasAnyOriginal ? (
                   <div className="text-center py-8">
@@ -552,7 +630,8 @@ IMPORTANTE:
                 {orderedImages.slice(0, 6).map((img, idx) => (
                   <div
                     key={img.id || idx}
-                    className="w-12 h-15 flex-shrink-0 rounded overflow-hidden border border-white/10"
+                    className="w-12 h-15 flex-shrink-0 rounded overflow-hidden border border-white/10 cursor-pointer hover:border-white/30 transition-colors"
+                    onClick={() => setEditingImage(img)}
                   >
                     <img
                       src={img.src}
@@ -571,6 +650,22 @@ IMPORTANTE:
           </div>
         );
       })}
+
+      {/* Image Preview Modal */}
+      {editingImage && (
+        <ImagePreviewModal
+          image={editingImage}
+          onClose={() => setEditingImage(null)}
+          onImageUpdate={(newSrc) => {
+            if (editingImage.id && onUpdateGalleryImage) {
+              onUpdateGalleryImage(editingImage.id, newSrc);
+            }
+            setEditingImage(null);
+          }}
+          onSetChatReference={onSetChatReference || (() => {})}
+          downloadFilename={`carrossel-${editingImage.source || "image"}.png`}
+        />
+      )}
     </div>
   );
 };

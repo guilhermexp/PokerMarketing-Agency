@@ -6,6 +6,7 @@ import {
   resizeImageContentAware,
   loadImageData,
   imageDataToBase64,
+  createProtectionMaskFromCanvas,
 } from "../../services/seamCarvingService";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
@@ -224,6 +225,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     height: number;
   } | null>(null);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [useProtectionMask, setUseProtectionMask] = useState(false);
+  const [isDrawingProtection, setIsDrawingProtection] = useState(false);
+  const protectionCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -242,6 +246,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     img.onload = () => {
       const imageCanvas = imageCanvasRef.current;
       const maskCanvas = maskCanvasRef.current;
+      const protectionCanvas = protectionCanvasRef.current;
       const container = containerRef.current;
       if (!imageCanvas || !maskCanvas || !container) return;
 
@@ -254,6 +259,12 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       imageCanvas.height = naturalHeight;
       maskCanvas.width = naturalWidth;
       maskCanvas.height = naturalHeight;
+
+      // Initialize protection canvas
+      if (protectionCanvas) {
+        protectionCanvas.width = naturalWidth;
+        protectionCanvas.height = naturalHeight;
+      }
 
       const ctx = imageCanvas.getContext("2d");
       ctx?.drawImage(img, 0, 0, naturalWidth, naturalHeight);
@@ -340,6 +351,85 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     const ctx = canvas.getContext("2d");
     ctx?.clearRect(0, 0, canvas.width, canvas.height);
   };
+
+  // Protection mask drawing functions
+  const getProtectionCoords = (
+    e:
+      | React.MouseEvent<HTMLCanvasElement>
+      | React.TouchEvent<HTMLCanvasElement>,
+  ): { x: number; y: number } => {
+    const canvas = protectionCanvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    let clientX, clientY;
+    if ("touches" in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  };
+
+  const startProtectionDrawing = (
+    e:
+      | React.MouseEvent<HTMLCanvasElement>
+      | React.TouchEvent<HTMLCanvasElement>,
+  ) => {
+    setIsDrawingProtection(true);
+    const { x, y } = getProtectionCoords(e);
+    const ctx = protectionCanvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const drawProtection = (
+    e:
+      | React.MouseEvent<HTMLCanvasElement>
+      | React.TouchEvent<HTMLCanvasElement>,
+  ) => {
+    if (!isDrawingProtection) return;
+    const { x, y } = getProtectionCoords(e);
+    const ctx = protectionCanvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = "rgba(0, 255, 100, 0.6)";
+    ctx.lineWidth = 80;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+  };
+
+  const stopProtectionDrawing = () => {
+    const ctx = protectionCanvasRef.current?.getContext("2d");
+    ctx?.closePath();
+    setIsDrawingProtection(false);
+  };
+
+  const clearProtectionMask = () => {
+    const canvas = protectionCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx?.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const hasProtectionDrawing = useCallback(() => {
+    const canvas = protectionCanvasRef.current;
+    if (!canvas) return false;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return false;
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    return data.some((channel) => channel !== 0);
+  }, []);
 
   const handleEdit = async () => {
     console.log(
@@ -548,12 +638,24 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             `[Seam Carving] Resizing from ${imageData.width}x${imageData.height} to ${targetWidth}x${targetHeight}`
           );
 
-          // Perform seam carving
+          // Get protection mask if enabled and canvas has drawing
+          let protectionMask = undefined;
+          if (useProtectionMask && protectionCanvasRef.current) {
+            protectionMask = createProtectionMaskFromCanvas(
+              protectionCanvasRef.current
+            );
+            if (protectionMask) {
+              console.log("[Seam Carving] Using protection mask");
+            }
+          }
+
+          // Perform seam carving with optional protection mask
           const resizedImageData = await resizeImageContentAware(
             imageData,
             targetWidth,
             targetHeight,
-            (progress) => setResizeProgress(progress)
+            (progress) => setResizeProgress(progress),
+            protectionMask || undefined
           );
 
           // Convert to data URL for preview (don't upload yet)
@@ -583,7 +685,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         }
       }, 500); // 500ms debounce
     },
-    [image.src]
+    [image.src, useProtectionMask]
   );
 
   // Save the resized image
@@ -778,9 +880,12 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                     ref={imageCanvasRef}
                     className="absolute max-w-full max-h-full object-contain rounded-lg shadow-2xl"
                   />
+                  {/* AI Edit Mask Canvas - visible when NOT in protection mode */}
                   <canvas
                     ref={maskCanvasRef}
-                    className="absolute max-w-full max-h-full object-contain cursor-crosshair opacity-60 mix-blend-screen rounded-lg"
+                    className={`absolute max-w-full max-h-full object-contain cursor-crosshair opacity-60 mix-blend-screen rounded-lg ${
+                      useProtectionMask ? "hidden" : ""
+                    }`}
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
@@ -788,6 +893,21 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                     onTouchStart={startDrawing}
                     onTouchMove={draw}
                     onTouchEnd={stopDrawing}
+                  />
+                  {/* Protection Mask Canvas - visible when in protection mode */}
+                  <canvas
+                    ref={protectionCanvasRef}
+                    className={`absolute max-w-full max-h-full object-contain cursor-crosshair opacity-60 rounded-lg ${
+                      useProtectionMask ? "" : "hidden"
+                    }`}
+                    style={{ mixBlendMode: "screen" }}
+                    onMouseDown={startProtectionDrawing}
+                    onMouseMove={drawProtection}
+                    onMouseUp={stopProtectionDrawing}
+                    onMouseOut={stopProtectionDrawing}
+                    onTouchStart={startProtectionDrawing}
+                    onTouchMove={drawProtection}
+                    onTouchEnd={stopProtectionDrawing}
                   />
 
                   {/* Processing Overlay */}
@@ -816,10 +936,14 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             {/* Hint - Below image */}
             {!isVideo && !isActionRunning && (
               <div className="mt-4 flex items-center gap-2 text-white/30">
-                <Icon name="edit" className="w-3.5 h-3.5 flex-shrink-0" />
+                <Icon
+                  name={useProtectionMask ? "shield" : "edit"}
+                  className="w-3.5 h-3.5 flex-shrink-0"
+                />
                 <span className="text-[10px]">
-                  Desenhe para marcar a área desejada, escreva sua alteração e
-                  clique em Editar com IA
+                  {useProtectionMask
+                    ? "Pinte as áreas com texto/logotipos que devem ser protegidas durante o redimensionamento"
+                    : "Desenhe para marcar a área desejada, escreva sua alteração e clique em Editar com IA"}
                 </span>
               </div>
             )}
@@ -902,6 +1026,46 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                         </div>
                       </div>
                     </div>
+
+                    {/* Protection Mask Toggle */}
+                    <div className="pt-2 border-t border-white/[0.04]">
+                      <div className="flex items-center justify-between">
+                        <button
+                          onClick={() => {
+                            setUseProtectionMask(!useProtectionMask);
+                            if (!useProtectionMask) {
+                              // When enabling, clear any resize preview
+                              setResizedPreview(null);
+                              setWidthPercent(100);
+                              setHeightPercent(100);
+                            }
+                          }}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all ${
+                            useProtectionMask
+                              ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                              : "bg-white/[0.03] text-white/40 hover:text-white/60 border border-white/[0.06]"
+                          }`}
+                        >
+                          <Icon name="shield" className="w-3 h-3" />
+                          Proteger Texto
+                        </button>
+                        {useProtectionMask && (
+                          <button
+                            onClick={clearProtectionMask}
+                            className="flex items-center gap-1 px-2 py-1 text-[9px] text-white/30 hover:text-white/50 transition-colors"
+                          >
+                            <Icon name="x" className="w-2.5 h-2.5" />
+                            Limpar
+                          </button>
+                        )}
+                      </div>
+                      {useProtectionMask && (
+                        <p className="text-[9px] text-green-400/60 mt-2">
+                          Pinte sobre textos e logotipos na imagem para protegê-los do redimensionamento
+                        </p>
+                      )}
+                    </div>
+
                     {isResizing && (
                       <div className="mt-2">
                         <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
@@ -933,7 +1097,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                         </button>
                       </div>
                     )}
-                    {!resizedPreview && (
+                    {!resizedPreview && !useProtectionMask && (
                       <p className="text-[9px] text-white/20">
                         Seam Carving: redimensiona sem perder conteúdo importante
                       </p>
