@@ -44,6 +44,14 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [panStartY, setPanStartY] = useState(0);
   const [panStartOffset, setPanStartOffset] = useState(0);
+  // Expand on hover state
+  const [expandedIndex, setExpandedIndex] = useState<number>(0);
+  // Caption editor toggle
+  const [showCaptionEditor, setShowCaptionEditor] = useState(false);
+
+  // Get card width based on expanded state
+  const getCardWidth = (index: number) =>
+    index === expandedIndex ? "20rem" : "7rem";
 
   const goToSlide = (index: number) => {
     setCurrentIndex(Math.max(0, Math.min(index, images.length - 1)));
@@ -120,7 +128,7 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
           <div className="w-24 h-6 bg-black rounded-full mx-auto mb-1" />
 
           {/* Screen */}
-          <div className="bg-[#0a0a0a] rounded-[24px] overflow-hidden">
+          <div className="relative bg-[#0a0a0a] rounded-[24px] overflow-hidden">
             {/* Instagram Header */}
             <div className="px-3 py-2 flex items-center gap-2 border-b border-white/5">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
@@ -221,55 +229,81 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               <Icon name="bookmark" className="w-5 h-5 text-white" />
             </div>
 
-            {/* Caption Preview */}
+            {/* Caption Preview with Toggle */}
             <div className="px-3 pb-3">
-              <p className="text-[10px] text-white/90 line-clamp-2">
-                <span className="font-semibold">cpc_poker</span> {caption || clipTitle}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Caption Editor */}
-        <div className="mt-4 w-[320px]">
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-medium text-white/60">Legenda</label>
-            {onGenerateCaption && (
               <button
-                onClick={onGenerateCaption}
-                disabled={isGeneratingCaption}
-                className="px-2 py-1 text-[10px] font-medium rounded bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+                onClick={() => setShowCaptionEditor(!showCaptionEditor)}
+                className="w-full text-left hover:bg-white/5 rounded p-1 -m-1 transition-colors"
               >
-                {isGeneratingCaption ? (
-                  <>
-                    <Loader size={10} />
-                    Gerando...
-                  </>
-                ) : (
-                  <>
-                    <Icon name="sparkles" className="w-3 h-3" />
-                    Gerar Legenda
-                  </>
-                )}
+                <p className="text-[10px] text-white/90 line-clamp-2">
+                  <span className="font-semibold">cpc_poker</span> {caption || clipTitle}
+                </p>
+                <span className="text-[8px] text-white/40 mt-1 flex items-center gap-1">
+                  <Icon name="edit-2" className="w-2.5 h-2.5" />
+                  Clique para editar legenda
+                </span>
               </button>
+            </div>
+
+            {/* Caption Editor Overlay */}
+            {showCaptionEditor && (
+              <div className="absolute inset-0 bg-black/95 rounded-[24px] z-20 flex flex-col p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-xs font-medium text-white/80">Editar Legenda</label>
+                  <button
+                    onClick={() => setShowCaptionEditor(false)}
+                    className="p-1 rounded-full hover:bg-white/10 transition-colors"
+                  >
+                    <Icon name="x" className="w-4 h-4 text-white/60" />
+                  </button>
+                </div>
+                <textarea
+                  value={caption}
+                  onChange={(e) => onCaptionChange?.(e.target.value)}
+                  placeholder="Escreva a legenda do carrossel..."
+                  className="flex-1 w-full px-3 py-2 text-xs text-white/90 bg-white/[0.05] border border-white/[0.1] rounded-lg resize-none focus:outline-none focus:border-amber-500/50 placeholder:text-white/30"
+                  autoFocus
+                />
+                <div className="flex items-center justify-between mt-3">
+                  {onGenerateCaption && (
+                    <button
+                      onClick={onGenerateCaption}
+                      disabled={isGeneratingCaption}
+                      className="px-3 py-1.5 text-[10px] font-medium rounded-lg bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {isGeneratingCaption ? (
+                        <>
+                          <Loader size={10} />
+                          Gerando...
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="sparkles" className="w-3 h-3" />
+                          Gerar com IA
+                        </>
+                      )}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowCaptionEditor(false)}
+                    className="px-3 py-1.5 text-[10px] font-medium rounded-lg bg-white/10 text-white/70 hover:bg-white/20 transition-colors"
+                  >
+                    Concluir
+                  </button>
+                </div>
+              </div>
             )}
           </div>
-          <textarea
-            value={caption}
-            onChange={(e) => onCaptionChange?.(e.target.value)}
-            placeholder="Escreva a legenda do carrossel..."
-            className="w-full h-24 px-3 py-2 text-xs text-white/90 bg-white/[0.03] border border-white/[0.06] rounded-lg resize-none focus:outline-none focus:border-amber-500/50 placeholder:text-white/30"
-          />
         </div>
       </div>
 
-      {/* Reorderable Thumbnails */}
-      <div className="flex-1 min-w-0">
+      {/* Reorderable Thumbnails - Expand on Hover */}
+      <div className="flex-1 min-w-0 -mt-4">
         <div className="flex items-center gap-2 mb-4">
           <Icon name="move" className="w-4 h-4 text-white/40" />
           <span className="text-xs text-white/50">Arraste para reordenar</span>
         </div>
-        <div className="flex gap-4 overflow-x-auto pb-2">
+        <div className="flex items-center justify-start gap-1 pb-2">
           {images.map((img, idx) => (
             <div
               key={img.id || idx}
@@ -277,15 +311,20 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               onDragStart={(e) => handleDragStart(e, idx)}
               onDragOver={(e) => handleDragOver(e, idx)}
               onDragEnd={handleDragEnd}
-              onClick={() => setCurrentIndex(idx)}
+              onClick={() => onOpenEditor?.(img)}
+              onMouseEnter={() => setExpandedIndex(idx)}
               className={`
-                relative w-[320px] flex-shrink-0 aspect-[4/5] rounded-xl overflow-hidden cursor-move group
-                border-2 transition-all duration-200 shadow-lg
+                relative flex-shrink-0 rounded-xl overflow-hidden cursor-move group
+                border-2 transition-all duration-500 ease-in-out shadow-lg
                 ${idx === currentIndex ? "border-amber-500 ring-2 ring-amber-500/30" : "border-white/10"}
                 ${dragOverIndex === idx ? "scale-105 border-blue-500" : ""}
                 ${draggedIndex === idx ? "opacity-50 scale-95" : ""}
                 hover:border-white/30
               `}
+              style={{
+                width: getCardWidth(idx),
+                height: "28rem",
+              }}
             >
               <img
                 src={img.src}
