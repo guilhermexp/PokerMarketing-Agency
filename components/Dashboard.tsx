@@ -318,9 +318,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       Campanha Gerada
                     </h2>
                     <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
-                      {campaign.videoClipScripts.length} clips •{" "}
-                      {campaign.posts.length} posts •{" "}
-                      {campaign.adCreatives.length} anúncios
+                      {campaign.videoClipScripts?.length || 0} clips •{" "}
+                      {campaign.posts?.length || 0} posts •{" "}
+                      {campaign.adCreatives?.length || 0} anúncios
                       {campaign.generatedWithModel && (
                         <span className="ml-2 text-white/20">
                           • {campaign.generatedWithModel.split("/").pop()}

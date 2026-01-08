@@ -1116,20 +1116,20 @@ function AppContent() {
             generation_options: options as unknown as Record<string, unknown>,
             status: "completed",
             organization_id: organizationId,
-            video_clip_scripts: r.videoClipScripts.map((v) => ({
+            video_clip_scripts: (r.videoClipScripts || []).map((v) => ({
               title: v.title,
               hook: v.hook,
               image_prompt: v.image_prompt,
               audio_script: v.audio_script,
               scenes: v.scenes,
             })),
-            posts: r.posts.map((p) => ({
+            posts: (r.posts || []).map((p) => ({
               platform: normalizeSocialPlatform(p.platform),
               content: p.content,
               hashtags: p.hashtags,
               image_prompt: p.image_prompt,
             })),
-            ad_creatives: r.adCreatives.map((a) => ({
+            ad_creatives: (r.adCreatives || []).map((a) => ({
               platform: normalizeAdPlatform(a.platform),
               headline: a.headline,
               body: a.body,
@@ -1147,14 +1147,15 @@ function AppContent() {
           // Map database IDs to local state for video_script_id linking
           if (
             savedCampaign.video_clip_scripts &&
-            savedCampaign.video_clip_scripts.length > 0
+            savedCampaign.video_clip_scripts.length > 0 &&
+            r.videoClipScripts
           ) {
             r.videoClipScripts = r.videoClipScripts.map((clip, index) => ({
               ...clip,
               id: savedCampaign.video_clip_scripts[index]?.id,
             }));
           }
-          if (savedCampaign.posts && savedCampaign.posts.length > 0) {
+          if (savedCampaign.posts && savedCampaign.posts.length > 0 && r.posts) {
             r.posts = r.posts.map((post, index) => ({
               ...post,
               id: savedCampaign.posts[index]?.id,
@@ -1162,7 +1163,8 @@ function AppContent() {
           }
           if (
             savedCampaign.ad_creatives &&
-            savedCampaign.ad_creatives.length > 0
+            savedCampaign.ad_creatives.length > 0 &&
+            r.adCreatives
           ) {
             r.adCreatives = r.adCreatives.map((ad, index) => ({
               ...ad,
@@ -1177,11 +1179,11 @@ function AppContent() {
             "[Campaign] Saved to database with IDs:",
             savedCampaign.id,
             "clips:",
-            r.videoClipScripts.map((c) => c.id),
+            (r.videoClipScripts || []).map((c) => c.id),
             "posts:",
-            r.posts.map((p) => p.id),
+            (r.posts || []).map((p) => p.id),
             "ads:",
-            r.adCreatives.map((a) => a.id),
+            (r.adCreatives || []).map((a) => a.id),
           );
 
           // Persist productImages to localStorage for this campaign
