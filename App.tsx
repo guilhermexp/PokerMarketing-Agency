@@ -114,31 +114,53 @@ const resizeImageForChat = (
   maxHeight: number,
 ): Promise<{ base64: string; mimeType: "image/jpeg" }> => {
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      let { width, height } = img;
-      if (width > height) {
-        if (width > maxWidth) {
-          height = Math.round(height * (maxWidth / width));
-          width = maxWidth;
+    const loadImage = async () => {
+      let imageSrc = dataUrl;
+      let revokeUrl = false;
+
+      if (!dataUrl.startsWith("data:")) {
+        const response = await fetch(dataUrl);
+        if (!response.ok) {
+          throw new Error(`Falha ao carregar imagem (${response.status})`);
         }
-      } else {
-        if (height > maxHeight) {
-          width = Math.round(width * (maxHeight / height));
-          height = maxHeight;
-        }
+        const blob = await response.blob();
+        imageSrc = URL.createObjectURL(blob);
+        revokeUrl = true;
       }
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return reject(new Error("Canvas context error"));
-      ctx.drawImage(img, 0, 0, width, height);
-      const resizedDataUrl = canvas.toDataURL("image/jpeg", 0.6);
-      resolve({ base64: resizedDataUrl.split(",")[1], mimeType: "image/jpeg" });
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round(height * (maxWidth / width));
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round(width * (maxHeight / height));
+            height = maxHeight;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas context error"));
+        ctx.drawImage(img, 0, 0, width, height);
+        if (revokeUrl) URL.revokeObjectURL(imageSrc);
+        const resizedDataUrl = canvas.toDataURL("image/jpeg", 0.6);
+        resolve({
+          base64: resizedDataUrl.split(",")[1],
+          mimeType: "image/jpeg",
+        });
+      };
+      img.onerror = (err) => reject(err);
+      img.src = imageSrc;
     };
-    img.onerror = (err) => reject(err);
-    img.src = dataUrl;
+
+    loadImage().catch(reject);
   });
 };
 

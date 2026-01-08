@@ -2248,7 +2248,7 @@ app.get("/api/db/campaigns", async (req, res) => {
 
       result = await sql`
         SELECT
-          c.id, c.user_id, c.organization_id, c.name, c.description, c.status, c.created_at, c.updated_at,
+          c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at,
           COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
           COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
           COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
@@ -2262,7 +2262,7 @@ app.get("/api/db/campaigns", async (req, res) => {
     } else {
       result = await sql`
         SELECT
-          c.id, c.user_id, c.organization_id, c.name, c.description, c.status, c.created_at, c.updated_at,
+          c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at,
           COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
           COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
           COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
