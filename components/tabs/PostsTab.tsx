@@ -550,10 +550,12 @@ export const PostsTab: React.FC<PostsTabProps> = ({
       });
 
       // Update post image_url in database
-      if (post.id) {
+      // Use posts[index].id to get the latest ID (post might have been updated since generation started)
+      const currentPostId = posts[index]?.id || post.id;
+      if (currentPostId) {
         try {
-          await updatePostImage(post.id, httpUrl);
-          console.log("[PostsTab] Saved image to database for post:", post.id);
+          await updatePostImage(currentPostId, httpUrl);
+          console.log("[PostsTab] Saved image to database for post:", currentPostId);
         } catch (err) {
           console.error(
             "[PostsTab] Failed to update post image in database:",
@@ -561,7 +563,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
           );
         }
       } else {
-        console.warn("[PostsTab] Post has no ID, cannot save image to database");
+        console.warn("[PostsTab] Post has no ID, cannot save image to database. Image saved to gallery only.");
       }
     } catch (err: any) {
       setGenerationState((prev) => {

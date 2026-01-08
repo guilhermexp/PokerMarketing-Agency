@@ -81,7 +81,12 @@ export type IconName =
   | 'message-circle'
   | 'bookmark'
   | 'more-horizontal'
-  | 'move';
+  | 'move'
+  // Editor icons
+  | 'square'
+  | 'maximize-2'
+  | 'wand-2'
+  | 'edit-2';
 
 interface IconProps {
   name: IconName;
@@ -518,6 +523,35 @@ const iconPaths: Record<IconName, React.ReactNode> = {
       <polyline points="19 9 22 12 19 15"></polyline>
       <line x1="2" y1="12" x2="22" y2="12"></line>
       <line x1="12" y1="2" x2="12" y2="22"></line>
+    </>
+  ),
+  square: (
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+  ),
+  'maximize-2': (
+    <>
+      <polyline points="15 3 21 3 21 9"></polyline>
+      <polyline points="9 21 3 21 3 15"></polyline>
+      <line x1="21" y1="3" x2="14" y2="10"></line>
+      <line x1="3" y1="21" x2="10" y2="14"></line>
+    </>
+  ),
+  'wand-2': (
+    <>
+      <path d="M15 4V2"></path>
+      <path d="M15 16v-2"></path>
+      <path d="M8 9h2"></path>
+      <path d="M20 9h2"></path>
+      <path d="M17.8 11.8L19 13"></path>
+      <path d="M15 9h.01"></path>
+      <path d="M17.8 6.2L19 5"></path>
+      <path d="m3 21 9-9"></path>
+      <path d="M12.2 6.2L11 5"></path>
+    </>
+  ),
+  'edit-2': (
+    <>
+      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
     </>
   ),
 };

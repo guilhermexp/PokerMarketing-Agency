@@ -525,15 +525,20 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
       });
 
       // Update ad creative image_url in database
-      if (ad.id) {
+      // Use adCreatives[index].id to get the latest ID (ad might have been updated since generation started)
+      const currentAdId = adCreatives[index]?.id || ad.id;
+      if (currentAdId) {
         try {
-          await updateAdCreativeImage(ad.id, httpUrl);
+          await updateAdCreativeImage(currentAdId, httpUrl);
+          console.log("[AdCreativesTab] Saved image to database for ad:", currentAdId);
         } catch (err) {
           console.error(
             "[AdCreativesTab] Failed to update ad image in database:",
             err,
           );
         }
+      } else {
+        console.warn("[AdCreativesTab] Ad has no ID, cannot save image to database. Image saved to gallery only.");
       }
     } catch (err: any) {
       setGenerationState((prev) => {

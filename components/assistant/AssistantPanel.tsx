@@ -140,8 +140,8 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   return (
     <aside className="w-full sm:w-[380px] h-full bg-[#080808] border-l border-white/10 flex flex-col flex-shrink-0">
       {/* Header minimalista */}
-      <div className="flex-shrink-0 h-14 flex items-center justify-between px-4 border-b border-white/10">
-        <h2 className="text-sm font-semibold text-white">Aura</h2>
+      <div className="flex-shrink-0 h-14 flex items-center justify-between px-4">
+        <img src="/icon.png" alt="Socialab" className="w-9 h-9 rounded-xl" />
         <div className="flex items-center gap-1">
           <button className="p-2 text-white/40 hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
             <Icon name="clock" className="w-4 h-4" />
@@ -177,7 +177,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
       </div>
 
       {/* Input Area */}
-      <div className="flex-shrink-0 p-4 border-t border-white/10">
+      <div className="flex-shrink-0 p-4">
         {referenceImage && (
           <div className="relative mb-3 p-2 bg-primary/10 border border-primary/20 rounded-lg flex items-center gap-3 animate-fade-in-up">
             <img
