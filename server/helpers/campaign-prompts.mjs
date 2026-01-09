@@ -33,6 +33,14 @@ ${quantityInstructions}
    - Estilo cinematográfico, luxuoso e premium
    - Textos em fonte bold condensed sans-serif
 
+**REGRAS PARA CARROSSÉIS (carousels):**
+1. Cada carrossel deve ter 5 slides
+2. O cover_prompt descreve a imagem de CAPA que estabelece o estilo visual do carrossel
+3. Cada slide tem: slide (número), visual (descrição da imagem), text (texto CURTO em MAIÚSCULAS, máx 10 palavras)
+4. Slide 1 = título/gancho, slides 2-4 = conteúdo principal, slide 5 = CTA
+5. A tipografia e estilo visual DEVEM ser consistentes em todos os slides
+6. Todos os textos em PORTUGUÊS
+
 **MISSÃO:** Gere uma campanha completa em JSON com as QUANTIDADES EXATAS especificadas. Cada image_prompt DEVE ser em PORTUGUÊS e alinhado com seu content.`;
 }
 
@@ -117,6 +125,13 @@ export function buildQuantityInstructions(options, mode = "prod") {
   } else {
     quantities.push(`- Anúncios (adCreatives): 0 (array vazio)`);
   }
+
+  // Carousels - always generate 1 by default for now
+  quantities.push(
+    isProd
+      ? `- Carrosséis Instagram (carousels): EXATAMENTE 1 carrossel com 5 slides`
+      : `- Carrosséis (carousels): 1 carrossel com 5 slides`,
+  );
 
   return quantities.join("\n    ");
 }

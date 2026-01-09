@@ -1695,11 +1695,11 @@ app.get("/api/db/campaigns", async (req, res) => {
         return res.status(200).json(null);
       }
 
-      // If include_content is true, also fetch video_clip_scripts, posts, and ad_creatives
+      // If include_content is true, also fetch video_clip_scripts, posts, ad_creatives and carousel_scripts
       if (include_content === "true") {
         const campaign = result[0];
 
-        const [videoScripts, posts, adCreatives] = await Promise.all([
+        const [videoScripts, posts, adCreatives, carouselScripts] = await Promise.all([
           sql`
             SELECT * FROM video_clip_scripts
             WHERE campaign_id = ${id}
@@ -1715,6 +1715,11 @@ app.get("/api/db/campaigns", async (req, res) => {
             WHERE campaign_id = ${id}
             ORDER BY sort_order ASC
           `,
+          sql`
+            SELECT * FROM carousel_scripts
+            WHERE campaign_id = ${id}
+            ORDER BY sort_order ASC
+          `,
         ]);
 
         return res.status(200).json({
@@ -1722,6 +1727,7 @@ app.get("/api/db/campaigns", async (req, res) => {
           video_clip_scripts: videoScripts,
           posts: posts,
           ad_creatives: adCreatives,
+          carousel_scripts: carouselScripts,
         });
       }
 
@@ -1815,6 +1821,7 @@ app.post("/api/db/campaigns", async (req, res) => {
       video_clip_scripts,
       posts,
       ad_creatives,
+      carousel_scripts,
     } = req.body;
 
     if (!user_id) {
@@ -1892,12 +1899,27 @@ app.post("/api/db/campaigns", async (req, res) => {
       }
     }
 
+    // Insert and collect carousel scripts with their IDs
+    const createdCarouselScripts = [];
+    if (carousel_scripts && Array.isArray(carousel_scripts)) {
+      for (let i = 0; i < carousel_scripts.length; i++) {
+        const carousel = carousel_scripts[i];
+        const result = await sql`
+          INSERT INTO carousel_scripts (campaign_id, user_id, organization_id, title, hook, cover_prompt, caption, slides, sort_order)
+          VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${carousel.title}, ${carousel.hook}, ${carousel.cover_prompt || null}, ${carousel.caption || null}, ${JSON.stringify(carousel.slides || [])}, ${i})
+          RETURNING *
+        `;
+        createdCarouselScripts.push(result[0]);
+      }
+    }
+
     // Return campaign with all created items including their IDs
     res.status(201).json({
       ...campaign,
       video_clip_scripts: createdVideoClipScripts,
       posts: createdPosts,
       ad_creatives: createdAdCreatives,
+      carousel_scripts: createdCarouselScripts,
     });
   } catch (error) {
     if (
@@ -2038,6 +2060,103 @@ app.patch("/api/db/campaigns/scene", async (req, res) => {
     res.json(result[0]);
   } catch (error) {
     logError("Campaigns API (PATCH scene)", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Carousels API - Update carousel (cover_url, caption)
+app.patch("/api/db/carousels", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { id } = req.query;
+    const { cover_url, caption } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ error: "id is required" });
+    }
+
+    // Build dynamic update
+    const updates = [];
+    const values = [];
+
+    if (cover_url !== undefined) {
+      updates.push("cover_url = $1");
+      values.push(cover_url);
+    }
+    if (caption !== undefined) {
+      updates.push(`caption = $${values.length + 1}`);
+      values.push(caption);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    const result = await sql`
+      UPDATE carousel_scripts
+      SET cover_url = COALESCE(${cover_url}, cover_url),
+          caption = COALESCE(${caption}, caption),
+          updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `;
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Carousel not found" });
+    }
+
+    res.json(result[0]);
+  } catch (error) {
+    logError("Carousels API (PATCH)", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Carousels API - Update slide image_url in slides JSONB
+app.patch("/api/db/carousels/slide", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { carousel_id, slide_number } = req.query;
+    const { image_url } = req.body;
+
+    if (!carousel_id || slide_number === undefined) {
+      return res
+        .status(400)
+        .json({ error: "carousel_id and slide_number are required" });
+    }
+
+    const slideNum = parseInt(slide_number, 10);
+
+    // Get current slides
+    const [carousel] = await sql`
+      SELECT slides FROM carousel_scripts WHERE id = ${carousel_id}
+    `;
+
+    if (!carousel) {
+      return res.status(404).json({ error: "Carousel not found" });
+    }
+
+    // Update the specific slide with image_url
+    const slides = carousel.slides || [];
+    const updatedSlides = slides.map((slide) => {
+      if (slide.slide === slideNum) {
+        return { ...slide, image_url: image_url || null };
+      }
+      return slide;
+    });
+
+    // Save updated slides back to database
+    const result = await sql`
+      UPDATE carousel_scripts
+      SET slides = ${JSON.stringify(updatedSlides)}::jsonb,
+          updated_at = NOW()
+      WHERE id = ${carousel_id}
+      RETURNING *
+    `;
+
+    res.json(result[0]);
+  } catch (error) {
+    logError("Carousels API (PATCH slide)", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -3120,8 +3239,33 @@ const campaignSchema = {
         required: ["platform", "headline", "body", "cta", "image_prompt"],
       },
     },
+    carousels: {
+      type: Type.ARRAY,
+      description: "Carrosséis para Instagram (4-6 slides cada).",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          hook: { type: Type.STRING },
+          cover_prompt: { type: Type.STRING },
+          slides: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                slide: { type: Type.INTEGER },
+                visual: { type: Type.STRING },
+                text: { type: Type.STRING },
+              },
+              required: ["slide", "visual", "text"],
+            },
+          },
+        },
+        required: ["title", "hook", "cover_prompt", "slides"],
+      },
+    },
   },
-  required: ["videoClipScripts", "posts", "adCreatives"],
+  required: ["videoClipScripts", "posts", "adCreatives", "carousels"],
 };
 
 // Quick post schema

@@ -5,6 +5,7 @@ import type {
   BrandProfile,
   ImageFile,
   ScheduledPost,
+  CarouselScript,
 } from "../../types";
 import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
@@ -13,6 +14,23 @@ import { SchedulePostModal } from "../calendar/SchedulePostModal";
 import { generateImage, generateQuickPostText } from "../../services/geminiService";
 import { uploadImageToBlob } from "../../services/blobService";
 import { urlToBase64, urlToDataUrl } from "../../utils/imageHelpers";
+import {
+  updateCarouselCover,
+  updateCarouselSlideImage,
+  updateCarouselCaption,
+  type DbCarouselScript,
+} from "../../services/apiClient";
+
+// Convert DbCarouselScript to CarouselScript
+const toCarouselScript = (db: DbCarouselScript): CarouselScript => ({
+  id: db.id,
+  title: db.title,
+  hook: db.hook,
+  cover_prompt: db.cover_prompt || "",
+  cover_url: db.cover_url,
+  caption: db.caption || undefined,
+  slides: db.slides,
+});
 
 // urlToBase64 imported from utils/imageHelpers
 
@@ -360,6 +378,7 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
 
 interface CarrosselTabProps {
   videoClipScripts: VideoClipScript[];
+  carousels?: CarouselScript[];
   galleryImages?: GalleryImage[];
   brandProfile: BrandProfile;
   onAddImageToGallery: (image: Omit<GalleryImage, "id">) => GalleryImage;
@@ -367,10 +386,12 @@ interface CarrosselTabProps {
   onSetChatReference?: (image: GalleryImage | null) => void;
   onPublishCarousel?: (imageUrls: string[], caption: string) => Promise<void>;
   onSchedulePost?: (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onCarouselUpdate?: (carousel: CarouselScript) => void;
 }
 
 export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   videoClipScripts,
+  carousels = [],
   galleryImages,
   brandProfile,
   onAddImageToGallery,
@@ -378,6 +399,7 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   onSetChatReference,
   onPublishCarousel,
   onSchedulePost,
+  onCarouselUpdate,
 }) => {
   // Track which images are being generated: { "clipId-sceneNumber": true }
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
@@ -399,6 +421,15 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   const [schedulingClip, setSchedulingClip] = useState<{clipKey: string, images: GalleryImage[], title: string} | null>(null);
   // Toast notification state
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+  // Track campaign carousel generation: { "carouselId-cover": true, "carouselId-slide-1": true }
+  const [generatingCarousel, setGeneratingCarousel] = useState<Record<string, boolean>>({});
+  // Local state for campaign carousels (to reflect updates)
+  const [localCarousels, setLocalCarousels] = useState<CarouselScript[]>(carousels);
+
+  // Sync localCarousels with prop when it changes
+  useEffect(() => {
+    setLocalCarousels(carousels);
+  }, [carousels]);
 
   // Auto-hide toast after 4 seconds
   useEffect(() => {
@@ -628,6 +659,167 @@ IMPORTANTE:
     }
   };
 
+  // ============================================================================
+  // Campaign Carousel Generation Functions
+  // ============================================================================
+
+  // Generate cover image for a campaign carousel
+  const handleGenerateCarouselCover = async (carousel: CarouselScript) => {
+    if (!carousel.cover_prompt) return;
+
+    const key = `${carousel.id}-cover`;
+    setGeneratingCarousel(prev => ({ ...prev, [key]: true }));
+
+    try {
+      const prompt = `CAPA DE CARROSSEL INSTAGRAM
+
+${carousel.cover_prompt}
+
+REQUISITOS:
+- Formato 4:5 para feed do Instagram
+- Estilo cinematográfico e premium
+- Textos em fonte bold condensed sans-serif
+- Esta imagem define o estilo visual para todos os slides do carrossel
+- A tipografia (fonte, peso, cor, efeitos) será usada como referência para os slides seguintes`;
+
+      const imageDataUrl = await generateImage(prompt, brandProfile, {
+        aspectRatio: "4:5",
+        model: "gemini-3-pro-image-preview",
+      });
+
+      const base64Data = imageDataUrl.split(",")[1];
+      const mimeType = imageDataUrl.match(/data:(.*?);/)?.[1] || "image/png";
+      const httpUrl = await uploadImageToBlob(base64Data, mimeType);
+
+      if (httpUrl && carousel.id) {
+        // Update in database
+        const updated = await updateCarouselCover(carousel.id, httpUrl);
+        const converted = toCarouselScript(updated);
+        // Update local state
+        setLocalCarousels(prev => prev.map(c => c.id === carousel.id ? converted : c));
+        onCarouselUpdate?.(converted);
+      }
+    } catch (err) {
+      console.error('[CarrosselTab] Failed to generate carousel cover:', err);
+    } finally {
+      setGeneratingCarousel(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  // Generate slide image using cover as style reference
+  const handleGenerateCarouselSlide = async (
+    carousel: CarouselScript,
+    slideNumber: number,
+    slide: { visual: string; text: string }
+  ) => {
+    if (!carousel.cover_url) {
+      console.error('[CarrosselTab] Cannot generate slide without cover image');
+      return;
+    }
+
+    const key = `${carousel.id}-slide-${slideNumber}`;
+    setGeneratingCarousel(prev => ({ ...prev, [key]: true }));
+
+    try {
+      // Get cover image as style reference
+      const coverData = await urlToBase64(carousel.cover_url);
+      if (!coverData) {
+        console.error('[CarrosselTab] Failed to convert cover to base64');
+        return;
+      }
+
+      const styleRef: ImageFile = {
+        base64: coverData.base64,
+        mimeType: coverData.mimeType,
+      };
+
+      const prompt = `SLIDE ${slideNumber} DE UM CARROSSEL INSTAGRAM
+
+Descrição visual: ${slide.visual}
+Texto para incluir: ${slide.text}
+
+IMPORTANTE:
+- Use a imagem anexada como referência EXATA de estilo, cores, tipografia e composição
+- Formato 4:5 para feed do Instagram
+- A tipografia (fonte, peso, cor, efeitos) DEVE ser IDÊNTICA à imagem de referência
+- Mantenha consistência visual com a capa do carrossel`;
+
+      const imageDataUrl = await generateImage(prompt, brandProfile, {
+        aspectRatio: "4:5",
+        model: "gemini-3-pro-image-preview",
+        styleReferenceImage: styleRef,
+      });
+
+      const base64Data = imageDataUrl.split(",")[1];
+      const mimeType = imageDataUrl.match(/data:(.*?);/)?.[1] || "image/png";
+      const httpUrl = await uploadImageToBlob(base64Data, mimeType);
+
+      if (httpUrl && carousel.id) {
+        // Update in database
+        const updated = await updateCarouselSlideImage(carousel.id, slideNumber, httpUrl);
+        const converted = toCarouselScript(updated);
+        // Update local state
+        setLocalCarousels(prev => prev.map(c => c.id === carousel.id ? converted : c));
+        onCarouselUpdate?.(converted);
+      }
+    } catch (err) {
+      console.error(`[CarrosselTab] Failed to generate slide ${slideNumber}:`, err);
+    } finally {
+      setGeneratingCarousel(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  // Generate all slides for a campaign carousel
+  const handleGenerateAllCarouselSlides = async (carousel: CarouselScript) => {
+    if (!carousel.cover_url) {
+      // Generate cover first
+      await handleGenerateCarouselCover(carousel);
+      // After cover is generated, refetch the updated carousel
+      // The state update will trigger re-render
+      return;
+    }
+
+    // Generate all slides that don't have images yet
+    for (const slide of carousel.slides) {
+      if (!slide.image_url) {
+        await handleGenerateCarouselSlide(carousel, slide.slide, slide);
+      }
+    }
+  };
+
+  // Convert campaign carousel to GalleryImage array for preview
+  const getCarouselPreviewImages = (carousel: CarouselScript): GalleryImage[] => {
+    const images: GalleryImage[] = [];
+
+    // Add cover if exists
+    if (carousel.cover_url) {
+      images.push({
+        id: `${carousel.id}-cover`,
+        src: carousel.cover_url,
+        prompt: carousel.cover_prompt || "",
+        source: `Carrossel-${carousel.title}-cover`,
+        model: "gemini-3-pro-image-preview",
+      });
+    }
+
+    // Add slides with images
+    for (const slide of carousel.slides) {
+      if (slide.image_url) {
+        images.push({
+          id: `${carousel.id}-slide-${slide.slide}`,
+          src: slide.image_url,
+          prompt: slide.visual,
+          source: `Carrossel-${carousel.title}-${slide.slide}`,
+          model: "gemini-3-pro-image-preview",
+        });
+      }
+    }
+
+    return images;
+  };
+
+  // ============================================================================
+
   // Publish carousel to Instagram
   const handlePublishCarousel = async (clipKey: string, images: GalleryImage[], title: string) => {
     if (!onPublishCarousel || images.length < 2) return;
@@ -645,18 +837,225 @@ IMPORTANTE:
     }
   };
 
-  if (!videoClipScripts || videoClipScripts.length === 0) {
+  const hasClipCarousels = videoClipScripts && videoClipScripts.length > 0;
+  const hasCampaignCarousels = localCarousels && localCarousels.length > 0;
+
+  if (!hasClipCarousels && !hasCampaignCarousels) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-white/40">
         <Icon name="image" className="w-12 h-12 mb-4" />
-        <p className="text-sm">Nenhum clip disponível</p>
+        <p className="text-sm">Nenhum carrossel disponível</p>
+        <p className="text-xs mt-1">Gere uma campanha ou crie cenas nos clips</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {videoClipScripts.map((clip, index) => {
+      {/* Campaign Carousels Section */}
+      {hasCampaignCarousels && (
+        <>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-medium">
+              Carrosséis da Campanha
+            </span>
+          </div>
+          {localCarousels.map((carousel, index) => {
+            const carouselKey = `carousel-${carousel.id}`;
+            const isExpanded = !collapsedClips.has(carouselKey);
+            const previewImages = getCarouselPreviewImages(carousel);
+            const hasAnyImages = previewImages.length > 0;
+            const totalSlides = carousel.slides.length;
+            const slidesWithImages = carousel.slides.filter(s => s.image_url).length;
+            const hasCover = !!carousel.cover_url;
+            const allGenerated = hasCover && slidesWithImages === totalSlides;
+            const isGeneratingAny = Object.entries(generatingCarousel).some(
+              ([key, val]) => key.startsWith(`${carousel.id}-`) && val,
+            );
+            const orderedImages = customOrders[carouselKey] || previewImages;
+
+            return (
+              <div
+                key={carouselKey}
+                className="bg-white/[0.02] border border-amber-500/20 rounded-xl overflow-hidden"
+              >
+                {/* Header */}
+                <div
+                  className="px-3 sm:px-4 py-3 border-b border-white/[0.06] flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                  onClick={() => {
+                    setCollapsedClips((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(carouselKey)) {
+                        next.delete(carouselKey);
+                      } else {
+                        next.add(carouselKey);
+                      }
+                      return next;
+                    });
+                  }}
+                >
+                  {/* Title row */}
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-xs font-medium text-amber-400 flex-shrink-0">
+                      {index + 1}
+                    </div>
+                    <h3 className="text-sm font-medium text-white/90 truncate flex-1">
+                      {carousel.title}
+                    </h3>
+                    <Icon
+                      name={isExpanded ? "chevron-up" : "chevron-down"}
+                      className="w-4 h-4 text-white/40 sm:hidden flex-shrink-0"
+                    />
+                  </div>
+
+                  {/* Actions row */}
+                  <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none -mx-3 px-3 sm:mx-0 sm:px-0 pb-1 sm:pb-0 [&>*]:flex-shrink-0">
+                    {/* Status badges */}
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      {hasAnyImages && (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-medium whitespace-nowrap">
+                          {previewImages.length} imagens
+                        </span>
+                      )}
+                      <span className="text-[10px] sm:text-xs text-white/40 whitespace-nowrap">
+                        {hasCover ? "1" : "0"} capa + {slidesWithImages}/{totalSlides} slides
+                      </span>
+                    </div>
+
+                    {/* Generate button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!hasCover) {
+                          handleGenerateCarouselCover(carousel);
+                        } else {
+                          handleGenerateAllCarouselSlides(carousel);
+                        }
+                      }}
+                      disabled={isGeneratingAny}
+                      className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {isGeneratingAny ? "Gerando..." : !hasCover ? "Gerar Capa" : allGenerated ? "Regenerar" : "Gerar Slides"}
+                    </button>
+
+                    {/* Schedule button */}
+                    {onSchedulePost && hasAnyImages && orderedImages.length >= 2 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSchedulingClip({ clipKey: carouselKey, images: orderedImages, title: carousel.title });
+                        }}
+                        className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+                      >
+                        <Icon name="calendar" className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+                        Agendar
+                      </button>
+                    )}
+
+                    {/* Publish button */}
+                    {onPublishCarousel && hasAnyImages && orderedImages.length >= 2 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePublishCarousel(carouselKey, orderedImages, carousel.title);
+                        }}
+                        disabled={publishing[carouselKey]}
+                        className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-white/10 text-white/70 hover:bg-white/15 transition-colors disabled:opacity-50 flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+                      >
+                        {publishing[carouselKey] ? (
+                          <>
+                            <Loader size={12} />
+                            Publicando...
+                          </>
+                        ) : (
+                          <>
+                            <Icon name="send" className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+                            Publicar
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    <Icon
+                      name={isExpanded ? "chevron-up" : "chevron-down"}
+                      className="w-4 h-4 text-white/40 hidden sm:block"
+                    />
+                  </div>
+                </div>
+
+                {/* Expanded Content */}
+                {isExpanded && (
+                  <div className="p-6">
+                    {hasAnyImages ? (
+                      <CarouselPreview
+                        images={orderedImages}
+                        onReorder={(newOrder) => handleReorder(carouselKey, newOrder)}
+                        clipTitle={carousel.title}
+                        onOpenEditor={setEditingImage}
+                        caption={captions[carouselKey] || carousel.caption || ""}
+                        onCaptionChange={(newCaption) => setCaptions(prev => ({ ...prev, [carouselKey]: newCaption }))}
+                      />
+                    ) : (
+                      <div className="text-center py-8">
+                        <Icon
+                          name="image"
+                          className="w-10 h-10 text-white/20 mx-auto mb-3"
+                        />
+                        <p className="text-sm text-white/50 mb-4">
+                          Gere a capa primeiro para visualizar o carrossel
+                        </p>
+                        <button
+                          onClick={() => handleGenerateCarouselCover(carousel)}
+                          disabled={isGeneratingAny}
+                          className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500 transition-colors disabled:opacity-50"
+                        >
+                          {isGeneratingAny ? "Gerando..." : "Gerar Capa"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Collapsed Preview */}
+                {!isExpanded && hasAnyImages && (
+                  <div className="px-4 py-3 flex gap-2 overflow-x-auto">
+                    {orderedImages.slice(0, 6).map((img, idx) => (
+                      <div
+                        key={img.id || idx}
+                        className="w-12 h-15 flex-shrink-0 rounded overflow-hidden border border-white/10 cursor-pointer hover:border-white/30 transition-colors"
+                        onClick={() => setEditingImage(img)}
+                      >
+                        <img
+                          src={img.src}
+                          alt={`Preview ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                    {orderedImages.length > 6 && (
+                      <div className="w-12 h-15 flex-shrink-0 rounded bg-white/5 flex items-center justify-center text-xs text-white/40">
+                        +{orderedImages.length - 6}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {/* Clip-based Carousels Section */}
+      {hasClipCarousels && (
+        <>
+          {hasCampaignCarousels && (
+            <div className="flex items-center gap-2 mb-2 mt-6">
+              <span className="px-2 py-0.5 rounded-full bg-white/10 text-white/60 text-xs font-medium">
+                Carrosséis dos Clips
+              </span>
+            </div>
+          )}
+          {videoClipScripts.map((clip, index) => {
         const originalImages = getOriginalSceneImages(clip);
         const carrosselImages = getCarrosselImages(clip);
         const hasAnyOriginal = originalImages.length > 0;
@@ -855,6 +1254,8 @@ IMPORTANTE:
           </div>
         );
       })}
+        </>
+      )}
 
       {/* Image Preview Modal */}
       {editingImage && (

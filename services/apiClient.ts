@@ -414,6 +414,23 @@ export interface DbAdCreative {
   sort_order: number;
 }
 
+export interface DbCarouselScript {
+  id: string;
+  campaign_id: string;
+  title: string;
+  hook: string;
+  cover_prompt: string | null;
+  cover_url: string | null;
+  caption: string | null;
+  slides: Array<{
+    slide: number;
+    visual: string;
+    text: string;
+    image_url?: string;
+  }>;
+  sort_order: number;
+}
+
 export interface DbCampaign {
   id: string;
   user_id: string;
@@ -428,6 +445,7 @@ export interface DbCampaign {
   clips_count?: number;
   posts_count?: number;
   ads_count?: number;
+  carousels_count?: number;
   clip_preview_url?: string | null;
   post_preview_url?: string | null;
   ad_preview_url?: string | null;
@@ -439,6 +457,7 @@ export interface DbCampaignFull extends DbCampaign {
   video_clip_scripts: DbVideoClipScript[];
   posts: DbPost[];
   ad_creatives: DbAdCreative[];
+  carousel_scripts: DbCarouselScript[];
 }
 
 export async function getCampaigns(
@@ -498,6 +517,17 @@ export async function createCampaign(
       body: string;
       cta: string;
       image_prompt?: string;
+    }>;
+    carousel_scripts?: Array<{
+      title: string;
+      hook: string;
+      cover_prompt?: string;
+      caption?: string;
+      slides: Array<{
+        slide: number;
+        visual: string;
+        text: string;
+      }>;
     }>;
   },
 ): Promise<DbCampaignFull> {
@@ -567,6 +597,44 @@ export async function updateSceneImage(
       body: JSON.stringify({ image_url: imageUrl }),
     },
   );
+}
+
+// ============================================================================
+// Carousel Scripts Updates
+// ============================================================================
+
+export async function updateCarouselCover(
+  carouselId: string,
+  coverUrl: string,
+): Promise<DbCarouselScript> {
+  return fetchApi<DbCarouselScript>(`/carousels?id=${carouselId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ cover_url: coverUrl }),
+  });
+}
+
+export async function updateCarouselSlideImage(
+  carouselId: string,
+  slideNumber: number,
+  imageUrl: string,
+): Promise<DbCarouselScript> {
+  return fetchApi<DbCarouselScript>(
+    `/carousels/slide?carousel_id=${carouselId}&slide_number=${slideNumber}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ image_url: imageUrl }),
+    },
+  );
+}
+
+export async function updateCarouselCaption(
+  carouselId: string,
+  caption: string,
+): Promise<DbCarouselScript> {
+  return fetchApi<DbCarouselScript>(`/carousels?id=${carouselId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ caption }),
+  });
 }
 
 // ============================================================================

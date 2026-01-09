@@ -115,7 +115,7 @@ export function initializeWorker(processorFn) {
 
   worker = new Worker('image-generation', processorFn, {
     connection: conn,
-    concurrency: 2, // Process 2 jobs at a time
+    concurrency: 1, // Process 1 job at a time to avoid race conditions
   });
 
   worker.on('completed', (job, result) => {
@@ -134,7 +134,7 @@ export function initializeWorker(processorFn) {
     console.error('[JobQueue] Worker error:', err.message);
   });
 
-  console.log('[JobQueue] Worker initialized with concurrency 2');
+  console.log('[JobQueue] Worker initialized with concurrency 1');
   return worker;
 }
 

@@ -68,6 +68,24 @@ export interface AdCreative {
   image_url?: string | null; // Generated image URL (from database)
 }
 
+// Carousel Script - similar to VideoClipScript but for Instagram carousels
+export interface CarouselSlide {
+  slide: number;
+  visual: string; // Visual description for image generation
+  text: string; // Short text to include in the slide (max 10 words)
+  image_url?: string; // Generated slide image URL
+}
+
+export interface CarouselScript {
+  id?: string; // Database ID
+  title: string;
+  hook: string; // Opening text
+  slides: CarouselSlide[];
+  cover_prompt: string; // Prompt for cover image (sets visual style)
+  cover_url?: string | null; // Generated cover image URL
+  caption?: string; // Instagram caption
+}
+
 export interface MarketingCampaign {
   id?: string; // Database ID (optional for new campaigns)
   name?: string; // Campaign name
@@ -75,6 +93,7 @@ export interface MarketingCampaign {
   videoClipScripts: VideoClipScript[];
   posts: Post[];
   adCreatives: AdCreative[];
+  carousels: CarouselScript[]; // Instagram carousels
   createdAt?: string; // ISO timestamp
   updatedAt?: string; // ISO timestamp
   generatedWithModel?: string; // AI model used to generate
@@ -89,6 +108,7 @@ export interface CampaignSummary {
   videoCount?: number;
   postCount?: number;
   adCount?: number;
+  carouselCount?: number;
 }
 
 export interface ImageFile {
@@ -156,6 +176,7 @@ export interface GalleryImage {
   post_id?: string;
   ad_creative_id?: string;
   video_script_id?: string;
+  carousel_script_id?: string;
   campaign_id?: string; // Derived from post_id or ad_creative_id via JOIN
   // Database linking for flyers
   tournament_event_id?: string;

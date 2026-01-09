@@ -1137,6 +1137,13 @@ function AppContent() {
               cta: a.cta,
               image_prompt: a.image_prompt,
             })),
+            carousel_scripts: (r.carousels || []).map((c) => ({
+              title: c.title,
+              hook: c.hook,
+              cover_prompt: c.cover_prompt,
+              caption: c.caption,
+              slides: c.slides,
+            })),
           });
 
           // Update campaign with database IDs (including clip/post/ad IDs for image linking)
@@ -1170,6 +1177,16 @@ function AppContent() {
             r.adCreatives = r.adCreatives.map((ad, index) => ({
               ...ad,
               id: savedCampaign.ad_creatives[index]?.id,
+            }));
+          }
+          if (
+            savedCampaign.carousel_scripts &&
+            savedCampaign.carousel_scripts.length > 0 &&
+            r.carousels
+          ) {
+            r.carousels = r.carousels.map((carousel, index) => ({
+              ...carousel,
+              id: savedCampaign.carousel_scripts[index]?.id,
             }));
           }
 
@@ -1258,6 +1275,15 @@ function AppContent() {
             image_prompt: a.image_prompt || "",
             image_url: a.image_url || null, // Include saved image URL
           })),
+          carousels: (fullCampaign.carousel_scripts || []).map((c) => ({
+            id: c.id,
+            title: c.title,
+            hook: c.hook,
+            cover_prompt: c.cover_prompt || "",
+            cover_url: c.cover_url || null,
+            caption: c.caption || "",
+            slides: c.slides || [],
+          })),
         };
         console.log(
           "[Campaign] Loaded:",
@@ -1266,7 +1292,9 @@ function AppContent() {
           loadedCampaign.posts.length,
           "posts,",
           loadedCampaign.adCreatives.length,
-          "ads",
+          "ads,",
+          loadedCampaign.carousels.length,
+          "carousels",
         );
         setCampaign(loadedCampaign);
         setActiveView("campaign");

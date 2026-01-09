@@ -371,6 +371,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                   {activeTab === "carrossel" && (
                     <CarrosselTab
                       videoClipScripts={campaign.videoClipScripts}
+                      carousels={campaign.carousels}
                       galleryImages={galleryImages}
                       brandProfile={brandProfile}
                       onAddImageToGallery={onAddImageToGallery}

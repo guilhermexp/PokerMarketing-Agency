@@ -524,8 +524,33 @@ const campaignSchema = {
         required: ["platform", "headline", "body", "cta", "image_prompt"],
       },
     },
+    carousels: {
+      type: Type.ARRAY,
+      description: "Carrosséis para Instagram (4-6 slides cada).",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          hook: { type: Type.STRING },
+          cover_prompt: { type: Type.STRING },
+          slides: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                slide: { type: Type.INTEGER },
+                visual: { type: Type.STRING },
+                text: { type: Type.STRING },
+              },
+              required: ["slide", "visual", "text"],
+            },
+          },
+        },
+        required: ["title", "hook", "cover_prompt", "slides"],
+      },
+    },
   },
-  required: ["videoClipScripts", "posts", "adCreatives"],
+  required: ["videoClipScripts", "posts", "adCreatives", "carousels"],
 };
 
 // Quick post schema
@@ -621,51 +646,45 @@ const processVideoGenerationJob = async (job, jobId, prompt, config, sql) => {
       });
     }
     videoUrl = result?.data?.video?.url || result?.video?.url || "";
-  } else if (isInterpolationMode) {
-    // Veo 3.1 with first/last frame interpolation via Google API
+  } else {
+    // Veo 3.1 model - try Google API first, fallback to FAL.ai
     try {
       videoUrl = await generateVideoWithGoogleVeo(
         prompt,
         aspectRatio || "9:16",
         imageUrl,
-        lastFrameUrl,
+        isInterpolationMode ? lastFrameUrl : null,
       );
     } catch (googleError) {
       console.log(
-        `[JobProcessor] Google Veo interpolation failed: ${googleError.message}`,
+        `[JobProcessor] Google Veo failed: ${googleError.message}`,
       );
       console.log("[JobProcessor] Falling back to FAL.ai...");
-      result = await fal.subscribe("fal-ai/veo3.1/fast/image-to-video", {
-        input: {
-          prompt,
-          image_url: imageUrl,
-          duration: "8s",
-          aspect_ratio: aspectRatio || "9:16",
-        },
-      });
+      const duration = isInterpolationMode
+        ? "8s"
+        : sceneDuration
+          ? String(sceneDuration)
+          : "5";
+      if (imageUrl) {
+        result = await fal.subscribe("fal-ai/veo3.1/fast/image-to-video", {
+          input: {
+            prompt,
+            image_url: imageUrl,
+            duration,
+            aspect_ratio: aspectRatio || "9:16",
+          },
+        });
+      } else {
+        result = await fal.subscribe("fal-ai/veo3.1/fast", {
+          input: {
+            prompt,
+            duration,
+            aspect_ratio: aspectRatio || "9:16",
+          },
+        });
+      }
       videoUrl = result?.data?.video?.url || result?.video?.url || "";
     }
-  } else {
-    // Veo 3.1 model (default)
-    if (imageUrl) {
-      result = await fal.subscribe("fal-ai/veo3.1/fast/image-to-video", {
-        input: {
-          prompt,
-          image_url: imageUrl,
-          duration: sceneDuration ? String(sceneDuration) : "5",
-          aspect_ratio: aspectRatio || "9:16",
-        },
-      });
-    } else {
-      result = await fal.subscribe("fal-ai/veo3.1/fast", {
-        input: {
-          prompt,
-          duration: sceneDuration ? String(sceneDuration) : "5",
-          aspect_ratio: aspectRatio || "9:16",
-        },
-      });
-    }
-    videoUrl = result?.data?.video?.url || result?.video?.url || "";
   }
 
   job.updateProgress(70);
@@ -2600,7 +2619,7 @@ app.get("/api/db/campaigns", async (req, res) => {
       if (include_content === "true") {
         const campaign = result[0];
 
-        const [videoScripts, posts, adCreatives] = await Promise.all([
+        const [videoScripts, posts, adCreatives, carouselScripts] = await Promise.all([
           sql`
             SELECT * FROM video_clip_scripts
             WHERE campaign_id = ${id}
@@ -2616,6 +2635,11 @@ app.get("/api/db/campaigns", async (req, res) => {
             WHERE campaign_id = ${id}
             ORDER BY sort_order ASC
           `,
+          sql`
+            SELECT * FROM carousel_scripts
+            WHERE campaign_id = ${id}
+            ORDER BY sort_order ASC
+          `,
         ]);
 
         return res.status(200).json({
@@ -2623,6 +2647,7 @@ app.get("/api/db/campaigns", async (req, res) => {
           video_clip_scripts: videoScripts,
           posts: posts,
           ad_creatives: adCreatives,
+          carousel_scripts: carouselScripts,
         });
       }
 
@@ -2695,6 +2720,7 @@ app.post("/api/db/campaigns", async (req, res) => {
       video_clip_scripts,
       posts,
       ad_creatives,
+      carousel_scripts,
     } = req.body;
 
     if (!user_id) {
@@ -2772,12 +2798,27 @@ app.post("/api/db/campaigns", async (req, res) => {
       }
     }
 
+    // Insert and collect carousel scripts with their IDs
+    const createdCarouselScripts = [];
+    if (carousel_scripts && Array.isArray(carousel_scripts)) {
+      for (let i = 0; i < carousel_scripts.length; i++) {
+        const carousel = carousel_scripts[i];
+        const result = await sql`
+          INSERT INTO carousel_scripts (campaign_id, user_id, organization_id, title, hook, cover_prompt, caption, slides, sort_order)
+          VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${carousel.title}, ${carousel.hook}, ${carousel.cover_prompt || null}, ${carousel.caption || null}, ${JSON.stringify(carousel.slides || [])}, ${i})
+          RETURNING *
+        `;
+        createdCarouselScripts.push(result[0]);
+      }
+    }
+
     // Return campaign with all created items including their IDs
     res.status(201).json({
       ...campaign,
       video_clip_scripts: createdVideoClipScripts,
       posts: createdPosts,
       ad_creatives: createdAdCreatives,
+      carousel_scripts: createdCarouselScripts,
     });
   } catch (error) {
     if (
@@ -2924,6 +2965,90 @@ app.patch("/api/db/campaigns/scene", async (req, res) => {
     res.json(result[0]);
   } catch (error) {
     console.error("[Campaigns API] Error updating scene image:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Carousels API - Update carousel (cover_url, caption)
+app.patch("/api/db/carousels", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { id } = req.query;
+    const { cover_url, caption } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ error: "id is required" });
+    }
+
+    const result = await sql`
+      UPDATE carousel_scripts
+      SET cover_url = COALESCE(${cover_url}, cover_url),
+          caption = COALESCE(${caption}, caption),
+          updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `;
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Carousel not found" });
+    }
+
+    console.log(`[Carousels API] Updated carousel ${id}`);
+    res.json(result[0]);
+  } catch (error) {
+    console.error("[Carousels API] Error updating carousel:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Carousels API - Update slide image_url in slides JSONB
+app.patch("/api/db/carousels/slide", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { carousel_id, slide_number } = req.query;
+    const { image_url } = req.body;
+
+    if (!carousel_id || slide_number === undefined) {
+      return res
+        .status(400)
+        .json({ error: "carousel_id and slide_number are required" });
+    }
+
+    const slideNum = parseInt(slide_number, 10);
+
+    // Get current slides
+    const [carousel] = await sql`
+      SELECT slides FROM carousel_scripts WHERE id = ${carousel_id}
+    `;
+
+    if (!carousel) {
+      return res.status(404).json({ error: "Carousel not found" });
+    }
+
+    // Update the specific slide with image_url
+    const slides = carousel.slides || [];
+    const updatedSlides = slides.map((slide) => {
+      if (slide.slide === slideNum) {
+        return { ...slide, image_url: image_url || null };
+      }
+      return slide;
+    });
+
+    // Save updated slides back to database
+    const result = await sql`
+      UPDATE carousel_scripts
+      SET slides = ${JSON.stringify(updatedSlides)}::jsonb,
+          updated_at = NOW()
+      WHERE id = ${carousel_id}
+      RETURNING *
+    `;
+
+    console.log(
+      `[Carousels API] Updated slide ${slideNum} image for carousel ${carousel_id}`,
+    );
+    res.json(result[0]);
+  } catch (error) {
+    console.error("[Carousels API] Error updating slide image:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -4723,75 +4848,58 @@ app.post("/api/ai/video", async (req, res) => {
       }
 
       videoUrl = result?.data?.video?.url || result?.video?.url || "";
-    } else if (isInterpolationMode) {
-      // Veo 3.1 with first/last frame interpolation via Google API
+    } else {
+      // Veo 3.1 - try Google API first, fallback to FAL.ai
       try {
         videoUrl = await generateVideoWithGoogleVeo(
           prompt,
           aspectRatio,
           imageUrl,
-          lastFrameUrl,
+          isInterpolationMode ? lastFrameUrl : null,
         );
       } catch (googleError) {
         console.log(
-          `[Video API] Google Veo interpolation failed: ${googleError.message}`,
+          `[Video API] Google Veo failed: ${googleError.message}`,
         );
-        console.log("[Video API] Falling back to FAL.ai image-to-video...");
-        // Fallback to FAL.ai without interpolation
-        const result = await fal.subscribe(
-          "fal-ai/veo3.1/fast/image-to-video",
-          {
+        console.log("[Video API] Falling back to FAL.ai...");
+        const duration = isInterpolationMode
+          ? "8s"
+          : sceneDuration && sceneDuration <= 4
+            ? "4s"
+            : sceneDuration && sceneDuration <= 6
+              ? "6s"
+              : "8s";
+
+        let result;
+
+        if (isHttpUrl) {
+          result = await fal.subscribe("fal-ai/veo3.1/fast/image-to-video", {
             input: {
               prompt,
               image_url: imageUrl,
               aspect_ratio: aspectRatio,
-              duration: "8s",
+              duration,
               resolution: "720p",
               generate_audio: true,
             },
             logs: true,
-          },
-        );
+          });
+        } else {
+          result = await fal.subscribe("fal-ai/veo3.1/fast", {
+            input: {
+              prompt,
+              aspect_ratio: aspectRatio,
+              duration,
+              resolution: "720p",
+              generate_audio: true,
+              auto_fix: true,
+            },
+            logs: true,
+          });
+        }
+
         videoUrl = result?.data?.video?.url || result?.video?.url || "";
       }
-    } else {
-      // Veo 3.1 standard via FAL.ai
-      const duration =
-        sceneDuration && sceneDuration <= 4
-          ? "4s"
-          : sceneDuration && sceneDuration <= 6
-            ? "6s"
-            : "8s";
-
-      let result;
-
-      if (isHttpUrl) {
-        result = await fal.subscribe("fal-ai/veo3.1/fast/image-to-video", {
-          input: {
-            prompt,
-            image_url: imageUrl,
-            aspect_ratio: aspectRatio,
-            duration,
-            resolution: "720p",
-            generate_audio: true,
-          },
-          logs: true,
-        });
-      } else {
-        result = await fal.subscribe("fal-ai/veo3.1/fast", {
-          input: {
-            prompt,
-            aspect_ratio: aspectRatio,
-            duration,
-            resolution: "720p",
-            generate_audio: true,
-            auto_fix: true,
-          },
-          logs: true,
-        });
-      }
-
-      videoUrl = result?.data?.video?.url || result?.video?.url || "";
     }
 
     if (!videoUrl) {
