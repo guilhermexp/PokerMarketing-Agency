@@ -1,6 +1,6 @@
 /**
- * Admin Organizations Page
- * List all organizations with their usage stats
+ * Organizations Page - Página de organizações
+ * Design minimalista com tema dark
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -54,7 +54,7 @@ export function OrganizationsPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error('Failed to fetch organizations');
+      if (!res.ok) throw new Error('Falha ao carregar organizações');
 
       const data = await res.json();
       setOrganizations(data.organizations);
@@ -62,7 +62,7 @@ export function OrganizationsPage() {
       setError(null);
     } catch (err) {
       console.error('Error fetching organizations:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load organizations');
+      setError(err instanceof Error ? err.message : 'Falha ao carregar organizações');
     } finally {
       setIsLoading(false);
     }
@@ -79,41 +79,41 @@ export function OrganizationsPage() {
   const columns: Column<Organization>[] = [
     {
       key: 'organization',
-      header: 'Organization',
+      header: 'Organização',
       render: (row) => (
         <div>
-          <div className="font-medium text-[var(--color-text-primary)]">
-            {row.primary_brand_name || 'Unnamed'}
+          <div className="text-[13px] font-medium text-white/80">
+            {row.primary_brand_name || 'Sem nome'}
           </div>
-          <div className="text-xs text-[var(--color-text-tertiary)] font-mono">
-            {row.organization_id.slice(0, 20)}...
+          <div className="text-[10px] text-white/30 font-mono mt-0.5">
+            {row.organization_id?.slice(0, 20)}...
           </div>
         </div>
       ),
     },
     {
       key: 'brands',
-      header: 'Brands',
+      header: 'Marcas',
       render: (row) => (
-        <span className="px-2 py-1 bg-purple-500/10 text-purple-500 rounded-full text-xs font-medium">
+        <span className="text-[12px] text-white/60 tabular-nums">
           {row.brand_count}
         </span>
       ),
     },
     {
       key: 'campaigns',
-      header: 'Campaigns',
+      header: 'Campanhas',
       render: (row) => (
-        <span className="px-2 py-1 bg-blue-500/10 text-blue-500 rounded-full text-xs font-medium">
+        <span className="text-[12px] text-white/60 tabular-nums">
           {row.campaign_count}
         </span>
       ),
     },
     {
       key: 'images',
-      header: 'Images',
+      header: 'Imagens',
       render: (row) => (
-        <span className="px-2 py-1 bg-green-500/10 text-green-500 rounded-full text-xs font-medium">
+        <span className="text-[12px] text-white/60 tabular-nums">
           {row.gallery_image_count}
         </span>
       ),
@@ -122,34 +122,34 @@ export function OrganizationsPage() {
       key: 'posts',
       header: 'Posts',
       render: (row) => (
-        <span className="px-2 py-1 bg-orange-500/10 text-orange-500 rounded-full text-xs font-medium">
+        <span className="text-[12px] text-white/60 tabular-nums">
           {row.scheduled_post_count}
         </span>
       ),
     },
     {
       key: 'aiUsage',
-      header: 'AI Usage (Month)',
+      header: 'Uso IA (mês)',
       render: (row) => (
         <div className="text-right">
-          <div className="text-[var(--color-text-primary)] font-medium">
-            ${row.aiUsageThisMonth.costUsd.toFixed(2)}
+          <div className="text-[12px] font-medium text-amber-500 tabular-nums">
+            ${row.aiUsageThisMonth?.costUsd?.toFixed(2) || '0.00'}
           </div>
-          <div className="text-xs text-[var(--color-text-tertiary)]">
-            {row.aiUsageThisMonth.requests} requests
+          <div className="text-[10px] text-white/40">
+            {row.aiUsageThisMonth?.requests || 0} req.
           </div>
         </div>
       ),
     },
     {
       key: 'last_activity',
-      header: 'Last Activity',
+      header: 'Última Atividade',
       render: (row) => (
-        <span className="text-[var(--color-text-secondary)]">
+        <span className="text-[12px] text-white/50">
           {row.last_activity
-            ? new Date(row.last_activity).toLocaleDateString('en-US', {
+            ? new Date(row.last_activity).toLocaleDateString('pt-BR', {
+                day: '2-digit',
                 month: 'short',
-                day: 'numeric',
                 year: 'numeric',
               })
             : '-'}
@@ -159,20 +159,20 @@ export function OrganizationsPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">All Organizations</h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {pagination.total} organizations registered
+          <h2 className="text-[15px] font-medium text-white/90">Todas as Organizações</h2>
+          <p className="text-[12px] text-white/40 mt-0.5">
+            {pagination.total} organizações cadastradas
           </p>
         </div>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-500">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-400 text-[13px]">
           {error}
         </div>
       )}
@@ -182,12 +182,12 @@ export function OrganizationsPage() {
         columns={columns}
         data={organizations}
         isLoading={isLoading}
-        emptyMessage="No organizations found"
+        emptyMessage="Nenhuma organização encontrada"
       />
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border)] overflow-hidden">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg overflow-hidden">
           <Pagination
             currentPage={pagination.page}
             totalPages={pagination.totalPages}

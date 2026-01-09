@@ -1,6 +1,6 @@
 /**
- * Admin Layout Component
- * Main layout wrapper for admin panel with sidebar and header
+ * Admin Layout - Layout principal do painel admin
+ * Design minimalista com tema dark
  */
 
 import React from 'react';
@@ -13,10 +13,10 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   return (
-    <div className="min-h-screen bg-[var(--color-bg-primary)]">
+    <div className="min-h-screen bg-[#0c0c0c]">
       <AdminSidebar />
       <AdminHeader />
-      <main className="ml-64 pt-16 min-h-screen">
+      <main className="ml-56 pt-14 min-h-screen">
         <div className="p-6">
           {children}
         </div>

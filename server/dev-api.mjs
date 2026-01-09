@@ -349,36 +349,37 @@ app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
     const sql = getSql();
 
     // Get all stats in parallel
+    // Note: organizations are managed by Clerk, not in our DB
     const [
       usersResult,
-      orgsResult,
       campaignsResult,
       postsResult,
       galleryResult,
       aiUsageResult,
-      errorsResult
+      errorsResult,
+      orgCountResult
     ] = await Promise.all([
       sql`SELECT COUNT(*) as count FROM users`,
-      sql`SELECT COUNT(*) as count FROM organizations`,
       sql`SELECT COUNT(*) as count FROM campaigns`,
       sql`SELECT COUNT(*) as count,
           COUNT(*) FILTER (WHERE status = 'scheduled') as pending
           FROM scheduled_posts`,
       sql`SELECT COUNT(*) as count FROM gallery_images`,
       sql`SELECT
-          COALESCE(SUM(cost_cents), 0) as total_cost,
+          COALESCE(SUM(estimated_cost_cents), 0) as total_cost,
           COUNT(*) as total_requests
-          FROM ai_usage_logs
+          FROM api_usage_logs
           WHERE created_at >= date_trunc('month', CURRENT_DATE)`,
-      sql`SELECT COUNT(*) as count FROM ai_usage_logs
+      sql`SELECT COUNT(*) as count FROM api_usage_logs
           WHERE created_at >= NOW() - INTERVAL '24 hours'
-          AND (error IS NOT NULL OR status = 'error')`
+          AND status = 'failed'`,
+      sql`SELECT COUNT(DISTINCT organization_id) as count FROM api_usage_logs WHERE organization_id IS NOT NULL`
     ]);
 
     res.json({
       totalUsers: parseInt(usersResult[0]?.count || 0),
       activeUsersToday: 0, // Would need session tracking
-      totalOrganizations: parseInt(orgsResult[0]?.count || 0),
+      totalOrganizations: parseInt(orgCountResult[0]?.count || 0),
       totalCampaigns: parseInt(campaignsResult[0]?.count || 0),
       totalScheduledPosts: parseInt(postsResult[0]?.count || 0),
       pendingPosts: parseInt(postsResult[0]?.pending || 0),
@@ -397,24 +398,26 @@ app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
 app.get("/api/admin/usage", requireSuperAdmin, async (req, res) => {
   try {
     const sql = getSql();
-    const { groupBy = 'day', days = 30 } = req.query;
+    const { days = 30 } = req.query;
 
     const timeline = await sql`
       SELECT
-        DATE_TRUNC(${groupBy}, created_at) as date,
+        DATE(created_at) as date,
         COUNT(*) as total_requests,
-        COALESCE(SUM(cost_cents), 0) as total_cost_cents,
-        operation_type
-      FROM ai_usage_logs
+        COALESCE(SUM(estimated_cost_cents), 0) as total_cost_cents,
+        operation
+      FROM api_usage_logs
       WHERE created_at >= NOW() - INTERVAL '1 day' * ${parseInt(days)}
-      GROUP BY DATE_TRUNC(${groupBy}, created_at), operation_type
+      GROUP BY DATE(created_at), operation
       ORDER BY date DESC
     `;
 
     // Aggregate by date
     const aggregated = {};
     for (const row of timeline) {
-      const dateKey = row.date.toISOString().split('T')[0];
+      const dateKey = row.date instanceof Date
+        ? row.date.toISOString().split('T')[0]
+        : String(row.date);
       if (!aggregated[dateKey]) {
         aggregated[dateKey] = { date: dateKey, total_requests: 0, total_cost_cents: 0 };
       }
@@ -435,28 +438,34 @@ app.get("/api/admin/usage", requireSuperAdmin, async (req, res) => {
 app.get("/api/admin/users", requireSuperAdmin, async (req, res) => {
   try {
     const sql = getSql();
-    const { limit = 50, offset = 0 } = req.query;
+    const { limit = 20, page = 1 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const users = await sql`
       SELECT
-        u.id, u.clerk_id, u.email, u.name, u.created_at,
+        u.id, u.auth_provider_id as clerk_id, u.email, u.name, u.created_at,
         COUNT(DISTINCT c.id) as campaigns_count,
         COUNT(DISTINCT g.id) as gallery_count
       FROM users u
       LEFT JOIN campaigns c ON c.user_id = u.id
       LEFT JOIN gallery_images g ON g.user_id = u.id
-      GROUP BY u.id
+      GROUP BY u.id, u.auth_provider_id, u.email, u.name, u.created_at
       ORDER BY u.created_at DESC
-      LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+      LIMIT ${parseInt(limit)} OFFSET ${offset}
     `;
 
     const countResult = await sql`SELECT COUNT(*) as total FROM users`;
+    const total = parseInt(countResult[0]?.total || 0);
+    const totalPages = Math.ceil(total / parseInt(limit));
 
     res.json({
       users,
-      total: parseInt(countResult[0]?.total || 0),
-      limit: parseInt(limit),
-      offset: parseInt(offset)
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages
+      }
     });
   } catch (error) {
     console.error('[Admin] Users error:', error);
@@ -464,32 +473,141 @@ app.get("/api/admin/users", requireSuperAdmin, async (req, res) => {
   }
 });
 
-// Admin: Get organizations list
+// Admin: Get organizations list (from Clerk org IDs in brand_profiles/campaigns/usage tables)
 app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
   try {
     const sql = getSql();
-    const { limit = 50, offset = 0 } = req.query;
+    const { limit = 20, page = 1 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
+    // Get organization base data with counts from various tables
     const orgs = await sql`
+      WITH org_base AS (
+        SELECT DISTINCT organization_id
+        FROM brand_profiles
+        WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+        UNION
+        SELECT DISTINCT organization_id
+        FROM campaigns
+        WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+      ),
+      brand_data AS (
+        SELECT
+          organization_id,
+          COUNT(*) as brand_count,
+          MIN(name) as primary_brand_name,
+          MIN(created_at) as first_brand_created
+        FROM brand_profiles
+        WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+        GROUP BY organization_id
+      ),
+      campaign_data AS (
+        SELECT
+          organization_id,
+          COUNT(*) as campaign_count
+        FROM campaigns
+        WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+        GROUP BY organization_id
+      ),
+      gallery_data AS (
+        SELECT
+          organization_id,
+          COUNT(*) as gallery_image_count
+        FROM gallery_images
+        WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+        GROUP BY organization_id
+      ),
+      post_data AS (
+        SELECT
+          organization_id,
+          COUNT(*) as scheduled_post_count
+        FROM scheduled_posts
+        WHERE organization_id IS NOT NULL
+        GROUP BY organization_id
+      ),
+      activity_data AS (
+        SELECT
+          organization_id,
+          MAX(created_at) as last_activity
+        FROM (
+          SELECT organization_id, created_at FROM brand_profiles WHERE organization_id IS NOT NULL
+          UNION ALL
+          SELECT organization_id, created_at FROM campaigns WHERE organization_id IS NOT NULL
+          UNION ALL
+          SELECT organization_id, created_at FROM gallery_images WHERE organization_id IS NOT NULL
+          UNION ALL
+          SELECT organization_id, created_at FROM scheduled_posts WHERE organization_id IS NOT NULL
+        ) all_activity
+        GROUP BY organization_id
+      ),
+      usage_this_month AS (
+        SELECT
+          organization_id,
+          COUNT(*) as request_count,
+          COALESCE(SUM(estimated_cost_cents), 0) as cost_cents
+        FROM api_usage_logs
+        WHERE organization_id IS NOT NULL
+          AND created_at >= DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY organization_id
+      )
       SELECT
-        o.id, o.clerk_id, o.name, o.slug, o.created_at,
-        COUNT(DISTINCT om.user_id) as members_count,
-        COUNT(DISTINCT c.id) as campaigns_count
-      FROM organizations o
-      LEFT JOIN organization_members om ON om.organization_id = o.id
-      LEFT JOIN campaigns c ON c.organization_id = o.id
-      GROUP BY o.id
-      ORDER BY o.created_at DESC
-      LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+        o.organization_id,
+        COALESCE(b.primary_brand_name, 'Unnamed') as primary_brand_name,
+        COALESCE(b.brand_count, 0) as brand_count,
+        COALESCE(c.campaign_count, 0) as campaign_count,
+        COALESCE(g.gallery_image_count, 0) as gallery_image_count,
+        COALESCE(p.scheduled_post_count, 0) as scheduled_post_count,
+        b.first_brand_created,
+        a.last_activity,
+        COALESCE(u.request_count, 0) as ai_requests,
+        COALESCE(u.cost_cents, 0) as ai_cost_cents
+      FROM org_base o
+      LEFT JOIN brand_data b ON b.organization_id = o.organization_id
+      LEFT JOIN campaign_data c ON c.organization_id = o.organization_id
+      LEFT JOIN gallery_data g ON g.organization_id = o.organization_id
+      LEFT JOIN post_data p ON p.organization_id = o.organization_id
+      LEFT JOIN activity_data a ON a.organization_id = o.organization_id
+      LEFT JOIN usage_this_month u ON u.organization_id = o.organization_id
+      ORDER BY a.last_activity DESC NULLS LAST
+      LIMIT ${parseInt(limit)} OFFSET ${offset}
     `;
 
-    const countResult = await sql`SELECT COUNT(*) as total FROM organizations`;
+    // Transform data to match frontend interface
+    const organizations = orgs.map(org => ({
+      organization_id: org.organization_id,
+      primary_brand_name: org.primary_brand_name,
+      brand_count: String(org.brand_count),
+      campaign_count: String(org.campaign_count),
+      gallery_image_count: String(org.gallery_image_count),
+      scheduled_post_count: String(org.scheduled_post_count),
+      first_brand_created: org.first_brand_created,
+      last_activity: org.last_activity,
+      aiUsageThisMonth: {
+        requests: parseInt(org.ai_requests) || 0,
+        costCents: parseInt(org.ai_cost_cents) || 0,
+        costUsd: (parseInt(org.ai_cost_cents) || 0) / 100
+      }
+    }));
+
+    // Count total organizations
+    const countResult = await sql`
+      SELECT COUNT(DISTINCT organization_id) as total FROM (
+        SELECT organization_id FROM brand_profiles WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+        UNION
+        SELECT organization_id FROM campaigns WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+      ) orgs
+    `;
+    const total = parseInt(countResult[0]?.total || 0);
+    const totalPages = Math.ceil(total / parseInt(limit));
 
     res.json({
-      organizations: orgs,
-      total: parseInt(countResult[0]?.total || 0),
-      limit: parseInt(limit),
-      offset: parseInt(offset)
+      organizations,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages
+      }
     });
   } catch (error) {
     console.error('[Admin] Organizations error:', error);
@@ -501,27 +619,44 @@ app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
 app.get("/api/admin/logs", requireSuperAdmin, async (req, res) => {
   try {
     const sql = getSql();
-    const { limit = 100, offset = 0, type } = req.query;
+    const { limit = 100, page = 1 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    let logs;
-    if (type) {
-      logs = await sql`
-        SELECT id, user_id, operation_type, model, cost_cents, error, created_at
-        FROM ai_usage_logs
-        WHERE operation_type = ${type}
-        ORDER BY created_at DESC
-        LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
-      `;
-    } else {
-      logs = await sql`
-        SELECT id, user_id, operation_type, model, cost_cents, error, created_at
-        FROM ai_usage_logs
-        ORDER BY created_at DESC
-        LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
-      `;
-    }
+    // Simple query without dynamic filters for now
+    const logs = await sql`
+      SELECT id, user_id, organization_id, endpoint, operation as category, model_id as model,
+             estimated_cost_cents as cost_cents, error_message as error,
+             CASE WHEN status = 'failed' THEN 'error' ELSE 'info' END as severity,
+             status, latency_ms as duration_ms, created_at as timestamp
+      FROM api_usage_logs
+      ORDER BY created_at DESC
+      LIMIT ${parseInt(limit)} OFFSET ${offset}
+    `;
 
-    res.json({ logs });
+    const totalResult = await sql`SELECT COUNT(*) as count FROM api_usage_logs`;
+
+    // Get unique categories
+    const categoriesResult = await sql`SELECT DISTINCT operation as category FROM api_usage_logs WHERE operation IS NOT NULL`;
+
+    // Get recent error count
+    const errorCountResult = await sql`SELECT COUNT(*) as count FROM api_usage_logs WHERE status = 'failed' AND created_at >= NOW() - INTERVAL '24 hours'`;
+
+    const total = parseInt(totalResult[0]?.count || 0);
+    const totalPages = Math.ceil(total / parseInt(limit));
+
+    res.json({
+      logs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages
+      },
+      filters: {
+        categories: categoriesResult.map(r => r.category),
+        recentErrorCount: parseInt(errorCountResult[0]?.count || 0)
+      }
+    });
   } catch (error) {
     console.error('[Admin] Logs error:', error);
     res.status(500).json({ error: 'Failed to fetch logs' });

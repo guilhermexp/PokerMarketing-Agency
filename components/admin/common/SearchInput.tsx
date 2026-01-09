@@ -1,6 +1,5 @@
 /**
- * Search Input Component
- * Reusable search input for admin filters
+ * Search Input - Campo de busca minimalista
  */
 
 import React, { useState, useEffect } from 'react';
@@ -13,7 +12,7 @@ interface SearchInputProps {
 }
 
 export function SearchInput({
-  placeholder = 'Search...',
+  placeholder = 'Buscar...',
   value,
   onChange,
   debounceMs = 300,
@@ -37,16 +36,16 @@ export function SearchInput({
   return (
     <div className="relative">
       <svg
-        className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-text-tertiary)]"
+        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
+        strokeWidth={1.5}
       >
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
-          strokeWidth={2}
-          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
         />
       </svg>
       <input
@@ -54,7 +53,7 @@ export function SearchInput({
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         placeholder={placeholder}
-        className="w-full pl-10 pr-4 py-2.5 bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
+        className="w-full pl-9 pr-9 py-2 bg-white/[0.03] border border-white/[0.08] rounded-md text-[13px] text-white/80 placeholder-white/30 focus:outline-none focus:border-amber-500/50 transition-colors"
       />
       {localValue && (
         <button
@@ -62,10 +61,10 @@ export function SearchInput({
             setLocalValue('');
             onChange('');
           }}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
+          className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded text-white/30 hover:text-white/60 transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       )}

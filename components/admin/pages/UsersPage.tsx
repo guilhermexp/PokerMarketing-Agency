@@ -1,6 +1,6 @@
 /**
- * Admin Users Page
- * List and manage all users
+ * Users Page - Página de usuários
+ * Design minimalista com tema dark
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -62,7 +62,7 @@ export function UsersPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error('Failed to fetch users');
+      if (!res.ok) throw new Error('Falha ao carregar usuários');
 
       const data = await res.json();
       setUsers(data.users);
@@ -70,7 +70,7 @@ export function UsersPage() {
       setError(null);
     } catch (err) {
       console.error('Error fetching users:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load users');
+      setError(err instanceof Error ? err.message : 'Falha ao carregar usuários');
     } finally {
       setIsLoading(false);
     }
@@ -92,43 +92,43 @@ export function UsersPage() {
   const columns: Column<User>[] = [
     {
       key: 'user',
-      header: 'User',
+      header: 'Usuário',
       render: (row) => (
         <div className="flex items-center gap-3">
           {row.avatar_url ? (
             <img
               src={row.avatar_url}
               alt={row.name || row.email}
-              className="w-8 h-8 rounded-full object-cover"
+              className="w-7 h-7 rounded-full object-cover"
             />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-white text-sm font-medium">
+            <div className="w-7 h-7 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500 text-[11px] font-medium">
               {(row.name || row.email).charAt(0).toUpperCase()}
             </div>
           )}
           <div>
-            <div className="font-medium text-[var(--color-text-primary)]">
-              {row.name || 'No name'}
+            <div className="text-[13px] font-medium text-white/80">
+              {row.name || 'Sem nome'}
             </div>
-            <div className="text-xs text-[var(--color-text-secondary)]">{row.email}</div>
+            <div className="text-[11px] text-white/40">{row.email}</div>
           </div>
         </div>
       ),
     },
     {
       key: 'campaigns',
-      header: 'Campaigns',
+      header: 'Campanhas',
       render: (row) => (
-        <span className="px-2 py-1 bg-blue-500/10 text-blue-500 rounded-full text-xs font-medium">
+        <span className="text-[12px] text-white/60 tabular-nums">
           {row.campaign_count}
         </span>
       ),
     },
     {
       key: 'brands',
-      header: 'Brands',
+      header: 'Marcas',
       render: (row) => (
-        <span className="px-2 py-1 bg-purple-500/10 text-purple-500 rounded-full text-xs font-medium">
+        <span className="text-[12px] text-white/60 tabular-nums">
           {row.brand_count}
         </span>
       ),
@@ -137,34 +137,34 @@ export function UsersPage() {
       key: 'posts',
       header: 'Posts',
       render: (row) => (
-        <span className="px-2 py-1 bg-green-500/10 text-green-500 rounded-full text-xs font-medium">
+        <span className="text-[12px] text-white/60 tabular-nums">
           {row.scheduled_post_count}
         </span>
       ),
     },
     {
       key: 'last_login',
-      header: 'Last Login',
+      header: 'Último Login',
       render: (row) => (
-        <span className="text-[var(--color-text-secondary)]">
+        <span className="text-[12px] text-white/50">
           {row.last_login
-            ? new Date(row.last_login).toLocaleDateString('en-US', {
+            ? new Date(row.last_login).toLocaleDateString('pt-BR', {
+                day: '2-digit',
                 month: 'short',
-                day: 'numeric',
                 year: 'numeric',
               })
-            : 'Never'}
+            : '-'}
         </span>
       ),
     },
     {
       key: 'created_at',
-      header: 'Joined',
+      header: 'Cadastro',
       render: (row) => (
-        <span className="text-[var(--color-text-secondary)]">
-          {new Date(row.created_at).toLocaleDateString('en-US', {
+        <span className="text-[12px] text-white/50">
+          {new Date(row.created_at).toLocaleDateString('pt-BR', {
+            day: '2-digit',
             month: 'short',
-            day: 'numeric',
             year: 'numeric',
           })}
         </span>
@@ -173,21 +173,21 @@ export function UsersPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">All Users</h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {pagination.total} users registered
+          <h2 className="text-[15px] font-medium text-white/90">Todos os Usuários</h2>
+          <p className="text-[12px] text-white/40 mt-0.5">
+            {pagination.total} usuários cadastrados
           </p>
         </div>
       </div>
 
       {/* Search */}
-      <div className="max-w-md">
+      <div className="max-w-xs">
         <SearchInput
-          placeholder="Search by name or email..."
+          placeholder="Buscar por nome ou email..."
           value={search}
           onChange={handleSearch}
         />
@@ -195,7 +195,7 @@ export function UsersPage() {
 
       {/* Error */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-500">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-400 text-[13px]">
           {error}
         </div>
       )}
@@ -205,12 +205,12 @@ export function UsersPage() {
         columns={columns}
         data={users}
         isLoading={isLoading}
-        emptyMessage="No users found"
+        emptyMessage="Nenhum usuário encontrado"
       />
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border)] overflow-hidden">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg overflow-hidden">
           <Pagination
             currentPage={pagination.page}
             totalPages={pagination.totalPages}

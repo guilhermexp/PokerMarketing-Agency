@@ -1,6 +1,5 @@
 /**
- * Data Table Component
- * Reusable table component for admin lists
+ * Data Table - Tabela de dados minimalista
  */
 
 import React from 'react';
@@ -24,19 +23,19 @@ export function DataTable<T>({
   columns,
   data,
   isLoading,
-  emptyMessage = 'No data available',
+  emptyMessage = 'Nenhum dado disponível',
   onRowClick,
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
-      <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border)] overflow-hidden">
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg">
         <div className="p-8 text-center">
-          <div className="inline-flex items-center gap-2 text-[var(--color-text-secondary)]">
-            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <div className="inline-flex items-center gap-2 text-white/40">
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
-            Loading...
+            <span className="text-[13px]">Carregando...</span>
           </div>
         </div>
       </div>
@@ -45,8 +44,8 @@ export function DataTable<T>({
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border)] overflow-hidden">
-        <div className="p-8 text-center text-[var(--color-text-secondary)]">
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg">
+        <div className="p-8 text-center text-white/40 text-[13px]">
           {emptyMessage}
         </div>
       </div>
@@ -54,34 +53,34 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border)] overflow-hidden">
+    <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg-tertiary)]">
+            <tr className="border-b border-white/[0.06]">
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className={`px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider ${column.className || ''}`}
+                  className={`px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wider text-white/40 ${column.className || ''}`}
                 >
                   {column.header}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--color-border)]">
+          <tbody className="divide-y divide-white/[0.04]">
             {data.map((row, index) => (
               <tr
                 key={index}
-                className={`${onRowClick ? 'cursor-pointer hover:bg-[var(--color-bg-tertiary)]' : ''} transition-colors`}
+                className={`${onRowClick ? 'cursor-pointer hover:bg-white/[0.02]' : ''} transition-colors`}
                 onClick={() => onRowClick?.(row)}
               >
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={`px-4 py-3 text-sm text-[var(--color-text-primary)] ${column.className || ''}`}
+                    className={`px-4 py-3 text-[13px] text-white/70 ${column.className || ''}`}
                   >
-                    {column.render ? column.render(row) : String(row[column.key] ?? '-')}
+                    {column.render ? column.render(row) : String((row as Record<string, unknown>)[column.key] ?? '-')}
                   </td>
                 ))}
               </tr>

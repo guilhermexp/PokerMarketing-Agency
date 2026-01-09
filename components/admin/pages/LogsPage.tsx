@@ -1,6 +1,6 @@
 /**
- * Admin Activity Logs Page
- * View and filter system activity logs
+ * Logs Page - Página de logs de atividade
+ * Design minimalista com tema dark
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -29,11 +29,10 @@ interface ActivityLog {
   created_at: string;
   user_email: string | null;
   user_name: string | null;
-}
-
-interface CategoryCount {
-  category: string;
-  count: string;
+  timestamp?: string;
+  model?: string;
+  cost_cents?: number;
+  error?: string | null;
 }
 
 interface PaginationInfo {
@@ -46,27 +45,16 @@ interface PaginationInfo {
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const severityColors = {
-  info: 'bg-blue-500/10 text-blue-500',
-  warning: 'bg-yellow-500/10 text-yellow-500',
-  error: 'bg-red-500/10 text-red-500',
-  critical: 'bg-red-600/20 text-red-400 border border-red-500/30',
-};
-
-const categoryColors: Record<string, string> = {
-  auth: 'bg-purple-500/10 text-purple-500',
-  crud: 'bg-blue-500/10 text-blue-500',
-  ai_generation: 'bg-green-500/10 text-green-500',
-  publishing: 'bg-orange-500/10 text-orange-500',
-  settings: 'bg-gray-500/10 text-gray-400',
-  admin: 'bg-yellow-500/10 text-yellow-500',
-  system: 'bg-cyan-500/10 text-cyan-500',
-  error: 'bg-red-500/10 text-red-500',
+  info: 'text-white/50',
+  warning: 'text-amber-500',
+  error: 'text-red-400',
+  critical: 'text-red-500 font-medium',
 };
 
 export function LogsPage() {
   const { getToken } = useAuth();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
-  const [categories, setCategories] = useState<CategoryCount[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [recentErrorCount, setRecentErrorCount] = useState(0);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -100,17 +88,17 @@ export function LogsPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error('Failed to fetch logs');
+      if (!res.ok) throw new Error('Falha ao carregar logs');
 
       const data = await res.json();
       setLogs(data.logs);
       setPagination(data.pagination);
-      setCategories(data.filters.categories || []);
-      setRecentErrorCount(data.filters.recentErrorCount || 0);
+      setCategories(data.filters?.categories || []);
+      setRecentErrorCount(data.filters?.recentErrorCount || 0);
       setError(null);
     } catch (err) {
       console.error('Error fetching logs:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load logs');
+      setError(err instanceof Error ? err.message : 'Falha ao carregar logs');
     } finally {
       setIsLoading(false);
     }
@@ -142,55 +130,51 @@ export function LogsPage() {
   const columns: Column<ActivityLog>[] = [
     {
       key: 'timestamp',
-      header: 'Time',
-      className: 'w-36',
-      render: (row) => (
-        <div className="text-xs">
-          <div className="text-[var(--color-text-primary)]">
-            {new Date(row.created_at).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-            })}
+      header: 'Data/Hora',
+      className: 'w-32',
+      render: (row) => {
+        const date = new Date(row.timestamp || row.created_at);
+        return (
+          <div className="text-[11px]">
+            <div className="text-white/60">
+              {date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+            </div>
+            <div className="text-white/40">
+              {date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </div>
           </div>
-          <div className="text-[var(--color-text-tertiary)]">
-            {new Date(row.created_at).toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-            })}
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'severity',
-      header: 'Severity',
-      className: 'w-24',
+      header: 'Nível',
+      className: 'w-20',
       render: (row) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${severityColors[row.severity]}`}>
+        <span className={`text-[11px] uppercase tracking-wide ${severityColors[row.severity]}`}>
           {row.severity}
         </span>
       ),
     },
     {
       key: 'category',
-      header: 'Category',
-      className: 'w-32',
+      header: 'Categoria',
+      className: 'w-28',
       render: (row) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${categoryColors[row.category] || 'bg-gray-500/10 text-gray-400'}`}>
+        <span className="text-[11px] text-white/50">
           {row.category}
         </span>
       ),
     },
     {
       key: 'action',
-      header: 'Action',
+      header: 'Ação',
       render: (row) => (
         <div>
-          <div className="font-medium text-[var(--color-text-primary)]">{row.action}</div>
-          {row.entity_name && (
-            <div className="text-xs text-[var(--color-text-tertiary)]">
-              {row.entity_type}: {row.entity_name}
+          <div className="text-[12px] font-medium text-white/70">{row.action || row.category}</div>
+          {row.model && (
+            <div className="text-[10px] text-white/40 mt-0.5 font-mono">
+              {row.model}
             </div>
           )}
         </div>
@@ -198,13 +182,13 @@ export function LogsPage() {
     },
     {
       key: 'actor',
-      header: 'Actor',
+      header: 'Ator',
       render: (row) => (
-        <div className="text-sm">
-          <div className="text-[var(--color-text-primary)]">
-            {row.actor_name || row.user_name || 'System'}
+        <div className="text-[11px]">
+          <div className="text-white/60">
+            {row.actor_name || row.user_name || 'Sistema'}
           </div>
-          <div className="text-xs text-[var(--color-text-tertiary)]">
+          <div className="text-white/40">
             {row.actor_email || row.user_email || '-'}
           </div>
         </div>
@@ -213,42 +197,49 @@ export function LogsPage() {
     {
       key: 'status',
       header: 'Status',
-      className: 'w-20',
+      className: 'w-16',
       render: (row) => (
-        row.success ? (
-          <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        row.success !== false && !row.error ? (
+          <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
           </svg>
         ) : (
-          <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         )
       ),
     },
     {
       key: 'duration',
-      header: 'Duration',
-      className: 'w-24 text-right',
+      header: 'Tempo',
+      className: 'w-20 text-right',
       render: (row) => (
-        <span className="text-[var(--color-text-secondary)]">
+        <span className="text-[11px] text-white/40 tabular-nums">
           {row.duration_ms ? `${row.duration_ms}ms` : '-'}
         </span>
       ),
     },
   ];
 
+  const severityLabels: Record<string, string> = {
+    info: 'Info',
+    warning: 'Aviso',
+    error: 'Erro',
+    critical: 'Crítico',
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Activity Logs</h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {pagination.total} total logs
+          <h2 className="text-[15px] font-medium text-white/90">Logs de Atividade</h2>
+          <p className="text-[12px] text-white/40 mt-0.5">
+            {pagination.total} logs registrados
             {recentErrorCount > 0 && (
-              <span className="ml-2 text-red-500">
-                ({recentErrorCount} errors in last 24h)
+              <span className="ml-2 text-red-400">
+                ({recentErrorCount} erros nas últimas 24h)
               </span>
             )}
           </p>
@@ -257,50 +248,51 @@ export function LogsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4">
-        {/* Search */}
-        <div className="w-64">
+        <div className="w-56">
           <SearchInput
-            placeholder="Search actions..."
+            placeholder="Buscar ações..."
             value={filters.action}
             onChange={handleSearch}
           />
         </div>
 
         {/* Category Filter */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-[var(--color-text-secondary)]">Category:</span>
-          <div className="flex gap-1">
-            {categories.slice(0, 6).map((cat) => (
-              <button
-                key={cat.category}
-                onClick={() => handleCategoryChange(cat.category)}
-                className={`px-2 py-1 text-xs font-medium rounded-full transition-colors ${
-                  filters.category === cat.category
-                    ? 'bg-[var(--color-accent)] text-white'
-                    : categoryColors[cat.category] || 'bg-gray-500/10 text-gray-400 hover:bg-gray-500/20'
-                }`}
-              >
-                {cat.category} ({cat.count})
-              </button>
-            ))}
+        {categories.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-white/40">Categoria:</span>
+            <div className="flex gap-1">
+              {categories.slice(0, 5).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => handleCategoryChange(cat)}
+                  className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                    filters.category === cat
+                      ? 'bg-amber-500/15 text-amber-500'
+                      : 'text-white/40 hover:text-white/60 bg-white/[0.03]'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Severity Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-[var(--color-text-secondary)]">Severity:</span>
+          <span className="text-[11px] text-white/40">Nível:</span>
           <div className="flex gap-1">
             {(['info', 'warning', 'error', 'critical'] as const).map((sev) => (
               <button
                 key={sev}
                 onClick={() => handleSeverityChange(sev)}
-                className={`px-2 py-1 text-xs font-medium rounded-full transition-colors ${
+                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
                   filters.severity === sev
-                    ? 'bg-[var(--color-accent)] text-white'
-                    : severityColors[sev] + ' hover:opacity-80'
+                    ? 'bg-amber-500/15 text-amber-500'
+                    : `${severityColors[sev]} bg-white/[0.03] hover:bg-white/[0.05]`
                 }`}
               >
-                {sev}
+                {severityLabels[sev]}
               </button>
             ))}
           </div>
@@ -313,16 +305,16 @@ export function LogsPage() {
               setFilters({ action: '', category: '', severity: '' });
               setPagination((prev) => ({ ...prev, page: 1 }));
             }}
-            className="text-sm text-[var(--color-accent)] hover:underline"
+            className="text-[11px] text-amber-500 hover:text-amber-400"
           >
-            Clear filters
+            Limpar filtros
           </button>
         )}
       </div>
 
       {/* Error */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-500">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-400 text-[13px]">
           {error}
         </div>
       )}
@@ -332,12 +324,12 @@ export function LogsPage() {
         columns={columns}
         data={logs}
         isLoading={isLoading}
-        emptyMessage="No logs found"
+        emptyMessage="Nenhum log encontrado"
       />
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border)] overflow-hidden">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg overflow-hidden">
           <Pagination
             currentPage={pagination.page}
             totalPages={pagination.totalPages}

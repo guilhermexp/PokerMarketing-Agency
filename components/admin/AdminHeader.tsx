@@ -1,6 +1,6 @@
 /**
- * Admin Header Component
- * Top header with user info and quick actions
+ * Admin Header - Cabeçalho do painel admin
+ * Design minimalista com tema dark
  */
 
 import React from 'react';
@@ -8,18 +8,17 @@ import { useUser, UserButton } from '@clerk/clerk-react';
 import { useLocation } from 'react-router-dom';
 
 const pageTitles: Record<string, string> = {
-  '/admin': 'Overview',
-  '/admin/users': 'Users',
-  '/admin/organizations': 'Organizations',
-  '/admin/usage': 'AI Usage',
-  '/admin/logs': 'Activity Logs',
+  '/admin': 'Visão Geral',
+  '/admin/users': 'Usuários',
+  '/admin/organizations': 'Organizações',
+  '/admin/usage': 'Uso de IA',
+  '/admin/logs': 'Logs de Atividade',
 };
 
 export function AdminHeader() {
   const { user } = useUser();
   const location = useLocation();
 
-  // Get page title based on current path
   const getPageTitle = () => {
     for (const [path, title] of Object.entries(pageTitles)) {
       if (location.pathname === path || location.pathname.startsWith(path + '/')) {
@@ -30,38 +29,36 @@ export function AdminHeader() {
   };
 
   return (
-    <header className="h-16 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] fixed top-0 left-64 right-0 z-10">
+    <header className="h-14 bg-[#0c0c0c] border-b border-white/[0.06] fixed top-0 left-56 right-0 z-10">
       <div className="h-full px-6 flex items-center justify-between">
         {/* Page Title */}
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
+        <div className="flex items-center gap-3">
+          <h1 className="text-[15px] font-medium text-white/90">
             {getPageTitle()}
           </h1>
-          <span className="px-2 py-0.5 text-xs font-medium bg-yellow-500/10 text-yellow-500 rounded-full border border-yellow-500/20">
-            Super Admin
+          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/15 text-amber-500 rounded">
+            Admin
           </span>
         </div>
 
         {/* Right side */}
-        <div className="flex items-center gap-4">
-          {/* Quick Stats */}
-          <div className="hidden md:flex items-center gap-6 mr-4">
-            <div className="text-right">
-              <p className="text-xs text-[var(--color-text-tertiary)]">Logged in as</p>
-              <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                {user?.primaryEmailAddress?.emailAddress || 'Admin'}
-              </p>
-            </div>
+        <div className="flex items-center gap-3">
+          {/* User info */}
+          <div className="hidden md:block text-right mr-1">
+            <p className="text-[11px] text-white/30 leading-tight">Logado como</p>
+            <p className="text-[12px] font-medium text-white/60 leading-tight">
+              {user?.primaryEmailAddress?.emailAddress || 'Admin'}
+            </p>
           </div>
 
-          {/* Refresh Button */}
+          {/* Refresh */}
           <button
             onClick={() => window.location.reload()}
-            className="p-2 rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
-            title="Refresh"
+            className="w-8 h-8 flex items-center justify-center rounded-md text-white/40 hover:text-white/70 hover:bg-white/[0.04] transition-all"
+            title="Atualizar"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>
           </button>
 
@@ -70,7 +67,7 @@ export function AdminHeader() {
             afterSignOutUrl="/"
             appearance={{
               elements: {
-                avatarBox: 'w-9 h-9',
+                avatarBox: 'w-8 h-8',
               },
             }}
           />
