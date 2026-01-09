@@ -375,6 +375,7 @@ function AppContent() {
         type: post.content_type as ScheduledPost["type"],
         contentId: post.content_id || "",
         imageUrl: post.image_url,
+        carouselImageUrls: post.carousel_image_urls || undefined,
         caption: post.caption,
         hashtags: post.hashtags || [],
         scheduledDate: normalizedDate,

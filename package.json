@@ -33,6 +33,7 @@
     "cloudinary": "^2.8.0",
     "framer-motion": "^12.24.10",
     "ioredis": "^5.8.2",
+    "lucide-react": "^0.562.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-dropzone": "^14.3.8",

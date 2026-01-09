@@ -1083,7 +1083,7 @@ app.get("/api/admin/users", requireSuperAdmin, async (req, res) => {
         u.email,
         u.name,
         u.avatar_url,
-        u.last_login,
+        u.last_login_at,
         u.created_at,
         COUNT(DISTINCT c.id) as campaign_count,
         COUNT(DISTINCT bp.id) as brand_count,
@@ -1093,7 +1093,7 @@ app.get("/api/admin/users", requireSuperAdmin, async (req, res) => {
       LEFT JOIN brand_profiles bp ON bp.user_id = u.id AND bp.deleted_at IS NULL
       LEFT JOIN scheduled_posts sp ON sp.user_id = u.id
       WHERE (${searchFilter}::text IS NULL OR u.email ILIKE ${searchFilter} OR u.name ILIKE ${searchFilter})
-      GROUP BY u.id, u.auth_provider_id, u.email, u.name, u.avatar_url, u.last_login, u.created_at
+      GROUP BY u.id, u.auth_provider_id, u.email, u.name, u.avatar_url, u.last_login_at, u.created_at
       ORDER BY u.created_at DESC
       LIMIT ${parseInt(limit)} OFFSET ${offset}
     `;

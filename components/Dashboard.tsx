@@ -36,6 +36,8 @@ import { CampaignsList } from "./CampaignsList";
 import { SchedulesListView } from "./SchedulesListView";
 import { QuickPostModal } from "./common/QuickPostModal";
 import { FloatingSidebar } from "./FloatingSidebar";
+import { LimelightNav } from "./ui/limelight-nav";
+import { Zap, Layers, Image, Calendar, LayoutGrid } from "lucide-react";
 import type { ScheduledPost } from "../types";
 
 type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar";
@@ -610,30 +612,30 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
       )}
 
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-[#0a0a0a] border-t border-white/[0.08] safe-area-pb">
-        <div className="flex items-center justify-around px-2 py-2">
-          {[
-            { icon: "zap" as IconName, label: "Direct", key: "campaign" as View },
-            { icon: "layers" as IconName, label: "Campanhas", key: "campaigns" as View },
-            { icon: "image" as IconName, label: "Flyers", key: "flyer" as View },
-            { icon: "calendar" as IconName, label: "Agenda", key: "calendar" as View },
-            { icon: "layout" as IconName, label: "Galeria", key: "gallery" as View },
-          ].map((item) => (
-            <button
-              key={item.key}
-              onClick={() => onViewChange(item.key)}
-              className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-lg transition-all ${
-                activeView === item.key
-                  ? "text-white"
-                  : "text-white/40"
-              }`}
-            >
-              <Icon name={item.icon} className="w-5 h-5" />
-              <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
+      {(() => {
+        const mobileNavItems = [
+          { id: "campaign", icon: <Zap />, label: "Direct" },
+          { id: "campaigns", icon: <Layers />, label: "Campanhas" },
+          { id: "flyer", icon: <Image />, label: "Flyers" },
+          { id: "calendar", icon: <Calendar />, label: "Agenda" },
+          { id: "gallery", icon: <LayoutGrid />, label: "Galeria" },
+        ] as const;
+        const activeNavIndex = mobileNavItems.findIndex(item => item.id === activeView);
+        return (
+          <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden flex justify-center pb-[env(safe-area-inset-bottom)] bg-gradient-to-t from-black/80 to-transparent pt-4">
+            <LimelightNav
+              items={mobileNavItems.map(item => ({
+                id: item.id,
+                icon: item.icon,
+                label: item.label,
+                onClick: () => onViewChange(item.id as View),
+              }))}
+              activeIndex={activeNavIndex >= 0 ? activeNavIndex : 0}
+              onTabChange={(index) => onViewChange(mobileNavItems[index].id as View)}
+            />
+          </div>
+        );
+      })()}
 
       {/* QuickPost Modal for Gallery */}
       {quickPostImage && (
