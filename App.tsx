@@ -1908,9 +1908,6 @@ function AppContent() {
             onUpdateGalleryImage={handleUpdateGalleryImage}
             onDeleteGalleryImage={handleDeleteGalleryImage}
             onMarkGalleryImagePublished={handleMarkGalleryImagePublished}
-            onGalleryLoadMore={galleryLoadMore}
-            galleryIsLoadingMore={galleryIsLoadingMore}
-            galleryHasMore={galleryHasMore}
             tournamentEvents={tournamentEvents}
             weekScheduleInfo={weekScheduleInfo}
             onTournamentFileUpload={handleTournamentFileUpload}

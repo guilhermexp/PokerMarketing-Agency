@@ -2554,15 +2554,15 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   return (
     <div className="flex h-full">
       <div className="flex-1 overflow-y-auto">
-        <div className="space-y-6 animate-fade-in-up px-6 py-5">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="flex items-center gap-4">
+        <div className="space-y-4 sm:space-y-6 animate-fade-in-up px-4 sm:px-6 py-4 sm:py-5">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
               <div className="text-left">
-                <h2 className="text-2xl font-black text-white uppercase tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
                   Daily Protocol
                 </h2>
                 <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
-                  Agrupamento Inteligente • Ciclo Diário
+                  Agrupamento Inteligente
                 </p>
               </div>
               {/* Week and day stats inline in header */}

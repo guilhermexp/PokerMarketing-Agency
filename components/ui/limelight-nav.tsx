@@ -78,18 +78,18 @@ export const LimelightNav = ({
   };
 
   return (
-    <nav className={`relative inline-flex items-center h-16 rounded-2xl bg-[#0a0a0a] text-white border border-white/[0.08] px-2 ${className || ''}`}>
+    <nav className={`relative inline-flex items-center h-14 rounded-2xl bg-[#0a0a0a]/95 backdrop-blur-xl text-white border border-white/[0.08] px-1 shadow-2xl shadow-black/50 ${className || ''}`}>
       {items.map(({ id, icon, label, onClick }, index) => (
           <button
             key={id}
             ref={el => (navItemRefs.current[index] = el)}
-            className={`relative z-20 flex h-full cursor-pointer items-center justify-center p-4 ${iconContainerClassName || ''}`}
+            className={`relative z-20 flex h-full cursor-pointer items-center justify-center px-4 py-3 active:scale-95 transition-transform ${iconContainerClassName || ''}`}
             onClick={() => handleItemClick(index, onClick)}
             aria-label={label}
           >
             {cloneElement(icon, {
-              className: `w-6 h-6 transition-opacity duration-100 ease-in-out ${
-                activeIndex === index ? 'opacity-100' : 'opacity-40'
+              className: `w-5 h-5 transition-all duration-150 ease-out ${
+                activeIndex === index ? 'opacity-100 scale-110' : 'opacity-35'
               } ${icon.props.className || ''} ${iconClassName || ''}`,
             })}
           </button>
@@ -97,12 +97,12 @@ export const LimelightNav = ({
 
       <div
         ref={limelightRef}
-        className={`absolute top-0 z-10 w-11 h-[5px] rounded-full bg-primary shadow-[0_50px_15px_var(--color-primary)] ${
-          isReady ? 'transition-[left] duration-400 ease-in-out' : ''
+        className={`absolute top-0 z-10 w-10 h-[4px] rounded-full bg-primary ${
+          isReady ? 'transition-[left] duration-300 ease-out' : ''
         } ${limelightClassName || ''}`}
         style={{ left: '-999px' }}
       >
-        <div className="absolute left-[-30%] top-[5px] w-[160%] h-14 [clip-path:polygon(5%_100%,25%_0,75%_0,95%_100%)] bg-gradient-to-b from-primary/30 to-transparent pointer-events-none" />
+        <div className="absolute left-[-35%] top-[4px] w-[170%] h-12 [clip-path:polygon(8%_100%,28%_0,72%_0,92%_100%)] bg-gradient-to-b from-primary/25 to-transparent pointer-events-none" />
       </div>
     </nav>
   );

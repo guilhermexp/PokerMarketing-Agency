@@ -16,10 +16,6 @@ interface GalleryViewProps {
   onQuickPost?: (image: GalleryImage) => void;
   onPublishToCampaign?: (text: string, image: GalleryImage) => void;
   onSchedulePost?: (image: GalleryImage) => void;
-  // Pagination
-  onLoadMore?: () => void;
-  isLoadingMore?: boolean;
-  hasMore?: boolean;
 }
 
 type ViewMode = "gallery" | "references";
@@ -255,9 +251,6 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   onQuickPost,
   onPublishToCampaign,
   onSchedulePost,
-  onLoadMore,
-  isLoadingMore = false,
-  hasMore = true,
 }) => {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("gallery");
@@ -457,12 +450,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
         onChange={handleFileSelect}
       />
 
-      <div className="space-y-6 animate-fade-in-up">
+      <div className="space-y-4 sm:space-y-6 animate-fade-in-up">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="text-left">
-            <h2 className="text-2xl font-black text-white uppercase tracking-tight">
-              {viewMode === "gallery" ? "Galeria de Assets" : "Favoritos"}
+        <div className="flex justify-between items-start gap-3">
+          <div className="text-left min-w-0">
+            <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
+              {viewMode === "gallery" ? "Galeria" : "Favoritos"}
             </h2>
             <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
               {viewMode === "gallery"
@@ -470,21 +463,21 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 : `${styleReferences.length} itens salvos`}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 flex-shrink-0">
             {viewMode === "references" && (
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-3 py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all"
+                className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95"
               >
-                <Icon name="upload" className="w-3 h-3" />
-                Adicionar
+                <Icon name="upload" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
+                <span className="hidden sm:inline">Adicionar</span>
               </button>
             )}
             <button
               onClick={() =>
                 setViewMode(viewMode === "gallery" ? "references" : "gallery")
               }
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all active:scale-95 ${
                 viewMode === "references"
                   ? "bg-primary/10 text-primary/80 border border-primary/20"
                   : "bg-transparent border border-white/[0.06] text-white/50 hover:border-white/[0.1] hover:text-white/70"
@@ -492,9 +485,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             >
               <Icon
                 name={viewMode === "gallery" ? "heart" : "layout"}
-                className="w-3 h-3"
+                className="w-3.5 h-3.5 sm:w-3 sm:h-3"
               />
-              {viewMode === "gallery" ? "Favoritos" : "Galeria de Assets"}
+              <span className="hidden sm:inline">{viewMode === "gallery" ? "Favoritos" : "Galeria"}</span>
             </button>
           </div>
         </div>
@@ -556,35 +549,6 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                   ))}
                 </div>
               )}
-
-              {/* Load More Button */}
-              {onLoadMore &&
-                hasMore &&
-                images.length > 0 &&
-                currentPage === totalPages && (
-                  <div className="flex justify-center pt-6 pb-2">
-                    <Button
-                      variant="secondary"
-                      onClick={onLoadMore}
-                      isLoading={isLoadingMore}
-                      icon={isLoadingMore ? undefined : "chevron-down"}
-                    >
-                      {isLoadingMore ? "Carregando..." : "Carregar Mais"}
-                    </Button>
-                  </div>
-                )}
-
-              {/* No more images indicator */}
-              {onLoadMore &&
-                !hasMore &&
-                images.length > 0 &&
-                currentPage === totalPages && (
-                  <div className="flex justify-center pt-6 pb-2">
-                    <span className="text-[10px] text-white/30 font-bold uppercase tracking-wider">
-                      Todas as imagens carregadas
-                    </span>
-                  </div>
-                )}
 
               {/* Pagination */}
               {totalPages > 1 && (

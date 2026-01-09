@@ -178,28 +178,41 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   return (
     <div className="space-y-6 animate-fade-in-up h-full flex flex-col">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="text-left">
-          <h2 className="text-2xl font-black text-white uppercase tracking-tight">
-            Agenda
-          </h2>
-          <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
-            Agendamento de Publicações
-          </p>
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex justify-between items-start">
+          <div className="text-left">
+            <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
+              Agenda
+            </h2>
+            <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
+              Agendamento de Publicações
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setSelectedDate(null);
+              setIsScheduleModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95"
+          >
+            <Icon name="plus" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
+            <span className="hidden sm:inline">Agendar Post</span>
+            <span className="sm:hidden">Novo</span>
+          </button>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Stats */}
-          <div className="flex items-center gap-3 px-3 py-2 bg-[#0a0a0a] border border-white/10 rounded-lg">
+        {/* Stats - scrollable on mobile */}
+        <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex items-center gap-2 sm:gap-3 px-3 py-2 bg-[#0a0a0a] border border-white/10 rounded-lg flex-shrink-0">
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-amber-500" />
-              <span className="text-[9px] font-black text-white/40 uppercase">
+              <span className="text-[9px] font-black text-white/40 uppercase whitespace-nowrap">
                 {stats.scheduled} agendados
               </span>
             </div>
             <div className="h-3 w-px bg-white/10" />
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-[9px] font-black text-white/40 uppercase">
+              <span className="text-[9px] font-black text-white/40 uppercase whitespace-nowrap">
                 {stats.published} publicados
               </span>
             </div>
@@ -208,23 +221,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 <div className="h-3 w-px bg-white/10" />
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-red-500" />
-                  <span className="text-[9px] font-black text-red-400 uppercase">
+                  <span className="text-[9px] font-black text-red-400 uppercase whitespace-nowrap">
                     {stats.failed} falhas
                   </span>
                 </div>
               </>
             )}
           </div>
-          <button
-            onClick={() => {
-              setSelectedDate(null);
-              setIsScheduleModalOpen(true);
-            }}
-            className="flex items-center gap-1.5 px-3 py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all"
-          >
-            <Icon name="plus" className="w-3 h-3" />
-            Agendar Post
-          </button>
         </div>
       </div>
 
@@ -272,47 +275,50 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       )}
 
       {/* Calendar Controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-4 py-3 bg-[#111111] border border-white/5 rounded-xl">
-        <div className="flex items-center gap-3">
-          {/* Navigation */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={
-                viewType === "monthly" ? goToPreviousMonth : goToPreviousWeek
-              }
-              className="p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-            >
-              <Icon name="chevron-left" className="w-4 h-4" />
-            </button>
-            <button
-              onClick={viewType === "monthly" ? goToNextMonth : goToNextWeek}
-              className="p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-            >
-              <Icon name="chevron-right" className="w-4 h-4" />
-            </button>
-          </div>
+      <div className="flex flex-col gap-3 px-3 sm:px-4 py-3 bg-[#111111] border border-white/5 rounded-xl">
+        {/* Top row: Navigation + Period + Today */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Navigation */}
+            <div className="flex items-center">
+              <button
+                onClick={
+                  viewType === "monthly" ? goToPreviousMonth : goToPreviousWeek
+                }
+                className="p-2.5 sm:p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-colors active:scale-95"
+              >
+                <Icon name="chevron-left" className="w-5 h-5 sm:w-4 sm:h-4" />
+              </button>
+              <button
+                onClick={viewType === "monthly" ? goToNextMonth : goToNextWeek}
+                className="p-2.5 sm:p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-colors active:scale-95"
+              >
+                <Icon name="chevron-right" className="w-5 h-5 sm:w-4 sm:h-4" />
+              </button>
+            </div>
 
-          {/* Current Period */}
-          <h3 className="text-sm font-black text-white uppercase tracking-wide">
-            {viewType === "monthly"
-              ? `${monthNames[currentMonth]} ${currentYear}`
-              : `Semana de ${currentDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`}
-          </h3>
+            {/* Current Period */}
+            <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wide">
+              {viewType === "monthly"
+                ? `${monthNames[currentMonth]} ${currentYear}`
+                : `Semana de ${currentDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`}
+            </h3>
+          </div>
 
           {/* Today Button */}
           <button
             onClick={goToToday}
-            className="px-3 py-1.5 text-[8px] font-black uppercase tracking-wider text-white/40 hover:text-white border border-white/10 hover:border-white/20 rounded-lg transition-colors"
+            className="px-3 py-2 sm:py-1.5 text-[9px] sm:text-[8px] font-black uppercase tracking-wider text-white/40 hover:text-white border border-white/10 hover:border-white/20 rounded-lg transition-colors active:scale-95"
           >
             Hoje
           </button>
         </div>
 
-        {/* View Toggle */}
-        <div className="flex items-center gap-1 p-1 bg-black/40 rounded-lg">
+        {/* Bottom row: View Toggle (full width on mobile) */}
+        <div className="flex items-center gap-1 p-1 bg-black/40 rounded-lg w-full sm:w-auto sm:self-end">
           <button
             onClick={() => setViewType("monthly")}
-            className={`px-3 py-1.5 text-[8px] font-black uppercase tracking-wider rounded-md transition-all ${
+            className={`flex-1 sm:flex-none px-4 sm:px-3 py-2 sm:py-1.5 text-[10px] sm:text-[8px] font-black uppercase tracking-wider rounded-md transition-all active:scale-95 ${
               viewType === "monthly"
                 ? "bg-white text-black"
                 : "text-white/40 hover:text-white"
@@ -322,7 +328,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           </button>
           <button
             onClick={() => setViewType("weekly")}
-            className={`px-3 py-1.5 text-[8px] font-black uppercase tracking-wider rounded-md transition-all ${
+            className={`flex-1 sm:flex-none px-4 sm:px-3 py-2 sm:py-1.5 text-[10px] sm:text-[8px] font-black uppercase tracking-wider rounded-md transition-all active:scale-95 ${
               viewType === "weekly"
                 ? "bg-white text-black"
                 : "text-white/40 hover:text-white"

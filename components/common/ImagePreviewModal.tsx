@@ -251,6 +251,23 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     image.src?.includes("video") ||
     image.source?.startsWith("Video-");
 
+  // Video dimensions state for dynamic aspect ratio
+  const [videoDimensions, setVideoDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Determine if video is vertical (like Reels - 9:16)
+  const isVerticalVideo = videoDimensions
+    ? videoDimensions.height > videoDimensions.width
+    : false;
+
+  // Reset video dimensions when image changes
+  useEffect(() => {
+    setVideoDimensions(null);
+  }, [image.src]);
+
   const drawCanvases = useCallback(() => {
     let isActive = true;
 
@@ -950,13 +967,25 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             className="relative flex-1 flex flex-col items-center justify-center p-6 lg:p-10 overflow-hidden bg-[#080808]"
           >
             {/* Canvas/Video Container */}
-            <div className="relative flex-1 w-full flex items-center justify-center">
+            <div className={`relative flex-1 w-full flex items-center justify-center ${isVerticalVideo ? 'max-w-[400px] mx-auto' : ''}`}>
               {isVideo ? (
                 <video
+                  ref={videoRef}
                   src={image.src}
                   controls
                   autoPlay
-                  className="max-w-full max-h-full object-contain rounded-lg"
+                  onLoadedMetadata={(e) => {
+                    const video = e.currentTarget;
+                    setVideoDimensions({
+                      width: video.videoWidth,
+                      height: video.videoHeight,
+                    });
+                  }}
+                  className={`rounded-lg ${
+                    isVerticalVideo
+                      ? 'h-full max-h-[calc(95vh-200px)] w-auto'
+                      : 'max-w-full max-h-full object-contain'
+                  }`}
                 />
               ) : resizedPreview ? (
                 /* Side-by-side comparison view */
@@ -1092,6 +1121,18 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                         <span className="text-white/30">Modelo:</span>{" "}
                         {image.model}
                       </p>
+                    )}
+                    {videoDimensions && (
+                      <>
+                        <p>
+                          <span className="text-white/30">Dimensões:</span>{" "}
+                          {videoDimensions.width} × {videoDimensions.height} px
+                        </p>
+                        <p>
+                          <span className="text-white/30">Proporção:</span>{" "}
+                          {isVerticalVideo ? "Vertical (Reels 9:16)" : "Horizontal"}
+                        </p>
+                      </>
                     )}
                   </div>
                 </section>

@@ -373,28 +373,28 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
   return (
     <>
-      <div className="flex flex-col items-center justify-start pt-[8vh] min-h-[60vh] animate-fade-in-up">
+      <div className="flex flex-col items-center pt-[12vh] sm:pt-[8vh] min-h-[60vh] animate-fade-in-up px-3 sm:px-0">
         {/* Title */}
-        <div className="flex items-center justify-center gap-4 mb-10">
+        <div className="flex flex-row items-center justify-center gap-3 sm:gap-4 mb-16 sm:mb-10">
           <img
             src="/logo-socialab.png"
             alt="Socialab"
-            className="w-48 h-48 md:w-64 md:h-64 -rotate-12 hover:rotate-0 transition-transform duration-500"
+            className="w-28 h-28 sm:w-48 sm:h-48 md:w-64 md:h-64 -rotate-12 hover:rotate-0 transition-transform duration-500"
           />
-          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight">
+          <h1 className="text-xl sm:text-4xl md:text-5xl font-black text-white tracking-tight">
             O que vamos criar?
           </h1>
         </div>
 
         {/* Main Input Box */}
         <div className="w-full max-w-3xl relative">
-          <div className="bg-[#080808] border border-white/[0.06] rounded-2xl transition-all focus-within:border-white/12 focus-within:bg-[#0a0a0a]">
+          <div className="bg-[#080808] border border-white/[0.06] rounded-xl sm:rounded-2xl transition-all focus-within:border-white/12 focus-within:bg-[#0a0a0a]">
             {/* Textarea or Preview */}
             {isPreviewMode && transcript ? (
               <div
                 onClick={() => setIsPreviewMode(false)}
-                className="w-full bg-transparent px-5 pt-4 pb-3 text-white text-[14px] cursor-text overflow-y-auto prose prose-invert prose-sm max-w-none"
-                style={{ minHeight: '90px', maxHeight: '400px' }}
+                className="w-full bg-transparent px-4 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-3 text-white text-[13px] sm:text-[14px] cursor-text overflow-y-auto prose prose-invert prose-sm max-w-none"
+                style={{ minHeight: '70px', maxHeight: '300px' }}
                 dangerouslySetInnerHTML={{ __html: parseMarkdown(transcript) }}
               />
             ) : (
@@ -406,14 +406,14 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                   setIsPreviewMode(false);
                 }}
                 onKeyDown={handleKeyDown}
-                className="w-full bg-transparent px-5 pt-4 pb-3 text-white text-[14px] placeholder:text-white/25 outline-none resize-none overflow-y-auto"
+                className="w-full bg-transparent px-4 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-3 text-white text-[13px] sm:text-[14px] placeholder:text-white/25 outline-none resize-none overflow-y-auto"
                 placeholder="Cole a transcrição do seu vídeo, post de blog ou descreva sua campanha..."
-                style={{ minHeight: '90px', maxHeight: '400px' }}
+                style={{ minHeight: '70px', maxHeight: '300px' }}
               />
             )}
 
             {/* Bottom Bar */}
-            <div className="px-4 pb-3 flex items-center justify-between">
+            <div className="px-3 sm:px-4 pb-2 sm:pb-3 flex items-center justify-between">
               {/* Model Selector */}
               <div className="relative" ref={modelSelectorRef}>
                 <button
@@ -504,7 +504,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
           )}
 
           {/* Attachment Options */}
-          <div className="flex items-center justify-center gap-3 mt-6 flex-wrap">
+          <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-3 sm:mt-6 flex-wrap">
             {/* Hidden file inputs */}
             <input
               ref={productInputRef}
@@ -540,7 +540,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
             <button
               onClick={() => productInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all text-[10px] font-bold uppercase tracking-wide"
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all text-[9px] sm:text-[10px] font-bold uppercase tracking-wide active:scale-95"
             >
               <Icon name="image" className="w-3 h-3" />
               <span>Produto</span>
@@ -548,27 +548,27 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
             <button
               onClick={() => collabLogoInputRef.current?.click()}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[10px] font-bold uppercase tracking-wide ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border transition-all text-[9px] sm:text-[10px] font-bold uppercase tracking-wide active:scale-95 ${
                 collabLogo
                   ? "border-blue-500/20 bg-blue-500/10 text-blue-400"
                   : "border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70"
               }`}
             >
               <Icon name="users" className="w-3 h-3" />
-              <span>Logo Colab</span>
+              <span>Logo</span>
             </button>
 
             <button
               onClick={() => inspirationInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all text-[10px] font-bold uppercase tracking-wide"
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all text-[9px] sm:text-[10px] font-bold uppercase tracking-wide active:scale-95"
             >
               <Icon name="copy" className="w-3 h-3" />
-              <span>Referência</span>
+              <span>Ref</span>
             </button>
 
             <button
               onClick={() => assetsInputRef.current?.click()}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-[10px] font-bold uppercase tracking-wide ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border transition-all text-[9px] sm:text-[10px] font-bold uppercase tracking-wide active:scale-95 ${
                 compositionAssets.length > 0
                   ? "border-green-500/20 bg-green-500/10 text-green-400"
                   : "border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70"
@@ -594,7 +594,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
             <button
               onClick={() => setIsOptionsModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all text-[10px] font-bold uppercase tracking-wide"
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-white/[0.06] bg-transparent text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all text-[9px] sm:text-[10px] font-bold uppercase tracking-wide active:scale-95"
             >
               <Icon name="settings" className="w-3 h-3" />
               <span>Opções</span>
@@ -734,13 +734,13 @@ export const UploadForm: React.FC<UploadFormProps> = ({
           )}
 
           {/* Hint */}
-          <p className="text-center text-[10px] text-white/20 mt-4">
+          <p className="text-center text-[9px] sm:text-[10px] text-white/20 mt-3 sm:mt-4">
             Pressione <span className="text-white/30 font-mono">⌘ Enter</span>{" "}
             para gerar
           </p>
 
           {/* Options Summary */}
-          <p className="text-center text-[10px] text-white/15 mt-2">
+          <p className="text-center text-[8px] sm:text-[10px] text-white/15 mt-1 sm:mt-2 px-2">
             {getOptionsSummary()}
           </p>
         </div>

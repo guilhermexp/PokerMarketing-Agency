@@ -385,12 +385,12 @@ export function CampaignsList({
 
       {/* Header */}
       <div
-        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2"
+        className="flex justify-between items-start gap-3 mb-2"
         style={{ animation: "fadeSlideIn 0.4s ease-out" }}
       >
         <div>
-          <h1 className="text-2xl font-black text-white uppercase tracking-tight">
-            Minhas Campanhas
+          <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
+            Campanhas
           </h1>
           {!isLoading && (
             <p className="text-[11px] text-white/30 uppercase tracking-wider mt-1">
@@ -401,10 +401,11 @@ export function CampaignsList({
         </div>
         <button
           onClick={onNewCampaign}
-          className="flex items-center gap-1.5 px-3 py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all"
+          className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
         >
-          <Icon name="upload" className="w-3 h-3" />
-          Nova Campanha
+          <Icon name="plus" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
+          <span className="hidden sm:inline">Nova Campanha</span>
+          <span className="sm:hidden">Nova</span>
         </button>
       </div>
 

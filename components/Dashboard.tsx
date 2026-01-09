@@ -67,10 +67,6 @@ interface DashboardProps {
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onDeleteGalleryImage?: (imageId: string) => void;
   onMarkGalleryImagePublished?: (imageId: string) => void;
-  // Gallery Pagination
-  onGalleryLoadMore?: () => void;
-  galleryIsLoadingMore?: boolean;
-  galleryHasMore?: boolean;
   tournamentEvents: TournamentEvent[];
   weekScheduleInfo: WeekScheduleInfo | null;
   onTournamentFileUpload: (file: File) => Promise<void>;
@@ -159,9 +155,6 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     onViewChange,
     onPublishToCampaign,
     onDeleteGalleryImage,
-    onGalleryLoadMore,
-    galleryIsLoadingMore,
-    galleryHasMore,
     styleReferences,
     onAddStyleReference,
     onRemoveStyleReference,
@@ -271,7 +264,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         onSignOut={() => signOut()}
       />
 
-      <main className="flex-1 overflow-y-auto relative z-10 bg-[#070707] pb-16 sm:pb-[env(safe-area-inset-bottom)] sm:pl-16">
+      <main className="flex-1 overflow-y-auto relative z-10 bg-[#070707] pb-24 sm:pb-[env(safe-area-inset-bottom)] sm:pl-16">
         {activeView === "campaign" && (
           <div className="px-4 py-4 sm:px-6 sm:py-5">
             {showUploadForm && (
@@ -536,9 +529,6 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
               onSelectStyleReference={onSelectStyleReference}
               onPublishToCampaign={onPublishToCampaign}
               onQuickPost={setQuickPostImage}
-              onLoadMore={onGalleryLoadMore}
-              isLoadingMore={galleryIsLoadingMore}
-              hasMore={galleryHasMore}
               onSchedulePost={(image) => {
                 // Create scheduled post for tomorrow at noon
                 const tomorrow = new Date();
@@ -622,17 +612,19 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         ] as const;
         const activeNavIndex = mobileNavItems.findIndex(item => item.id === activeView);
         return (
-          <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden flex justify-center pb-[env(safe-area-inset-bottom)] bg-gradient-to-t from-black/80 to-transparent pt-4">
-            <LimelightNav
-              items={mobileNavItems.map(item => ({
-                id: item.id,
-                icon: item.icon,
-                label: item.label,
-                onClick: () => onViewChange(item.id as View),
-              }))}
-              activeIndex={activeNavIndex >= 0 ? activeNavIndex : 0}
-              onTabChange={(index) => onViewChange(mobileNavItems[index].id as View)}
-            />
+          <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden flex justify-center pb-[max(12px,env(safe-area-inset-bottom))] pt-3 pointer-events-none">
+            <div className="pointer-events-auto">
+              <LimelightNav
+                items={mobileNavItems.map(item => ({
+                  id: item.id,
+                  icon: item.icon,
+                  label: item.label,
+                  onClick: () => onViewChange(item.id as View),
+                }))}
+                activeIndex={activeNavIndex >= 0 ? activeNavIndex : 0}
+                onTabChange={(index) => onViewChange(mobileNavItems[index].id as View)}
+              />
+            </div>
           </div>
         );
       })()}
