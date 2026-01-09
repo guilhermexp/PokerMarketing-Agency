@@ -21,6 +21,8 @@ export default defineConfig(({ mode }) => {
       process.env.BLOB_READ_WRITE_TOKEN || envFile.BLOB_READ_WRITE_TOKEN,
     DATABASE_URL: process.env.DATABASE_URL || envFile.DATABASE_URL,
     RUBE_TOKEN: process.env.RUBE_TOKEN || envFile.RUBE_TOKEN,
+    VITE_SUPER_ADMIN_EMAILS:
+      process.env.VITE_SUPER_ADMIN_EMAILS || envFile.VITE_SUPER_ADMIN_EMAILS,
   };
 
   console.log("[Vite Config] GEMINI_API_KEY available:", !!env.GEMINI_API_KEY);
@@ -137,6 +139,9 @@ export default defineConfig(({ mode }) => {
         env.VITE_CLERK_PUBLISHABLE_KEY,
       ),
       "process.env.OPENROUTER_API_KEY": JSON.stringify(env.OPENROUTER_API_KEY),
+      "import.meta.env.VITE_SUPER_ADMIN_EMAILS": JSON.stringify(
+        env.VITE_SUPER_ADMIN_EMAILS,
+      ),
     },
     resolve: {
       alias: {
