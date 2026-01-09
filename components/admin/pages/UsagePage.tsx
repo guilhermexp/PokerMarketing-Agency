@@ -142,6 +142,7 @@ export function UsagePage() {
         <StatsCard
           title="Custo Total (30d)"
           value={`$${totals?.totalCostUsd?.toFixed(2) || '0.00'}`}
+          subtitle={`R$ ${((totals?.totalCostUsd || 0) * 6.0).toFixed(2).replace('.', ',')}`}
           color="amber"
           icon={
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -298,9 +299,14 @@ export function UsagePage() {
                       </div>
                     </div>
                   </div>
-                  <span className="text-[12px] font-medium text-amber-500 tabular-nums">
-                    ${user.totalCostUsd.toFixed(2)}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-[12px] font-medium text-amber-500 tabular-nums">
+                      ${user.totalCostUsd.toFixed(2)}
+                    </span>
+                    <div className="text-[10px] text-white/30">
+                      R$ {(user.totalCostUsd * 6.0).toFixed(2).replace('.', ',')}
+                    </div>
+                  </div>
                 </div>
               ))
             )}
@@ -331,9 +337,14 @@ export function UsagePage() {
                       </div>
                     </div>
                   </div>
-                  <span className="text-[12px] font-medium text-amber-500 tabular-nums">
-                    ${org.totalCostUsd.toFixed(2)}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-[12px] font-medium text-amber-500 tabular-nums">
+                      ${org.totalCostUsd.toFixed(2)}
+                    </span>
+                    <div className="text-[10px] text-white/30">
+                      R$ {(org.totalCostUsd * 6.0).toFixed(2).replace('.', ',')}
+                    </div>
+                  </div>
                 </div>
               ))
             )}

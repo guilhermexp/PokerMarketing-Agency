@@ -438,23 +438,37 @@ app.get("/api/admin/usage", requireSuperAdmin, async (req, res) => {
 app.get("/api/admin/users", requireSuperAdmin, async (req, res) => {
   try {
     const sql = getSql();
-    const { limit = 20, page = 1 } = req.query;
+    const { limit = 20, page = 1, search = '' } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    const searchFilter = search ? `%${search}%` : null;
 
     const users = await sql`
       SELECT
-        u.id, u.auth_provider_id as clerk_id, u.email, u.name, u.created_at,
-        COUNT(DISTINCT c.id) as campaigns_count,
-        COUNT(DISTINCT g.id) as gallery_count
+        u.id,
+        u.auth_provider_id as clerk_user_id,
+        u.email,
+        u.name,
+        u.avatar_url,
+        u.last_login,
+        u.created_at,
+        COUNT(DISTINCT c.id) as campaign_count,
+        COUNT(DISTINCT bp.id) as brand_count,
+        COUNT(DISTINCT sp.id) as scheduled_post_count
       FROM users u
-      LEFT JOIN campaigns c ON c.user_id = u.id
-      LEFT JOIN gallery_images g ON g.user_id = u.id
-      GROUP BY u.id, u.auth_provider_id, u.email, u.name, u.created_at
+      LEFT JOIN campaigns c ON c.user_id = u.id AND c.deleted_at IS NULL
+      LEFT JOIN brand_profiles bp ON bp.user_id = u.id AND bp.deleted_at IS NULL
+      LEFT JOIN scheduled_posts sp ON sp.user_id = u.id
+      WHERE (${searchFilter}::text IS NULL OR u.email ILIKE ${searchFilter} OR u.name ILIKE ${searchFilter})
+      GROUP BY u.id, u.auth_provider_id, u.email, u.name, u.avatar_url, u.last_login, u.created_at
       ORDER BY u.created_at DESC
       LIMIT ${parseInt(limit)} OFFSET ${offset}
     `;
 
-    const countResult = await sql`SELECT COUNT(*) as total FROM users`;
+    const countResult = await sql`
+      SELECT COUNT(*) as total FROM users
+      WHERE (${searchFilter}::text IS NULL OR email ILIKE ${searchFilter} OR name ILIKE ${searchFilter})
+    `;
     const total = parseInt(countResult[0]?.total || 0);
     const totalPages = Math.ceil(total / parseInt(limit));
 
@@ -3131,6 +3145,7 @@ app.post("/api/ai/campaign", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
+  const sql = getSql();
 
   try {
     const {
@@ -3350,6 +3365,7 @@ app.post("/api/ai/flyer", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
+  const sql = getSql();
 
   try {
     const {
@@ -3476,6 +3492,7 @@ app.post("/api/ai/image", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
+  const sql = getSql();
 
   try {
     const {
@@ -3554,6 +3571,7 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
+  const sql = getSql();
 
   try {
     const { prompt, duration = 5, aspectRatio = "16:9" } = req.body;
@@ -3635,6 +3653,7 @@ app.post("/api/ai/text", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
+  const sql = getSql();
 
   try {
     const {
@@ -3794,6 +3813,8 @@ app.post("/api/ai/enhance-prompt", async (req, res) => {
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
 
+  const sql = getSql();
+
   try {
     const { prompt, brandProfile } = req.body;
 
@@ -3805,28 +3826,40 @@ app.post("/api/ai/enhance-prompt", async (req, res) => {
 
     const ai = getGeminiAi();
 
-    const systemPrompt = `Você é um especialista em marketing digital e criação de conteúdo viral. Sua função é aprimorar briefings de campanhas para gerar máximo engajamento.
+    const systemPrompt = `Você é um especialista em marketing digital e criação de conteúdo multiplataforma. Sua função é aprimorar briefings de campanhas para gerar máximo engajamento em TODOS os formatos de conteúdo.
 
-DIRETRIZES DE ENGAJAMENTO (6 Níveis):
+TIPOS DE CONTEÚDO QUE A CAMPANHA PODE GERAR:
+1. **Vídeos/Reels**: Conteúdo em vídeo curto para Instagram/TikTok
+2. **Posts de Feed**: Imagens estáticas ou carrosséis para Instagram/Facebook
+3. **Stories**: Conteúdo efêmero vertical
+4. **Anúncios**: Criativos para campanhas pagas
 
-Level 1 - ESTIMULAÇÃO: O conteúdo deve abrir com elementos que "parem o scroll" nos primeiros 1-2 segundos - cores vibrantes, movimento, contraste e brilho diferenciados.
+DIRETRIZES DE ENGAJAMENTO (aplicáveis a TODOS os formatos):
 
-Level 2 - CAPTIVAÇÃO: Inclua perguntas abertas relevantes que criem um "curiosity loop". Use contraste (conhecido vs. desconhecido) ou premissas chocantes/inusitadas.
+**ATENÇÃO IMEDIATA:**
+- Para vídeos: Hook visual/auditivo nos primeiros 2 segundos
+- Para posts: Headline impactante ou visual que pare o scroll
+- Para stories: Elemento interativo ou surpresa inicial
 
-Level 3 - ANTECIPAÇÃO: Dê pistas e contexto para o público tentar adivinhar o desfecho. Aproxime-se do "quase revelar", depois faça uma pequena finta para renovar o loop.
+**CURIOSIDADE:**
+- Perguntas abertas que o público precisa responder
+- Contraste (conhecido vs. desconhecido)
+- Premissas intrigantes ou contra-intuitivas
 
-Level 4 - VALIDAÇÃO: Entregue a resposta/benefício de forma não óbvia. Em conteúdo educativo, ofereça dicas concretas que resolvam problemas reais.
+**VALOR PRÁTICO:**
+- Dicas concretas que resolvam problemas reais
+- Informação útil e acionável
+- Transformação clara (antes → depois)
 
-Level 5 - AFEIÇÃO: Aumente a likability com postura confiante, energia positiva e valor prático genuíno. Isso compra mais atenção entre peças.
+**CONEXÃO EMOCIONAL:**
+- Tom autêntico e humanizado
+- Storytelling quando apropriado
+- Identificação com dores/desejos do público
 
-Level 6 - REVELAÇÃO: Treine o público a associar a marca a valor consistente. Cada vez que veem a marca, já sentem expectativa positiva.
-
-APLICAÇÃO DIRETA:
-- Hook visual forte nos 2s iniciais
-- Pergunta que o avatar precisa responder
-- Detalhes que aumentem as apostas e ajudem a antecipar
-- Solução concreta e inesperada
-- Consistência de valor para gerar lembrança automática
+**CHAMADA PARA AÇÃO:**
+- CTA claro e específico
+- Senso de urgência quando apropriado
+- Próximo passo óbvio
 
 ${
   brandProfile
@@ -3840,30 +3873,34 @@ CONTEXTO DA MARCA:
 }
 
 TAREFA:
-Receba o briefing do usuário e transforme-o em um briefing aprimorado que maximize o potencial de engajamento da campanha, seguindo as diretrizes acima.
+Receba o briefing do usuário e transforme-o em um briefing aprimorado que maximize o potencial de engajamento para TODOS os tipos de conteúdo que serão gerados (vídeos, posts e anúncios).
 
 REGRAS:
 1. Mantenha a essência e objetivo original do briefing
-2. Adicione elementos específicos de cada nível de engajamento quando aplicável
-3. Sugira hooks, perguntas e estrutura narrativa
-4. Seja específico e acionável
-5. Responda APENAS com o briefing aprimorado, sem explicações adicionais
-6. Use português brasileiro
-7. Mantenha um tamanho similar ou ligeiramente maior que o original
-8. Use formatação markdown para estruturar o briefing (negrito, listas, etc)`;
+2. Seja abrangente - o briefing será usado para gerar vídeos E posts estáticos
+3. Adicione sugestões de hooks, headlines, e elementos visuais
+4. Inclua ideias de CTAs e hashtags relevantes
+5. Seja específico e acionável
+6. Responda APENAS com o briefing aprimorado, sem explicações
+7. Use português brasileiro
+8. Mantenha tamanho similar ou ligeiramente maior que o original
+9. Use formatação markdown para estruturar (negrito, listas, etc)`;
 
     const result = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: {
-        parts: [{ text: systemPrompt + "\n\nBRIEFING ORIGINAL:\n" + prompt }],
-      },
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: systemPrompt + "\n\nBRIEFING ORIGINAL:\n" + prompt }],
+        },
+      ],
       config: {
-        temperature: 0.8,
+        temperature: 0.5,
         maxOutputTokens: 2048,
       },
     });
 
-    const enhancedPrompt = result.candidates[0].content.parts[0].text;
+    const enhancedPrompt = result.text?.trim() || "";
 
     console.log("[Enhance Prompt API] Successfully enhanced prompt");
 
@@ -3903,6 +3940,7 @@ app.post("/api/ai/edit-image", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
+  const sql = getSql();
 
   try {
     const { image, prompt, mask, referenceImage } = req.body;
@@ -3994,6 +4032,7 @@ app.post("/api/ai/extract-colors", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
+  const sql = getSql();
 
   try {
     const { logo } = req.body;
@@ -4086,6 +4125,7 @@ app.post("/api/ai/speech", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
+  const sql = getSql();
 
   try {
     const { script, voiceName = "Orus" } = req.body;
@@ -4156,6 +4196,7 @@ app.post("/api/ai/assistant", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
+  const sql = getSql();
 
   try {
     const { history, brandProfile } = req.body;
@@ -4524,6 +4565,7 @@ app.post("/api/ai/video", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
+  const sql = getSql();
 
   try {
     const {

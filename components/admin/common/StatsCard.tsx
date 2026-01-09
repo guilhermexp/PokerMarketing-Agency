@@ -8,6 +8,7 @@ interface StatsCardProps {
   title: string;
   value: string | number;
   icon: React.ReactNode;
+  subtitle?: string;
   change?: {
     value: number;
     label: string;
@@ -15,7 +16,7 @@ interface StatsCardProps {
   color?: 'default' | 'amber' | 'green' | 'red';
 }
 
-export function StatsCard({ title, value, icon, change, color = 'default' }: StatsCardProps) {
+export function StatsCard({ title, value, icon, subtitle, change, color = 'default' }: StatsCardProps) {
   const iconColors = {
     default: 'text-white/40',
     amber: 'text-amber-500',
@@ -29,6 +30,9 @@ export function StatsCard({ title, value, icon, change, color = 'default' }: Sta
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-wider text-white/40 mb-1">{title}</p>
           <p className="text-2xl font-semibold text-white/90 tabular-nums">{value}</p>
+          {subtitle && (
+            <p className="text-[11px] text-white/40 mt-0.5">{subtitle}</p>
+          )}
           {change && (
             <div className="flex items-center gap-1.5 mt-2">
               {change.value >= 0 ? (
