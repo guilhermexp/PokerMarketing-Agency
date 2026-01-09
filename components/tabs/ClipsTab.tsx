@@ -4047,8 +4047,8 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     <>
       <div className="bg-[#0a0a0a] rounded-xl border border-white/[0.05] overflow-hidden">
         {/* Header - Minimal */}
-        <div className="px-4 py-3 flex items-center justify-between gap-4">
-          <div className="min-w-0 flex-1">
+        <div className="px-3 sm:px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="min-w-0 flex-shrink-0">
             <h3 className="text-[13px] font-semibold text-white truncate">
               {clip.title}
             </h3>
@@ -4056,7 +4056,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               {scenes.length} cenas • {totalDuration}s
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-1 sm:pb-0 -mx-3 px-3 sm:mx-0 sm:px-0 [&>*]:flex-shrink-0">
             <button
               onClick={() => setIsSettingsOpen(true)}
               className="p-1.5 rounded-md text-white/30 hover:text-white/60 hover:bg-white/5 transition-all"

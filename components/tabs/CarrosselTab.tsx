@@ -680,7 +680,7 @@ IMPORTANTE:
           >
             {/* Header */}
             <div
-              className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+              className="px-3 sm:px-4 py-3 border-b border-white/[0.06] flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
               onClick={() => {
                 setCollapsedClips((prev) => {
                   const next = new Set(prev);
@@ -693,82 +693,93 @@ IMPORTANTE:
                 });
               }}
             >
-              <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white/60">
-                {index + 1}
-              </div>
-              <h3 className="text-sm font-medium text-white/90 truncate flex-1">
-                {clip.title}
-              </h3>
-
-              {/* Status badges */}
-              <div className="flex items-center gap-2">
-                {hasCarrosselImages && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-medium">
-                    {carrosselCount} slides
-                  </span>
-                )}
-                <span className="text-xs text-white/40">
-                  {carrosselCount}/{totalScenes} em 4:5
-                </span>
+              {/* Title row */}
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white/60 flex-shrink-0">
+                  {index + 1}
+                </div>
+                <h3 className="text-sm font-medium text-white/90 truncate flex-1">
+                  {clip.title}
+                </h3>
+                {/* Expand icon - visible on mobile in title row */}
+                <Icon
+                  name={isExpanded ? "chevron-up" : "chevron-down"}
+                  className="w-4 h-4 text-white/40 sm:hidden flex-shrink-0"
+                />
               </div>
 
-              {/* Generate button */}
-              {hasAnyOriginal && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleGenerateAll(clip);
-                  }}
-                  disabled={isGeneratingAny}
-                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors disabled:opacity-50"
-                >
-                  {isGeneratingAny ? "Gerando..." : allGenerated ? "Regenerar 4:5" : "Gerar 4:5"}
-                </button>
-              )}
-
-              {/* Schedule button */}
-              {onSchedulePost && hasCarrosselImages && orderedImages.length >= 2 && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSchedulingClip({ clipKey, images: orderedImages, title: clip.title });
-                  }}
-                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors flex items-center gap-1.5"
-                >
-                  <Icon name="calendar" className="w-3.5 h-3.5" />
-                  Agendar
-                </button>
-              )}
-
-              {/* Publish button */}
-              {onPublishCarousel && hasCarrosselImages && orderedImages.length >= 2 && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePublishCarousel(clipKey, orderedImages, clip.title);
-                  }}
-                  disabled={publishing[clipKey]}
-                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-white/10 text-white/70 hover:bg-white/15 transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {publishing[clipKey] ? (
-                    <>
-                      <Loader size={12} />
-                      Publicando...
-                    </>
-                  ) : (
-                    <>
-                      <Icon name="send" className="w-3.5 h-3.5" />
-                      Publicar
-                    </>
+              {/* Actions row - scrollable on mobile */}
+              <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none -mx-3 px-3 sm:mx-0 sm:px-0 pb-1 sm:pb-0 [&>*]:flex-shrink-0">
+                {/* Status badges */}
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  {hasCarrosselImages && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-medium whitespace-nowrap">
+                      {carrosselCount} slides
+                    </span>
                   )}
-                </button>
-              )}
+                  <span className="text-[10px] sm:text-xs text-white/40 whitespace-nowrap">
+                    {carrosselCount}/{totalScenes} em 4:5
+                  </span>
+                </div>
 
-              {/* Expand icon */}
-              <Icon
-                name={isExpanded ? "chevron-up" : "chevron-down"}
-                className="w-4 h-4 text-white/40"
-              />
+                {/* Generate button */}
+                {hasAnyOriginal && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleGenerateAll(clip);
+                    }}
+                    disabled={isGeneratingAny}
+                    className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {isGeneratingAny ? "Gerando..." : allGenerated ? "Regenerar 4:5" : "Gerar 4:5"}
+                  </button>
+                )}
+
+                {/* Schedule button */}
+                {onSchedulePost && hasCarrosselImages && orderedImages.length >= 2 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSchedulingClip({ clipKey, images: orderedImages, title: clip.title });
+                    }}
+                    className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+                  >
+                    <Icon name="calendar" className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+                    Agendar
+                  </button>
+                )}
+
+                {/* Publish button */}
+                {onPublishCarousel && hasCarrosselImages && orderedImages.length >= 2 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePublishCarousel(clipKey, orderedImages, clip.title);
+                    }}
+                    disabled={publishing[clipKey]}
+                    className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-white/10 text-white/70 hover:bg-white/15 transition-colors disabled:opacity-50 flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+                  >
+                    {publishing[clipKey] ? (
+                      <>
+                        <Loader size={12} />
+                        Publicando...
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="send" className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+                        Publicar
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Expand icon - hidden on mobile, visible on desktop */}
+                <Icon
+                  name={isExpanded ? "chevron-up" : "chevron-down"}
+                  className="w-4 h-4 text-white/40 hidden sm:block"
+                />
+              </div>
             </div>
 
             {/* Expanded Content */}
