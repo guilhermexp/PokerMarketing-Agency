@@ -44,6 +44,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selectedPostForEdit, setSelectedPostForEdit] = useState<ScheduledPost | null>(null);
   const [showNotificationBanner, setShowNotificationBanner] = useState(false);
   const [pendingPosts, setPendingPosts] = useState<ScheduledPost[]>([]);
 
@@ -351,6 +352,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             onDayClick={handleDayClick}
             onUpdatePost={onUpdateScheduledPost}
             onDeletePost={onDeleteScheduledPost}
+            onPostClick={(post) => {
+              setSelectedPostForEdit(post);
+              setSelectedDate(post.scheduledDate);
+              setSelectedTime(post.scheduledTime);
+              setIsScheduleModalOpen(true);
+            }}
             onPublishToInstagram={onPublishToInstagram}
             publishingStates={publishingStates}
           />
@@ -365,12 +372,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             setIsScheduleModalOpen(false);
             setSelectedDate(null);
             setSelectedTime(null);
+            setSelectedPostForEdit(null);
           }}
-          onSchedule={handleSchedulePost}
+          onSchedule={(newPost) => {
+            // If editing, delete old post first then create new
+            if (selectedPostForEdit) {
+              onDeleteScheduledPost(selectedPostForEdit.id);
+            }
+            handleSchedulePost(newPost);
+          }}
           galleryImages={galleryImages}
           campaigns={campaigns}
           initialDate={selectedDate}
           initialTime={selectedTime}
+          initialCaption={selectedPostForEdit?.caption}
         />
       )}
     </div>

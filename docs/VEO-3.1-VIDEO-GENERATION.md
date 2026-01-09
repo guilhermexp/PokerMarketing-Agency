@@ -198,17 +198,17 @@ if (imageUrl) {
 ### Conceito
 
 O modo First & Last Frame usa a funcionalidade de interpolação do Veo 3.1 para criar transições suaves entre cenas. Cada vídeo usa:
-- **First Frame**: Imagem da cena atual (capa)
+- **First Frame**: Imagem da cena atual (capa) **ou** o *último frame real do vídeo anterior* (quando disponível)
 - **Last Frame**: Imagem da próxima cena (capa)
 
-O Veo 3.1 gera um vídeo de 8 segundos que interpola visualmente entre as duas imagens.
+O Veo 3.1 gera um vídeo de 8 segundos que interpola visualmente entre as duas imagens. Quando o toggle experimental está ativo, o sistema tenta garantir continuidade perfeita usando o último frame real do vídeo anterior como first frame da cena seguinte.
 
 ### Lógica de Interpolação
 
 ```
 Cena 1: first_frame = capa_1, last_frame = capa_2 → Vídeo 8s
-Cena 2: first_frame = capa_2, last_frame = capa_3 → Vídeo 8s
-Cena 3: first_frame = capa_3, last_frame = capa_4 → Vídeo 8s
+Cena 2: first_frame = ultimo_frame_video_1 (se extraído), last_frame = capa_3 → Vídeo 8s
+Cena 3: first_frame = ultimo_frame_video_2 (se extraído), last_frame = capa_4 → Vídeo 8s
 Cena 4: first_frame = capa_4, last_frame = null  → Modo padrão (última cena)
 ```
 
@@ -253,7 +253,12 @@ if (useFrameInterpolation && isVeoModel) {
   // Se não há próxima cena (última), lastFrameUrl permanece undefined
 }
 
-// 2. Configurar job com interpolação
+// 2. Ajustar first frame usando o último frame real do vídeo anterior (quando disponível)
+if (useFrameInterpolation && isVeoModel && sceneStartFrameOverrides[sceneNumber]) {
+  imageUrl = sceneStartFrameOverrides[sceneNumber];
+}
+
+// 3. Configurar job com interpolação
 const jobConfig: VideoJobConfig = {
   model: apiModel,
   aspectRatio: "9:16",
@@ -263,6 +268,25 @@ const jobConfig: VideoJobConfig = {
   useInterpolation: useFrameInterpolation && !!lastFrameUrl,
 };
 ```
+
+### Extração do Último Frame (Frontend)
+
+Quando o toggle experimental está ativo, após gerar cada vídeo o frontend tenta extrair o último frame e salvar no Blob. Esse frame é usado como first frame da próxima cena:
+
+```
+const extracted = await extractLastFrameFromVideo(videoUrl);
+const lastFrameUploadUrl = await uploadImageToBlob(
+  extracted.base64,
+  extracted.mimeType,
+);
+sceneStartFrameOverrides[nextSceneNumber] = lastFrameUploadUrl;
+```
+
+### Observações Importantes
+
+- **O fluxo experimental é sequencial**: a próxima cena só inicia após extrair/upload do último frame da cena anterior.
+- **Background jobs são desativados no modo experimental** para garantir a cadeia de frames.
+- **Modo padrão permanece inalterado** (sem extração, sem dependência entre cenas).
 
 ### Implementação no Backend
 

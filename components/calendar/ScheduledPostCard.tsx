@@ -82,6 +82,18 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
     setIsEditingDate(false);
   };
 
+  // Get content type label
+  const getContentTypeLabel = () => {
+    if (!post.instagramContentType) return null;
+    switch (post.instagramContentType) {
+      case 'story': return 'Story';
+      case 'carousel': return 'Carousel';
+      case 'reel': return 'Reel';
+      default: return null;
+    }
+  };
+  const contentTypeLabel = getContentTypeLabel();
+
   if (variant === 'compact') {
     return (
       <>
@@ -93,7 +105,7 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
             ${statusColors[post.status]}
             hover:scale-105
           `}
-          title={`${post.scheduledTime} - ${post.platforms}`}
+          title={`${post.scheduledTime} - ${post.platforms}${contentTypeLabel ? ` - ${contentTypeLabel}` : ''}`}
         >
           <div className="flex items-center gap-1">
             <Icon
@@ -103,6 +115,11 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
             <span className="text-[7px] font-bold truncate">
               {post.scheduledTime}
             </span>
+            {contentTypeLabel && (
+              <span className="text-[8px] font-bold text-white/50 uppercase ml-auto">
+                {contentTypeLabel}
+              </span>
+            )}
           </div>
         </button>
 

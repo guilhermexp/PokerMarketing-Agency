@@ -4919,9 +4919,55 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         ) : (
           /* Normal View */
           <div className="flex flex-col lg:flex-row">
-            {/* Preview Carousel - Thumbnail / Merged Video */}
+            {/* Preview Carousel - Instagram Reels Style */}
             <div className="flex-shrink-0 p-4 lg:pt-14 bg-[#0d0d0d] border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col">
-              <div className="w-64 aspect-[9/16] bg-[#080808] rounded-xl overflow-hidden relative border border-white/5">
+              <div className="w-72 aspect-[9/16] bg-black rounded-3xl overflow-hidden relative border-[3px] border-zinc-800 shadow-2xl">
+                {/* Instagram Reels UI Overlay */}
+                <div className="absolute inset-0 pointer-events-none z-10">
+                  {/* Top bar */}
+                  <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent">
+                    <span className="text-white text-[11px] font-semibold">Reels</span>
+                    <Icon name="camera" className="w-5 h-5 text-white" />
+                  </div>
+
+                  {/* Right side icons */}
+                  <div className="absolute right-3 bottom-24 flex flex-col items-center gap-4">
+                    <div className="flex flex-col items-center">
+                      <Icon name="heart" className="w-6 h-6 text-white" />
+                      <span className="text-white text-[10px] mt-1">12.5K</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <Icon name="message-circle" className="w-6 h-6 text-white" />
+                      <span className="text-white text-[10px] mt-1">384</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <Icon name="send" className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <Icon name="more-horizontal" className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="w-6 h-6 rounded border-2 border-white overflow-hidden mt-2">
+                      <div className="w-full h-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500" />
+                    </div>
+                  </div>
+
+                  {/* Bottom info */}
+                  <div className="absolute bottom-0 left-0 right-12 p-3 bg-gradient-to-t from-black/80 to-transparent">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 p-[2px]">
+                        <div className="w-full h-full rounded-full bg-black flex items-center justify-center">
+                          <span className="text-white text-[8px] font-bold">
+                            {brandProfile.name?.charAt(0) || "B"}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-white text-[11px] font-semibold">
+                        {brandProfile.name || "brand"}
+                      </span>
+                    </div>
+                    <p className="text-white text-[10px] line-clamp-2">{clip.title}</p>
+                  </div>
+                </div>
                 {/* Merged Video Slide */}
                 {previewSlide === "video" && (mergedVideoUrl || isMerging) && (
                   <>
@@ -5204,10 +5250,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
                   return (
                     <div
                       key={scene.sceneNumber}
-                      className="bg-[#0a0a0a] rounded-lg border border-white/[0.05] overflow-hidden flex flex-col flex-shrink-0 w-72"
+                      className="bg-black rounded-3xl border-[3px] border-zinc-800 shadow-2xl overflow-hidden flex flex-col flex-shrink-0 w-72"
                     >
                       {/* Scene Preview - Carousel */}
-                      <div className="aspect-[9/16] bg-black relative">
+                      <div className="aspect-[9/16] bg-black relative rounded-t-3xl overflow-hidden">
                         {/* Loading States */}
                         {isLoadingVideo ? (
                           <div className="absolute inset-0 flex flex-col items-center justify-center">

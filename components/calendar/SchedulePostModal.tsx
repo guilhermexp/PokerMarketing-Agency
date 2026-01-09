@@ -13,6 +13,9 @@ interface SchedulePostModalProps {
   initialDate?: string | null;
   initialTime?: string | null;
   initialImage?: GalleryImage | null;
+  // For carousel pre-selection from CarrosselTab
+  initialCarouselImages?: GalleryImage[];
+  initialCaption?: string;
 }
 
 // Check if gallery item is a video
@@ -44,7 +47,9 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   campaigns = [],
   initialDate,
   initialTime,
-  initialImage
+  initialImage,
+  initialCarouselImages,
+  initialCaption,
 }) => {
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -74,16 +79,28 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
   // Set initial image when modal opens with a pre-selected image
   useEffect(() => {
-    if (isOpen && initialImage) {
-      setSelectedImages([initialImage]);
-      setCaption(initialImage.prompt || '');
-    } else if (!isOpen) {
+    if (isOpen) {
+      // Carousel pre-selection takes priority
+      if (initialCarouselImages && initialCarouselImages.length > 0) {
+        setSelectedImages(initialCarouselImages);
+        setContentType('carousel');
+        setCaption(initialCaption || '');
+      } else if (initialImage) {
+        setSelectedImages([initialImage]);
+        setCaption(initialImage.prompt || '');
+      }
+      // Set initial caption if provided separately
+      if (initialCaption && !initialCarouselImages) {
+        setCaption(initialCaption);
+      }
+    } else {
       // Reset when modal closes
       setSelectedImages([]);
       setCaption('');
       setHashtags('');
+      setContentType('photo');
     }
-  }, [isOpen, initialImage]);
+  }, [isOpen, initialImage, initialCarouselImages, initialCaption]);
 
   // Update date/time when modal opens with initial values
   useEffect(() => {

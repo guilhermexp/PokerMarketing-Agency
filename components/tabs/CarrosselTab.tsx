@@ -1,13 +1,15 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import type {
   VideoClipScript,
   GalleryImage,
   BrandProfile,
   ImageFile,
+  ScheduledPost,
 } from "../../types";
 import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
+import { SchedulePostModal } from "../calendar/SchedulePostModal";
 import { generateImage, generateQuickPostText } from "../../services/geminiService";
 import { uploadImageToBlob } from "../../services/blobService";
 import { urlToBase64, urlToDataUrl } from "../../utils/imageHelpers";
@@ -364,6 +366,7 @@ interface CarrosselTabProps {
   onUpdateGalleryImage?: (imageId: string, newImageSrc: string) => void;
   onSetChatReference?: (image: GalleryImage | null) => void;
   onPublishCarousel?: (imageUrls: string[], caption: string) => Promise<void>;
+  onSchedulePost?: (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => void;
 }
 
 export const CarrosselTab: React.FC<CarrosselTabProps> = ({
@@ -374,6 +377,7 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   onUpdateGalleryImage,
   onSetChatReference,
   onPublishCarousel,
+  onSchedulePost,
 }) => {
   // Track which images are being generated: { "clipId-sceneNumber": true }
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
@@ -391,6 +395,18 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   const [captions, setCaptions] = useState<Record<string, string>>({});
   // Track caption generation state
   const [generatingCaption, setGeneratingCaption] = useState<Record<string, boolean>>({});
+  // Schedule modal state
+  const [schedulingClip, setSchedulingClip] = useState<{clipKey: string, images: GalleryImage[], title: string} | null>(null);
+  // Toast notification state
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+
+  // Auto-hide toast after 4 seconds
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   // Get truncated title for source (max 50 chars in DB)
   const getTruncatedTitle = (title: string) => {
@@ -710,6 +726,20 @@ IMPORTANTE:
                 </button>
               )}
 
+              {/* Schedule button */}
+              {onSchedulePost && hasCarrosselImages && orderedImages.length >= 2 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSchedulingClip({ clipKey, images: orderedImages, title: clip.title });
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors flex items-center gap-1.5"
+                >
+                  <Icon name="calendar" className="w-3.5 h-3.5" />
+                  Agendar
+                </button>
+              )}
+
               {/* Publish button */}
               {onPublishCarousel && hasCarrosselImages && orderedImages.length >= 2 && (
                 <button
@@ -829,6 +859,65 @@ IMPORTANTE:
           onSetChatReference={onSetChatReference || (() => {})}
           downloadFilename={`carrossel-${editingImage.source || "image"}.png`}
         />
+      )}
+
+      {/* Schedule Post Modal */}
+      {schedulingClip && onSchedulePost && (
+        <SchedulePostModal
+          isOpen={true}
+          onClose={() => setSchedulingClip(null)}
+          onSchedule={(post) => {
+            onSchedulePost(post);
+            setSchedulingClip(null);
+            // Show success toast with scheduled date/time
+            const scheduledDate = new Date(`${post.scheduledDate}T${post.scheduledTime}`);
+            const formattedDate = scheduledDate.toLocaleDateString('pt-BR', {
+              day: '2-digit',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+            setToast({
+              message: `Carrossel agendado para ${formattedDate}`,
+              type: 'success',
+            });
+          }}
+          galleryImages={schedulingClip.images}
+          initialCarouselImages={schedulingClip.images}
+          initialCaption={captions[schedulingClip.clipKey] || schedulingClip.title}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[400] animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-sm ${
+            toast.type === 'success'
+              ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-100'
+              : 'bg-red-950/90 border-red-500/30 text-red-100'
+          }`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              toast.type === 'success' ? 'bg-emerald-500/20' : 'bg-red-500/20'
+            }`}>
+              <Icon
+                name={toast.type === 'success' ? 'check' : 'x'}
+                className={`w-4 h-4 ${toast.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}
+              />
+            </div>
+            <div>
+              <p className="text-sm font-medium">{toast.message}</p>
+              <p className="text-xs opacity-60">
+                {toast.type === 'success' ? 'Acesse o Calendário para gerenciar' : 'Tente novamente'}
+              </p>
+            </div>
+            <button
+              onClick={() => setToast(null)}
+              className="p-1 rounded-full hover:bg-white/10 transition-colors ml-2"
+            >
+              <Icon name="x" className="w-3.5 h-3.5 opacity-60" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

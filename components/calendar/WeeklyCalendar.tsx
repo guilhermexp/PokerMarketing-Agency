@@ -9,6 +9,7 @@ interface WeeklyCalendarProps {
   onDayClick: (date: string, hour?: number) => void;
   onUpdatePost: (postId: string, updates: Partial<ScheduledPost>) => void;
   onDeletePost: (postId: string) => void;
+  onPostClick?: (post: ScheduledPost) => void;
   onPublishToInstagram: (post: ScheduledPost) => void;
   publishingStates: Record<string, InstagramPublishState>;
 }
@@ -29,6 +30,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
   onDayClick,
   onUpdatePost,
   onDeletePost,
+  onPostClick,
   onPublishToInstagram,
   publishingStates,
 }) => {
@@ -329,56 +331,152 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
       {/* Day Summary Modal */}
       {selectedDaySummary && (
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setSelectedDaySummary(null)}
         >
           <div
-            className="bg-[#111111] border border-white/10 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden animate-fade-in-up"
+            className="bg-[#0a0a0a] border border-white/[0.06] rounded-xl w-full max-w-xl max-h-[85vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/5">
-              <div>
-                <h3 className="text-lg font-black text-white">
-                  {selectedDaySummary.dayName}, {selectedDaySummary.dayNumber} {selectedDaySummary.month}
-                </h3>
-                <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-0.5">
-                  {getPostsForDate(selectedDaySummary.date).length} agendamento(s)
-                </p>
+            {/* Modal Header - Minimal */}
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-white/[0.03] border border-white/[0.06] flex flex-col items-center justify-center">
+                  <span className="text-xs font-black text-white">{selectedDaySummary.dayNumber}</span>
+                  <span className="text-[8px] text-white/40 uppercase">{selectedDaySummary.month}</span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white/90">{selectedDaySummary.dayName}</h3>
+                  <p className="text-[10px] text-white/40">
+                    {getPostsForDate(selectedDaySummary.date).length} posts agendados
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setSelectedDaySummary(null)}
-                className="p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                className="p-1.5 text-white/30 hover:text-white/60 transition-colors"
               >
-                <Icon name="x" className="w-5 h-5" />
+                <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Modal Content */}
-            <div className="p-4 overflow-y-auto max-h-[60vh] space-y-3">
-              {getPostsForDate(selectedDaySummary.date).map((post) => (
-                <ScheduledPostCard
-                  key={post.id}
-                  post={post}
-                  variant="default"
-                  onUpdate={onUpdatePost}
-                  onDelete={onDeletePost}
-                  onPublishToInstagram={onPublishToInstagram}
-                  publishingState={publishingStates[post.id] || null}
-                />
-              ))}
+            {/* Modal Content - Clean List */}
+            <div className="px-4 pb-4 overflow-y-auto max-h-[65vh]">
+              <div className="space-y-2">
+                {getPostsForDate(selectedDaySummary.date).map((post) => {
+                  const contentType = post.instagramContentType;
+                  const typeLabel = contentType === 'story' ? 'Story' :
+                                   contentType === 'carousel' ? 'Carousel' :
+                                   contentType === 'reel' ? 'Reel' : null;
+                  const statusColor = post.status === 'published' ? 'text-emerald-400' :
+                                     post.status === 'failed' ? 'text-red-400' :
+                                     post.status === 'publishing' ? 'text-amber-400' : 'text-white/50';
+
+                  return (
+                    <div
+                      key={post.id}
+                      className="group flex items-center gap-4 p-3 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/[0.06]"
+                    >
+                      {/* Thumbnail - Clickable */}
+                      <div
+                        onClick={() => {
+                          if (onPostClick) {
+                            setSelectedDaySummary(null);
+                            onPostClick(post);
+                          }
+                        }}
+                        className={onPostClick ? "cursor-pointer" : ""}
+                      >
+                        {post.imageUrl ? (
+                          <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-white/5 border border-white/10 hover:border-white/30 transition-colors">
+                            <img src={post.imageUrl} alt="" className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-24 h-24 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 border border-white/10 hover:border-white/30 transition-colors">
+                            <Icon name="image" className="w-8 h-8 text-white/20" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-bold text-white/90">{post.scheduledTime}</span>
+                          {typeLabel && (
+                            <span className="text-[10px] font-bold text-white/40 uppercase px-1.5 py-0.5 bg-white/5 rounded">{typeLabel}</span>
+                          )}
+                          {post.status === 'published' && (
+                            <span className="text-[10px] font-bold text-emerald-400 uppercase px-1.5 py-0.5 bg-emerald-500/10 rounded">Publicado</span>
+                          )}
+                          {post.status === 'failed' && (
+                            <span className="text-[10px] font-bold text-red-400 uppercase px-1.5 py-0.5 bg-red-500/10 rounded">Falhou</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-white/50 line-clamp-2">
+                          {post.caption || 'Sem legenda'}
+                        </p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-0.5">
+                        {post.status === 'scheduled' && (
+                          <>
+                            {onPublishToInstagram && (
+                              <button
+                                onClick={() => onPublishToInstagram(post)}
+                                className="p-1.5 text-white/30 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                                title="Publicar agora"
+                              >
+                                <Icon name="send" className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                const newTime = prompt('Nova hora (HH:MM):', post.scheduledTime);
+                                if (newTime && /^\d{2}:\d{2}$/.test(newTime)) {
+                                  onUpdatePost(post.id, { scheduledTime: newTime });
+                                }
+                              }}
+                              className="p-1.5 text-white/30 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                              title="Reagendar"
+                            >
+                              <Icon name="clock" className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                onUpdatePost(post.id, { status: 'published', publishedAt: Date.now() });
+                              }}
+                              className="p-1.5 text-white/30 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-colors"
+                              title="Marcar como publicado"
+                            >
+                              <Icon name="check" className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => onDeletePost(post.id)}
+                          className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
+                          title="Excluir"
+                        >
+                          <Icon name="trash" className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-white/5 flex justify-end">
+            {/* Modal Footer - Minimal */}
+            <div className="px-3 pb-3">
               <button
                 onClick={() => {
                   setSelectedDaySummary(null);
                   onDayClick(selectedDaySummary.date);
                 }}
-                className="px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors"
+                className="w-full py-2.5 text-[10px] font-bold text-primary/80 uppercase tracking-wide bg-primary/10 hover:bg-primary/15 border border-primary/20 rounded-lg transition-colors"
               >
-                + Agendar novo post
+                + Novo agendamento
               </button>
             </div>
           </div>

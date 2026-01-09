@@ -382,6 +382,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       onUpdateGalleryImage={onUpdateGalleryImage}
                       onSetChatReference={onSetChatReference}
                       onPublishCarousel={instagramContext?.instagramAccountId ? handlePublishCarousel : undefined}
+                      onSchedulePost={onSchedulePost}
                     />
                   )}
                   {activeTab === "posts" && (

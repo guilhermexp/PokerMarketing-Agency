@@ -101,6 +101,22 @@ export const generateQuickPostText = async (
   return response.result;
 };
 
+export const enhancePrompt = async (
+  prompt: string,
+  brandProfile?: BrandProfile,
+): Promise<string> => {
+  const response = await apiCall("/api/ai/enhance-prompt", {
+    prompt,
+    brandProfile: brandProfile ? {
+      name: brandProfile.name,
+      description: brandProfile.description,
+      toneOfVoice: brandProfile.toneOfVoice,
+    } : undefined,
+  });
+
+  return response.enhancedPrompt;
+};
+
 export const generateImage = async (
   prompt: string,
   brandProfile: BrandProfile,

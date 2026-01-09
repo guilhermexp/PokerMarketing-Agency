@@ -2760,7 +2760,15 @@ const quickPostSchema = {
 // AI Campaign Generation
 app.post("/api/ai/campaign", async (req, res) => {
   try {
-    const { brandProfile, transcript, options, productImages, inspirationImages, collabLogo, compositionAssets } = req.body;
+    const {
+      brandProfile,
+      transcript,
+      options,
+      productImages,
+      inspirationImages,
+      collabLogo,
+      compositionAssets,
+    } = req.body;
 
     if (!brandProfile || !transcript || !options) {
       return res.status(400).json({
@@ -3270,6 +3278,89 @@ app.post("/api/ai/text", async (req, res) => {
   }
 });
 
+// AI Enhance Prompt - Improves user input for better campaign results
+app.post("/api/ai/enhance-prompt", async (req, res) => {
+  try {
+    const { prompt, brandProfile } = req.body;
+
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ error: "prompt is required" });
+    }
+
+    console.log("[Enhance Prompt API] Enhancing prompt...");
+
+    const ai = getGeminiAi();
+
+    const systemPrompt = `Você é um especialista em marketing digital e criação de conteúdo viral. Sua função é aprimorar briefings de campanhas para gerar máximo engajamento.
+
+DIRETRIZES DE ENGAJAMENTO (6 Níveis):
+
+Level 1 - ESTIMULAÇÃO: O conteúdo deve abrir com elementos que "parem o scroll" nos primeiros 1-2 segundos - cores vibrantes, movimento, contraste e brilho diferenciados.
+
+Level 2 - CAPTIVAÇÃO: Inclua perguntas abertas relevantes que criem um "curiosity loop". Use contraste (conhecido vs. desconhecido) ou premissas chocantes/inusitadas.
+
+Level 3 - ANTECIPAÇÃO: Dê pistas e contexto para o público tentar adivinhar o desfecho. Aproxime-se do "quase revelar", depois faça uma pequena finta para renovar o loop.
+
+Level 4 - VALIDAÇÃO: Entregue a resposta/benefício de forma não óbvia. Em conteúdo educativo, ofereça dicas concretas que resolvam problemas reais.
+
+Level 5 - AFEIÇÃO: Aumente a likability com postura confiante, energia positiva e valor prático genuíno. Isso compra mais atenção entre peças.
+
+Level 6 - REVELAÇÃO: Treine o público a associar a marca a valor consistente. Cada vez que veem a marca, já sentem expectativa positiva.
+
+APLICAÇÃO DIRETA:
+- Hook visual forte nos 2s iniciais
+- Pergunta que o avatar precisa responder
+- Detalhes que aumentem as apostas e ajudem a antecipar
+- Solução concreta e inesperada
+- Consistência de valor para gerar lembrança automática
+
+${
+  brandProfile
+    ? `
+CONTEXTO DA MARCA:
+- Nome: ${brandProfile.name || "Não especificado"}
+- Descrição: ${brandProfile.description || "Não especificado"}
+- Tom de Voz: ${brandProfile.toneOfVoice || "Não especificado"}
+`
+    : ""
+}
+
+TAREFA:
+Receba o briefing do usuário e transforme-o em um briefing aprimorado que maximize o potencial de engajamento da campanha, seguindo as diretrizes acima.
+
+REGRAS:
+1. Mantenha a essência e objetivo original do briefing
+2. Adicione elementos específicos de cada nível de engajamento quando aplicável
+3. Sugira hooks, perguntas e estrutura narrativa
+4. Seja específico e acionável
+5. Responda APENAS com o briefing aprimorado, sem explicações adicionais
+6. Use português brasileiro
+7. Mantenha um tamanho similar ou ligeiramente maior que o original
+8. Use formatação markdown para estruturar o briefing (negrito, listas, etc)`;
+
+    const result = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: {
+        parts: [{ text: systemPrompt + "\n\nBRIEFING ORIGINAL:\n" + prompt }],
+      },
+      config: {
+        temperature: 0.8,
+        maxOutputTokens: 2048,
+      },
+    });
+
+    const enhancedPrompt = result.candidates[0].content.parts[0].text;
+
+    console.log("[Enhance Prompt API] Successfully enhanced prompt");
+    res.json({ enhancedPrompt });
+  } catch (error) {
+    console.error("[Enhance Prompt API] Error:", error);
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to enhance prompt" });
+  }
+});
+
 // AI Edit Image
 app.post("/api/ai/edit-image", async (req, res) => {
   try {
@@ -3458,6 +3549,15 @@ app.post("/api/ai/assistant", async (req, res) => {
     console.log("[Assistant API] Starting streaming conversation...");
 
     const ai = getGeminiAi();
+    const sanitizedHistory = history
+      .map((message) => {
+        const parts = (message.parts || []).filter(
+          (part) => part.text || part.inlineData,
+        );
+        if (!parts.length) return null;
+        return { ...message, parts };
+      })
+      .filter(Boolean);
 
     const assistantTools = {
       functionDeclarations: [
@@ -3524,7 +3624,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
 
     const stream = await ai.models.generateContentStream({
       model: DEFAULT_ASSISTANT_MODEL,
-      contents: history,
+      contents: sanitizedHistory,
       config: {
         systemInstruction,
         tools: [assistantTools],

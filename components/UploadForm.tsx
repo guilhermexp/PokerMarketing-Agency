@@ -15,6 +15,7 @@ import {
   type CreativeModelId,
 } from "../config/ai-models";
 import { urlToBase64 } from "../utils/imageHelpers";
+import { enhancePrompt } from "../services/geminiService";
 
 // Models from centralized config
 const creativeModelOptions = CREATIVE_MODELS_FOR_UI.map((m) => m.id);
@@ -163,6 +164,31 @@ export const UploadForm: React.FC<UploadFormProps> = ({
     }
   }, [isFavoritesOpen]);
 
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+
+  // Simple markdown parser
+  const parseMarkdown = (text: string) => {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold mt-3 mb-1">$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2 class="text-lg font-bold mt-4 mb-2">$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1 class="text-xl font-bold mt-4 mb-2">$1</h1>')
+      .replace(/^\* (.*$)/gim, '<li class="ml-4">• $1</li>')
+      .replace(/^- (.*$)/gim, '<li class="ml-4">• $1</li>')
+      .replace(/\n/g, "<br />");
+  };
+
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.max(90, Math.min(textarea.scrollHeight, 400))}px`;
+    }
+  }, [transcript]);
+
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [generationOptions, setGenerationOptions] = useState<GenerationOptions>(
     {
@@ -210,6 +236,24 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       setInspirationImages((prev) => [...prev, ...newImages]);
     } else if (type === "assets") {
       setCompositionAssets((prev) => [...prev, ...newImages]);
+    }
+  };
+
+  const handleEnhancePrompt = async () => {
+    if (!transcript.trim() || isEnhancing) return;
+
+    setIsEnhancing(true);
+    setError(null);
+
+    try {
+      const enhanced = await enhancePrompt(transcript, brandProfile);
+      setTranscript(enhanced);
+      setIsPreviewMode(true);
+    } catch (err) {
+      console.error("[UploadForm] Failed to enhance prompt:", err);
+      setError("Erro ao aprimorar o prompt. Tente novamente.");
+    } finally {
+      setIsEnhancing(false);
     }
   };
 
@@ -329,7 +373,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
   return (
     <>
-      <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in-up">
+      <div className="flex flex-col items-center justify-start pt-[8vh] min-h-[60vh] animate-fade-in-up">
         {/* Title */}
         <div className="flex items-center justify-center gap-4 mb-10">
           <img
@@ -345,16 +389,28 @@ export const UploadForm: React.FC<UploadFormProps> = ({
         {/* Main Input Box */}
         <div className="w-full max-w-3xl relative">
           <div className="bg-[#080808] border border-white/[0.06] rounded-2xl transition-all focus-within:border-white/12 focus-within:bg-[#0a0a0a]">
-            {/* Textarea */}
-            <textarea
-              ref={textareaRef}
-              value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="w-full bg-transparent px-5 pt-4 pb-3 text-white text-[14px] placeholder:text-white/25 outline-none resize-none min-h-[90px]"
-              placeholder="Cole a transcrição do seu vídeo, post de blog ou descreva sua campanha..."
-              rows={3}
-            />
+            {/* Textarea or Preview */}
+            {isPreviewMode && transcript ? (
+              <div
+                onClick={() => setIsPreviewMode(false)}
+                className="w-full bg-transparent px-5 pt-4 pb-3 text-white text-[14px] cursor-text overflow-y-auto prose prose-invert prose-sm max-w-none"
+                style={{ minHeight: '90px', maxHeight: '400px' }}
+                dangerouslySetInnerHTML={{ __html: parseMarkdown(transcript) }}
+              />
+            ) : (
+              <textarea
+                ref={textareaRef}
+                value={transcript}
+                onChange={(e) => {
+                  setTranscript(e.target.value);
+                  setIsPreviewMode(false);
+                }}
+                onKeyDown={handleKeyDown}
+                className="w-full bg-transparent px-5 pt-4 pb-3 text-white text-[14px] placeholder:text-white/25 outline-none resize-none overflow-y-auto"
+                placeholder="Cole a transcrição do seu vídeo, post de blog ou descreva sua campanha..."
+                style={{ minHeight: '90px', maxHeight: '400px' }}
+              />
+            )}
 
             {/* Bottom Bar */}
             <div className="px-4 pb-3 flex items-center justify-between">
@@ -401,6 +457,28 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Enhance Prompt - right next to model selector */}
+              <button
+                onClick={handleEnhancePrompt}
+                disabled={!transcript.trim() || isEnhancing || isGenerating}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all ${
+                  transcript.trim() && !isEnhancing && !isGenerating
+                    ? "text-white/30 hover:text-white/50 hover:bg-white/[0.04] cursor-pointer"
+                    : "text-white/10 cursor-not-allowed"
+                }`}
+              >
+                {isEnhancing ? (
+                  <div className="w-3 h-3 border border-white/30 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Icon name="wand-2" className="w-3 h-3" />
+                )}
+                <span className="text-[10px] font-medium uppercase tracking-wide">
+                  Aprimorar
+                </span>
+              </button>
+
+              <div className="flex-1" />
 
               {/* Submit Button */}
               <button
