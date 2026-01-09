@@ -39,6 +39,12 @@ import {
   buildQuantityInstructions,
 } from "./helpers/campaign-prompts.mjs";
 import { urlToBase64 } from "./helpers/image-helpers.mjs";
+import {
+  logAiUsage,
+  extractGeminiTokens,
+  extractOpenRouterTokens,
+  createTimer,
+} from "./helpers/usage-tracking.mjs";
 
 config();
 
@@ -926,6 +932,232 @@ app.get("/api/db/health", async (req, res) => {
     res.json({ status: "healthy", timestamp: new Date().toISOString() });
   } catch (error) {
     res.status(500).json({ status: "unhealthy", error: error.message });
+  }
+});
+
+// ============================================================================
+// ADMIN ENDPOINTS
+// ============================================================================
+
+// Super admin emails from environment
+const SUPER_ADMIN_EMAILS = (process.env.VITE_SUPER_ADMIN_EMAILS || '')
+  .split(',')
+  .map(email => email.trim().toLowerCase())
+  .filter(Boolean);
+
+// Middleware to verify super admin access
+async function requireSuperAdmin(req, res, next) {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Get user email from Clerk
+    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+    const userResponse = await fetch(`https://api.clerk.com/v1/users/${auth.userId}`, {
+      headers: { Authorization: `Bearer ${clerkSecretKey}` }
+    });
+
+    if (!userResponse.ok) {
+      return res.status(401).json({ error: 'Failed to verify user' });
+    }
+
+    const userData = await userResponse.json();
+    const userEmail = userData.email_addresses?.[0]?.email_address?.toLowerCase();
+
+    if (!userEmail || !SUPER_ADMIN_EMAILS.includes(userEmail)) {
+      return res.status(403).json({ error: 'Access denied. Super admin only.' });
+    }
+
+    req.adminEmail = userEmail;
+    next();
+  } catch (error) {
+    console.error('[Admin] Auth error:', error);
+    res.status(500).json({ error: 'Authentication error' });
+  }
+}
+
+// Admin: Get overview stats
+app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
+  try {
+    const sql = getSql();
+
+    const [
+      usersResult,
+      orgsResult,
+      campaignsResult,
+      postsResult,
+      galleryResult,
+      aiUsageResult,
+      errorsResult
+    ] = await Promise.all([
+      sql`SELECT COUNT(*) as count FROM users`,
+      sql`SELECT COUNT(*) as count FROM organizations`,
+      sql`SELECT COUNT(*) as count FROM campaigns`,
+      sql`SELECT COUNT(*) as count,
+          COUNT(*) FILTER (WHERE status = 'scheduled') as pending
+          FROM scheduled_posts`,
+      sql`SELECT COUNT(*) as count FROM gallery_images`,
+      sql`SELECT
+          COALESCE(SUM(cost_cents), 0) as total_cost,
+          COUNT(*) as total_requests
+          FROM ai_usage_logs
+          WHERE created_at >= date_trunc('month', CURRENT_DATE)`,
+      sql`SELECT COUNT(*) as count FROM ai_usage_logs
+          WHERE created_at >= NOW() - INTERVAL '24 hours'
+          AND (error IS NOT NULL OR status = 'error')`
+    ]);
+
+    res.json({
+      totalUsers: parseInt(usersResult[0]?.count || 0),
+      activeUsersToday: 0,
+      totalOrganizations: parseInt(orgsResult[0]?.count || 0),
+      totalCampaigns: parseInt(campaignsResult[0]?.count || 0),
+      totalScheduledPosts: parseInt(postsResult[0]?.count || 0),
+      pendingPosts: parseInt(postsResult[0]?.pending || 0),
+      totalGalleryImages: parseInt(galleryResult[0]?.count || 0),
+      aiCostThisMonth: parseInt(aiUsageResult[0]?.total_cost || 0),
+      aiRequestsThisMonth: parseInt(aiUsageResult[0]?.total_requests || 0),
+      recentErrors: parseInt(errorsResult[0]?.count || 0)
+    });
+  } catch (error) {
+    console.error('[Admin] Stats error:', error);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+// Admin: Get AI usage analytics
+app.get("/api/admin/usage", requireSuperAdmin, async (req, res) => {
+  try {
+    const sql = getSql();
+    const { groupBy = 'day', days = 30 } = req.query;
+
+    const timeline = await sql`
+      SELECT
+        DATE_TRUNC(${groupBy}, created_at) as date,
+        COUNT(*) as total_requests,
+        COALESCE(SUM(cost_cents), 0) as total_cost_cents,
+        operation_type
+      FROM ai_usage_logs
+      WHERE created_at >= NOW() - INTERVAL '1 day' * ${parseInt(days)}
+      GROUP BY DATE_TRUNC(${groupBy}, created_at), operation_type
+      ORDER BY date DESC
+    `;
+
+    const aggregated = {};
+    for (const row of timeline) {
+      const dateKey = row.date.toISOString().split('T')[0];
+      if (!aggregated[dateKey]) {
+        aggregated[dateKey] = { date: dateKey, total_requests: 0, total_cost_cents: 0 };
+      }
+      aggregated[dateKey].total_requests += parseInt(row.total_requests);
+      aggregated[dateKey].total_cost_cents += parseInt(row.total_cost_cents);
+    }
+
+    res.json({
+      timeline: Object.values(aggregated).sort((a, b) => a.date.localeCompare(b.date))
+    });
+  } catch (error) {
+    console.error('[Admin] Usage error:', error);
+    res.status(500).json({ error: 'Failed to fetch usage data' });
+  }
+});
+
+// Admin: Get users list
+app.get("/api/admin/users", requireSuperAdmin, async (req, res) => {
+  try {
+    const sql = getSql();
+    const { limit = 50, offset = 0 } = req.query;
+
+    const users = await sql`
+      SELECT
+        u.id, u.clerk_id, u.email, u.name, u.created_at,
+        COUNT(DISTINCT c.id) as campaigns_count,
+        COUNT(DISTINCT g.id) as gallery_count
+      FROM users u
+      LEFT JOIN campaigns c ON c.user_id = u.id
+      LEFT JOIN gallery_images g ON g.user_id = u.id
+      GROUP BY u.id
+      ORDER BY u.created_at DESC
+      LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+    `;
+
+    const countResult = await sql`SELECT COUNT(*) as total FROM users`;
+
+    res.json({
+      users,
+      total: parseInt(countResult[0]?.total || 0),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    console.error('[Admin] Users error:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Admin: Get organizations list
+app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
+  try {
+    const sql = getSql();
+    const { limit = 50, offset = 0 } = req.query;
+
+    const orgs = await sql`
+      SELECT
+        o.id, o.clerk_id, o.name, o.slug, o.created_at,
+        COUNT(DISTINCT om.user_id) as members_count,
+        COUNT(DISTINCT c.id) as campaigns_count
+      FROM organizations o
+      LEFT JOIN organization_members om ON om.organization_id = o.id
+      LEFT JOIN campaigns c ON c.organization_id = o.id
+      GROUP BY o.id
+      ORDER BY o.created_at DESC
+      LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+    `;
+
+    const countResult = await sql`SELECT COUNT(*) as total FROM organizations`;
+
+    res.json({
+      organizations: orgs,
+      total: parseInt(countResult[0]?.total || 0),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    console.error('[Admin] Organizations error:', error);
+    res.status(500).json({ error: 'Failed to fetch organizations' });
+  }
+});
+
+// Admin: Get activity logs
+app.get("/api/admin/logs", requireSuperAdmin, async (req, res) => {
+  try {
+    const sql = getSql();
+    const { limit = 100, offset = 0, type } = req.query;
+
+    let logs;
+    if (type) {
+      logs = await sql`
+        SELECT id, user_id, operation_type, model, cost_cents, error, created_at
+        FROM ai_usage_logs
+        WHERE operation_type = ${type}
+        ORDER BY created_at DESC
+        LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+      `;
+    } else {
+      logs = await sql`
+        SELECT id, user_id, operation_type, model, cost_cents, error, created_at
+        FROM ai_usage_logs
+        ORDER BY created_at DESC
+        LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+      `;
+    }
+
+    res.json({ logs });
+  } catch (error) {
+    console.error('[Admin] Logs error:', error);
+    res.status(500).json({ error: 'Failed to fetch logs' });
   }
 });
 
@@ -3070,6 +3302,11 @@ app.post("/api/upload", async (req, res) => {
 
 // AI Campaign Generation
 app.post("/api/ai/campaign", async (req, res) => {
+  const timer = createTimer();
+  const auth = getAuth(req);
+  const organizationId = auth?.orgId || null;
+  const sql = getSql();
+
   try {
     const {
       brandProfile,
@@ -3158,6 +3395,25 @@ app.post("/api/ai/campaign", async (req, res) => {
 
     console.log("[Campaign API] Campaign generated successfully");
 
+    // Log AI usage
+    const inputTokens = prompt.length / 4;
+    const outputTokens = result.length / 4;
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/campaign',
+      operation: 'campaign',
+      model,
+      inputTokens: Math.round(inputTokens),
+      outputTokens: Math.round(outputTokens),
+      latencyMs: timer(),
+      status: 'success',
+      metadata: {
+        productImagesCount: productImages?.length || 0,
+        inspirationImagesCount: inspirationImages?.length || 0,
+        hasCollabLogo: !!collabLogo,
+      }
+    });
+
     res.json({
       success: true,
       campaign,
@@ -3165,6 +3421,15 @@ app.post("/api/ai/campaign", async (req, res) => {
     });
   } catch (error) {
     console.error("[Campaign API] Error:", error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/campaign',
+      operation: 'campaign',
+      model: req.body?.brandProfile?.creativeModel || DEFAULT_TEXT_MODEL,
+      latencyMs: timer(),
+      status: 'failed',
+      error: error.message,
+    }).catch(() => {});
     return res
       .status(500)
       .json({ error: error.message || "Failed to generate campaign" });
@@ -3173,6 +3438,11 @@ app.post("/api/ai/campaign", async (req, res) => {
 
 // AI Flyer Generation
 app.post("/api/ai/flyer", async (req, res) => {
+  const timer = createTimer();
+  const auth = getAuth(req);
+  const organizationId = auth?.orgId || null;
+  const sql = getSql();
+
   try {
     const {
       prompt,
@@ -3259,12 +3529,34 @@ app.post("/api/ai/flyer", async (req, res) => {
 
     console.log("[Flyer API] Flyer generated successfully");
 
+    // Log AI usage
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/flyer',
+      operation: 'flyer',
+      model: DEFAULT_IMAGE_MODEL,
+      imageCount: 1,
+      imageSize: imageSize || '1K',
+      latencyMs: timer(),
+      status: 'success',
+      metadata: { aspectRatio, hasLogo: !!logo, hasReference: !!referenceImage }
+    });
+
     res.json({
       success: true,
       imageUrl: imageDataUrl,
     });
   } catch (error) {
     console.error("[Flyer API] Error:", error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/flyer',
+      operation: 'flyer',
+      model: DEFAULT_IMAGE_MODEL,
+      latencyMs: timer(),
+      status: 'failed',
+      error: error.message,
+    }).catch(() => {});
     return res
       .status(500)
       .json({ error: error.message || "Failed to generate flyer" });
@@ -3273,6 +3565,11 @@ app.post("/api/ai/flyer", async (req, res) => {
 
 // AI Image Generation
 app.post("/api/ai/image", async (req, res) => {
+  const timer = createTimer();
+  const auth = getAuth(req);
+  const organizationId = auth?.orgId || null;
+  const sql = getSql();
+
   try {
     const {
       prompt,
@@ -3311,13 +3608,35 @@ app.post("/api/ai/image", async (req, res) => {
 
     console.log("[Image API] Image generated successfully");
 
+    // Log AI usage
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/image',
+      operation: 'image',
+      model,
+      imageCount: 1,
+      imageSize: imageSize || '1K',
+      latencyMs: timer(),
+      status: 'success',
+      metadata: { aspectRatio, hasProductImages: !!productImages?.length, hasStyleRef: !!styleReferenceImage }
+    });
+
     res.json({
       success: true,
       imageUrl: imageDataUrl,
-      model: DEFAULT_IMAGE_MODEL,
+      model,
     });
   } catch (error) {
     console.error("[Image API] Error:", error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/image',
+      operation: 'image',
+      model: DEFAULT_IMAGE_MODEL,
+      latencyMs: timer(),
+      status: 'failed',
+      error: error.message,
+    }).catch(() => {});
     return res
       .status(500)
       .json({ error: error.message || "Failed to generate image" });
@@ -3326,6 +3645,11 @@ app.post("/api/ai/image", async (req, res) => {
 
 // Convert generic prompt to structured JSON for video generation
 app.post("/api/ai/convert-prompt", async (req, res) => {
+  const timer = createTimer();
+  const auth = getAuth(req);
+  const organizationId = auth?.orgId || null;
+  const sql = getSql();
+
   try {
     const { prompt, duration = 5, aspectRatio = "16:9" } = req.body;
 
@@ -3367,12 +3691,34 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
 
     console.log("[Convert Prompt API] Conversion successful");
 
+    // Log AI usage
+    const tokens = extractGeminiTokens(response);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/convert-prompt',
+      operation: 'text',
+      model: DEFAULT_FAST_TEXT_MODEL,
+      inputTokens: tokens.inputTokens,
+      outputTokens: tokens.outputTokens,
+      latencyMs: timer(),
+      status: 'success',
+    });
+
     res.json({
       success: true,
       result,
     });
   } catch (error) {
     console.error("[Convert Prompt API] Error:", error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/convert-prompt',
+      operation: 'text',
+      model: DEFAULT_FAST_TEXT_MODEL,
+      latencyMs: timer(),
+      status: 'failed',
+      error: error.message,
+    }).catch(() => {});
     return res
       .status(500)
       .json({ error: error.message || "Failed to convert prompt" });
@@ -3381,6 +3727,11 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
 
 // AI Text Generation
 app.post("/api/ai/text", async (req, res) => {
+  const timer = createTimer();
+  const auth = getAuth(req);
+  const organizationId = auth?.orgId || null;
+  const sql = getSql();
+
   try {
     const {
       type,
@@ -3496,6 +3847,21 @@ app.post("/api/ai/text", async (req, res) => {
 
     console.log("[Text API] Text generated successfully");
 
+    // Log AI usage
+    const inputTokens = (userPrompt?.length || 0) / 4;
+    const outputTokens = result.length / 4;
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/text',
+      operation: 'text',
+      model,
+      inputTokens: Math.round(inputTokens),
+      outputTokens: Math.round(outputTokens),
+      latencyMs: timer(),
+      status: 'success',
+      metadata: { type, hasImage: !!image }
+    });
+
     res.json({
       success: true,
       result: JSON.parse(result),
@@ -3503,6 +3869,15 @@ app.post("/api/ai/text", async (req, res) => {
     });
   } catch (error) {
     console.error("[Text API] Error:", error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/text',
+      operation: 'text',
+      model: req.body?.brandProfile?.creativeModel || DEFAULT_TEXT_MODEL,
+      latencyMs: timer(),
+      status: 'failed',
+      error: error.message,
+    }).catch(() => {});
     return res
       .status(500)
       .json({ error: error.message || "Failed to generate text" });
@@ -3511,6 +3886,11 @@ app.post("/api/ai/text", async (req, res) => {
 
 // AI Enhance Prompt - Improves user input for better campaign results
 app.post("/api/ai/enhance-prompt", async (req, res) => {
+  const timer = createTimer();
+  const auth = getAuth(req);
+  const organizationId = auth?.orgId || null;
+  const sql = getSql();
+
   try {
     const { prompt, brandProfile } = req.body;
 
@@ -3583,9 +3963,32 @@ REGRAS:
     const enhancedPrompt = result.candidates[0].content.parts[0].text;
 
     console.log("[Enhance Prompt API] Successfully enhanced prompt");
+
+    // Log AI usage
+    const tokens = extractGeminiTokens(result);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/enhance-prompt',
+      operation: 'text',
+      model: 'gemini-3-flash-preview',
+      inputTokens: tokens.inputTokens,
+      outputTokens: tokens.outputTokens,
+      latencyMs: timer(),
+      status: 'success',
+    });
+
     res.json({ enhancedPrompt });
   } catch (error) {
     console.error("[Enhance Prompt API] Error:", error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/enhance-prompt',
+      operation: 'text',
+      model: 'gemini-3-flash-preview',
+      latencyMs: timer(),
+      status: 'failed',
+      error: error.message,
+    }).catch(() => {});
     return res
       .status(500)
       .json({ error: error.message || "Failed to enhance prompt" });
@@ -3594,6 +3997,11 @@ REGRAS:
 
 // AI Edit Image
 app.post("/api/ai/edit-image", async (req, res) => {
+  const timer = createTimer();
+  const auth = getAuth(req);
+  const organizationId = auth?.orgId || null;
+  const sql = getSql();
+
   try {
     const { image, prompt, mask, referenceImage } = req.body;
 
@@ -3645,12 +4053,34 @@ app.post("/api/ai/edit-image", async (req, res) => {
 
     console.log("[Edit Image API] Image edited successfully");
 
+    // Log AI usage
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/edit-image',
+      operation: 'edit_image',
+      model: 'gemini-3-pro-image-preview',
+      imageCount: 1,
+      imageSize: '1K',
+      latencyMs: timer(),
+      status: 'success',
+      metadata: { hasMask: !!mask, hasReference: !!referenceImage }
+    });
+
     res.json({
       success: true,
       imageUrl: imageDataUrl,
     });
   } catch (error) {
     console.error("[Edit Image API] Error:", error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/edit-image',
+      operation: 'edit_image',
+      model: 'gemini-3-pro-image-preview',
+      latencyMs: timer(),
+      status: 'failed',
+      error: error.message,
+    }).catch(() => {});
     return res
       .status(500)
       .json({ error: error.message || "Failed to edit image" });
@@ -3659,6 +4089,11 @@ app.post("/api/ai/edit-image", async (req, res) => {
 
 // AI Extract Colors from Logo
 app.post("/api/ai/extract-colors", async (req, res) => {
+  const timer = createTimer();
+  const auth = getAuth(req);
+  const organizationId = auth?.orgId || null;
+  const sql = getSql();
+
   try {
     const { logo } = req.body;
 
@@ -3714,9 +4149,31 @@ Retorne as cores em formato hexadecimal (#RRGGBB).`,
 
     console.log("[Extract Colors API] Colors extracted:", colors);
 
+    // Log AI usage
+    const tokens = extractGeminiTokens(response);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/extract-colors',
+      operation: 'text',
+      model: DEFAULT_TEXT_MODEL,
+      inputTokens: tokens.inputTokens,
+      outputTokens: tokens.outputTokens,
+      latencyMs: timer(),
+      status: 'success',
+    });
+
     res.json(colors);
   } catch (error) {
     console.error("[Extract Colors API] Error:", error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/extract-colors',
+      operation: 'text',
+      model: DEFAULT_TEXT_MODEL,
+      latencyMs: timer(),
+      status: 'failed',
+      error: error.message,
+    }).catch(() => {});
     return res
       .status(500)
       .json({ error: error.message || "Failed to extract colors" });
@@ -3725,6 +4182,11 @@ Retorne as cores em formato hexadecimal (#RRGGBB).`,
 
 // AI Speech Generation (TTS)
 app.post("/api/ai/speech", async (req, res) => {
+  const timer = createTimer();
+  const auth = getAuth(req);
+  const organizationId = auth?.orgId || null;
+  const sql = getSql();
+
   try {
     const { script, voiceName = "Orus" } = req.body;
 
@@ -3756,12 +4218,33 @@ app.post("/api/ai/speech", async (req, res) => {
 
     console.log("[Speech API] Speech generated successfully");
 
+    // Log AI usage - TTS is priced per character
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/speech',
+      operation: 'speech',
+      model: 'gemini-2.5-flash-preview-tts',
+      characterCount: script.length,
+      latencyMs: timer(),
+      status: 'success',
+      metadata: { voiceName }
+    });
+
     res.json({
       success: true,
       audioBase64,
     });
   } catch (error) {
     console.error("[Speech API] Error:", error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/speech',
+      operation: 'speech',
+      model: 'gemini-2.5-flash-preview-tts',
+      latencyMs: timer(),
+      status: 'failed',
+      error: error.message,
+    }).catch(() => {});
     return res
       .status(500)
       .json({ error: error.message || "Failed to generate speech" });
@@ -3770,6 +4253,11 @@ app.post("/api/ai/speech", async (req, res) => {
 
 // AI Assistant Streaming Endpoint
 app.post("/api/ai/assistant", async (req, res) => {
+  const timer = createTimer();
+  const auth = getAuth(req);
+  const organizationId = auth?.orgId || null;
+  const sql = getSql();
+
   try {
     const { history, brandProfile } = req.body;
 
@@ -3881,8 +4369,30 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
     res.end();
 
     console.log("[Assistant API] Streaming completed");
+
+    // Log AI usage - estimate tokens based on history length
+    const inputTokens = JSON.stringify(sanitizedHistory).length / 4;
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/assistant',
+      operation: 'text',
+      model: DEFAULT_ASSISTANT_MODEL,
+      inputTokens: Math.round(inputTokens),
+      latencyMs: timer(),
+      status: 'success',
+      metadata: { historyLength: sanitizedHistory.length }
+    }).catch(() => {});
   } catch (error) {
     console.error("[Assistant API] Error:", error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/assistant',
+      operation: 'text',
+      model: DEFAULT_ASSISTANT_MODEL,
+      latencyMs: timer(),
+      status: 'failed',
+      error: error.message,
+    }).catch(() => {});
     if (!res.headersSent) {
       return res
         .status(500)
@@ -3985,6 +4495,11 @@ async function generateVideoWithGoogleVeo(
 }
 
 app.post("/api/ai/video", async (req, res) => {
+  const timer = createTimer();
+  const auth = getAuth(req);
+  const organizationId = auth?.orgId || null;
+  const sql = getSql();
+
   try {
     configureFal();
 
@@ -4132,6 +4647,19 @@ app.post("/api/ai/video", async (req, res) => {
 
     console.log(`[Video API] Video stored: ${blob.url}`);
 
+    // Log AI usage - video is priced per second
+    const durationSeconds = sceneDuration || 5; // Default 5 seconds
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/video',
+      operation: 'video',
+      model: model.includes('veo') ? 'veo-3.1-fast' : model,
+      videoDurationSeconds: durationSeconds,
+      latencyMs: timer(),
+      status: 'success',
+      metadata: { aspectRatio, hasImageUrl: !!imageUrl, isInterpolation: isInterpolationMode }
+    });
+
     return res.status(200).json({
       success: true,
       url: blob.url,
@@ -4139,6 +4667,15 @@ app.post("/api/ai/video", async (req, res) => {
     });
   } catch (error) {
     console.error("[Video API] Error:", error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/video',
+      operation: 'video',
+      model: req.body?.model || 'veo-3.1-fast',
+      latencyMs: timer(),
+      status: 'failed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }).catch(() => {});
     return res.status(500).json({
       error:
         error instanceof Error ? error.message : "Failed to generate video",
