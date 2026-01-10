@@ -1335,6 +1335,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
       visual: s.visual,
       narration: s.narration,
       duration: s.duration_seconds,
+      image_url: s.image_url, // Persist scene images across sessions
     }));
     setScenes(parsedScenes);
 
@@ -1503,54 +1504,33 @@ const ClipCard: React.FC<ClipCardProps> = ({
     };
   }, [videoStates]);
 
-  // Initial scene images recovery
+  // Initial scene images recovery from database
   useEffect(() => {
     if (scenes.length === 0) return;
 
-    // Try to recover existing scene images from database or gallery (only once on mount)
-    // Priority: database (scene.image_url) > gallery (by video_script_id)
+    // Recover scene images from database (scene.image_url) only once on mount
     if (!hasInitializedSceneImages.current && clip.id) {
       hasInitializedSceneImages.current = true;
       const recoveredSceneImages: Record<number, SceneReferenceImage> = {};
       scenes.forEach((scene) => {
-        // Priority 1: Check if scene has image_url from database (most reliable)
         if (scene.image_url) {
           recoveredSceneImages[scene.sceneNumber] = {
             dataUrl: scene.image_url,
             httpUrl: scene.image_url,
             isUploading: false,
           };
-          return;
-        }
-
-        // Priority 2: Look for an image in gallery that matches this clip's scene
-        if (galleryImages && galleryImages.length > 0) {
-          const newSource = getSceneSource(scene.sceneNumber);
-          const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
-          const existingImage =
-            findGalleryImage(galleryImages, clip.id, newSource) ||
-            findGalleryImage(galleryImages, clip.id, oldSource);
-          if (existingImage) {
-            // Check if src is HTTP URL or data URL
-            const isHttpUrl = existingImage.src.startsWith("http");
-            recoveredSceneImages[scene.sceneNumber] = {
-              dataUrl: existingImage.src, // Works for display (both HTTP and data URL)
-              httpUrl: isHttpUrl ? existingImage.src : undefined, // HTTP URL for fal.ai
-              isUploading: false,
-            };
-          }
         }
       });
       if (Object.keys(recoveredSceneImages).length > 0) {
         console.log(
-          "[ClipCard] Recovered scene images for clip:",
+          "[ClipCard] Recovered scene images from database:",
           clip.id,
           Object.keys(recoveredSceneImages),
         );
         setSceneImages(recoveredSceneImages);
       }
     }
-  }, [scenes, galleryImages, clip.title, clip.id]);
+  }, [scenes, clip.id]);
 
   // Track trigger changes and auto-generate scene images
   // Initialize to 0 to prevent initial trigger (0 !== undefined would trigger)
@@ -1566,21 +1546,9 @@ const ClipCard: React.FC<ClipCardProps> = ({
     ) {
       prevTriggerRef.current = triggerSceneImageGeneration;
 
-      // Check if all scenes already have images (either in state or in gallery)
-      // Filter by video_script_id to only consider images from this specific clip
+      // Check if all scenes already have images (in state or from database)
       const allScenesHaveImages = scenes.every((scene) => {
-        // Check state first
-        if (sceneImages[scene.sceneNumber]?.dataUrl) return true;
-        // Then check gallery (with fallback for legacy data)
-        if (galleryImages && galleryImages.length > 0) {
-          const newSource = getSceneSource(scene.sceneNumber);
-          const oldSource = `Cena-${clip.title}-${scene.sceneNumber}`;
-          const found =
-            findGalleryImage(galleryImages, clip.id, newSource) ||
-            findGalleryImage(galleryImages, clip.id, oldSource);
-          return !!found;
-        }
-        return false;
+        return sceneImages[scene.sceneNumber]?.dataUrl || scene.image_url;
       });
 
       // Only trigger generation if there are scenes without images
@@ -1591,11 +1559,9 @@ const ClipCard: React.FC<ClipCardProps> = ({
   }, [
     triggerSceneImageGeneration,
     thumbnail,
-    scenes.length,
+    scenes,
     isGeneratingImages,
     sceneImages,
-    galleryImages,
-    clip.title,
   ]);
 
   // Build prompt for Sora (optionally includes narration context)

@@ -44,6 +44,9 @@ interface CarouselPreviewProps {
   onCaptionChange?: (caption: string) => void;
   onGenerateCaption?: () => void;
   isGeneratingCaption?: boolean;
+  // For showing loading state on individual slides
+  generatingSlides?: Record<string, boolean>;
+  totalExpectedSlides?: number;
 }
 
 const CarouselPreview: React.FC<CarouselPreviewProps> = ({
@@ -55,6 +58,8 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
   onCaptionChange,
   onGenerateCaption,
   isGeneratingCaption = false,
+  generatingSlides = {},
+  totalExpectedSlides = 0,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -324,14 +329,19 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
           <span className="text-xs text-white/50">Arraste para reordenar</span>
         </div>
         <div className="flex items-center justify-start gap-1 pb-2">
-          {images.map((img, idx) => (
+          {images.map((img, idx) => {
+            // Check if this specific slide is being generated
+            const isGenerating = Object.entries(generatingSlides).some(
+              ([key, val]) => val && (key.endsWith(`-${idx}`) || key.endsWith(`-${idx + 1}`) || key.endsWith('-cover'))
+            );
+            return (
             <div
               key={img.id || idx}
-              draggable
+              draggable={!isGenerating}
               onDragStart={(e) => handleDragStart(e, idx)}
               onDragOver={(e) => handleDragOver(e, idx)}
               onDragEnd={handleDragEnd}
-              onClick={() => onOpenEditor?.(img)}
+              onClick={() => !isGenerating && onOpenEditor?.(img)}
               onMouseEnter={() => setExpandedIndex(idx)}
               className={`
                 relative flex-shrink-0 rounded-xl overflow-hidden cursor-move group
@@ -356,7 +366,7 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
                 {idx + 1}
               </div>
               {/* Edit button - appears on hover */}
-              {onOpenEditor && (
+              {onOpenEditor && !isGenerating && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -369,7 +379,31 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({
                 </button>
               )}
             </div>
-          ))}
+            );
+          })}
+          {/* Skeleton placeholders for slides being generated */}
+          {totalExpectedSlides > images.length && Object.values(generatingSlides).some(v => v) && (
+            Array.from({ length: Math.min(totalExpectedSlides - images.length, 5) }).map((_, idx) => (
+              <div
+                key={`skeleton-${idx}`}
+                className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-amber-500/30 shadow-lg animate-pulse"
+                style={{
+                  width: "7rem",
+                  height: "28rem",
+                }}
+              >
+                <div className="w-full h-full bg-gradient-to-b from-amber-900/20 to-amber-950/40 flex items-center justify-center">
+                  <div className="text-center">
+                    <Loader size={20} className="mx-auto mb-2" />
+                    <span className="text-[10px] text-amber-400/60">Gerando...</span>
+                  </div>
+                </div>
+                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/50 text-sm text-white/40 font-medium">
+                  {images.length + idx + 1}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -425,11 +459,19 @@ export const CarrosselTab: React.FC<CarrosselTabProps> = ({
   const [generatingCarousel, setGeneratingCarousel] = useState<Record<string, boolean>>({});
   // Local state for campaign carousels (to reflect updates)
   const [localCarousels, setLocalCarousels] = useState<CarouselScript[]>(carousels);
+  // Ref to access latest carousel state in async functions
+  const localCarouselsRef = React.useRef<CarouselScript[]>(carousels);
 
   // Sync localCarousels with prop when it changes
   useEffect(() => {
     setLocalCarousels(carousels);
+    localCarouselsRef.current = carousels;
   }, [carousels]);
+
+  // Keep ref in sync with local state
+  useEffect(() => {
+    localCarouselsRef.current = localCarousels;
+  }, [localCarousels]);
 
   // Auto-hide toast after 4 seconds
   useEffect(() => {
@@ -671,20 +713,29 @@ IMPORTANTE:
     setGeneratingCarousel(prev => ({ ...prev, [key]: true }));
 
     try {
-      const prompt = `CAPA DE CARROSSEL INSTAGRAM
+      // O servidor adiciona automaticamente: cores da marca, tom de voz, estilo cinematográfico
+      const prompt = `CAPA DE CARROSSEL INSTAGRAM - SLIDE PRINCIPAL
 
 ${carousel.cover_prompt}
 
-REQUISITOS:
-- Formato 4:5 para feed do Instagram
-- Estilo cinematográfico e premium
-- Textos em fonte bold condensed sans-serif
-- Esta imagem define o estilo visual para todos os slides do carrossel
-- A tipografia (fonte, peso, cor, efeitos) será usada como referência para os slides seguintes`;
+Esta imagem define o estilo visual (tipografia, cores, composição) para todos os slides do carrossel.`;
+
+      // Passar logo como productImages (mesmo padrão do ClipsTab)
+      const productImages: ImageFile[] = [];
+      if (brandProfile.logo) {
+        // Se for data URL, extrair base64. Se for HTTP URL, o servidor já vai buscar.
+        if (brandProfile.logo.startsWith("data:")) {
+          productImages.push({
+            base64: brandProfile.logo.split(",")[1],
+            mimeType: brandProfile.logo.match(/:(.*?);/)?.[1] || "image/png",
+          });
+        }
+      }
 
       const imageDataUrl = await generateImage(prompt, brandProfile, {
         aspectRatio: "4:5",
         model: "gemini-3-pro-image-preview",
+        productImages: productImages.length > 0 ? productImages : undefined,
       });
 
       const base64Data = imageDataUrl.split(",")[1];
@@ -695,8 +746,12 @@ REQUISITOS:
         // Update in database
         const updated = await updateCarouselCover(carousel.id, httpUrl);
         const converted = toCarouselScript(updated);
-        // Update local state
-        setLocalCarousels(prev => prev.map(c => c.id === carousel.id ? converted : c));
+        // Update local state and ref immediately
+        setLocalCarousels(prev => {
+          const newState = prev.map(c => c.id === carousel.id ? converted : c);
+          localCarouselsRef.current = newState;
+          return newState;
+        });
         onCarouselUpdate?.(converted);
       }
     } catch (err) {
@@ -733,21 +788,31 @@ REQUISITOS:
         mimeType: coverData.mimeType,
       };
 
-      const prompt = `SLIDE ${slideNumber} DE UM CARROSSEL INSTAGRAM
+      // Segue o mesmo padrão de geração de cenas dos clips
+      // O servidor adiciona: cores, tom, estilo cinematográfico, regras de tipografia (quando há styleRef)
+      const prompt = `SLIDE ${slideNumber} DE UM CARROSSEL - DEVE USAR A MESMA TIPOGRAFIA DA IMAGEM DE REFERÊNCIA
 
 Descrição visual: ${slide.visual}
 Texto para incluir: ${slide.text}
 
-IMPORTANTE:
-- Use a imagem anexada como referência EXATA de estilo, cores, tipografia e composição
-- Formato 4:5 para feed do Instagram
-- A tipografia (fonte, peso, cor, efeitos) DEVE ser IDÊNTICA à imagem de referência
-- Mantenha consistência visual com a capa do carrossel`;
+IMPORTANTE: Este slide faz parte de uma sequência. A tipografia (fonte, peso, cor, efeitos) DEVE ser IDÊNTICA à imagem de referência anexada. NÃO use fontes diferentes.`;
+
+      // Passar logo como productImages (mesmo padrão do ClipsTab)
+      const productImages: ImageFile[] = [];
+      if (brandProfile.logo) {
+        if (brandProfile.logo.startsWith("data:")) {
+          productImages.push({
+            base64: brandProfile.logo.split(",")[1],
+            mimeType: brandProfile.logo.match(/:(.*?);/)?.[1] || "image/png",
+          });
+        }
+      }
 
       const imageDataUrl = await generateImage(prompt, brandProfile, {
         aspectRatio: "4:5",
         model: "gemini-3-pro-image-preview",
         styleReferenceImage: styleRef,
+        productImages: productImages.length > 0 ? productImages : undefined,
       });
 
       const base64Data = imageDataUrl.split(",")[1];
@@ -758,8 +823,12 @@ IMPORTANTE:
         // Update in database
         const updated = await updateCarouselSlideImage(carousel.id, slideNumber, httpUrl);
         const converted = toCarouselScript(updated);
-        // Update local state
-        setLocalCarousels(prev => prev.map(c => c.id === carousel.id ? converted : c));
+        // Update local state and ref immediately
+        setLocalCarousels(prev => {
+          const newState = prev.map(c => c.id === carousel.id ? converted : c);
+          localCarouselsRef.current = newState;
+          return newState;
+        });
         onCarouselUpdate?.(converted);
       }
     } catch (err) {
@@ -769,21 +838,100 @@ IMPORTANTE:
     }
   };
 
-  // Generate all slides for a campaign carousel
-  const handleGenerateAllCarouselSlides = async (carousel: CarouselScript) => {
-    if (!carousel.cover_url) {
-      // Generate cover first
-      await handleGenerateCarouselCover(carousel);
-      // After cover is generated, refetch the updated carousel
-      // The state update will trigger re-render
-      return;
+  // Generate ALL images for a campaign carousel (cover + all slides) in sequence
+  const handleGenerateAllCarouselImages = async (carousel: CarouselScript) => {
+    const carouselId = carousel.id;
+
+    try {
+      // Step 1: Generate cover if not exists
+      let currentCarousel = localCarouselsRef.current.find(c => c.id === carouselId) || carousel;
+
+      if (!currentCarousel.cover_url) {
+        console.log('[CarrosselTab] Generating cover...');
+        await handleGenerateCarouselCover(currentCarousel);
+
+        // Wait for state update
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Get the updated carousel from ref
+        currentCarousel = localCarouselsRef.current.find(c => c.id === carouselId)!;
+        if (!currentCarousel?.cover_url) {
+          console.error('[CarrosselTab] Cover generation failed, stopping');
+          return;
+        }
+      }
+
+      // Step 2: Generate all slides sequentially
+      console.log('[CarrosselTab] Generating slides...');
+      for (let i = 0; i < currentCarousel.slides.length; i++) {
+        // Always get the latest carousel state
+        currentCarousel = localCarouselsRef.current.find(c => c.id === carouselId)!;
+        const slide = currentCarousel.slides[i];
+
+        if (!slide.image_url) {
+          await handleGenerateCarouselSlide(currentCarousel, slide.slide, slide);
+          // Small delay between slides for state sync
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      console.log('[CarrosselTab] All carousel images generated!');
+    } catch (err) {
+      console.error('[CarrosselTab] Failed to generate all carousel images:', err);
+    }
+  };
+
+  // Handle image update for carousel images (from ImagePreviewModal)
+  const handleCarouselImageUpdate = async (imageId: string, newSrc: string) => {
+    // Check if this is a campaign carousel image
+    // Image IDs are formatted as: "{carouselId}-cover" or "{carouselId}-slide-{slideNumber}"
+    const coverMatch = imageId.match(/^(.+)-cover$/);
+    const slideMatch = imageId.match(/^(.+)-slide-(\d+)$/);
+
+    if (coverMatch) {
+      const carouselId = coverMatch[1];
+      const carousel = localCarousels.find(c => c.id === carouselId);
+      if (carousel) {
+        try {
+          // Update in database
+          const updated = await updateCarouselCover(carouselId, newSrc);
+          const converted = toCarouselScript(updated);
+          // Update local state
+          setLocalCarousels(prev => {
+            const newState = prev.map(c => c.id === carouselId ? converted : c);
+            localCarouselsRef.current = newState;
+            return newState;
+          });
+          onCarouselUpdate?.(converted);
+        } catch (err) {
+          console.error('[CarrosselTab] Failed to update carousel cover:', err);
+        }
+      }
+    } else if (slideMatch) {
+      const carouselId = slideMatch[1];
+      const slideNumber = parseInt(slideMatch[2], 10);
+      const carousel = localCarousels.find(c => c.id === carouselId);
+      if (carousel) {
+        try {
+          // Update in database
+          const updated = await updateCarouselSlideImage(carouselId, slideNumber, newSrc);
+          const converted = toCarouselScript(updated);
+          // Update local state
+          setLocalCarousels(prev => {
+            const newState = prev.map(c => c.id === carouselId ? converted : c);
+            localCarouselsRef.current = newState;
+            return newState;
+          });
+          onCarouselUpdate?.(converted);
+        } catch (err) {
+          console.error(`[CarrosselTab] Failed to update carousel slide ${slideNumber}:`, err);
+        }
+      }
     }
 
-    // Generate all slides that don't have images yet
-    for (const slide of carousel.slides) {
-      if (!slide.image_url) {
-        await handleGenerateCarouselSlide(carousel, slide.slide, slide);
-      }
+    // Also update gallery if applicable
+    if (onUpdateGalleryImage) {
+      onUpdateGalleryImage(imageId, newSrc);
     }
   };
 
@@ -922,20 +1070,31 @@ IMPORTANTE:
                       </span>
                     </div>
 
-                    {/* Generate button */}
+                    {/* Generate All button */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (!hasCover) {
-                          handleGenerateCarouselCover(carousel);
-                        } else {
-                          handleGenerateAllCarouselSlides(carousel);
-                        }
+                        handleGenerateAllCarouselImages(carousel);
                       }}
                       disabled={isGeneratingAny}
-                      className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors disabled:opacity-50 whitespace-nowrap"
+                      className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-amber-600/20 text-amber-500 hover:bg-amber-600/30 transition-colors disabled:opacity-50 whitespace-nowrap flex items-center gap-1.5"
                     >
-                      {isGeneratingAny ? "Gerando..." : !hasCover ? "Gerar Capa" : allGenerated ? "Regenerar" : "Gerar Slides"}
+                      {isGeneratingAny ? (
+                        <>
+                          <Loader size={12} />
+                          Gerando...
+                        </>
+                      ) : allGenerated ? (
+                        <>
+                          <Icon name="refresh" className="w-3 h-3" />
+                          Regenerar
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="zap" className="w-3 h-3" />
+                          Gerar Tudo
+                        </>
+                      )}
                     </button>
 
                     {/* Schedule button */}
@@ -994,7 +1153,73 @@ IMPORTANTE:
                         onOpenEditor={setEditingImage}
                         caption={captions[carouselKey] || carousel.caption || ""}
                         onCaptionChange={(newCaption) => setCaptions(prev => ({ ...prev, [carouselKey]: newCaption }))}
+                        generatingSlides={Object.fromEntries(
+                          Object.entries(generatingCarousel).filter(([key]) => key.startsWith(`${carousel.id}-`))
+                        )}
+                        totalExpectedSlides={totalSlides + 1}
                       />
+                    ) : isGeneratingAny ? (
+                      /* Show skeleton preview while generating from empty state */
+                      <div className="flex gap-6 items-center">
+                        <div className="flex-shrink-0">
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                            <span className="px-2 py-0.5 rounded bg-amber-500/20 text-[10px] font-medium text-amber-400 border border-amber-500/20">
+                              Gerando carrossel...
+                            </span>
+                          </div>
+                          <div className="w-[320px] bg-black rounded-[32px] p-2 shadow-2xl border border-amber-500/20 animate-pulse">
+                            <div className="w-24 h-6 bg-black rounded-full mx-auto mb-1" />
+                            <div className="relative bg-[#0a0a0a] rounded-[24px] overflow-hidden">
+                              <div className="px-3 py-2 flex items-center gap-2 border-b border-white/5">
+                                <div className="w-7 h-7 rounded-full bg-amber-900/30" />
+                                <div className="flex-1 space-y-1">
+                                  <div className="w-16 h-2.5 bg-amber-900/30 rounded" />
+                                  <div className="w-12 h-2 bg-amber-900/20 rounded" />
+                                </div>
+                              </div>
+                              <div className="aspect-[4/5] bg-gradient-to-b from-amber-900/20 to-amber-950/40 flex items-center justify-center">
+                                <div className="text-center">
+                                  <Loader size={32} className="mx-auto mb-3" />
+                                  <p className="text-sm text-amber-400/80">Gerando capa...</p>
+                                  <p className="text-xs text-amber-400/50 mt-1">Depois os slides</p>
+                                </div>
+                              </div>
+                              <div className="flex justify-center gap-1 py-2">
+                                {Array.from({ length: Math.min(totalSlides, 5) }).map((_, i) => (
+                                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-amber-500/30" />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Loader size={14} />
+                            <span className="text-xs text-amber-400/60">Gerando imagens do carrossel...</span>
+                          </div>
+                          <div className="flex items-center justify-start gap-1 pb-2">
+                            {Array.from({ length: Math.min(totalSlides + 1, 6) }).map((_, idx) => (
+                              <div
+                                key={`skeleton-${idx}`}
+                                className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-amber-500/30 shadow-lg animate-pulse"
+                                style={{ width: idx === 0 ? "10rem" : "5rem", height: "20rem" }}
+                              >
+                                <div className="w-full h-full bg-gradient-to-b from-amber-900/20 to-amber-950/40 flex items-center justify-center">
+                                  {idx === 0 && (
+                                    <div className="text-center">
+                                      <Loader size={16} className="mx-auto mb-1" />
+                                      <span className="text-[9px] text-amber-400/60">Capa</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/50 text-xs text-white/40 font-medium">
+                                  {idx === 0 ? "C" : idx}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     ) : (
                       <div className="text-center py-8">
                         <Icon
@@ -1002,14 +1227,14 @@ IMPORTANTE:
                           className="w-10 h-10 text-white/20 mx-auto mb-3"
                         />
                         <p className="text-sm text-white/50 mb-4">
-                          Gere a capa primeiro para visualizar o carrossel
+                          Clique em "Gerar Tudo" para criar o carrossel completo
                         </p>
                         <button
-                          onClick={() => handleGenerateCarouselCover(carousel)}
+                          onClick={() => handleGenerateAllCarouselImages(carousel)}
                           disabled={isGeneratingAny}
                           className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500 transition-colors disabled:opacity-50"
                         >
-                          {isGeneratingAny ? "Gerando..." : "Gerar Capa"}
+                          {isGeneratingAny ? "Gerando..." : "Gerar Tudo"}
                         </button>
                       </div>
                     )}
@@ -1263,8 +1488,9 @@ IMPORTANTE:
           image={editingImage}
           onClose={() => setEditingImage(null)}
           onImageUpdate={(newSrc) => {
-            if (editingImage.id && onUpdateGalleryImage) {
-              onUpdateGalleryImage(editingImage.id, newSrc);
+            if (editingImage.id) {
+              // Use the new handler that updates both carousel state and gallery
+              handleCarouselImageUpdate(editingImage.id, newSrc);
             }
             setEditingImage(null);
           }}

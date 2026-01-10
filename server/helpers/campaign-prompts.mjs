@@ -35,11 +35,17 @@ ${quantityInstructions}
 
 **REGRAS PARA CARROSSÉIS (carousels):**
 1. Cada carrossel deve ter 5 slides
-2. O cover_prompt descreve a imagem de CAPA que estabelece o estilo visual do carrossel
-3. Cada slide tem: slide (número), visual (descrição da imagem), text (texto CURTO em MAIÚSCULAS, máx 10 palavras)
-4. Slide 1 = título/gancho, slides 2-4 = conteúdo principal, slide 5 = CTA
-5. A tipografia e estilo visual DEVEM ser consistentes em todos os slides
-6. Todos os textos em PORTUGUÊS
+2. O cover_prompt DEVE seguir AS MESMAS REGRAS do image_prompt:
+   - Cores da marca (${brandProfile.primaryColor}, ${brandProfile.secondaryColor})
+   - Estilo cinematográfico, luxuoso e premium
+   - Textos em fonte bold condensed sans-serif
+   - Descrição detalhada da composição visual
+   - Em PORTUGUÊS
+3. Cada slide tem: slide (número), visual (descrição detalhada para gerar imagem), text (texto CURTO em MAIÚSCULAS, máx 10 palavras)
+4. O campo "visual" de cada slide DEVE ser uma descrição completa para geração de imagem (estilo, cores, composição)
+5. Slide 1 = título/gancho, slides 2-4 = conteúdo principal, slide 5 = CTA
+6. A tipografia e estilo visual DEVEM ser consistentes em todos os slides
+7. Todos os textos em PORTUGUÊS
 
 **MISSÃO:** Gere uma campanha completa em JSON com as QUANTIDADES EXATAS especificadas. Cada image_prompt DEVE ser em PORTUGUÊS e alinhado com seu content.`;
 }

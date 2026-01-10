@@ -120,6 +120,8 @@ interface DashboardProps {
   onUpdateCreativeModel?: (model: CreativeModel) => void;
   // Instagram Multi-tenant
   instagramContext?: InstagramContext;
+  // Carousel updates
+  onCarouselUpdate?: (carousel: import("../types").CarouselScript) => void;
 }
 
 type Tab = "clips" | "carrossel" | "posts" | "ads";
@@ -179,6 +181,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     onDeleteSchedule,
     onMarkGalleryImagePublished,
     instagramContext,
+    onCarouselUpdate,
   } = props;
 
   // Debug log for productImages
@@ -379,6 +382,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       onSetChatReference={onSetChatReference}
                       onPublishCarousel={instagramContext?.instagramAccountId ? handlePublishCarousel : undefined}
                       onSchedulePost={onSchedulePost}
+                      onCarouselUpdate={onCarouselUpdate}
                     />
                   )}
                   {activeTab === "posts" && (

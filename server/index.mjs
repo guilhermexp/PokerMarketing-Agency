@@ -354,10 +354,19 @@ const getToneText = (brandProfile, target) => {
   return shouldUseTone(brandProfile, target) ? brandProfile.toneOfVoice : "";
 };
 
-const buildImagePrompt = (prompt, brandProfile, hasStyleReference = false) => {
+const buildImagePrompt = (prompt, brandProfile, hasStyleReference = false, hasLogo = false) => {
   const toneText = getToneText(brandProfile, "images");
   let fullPrompt = `PROMPT TÉCNICO: ${prompt}
 ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
+
+  if (hasLogo) {
+    fullPrompt += `
+
+**LOGO DA MARCA (OBRIGATÓRIO):**
+- Use o LOGO EXATO fornecido na imagem de referência anexada - NÃO CRIE UM LOGO DIFERENTE
+- O logo deve aparecer de forma clara e legível na composição
+- Mantenha as proporções e cores originais do logo`;
+  }
 
   if (hasStyleReference) {
     fullPrompt += `
@@ -3634,7 +3643,67 @@ app.post("/api/ai/campaign", async (req, res) => {
     let result;
 
     if (isOpenRouter) {
-      const textParts = [prompt];
+      // Add explicit JSON schema for OpenRouter models
+      const jsonSchemaPrompt = `${prompt}
+
+**FORMATO JSON OBRIGATÓRIO - TODOS OS CAMPOS SÃO OBRIGATÓRIOS:**
+
+ATENÇÃO: Você DEVE gerar TODOS os 4 arrays: videoClipScripts, posts, adCreatives E carousels.
+O campo "carousels" é OBRIGATÓRIO e NÃO pode ser omitido.
+
+\`\`\`json
+{
+  "videoClipScripts": [
+    {
+      "title": "Título do vídeo",
+      "hook": "Gancho inicial do vídeo",
+      "scenes": [
+        {"scene": 1, "visual": "descrição visual", "narration": "narração", "duration_seconds": 5}
+      ],
+      "image_prompt": "prompt para thumbnail com cores da marca, estilo cinematográfico",
+      "audio_script": "script de áudio completo"
+    }
+  ],
+  "posts": [
+    {
+      "platform": "Instagram|Facebook|Twitter|LinkedIn",
+      "content": "texto do post",
+      "hashtags": ["tag1", "tag2"],
+      "image_prompt": "descrição da imagem com cores da marca, estilo cinematográfico"
+    }
+  ],
+  "adCreatives": [
+    {
+      "platform": "Facebook|Google",
+      "headline": "título do anúncio",
+      "body": "corpo do anúncio",
+      "cta": "call to action",
+      "image_prompt": "descrição da imagem com cores da marca, estilo cinematográfico"
+    }
+  ],
+  "carousels": [
+    {
+      "title": "Título do carrossel Instagram",
+      "hook": "Gancho/abertura impactante do carrossel",
+      "cover_prompt": "Imagem de capa cinematográfica com cores da marca, título em fonte bold condensed sans-serif, estilo luxuoso e premium, composição visual impactante",
+      "slides": [
+        {"slide": 1, "visual": "descrição visual detalhada do slide 1 - capa/título", "text": "TEXTO CURTO EM MAIÚSCULAS"},
+        {"slide": 2, "visual": "descrição visual detalhada do slide 2 - conteúdo", "text": "TEXTO CURTO EM MAIÚSCULAS"},
+        {"slide": 3, "visual": "descrição visual detalhada do slide 3 - conteúdo", "text": "TEXTO CURTO EM MAIÚSCULAS"},
+        {"slide": 4, "visual": "descrição visual detalhada do slide 4 - conteúdo", "text": "TEXTO CURTO EM MAIÚSCULAS"},
+        {"slide": 5, "visual": "descrição visual detalhada do slide 5 - CTA", "text": "TEXTO CURTO EM MAIÚSCULAS"}
+      ]
+    }
+  ]
+}
+\`\`\`
+
+REGRAS CRÍTICAS:
+1. O JSON DEVE conter EXATAMENTE os 4 arrays: videoClipScripts, posts, adCreatives, carousels
+2. O array "carousels" NUNCA pode estar vazio - gere pelo menos 1 carrossel com 5 slides
+3. Responda APENAS com o JSON válido, sem texto adicional.`;
+
+      const textParts = [jsonSchemaPrompt];
 
       if (allImages.length > 0) {
         result = await generateTextWithOpenRouterVision(
@@ -3644,7 +3713,7 @@ app.post("/api/ai/campaign", async (req, res) => {
           0.7,
         );
       } else {
-        result = await generateTextWithOpenRouter(model, "", prompt, 0.7);
+        result = await generateTextWithOpenRouter(model, "", jsonSchemaPrompt, 0.7);
       }
     } else {
       const parts = [{ text: prompt }];
@@ -3865,10 +3934,33 @@ app.post("/api/ai/image", async (req, res) => {
       `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}`,
     );
 
+    // Prepare product images array, including brand logo if available
+    let allProductImages = productImages ? [...productImages] : [];
+
+    // Auto-include brand logo as reference if it's an HTTP URL and not already passed by frontend
+    // (Frontend handles data URLs, server handles HTTP URLs)
+    if (brandProfile.logo && brandProfile.logo.startsWith('http') && allProductImages.length === 0) {
+      try {
+        const logoBase64 = await urlToBase64(brandProfile.logo);
+        if (logoBase64) {
+          console.log("[Image API] Including brand logo from HTTP URL");
+          // Detect mime type from URL or default to png
+          const mimeType = brandProfile.logo.includes('.svg') ? 'image/svg+xml'
+            : brandProfile.logo.includes('.jpg') || brandProfile.logo.includes('.jpeg') ? 'image/jpeg'
+            : 'image/png';
+          allProductImages.unshift({ base64: logoBase64, mimeType });
+        }
+      } catch (err) {
+        console.warn("[Image API] Failed to include brand logo:", err.message);
+      }
+    }
+
+    const hasLogo = !!brandProfile.logo && allProductImages.length > 0;
     const fullPrompt = buildImagePrompt(
       prompt,
       brandProfile,
       !!styleReferenceImage,
+      hasLogo,
     );
 
     const imageDataUrl = await generateGeminiImage(
@@ -3876,7 +3968,7 @@ app.post("/api/ai/image", async (req, res) => {
       aspectRatio,
       DEFAULT_IMAGE_MODEL,
       imageSize,
-      productImages,
+      allProductImages.length > 0 ? allProductImages : undefined,
       styleReferenceImage,
     );
 

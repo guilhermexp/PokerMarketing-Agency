@@ -1137,13 +1137,15 @@ function AppContent() {
               cta: a.cta,
               image_prompt: a.image_prompt,
             })),
-            carousel_scripts: (r.carousels || []).map((c) => ({
-              title: c.title,
-              hook: c.hook,
-              cover_prompt: c.cover_prompt,
-              caption: c.caption,
-              slides: c.slides,
-            })),
+            carousel_scripts: (r.carousels || [])
+              .filter((c) => c && c.title && c.hook && c.cover_prompt) // Filter out invalid carousels
+              .map((c) => ({
+                title: c.title,
+                hook: c.hook,
+                cover_prompt: c.cover_prompt,
+                caption: c.caption || null,
+                slides: c.slides || [],
+              })),
           });
 
           // Update campaign with database IDs (including clip/post/ad IDs for image linking)
@@ -2040,6 +2042,18 @@ function AppContent() {
                   console.error("Failed to update creative model:", e);
                 }
               }
+            }}
+            onCarouselUpdate={(updatedCarousel) => {
+              // Update carousel in campaign state
+              setCampaign((prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  carousels: prev.carousels?.map((c) =>
+                    c.id === updatedCarousel.id ? updatedCarousel : c
+                  ) || [],
+                };
+              });
             }}
           />
         </>
