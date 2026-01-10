@@ -889,6 +889,7 @@ IMPORTANTE: Este slide faz parte de uma sequência. A tipografia (fonte, peso, c
     const slideMatch = imageId.match(/^(.+)-slide-(\d+)$/);
 
     if (coverMatch) {
+      // Campaign carousel cover image
       const carouselId = coverMatch[1];
       const carousel = localCarousels.find(c => c.id === carouselId);
       if (carousel) {
@@ -903,11 +904,15 @@ IMPORTANTE: Este slide faz parte de uma sequência. A tipografia (fonte, peso, c
             return newState;
           });
           onCarouselUpdate?.(converted);
+          console.log('[CarrosselTab] Updated carousel cover:', carouselId);
         } catch (err) {
           console.error('[CarrosselTab] Failed to update carousel cover:', err);
         }
       }
+      // DO NOT call onUpdateGalleryImage - carousel images are NOT in gallery table
+      return;
     } else if (slideMatch) {
+      // Campaign carousel slide image
       const carouselId = slideMatch[1];
       const slideNumber = parseInt(slideMatch[2], 10);
       const carousel = localCarousels.find(c => c.id === carouselId);
@@ -923,13 +928,16 @@ IMPORTANTE: Este slide faz parte de uma sequência. A tipografia (fonte, peso, c
             return newState;
           });
           onCarouselUpdate?.(converted);
+          console.log('[CarrosselTab] Updated carousel slide:', carouselId, slideNumber);
         } catch (err) {
           console.error(`[CarrosselTab] Failed to update carousel slide ${slideNumber}:`, err);
         }
       }
+      // DO NOT call onUpdateGalleryImage - carousel images are NOT in gallery table
+      return;
     }
 
-    // Also update gallery if applicable
+    // For clip-based carousel images (stored in gallery), update gallery
     if (onUpdateGalleryImage) {
       onUpdateGalleryImage(imageId, newSrc);
     }
