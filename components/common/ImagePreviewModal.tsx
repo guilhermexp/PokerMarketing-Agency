@@ -209,6 +209,13 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     height: number;
   } | null>(null);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // AI Edit preview state
+  const [editPreview, setEditPreview] = useState<{
+    dataUrl: string;
+    type: "edit" | "removeBg";
+    prompt?: string;
+  } | null>(null);
   const [useProtectionMask, setUseProtectionMask] = useState(false);
   const [isDrawingProtection, setIsDrawingProtection] = useState(false);
   const protectionCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -617,32 +624,13 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         editedImageDataUrl?.substring(0, 50),
       );
 
-      // Upload edited image to blob storage for persistence
-      let finalImageUrl = editedImageDataUrl;
-      if (editedImageDataUrl.startsWith("data:")) {
-        const [header, base64Data] = editedImageDataUrl.split(",");
-        const mimeType = header.match(/:(.*?);/)?.[1] || "image/png";
-        try {
-          finalImageUrl = await uploadImageToBlob(base64Data, mimeType);
-          console.log(
-            "[ImagePreviewModal] Edited image uploaded to blob:",
-            finalImageUrl,
-          );
-        } catch (uploadErr) {
-          console.error(
-            "[ImagePreviewModal] Failed to upload edited image:",
-            uploadErr,
-          );
-          // Continue with data URL if upload fails
-        }
-      }
-
-      onImageUpdate(finalImageUrl);
-      setEditPrompt("");
+      // Store preview instead of saving directly
+      setEditPreview({
+        dataUrl: editedImageDataUrl,
+        type: "edit",
+        prompt: editPrompt,
+      });
       clearMask();
-
-      // Redraw canvas with the new image
-      setTimeout(() => drawCanvases(), 100);
     } catch (err: any) {
       setError(err.message || "Falha ao editar a imagem.");
     } finally {
@@ -668,35 +656,58 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         removeBgPrompt,
       );
 
-      // Upload edited image to blob storage for persistence
-      let finalImageUrl = editedImageDataUrl;
-      if (editedImageDataUrl.startsWith("data:")) {
-        const [header, base64Data] = editedImageDataUrl.split(",");
-        const mimeType = header.match(/:(.*?);/)?.[1] || "image/png";
-        try {
-          finalImageUrl = await uploadImageToBlob(base64Data, mimeType);
-          console.log(
-            "[ImagePreviewModal] Background removed image uploaded to blob:",
-            finalImageUrl,
-          );
-        } catch (uploadErr) {
-          console.error(
-            "[ImagePreviewModal] Failed to upload edited image:",
-            uploadErr,
-          );
-        }
-      }
-
-      onImageUpdate(finalImageUrl);
-
-      // Redraw canvas with the new image
-      setTimeout(() => drawCanvases(), 100);
+      // Store preview instead of saving directly
+      setEditPreview({
+        dataUrl: editedImageDataUrl,
+        type: "removeBg",
+      });
     } catch (err: any) {
       setError(err.message || "Falha ao remover o fundo.");
     } finally {
       setIsRemovingBackground(false);
     }
   };
+
+  // Save the AI edit
+  const handleSaveEdit = useCallback(async () => {
+    if (!editPreview) return;
+
+    setIsEditing(true);
+    setError(null);
+
+    try {
+      // Upload edited image to blob storage for persistence
+      let finalImageUrl = editPreview.dataUrl;
+      if (editPreview.dataUrl.startsWith("data:")) {
+        const [header, base64Data] = editPreview.dataUrl.split(",");
+        const mimeType = header.match(/:(.*?);/)?.[1] || "image/png";
+        try {
+          finalImageUrl = await uploadImageToBlob(base64Data, mimeType);
+          console.log("[ImagePreviewModal] Edited image uploaded to blob:", finalImageUrl);
+        } catch (uploadErr) {
+          console.error("[ImagePreviewModal] Failed to upload edited image:", uploadErr);
+          // Continue with data URL if upload fails
+        }
+      }
+
+      onImageUpdate(finalImageUrl);
+      setEditPrompt("");
+      setEditPreview(null);
+
+      // Redraw canvas with the new image
+      setTimeout(() => drawCanvases(), 100);
+    } catch (err: any) {
+      setError(err.message || "Falha ao salvar a edição.");
+    } finally {
+      setIsEditing(false);
+    }
+  }, [editPreview, onImageUpdate, drawCanvases]);
+
+  // Discard the AI edit preview
+  const handleDiscardEdit = useCallback(() => {
+    setEditPreview(null);
+    setEditPrompt("");
+  }, []);
 
   const handleDownload = () => {
     const link = document.createElement("a");
@@ -966,8 +977,8 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                       : 'max-w-full max-h-full object-contain'
                   }`}
                 />
-              ) : resizedPreview ? (
-                /* Side-by-side comparison view */
+              ) : resizedPreview || editPreview ? (
+                /* Side-by-side comparison view for resize OR AI edit */
                 <div className="flex gap-4 items-center justify-center w-full h-full">
                   {/* Original Image */}
                   <div className="flex flex-col items-center flex-1 max-w-[45%]">
@@ -989,19 +1000,25 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                     <Icon name="arrow-right" className="w-6 h-6" />
                   </div>
 
-                  {/* Resized Image */}
+                  {/* Preview Image (Resized or AI Edit) */}
                   <div className="flex flex-col items-center flex-1 max-w-[45%]">
                     <span className="text-[10px] text-primary mb-2 uppercase tracking-wider font-semibold">
-                      Redimensionada
+                      {resizedPreview ? "Redimensionada" : editPreview?.type === "removeBg" ? "Sem fundo" : "Editada"}
                     </span>
                     <img
-                      src={resizedPreview.dataUrl}
-                      alt="Redimensionada"
+                      src={resizedPreview ? resizedPreview.dataUrl : editPreview!.dataUrl}
+                      alt="Preview"
                       className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-2xl border border-primary/30"
                     />
-                    <span className="text-[9px] text-primary/70 mt-2">
-                      {resizedPreview.width} × {resizedPreview.height}
-                    </span>
+                    {resizedPreview ? (
+                      <span className="text-[9px] text-primary/70 mt-2">
+                        {resizedPreview.width} × {resizedPreview.height}
+                      </span>
+                    ) : editPreview?.prompt ? (
+                      <span className="text-[9px] text-primary/70 mt-2 max-w-[200px] truncate">
+                        {editPreview.prompt}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               ) : (
@@ -1065,7 +1082,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             </div>
 
             {/* Hint - Below image */}
-            {!isVideo && !isActionRunning && (
+            {!isVideo && !isActionRunning && !resizedPreview && !editPreview && (
               <div className="mt-4 flex items-center gap-2 text-white/30">
                 <Icon
                   name={useProtectionMask ? "shield" : "edit"}
@@ -1363,46 +1380,80 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             {/* Bottom Actions - Compact */}
             {!isVideo && (
               <div className="p-4 border-t border-white/[0.06] space-y-2">
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={clearMask}
-                    disabled={isActionRunning}
-                    title="Limpar máscara"
-                    className="w-8 h-8 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-white/30 hover:text-white/50 transition-all disabled:opacity-30 flex items-center justify-center"
-                  >
-                    <Icon name="eraser" className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={handleRemoveBackground}
-                    disabled={isActionRunning}
-                    className="flex-1 h-8 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
-                  >
-                    {isRemovingBackground ? (
-                      <Loader className="w-3 h-3" />
-                    ) : (
-                      <Icon name="scissors" className="w-3 h-3" />
-                    )}
-                    Remove BG
-                  </button>
-                </div>
+                {editPreview ? (
+                  /* Show approve/discard buttons when there's an edit preview */
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={handleDiscardEdit}
+                      disabled={isEditing}
+                      className="flex-1 h-9 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
+                    >
+                      <Icon name="x" className="w-3.5 h-3.5" />
+                      Descartar
+                    </button>
+                    <button
+                      onClick={handleSaveEdit}
+                      disabled={isEditing}
+                      className="flex-1 h-9 bg-primary hover:bg-primary/90 rounded-lg text-[11px] font-bold text-black transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      {isEditing ? (
+                        <>
+                          <Loader className="w-3.5 h-3.5" />
+                          Salvando...
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="check" className="w-3.5 h-3.5" />
+                          Aplicar
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  /* Normal edit controls */
+                  <>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={clearMask}
+                        disabled={isActionRunning}
+                        title="Limpar máscara"
+                        className="w-8 h-8 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-white/30 hover:text-white/50 transition-all disabled:opacity-30 flex items-center justify-center"
+                      >
+                        <Icon name="eraser" className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={handleRemoveBackground}
+                        disabled={isActionRunning}
+                        className="flex-1 h-8 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
+                      >
+                        {isRemovingBackground ? (
+                          <Loader className="w-3 h-3" />
+                        ) : (
+                          <Icon name="scissors" className="w-3 h-3" />
+                        )}
+                        Remove BG
+                      </button>
+                    </div>
 
-                <button
-                  onClick={handleEdit}
-                  disabled={!editPrompt.trim() || isActionRunning}
-                  className="w-full h-9 bg-primary hover:bg-primary/90 disabled:bg-white/[0.03] disabled:text-white/20 rounded-lg text-[11px] font-bold text-black disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
-                >
-                  {isEditing ? (
-                    <>
-                      <Loader className="w-3.5 h-3.5" />
-                      Processando...
-                    </>
-                  ) : (
-                    <>
-                      <Icon name="wand-2" className="w-3.5 h-3.5" />
-                      Aplicar edição
-                    </>
-                  )}
-                </button>
+                    <button
+                      onClick={handleEdit}
+                      disabled={!editPrompt.trim() || isActionRunning}
+                      className="w-full h-9 bg-primary hover:bg-primary/90 disabled:bg-white/[0.03] disabled:text-white/20 rounded-lg text-[11px] font-bold text-black disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
+                    >
+                      {isEditing ? (
+                        <>
+                          <Loader className="w-3.5 h-3.5" />
+                          Processando...
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="wand-2" className="w-3.5 h-3.5" />
+                          Editar com IA
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
