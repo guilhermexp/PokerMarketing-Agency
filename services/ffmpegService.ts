@@ -4,6 +4,16 @@ import { toBlobURL } from "@ffmpeg/util";
 // Constants
 const CROSSFADE_DURATION = 0.5; // segundos de transição entre vídeos
 
+// Video normalization settings for seamless transitions
+const TARGET_WIDTH = 1080;
+const TARGET_HEIGHT = 1920;
+const TARGET_FPS = 30;
+const TARGET_PIXEL_FORMAT = "yuv420p";
+
+// Encoding quality settings
+const ENCODING_PRESET = "medium"; // ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
+const ENCODING_CRF = 23; // 0-51, lower = better quality, 18-23 is visually lossless
+
 // Types
 export interface ExportProgress {
   phase:
@@ -182,6 +192,10 @@ const buildSimpleConcatFilter = (
 /**
  * Build filter complex for concatenating videos with trim support
  * Applies trim to each video before concatenation
+ *
+ * Improvements:
+ * 1. Normalizes all videos to same resolution/fps/format for clean cuts
+ * 2. Consistent audio sample rate normalization
  */
 const buildTrimConcatFilter = (
   videos: VideoInput[],
@@ -197,7 +211,12 @@ const buildTrimConcatFilter = (
     const isMuted = !!v.mute;
     const removeSilence = !!options.removeSilence;
     if (!hasTrim && !isMuted && !removeSilence) {
-      return { filterComplex: "", videoOutput: "[0:v]", audioOutput: "[0:a]" };
+      // Still normalize single video for consistent output
+      return {
+        filterComplex: `[0:v]scale=${TARGET_WIDTH}:${TARGET_HEIGHT}:force_original_aspect_ratio=decrease,pad=${TARGET_WIDTH}:${TARGET_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,fps=${TARGET_FPS},format=${TARGET_PIXEL_FORMAT},setsar=1[vfinal];[0:a]aresample=44100[afinal]`,
+        videoOutput: "[vfinal]",
+        audioOutput: "[afinal]",
+      };
     }
     const start = v.trimStart ?? 0;
     const end = v.trimEnd ?? v.duration;
@@ -206,7 +225,7 @@ const buildTrimConcatFilter = (
       ? ",silenceremove=start_periods=1:start_duration=0.2:start_threshold=-45dB:stop_periods=1:stop_duration=0.2:stop_threshold=-45dB"
       : "";
     return {
-      filterComplex: `[0:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[vfinal];[0:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS${volumeFilter}${silenceFilter}[afinal]`,
+      filterComplex: `[0:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS,scale=${TARGET_WIDTH}:${TARGET_HEIGHT}:force_original_aspect_ratio=decrease,pad=${TARGET_WIDTH}:${TARGET_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,fps=${TARGET_FPS},format=${TARGET_PIXEL_FORMAT},setsar=1[vfinal];[0:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS${volumeFilter}${silenceFilter},aresample=44100[afinal]`,
       videoOutput: "[vfinal]",
       audioOutput: "[afinal]",
     };
@@ -214,33 +233,41 @@ const buildTrimConcatFilter = (
 
   const parts: string[] = [];
 
-  // Apply trim to each video
+  // Apply trim and normalize each video for consistent concatenation
   videos.forEach((video, i) => {
     const start = video.trimStart ?? 0;
     const end = video.trimEnd ?? video.duration;
-    const hasTrim = start > 0 || end < video.duration;
     const isMuted = !!video.mute;
     const silenceFilter = options.removeSilence
       ? ",silenceremove=start_periods=1:start_duration=0.2:start_threshold=-45dB:stop_periods=1:stop_duration=0.2:stop_threshold=-45dB"
       : "";
 
-    if (hasTrim) {
-      parts.push(
-        `[${i}:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[v${i}]`,
-      );
-      parts.push(
-        `[${i}:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS${isMuted ? ",volume=0" : ""}${silenceFilter}[a${i}]`,
-      );
-    } else {
-      // No trim needed, just reset timestamps
-      parts.push(`[${i}:v]setpts=PTS-STARTPTS[v${i}]`);
-      parts.push(
-        `[${i}:a]asetpts=PTS-STARTPTS${isMuted ? ",volume=0" : ""}${silenceFilter}[a${i}]`,
-      );
-    }
+    // Video: trim → normalize resolution/fps/format
+    const videoFilters = [
+      `trim=start=${start}:end=${end}`,
+      `setpts=PTS-STARTPTS`,
+      `scale=${TARGET_WIDTH}:${TARGET_HEIGHT}:force_original_aspect_ratio=decrease`,
+      `pad=${TARGET_WIDTH}:${TARGET_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black`,
+      `fps=${TARGET_FPS}`,
+      `format=${TARGET_PIXEL_FORMAT}`,
+      `setsar=1`,
+    ].join(",");
+    parts.push(`[${i}:v]${videoFilters}[v${i}]`);
+
+    // Audio: trim → normalize
+    const audioFilters = [
+      `atrim=start=${start}:end=${end}`,
+      `asetpts=PTS-STARTPTS`,
+      isMuted ? "volume=0" : null,
+      silenceFilter ? silenceFilter.substring(1) : null,
+      `aresample=44100`,
+    ]
+      .filter(Boolean)
+      .join(",");
+    parts.push(`[${i}:a]${audioFilters}[a${i}]`);
   });
 
-  // Concat all trimmed streams
+  // Concat all normalized streams
   const streams = videos.map((_, i) => `[v${i}][a${i}]`).join("");
   parts.push(`${streams}concat=n=${videos.length}:v=1:a=1[vfinal][afinal]`);
 
@@ -275,6 +302,12 @@ const hasTransitions = (videos: VideoInput[]): boolean => {
 /**
  * Build filter complex with xfade transitions between clips
  * Uses FFmpeg xfade filter for smooth video transitions and acrossfade for audio
+ *
+ * Key improvements:
+ * 1. Normalizes all videos to same resolution/fps/pixel format before xfade
+ * 2. Correct offset calculation: offset = sum of (previous clip durations - previous transition overlaps)
+ * 3. Uses smoother audio crossfade curves (exponential instead of triangular)
+ * 4. Ensures color space consistency for seamless blending
  */
 const buildXfadeConcatFilter = (
   videos: VideoInput[],
@@ -290,7 +323,15 @@ const buildXfadeConcatFilter = (
 
   const parts: string[] = [];
 
-  // Step 1: Apply trim to each video and prepare streams
+  // Calculate effective durations for each clip (after trim)
+  const clipDurations = videos.map((video) => {
+    const start = video.trimStart ?? 0;
+    const end = video.trimEnd ?? video.duration;
+    return end - start;
+  });
+
+  // Step 1: Apply trim, normalize resolution/fps/format for each video
+  // This is CRITICAL for smooth xfade - all inputs must have same format
   videos.forEach((video, i) => {
     const start = video.trimStart ?? 0;
     const end = video.trimEnd ?? video.duration;
@@ -299,34 +340,60 @@ const buildXfadeConcatFilter = (
       ? ",silenceremove=start_periods=1:start_duration=0.2:start_threshold=-45dB:stop_periods=1:stop_duration=0.2:stop_threshold=-45dB"
       : "";
 
-    // Video: trim, reset PTS, ensure yuv420p format
-    parts.push(
-      `[${i}:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS,format=yuv420p[v${i}]`,
-    );
-    // Audio: trim, reset PTS, apply volume/silence filters
-    parts.push(
-      `[${i}:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS${isMuted ? ",volume=0" : ""}${silenceFilter}[a${i}]`,
-    );
+    // Video pipeline: trim → scale to target (with padding to maintain aspect) → set fps → reset PTS → format
+    // Using scale with force_original_aspect_ratio and pad ensures no distortion
+    const videoFilters = [
+      `trim=start=${start}:end=${end}`,
+      `setpts=PTS-STARTPTS`,
+      `scale=${TARGET_WIDTH}:${TARGET_HEIGHT}:force_original_aspect_ratio=decrease`,
+      `pad=${TARGET_WIDTH}:${TARGET_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black`,
+      `fps=${TARGET_FPS}`,
+      `format=${TARGET_PIXEL_FORMAT}`,
+      `setsar=1`, // Reset sample aspect ratio for consistency
+    ].join(",");
+
+    parts.push(`[${i}:v]${videoFilters}[v${i}]`);
+
+    // Audio pipeline: trim → reset PTS → optional mute → optional silence removal → normalize sample rate
+    const audioFilters = [
+      `atrim=start=${start}:end=${end}`,
+      `asetpts=PTS-STARTPTS`,
+      isMuted ? "volume=0" : null,
+      silenceFilter ? silenceFilter.substring(1) : null, // Remove leading comma
+      `aresample=44100`, // Normalize audio sample rate
+    ]
+      .filter(Boolean)
+      .join(",");
+
+    parts.push(`[${i}:a]${audioFilters}[a${i}]`);
   });
 
   // Step 2: Chain xfade filters for video
-  // FFmpeg xfade needs cumulative offset calculation
-  let cumulativeOffset = 0;
+  // CORRECT offset calculation:
+  // For xfade, offset = time in the OUTPUT when transition starts
+  // First clip plays from 0 to (duration1 - transitionDuration)
+  // Then transition happens for transitionDuration
+  // Second clip visible from (duration1 - transitionDuration) onwards
+  // etc.
+
+  let accumulatedDuration = 0; // Running total of output duration
 
   for (let i = 0; i < videos.length - 1; i++) {
-    const video = videos[i];
-    const clipDuration =
-      (video.trimEnd ?? video.duration) - (video.trimStart ?? 0);
-    const transition = video.transitionOut;
+    const currentClipDuration = clipDurations[i];
+    const transition = videos[i].transitionOut;
 
     // Default to fade if no transition specified
     const transitionType = transition?.type || "fade";
-    const transitionDuration = transition?.duration || CROSSFADE_DURATION;
+    const transitionDuration = Math.min(
+      transition?.duration || CROSSFADE_DURATION,
+      currentClipDuration * 0.5, // Don't let transition be more than half the clip
+      clipDurations[i + 1] * 0.5, // Or half the next clip
+    );
 
-    // xfade offset is when the transition starts
-    // For first transition: clip0_duration - transition_duration
-    // For subsequent: previous_offset + clip_duration - transition_duration
-    const offset = cumulativeOffset + clipDuration - transitionDuration;
+    // Offset is when THIS transition starts in the output timeline
+    // For first transition: clipDuration[0] - transitionDuration
+    // For subsequent: previous accumulated duration + current clip duration - transitionDuration
+    const offset = accumulatedDuration + currentClipDuration - transitionDuration;
 
     // Input labels: first uses [v0], subsequent use previous output
     const inLabel = i === 0 ? "[v0]" : `[vt${i - 1}]`;
@@ -334,18 +401,21 @@ const buildXfadeConcatFilter = (
     const outLabel = i === videos.length - 2 ? "[vfinal]" : `[vt${i}]`;
 
     parts.push(
-      `${inLabel}[v${i + 1}]xfade=transition=${transitionType}:duration=${transitionDuration}:offset=${offset.toFixed(3)}${outLabel}`,
+      `${inLabel}[v${i + 1}]xfade=transition=${transitionType}:duration=${transitionDuration.toFixed(3)}:offset=${offset.toFixed(3)}${outLabel}`,
     );
 
     // Audio crossfade with same timing
+    // Using 'exp' (exponential) curves for smoother, more natural audio transitions
+    // c1=exp: outgoing audio fades out with exponential curve
+    // c2=exp: incoming audio fades in with exponential curve
     const aInLabel = i === 0 ? "[a0]" : `[at${i - 1}]`;
     const aOutLabel = i === videos.length - 2 ? "[afinal]" : `[at${i}]`;
     parts.push(
-      `${aInLabel}[a${i + 1}]acrossfade=d=${transitionDuration}:c1=tri:c2=tri${aOutLabel}`,
+      `${aInLabel}[a${i + 1}]acrossfade=d=${transitionDuration.toFixed(3)}:c1=exp:c2=exp${aOutLabel}`,
     );
 
-    // Update cumulative offset for next iteration
-    cumulativeOffset = offset;
+    // Update accumulated duration: we've added currentClipDuration but overlapped by transitionDuration
+    accumulatedDuration = offset;
   }
 
   return {
@@ -470,6 +540,23 @@ export const concatenateVideos = async (
             videoOutput,
             "-map",
             audioOutput,
+            // Video encoding settings for quality
+            "-c:v",
+            "libx264",
+            "-preset",
+            ENCODING_PRESET,
+            "-crf",
+            ENCODING_CRF.toString(),
+            // Audio encoding settings
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k", // High quality audio bitrate
+            // Additional quality flags
+            "-movflags",
+            "+faststart", // Enable fast start for web playback
+            "-pix_fmt",
+            TARGET_PIXEL_FORMAT,
             "-y",
             outputFilename,
           ]);
@@ -486,29 +573,73 @@ export const concatenateVideos = async (
         }
       } catch (fadeError) {
         console.warn(
-          "Filter complex failed, falling back to simple concat:",
+          "Filter complex failed, falling back to normalized concat:",
           fadeError,
         );
 
-        // Fallback: simple concat without transitions
-        const concatList = inputFilenames
-          .map((name) => `file ${name}`)
-          .join("\n");
-        await ffmpeg.writeFile("concat_list.txt", concatList);
+        // Fallback: normalize each video individually, then concat
+        // This is more robust than -c copy which fails with different formats
+        try {
+          const normalizedFilenames: string[] = [];
 
-        await ffmpeg.exec([
-          "-f",
-          "concat",
-          "-safe",
-          "0",
-          "-i",
-          "concat_list.txt",
-          "-c",
-          "copy",
-          outputFilename,
-        ]);
+          // Step 1: Normalize each input video to same format
+          for (let i = 0; i < inputFilenames.length; i++) {
+            const normalizedName = `normalized_${i}.mp4`;
+            await ffmpeg.exec([
+              "-i",
+              inputFilenames[i],
+              "-vf",
+              `scale=${TARGET_WIDTH}:${TARGET_HEIGHT}:force_original_aspect_ratio=decrease,pad=${TARGET_WIDTH}:${TARGET_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,fps=${TARGET_FPS},format=${TARGET_PIXEL_FORMAT},setsar=1`,
+              "-af",
+              "aresample=44100",
+              "-c:v",
+              "libx264",
+              "-preset",
+              "fast",
+              "-crf",
+              "23",
+              "-c:a",
+              "aac",
+              "-y",
+              normalizedName,
+            ]);
+            normalizedFilenames.push(normalizedName);
+          }
 
-        await ffmpeg.deleteFile("concat_list.txt");
+          // Step 2: Concat normalized videos
+          const concatList = normalizedFilenames
+            .map((name) => `file ${name}`)
+            .join("\n");
+          await ffmpeg.writeFile("concat_list.txt", concatList);
+
+          await ffmpeg.exec([
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            "concat_list.txt",
+            "-c",
+            "copy", // Safe to copy now since all have same format
+            "-movflags",
+            "+faststart",
+            "-y",
+            outputFilename,
+          ]);
+
+          // Cleanup
+          await ffmpeg.deleteFile("concat_list.txt");
+          for (const name of normalizedFilenames) {
+            try {
+              await ffmpeg.deleteFile(name);
+            } catch {
+              /* ignore cleanup errors */
+            }
+          }
+        } catch (fallbackError) {
+          console.error("Normalized fallback also failed:", fallbackError);
+          throw fadeError; // Re-throw original error
+        }
       }
     }
 
