@@ -37,10 +37,11 @@ import { SchedulesListView } from "./SchedulesListView";
 import { QuickPostModal } from "./common/QuickPostModal";
 import { FloatingSidebar } from "./FloatingSidebar";
 import { LimelightNav } from "./ui/limelight-nav";
-import { Zap, Layers, Image, Calendar, LayoutGrid } from "lucide-react";
+import { Zap, Layers, Image, Calendar, LayoutGrid, Video } from "lucide-react";
 import type { ScheduledPost } from "../types";
+import { PlaygroundView } from "./playground";
 
-type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar";
+type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar" | "playground";
 
 interface DashboardProps {
   brandProfile: BrandProfile;
@@ -583,6 +584,11 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             />
           </div>
         )}
+        {activeView === "playground" && (
+          <div className="h-full">
+            <PlaygroundView brandProfile={brandProfile} />
+          </div>
+        )}
       </main>
 
       <AssistantPanel
@@ -614,6 +620,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           { id: "flyer", icon: <Image />, label: "Flyers" },
           { id: "calendar", icon: <Calendar />, label: "Agenda" },
           { id: "gallery", icon: <LayoutGrid />, label: "Galeria" },
+          { id: "playground", icon: <Video />, label: "Playground" },
         ] as const;
         const activeNavIndex = mobileNavItems.findIndex(item => item.id === activeView);
         return (

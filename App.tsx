@@ -87,7 +87,8 @@ export type ViewType =
   | "campaigns"
   | "flyer"
   | "gallery"
-  | "calendar";
+  | "calendar"
+  | "playground";
 
 const MAX_GALLERY_SIZE = 12;
 const MAX_CHAT_HISTORY_MESSAGES = 10;

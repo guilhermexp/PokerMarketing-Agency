@@ -700,6 +700,11 @@ const ClipCard: React.FC<ClipCardProps> = ({
   const [isGeneratingVideo, setIsGeneratingVideo] = useState<
     Record<number, boolean>
   >({}); // Loading state per scene
+
+  // Refs for waiting on background job completions (used in batch mode)
+  const jobCompletionResolvers = useRef<
+    Map<string, { resolve: () => void; reject: (error: string) => void }>
+  >(new Map());
   const [sceneImages, setSceneImages] = useState<
     Record<number, SceneReferenceImage>
   >({});
@@ -897,6 +902,14 @@ const ClipCard: React.FC<ClipCardProps> = ({
         ...prev,
         [sceneNumber]: false,
       }));
+
+      // Resolve any pending Promise for batch mode
+      const jobContext = job.context;
+      if (jobContext && jobCompletionResolvers.current.has(jobContext)) {
+        const resolver = jobCompletionResolvers.current.get(jobContext);
+        resolver?.resolve();
+        jobCompletionResolvers.current.delete(jobContext);
+      }
     });
 
     const unsubFailed = onJobFailed((job) => {
@@ -935,6 +948,14 @@ const ClipCard: React.FC<ClipCardProps> = ({
           ],
         };
       });
+
+      // Reject any pending Promise for batch mode
+      const jobContext = job.context;
+      if (jobContext && jobCompletionResolvers.current.has(jobContext)) {
+        const resolver = jobCompletionResolvers.current.get(jobContext);
+        resolver?.reject(job.error_message || "Falha na geração do vídeo");
+        jobCompletionResolvers.current.delete(jobContext);
+      }
     });
 
     return () => {
@@ -1632,10 +1653,12 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
   };
 
   // Returns whether fallback was used (for batch operations to skip Gemini on subsequent calls)
+  // waitForCompletion: when true, waits for background job to complete before returning (for batch operations)
   const handleGenerateVideo = useCallback(
     async (
       sceneNumber: number,
       useFallbackDirectly: boolean = false,
+      waitForCompletion: boolean = false,
     ): Promise<{ usedFallback: boolean; error: string | null }> => {
       // Set loading state for this scene
       setIsGeneratingVideo((prev) => ({ ...prev, [sceneNumber]: true }));
@@ -1789,16 +1812,42 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
               useInterpolation: useFrameInterpolation && !!lastFrameUrl,
             };
 
+            const jobContext = `video-${clip.id}-scene-${sceneNumber}`;
+
             await queueVideoJob(
               userId,
               jsonPrompt,
               jobConfig,
-              `video-${clip.id}-scene-${sceneNumber}`,
+              jobContext,
             );
 
             console.log(`[ClipsTab] Video job queued for scene ${sceneNumber}`);
-            // Job is queued - loading state will be cleared when job completes
-            // Return immediately, don't wait for result
+
+            // If waitForCompletion is true (batch mode), wait for the job to complete
+            if (waitForCompletion) {
+              console.log(
+                `[ClipsTab] Waiting for job completion (batch mode) for scene ${sceneNumber}...`,
+              );
+              try {
+                await new Promise<void>((resolve, reject) => {
+                  jobCompletionResolvers.current.set(jobContext, {
+                    resolve,
+                    reject,
+                  });
+                });
+                console.log(
+                  `[ClipsTab] Job completed for scene ${sceneNumber}, proceeding to next`,
+                );
+              } catch (jobError) {
+                console.error(
+                  `[ClipsTab] Job failed for scene ${sceneNumber}:`,
+                  jobError,
+                );
+                return { usedFallback: false, error: String(jobError) };
+              }
+            }
+
+            // Job is queued (or completed in batch mode)
             return { usedFallback: false, error: null };
           } catch (queueErr) {
             console.error(
@@ -2001,9 +2050,12 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
       // Only generate if scene has no videos yet
       const sceneVideos = videoStates[scene.sceneNumber] || [];
       if (sceneVideos.length === 0 || !sceneVideos.some((v) => v.url)) {
+        // waitForCompletion: true ensures we wait for each video to complete
+        // before starting the next one (prevents race conditions in background jobs)
         const result = await handleGenerateVideo(
           scene.sceneNumber,
           useFallback,
+          true, // waitForCompletion - process one at a time
         );
 
         // If there was an error, stop and notify user
@@ -2043,7 +2095,13 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
     let useFallback = false; // Track if we should skip Gemini for remaining scenes
 
     for (const scene of scenes) {
-      const result = await handleGenerateVideo(scene.sceneNumber, useFallback);
+      // waitForCompletion: true ensures we wait for each video to complete
+      // before starting the next one (prevents race conditions in background jobs)
+      const result = await handleGenerateVideo(
+        scene.sceneNumber,
+        useFallback,
+        true, // waitForCompletion - process one at a time
+      );
 
       // If there was an error, stop and notify user
       if (result.error) {

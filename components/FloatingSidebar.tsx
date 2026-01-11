@@ -4,7 +4,7 @@ import { Icon } from "./common/Icon";
 import { Tooltip, TooltipProvider } from "./common/Tooltip";
 import type { IconName } from "../types";
 
-type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar";
+type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar" | "playground";
 
 interface MenuItem {
   icon: IconName;
@@ -18,6 +18,7 @@ const menuItems: MenuItem[] = [
   { icon: "image", label: "Flyers", key: "flyer" },
   { icon: "calendar", label: "Agenda", key: "calendar" },
   { icon: "layout", label: "Galeria", key: "gallery" },
+  { icon: "video", label: "Playground", key: "playground" },
 ];
 
 interface FloatingSidebarProps {
