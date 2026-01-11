@@ -15,6 +15,7 @@ import type {
   Post,
 } from "../types";
 import { generateVideo as generateServerVideo, type ApiVideoModel } from "./apiClient";
+import { uploadImageToBlob } from "./blobService";
 
 // Convert VideoModel to ApiVideoModel for server calls
 const toApiVideoModel = (model: VideoModel): ApiVideoModel => {
@@ -237,10 +238,8 @@ export const generateVideo = async (
   useFallbackDirectly: boolean = false,
   generateAudio: boolean = true,
 ): Promise<GenerateVideoResult> => {
-  // Upload image to blob if provided
   let imageUrl: string | undefined;
   if (image) {
-    const { uploadImageToBlob } = await import("./blobService");
     imageUrl = await uploadImageToBlob(image.base64, image.mimeType);
   }
 

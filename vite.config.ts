@@ -9,23 +9,13 @@ export default defineConfig(({ mode }) => {
   // Load from .env file
   const envFile = loadEnv(mode, ".", "");
 
-  // Merge with process.env (Docker ENV vars take precedence)
   const env = {
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY || envFile.GEMINI_API_KEY,
     VITE_CLERK_PUBLISHABLE_KEY:
       process.env.VITE_CLERK_PUBLISHABLE_KEY ||
       envFile.VITE_CLERK_PUBLISHABLE_KEY,
-    OPENROUTER_API_KEY:
-      process.env.OPENROUTER_API_KEY || envFile.OPENROUTER_API_KEY,
-    BLOB_READ_WRITE_TOKEN:
-      process.env.BLOB_READ_WRITE_TOKEN || envFile.BLOB_READ_WRITE_TOKEN,
-    DATABASE_URL: process.env.DATABASE_URL || envFile.DATABASE_URL,
-    RUBE_TOKEN: process.env.RUBE_TOKEN || envFile.RUBE_TOKEN,
     VITE_SUPER_ADMIN_EMAILS:
       process.env.VITE_SUPER_ADMIN_EMAILS || envFile.VITE_SUPER_ADMIN_EMAILS,
   };
-
-  console.log("[Vite Config] GEMINI_API_KEY available:", !!env.GEMINI_API_KEY);
 
   return {
     server: {
@@ -121,24 +111,9 @@ export default defineConfig(({ mode }) => {
       }),
     ],
     define: {
-      "process.env.API_KEY": JSON.stringify(env.GEMINI_API_KEY),
-      "process.env.GEMINI_API_KEY": JSON.stringify(env.GEMINI_API_KEY),
-      "import.meta.env.VITE_API_KEY": JSON.stringify(env.GEMINI_API_KEY),
-      // FAL_KEY removed - video generation is now server-side via /api/ai/video
-      "process.env.RUBE_TOKEN": JSON.stringify(env.RUBE_TOKEN),
-      "import.meta.env.VITE_RUBE_TOKEN": JSON.stringify(env.RUBE_TOKEN),
-      "process.env.BLOB_READ_WRITE_TOKEN": JSON.stringify(
-        env.BLOB_READ_WRITE_TOKEN,
-      ),
-      "import.meta.env.VITE_BLOB_READ_WRITE_TOKEN": JSON.stringify(
-        env.BLOB_READ_WRITE_TOKEN,
-      ),
-      "process.env.DATABASE_URL": JSON.stringify(env.DATABASE_URL),
-      "import.meta.env.VITE_DATABASE_URL": JSON.stringify(env.DATABASE_URL),
       "import.meta.env.VITE_CLERK_PUBLISHABLE_KEY": JSON.stringify(
         env.VITE_CLERK_PUBLISHABLE_KEY,
       ),
-      "process.env.OPENROUTER_API_KEY": JSON.stringify(env.OPENROUTER_API_KEY),
       "import.meta.env.VITE_SUPER_ADMIN_EMAILS": JSON.stringify(
         env.VITE_SUPER_ADMIN_EMAILS,
       ),
@@ -150,6 +125,32 @@ export default defineConfig(({ mode }) => {
     },
     optimizeDeps: {
       exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/util"],
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules/xlsx")) {
+              return "vendor-xlsx";
+            }
+            if (id.includes("node_modules/tesseract.js")) {
+              return "vendor-tesseract";
+            }
+            if (id.includes("node_modules/@ffmpeg")) {
+              return "vendor-ffmpeg";
+            }
+            if (id.includes("node_modules/@clerk")) {
+              return "vendor-clerk";
+            }
+            if (id.includes("node_modules/recharts")) {
+              return "vendor-recharts";
+            }
+            if (id.includes("node_modules/framer-motion")) {
+              return "vendor-framer-motion";
+            }
+          },
+        },
+      },
     },
   };
 });

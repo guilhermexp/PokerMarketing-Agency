@@ -36,14 +36,14 @@ import type { InstagramContext } from "../../services/rubeService";
 import type { ScheduledPost } from "../../types";
 import { urlToBase64 } from "../../utils/imageHelpers";
 import {
-  concatenateVideos,
   downloadBlob,
   extractLastFrameFromVideo,
-  initFFmpeg,
   type ExportProgress,
   type VideoInput,
   type AudioInput,
 } from "../../services/ffmpegService";
+
+const loadFfmpegService = () => import("../../services/ffmpegService");
 import { uploadVideo, getVideoDisplayUrl } from "../../services/apiClient";
 import {
   useBackgroundJobs,
@@ -773,9 +773,11 @@ const ClipCard: React.FC<ClipCardProps> = ({
 
   useEffect(() => {
     if (useFrameInterpolation && selectedVideoModel.includes("veo")) {
-      initFFmpeg().catch((err) => {
-        console.warn("[ClipsTab] Failed to preload FFmpeg:", err);
-      });
+      loadFfmpegService()
+        .then(({ initFFmpeg }) => initFFmpeg())
+        .catch((err) => {
+          console.warn("[ClipsTab] Failed to preload FFmpeg:", err);
+        });
     }
   }, [useFrameInterpolation, selectedVideoModel]);
 
@@ -2533,6 +2535,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     });
 
     try {
+      const { concatenateVideos } = await loadFfmpegService();
       const outputBlob = await concatenateVideos(generatedVideos, {
         outputFormat: "mp4",
         onProgress: setExportProgress,
@@ -2593,6 +2596,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     });
 
     try {
+      const { concatenateVideos } = await loadFfmpegService();
       const outputBlob = await concatenateVideos(generatedVideos, {
         outputFormat: "mp4",
         onProgress: setExportProgress,
@@ -2859,6 +2863,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         };
       }
 
+      const { concatenateVideos } = await loadFfmpegService();
       const outputBlob = await concatenateVideos(videoInputs, {
         outputFormat: "mp4",
         onProgress: setExportProgress,
