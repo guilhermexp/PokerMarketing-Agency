@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n api,vite -c cyan,green \"bun run dev:api\" \"bun run dev:vite\"",
+    "dev": "concurrently -n api,vite -c cyan,green \"node server/dev-api.mjs\" \"vite\"",
     "dev:local": "bun run dev:redis && concurrently -n redis,api,vite -c red,cyan,green \"docker compose logs -f redis\" \"bun run dev:api\" \"bun run dev:vite\"",
     "dev:api": "node server/dev-api.mjs",
     "dev:vite": "vite",

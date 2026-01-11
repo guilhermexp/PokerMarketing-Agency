@@ -952,7 +952,7 @@ export interface GenerationJobConfig {
 export interface GenerationJob {
   id: string;
   user_id: string;
-  job_type: "flyer" | "flyer_daily" | "post" | "ad" | "clip" | "video";
+  job_type: "flyer" | "flyer_daily" | "post" | "ad" | "clip" | "video" | "image";
   status: "queued" | "processing" | "completed" | "failed";
   progress: number;
   result_url: string | null;
@@ -987,9 +987,9 @@ export interface QueueJobResult {
  */
 export async function queueGenerationJob(
   userId: string,
-  jobType: "flyer" | "flyer_daily" | "post" | "ad" | "clip" | "video",
+  jobType: "flyer" | "flyer_daily" | "post" | "ad" | "clip" | "video" | "image",
   prompt: string,
-  config: GenerationJobConfig | VideoJobConfig,
+  config: GenerationJobConfig | VideoJobConfig | ImageJobConfig,
   context?: string,
   organizationId?: string | null,
 ): Promise<QueueJobResult> {
@@ -1032,6 +1032,42 @@ export async function queueVideoJob(
     "video",
     prompt,
     config,
+    context,
+    organizationId,
+  );
+}
+
+/**
+ * Configuration for image generation jobs
+ */
+export interface ImageJobConfig {
+  model?: string;
+  aspectRatio?: string;
+  imageSize?: string;
+  style?: string;
+  mood?: string;
+  source?: string;
+  referenceImage?: string;
+  sourceImage?: string; // For image editing
+  systemPrompt?: string;
+}
+
+/**
+ * Queue an image generation job for background processing
+ * Returns immediately, job runs in background via BullMQ
+ */
+export async function queueImageJob(
+  userId: string,
+  prompt: string,
+  config: ImageJobConfig,
+  context: string,
+  organizationId?: string | null,
+): Promise<QueueJobResult> {
+  return queueGenerationJob(
+    userId,
+    "image",
+    prompt,
+    config as GenerationJobConfig,
     context,
     organizationId,
   );

@@ -13,8 +13,8 @@ export default defineConfig(({ mode }) => {
     VITE_CLERK_PUBLISHABLE_KEY:
       process.env.VITE_CLERK_PUBLISHABLE_KEY ||
       envFile.VITE_CLERK_PUBLISHABLE_KEY,
-    VITE_SUPER_ADMIN_EMAILS:
-      process.env.VITE_SUPER_ADMIN_EMAILS || envFile.VITE_SUPER_ADMIN_EMAILS,
+    // SECURITY: Super admin emails should NOT be exposed to the client
+    // Admin verification happens server-side only
   };
 
   return {
@@ -114,9 +114,8 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_CLERK_PUBLISHABLE_KEY": JSON.stringify(
         env.VITE_CLERK_PUBLISHABLE_KEY,
       ),
-      "import.meta.env.VITE_SUPER_ADMIN_EMAILS": JSON.stringify(
-        env.VITE_SUPER_ADMIN_EMAILS,
-      ),
+      // SECURITY: VITE_SUPER_ADMIN_EMAILS removed from client bundle
+      // Admin status is verified via /api/admin/verify-admin endpoint
     },
     resolve: {
       alias: {

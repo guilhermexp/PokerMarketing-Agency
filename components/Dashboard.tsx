@@ -586,7 +586,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         )}
         {activeView === "playground" && (
           <div className="h-full">
-            <PlaygroundView brandProfile={brandProfile} />
+            <PlaygroundView brandProfile={brandProfile} userId={userId} />
           </div>
         )}
       </main>

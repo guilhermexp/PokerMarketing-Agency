@@ -55,11 +55,49 @@ const app = express();
 // Railway provides PORT environment variable
 const PORT = process.env.PORT || 8080;
 
-// CORS configuration
+// CORS configuration - SECURITY: Restrict to specific origins in production
+const allowedOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "*",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+
+      // In development, allow localhost
+      if (
+        process.env.NODE_ENV !== "production" &&
+        (origin.includes("localhost") || origin.includes("127.0.0.1"))
+      ) {
+        return callback(null, true);
+      }
+
+      // Check against allowed origins
+      if (allowedOrigins.length === 0) {
+        // If no origins configured, only allow same-origin in production
+        console.warn(
+          "[CORS] No CORS_ORIGIN configured - blocking cross-origin request from:",
+          origin,
+        );
+        return callback(new Error("CORS not allowed"), false);
+      }
+
+      if (
+        allowedOrigins.includes(origin) ||
+        allowedOrigins.some((allowed) => origin.endsWith(allowed))
+      ) {
+        return callback(null, true);
+      }
+
+      console.warn("[CORS] Blocked request from unauthorized origin:", origin);
+      return callback(new Error("CORS not allowed"), false);
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
 
@@ -607,6 +645,287 @@ async function resolveUserId(sql, userId) {
 }
 
 // ============================================================================
+// SECURITY: Authentication & Authorization Middleware
+// ============================================================================
+
+// Rate limiting storage (in-memory, use Redis in production for distributed)
+const rateLimitStore = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 100; // max requests per window
+
+function checkRateLimit(identifier) {
+  const now = Date.now();
+  const record = rateLimitStore.get(identifier);
+
+  if (!record || now - record.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimitStore.set(identifier, { windowStart: now, count: 1 });
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1 };
+  }
+
+  if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  record.count++;
+  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - record.count };
+}
+
+// Clean up old rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, record] of rateLimitStore) {
+    if (now - record.windowStart > RATE_LIMIT_WINDOW_MS * 2) {
+      rateLimitStore.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
+// Middleware: Require authentication
+function requireAuth(req, res, next) {
+  const auth = getAuth(req);
+
+  if (!auth?.userId) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "UNAUTHORIZED",
+    });
+  }
+
+  // Apply rate limiting per user
+  const rateLimit = checkRateLimit(auth.userId);
+  res.setHeader("X-RateLimit-Remaining", rateLimit.remaining);
+
+  if (!rateLimit.allowed) {
+    return res.status(429).json({
+      error: "Too many requests. Please try again later.",
+      code: "RATE_LIMIT_EXCEEDED",
+    });
+  }
+
+  req.authUserId = auth.userId;
+  req.authOrgId = auth.orgId || null;
+  next();
+}
+
+// Middleware: Verify user owns the requested resource
+async function requireResourceAccess(req, res, next) {
+  const auth = getAuth(req);
+
+  if (!auth?.userId) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "UNAUTHORIZED",
+    });
+  }
+
+  // Get user_id from query or body
+  const requestedUserId =
+    req.query.user_id || req.body?.user_id || req.params?.user_id;
+  const requestedOrgId =
+    req.query.organization_id ||
+    req.body?.organization_id ||
+    req.params?.organization_id;
+
+  // If no user_id provided, attach auth user
+  if (!requestedUserId && !requestedOrgId) {
+    req.authUserId = auth.userId;
+    req.authOrgId = auth.orgId || null;
+    return next();
+  }
+
+  try {
+    const sql = getSql();
+
+    // Resolve the authenticated user's database ID
+    const authDbUser = await sql`
+      SELECT id FROM users
+      WHERE auth_provider_id = ${auth.userId}
+      AND deleted_at IS NULL
+      LIMIT 1
+    `;
+
+    if (authDbUser.length === 0) {
+      return res.status(403).json({
+        error: "User not found in database",
+        code: "USER_NOT_FOUND",
+      });
+    }
+
+    const authDbUserId = authDbUser[0].id;
+
+    // If requesting by organization_id, verify org membership via Clerk
+    if (requestedOrgId) {
+      // Clerk provides orgId in the auth object if user is in that org
+      if (auth.orgId === requestedOrgId) {
+        req.authUserId = auth.userId;
+        req.authDbUserId = authDbUserId;
+        req.authOrgId = requestedOrgId;
+        return next();
+      }
+
+      // Check if user has access to this org
+      return res.status(403).json({
+        error: "Access denied to this organization",
+        code: "ORG_ACCESS_DENIED",
+      });
+    }
+
+    // If requesting by user_id, verify it matches the authenticated user
+    if (requestedUserId) {
+      const resolvedRequestedId = await resolveUserId(sql, requestedUserId);
+
+      // Allow if the requested user_id matches the authenticated user
+      if (
+        resolvedRequestedId === authDbUserId ||
+        requestedUserId === auth.userId
+      ) {
+        req.authUserId = auth.userId;
+        req.authDbUserId = authDbUserId;
+        req.authOrgId = auth.orgId || null;
+        return next();
+      }
+
+      console.warn(
+        `[Security] User ${auth.userId} attempted to access resources for user ${requestedUserId}`,
+      );
+      return res.status(403).json({
+        error: "Access denied to this resource",
+        code: "RESOURCE_ACCESS_DENIED",
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error("[Auth Middleware] Error:", error);
+    return res.status(500).json({ error: "Authentication error" });
+  }
+}
+
+// ============================================================================
+// SECURITY: Input Validation & Sanitization
+// ============================================================================
+
+// Sanitize string input to prevent XSS and injection attacks
+function sanitizeString(input, maxLength = 10000) {
+  if (typeof input !== "string") return "";
+
+  return input
+    .slice(0, maxLength)
+    .replace(/[<>]/g, "") // Remove potential HTML tags
+    .replace(/javascript:/gi, "") // Remove javascript: protocol
+    .replace(/on\w+=/gi, "") // Remove event handlers
+    .trim();
+}
+
+// Validate and sanitize AI prompt input
+function validatePrompt(prompt, fieldName = "prompt") {
+  if (!prompt || typeof prompt !== "string") {
+    return { valid: false, error: `${fieldName} is required and must be a string` };
+  }
+
+  const sanitized = sanitizeString(prompt, 50000);
+
+  if (sanitized.length < 1) {
+    return { valid: false, error: `${fieldName} cannot be empty` };
+  }
+
+  return { valid: true, value: sanitized };
+}
+
+// Validate user_id format
+function validateUserId(userId) {
+  if (!userId) return { valid: false, error: "user_id is required" };
+
+  const uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const clerkPattern = /^user_[a-zA-Z0-9]+$/;
+
+  if (uuidPattern.test(userId) || clerkPattern.test(userId)) {
+    return { valid: true, value: userId };
+  }
+
+  return { valid: false, error: "Invalid user_id format" };
+}
+
+// Validate URL format
+function validateUrl(url, allowedDomains = []) {
+  if (!url) return { valid: true, value: null };
+
+  try {
+    const parsed = new URL(url);
+
+    // Only allow http and https protocols
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return { valid: false, error: "Invalid URL protocol" };
+    }
+
+    // If allowed domains specified, check against them
+    if (allowedDomains.length > 0) {
+      const isAllowed = allowedDomains.some(
+        (domain) =>
+          parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`),
+      );
+      if (!isAllowed) {
+        return { valid: false, error: "URL domain not allowed" };
+      }
+    }
+
+    return { valid: true, value: url };
+  } catch {
+    return { valid: false, error: "Invalid URL format" };
+  }
+}
+
+// Rate limit for AI endpoints (stricter than general rate limit)
+const AI_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const AI_RATE_LIMIT_MAX_REQUESTS = 30; // max AI requests per window
+
+function checkAiRateLimit(identifier) {
+  const key = `ai:${identifier}`;
+  const now = Date.now();
+  const record = rateLimitStore.get(key);
+
+  if (!record || now - record.windowStart > AI_RATE_LIMIT_WINDOW_MS) {
+    rateLimitStore.set(key, { windowStart: now, count: 1 });
+    return { allowed: true, remaining: AI_RATE_LIMIT_MAX_REQUESTS - 1 };
+  }
+
+  if (record.count >= AI_RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  record.count++;
+  return { allowed: true, remaining: AI_RATE_LIMIT_MAX_REQUESTS - record.count };
+}
+
+// Middleware for AI endpoints with stricter rate limiting
+function requireAuthWithAiRateLimit(req, res, next) {
+  const auth = getAuth(req);
+
+  if (!auth?.userId) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "UNAUTHORIZED",
+    });
+  }
+
+  // Apply stricter AI rate limiting
+  const rateLimit = checkAiRateLimit(auth.userId);
+  res.setHeader("X-RateLimit-Remaining", rateLimit.remaining);
+
+  if (!rateLimit.allowed) {
+    return res.status(429).json({
+      error: "AI rate limit exceeded. Please try again later.",
+      code: "AI_RATE_LIMIT_EXCEEDED",
+    });
+  }
+
+  req.authUserId = auth.userId;
+  req.authOrgId = auth.orgId || null;
+  next();
+}
+
+// ============================================================================
 // BULLMQ JOB PROCESSOR
 // ============================================================================
 
@@ -720,7 +1039,132 @@ const processVideoGenerationJob = async (job, jobId, prompt, config, sql) => {
 };
 
 /**
- * Process image generation jobs from BullMQ queue
+ * Process generic image generation jobs (simple prompt-based)
+ */
+const processImageGenerationJob = async (job, jobId, prompt, config, sql) => {
+  console.log(`[JobProcessor] Processing IMAGE job ${jobId}`);
+
+  const ai = getGeminiAi();
+  const model = config.model || DEFAULT_IMAGE_MODEL;
+
+  // Build parts array
+  const parts = [];
+
+  // Add system instruction for image generation
+  const systemPrompt = config.systemPrompt || `You are an expert image generator. Create a high-quality image based on the user's description.
+Style: ${config.style || "photorealistic"}
+Mood: ${config.mood || "professional"}`;
+
+  parts.push({ text: systemPrompt });
+  parts.push({ text: `Generate an image: ${prompt}` });
+
+  // Add reference image if provided
+  if (config.referenceImage) {
+    const refData = await urlToBase64(config.referenceImage);
+    if (refData) {
+      parts.push({ text: "Use this as style reference:" });
+      parts.push({ inlineData: { data: refData, mimeType: "image/png" } });
+    }
+  }
+
+  // Add edit source image if provided (for image editing)
+  if (config.sourceImage) {
+    const srcData = await urlToBase64(config.sourceImage);
+    if (srcData) {
+      parts.push({ text: "Edit this image according to the instructions:" });
+      parts.push({ inlineData: { data: srcData, mimeType: "image/png" } });
+    }
+  }
+
+  job.updateProgress(30);
+
+  // Generate image
+  const response = await withRetry(() =>
+    ai.models.generateContent({
+      model,
+      contents: { parts },
+      config: {
+        imageConfig: {
+          aspectRatio: mapAspectRatio(config.aspectRatio || "1:1"),
+          imageSize: config.imageSize || "1K",
+        },
+      },
+    }),
+  );
+
+  job.updateProgress(70);
+
+  // Extract image from response
+  let imageDataUrl = null;
+  for (const part of response.candidates[0].content.parts) {
+    if (part.inlineData) {
+      imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      break;
+    }
+  }
+
+  if (!imageDataUrl) {
+    throw new Error("AI failed to generate image");
+  }
+
+  // Upload to Vercel Blob
+  const matches = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) throw new Error("Invalid image data");
+
+  const [, mimeType, base64Data] = matches;
+  const buffer = Buffer.from(base64Data, "base64");
+  const extension = mimeType.split("/")[1] || "png";
+
+  const blob = await put(`generated/image-${jobId}.${extension}`, buffer, {
+    access: "public",
+    contentType: mimeType,
+  });
+
+  job.updateProgress(90);
+
+  // Get owner info
+  const jobOwner = await sql`
+    SELECT user_id, organization_id FROM generation_jobs WHERE id = ${jobId}
+  `;
+
+  if (jobOwner.length === 0) {
+    throw new Error("Job record not found");
+  }
+
+  // Save to gallery
+  const galleryResult = await sql`
+    INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, source, model, aspect_ratio, image_size)
+    VALUES (
+      ${jobOwner[0].user_id},
+      ${jobOwner[0].organization_id},
+      ${blob.url},
+      ${prompt},
+      ${config.source || "AI Generated"},
+      ${model},
+      ${config.aspectRatio || "1:1"},
+      ${config.imageSize || "1K"}
+    )
+    RETURNING id
+  `;
+
+  const galleryId = galleryResult[0]?.id;
+
+  // Mark as completed
+  await sql`
+    UPDATE generation_jobs
+    SET status = 'completed',
+        result_url = ${blob.url},
+        result_gallery_id = ${galleryId},
+        completed_at = NOW(),
+        progress = 100
+    WHERE id = ${jobId}
+  `;
+
+  return { resultUrl: blob.url, galleryId };
+};
+
+/**
+ * Process all generation jobs from BullMQ queue
  */
 const processGenerationJob = async (job) => {
   const { jobId, prompt, config } = job.data;
@@ -751,7 +1195,7 @@ const processGenerationJob = async (job) => {
 
     job.updateProgress(10);
 
-    // Handle video jobs differently
+    // Handle video jobs
     if (jobType === "video") {
       const { resultUrl } = await processVideoGenerationJob(
         job,
@@ -775,7 +1219,21 @@ const processGenerationJob = async (job) => {
       return { success: true, resultUrl };
     }
 
-    // Continue with image generation for other job types...
+    // Handle generic image jobs (simple prompt-based generation)
+    if (jobType === "image") {
+      const { resultUrl, galleryId } = await processImageGenerationJob(
+        job,
+        jobId,
+        prompt,
+        config,
+        sql,
+      );
+
+      console.log(`[JobProcessor] Completed IMAGE job ${jobId}`);
+      return { success: true, resultUrl, galleryId };
+    }
+
+    // Continue with flyer/branded image generation for other job types...
 
     // Build brand profile object for helpers
     const brandProfile = {
@@ -1005,6 +1463,38 @@ async function requireSuperAdmin(req, res, next) {
     res.status(500).json({ error: 'Authentication error' });
   }
 }
+
+// Admin: Verify if current user is admin (for frontend to check admin status securely)
+app.get("/api/admin/verify-admin", requireAuth, async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return res.json({ isAdmin: false });
+    }
+
+    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+    const userResponse = await fetch(
+      `https://api.clerk.com/v1/users/${auth.userId}`,
+      {
+        headers: { Authorization: `Bearer ${clerkSecretKey}` },
+      },
+    );
+
+    if (!userResponse.ok) {
+      return res.json({ isAdmin: false });
+    }
+
+    const userData = await userResponse.json();
+    const userEmail =
+      userData.email_addresses?.[0]?.email_address?.toLowerCase();
+
+    const isAdmin = userEmail && SUPER_ADMIN_EMAILS.includes(userEmail);
+    res.json({ isAdmin });
+  } catch (error) {
+    console.error("[Admin] Verify admin error:", error);
+    res.json({ isAdmin: false });
+  }
+});
 
 // Admin: Get overview stats
 app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
@@ -1338,8 +1828,8 @@ app.get("/api/admin/logs", requireSuperAdmin, async (req, res) => {
   }
 });
 
-// Unified initial data endpoint
-app.get("/api/db/init", async (req, res) => {
+// Unified initial data endpoint - Protected
+app.get("/api/db/init", requireResourceAccess, async (req, res) => {
   const start = Date.now();
 
   try {
@@ -1543,8 +2033,8 @@ app.get("/api/db/init", async (req, res) => {
   }
 });
 
-// Users API
-app.get("/api/db/users", async (req, res) => {
+// Users API - Protected: requires authentication
+app.get("/api/db/users", requireAuth, async (req, res) => {
   try {
     const sql = getSql();
     const { email, id } = req.query;
@@ -1568,7 +2058,7 @@ app.get("/api/db/users", async (req, res) => {
   }
 });
 
-app.post("/api/db/users", async (req, res) => {
+app.post("/api/db/users", requireAuth, async (req, res) => {
   try {
     const sql = getSql();
     const { email, name, avatar_url, auth_provider, auth_provider_id } =
@@ -1607,8 +2097,8 @@ app.post("/api/db/users", async (req, res) => {
   }
 });
 
-// Brand Profiles API
-app.get("/api/db/brand-profiles", async (req, res) => {
+// Brand Profiles API - Protected: requires resource access verification
+app.get("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, id, organization_id } = req.query;
@@ -1653,7 +2143,7 @@ app.get("/api/db/brand-profiles", async (req, res) => {
   }
 });
 
-app.post("/api/db/brand-profiles", async (req, res) => {
+app.post("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const {
@@ -1709,7 +2199,7 @@ app.post("/api/db/brand-profiles", async (req, res) => {
   }
 });
 
-app.put("/api/db/brand-profiles", async (req, res) => {
+app.put("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { id } = req.query;
@@ -1774,8 +2264,8 @@ app.put("/api/db/brand-profiles", async (req, res) => {
   }
 });
 
-// Gallery Images API
-app.get("/api/db/gallery", async (req, res) => {
+// Gallery Images API - Protected: requires resource access verification
+app.get("/api/db/gallery", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id, source, limit } = req.query;
@@ -1838,7 +2328,7 @@ app.get("/api/db/gallery", async (req, res) => {
   }
 });
 
-app.post("/api/db/gallery", async (req, res) => {
+app.post("/api/db/gallery", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const {
@@ -1937,7 +2427,7 @@ app.patch("/api/db/gallery", async (req, res) => {
   }
 });
 
-app.delete("/api/db/gallery", async (req, res) => {
+app.delete("/api/db/gallery", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { id, user_id } = req.query;
@@ -2039,7 +2529,7 @@ app.patch("/api/db/ad-creatives", async (req, res) => {
 });
 
 // Scheduled Posts API
-app.get("/api/db/scheduled-posts", async (req, res) => {
+app.get("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id, status } = req.query;
@@ -2096,7 +2586,7 @@ app.get("/api/db/scheduled-posts", async (req, res) => {
   }
 });
 
-app.post("/api/db/scheduled-posts", async (req, res) => {
+app.post("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const {
@@ -2203,7 +2693,7 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
   }
 });
 
-app.put("/api/db/scheduled-posts", async (req, res) => {
+app.put("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { id } = req.query;
@@ -2260,7 +2750,7 @@ app.put("/api/db/scheduled-posts", async (req, res) => {
   }
 });
 
-app.delete("/api/db/scheduled-posts", async (req, res) => {
+app.delete("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { id, user_id } = req.query;
@@ -2418,7 +2908,9 @@ async function validateRubeToken(rubeToken) {
 }
 
 // GET - List Instagram accounts
-app.get("/api/db/instagram-accounts", async (req, res) => {
+// For organizations: returns all accounts connected to the org (shared by all members)
+// For personal: returns accounts owned by the user
+app.get("/api/db/instagram-accounts", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id, id } = req.query;
@@ -2426,7 +2918,7 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
     if (id) {
       const result = await sql`
         SELECT id, user_id, organization_id, instagram_user_id, instagram_username,
-               is_active, connected_at, last_used_at, created_at, updated_at
+               is_active, connected_at, last_used_at, created_at, updated_at, connected_by_user_id
         FROM instagram_accounts WHERE id = ${id}
       `;
       return res.json(result[0] || null);
@@ -2459,17 +2951,19 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
     }
     console.log("[Instagram] Resolved user ID:", resolvedUserId);
 
+    // For organizations: get accounts connected to the org (any member can use)
+    // For personal: get accounts owned by the user
     const result = organization_id
       ? await sql`
           SELECT id, user_id, organization_id, instagram_user_id, instagram_username,
-                 is_active, connected_at, last_used_at, created_at, updated_at
+                 is_active, connected_at, last_used_at, created_at, updated_at, connected_by_user_id
           FROM instagram_accounts
           WHERE organization_id = ${organization_id} AND is_active = TRUE
           ORDER BY connected_at DESC
         `
       : await sql`
           SELECT id, user_id, organization_id, instagram_user_id, instagram_username,
-                 is_active, connected_at, last_used_at, created_at, updated_at
+                 is_active, connected_at, last_used_at, created_at, updated_at, connected_by_user_id
           FROM instagram_accounts
           WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND is_active = TRUE
           ORDER BY connected_at DESC
@@ -2483,7 +2977,9 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
 });
 
 // POST - Connect new Instagram account
-app.post("/api/db/instagram-accounts", async (req, res) => {
+// For organizations: account is shared by all org members
+// For personal: account is owned by the user
+app.post("/api/db/instagram-accounts", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id, rube_token } = req.body;
@@ -2494,7 +2990,7 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
         .json({ error: "user_id and rube_token are required" });
     }
 
-    // Resolve Clerk ID to DB UUID
+    // Resolve Clerk ID to DB UUID (for tracking who connected)
     const userResult =
       await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
     const resolvedUserId = userResult[0]?.id;
@@ -2512,21 +3008,32 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
 
     const { instagramUserId, instagramUsername } = validation;
 
-    // Check if already connected
-    const existing = await sql`
-      SELECT id FROM instagram_accounts
-      WHERE user_id = ${resolvedUserId} AND instagram_user_id = ${instagramUserId}
-    `;
+    // Check if already connected based on context (org or personal)
+    let existing;
+    if (organization_id) {
+      // For organizations: check if this Instagram is already connected to the ORG
+      existing = await sql`
+        SELECT id FROM instagram_accounts
+        WHERE organization_id = ${organization_id} AND instagram_user_id = ${instagramUserId}
+      `;
+    } else {
+      // For personal: check if this Instagram is already connected to the USER
+      existing = await sql`
+        SELECT id FROM instagram_accounts
+        WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND instagram_user_id = ${instagramUserId}
+      `;
+    }
 
     if (existing.length > 0) {
-      // Update existing
+      // Update existing - reconnect with new token
       const result = await sql`
         UPDATE instagram_accounts
         SET rube_token = ${rube_token}, instagram_username = ${instagramUsername},
-            is_active = TRUE, connected_at = NOW(), updated_at = NOW()
+            is_active = TRUE, connected_at = NOW(), updated_at = NOW(),
+            connected_by_user_id = ${resolvedUserId}
         WHERE id = ${existing[0].id}
         RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
-                  is_active, connected_at, last_used_at, created_at, updated_at
+                  is_active, connected_at, last_used_at, created_at, updated_at, connected_by_user_id
       `;
       return res.json({
         success: true,
@@ -2535,12 +3042,16 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
       });
     }
 
-    // Create new
+    // Create new account
+    // For org accounts: user_id is null, organization_id is the owner
+    // For personal accounts: user_id is the owner, organization_id is null
+    const ownerUserId = organization_id ? null : resolvedUserId;
+
     const result = await sql`
-      INSERT INTO instagram_accounts (user_id, organization_id, instagram_user_id, instagram_username, rube_token)
-      VALUES (${resolvedUserId}, ${organization_id || null}, ${instagramUserId}, ${instagramUsername}, ${rube_token})
+      INSERT INTO instagram_accounts (user_id, organization_id, instagram_user_id, instagram_username, rube_token, connected_by_user_id)
+      VALUES (${ownerUserId}, ${organization_id || null}, ${instagramUserId}, ${instagramUsername}, ${rube_token}, ${resolvedUserId})
       RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
-                is_active, connected_at, last_used_at, created_at, updated_at
+                is_active, connected_at, last_used_at, created_at, updated_at, connected_by_user_id
     `;
 
     res.status(201).json({
@@ -2555,7 +3066,7 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
 });
 
 // PUT - Update Instagram account token
-app.put("/api/db/instagram-accounts", async (req, res) => {
+app.put("/api/db/instagram-accounts", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { id } = req.query;
@@ -2591,7 +3102,7 @@ app.put("/api/db/instagram-accounts", async (req, res) => {
 });
 
 // DELETE - Disconnect Instagram account (soft delete)
-app.delete("/api/db/instagram-accounts", async (req, res) => {
+app.delete("/api/db/instagram-accounts", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { id } = req.query;
@@ -2609,7 +3120,7 @@ app.delete("/api/db/instagram-accounts", async (req, res) => {
 });
 
 // Campaigns API
-app.get("/api/db/campaigns", async (req, res) => {
+app.get("/api/db/campaigns", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id, id, include_content } = req.query;
@@ -2715,7 +3226,7 @@ app.get("/api/db/campaigns", async (req, res) => {
   }
 });
 
-app.post("/api/db/campaigns", async (req, res) => {
+app.post("/api/db/campaigns", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const {
@@ -2841,7 +3352,7 @@ app.post("/api/db/campaigns", async (req, res) => {
   }
 });
 
-app.delete("/api/db/campaigns", async (req, res) => {
+app.delete("/api/db/campaigns", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { id, user_id } = req.query;
@@ -3063,7 +3574,7 @@ app.patch("/api/db/carousels/slide", async (req, res) => {
 });
 
 // Tournaments API
-app.get("/api/db/tournaments/list", async (req, res) => {
+app.get("/api/db/tournaments/list", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id } = req.query;
@@ -3114,7 +3625,7 @@ app.get("/api/db/tournaments/list", async (req, res) => {
   }
 });
 
-app.get("/api/db/tournaments", async (req, res) => {
+app.get("/api/db/tournaments", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id, week_schedule_id } = req.query;
@@ -3178,7 +3689,7 @@ app.get("/api/db/tournaments", async (req, res) => {
   }
 });
 
-app.post("/api/db/tournaments", async (req, res) => {
+app.post("/api/db/tournaments", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id, start_date, end_date, filename, events } =
@@ -3247,7 +3758,7 @@ app.post("/api/db/tournaments", async (req, res) => {
   }
 });
 
-app.delete("/api/db/tournaments", async (req, res) => {
+app.delete("/api/db/tournaments", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
     const { id, user_id } = req.query;
@@ -3584,7 +4095,7 @@ app.post("/api/upload", async (req, res) => {
 // ============================================================================
 
 // AI Campaign Generation
-app.post("/api/ai/campaign", async (req, res) => {
+app.post("/api/ai/campaign", requireAuthWithAiRateLimit, async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
@@ -3780,7 +4291,7 @@ REGRAS CRÍTICAS:
 });
 
 // AI Flyer Generation
-app.post("/api/ai/flyer", async (req, res) => {
+app.post("/api/ai/flyer", requireAuthWithAiRateLimit, async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
@@ -3907,7 +4418,7 @@ app.post("/api/ai/flyer", async (req, res) => {
 });
 
 // AI Image Generation
-app.post("/api/ai/image", async (req, res) => {
+app.post("/api/ai/image", requireAuthWithAiRateLimit, async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
@@ -4092,7 +4603,7 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
 });
 
 // AI Text Generation
-app.post("/api/ai/text", async (req, res) => {
+app.post("/api/ai/text", requireAuthWithAiRateLimit, async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
@@ -4378,7 +4889,7 @@ REGRAS:
 });
 
 // AI Edit Image
-app.post("/api/ai/edit-image", async (req, res) => {
+app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
@@ -4563,7 +5074,7 @@ Retorne as cores em formato hexadecimal (#RRGGBB).`,
 });
 
 // AI Speech Generation (TTS)
-app.post("/api/ai/speech", async (req, res) => {
+app.post("/api/ai/speech", requireAuthWithAiRateLimit, async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
@@ -4876,7 +5387,7 @@ async function generateVideoWithGoogleVeo(
   return `${videoUri}&key=${apiKey}`;
 }
 
-app.post("/api/ai/video", async (req, res) => {
+app.post("/api/ai/video", requireAuthWithAiRateLimit, async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
@@ -5057,42 +5568,63 @@ app.post("/api/ai/video", async (req, res) => {
 app.post("/api/rube", async (req, res) => {
   try {
     const sql = getSql();
-    const { instagram_account_id, user_id, ...mcpRequest } = req.body;
+    const { instagram_account_id, user_id, organization_id, ...mcpRequest } = req.body;
 
     let token;
     let instagramUserId;
 
-    // Multi-tenant mode: use user's token from database
-    if (instagram_account_id && user_id) {
+    // Multi-tenant mode: use token from database
+    // Supports both personal accounts (user_id) and organization accounts (organization_id)
+    if (instagram_account_id && (user_id || organization_id)) {
       console.log(
         "[Rube Proxy] Multi-tenant mode - fetching token for account:",
         instagram_account_id,
+        organization_id ? `(org: ${organization_id})` : "(personal)",
       );
 
-      // Resolve user_id: can be DB UUID or Clerk ID
-      let resolvedUserId = user_id;
-      if (user_id.startsWith("user_")) {
-        const userResult =
-          await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
-        resolvedUserId = userResult[0]?.id;
-        if (!resolvedUserId) {
-          console.log("[Rube Proxy] User not found for Clerk ID:", user_id);
-          return res.status(400).json({ error: "User not found" });
+      // Resolve user_id if provided (for personal accounts or audit)
+      let resolvedUserId = null;
+      if (user_id) {
+        if (user_id.startsWith("user_")) {
+          const userResult =
+            await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
+          resolvedUserId = userResult[0]?.id;
+          if (!resolvedUserId) {
+            console.log("[Rube Proxy] User not found for Clerk ID:", user_id);
+            return res.status(400).json({ error: "User not found" });
+          }
+        } else {
+          resolvedUserId = user_id;
         }
       }
 
-      // Fetch account token and instagram_user_id
-      const accountResult = await sql`
-        SELECT rube_token, instagram_user_id FROM instagram_accounts
-        WHERE id = ${instagram_account_id} AND user_id = ${resolvedUserId} AND is_active = TRUE
-        LIMIT 1
-      `;
+      // Fetch account token based on context
+      // For organizations: any member can use org accounts
+      // For personal: only the owner can use the account
+      let accountResult;
+      if (organization_id) {
+        // Organization context: verify account belongs to the org
+        accountResult = await sql`
+          SELECT rube_token, instagram_user_id FROM instagram_accounts
+          WHERE id = ${instagram_account_id} AND organization_id = ${organization_id} AND is_active = TRUE
+          LIMIT 1
+        `;
+      } else if (resolvedUserId) {
+        // Personal context: verify account belongs to the user
+        accountResult = await sql`
+          SELECT rube_token, instagram_user_id FROM instagram_accounts
+          WHERE id = ${instagram_account_id} AND user_id = ${resolvedUserId} AND organization_id IS NULL AND is_active = TRUE
+          LIMIT 1
+        `;
+      } else {
+        return res.status(400).json({ error: "user_id or organization_id required" });
+      }
 
       if (accountResult.length === 0) {
-        console.log("[Rube Proxy] Instagram account not found or not active");
+        console.log("[Rube Proxy] Instagram account not found or access denied");
         return res
           .status(403)
-          .json({ error: "Instagram account not found or inactive" });
+          .json({ error: "Instagram account not found or access denied" });
       }
 
       token = accountResult[0].rube_token;

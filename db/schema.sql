@@ -578,10 +578,12 @@ CREATE TYPE generation_job_type AS ENUM (
     'flyer_daily',
     'post',
     'ad',
-    'clip'
+    'clip',
+    'image',
+    'video'
 );
 
--- Note: 'clip' value added for video clip generation support
+-- Note: 'clip' for video clips, 'image' for generic images, 'video' for full videos
 
 CREATE TABLE generation_jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

@@ -16,8 +16,9 @@ import {
   GenerationMode,
   MediaType,
 } from './types';
-import { generateVideo, type ApiVideoModel } from '../../services/apiClient';
+import { queueVideoJob, type ApiVideoModel, type VideoJobConfig } from '../../services/apiClient';
 import { generateImage } from '../../services/geminiService';
+import { useBackgroundJobs } from '../../hooks/useBackgroundJobs';
 import type { BrandProfile } from '../../types';
 
 // Sample video URLs for the feed
@@ -86,12 +87,19 @@ const sampleVideos: FeedPost[] = [
 
 interface PlaygroundViewProps {
   brandProfile: BrandProfile;
+  userId?: string;
 }
 
-export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile }) => {
+export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, userId }) => {
   const [feed, setFeed] = useState<FeedPost[]>(sampleVideos);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [errorToast, setErrorToast] = useState<string | null>(null);
+
+  // Background jobs for video generation
+  const { onJobComplete, onJobFailed } = useBackgroundJobs();
+
+  // Track pending video jobs (jobContext -> postId mapping)
+  const pendingVideoJobs = React.useRef<Map<string, string>>(new Map());
 
   // Auto-dismiss error toast
   useEffect(() => {
@@ -100,6 +108,30 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile }) 
       return () => clearTimeout(timer);
     }
   }, [errorToast]);
+
+  // Handle background job completion
+  useEffect(() => {
+    const handleComplete = (jobContext: string, result: string) => {
+      const postId = pendingVideoJobs.current.get(jobContext);
+      if (postId) {
+        console.log(`[PlaygroundView] Video job completed for post ${postId}:`, result);
+        updateFeedPost(postId, { videoUrl: result, status: PostStatus.SUCCESS });
+        pendingVideoJobs.current.delete(jobContext);
+      }
+    };
+
+    const handleFailed = (jobContext: string, error: string) => {
+      const postId = pendingVideoJobs.current.get(jobContext);
+      if (postId) {
+        console.error(`[PlaygroundView] Video job failed for post ${postId}:`, error);
+        updateFeedPost(postId, { status: PostStatus.ERROR, errorMessage: error });
+        pendingVideoJobs.current.delete(jobContext);
+      }
+    };
+
+    onJobComplete(handleComplete);
+    onJobFailed(handleFailed);
+  }, [onJobComplete, onJobFailed]);
 
   const updateFeedPost = (id: string, updates: Partial<FeedPost>) => {
     setFeed(prevFeed =>
@@ -171,7 +203,11 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile }) 
 
         updateFeedPost(postId, { imageUrl: imageDataUrl, status: PostStatus.SUCCESS });
       } else {
-        // Generate video using existing API
+        // Generate video using background job
+        if (!userId) {
+          throw new Error('Usuario nao autenticado. Faca login para gerar videos.');
+        }
+
         const apiModel: ApiVideoModel = 'veo-3.1';
 
         // Build image URL from reference image if available
@@ -182,14 +218,23 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile }) 
           imageUrl = `data:image/png;base64,${refImage.base64}`;
         }
 
-        const url = await generateVideo({
-          prompt: params.prompt,
-          aspectRatio,
+        // Create job config
+        const jobConfig: VideoJobConfig = {
           model: apiModel,
+          aspectRatio,
           imageUrl,
-        });
+        };
 
-        updateFeedPost(postId, { videoUrl: url, status: PostStatus.SUCCESS });
+        const jobContext = `playground-video-${postId}`;
+
+        // Track this job for completion handler
+        pendingVideoJobs.current.set(jobContext, postId);
+
+        // Queue the video job (will be handled by onJobComplete/onJobFailed)
+        await queueVideoJob(userId, params.prompt, jobConfig, jobContext);
+
+        console.log(`[PlaygroundView] Video job queued for post ${postId}`);
+        // Status remains GENERATING until job completes
       }
     } catch (error) {
       console.error('Generation failed:', error);

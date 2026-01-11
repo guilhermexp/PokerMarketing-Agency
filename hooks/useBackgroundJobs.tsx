@@ -20,6 +20,8 @@ import {
   getScheduledPosts,
   type GenerationJob,
   type GenerationJobConfig,
+  type ImageJobConfig,
+  type VideoJobConfig,
   type DbScheduledPost,
 } from "../services/apiClient";
 
@@ -51,9 +53,9 @@ interface BackgroundJobsContextValue {
   // Actions
   queueJob: (
     userId: string,
-    jobType: "flyer" | "flyer_daily" | "post" | "ad" | "clip",
+    jobType: "flyer" | "flyer_daily" | "post" | "ad" | "clip" | "image" | "video",
     prompt: string,
-    config: GenerationJobConfig,
+    config: GenerationJobConfig | ImageJobConfig | VideoJobConfig,
     context?: string,
   ) => Promise<string>; // Returns jobId
 
@@ -429,9 +431,9 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
   const queueJob = useCallback(
     async (
       userId: string,
-      jobType: "flyer" | "flyer_daily" | "post" | "ad" | "clip",
+      jobType: "flyer" | "flyer_daily" | "post" | "ad" | "clip" | "image" | "video",
       prompt: string,
-      config: GenerationJobConfig,
+      config: GenerationJobConfig | ImageJobConfig | VideoJobConfig,
       context?: string,
     ): Promise<string> => {
       // Create optimistic local job
