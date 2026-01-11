@@ -110,11 +110,20 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile }) 
       // Map aspect ratio
       const aspectRatio: "16:9" | "9:16" = params.aspectRatio === '16:9' ? '16:9' : '9:16';
 
+      // Build image URL from reference image if available
+      let imageUrl: string | undefined;
+      if (params.referenceImages && params.referenceImages.length > 0) {
+        const refImage = params.referenceImages[0];
+        // Convert base64 to data URL format
+        imageUrl = `data:image/png;base64,${refImage.base64}`;
+      }
+
       // Generate video using existing API
       const url = await generateVideo({
         prompt: params.prompt,
         aspectRatio,
         model: apiModel,
+        imageUrl,
       });
 
       updateFeedPost(postId, { videoUrl: url, status: PostStatus.SUCCESS });

@@ -4572,10 +4572,12 @@ async function generateVideoWithGoogleVeo(
 
   const ai = new GoogleGenAI({ apiKey });
   const isHttpUrl = imageUrl && imageUrl.startsWith("http");
+  const isDataUrl = imageUrl && imageUrl.startsWith("data:");
+  const hasImage = isHttpUrl || isDataUrl;
   const hasLastFrame = lastFrameUrl && lastFrameUrl.startsWith("http");
   const mode = hasLastFrame
     ? "first-last-frame"
-    : isHttpUrl
+    : hasImage
       ? "image-to-video"
       : "text-to-video";
 
@@ -4609,6 +4611,16 @@ async function generateVideoWithGoogleVeo(
       imageBytes: imageBase64,
       mimeType: contentType,
     };
+  } else if (isDataUrl) {
+    // Parse data URL: data:image/png;base64,<base64data>
+    const matches = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (matches) {
+      const [, mimeType, base64Data] = matches;
+      generateParams.image = {
+        imageBytes: base64Data,
+        mimeType: mimeType,
+      };
+    }
   }
 
   // Add last frame for interpolation mode
