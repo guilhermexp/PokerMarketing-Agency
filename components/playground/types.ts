@@ -1,6 +1,6 @@
 /**
  * Playground Types
- * Type definitions for video generation playground
+ * Type definitions for video and image generation playground
  */
 
 export enum PostStatus {
@@ -9,9 +9,16 @@ export enum PostStatus {
   ERROR = "error",
 }
 
+export enum MediaType {
+  VIDEO = "video",
+  IMAGE = "image",
+}
+
 export interface FeedPost {
   id: string;
   videoUrl?: string;
+  imageUrl?: string;
+  mediaType: MediaType;
   username: string;
   avatarUrl: string;
   description: string;
@@ -38,8 +45,10 @@ export enum GenerationMode {
   FRAMES_TO_VIDEO = "frames_to_video",
 }
 
-export interface GenerateVideoParams {
+export interface GenerateMediaParams {
   prompt: string;
+  mediaType: MediaType;
+  useBrandProfile?: boolean;
   model: PlaygroundVeoModel;
   aspectRatio: PlaygroundAspectRatio;
   resolution: PlaygroundResolution;
@@ -50,6 +59,9 @@ export interface GenerateVideoParams {
   endFrame?: PlaygroundImageFile;
   isLooping?: boolean;
 }
+
+// Alias for backward compatibility
+export type GenerateVideoParams = GenerateMediaParams;
 
 // Veo Models available for playground
 export enum PlaygroundVeoModel {

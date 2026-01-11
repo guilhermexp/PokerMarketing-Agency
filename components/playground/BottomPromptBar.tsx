@@ -5,11 +5,12 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useRef, useState, useEffect } from 'react';
-import { ArrowUp, Plus, User } from 'lucide-react';
+import { ArrowUp, Plus, User, Video, ImageIcon, Palette } from 'lucide-react';
 import {
   CameoProfile,
   GenerateVideoParams,
   GenerationMode,
+  MediaType,
   PlaygroundImageFile,
   PlaygroundAspectRatio,
   PlaygroundResolution,
@@ -83,6 +84,8 @@ interface BottomPromptBarProps {
 export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [prompt, setPrompt] = useState('');
+  const [mediaType, setMediaType] = useState<MediaType>(MediaType.VIDEO);
+  const [useBrandProfile, setUseBrandProfile] = useState(false);
   const [selectedCameoId, setSelectedCameoId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<CameoProfile[]>(defaultCameoProfiles);
   const [profileImages, setProfileImages] = useState<Record<string, PlaygroundImageFile>>({});
@@ -216,6 +219,8 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
 
     const params: GenerateVideoParams = {
       prompt,
+      mediaType,
+      useBrandProfile,
       model: selectedModel,
       aspectRatio: currentAspectRatio,
       resolution: PlaygroundResolution.P720,
@@ -315,6 +320,46 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
             className={`w-11 h-11 flex items-center justify-center rounded-full transition-all duration-300 shrink-0 shadow-lg ${isExpanded ? 'bg-white/10 text-white hover:bg-white/20 border border-white/10 rotate-45' : 'text-white bg-gradient-to-br from-indigo-500 to-purple-600 hover:scale-105 shadow-[0_0_15px_rgba(99,102,241,0.5)]'}`}
           >
             <Plus className="w-5 h-5" />
+          </button>
+
+          {/* Media Type Toggle */}
+          <div className="flex items-center bg-black/40 rounded-full p-1 border border-white/10 shrink-0">
+            <button
+              onClick={() => setMediaType(MediaType.VIDEO)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                mediaType === MediaType.VIDEO
+                  ? 'bg-white text-black shadow-md'
+                  : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <Video className="w-3.5 h-3.5" />
+              Video
+            </button>
+            <button
+              onClick={() => setMediaType(MediaType.IMAGE)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                mediaType === MediaType.IMAGE
+                  ? 'bg-white text-black shadow-md'
+                  : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
+              Imagem
+            </button>
+          </div>
+
+          {/* Brand Profile Toggle */}
+          <button
+            onClick={() => setUseBrandProfile(!useBrandProfile)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all duration-200 shrink-0 ${
+              useBrandProfile
+                ? 'bg-white text-black shadow-md'
+                : 'bg-black/40 text-white/60 border border-white/10 hover:text-white'
+            }`}
+            title={useBrandProfile ? "Usando cores e tom da marca" : "Sem personalização de marca"}
+          >
+            <Palette className="w-3.5 h-3.5" />
+            Marca
           </button>
 
           <div className="flex-grow relative py-2 flex items-center">

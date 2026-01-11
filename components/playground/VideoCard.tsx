@@ -5,8 +5,8 @@
 
 import { motion } from 'framer-motion';
 import React, { useRef, useState } from 'react';
-import { Download, AlertCircle, Sparkles } from 'lucide-react';
-import { FeedPost, PostStatus } from './types';
+import { Download, AlertCircle, Sparkles, ImageIcon } from 'lucide-react';
+import { FeedPost, PostStatus, MediaType } from './types';
 import { VeoLogo } from './VeoLogo';
 
 interface VideoCardProps {
@@ -36,23 +36,37 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post }) => {
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!post.videoUrl || status !== PostStatus.SUCCESS) return;
+    const isImage = post.mediaType === MediaType.IMAGE;
+    const mediaUrl = isImage ? post.imageUrl : post.videoUrl;
+
+    if (!mediaUrl || status !== PostStatus.SUCCESS) return;
+
+    const extension = isImage ? 'png' : 'mp4';
+    const filename = `playground-${isImage ? 'image' : 'video'}-${post.id}.${extension}`;
 
     try {
-      if (post.videoUrl.startsWith('blob:')) {
+      if (mediaUrl.startsWith('blob:')) {
         const a = document.createElement('a');
-        a.href = post.videoUrl;
-        a.download = `playground-video-${post.id}.mp4`;
+        a.href = mediaUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else if (mediaUrl.startsWith('data:')) {
+        // Handle data URLs (common for images)
+        const a = document.createElement('a');
+        a.href = mediaUrl;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
       } else {
-        const response = await fetch(post.videoUrl);
+        const response = await fetch(mediaUrl);
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `playground-video-${post.id}.mp4`;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -99,6 +113,16 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post }) => {
         );
       case PostStatus.SUCCESS:
       default:
+        // Check if this is an image or video
+        if (post.mediaType === MediaType.IMAGE && post.imageUrl) {
+          return (
+            <img
+              src={post.imageUrl}
+              alt={post.description}
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            />
+          );
+        }
         return (
           <video
             ref={videoRef}
@@ -139,7 +163,11 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post }) => {
       )}
 
       <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-black/30 border border-white/10 backdrop-blur-xl px-2.5 py-1.5 rounded-full text-xs font-medium text-white/90 pointer-events-none shadow-lg z-20">
-        <VeoLogo className="w-3 h-3 opacity-80" />
+        {post.mediaType === MediaType.IMAGE ? (
+          <ImageIcon className="w-3 h-3 opacity-80" />
+        ) : (
+          <VeoLogo className="w-3 h-3 opacity-80" />
+        )}
         {post.modelTag}
       </div>
 
@@ -157,7 +185,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post }) => {
             <button
               onClick={handleDownload}
               className="p-3 rounded-full bg-white/10 border border-white/20 backdrop-blur-xl hover:bg-white/20 transition-all text-white shadow-[0_4px_12px_rgba(0,0,0,0.3)] group-active:scale-90 hover:scale-105 hover:border-white/40"
-              title="Download Video"
+              title={post.mediaType === MediaType.IMAGE ? "Download Imagem" : "Download Video"}
             >
               <Download className="w-5 h-5" />
             </button>

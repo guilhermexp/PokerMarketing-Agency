@@ -15,8 +15,10 @@ import {
   GenerateVideoParams,
   PostStatus,
   GenerationMode,
+  MediaType,
 } from './types';
 import { generateVideo, type ApiVideoModel } from '../../services/apiClient';
+import { generateImage } from '../../services/geminiService';
 import type { BrandProfile } from '../../types';
 
 // Sample video URLs for the feed
@@ -24,6 +26,7 @@ const sampleVideos: FeedPost[] = [
   {
     id: 's1',
     videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-alisa.mp4',
+    mediaType: MediaType.VIDEO,
     username: 'alisa_fortin',
     avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Maria',
     description: 'Tomando um cafe em um charmoso cafe parisiense',
@@ -33,6 +36,7 @@ const sampleVideos: FeedPost[] = [
   {
     id: 's2',
     videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-omar.mp4',
+    mediaType: MediaType.VIDEO,
     username: 'osanseviero',
     avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Emery',
     description: 'Em um zoologico de lhamas',
@@ -42,6 +46,7 @@ const sampleVideos: FeedPost[] = [
   {
     id: 's3',
     videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-ammaar.mp4',
+    mediaType: MediaType.VIDEO,
     username: 'ammaar',
     avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Kimberly',
     description: 'Caminhando no tapete vermelho de uma cerimonia',
@@ -51,6 +56,7 @@ const sampleVideos: FeedPost[] = [
   {
     id: 's4',
     videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-logan.mp4',
+    mediaType: MediaType.VIDEO,
     username: 'OfficialLoganK',
     avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Jocelyn',
     description: 'Vibe coding no topo de uma montanha.',
@@ -60,6 +66,7 @@ const sampleVideos: FeedPost[] = [
   {
     id: 's5',
     videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-kat.mp4',
+    mediaType: MediaType.VIDEO,
     username: 'kat_kampf',
     avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Jameson',
     description: 'Explorando um templo majestoso em uma floresta.',
@@ -69,6 +76,7 @@ const sampleVideos: FeedPost[] = [
   {
     id: 's6',
     videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-josh.mp4',
+    mediaType: MediaType.VIDEO,
     username: 'joshwoodward',
     avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Jade',
     description: 'No palco principal de um evento de tecnologia.',
@@ -104,31 +112,52 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile }) 
 
   const processGeneration = async (postId: string, params: GenerateVideoParams) => {
     try {
-      // Map playground model to API model
-      const apiModel: ApiVideoModel = 'veo-3.1';
+      const isImageGeneration = params.mediaType === MediaType.IMAGE;
 
       // Map aspect ratio
       const aspectRatio: "16:9" | "9:16" = params.aspectRatio === '16:9' ? '16:9' : '9:16';
 
-      // Build image URL from reference image if available
-      let imageUrl: string | undefined;
-      if (params.referenceImages && params.referenceImages.length > 0) {
-        const refImage = params.referenceImages[0];
-        // Convert base64 to data URL format
-        imageUrl = `data:image/png;base64,${refImage.base64}`;
+      if (isImageGeneration) {
+        // Generate image using Gemini Image Pro
+        // Use brand profile only if toggle is enabled
+        const profileToUse = params.useBrandProfile ? brandProfile : {
+          name: brandProfile.name,
+          // Minimal profile without brand styling
+        } as typeof brandProfile;
+
+        const imageDataUrl = await generateImage(
+          params.prompt,
+          profileToUse,
+          {
+            aspectRatio: params.aspectRatio,
+            model: 'gemini-3-pro-image-preview',
+          }
+        );
+
+        updateFeedPost(postId, { imageUrl: imageDataUrl, status: PostStatus.SUCCESS });
+      } else {
+        // Generate video using existing API
+        const apiModel: ApiVideoModel = 'veo-3.1';
+
+        // Build image URL from reference image if available
+        let imageUrl: string | undefined;
+        if (params.referenceImages && params.referenceImages.length > 0) {
+          const refImage = params.referenceImages[0];
+          // Convert base64 to data URL format
+          imageUrl = `data:image/png;base64,${refImage.base64}`;
+        }
+
+        const url = await generateVideo({
+          prompt: params.prompt,
+          aspectRatio,
+          model: apiModel,
+          imageUrl,
+        });
+
+        updateFeedPost(postId, { videoUrl: url, status: PostStatus.SUCCESS });
       }
-
-      // Generate video using existing API
-      const url = await generateVideo({
-        prompt: params.prompt,
-        aspectRatio,
-        model: apiModel,
-        imageUrl,
-      });
-
-      updateFeedPost(postId, { videoUrl: url, status: PostStatus.SUCCESS });
     } catch (error) {
-      console.error('Video generation failed:', error);
+      console.error('Generation failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
       updateFeedPost(postId, { status: PostStatus.ERROR, errorMessage: errorMessage });
 
@@ -146,13 +175,20 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile }) 
   const handleGenerate = useCallback(async (params: GenerateVideoParams) => {
     const newPostId = Date.now().toString();
     const refImage = params.referenceImages?.[0]?.base64;
+    const isImage = params.mediaType === MediaType.IMAGE;
 
-    // Determine model tag based on generation mode
-    const modelTag = params.mode === GenerationMode.REFERENCES_TO_VIDEO ? 'Veo' : 'Veo Fast';
+    // Determine model tag based on media type and generation mode
+    let modelTag: string;
+    if (isImage) {
+      modelTag = 'Gemini';
+    } else {
+      modelTag = params.mode === GenerationMode.REFERENCES_TO_VIDEO ? 'Veo' : 'Veo Fast';
+    }
 
     // Create new post object with GENERATING status
     const newPost: FeedPost = {
       id: newPostId,
+      mediaType: params.mediaType,
       username: brandProfile.name || 'voce',
       avatarUrl: brandProfile.logo || 'https://api.dicebear.com/7.x/avataaars/svg?seed=voce',
       description: params.prompt,
@@ -202,15 +238,10 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile }) 
         <header className="sticky top-0 z-30 w-full px-6 py-6 pointer-events-none">
           <div className="absolute inset-0 bg-black/20 backdrop-blur-xl" style={{ maskImage: 'linear-gradient(to bottom, black, transparent)' }} />
 
-          <div className="relative flex items-center justify-between text-white pointer-events-auto max-w-[1600px] mx-auto w-full">
+          <div className="relative flex items-center text-white pointer-events-auto max-w-[1600px] mx-auto w-full">
             <div className="flex items-center gap-3.5">
               <Clapperboard className="w-8 h-8 text-white" />
               <h1 className="text-3xl text-white tracking-wide drop-shadow-sm font-bold">PLAYGROUND</h1>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm font-medium text-white/60">
-              <VeoLogo className="w-4 h-4" />
-              <span>Powered by Veo</span>
             </div>
           </div>
         </header>
