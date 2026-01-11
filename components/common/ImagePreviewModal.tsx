@@ -134,7 +134,7 @@ const ImageUploader: React.FC<{
   );
 };
 
-// Minimal version of ImageUploader for AI Studio
+// Minimal version of ImageUploader for AI Studio - inline compact
 const MinimalImageUploader: React.FC<{
   image: ImageFile | null;
   onImageChange: (image: ImageFile | null) => void;
@@ -162,36 +162,15 @@ const MinimalImageUploader: React.FC<{
   return (
     <div
       {...getRootProps()}
-      className={`relative border border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+      className={`inline-flex items-center gap-1.5 px-2 py-1 border border-dashed rounded-md cursor-pointer transition-all ${
         isDragActive
           ? "border-white/20 bg-white/[0.02]"
           : "border-white/[0.08] hover:border-white/15"
       }`}
     >
       <input {...getInputProps()} />
-      {image ? (
-        <div className="relative">
-          <img
-            src={image.preview}
-            alt="Ref"
-            className="max-h-20 mx-auto rounded-lg"
-          />
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onImageChange(null);
-            }}
-            className="absolute -top-2 -right-2 w-5 h-5 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
-          >
-            <Icon name="x" className="w-2.5 h-2.5 text-white/60" />
-          </button>
-        </div>
-      ) : (
-        <div className="text-white/20">
-          <Icon name="upload" className="w-5 h-5 mx-auto mb-1.5" />
-          <p className="text-[10px]">Arraste ou clique</p>
-        </div>
-      )}
+      <Icon name="plus" className="w-3 h-3 text-white/25" />
+      <span className="text-[9px] text-white/25">Adicionar</span>
     </div>
   );
 };
@@ -1104,277 +1083,235 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
           </div>
 
           {/* Sidebar - Minimal */}
-          <div className="w-full lg:w-[320px] flex-shrink-0 bg-[#0a0a0a] flex flex-col border-t lg:border-t-0 lg:border-l border-white/[0.06]">
-            <div className="flex-grow overflow-y-auto p-5 space-y-5">
+          <div className="w-full lg:w-[280px] flex-shrink-0 bg-[#0a0a0a] flex flex-col border-t lg:border-t-0 lg:border-l border-white/[0.06]">
+            <div className="flex-grow overflow-y-auto p-4 space-y-3">
               {isVideo ? (
-                <section className="space-y-3">
-                  <label className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">
-                    Informações
-                  </label>
-                  <div className="space-y-2 text-xs text-white/60">
-                    <p>
-                      <span className="text-white/30">Fonte:</span>{" "}
-                      {image.source}
-                    </p>
-                    {image.model && (
-                      <p>
-                        <span className="text-white/30">Modelo:</span>{" "}
-                        {image.model}
-                      </p>
-                    )}
-                    {videoDimensions && (
-                      <>
-                        <p>
-                          <span className="text-white/30">Dimensões:</span>{" "}
-                          {videoDimensions.width} × {videoDimensions.height} px
-                        </p>
-                        <p>
-                          <span className="text-white/30">Proporção:</span>{" "}
-                          {isVerticalVideo ? "Vertical (Reels 9:16)" : "Horizontal"}
-                        </p>
-                      </>
-                    )}
+                <div className="space-y-2 text-[11px] text-white/50">
+                  <div className="flex justify-between">
+                    <span className="text-white/30">Fonte</span>
+                    <span>{image.source}</span>
                   </div>
-                </section>
+                  {image.model && (
+                    <div className="flex justify-between">
+                      <span className="text-white/30">Modelo</span>
+                      <span>{image.model}</span>
+                    </div>
+                  )}
+                  {videoDimensions && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-white/30">Dimensões</span>
+                        <span>{videoDimensions.width} × {videoDimensions.height}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white/30">Proporção</span>
+                        <span>{isVerticalVideo ? "9:16" : "16:9"}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
               ) : (
                 <>
-                  {/* Dimensions / Resize Section */}
-                  <section className="p-4 bg-white/[0.02] rounded-2xl border border-white/[0.06] space-y-4">
-                    <div className="flex items-center gap-2.5">
-                      <Icon
-                        name="maximize-2"
-                        className="w-4 h-4 text-white/40"
-                      />
-                      <div>
-                        <h4 className="text-xs font-semibold text-white/80">
-                          Dimensões
-                        </h4>
-                        <p className="text-[10px] text-white/30">
-                          {originalDimensions.width} ×{" "}
-                          {originalDimensions.height} px
-                        </p>
+                  {/* Resize Section - Compact */}
+                  <section className="space-y-3">
+                    {/* Header with dimensions */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Redimensionar</span>
+                      <span className="text-[10px] text-white/25 tabular-nums">
+                        {originalDimensions.width}×{originalDimensions.height}
+                      </span>
+                    </div>
+
+                    {/* Compact Inputs Row */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 flex items-center gap-1.5 bg-white/[0.03] rounded-lg px-2.5 py-1.5 border border-white/[0.06]">
+                        <span className="text-[9px] text-white/30 uppercase">L</span>
+                        <input
+                          type="number"
+                          min={10}
+                          max={100}
+                          value={widthPercent}
+                          onChange={(e) => handleResize(Number(e.target.value), heightPercent)}
+                          disabled={isResizing}
+                          className="w-full bg-transparent text-[11px] text-white/80 focus:outline-none tabular-nums disabled:opacity-50"
+                        />
+                        <span className="text-[9px] text-white/20">%</span>
+                      </div>
+                      <Icon name="x" className="w-2.5 h-2.5 text-white/15 flex-shrink-0" />
+                      <div className="flex-1 flex items-center gap-1.5 bg-white/[0.03] rounded-lg px-2.5 py-1.5 border border-white/[0.06]">
+                        <span className="text-[9px] text-white/30 uppercase">A</span>
+                        <input
+                          type="number"
+                          min={10}
+                          max={100}
+                          value={heightPercent}
+                          onChange={(e) => handleResize(widthPercent, Number(e.target.value))}
+                          disabled={isResizing}
+                          className="w-full bg-transparent text-[11px] text-white/80 focus:outline-none tabular-nums disabled:opacity-50"
+                        />
+                        <span className="text-[9px] text-white/20">%</span>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[9px] text-white/30 mb-1.5 block uppercase tracking-wider">
-                          Largura
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min={10}
-                            max={100}
-                            value={widthPercent}
-                            onChange={(e) =>
-                              handleResize(
-                                Number(e.target.value),
-                                heightPercent,
-                              )
-                            }
-                            disabled={isResizing}
-                            className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/90 focus:border-white/20 focus:outline-none transition-all disabled:opacity-50"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-white/30">
-                            %
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[9px] text-white/30 mb-1.5 block uppercase tracking-wider">
-                          Altura
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min={10}
-                            max={100}
-                            value={heightPercent}
-                            onChange={(e) =>
-                              handleResize(widthPercent, Number(e.target.value))
-                            }
-                            disabled={isResizing}
-                            className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/90 focus:border-white/20 focus:outline-none transition-all disabled:opacity-50"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-white/30">
-                            %
-                          </span>
-                        </div>
-                      </div>
+                    {/* Quick Presets - Horizontal Pills */}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {[
+                        { label: "4:5", w: 100, h: 80 },
+                        { label: "1:1", w: 80, h: 80 },
+                        { label: "16:9", w: 100, h: 56 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          onClick={() => handleResize(preset.w, preset.h)}
+                          disabled={isResizing}
+                          className="px-2.5 py-1 text-[9px] font-medium rounded-md bg-white/[0.03] text-white/40 hover:bg-white/[0.06] hover:text-white/60 border border-white/[0.04] transition-all disabled:opacity-40"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => handleResize(100, 100)}
+                        disabled={isResizing || (widthPercent === 100 && heightPercent === 100)}
+                        className="px-2.5 py-1 text-[9px] font-medium rounded-md bg-white/[0.03] text-white/40 hover:bg-white/[0.06] hover:text-white/60 border border-white/[0.04] transition-all disabled:opacity-40"
+                      >
+                        Reset
+                      </button>
                     </div>
 
-                    {/* Preset buttons */}
-                    <button
-                      onClick={() => handleResize(100, 80)}
-                      disabled={isResizing}
-                      className="w-full px-3 py-2 text-[11px] font-medium rounded-lg bg-white/[0.04] text-white/60 hover:bg-white/[0.08] hover:text-white/80 border border-white/[0.06] transition-all disabled:opacity-50"
-                    >
-                      Feed Instagram (4:5)
-                    </button>
-
-                    {/* Protection Mask Toggle */}
-                    <div className="pt-3 border-t border-white/[0.04]">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Icon
-                            name="shield"
-                            className="w-3.5 h-3.5 text-white/40"
-                          />
-                          <span className="text-[10px] text-white/50 font-medium">
-                            Proteger Texto
-                          </span>
-                        </div>
-                        {useProtectionMask && (
-                          <button
-                            onClick={clearProtectionMask}
-                            className="text-[9px] text-white/30 hover:text-white/50 transition-colors"
-                          >
-                            Limpar
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {/* Rectangle mode */}
-                        <button
-                          onClick={() => {
-                            setUseProtectionMask(true);
-                            setDrawMode("rectangle");
-                            setResizedPreview(null);
-                            setWidthPercent(100);
-                            setHeightPercent(100);
-                          }}
-                          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-medium transition-all ${
-                            useProtectionMask && drawMode === "rectangle"
-                              ? "bg-white/10 text-white border border-white/20"
-                              : "bg-white/[0.03] text-white/40 hover:text-white/60 border border-white/[0.06]"
-                          }`}
-                        >
-                          <Icon name="square" className="w-3 h-3" />
-                          Retângulo
-                        </button>
-
-                        {/* Brush mode */}
-                        <button
-                          onClick={() => {
-                            setUseProtectionMask(true);
-                            setDrawMode("brush");
-                            setResizedPreview(null);
-                            setWidthPercent(100);
-                            setHeightPercent(100);
-                          }}
-                          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-medium transition-all ${
-                            useProtectionMask && drawMode === "brush"
-                              ? "bg-white/10 text-white border border-white/20"
-                              : "bg-white/[0.03] text-white/40 hover:text-white/60 border border-white/[0.06]"
-                          }`}
-                        >
-                          <Icon name="edit" className="w-3 h-3" />
-                          Pincel
-                        </button>
-
-                        {/* Auto-detect button */}
-                        <button
-                          onClick={handleAutoDetectText}
-                          disabled={isDetectingText}
-                          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-medium transition-all ${
-                            isDetectingText
-                              ? "bg-white/10 text-white border border-white/20"
-                              : "bg-white/[0.03] text-white/40 hover:text-white/60 border border-white/[0.06]"
-                          }`}
-                        >
-                          {isDetectingText ? (
-                            <>
-                              <Loader className="w-3 h-3" />
-                              {detectProgress}%
-                            </>
-                          ) : (
-                            <>
-                              <Icon name="eye" className="w-3 h-3" />
-                              Auto
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Detection progress */}
-                      {isDetectingText && (
-                        <div className="mt-3">
-                          <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-white/40 transition-all duration-150"
-                              style={{ width: `${detectProgress}%` }}
-                            />
-                          </div>
-                          <span className="text-[9px] text-white/40 mt-1 block">
-                            Detectando texto com OCR...
-                          </span>
-                        </div>
-                      )}
-
-                      {useProtectionMask && !isDetectingText && (
-                        <p className="text-[9px] text-white/30 mt-2">
-                          Pinte sobre textos e logotipos para protegê-los
-                        </p>
-                      )}
-                    </div>
-
+                    {/* Progress Bar */}
                     {isResizing && (
-                      <div className="mt-3">
-                        <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                      <div className="space-y-1">
+                        <div className="h-0.5 bg-white/[0.06] rounded-full overflow-hidden">
                           <div
                             className="h-full bg-white/40 transition-all duration-150"
                             style={{ width: `${resizeProgress}%` }}
                           />
                         </div>
-                        <span className="text-[9px] text-white/30 mt-1 block">
-                          Redimensionando... {resizeProgress}%
-                        </span>
+                        <span className="text-[9px] text-white/30 tabular-nums">{resizeProgress}%</span>
                       </div>
                     )}
+
+                    {/* Save/Discard Buttons */}
                     {resizedPreview && !isResizing && (
-                      <div className="flex gap-2 mt-3">
+                      <div className="flex gap-1.5">
                         <button
                           onClick={handleDiscardResize}
-                          className="flex-1 h-9 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all flex items-center justify-center gap-1.5"
+                          className="flex-1 h-7 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-md text-[9px] font-medium text-white/40 hover:text-white/60 transition-all"
                         >
-                          <Icon name="x" className="w-3 h-3" />
-                          Descartar
+                          Cancelar
                         </button>
                         <button
                           onClick={handleSaveResize}
-                          className="flex-1 h-9 bg-white hover:bg-white/90 rounded-lg text-[10px] font-semibold text-black transition-all flex items-center justify-center gap-1.5"
+                          className="flex-1 h-7 bg-white hover:bg-white/90 rounded-md text-[9px] font-semibold text-black transition-all"
                         >
-                          <Icon name="check" className="w-3 h-3" />
-                          Salvar
+                          Aplicar
                         </button>
                       </div>
                     )}
-                    {!resizedPreview && !useProtectionMask && (
-                      <p className="text-[9px] text-white/20 mt-2">
-                        Seam Carving: redimensiona sem perder conteúdo
-                        importante
+                  </section>
+
+                  {/* Divider */}
+                  <div className="h-px bg-white/[0.04]" />
+
+                  {/* Protection Mask - Compact */}
+                  <section className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Proteger áreas</span>
+                      {useProtectionMask && hasProtectionDrawing() && (
+                        <button
+                          onClick={clearProtectionMask}
+                          className="text-[9px] text-white/25 hover:text-white/40 transition-colors"
+                        >
+                          Limpar
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Tool Buttons - Icon Only */}
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => {
+                          setUseProtectionMask(true);
+                          setDrawMode("rectangle");
+                          setResizedPreview(null);
+                          setWidthPercent(100);
+                          setHeightPercent(100);
+                        }}
+                        title="Retângulo"
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                          useProtectionMask && drawMode === "rectangle"
+                            ? "bg-white/10 text-white"
+                            : "bg-white/[0.03] text-white/30 hover:text-white/50 hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        <Icon name="square" className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setUseProtectionMask(true);
+                          setDrawMode("brush");
+                          setResizedPreview(null);
+                          setWidthPercent(100);
+                          setHeightPercent(100);
+                        }}
+                        title="Pincel"
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                          useProtectionMask && drawMode === "brush"
+                            ? "bg-white/10 text-white"
+                            : "bg-white/[0.03] text-white/30 hover:text-white/50 hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        <Icon name="edit" className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={handleAutoDetectText}
+                        disabled={isDetectingText}
+                        title="Detectar texto automaticamente"
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                          isDetectingText
+                            ? "bg-white/10 text-white"
+                            : "bg-white/[0.03] text-white/30 hover:text-white/50 hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        {isDetectingText ? (
+                          <Loader className="w-3.5 h-3.5" />
+                        ) : (
+                          <Icon name="eye" className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* OCR Progress */}
+                    {isDetectingText && (
+                      <div className="space-y-1">
+                        <div className="h-0.5 bg-white/[0.06] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-white/40 transition-all duration-150"
+                            style={{ width: `${detectProgress}%` }}
+                          />
+                        </div>
+                        <span className="text-[9px] text-white/30">Detectando texto...</span>
+                      </div>
+                    )}
+
+                    {useProtectionMask && !isDetectingText && (
+                      <p className="text-[9px] text-white/25 leading-relaxed">
+                        Marque textos e logos para preservá-los durante o redimensionamento.
                       </p>
                     )}
                   </section>
 
-                  {/* Edit Section */}
-                  <section className="p-4 bg-white/[0.02] rounded-2xl border border-white/[0.06] space-y-3">
+                  {/* Divider */}
+                  <div className="h-px bg-white/[0.04]" />
+
+                  {/* AI Edit Section - Compact */}
+                  <section className="space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon
-                          name="wand-2"
-                          className="w-3.5 h-3.5 text-white/40"
-                        />
-                        <span className="text-[10px] text-white/50 font-medium">
-                          Edição com IA
-                        </span>
-                      </div>
+                      <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Editar com IA</span>
                       {editPrompt && (
                         <button
                           onClick={() => setEditPrompt("")}
-                          className="text-[9px] text-white/30 hover:text-white/50 transition-colors"
+                          className="text-[9px] text-white/25 hover:text-white/40 transition-colors"
                         >
                           Limpar
                         </button>
@@ -1383,20 +1320,35 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                     <textarea
                       value={editPrompt}
                       onChange={(e) => setEditPrompt(e.target.value)}
-                      rows={3}
-                      className="w-full bg-black/30 border border-white/[0.08] rounded-lg p-3 text-sm text-white/80 focus:border-white/20 focus:outline-none transition-all resize-none placeholder:text-white/25"
-                      placeholder="Descreva a edição desejada..."
+                      rows={2}
+                      className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] text-white/70 focus:border-white/15 focus:outline-none transition-all resize-none placeholder:text-white/20"
+                      placeholder="Descreva a alteração..."
                     />
-                  </section>
 
-                  <section className="space-y-3">
-                    <label className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">
-                      Referência
-                    </label>
-                    <MinimalImageUploader
-                      image={referenceImage}
-                      onImageChange={setReferenceImage}
-                    />
+                    {/* Reference Image - Inline */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-white/30">Ref:</span>
+                      {referenceImage ? (
+                        <div className="relative">
+                          <img
+                            src={referenceImage.preview}
+                            alt="Ref"
+                            className="h-8 w-8 rounded object-cover border border-white/10"
+                          />
+                          <button
+                            onClick={() => setReferenceImage(null)}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-black/80 hover:bg-black rounded-full flex items-center justify-center"
+                          >
+                            <Icon name="x" className="w-2 h-2 text-white/60" />
+                          </button>
+                        </div>
+                      ) : (
+                        <MinimalImageUploader
+                          image={referenceImage}
+                          onImageChange={setReferenceImage}
+                        />
+                      )}
+                    </div>
                   </section>
                 </>
               )}
@@ -1408,22 +1360,22 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
               )}
             </div>
 
-            {/* Bottom Actions - Minimal */}
+            {/* Bottom Actions - Compact */}
             {!isVideo && (
-              <div className="p-5 border-t border-white/[0.06] space-y-2">
-                <div className="flex gap-2">
+              <div className="p-4 border-t border-white/[0.06] space-y-2">
+                <div className="flex gap-1.5">
                   <button
                     onClick={clearMask}
                     disabled={isActionRunning}
-                    className="flex-1 h-9 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
+                    title="Limpar máscara"
+                    className="w-8 h-8 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-white/30 hover:text-white/50 transition-all disabled:opacity-30 flex items-center justify-center"
                   >
-                    <Icon name="x" className="w-3 h-3" />
-                    Limpar
+                    <Icon name="eraser" className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={handleRemoveBackground}
                     disabled={isActionRunning}
-                    className="flex-1 h-9 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
+                    className="flex-1 h-8 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
                   >
                     {isRemovingBackground ? (
                       <Loader className="w-3 h-3" />
@@ -1437,17 +1389,17 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                 <button
                   onClick={handleEdit}
                   disabled={!editPrompt.trim() || isActionRunning}
-                  className="w-full h-11 bg-primary hover:bg-primary/90 disabled:bg-white/[0.03] disabled:text-white/20 rounded-xl text-xs font-bold text-black disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                  className="w-full h-9 bg-primary hover:bg-primary/90 disabled:bg-white/[0.03] disabled:text-white/20 rounded-lg text-[11px] font-bold text-black disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
                 >
                   {isEditing ? (
                     <>
-                      <Loader className="w-4 h-4" />
+                      <Loader className="w-3.5 h-3.5" />
                       Processando...
                     </>
                   ) : (
                     <>
-                      <Icon name="zap" className="w-4 h-4" />
-                      Editar com IA
+                      <Icon name="wand-2" className="w-3.5 h-3.5" />
+                      Aplicar edição
                     </>
                   )}
                 </button>
@@ -1455,16 +1407,16 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             )}
 
             {/* Mobile Quick Actions */}
-            <div className="lg:hidden flex gap-2 p-5 pt-0">
+            <div className="lg:hidden flex gap-1.5 p-4 pt-0">
               {onQuickPost && (
                 <button
                   onClick={() => {
                     onQuickPost(image);
                     onClose();
                   }}
-                  className="flex-1 h-9 bg-primary/10 hover:bg-primary/20 rounded-lg text-[9px] font-semibold text-primary transition-all flex items-center justify-center gap-1"
+                  className="flex-1 h-7 bg-primary/10 hover:bg-primary/20 rounded-md text-[9px] font-semibold text-primary transition-all flex items-center justify-center gap-1"
                 >
-                  <Icon name="zap" className="w-3 h-3" />
+                  <Icon name="zap" className="w-2.5 h-2.5" />
                   Post
                 </button>
               )}
@@ -1474,9 +1426,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                     onSchedulePost(image);
                     onClose();
                   }}
-                  className="flex-1 h-9 bg-white/[0.03] hover:bg-white/[0.06] rounded-lg text-[9px] font-medium text-white/50 transition-all flex items-center justify-center gap-1"
+                  className="flex-1 h-7 bg-white/[0.03] hover:bg-white/[0.06] rounded-md text-[9px] font-medium text-white/40 transition-all flex items-center justify-center gap-1"
                 >
-                  <Icon name="calendar" className="w-3 h-3" />
+                  <Icon name="calendar" className="w-2.5 h-2.5" />
                   Agendar
                 </button>
               )}

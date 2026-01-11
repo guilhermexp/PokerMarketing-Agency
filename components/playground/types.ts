@@ -58,6 +58,10 @@ export interface GenerateMediaParams {
   startFrame?: PlaygroundImageFile;
   endFrame?: PlaygroundImageFile;
   isLooping?: boolean;
+  // Image generation options
+  imageSize?: PlaygroundImageSize;
+  productImages?: ImageFile[];
+  styleReference?: ImageFile;
 }
 
 // Alias for backward compatibility
@@ -78,4 +82,15 @@ export enum PlaygroundAspectRatio {
 export enum PlaygroundResolution {
   P720 = "720p",
   P1080 = "1080p",
+}
+
+export enum PlaygroundImageSize {
+  K1 = "1K",
+  K2 = "2K",
+  K4 = "4K",
+}
+
+export interface ImageFile {
+  base64: string;
+  mimeType: string;
 }

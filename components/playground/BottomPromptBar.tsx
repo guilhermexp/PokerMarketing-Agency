@@ -5,7 +5,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useRef, useState, useEffect } from 'react';
-import { ArrowUp, Plus, User, Video, ImageIcon, Palette } from 'lucide-react';
+import { ArrowUp, Plus, User, Video, ImageIcon, Palette, Upload, X, Sparkles, Image as ImageLucide } from 'lucide-react';
 import {
   CameoProfile,
   GenerateVideoParams,
@@ -15,6 +15,8 @@ import {
   PlaygroundAspectRatio,
   PlaygroundResolution,
   PlaygroundVeoModel,
+  PlaygroundImageSize,
+  ImageFile,
 } from './types';
 
 const defaultCameoProfiles: CameoProfile[] = [
@@ -92,8 +94,15 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
   const uploadedImageUrlsRef = useRef<string[]>([]);
   const [promptIndex, setPromptIndex] = useState(0);
 
+  // Image generation options
+  const [imageSize, setImageSize] = useState<PlaygroundImageSize>(PlaygroundImageSize.K1);
+  const [productImages, setProductImages] = useState<(ImageFile & { preview: string })[]>([]);
+  const [styleReference, setStyleReference] = useState<(ImageFile & { preview: string }) | null>(null);
+
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const productImagesInputRef = useRef<HTMLInputElement>(null);
+  const styleReferenceInputRef = useRef<HTMLInputElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -192,6 +201,63 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
     return imgFile;
   };
 
+  const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const remainingSlots = 5 - productImages.length;
+    const filesToProcess = Array.from(files as FileList).slice(0, remainingSlots) as File[];
+
+    for (const file of filesToProcess) {
+      if (!file.type.startsWith('image/')) continue;
+
+      try {
+        const imgFile = await fileToImageFile(file);
+        const preview = URL.createObjectURL(file);
+        uploadedImageUrlsRef.current.push(preview);
+
+        setProductImages(prev => [...prev, {
+          base64: imgFile.base64,
+          mimeType: file.type,
+          preview,
+        }]);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de produto", error);
+      }
+    }
+
+    if (productImagesInputRef.current) productImagesInputRef.current.value = '';
+  };
+
+  const handleStyleReferenceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+
+    try {
+      const imgFile = await fileToImageFile(file);
+      const preview = URL.createObjectURL(file);
+      uploadedImageUrlsRef.current.push(preview);
+
+      setStyleReference({
+        base64: imgFile.base64,
+        mimeType: file.type,
+        preview,
+      });
+    } catch (error) {
+      console.error("Erro ao carregar referencia de estilo", error);
+    }
+
+    if (styleReferenceInputRef.current) styleReferenceInputRef.current.value = '';
+  };
+
+  const removeProductImage = (index: number) => {
+    setProductImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeStyleReference = () => {
+    setStyleReference(null);
+  };
+
   const handleSubmit = async () => {
     if (!prompt.trim()) return;
 
@@ -226,6 +292,14 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
       resolution: PlaygroundResolution.P720,
       mode: mode,
       referenceImages: referenceImages,
+      // Image generation options (only used when mediaType === IMAGE)
+      imageSize: mediaType === MediaType.IMAGE ? imageSize : undefined,
+      productImages: mediaType === MediaType.IMAGE && productImages.length > 0
+        ? productImages.map(({ base64, mimeType }) => ({ base64, mimeType }))
+        : undefined,
+      styleReference: mediaType === MediaType.IMAGE && styleReference
+        ? { base64: styleReference.base64, mimeType: styleReference.mimeType }
+        : undefined,
     };
 
     onGenerate(params);
@@ -309,6 +383,109 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
           )}
         </AnimatePresence>
 
+        {/* Image Options Panel - only shows when Image is selected */}
+        <AnimatePresence>
+          {isExpanded && mediaType === MediaType.IMAGE && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+              className="px-3 pt-3"
+            >
+              <div className="bg-black/40 rounded-2xl p-3 border border-white/5 shadow-inner">
+                <div className="flex items-center gap-2 mb-2 px-1 text-white/70">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">Opcoes de Imagem</p>
+                </div>
+
+                <div className="flex flex-wrap gap-4 px-1">
+                  {/* Quality Selector */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-white/40 uppercase tracking-wide">Qualidade</span>
+                    <select
+                      value={imageSize}
+                      onChange={(e) => setImageSize(e.target.value as PlaygroundImageSize)}
+                      className="bg-black/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/80 appearance-none cursor-pointer hover:border-white/20 focus:outline-none focus:border-white/30"
+                    >
+                      <option value={PlaygroundImageSize.K1}>1K</option>
+                      <option value={PlaygroundImageSize.K2}>2K</option>
+                      <option value={PlaygroundImageSize.K4}>4K</option>
+                    </select>
+                  </div>
+
+                  {/* Style Reference */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-white/40 uppercase tracking-wide">Estilo</span>
+                    {styleReference ? (
+                      <div className="relative group">
+                        <img
+                          src={styleReference.preview}
+                          alt="Estilo"
+                          className="w-8 h-8 object-cover rounded-lg border border-white/10"
+                        />
+                        <button
+                          onClick={removeStyleReference}
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-2.5 h-2.5 text-white" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="bg-black/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 flex items-center gap-1.5 cursor-pointer hover:border-white/20 transition-colors">
+                        <Upload className="w-3 h-3" />
+                        <span>Add</span>
+                        <input
+                          type="file"
+                          ref={styleReferenceInputRef}
+                          onChange={handleStyleReferenceUpload}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* Product Images / Assets */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-white/40 uppercase tracking-wide">Ativos ({productImages.length}/5)</span>
+                    <div className="flex items-center gap-1.5">
+                      {productImages.map((img, index) => (
+                        <div key={index} className="relative group">
+                          <img
+                            src={img.preview}
+                            alt={`Ativo ${index + 1}`}
+                            className="w-8 h-8 object-cover rounded-lg border border-white/10"
+                          />
+                          <button
+                            onClick={() => removeProductImage(index)}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-2.5 h-2.5 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                      {productImages.length < 5 && (
+                        <label className="w-8 h-8 bg-black/60 border border-white/10 rounded-lg flex items-center justify-center cursor-pointer hover:border-white/20 transition-colors">
+                          <Plus className="w-4 h-4 text-white/40" />
+                          <input
+                            type="file"
+                            ref={productImagesInputRef}
+                            onChange={handleProductImageUpload}
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className={`flex items-end gap-3 px-3 pb-3 relative transition-all ${isExpanded ? 'pt-3' : 'pt-3'}`}>
           <button
             onClick={() => {
@@ -348,18 +525,17 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
             </button>
           </div>
 
-          {/* Brand Profile Toggle */}
+          {/* Brand Profile Toggle - smaller */}
           <button
             onClick={() => setUseBrandProfile(!useBrandProfile)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all duration-200 shrink-0 ${
+            className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 shrink-0 ${
               useBrandProfile
                 ? 'bg-white text-black shadow-md'
                 : 'bg-black/40 text-white/60 border border-white/10 hover:text-white'
             }`}
             title={useBrandProfile ? "Usando cores e tom da marca" : "Sem personalização de marca"}
           >
-            <Palette className="w-3.5 h-3.5" />
-            Marca
+            <Palette className="w-4 h-4" />
           </button>
 
           <div className="flex-grow relative py-2 flex items-center">

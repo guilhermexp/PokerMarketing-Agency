@@ -9,7 +9,6 @@ import { Clapperboard } from 'lucide-react';
 import { ApiKeyDialog } from './ApiKeyDialog';
 import { BottomPromptBar } from './BottomPromptBar';
 import { VideoCard } from './VideoCard';
-import { VeoLogo } from './VeoLogo';
 import {
   FeedPost,
   GenerateVideoParams,
@@ -119,11 +118,43 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile }) 
 
       if (isImageGeneration) {
         // Generate image using Gemini Image Pro
-        // Use brand profile only if toggle is enabled
+        // Build productImages array with logo if brand profile is enabled + user-added assets
+        const allProductImages: { base64: string; mimeType: string }[] = [];
+
+        // Add brand logo if enabled
+        if (params.useBrandProfile && brandProfile.logo) {
+          const [header, base64Data] = brandProfile.logo.split(',');
+          const mimeType = header?.match(/:(.*?);/)?.[1] || 'image/png';
+          if (base64Data) {
+            allProductImages.push({ base64: base64Data, mimeType });
+          }
+        }
+
+        // Add user-uploaded product images/assets
+        if (params.productImages && params.productImages.length > 0) {
+          allProductImages.push(...params.productImages);
+        }
+
+        // Use full brandProfile when toggle is ON, minimal when OFF
         const profileToUse = params.useBrandProfile ? brandProfile : {
           name: brandProfile.name,
-          // Minimal profile without brand styling
+          description: '',
+          logo: null,
+          primaryColor: '',
+          secondaryColor: '',
+          tertiaryColor: '',
+          toneOfVoice: brandProfile.toneOfVoice,
         } as typeof brandProfile;
+
+        // Build person reference from cameo selection (same as video uses referenceImages)
+        let personReferenceImage: { base64: string; mimeType: string } | undefined;
+        if (params.referenceImages && params.referenceImages.length > 0) {
+          const refImage = params.referenceImages[0];
+          personReferenceImage = {
+            base64: refImage.base64,
+            mimeType: 'image/png',
+          };
+        }
 
         const imageDataUrl = await generateImage(
           params.prompt,
@@ -131,6 +162,10 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile }) 
           {
             aspectRatio: params.aspectRatio,
             model: 'gemini-3-pro-image-preview',
+            imageSize: params.imageSize as '1K' | '2K' | '4K' | undefined,
+            productImages: allProductImages.length > 0 ? allProductImages : undefined,
+            styleReferenceImage: params.styleReference,
+            personReferenceImage,
           }
         );
 

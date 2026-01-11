@@ -126,6 +126,7 @@ export const generateImage = async (
     imageSize?: ImageSize;
     productImages?: ImageFile[];
     styleReferenceImage?: ImageFile;
+    personReferenceImage?: ImageFile;
   },
 ): Promise<string> => {
   const response = await apiCall("/api/ai/image", {
@@ -136,6 +137,7 @@ export const generateImage = async (
     imageSize: options.imageSize,
     productImages: options.productImages,
     styleReferenceImage: options.styleReferenceImage,
+    personReferenceImage: options.personReferenceImage,
   });
 
   return response.imageUrl;

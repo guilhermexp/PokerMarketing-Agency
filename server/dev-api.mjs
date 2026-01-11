@@ -2901,9 +2901,20 @@ const generateGeminiImage = async (
   imageSize = "1K",
   productImages,
   styleReferenceImage,
+  personReferenceImage,
 ) => {
   const ai = getGeminiAi();
   const parts = [{ text: prompt }];
+
+  // Add person/face reference image first (highest priority for face consistency)
+  if (personReferenceImage) {
+    parts.push({
+      inlineData: {
+        data: personReferenceImage.base64,
+        mimeType: personReferenceImage.mimeType,
+      },
+    });
+  }
 
   if (styleReferenceImage) {
     parts.push({
@@ -3053,10 +3064,21 @@ const getToneText = (brandProfile, target) => {
   return shouldUseTone(brandProfile, target) ? brandProfile.toneOfVoice : "";
 };
 
-const buildImagePrompt = (prompt, brandProfile, hasStyleReference = false, hasLogo = false) => {
+const buildImagePrompt = (prompt, brandProfile, hasStyleReference = false, hasLogo = false, hasPersonReference = false) => {
   const toneText = getToneText(brandProfile, "images");
   let fullPrompt = `PROMPT TÉCNICO: ${prompt}
 ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
+
+  if (hasPersonReference) {
+    fullPrompt += `
+
+**PESSOA/ROSTO DE REFERÊNCIA (PRIORIDADE MÁXIMA):**
+- A primeira imagem anexada é uma FOTO DE REFERÊNCIA de uma pessoa
+- OBRIGATÓRIO: Use EXATAMENTE o rosto e aparência física desta pessoa na imagem gerada
+- Mantenha fielmente: formato do rosto, cor de pele, cabelo, olhos e características faciais
+- A pessoa deve ser o protagonista da cena, realizando a ação descrita no prompt
+- NÃO altere a identidade da pessoa - preserve sua aparência real`;
+  }
 
   if (hasLogo) {
     fullPrompt += `
@@ -3680,6 +3702,7 @@ app.post("/api/ai/image", async (req, res) => {
       imageSize = "1K",
       productImages,
       styleReferenceImage,
+      personReferenceImage,
     } = req.body;
     const model = DEFAULT_IMAGE_MODEL;
 
@@ -3690,7 +3713,7 @@ app.post("/api/ai/image", async (req, res) => {
     }
 
     console.log(
-      `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}`,
+      `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}${personReferenceImage ? ', with person reference' : ''}`,
     );
 
     // Prepare product images array, including brand logo if available
@@ -3715,11 +3738,13 @@ app.post("/api/ai/image", async (req, res) => {
     }
 
     const hasLogo = !!brandProfile.logo && allProductImages.length > 0;
+    const hasPersonReference = !!personReferenceImage;
     const fullPrompt = buildImagePrompt(
       prompt,
       brandProfile,
       !!styleReferenceImage,
       hasLogo,
+      hasPersonReference,
     );
     const imageDataUrl = await generateGeminiImage(
       fullPrompt,
@@ -3728,6 +3753,7 @@ app.post("/api/ai/image", async (req, res) => {
       imageSize,
       allProductImages.length > 0 ? allProductImages : undefined,
       styleReferenceImage,
+      personReferenceImage,
     );
 
     console.log("[Image API] Image generated successfully");
