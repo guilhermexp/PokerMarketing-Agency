@@ -4899,27 +4899,50 @@ app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
   const sql = getSql();
 
   try {
-    const { image, prompt, mask, referenceImage } = req.body;
+    const { image, prompt, mask, maskRegion, referenceImage } = req.body;
 
     if (!image || !prompt) {
       return res.status(400).json({ error: "image and prompt are required" });
     }
 
-    console.log("[Edit Image API] Editing image...");
+    console.log("[Edit Image API] Editing image...", { hasMask: !!mask, hasMaskRegion: !!maskRegion });
 
     const ai = getGeminiAi();
-    const instructionPrompt = `DESIGNER SÊNIOR: Execute alteração profissional: ${prompt}. Texto original e logos são SAGRADOS, preserve informações importantes visíveis.`;
+
+    // Build location-aware prompt if mask region is provided
+    let locationHint = "";
+    if (maskRegion) {
+      const { x, y, width, height, imageWidth, imageHeight } = maskRegion;
+      // Calculate position as percentage and quadrant
+      const centerX = x + width / 2;
+      const centerY = y + height / 2;
+      const percX = Math.round((centerX / imageWidth) * 100);
+      const percY = Math.round((centerY / imageHeight) * 100);
+
+      // Determine quadrant/position description
+      let positionDesc = "";
+      if (percY < 33) {
+        positionDesc = percX < 33 ? "canto superior esquerdo" : percX > 66 ? "canto superior direito" : "parte superior central";
+      } else if (percY > 66) {
+        positionDesc = percX < 33 ? "canto inferior esquerdo" : percX > 66 ? "canto inferior direito" : "parte inferior central";
+      } else {
+        positionDesc = percX < 33 ? "lado esquerdo" : percX > 66 ? "lado direito" : "centro";
+      }
+
+      locationHint = ` ATENÇÃO: Edite SOMENTE a área marcada no ${positionDesc} da imagem (aproximadamente ${Math.round(width/imageWidth*100)}% de largura x ${Math.round(height/imageHeight*100)}% de altura). NÃO modifique outras partes da imagem.`;
+      console.log("[Edit Image API] Location hint:", locationHint);
+    }
+
+    const instructionPrompt = `DESIGNER SÊNIOR: Execute alteração profissional: ${prompt}.${locationHint} Texto original e logos são SAGRADOS, preserve informações importantes visíveis.`;
 
     const parts = [
       { text: instructionPrompt },
       { inlineData: { data: image.base64, mimeType: image.mimeType } },
     ];
 
-    if (mask) {
-      parts.push({
-        inlineData: { data: mask.base64, mimeType: mask.mimeType },
-      });
-    }
+    // Note: Gemini doesn't support traditional mask images, so we only use the text description
+    // The mask parameter is kept for potential future use or other providers
+
     if (referenceImage) {
       parts.push({
         inlineData: {

@@ -586,18 +586,64 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       const maskCanvas = maskCanvasRef.current;
       let maskData: { base64: string; mimeType: string } | undefined =
         undefined;
+      let maskRegion:
+        | {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            imageWidth: number;
+            imageHeight: number;
+          }
+        | undefined = undefined;
 
       if (maskCanvas) {
         const ctx = maskCanvas.getContext("2d");
-        const data = ctx?.getImageData(
+        const imageData = ctx?.getImageData(
           0,
           0,
           maskCanvas.width,
           maskCanvas.height,
-        ).data;
+        );
+        const data = imageData?.data;
         const hasDrawing = data?.some((channel) => channel !== 0);
 
-        if (hasDrawing) {
+        if (hasDrawing && imageData) {
+          // Calculate bounding box of the drawn mask
+          let minX = maskCanvas.width,
+            minY = maskCanvas.height,
+            maxX = 0,
+            maxY = 0;
+          for (let y = 0; y < maskCanvas.height; y++) {
+            for (let x = 0; x < maskCanvas.width; x++) {
+              const idx = (y * maskCanvas.width + x) * 4;
+              // Check if pixel has any non-zero value (drawn)
+              if (
+                data[idx] !== 0 ||
+                data[idx + 1] !== 0 ||
+                data[idx + 2] !== 0 ||
+                data[idx + 3] !== 0
+              ) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+              }
+            }
+          }
+
+          if (maxX >= minX && maxY >= minY) {
+            maskRegion = {
+              x: minX,
+              y: minY,
+              width: maxX - minX,
+              height: maxY - minY,
+              imageWidth: maskCanvas.width,
+              imageHeight: maskCanvas.height,
+            };
+            console.log("[ImagePreviewModal] Mask region calculated:", maskRegion);
+          }
+
           const maskDataUrl = maskCanvas.toDataURL("image/png");
           const [, maskBase64] = maskDataUrl.split(",");
           maskData = { base64: maskBase64, mimeType: "image/png" };
@@ -610,6 +656,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 
       console.log("[ImagePreviewModal] Calling editImage API...", {
         hasMask: !!maskData,
+        hasMaskRegion: !!maskRegion,
         hasRef: !!refImageData,
       });
       const editedImageDataUrl = await editImage(
@@ -618,6 +665,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         editPrompt,
         maskData,
         refImageData,
+        maskRegion,
       );
       console.log(
         "[ImagePreviewModal] editImage returned:",
