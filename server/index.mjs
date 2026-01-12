@@ -55,40 +55,33 @@ const app = express();
 // Railway provides PORT environment variable
 const PORT = process.env.PORT || 8080;
 
-// CORS configuration - SECURITY: Restrict to specific origins in production
-const allowedOrigins = (process.env.CORS_ORIGIN || "")
+// CORS configuration - Allow same-origin and configured origins
+const configuredOrigins = (process.env.CORS_ORIGIN || "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// Default allowed domains (Railway, Vercel, localhost)
+const defaultAllowedPatterns = [
+  ".up.railway.app",
+  ".vercel.app",
+  "localhost",
+  "127.0.0.1",
+];
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, etc.)
+      // Allow requests with no origin (same-origin, mobile apps, curl, etc.)
       if (!origin) return callback(null, true);
 
-      // In development, allow localhost
-      if (
-        process.env.NODE_ENV !== "production" &&
-        (origin.includes("localhost") || origin.includes("127.0.0.1"))
-      ) {
+      // Check configured origins first
+      if (configuredOrigins.includes(origin)) {
         return callback(null, true);
       }
 
-      // Check against allowed origins
-      if (allowedOrigins.length === 0) {
-        // If no origins configured, only allow same-origin in production
-        console.warn(
-          "[CORS] No CORS_ORIGIN configured - blocking cross-origin request from:",
-          origin,
-        );
-        return callback(new Error("CORS not allowed"), false);
-      }
-
-      if (
-        allowedOrigins.includes(origin) ||
-        allowedOrigins.some((allowed) => origin.endsWith(allowed))
-      ) {
+      // Check against default allowed patterns (Railway, Vercel, localhost)
+      if (defaultAllowedPatterns.some((pattern) => origin.includes(pattern))) {
         return callback(null, true);
       }
 
@@ -3887,6 +3880,12 @@ app.get("/api/generate/status", async (req, res) => {
     }
 
     if (userId) {
+      // Resolve Clerk ID to database UUID if needed
+      const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        return res.json({ jobs: [], total: 0 });
+      }
+
       let jobs;
       const limitNum = parseInt(limit) || 50;
 
@@ -3897,7 +3896,7 @@ app.get("/api/generate/status", async (req, res) => {
             result_url, result_gallery_id, error_message,
             created_at, started_at, completed_at, context
           FROM generation_jobs
-          WHERE user_id = ${userId} AND status = ${filterStatus}
+          WHERE user_id = ${resolvedUserId} AND status = ${filterStatus}
           ORDER BY created_at DESC
           LIMIT ${limitNum}
         `;
@@ -3908,7 +3907,7 @@ app.get("/api/generate/status", async (req, res) => {
             result_url, result_gallery_id, error_message,
             created_at, started_at, completed_at, context
           FROM generation_jobs
-          WHERE user_id = ${userId}
+          WHERE user_id = ${resolvedUserId}
           ORDER BY created_at DESC
           LIMIT ${limitNum}
         `;
@@ -5756,11 +5755,20 @@ async function runAutoMigrations() {
       console.log("[Migration] Note: video enum might already exist");
     }
 
+    // Add 'image' to generation_job_type enum if not exists
+    try {
+      await sql`ALTER TYPE generation_job_type ADD VALUE IF NOT EXISTS 'image'`;
+      console.log("[Migration] ✓ Ensured 'image' job type exists");
+    } catch (enumError) {
+      // Might already exist or different PG version
+      console.log("[Migration] Note: image enum might already exist");
+    }
+
     // Create instagram_accounts table if not exists
     await sql`
       CREATE TABLE IF NOT EXISTS instagram_accounts (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
         organization_id VARCHAR(50),
         instagram_user_id VARCHAR(255) NOT NULL,
         instagram_username VARCHAR(255),
@@ -5769,11 +5777,36 @@ async function runAutoMigrations() {
         connected_at TIMESTAMPTZ DEFAULT NOW(),
         last_used_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW(),
-        UNIQUE(user_id, instagram_user_id)
+        updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `;
     console.log("[Migration] ✓ Ensured instagram_accounts table exists");
+
+    // Migration 009: Add connected_by_user_id for org sharing (tracks who connected)
+    try {
+      await sql`
+        ALTER TABLE instagram_accounts
+        ADD COLUMN IF NOT EXISTS connected_by_user_id UUID REFERENCES users(id)
+      `;
+      console.log("[Migration] ✓ Added connected_by_user_id column");
+
+      // Copy existing user_id to connected_by_user_id for existing records
+      await sql`
+        UPDATE instagram_accounts
+        SET connected_by_user_id = user_id
+        WHERE connected_by_user_id IS NULL AND user_id IS NOT NULL
+      `;
+      console.log("[Migration] ✓ Copied user_id to connected_by_user_id");
+
+      // Make user_id nullable (for org accounts)
+      await sql`
+        ALTER TABLE instagram_accounts
+        ALTER COLUMN user_id DROP NOT NULL
+      `;
+      console.log("[Migration] ✓ Made user_id nullable for org accounts");
+    } catch (migError) {
+      console.log("[Migration] Note: instagram_accounts org sharing migration:", migError.message);
+    }
 
     // Add instagram_account_id column to scheduled_posts if not exists
     await sql`
