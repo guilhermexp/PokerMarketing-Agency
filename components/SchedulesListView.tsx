@@ -2,7 +2,9 @@ import React from "react";
 import { Icon } from "./common/Icon";
 import { Button } from "./common/Button";
 import { Loader } from "./common/Loader";
+import { ManualEventModal } from "./common/ManualEventModal";
 import type { WeekScheduleWithCount } from "../services/apiClient";
+import type { TournamentEvent } from "../types";
 
 interface SchedulesListViewProps {
   schedules: WeekScheduleWithCount[];
@@ -11,6 +13,7 @@ interface SchedulesListViewProps {
   currentScheduleId?: string | null;
   onEnterAfterUpload?: () => void;
   onDeleteSchedule?: (scheduleId: string) => void;
+  onAddEvent?: (event: TournamentEvent) => void;
 }
 
 export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
@@ -20,8 +23,10 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
   currentScheduleId,
   onEnterAfterUpload,
   onDeleteSchedule,
+  onAddEvent,
 }) => {
   const [isUploading, setIsUploading] = React.useState(false);
+  const [isManualModalOpen, setIsManualModalOpen] = React.useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -80,21 +85,33 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
               0 semanas salvas
             </p>
           </div>
-          <label
-            className={`cursor-pointer ${isUploading ? "pointer-events-none opacity-70" : ""}`}
-          >
-            <span className="flex items-center gap-1.5 px-3 py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all">
-              <Icon name="upload" className="w-3 h-3" />
-              {isUploading ? "Carregando..." : "Nova Planilha"}
-            </span>
-            <input
-              type="file"
-              className="hidden"
-              accept=".xlsx,.xls"
-              onChange={handleFileChange}
-              disabled={isUploading}
-            />
-          </label>
+          <div className="flex items-center gap-2">
+            {onAddEvent && (
+              <Button
+                variant="primary"
+                size="small"
+                icon="edit"
+                onClick={() => setIsManualModalOpen(true)}
+              >
+                Torneio Manual
+              </Button>
+            )}
+            <label
+              className={`cursor-pointer ${isUploading ? "pointer-events-none opacity-70" : ""}`}
+            >
+              <span className="flex items-center gap-1.5 px-3 py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all">
+                <Icon name="upload" className="w-3 h-3" />
+                {isUploading ? "Carregando..." : "Nova Planilha"}
+              </span>
+              <input
+                type="file"
+                className="hidden"
+                accept=".xlsx,.xls"
+                onChange={handleFileChange}
+                disabled={isUploading}
+              />
+            </label>
+          </div>
         </div>
 
         {/* Empty State */}
@@ -106,11 +123,26 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
               <div className="w-6 h-6 rounded border border-white/20" />
               <div className="w-6 h-6 rounded border border-white/20" />
             </div>
-            <p className="text-white/40 text-sm">
+            <p className="text-white/40 text-sm mb-4">
               Nenhuma planilha ainda
+            </p>
+            <p className="text-white/30 text-xs">
+              Carregue uma planilha ou adicione torneios manualmente
             </p>
           </div>
         </div>
+
+        {/* Manual Event Modal */}
+        {onAddEvent && (
+          <ManualEventModal
+            isOpen={isManualModalOpen}
+            onClose={() => setIsManualModalOpen(false)}
+            onSave={(event) => {
+              onAddEvent(event);
+              setIsManualModalOpen(false);
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -128,26 +160,38 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
             {schedules.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <label
-          className={`cursor-pointer ${isUploading ? "pointer-events-none opacity-70" : ""}`}
-        >
-          <Button
-            as="span"
-            variant="secondary"
-            size="small"
-            icon="upload"
-            isLoading={isUploading}
+        <div className="flex items-center gap-2">
+          {onAddEvent && (
+            <Button
+              variant="primary"
+              size="small"
+              icon="edit"
+              onClick={() => setIsManualModalOpen(true)}
+            >
+              Torneio Manual
+            </Button>
+          )}
+          <label
+            className={`cursor-pointer ${isUploading ? "pointer-events-none opacity-70" : ""}`}
           >
-            {isUploading ? "Carregando..." : "Nova Planilha"}
-          </Button>
-          <input
-            type="file"
-            className="hidden"
-            accept=".xlsx,.xls"
-            onChange={handleFileChange}
-            disabled={isUploading}
-          />
-        </label>
+            <Button
+              as="span"
+              variant="secondary"
+              size="small"
+              icon="upload"
+              isLoading={isUploading}
+            >
+              {isUploading ? "Carregando..." : "Nova Planilha"}
+            </Button>
+            <input
+              type="file"
+              className="hidden"
+              accept=".xlsx,.xls"
+              onChange={handleFileChange}
+              disabled={isUploading}
+            />
+          </label>
+        </div>
       </div>
 
       {/* Schedules List - Simple rows */}
@@ -225,6 +269,18 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
           );
         })}
       </div>
+
+      {/* Manual Event Modal */}
+      {onAddEvent && (
+        <ManualEventModal
+          isOpen={isManualModalOpen}
+          onClose={() => setIsManualModalOpen(false)}
+          onSave={(event) => {
+            onAddEvent(event);
+            setIsManualModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 };

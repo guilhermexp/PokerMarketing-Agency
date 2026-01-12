@@ -4929,14 +4929,24 @@ app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
       });
     }
 
-    const response = await ai.models.generateContent({
-      model: DEFAULT_IMAGE_MODEL,
-      contents: { parts },
-      config: { imageConfig: { imageSize: "1K" } },
-    });
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: DEFAULT_IMAGE_MODEL,
+        contents: { parts },
+        config: { imageConfig: { imageSize: "1K" } },
+      })
+    );
+
+    // Check for blocked content
+    if (response.candidates?.[0]?.finishReason === "SAFETY") {
+      const safetyRatings = response.candidates?.[0]?.safetyRatings || [];
+      console.log("[Edit Image API] Blocked by safety filters:", safetyRatings);
+      throw new Error("A edição foi bloqueada pelos filtros de segurança. Tente reformular o pedido.");
+    }
 
     let imageDataUrl = null;
-    for (const part of response.candidates[0].content.parts) {
+    const parts_response = response.candidates?.[0]?.content?.parts || [];
+    for (const part of parts_response) {
       if (part.inlineData) {
         imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
         break;
@@ -4944,7 +4954,8 @@ app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
     }
 
     if (!imageDataUrl) {
-      throw new Error("Failed to edit image");
+      console.log("[Edit Image API] No image in response:", JSON.stringify(response.candidates?.[0], null, 2));
+      throw new Error("O modelo não retornou uma imagem. Tente novamente com uma instrução diferente.");
     }
 
     console.log("[Edit Image API] Image edited successfully");

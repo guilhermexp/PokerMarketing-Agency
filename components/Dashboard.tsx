@@ -465,6 +465,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             currentScheduleId={currentScheduleId}
             onEnterAfterUpload={() => setIsInsideSchedule(true)}
             onDeleteSchedule={onDeleteSchedule}
+            onAddEvent={(event) => {
+              onAddTournamentEvent(event);
+              setIsInsideSchedule(true);
+            }}
           />
         )}
         {activeView === "flyer" && isInsideSchedule && (

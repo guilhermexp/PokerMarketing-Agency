@@ -1,6 +1,7 @@
 -- ============================================================================
 -- RLS Policies for Neon + Clerk (Production Setup)
 -- Run this AFTER the main schema is created
+-- Last updated: 2025-01-12 - Added new tables from migrations 004-010
 -- ============================================================================
 --
 -- SECURITY MODEL:
@@ -19,6 +20,19 @@
 --    - neondb_owner: Full access (API backend)
 --    - app_readonly: Read-only for analytics/reporting
 --    - No public access
+--
+-- TABLES PROTECTED (22 total):
+-- ============================
+-- Core:           users, brand_profiles, campaigns
+-- Content:        video_clip_scripts, posts, ad_creatives, carousel_scripts
+-- Media:          gallery_images
+-- Scheduling:     scheduled_posts, tournament_events, week_schedules
+-- Chat:           chat_sessions, chat_messages
+-- Jobs:           generation_jobs
+-- Analytics:      analytics_daily, analytics_platform
+-- Audit:          audit_logs
+-- Instagram:      instagram_accounts
+-- Admin Tracking: model_pricing, api_usage_logs, aggregated_usage, activity_logs
 --
 -- ============================================================================
 
@@ -68,6 +82,18 @@ ALTER TABLE analytics_platform ENABLE ROW LEVEL SECURITY;
 
 -- Audit logs
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- Instagram accounts (from migration 004)
+ALTER TABLE instagram_accounts ENABLE ROW LEVEL SECURITY;
+
+-- Carousel scripts (from migration 008)
+ALTER TABLE carousel_scripts ENABLE ROW LEVEL SECURITY;
+
+-- Admin tracking tables (from migration 005)
+ALTER TABLE model_pricing ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_usage_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE aggregated_usage ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================================
 -- DROP EXISTING POLICIES (clean slate)
@@ -139,11 +165,30 @@ CREATE POLICY "deny_all" ON analytics_platform FOR ALL TO PUBLIC USING (false);
 -- Audit logs
 CREATE POLICY "deny_all" ON audit_logs FOR ALL TO PUBLIC USING (false);
 
+-- Instagram accounts (sensitive - contains tokens)
+CREATE POLICY "deny_all" ON instagram_accounts FOR ALL TO PUBLIC USING (false);
+
+-- Carousel scripts
+CREATE POLICY "deny_all" ON carousel_scripts FOR ALL TO PUBLIC USING (false);
+
+-- Model pricing (admin config)
+CREATE POLICY "deny_all" ON model_pricing FOR ALL TO PUBLIC USING (false);
+
+-- API usage logs
+CREATE POLICY "deny_all" ON api_usage_logs FOR ALL TO PUBLIC USING (false);
+
+-- Aggregated usage
+CREATE POLICY "deny_all" ON aggregated_usage FOR ALL TO PUBLIC USING (false);
+
+-- Activity logs
+CREATE POLICY "deny_all" ON activity_logs FOR ALL TO PUBLIC USING (false);
+
 -- ============================================================================
 -- FORCE RLS FOR TABLE OWNERS
 -- This ensures even the table owner follows RLS when not using BYPASSRLS role
 -- ============================================================================
 
+-- Core tables
 ALTER TABLE users FORCE ROW LEVEL SECURITY;
 ALTER TABLE brand_profiles FORCE ROW LEVEL SECURITY;
 ALTER TABLE campaigns FORCE ROW LEVEL SECURITY;
@@ -154,12 +199,32 @@ ALTER TABLE gallery_images FORCE ROW LEVEL SECURITY;
 ALTER TABLE scheduled_posts FORCE ROW LEVEL SECURITY;
 ALTER TABLE tournament_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE week_schedules FORCE ROW LEVEL SECURITY;
+
+-- Chat tables
 ALTER TABLE chat_sessions FORCE ROW LEVEL SECURITY;
 ALTER TABLE chat_messages FORCE ROW LEVEL SECURITY;
+
+-- Background jobs
 ALTER TABLE generation_jobs FORCE ROW LEVEL SECURITY;
+
+-- Analytics
 ALTER TABLE analytics_daily FORCE ROW LEVEL SECURITY;
 ALTER TABLE analytics_platform FORCE ROW LEVEL SECURITY;
+
+-- Audit logs
 ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
+
+-- Instagram accounts
+ALTER TABLE instagram_accounts FORCE ROW LEVEL SECURITY;
+
+-- Carousel scripts
+ALTER TABLE carousel_scripts FORCE ROW LEVEL SECURITY;
+
+-- Admin tracking tables
+ALTER TABLE model_pricing FORCE ROW LEVEL SECURITY;
+ALTER TABLE api_usage_logs FORCE ROW LEVEL SECURITY;
+ALTER TABLE aggregated_usage FORCE ROW LEVEL SECURITY;
+ALTER TABLE activity_logs FORCE ROW LEVEL SECURITY;
 
 -- ============================================================================
 -- VERIFICATION QUERIES
@@ -196,5 +261,10 @@ ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
 --    - Neon's direct connection (not pooler)
 --    - Or wrap all queries in transactions with SET LOCAL
 --    - Or use Neon Authorize (if available)
+--
+-- 5. IMPORTANT: When adding new tables to the schema, remember to:
+--    a) Enable RLS: ALTER TABLE new_table ENABLE ROW LEVEL SECURITY;
+--    b) Create policy: CREATE POLICY "deny_all" ON new_table FOR ALL TO PUBLIC USING (false);
+--    c) Force RLS: ALTER TABLE new_table FORCE ROW LEVEL SECURITY;
 --
 -- ============================================================================
