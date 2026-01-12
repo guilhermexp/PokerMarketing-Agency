@@ -17,7 +17,7 @@ import { Button } from "./Button";
 import { Icon } from "./Icon";
 import { Loader } from "./Loader";
 import type { GalleryImage } from "../../types";
-import { urlToBase64 } from "../../utils/imageHelpers";
+import { urlToBase64, downloadImage } from "../../utils/imageHelpers";
 
 interface ImagePreviewModalProps {
   image: GalleryImage;
@@ -710,12 +710,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   }, []);
 
   const handleDownload = () => {
-    const link = document.createElement("a");
-    link.href = image.src;
-    link.download = downloadFilename || "edited-image.png";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadImage(image.src, downloadFilename || "edited-image.png");
   };
 
   // Handle seam carving resize - creates preview only, doesn't save

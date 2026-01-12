@@ -24,7 +24,7 @@ import type {
   GenerationJobConfig,
   WeekScheduleWithCount,
 } from "../services/apiClient";
-import { urlToBase64 } from "../utils/imageHelpers";
+import { urlToBase64, downloadImage } from "../utils/imageHelpers";
 import { addEventFlyer, addDailyFlyer } from "../services/apiClient";
 
 // Check if we're in development mode (QStash won't work locally)
@@ -110,12 +110,7 @@ const fileToBase64 = (
 // urlToBase64 imported from utils/imageHelpers
 
 const handleDownloadFlyer = (src: string, filename: string) => {
-  const link = document.createElement("a");
-  link.href = src;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  downloadImage(src, filename);
 };
 
 const FlyerThumbStrip: React.FC<{

@@ -50,3 +50,44 @@ export const urlToBase64 = async (
     return null;
   }
 };
+
+/**
+ * Download an image from a URL (works with cross-origin URLs)
+ * Fetches the image as a blob and creates a local blob URL for download
+ */
+export const downloadImage = async (
+  src: string,
+  filename: string = "image.png",
+): Promise<void> => {
+  try {
+    // For data URLs, we can download directly
+    if (src.startsWith("data:")) {
+      const link = document.createElement("a");
+      link.href = src;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    // For external URLs, fetch as blob first to bypass cross-origin restrictions
+    const response = await fetch(src);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Clean up the blob URL
+    URL.revokeObjectURL(blobUrl);
+  } catch (error) {
+    console.error("[downloadImage] Failed to download:", src, error);
+    // Fallback: open in new tab if fetch fails
+    window.open(src, "_blank");
+  }
+};
