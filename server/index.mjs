@@ -5820,6 +5820,70 @@ async function runAutoMigrations() {
     console.log(
       "[Migration] ✓ Ensured instagram_account_id column in scheduled_posts",
     );
+
+    // Migration 005: Create AI usage tracking enums and table
+    try {
+      // Create ai_provider enum
+      await sql`
+        DO $$ BEGIN
+          CREATE TYPE ai_provider AS ENUM ('google', 'openrouter', 'fal');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$
+      `;
+
+      // Create ai_operation enum
+      await sql`
+        DO $$ BEGIN
+          CREATE TYPE ai_operation AS ENUM ('text', 'image', 'video', 'speech', 'flyer', 'edit_image', 'campaign');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$
+      `;
+
+      // Create usage_status enum
+      await sql`
+        DO $$ BEGIN
+          CREATE TYPE usage_status AS ENUM ('success', 'failed', 'timeout', 'rate_limited');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$
+      `;
+
+      // Create api_usage_logs table
+      await sql`
+        CREATE TABLE IF NOT EXISTS api_usage_logs (
+          id SERIAL PRIMARY KEY,
+          request_id UUID NOT NULL UNIQUE,
+          user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+          organization_id VARCHAR(50),
+          endpoint VARCHAR(255) NOT NULL,
+          operation ai_operation NOT NULL,
+          provider ai_provider NOT NULL,
+          model_id VARCHAR(100),
+          input_tokens INTEGER,
+          output_tokens INTEGER,
+          total_tokens INTEGER,
+          image_count INTEGER,
+          image_size VARCHAR(10),
+          video_duration_seconds INTEGER,
+          audio_duration_seconds INTEGER,
+          character_count INTEGER,
+          estimated_cost_cents INTEGER NOT NULL DEFAULT 0,
+          latency_ms INTEGER,
+          status usage_status NOT NULL DEFAULT 'success',
+          error_message TEXT,
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+
+      // Create indexes
+      await sql`CREATE INDEX IF NOT EXISTS idx_usage_logs_user ON api_usage_logs(user_id, created_at DESC)`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_usage_logs_org ON api_usage_logs(organization_id, created_at DESC)`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_usage_logs_date ON api_usage_logs((created_at::DATE))`;
+
+      console.log("[Migration] ✓ Ensured api_usage_logs table and enums exist");
+    } catch (usageError) {
+      console.log("[Migration] Note: api_usage_logs migration:", usageError.message);
+    }
   } catch (error) {
     console.error("[Migration] Error:", error.message);
     // Don't fail startup - column might already exist with different syntax
