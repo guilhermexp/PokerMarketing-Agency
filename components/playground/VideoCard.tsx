@@ -5,7 +5,7 @@
 
 import { motion } from 'framer-motion';
 import React, { useRef, useState } from 'react';
-import { Download, AlertCircle, Sparkles, ImageIcon } from 'lucide-react';
+import { Download, AlertCircle, Sparkles, ImageIcon, Volume2, VolumeX } from 'lucide-react';
 import { FeedPost, PostStatus, MediaType } from './types';
 import { VeoLogo } from './VeoLogo';
 
@@ -16,21 +16,26 @@ interface VideoCardProps {
 export const VideoCard: React.FC<VideoCardProps> = ({ post }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
 
   const status = post.status ?? PostStatus.SUCCESS;
 
   const handleMouseEnter = () => {
     setIsHovered(true);
     if (status === PostStatus.SUCCESS && videoRef.current) {
-      videoRef.current.muted = false;
       videoRef.current.play().catch(() => {});
     }
   };
 
   const handleMouseLeave = () => {
     setIsHovered(false);
-    if (status === PostStatus.SUCCESS && videoRef.current) {
-      videoRef.current.muted = true;
+  };
+
+  const handleToggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      videoRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
     }
   };
 
@@ -129,7 +134,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post }) => {
             src={post.videoUrl}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             loop
-            muted
+            muted={isMuted}
             playsInline
             autoPlay
           />
@@ -182,9 +187,22 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post }) => {
 
         {status === PostStatus.SUCCESS && (
           <div className="flex flex-col gap-3 items-center shrink-0 pointer-events-auto">
+            {post.mediaType === MediaType.VIDEO && post.videoUrl && (
+              <button
+                onClick={handleToggleMute}
+                className={`p-3 rounded-full border backdrop-blur-xl transition-all text-white shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:scale-105 ${
+                  isMuted
+                    ? 'bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40'
+                    : 'bg-white/30 border-white/40 hover:bg-white/40'
+                }`}
+                title={isMuted ? "Ativar audio" : "Desativar audio"}
+              >
+                {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </button>
+            )}
             <button
               onClick={handleDownload}
-              className="p-3 rounded-full bg-white/10 border border-white/20 backdrop-blur-xl hover:bg-white/20 transition-all text-white shadow-[0_4px_12px_rgba(0,0,0,0.3)] group-active:scale-90 hover:scale-105 hover:border-white/40"
+              className="p-3 rounded-full bg-white/10 border border-white/20 backdrop-blur-xl hover:bg-white/20 transition-all text-white shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:scale-105 hover:border-white/40"
               title={post.mediaType === MediaType.IMAGE ? "Download Imagem" : "Download Video"}
             >
               <Download className="w-5 h-5" />

@@ -441,6 +441,8 @@ export interface DbCampaign {
   status: string;
   created_at: string;
   updated_at: string;
+  // Creator info (from list query with JOIN)
+  creator_name?: string | null;
   // Counts and previews from list query
   clips_count?: number;
   posts_count?: number;

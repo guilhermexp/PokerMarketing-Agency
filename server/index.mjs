@@ -3183,6 +3183,7 @@ app.get("/api/db/campaigns", requireResourceAccess, async (req, res) => {
       result = await sql`
         SELECT
           c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at,
+          u.name as creator_name,
           COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
           COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
           COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
@@ -3190,6 +3191,7 @@ app.get("/api/db/campaigns", requireResourceAccess, async (req, res) => {
           (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
           (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url
         FROM campaigns c
+        LEFT JOIN users u ON u.id = c.user_id
         WHERE c.organization_id = ${organization_id} AND c.deleted_at IS NULL
         ORDER BY c.created_at DESC
       `;
@@ -3197,6 +3199,7 @@ app.get("/api/db/campaigns", requireResourceAccess, async (req, res) => {
       result = await sql`
         SELECT
           c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at,
+          u.name as creator_name,
           COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
           COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
           COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
@@ -3204,6 +3207,7 @@ app.get("/api/db/campaigns", requireResourceAccess, async (req, res) => {
           (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
           (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url
         FROM campaigns c
+        LEFT JOIN users u ON u.id = c.user_id
         WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL
         ORDER BY c.created_at DESC
       `;

@@ -11,6 +11,7 @@ interface CampaignWithCounts {
   name: string | null;
   status: string;
   createdAt: string;
+  creatorName: string | null;
   clipsCount: number;
   postsCount: number;
   adsCount: number;
@@ -96,8 +97,14 @@ const CampaignCard: React.FC<{
           <h3 className="text-[13px] font-semibold text-white truncate">
             {campaign.name || "Campanha sem título"}
           </h3>
-          <p className="text-[10px] text-white/25 mt-0.5">
-            {formatDate(campaign.createdAt)}
+          <p className="text-[10px] text-white/25 mt-0.5 flex items-center gap-1.5">
+            <span>{formatDate(campaign.createdAt)}</span>
+            {campaign.creatorName && (
+              <>
+                <span className="text-white/10">•</span>
+                <span className="truncate max-w-[100px]">{campaign.creatorName}</span>
+              </>
+            )}
           </p>
         </div>
 
@@ -327,6 +334,7 @@ export function CampaignsList({
       name: c.name,
       status: c.status,
       createdAt: c.created_at,
+      creatorName: c.creator_name || null,
       clipsCount: Number(c.clips_count) || 0,
       postsCount: Number(c.posts_count) || 0,
       adsCount: Number(c.ads_count) || 0,
