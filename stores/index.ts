@@ -2,13 +2,40 @@
  * Zustand Stores - Barrel Export
  *
  * Este arquivo re-exporta todos os stores para fácil importação.
- * Uso: import { useUiStore, useGalleryStore } from '@/stores';
+ * Uso: import { useUiStore, useJobsStore } from '@/stores';
  */
 
-// TODO: Fase 1 - Implementar stores
-// export { useUiStore } from './uiStore';
-// export { useGalleryStore } from './galleryStore';
-// export { useJobsStore } from './jobsStore';
+// UI Store - Global UI state (modals, sidebar, toasts)
+export {
+  useUiStore,
+  useIsModalOpen,
+  useToast,
+  selectActiveModal,
+  selectModalData,
+  selectSidebarOpen,
+  selectGlobalLoading,
+  selectToasts,
+  type ModalType,
+  type Toast,
+  type UiState,
+} from './uiStore';
 
-// Placeholder export para evitar erro de módulo vazio
-export const STORES_VERSION = '0.1.0';
+// Jobs Store - Background generation jobs
+export {
+  useJobsStore,
+  useGenerationJobStore,
+  useJobCounts,
+  selectJobs,
+  selectPendingJobs,
+  selectCompletedJobs,
+  selectFailedJobs,
+  selectIsLoading,
+  selectScheduledPostNotifications,
+  type ActiveJob,
+  type ScheduledPostNotification,
+  type JobType,
+  type JobStatus,
+} from './jobsStore';
+
+// Version for debugging
+export const STORES_VERSION = '1.0.0';
