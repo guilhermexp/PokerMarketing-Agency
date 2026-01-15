@@ -204,7 +204,7 @@ const getTruncatedHistory = (
 };
 
 function AppContent() {
-  const { userId, isLoading: authLoading } = useAuth();
+  const { userId, clerkUserId, isLoading: authLoading } = useAuth();
   const { organization, isLoaded: orgLoaded } = useOrganization();
   const organizationId = organization?.id || null;
 
@@ -264,9 +264,11 @@ function AppContent() {
 
   // === OPTIMIZED: Single request to load ALL initial data ===
   // This replaces 6 separate API calls with 1!
+  // clerkUserId is passed for parallel loading (data can load while user syncs)
   const { data: initialData, isLoading: isInitialLoading } = useInitialData(
     userId,
     organizationId,
+    clerkUserId,
   );
 
   // === SWR CACHED DATA HOOKS (now just read from cache populated by useInitialData) ===

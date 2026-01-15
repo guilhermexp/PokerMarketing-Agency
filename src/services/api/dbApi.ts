@@ -31,13 +31,19 @@ export interface InitialData {
 /**
  * Load ALL initial data in a single request
  * This replaces 6 separate API calls with 1, dramatically reducing network overhead
+ *
+ * @param userId - Database user ID (preferred) or Clerk user ID for parallel loading
+ * @param organizationId - Optional organization context
+ * @param clerkUserId - Clerk user ID for lookup (optional, for parallel loading)
  */
 export async function getInitialData(
   userId: string,
   organizationId?: string | null,
+  clerkUserId?: string,
 ): Promise<InitialData> {
   const params = new URLSearchParams({ user_id: userId });
   if (organizationId) params.append('organization_id', organizationId);
+  if (clerkUserId) params.append('clerk_user_id', clerkUserId);
 
   console.debug('[API] Loading all initial data in single request...');
   const start = Date.now();

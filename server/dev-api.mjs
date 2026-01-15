@@ -722,25 +722,58 @@ app.get("/api/db/init", async (req, res) => {
 
   try {
     const sql = getSql();
-    const { user_id, organization_id } = req.query;
+    const { user_id, organization_id, clerk_user_id } = req.query;
 
-    if (!user_id) {
-      return res.status(400).json({ error: "user_id is required" });
+    if (!user_id && !clerk_user_id) {
+      return res.status(400).json({ error: "user_id or clerk_user_id is required" });
     }
 
-    // Resolve user_id once (with caching)
-    const resolvedUserId = await resolveUserId(sql, user_id, reqId);
-    if (!resolvedUserId) {
-      console.log("[Init API] User not found, returning empty data");
-      return res.json({
-        brandProfile: null,
-        gallery: [],
-        scheduledPosts: [],
-        campaigns: [],
-        tournamentSchedule: null,
-        tournamentEvents: [],
-        schedulesList: [],
-      });
+    // If clerk_user_id is provided explicitly, try to find/create user
+    let resolvedUserId = null;
+    if (clerk_user_id) {
+      // First check if it's a UUID (db user id)
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidPattern.test(clerk_user_id)) {
+        resolvedUserId = clerk_user_id;
+      } else {
+        // It's a Clerk ID - look up or create the user
+        resolvedUserId = await resolveUserId(sql, clerk_user_id, reqId);
+        if (!resolvedUserId) {
+          // User doesn't exist yet - this happens during parallel loading
+          // Return empty data - the frontend will retry after user sync completes
+          console.log("[Init API] User not found for clerk_user_id:", clerk_user_id);
+          return res.json({
+            brandProfile: null,
+            gallery: [],
+            scheduledPosts: [],
+            campaigns: [],
+            tournamentSchedule: null,
+            tournamentEvents: [],
+            schedulesList: [],
+            _meta: {
+              loadTime: Date.now() - start,
+              queriesExecuted: 0,
+              timestamp: new Date().toISOString(),
+              userNotFound: true, // Signal to frontend to retry
+            },
+          });
+        }
+      }
+    } else if (user_id) {
+      // Original behavior: resolve user_id
+      resolvedUserId = await resolveUserId(sql, user_id, reqId);
+      if (!resolvedUserId) {
+        console.log("[Init API] User not found, returning empty data");
+        return res.json({
+          brandProfile: null,
+          gallery: [],
+          scheduledPosts: [],
+          campaigns: [],
+          tournamentSchedule: null,
+          tournamentEvents: [],
+          schedulesList: [],
+        });
+      }
     }
 
     // Note: RLS context via session vars doesn't work with Neon serverless pooler

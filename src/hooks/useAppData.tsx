@@ -84,16 +84,21 @@ const KEYS = {
 /**
  * Main hook that loads ALL initial data in a single request
  * Use this in your main App component for initial load
+ *
+ * @param userId - Database user ID (falls back to clerkUserId if db user not yet synced)
+ * @param organizationId - Optional organization context
+ * @param clerkUserId - Clerk user ID for parallel data loading
  */
 export function useInitialData(
   userId: string | null,
   organizationId?: string | null,
+  clerkUserId?: string | null,
 ) {
   const { data, error, isLoading, mutate } = useSWR(
     userId ? KEYS.initialData(userId, organizationId) : null,
     async () => {
       console.debug("[SWR] Fetching all initial data via /api/db/init...");
-      const result = await getInitialData(userId!, organizationId);
+      const result = await getInitialData(userId!, organizationId, clerkUserId || undefined);
 
       // Populate individual caches for optimistic updates
       // This allows individual hooks to work without re-fetching

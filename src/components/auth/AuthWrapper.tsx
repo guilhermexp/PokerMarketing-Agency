@@ -13,6 +13,7 @@ interface AuthContextType {
   isLoading: boolean;
   userId: string | null;
   clerkUserId: string | null;
+  isDbSyncing: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   userId: null,
   clerkUserId: null,
+  isDbSyncing: false,
 });
 
 export function useAuth() {
@@ -33,7 +35,7 @@ interface AuthWrapperProps {
 export function AuthWrapper({ children }: AuthWrapperProps) {
   const { user, isLoaded: clerkLoaded, isSignedIn } = useUser();
   const [dbUser, setDbUser] = useState<DbUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isDbSyncing, setIsDbSyncing] = useState(false);
 
   // Track if we've already synced this user to prevent duplicate calls
   const syncedUserIdRef = useRef<string | null>(null);
@@ -50,7 +52,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
 
       if (!isSignedIn || !clerkUserId) {
         setDbUser(null);
-        setIsLoading(false);
+        setIsDbSyncing(false);
         syncedUserIdRef.current = null;
         return;
       }
@@ -63,11 +65,13 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
       try {
         if (!userEmail) {
           console.error("User has no email address");
-          setIsLoading(false);
+          setIsDbSyncing(false);
           return;
         }
 
-        console.debug("[Auth] Syncing user to database (once per session)...");
+        console.debug("[Auth] Syncing user to database (background)...");
+        setIsDbSyncing(true);
+
         const syncedUser = await getOrCreateUser({
           email: userEmail,
           name: userName,
@@ -81,7 +85,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
         console.debug("[Auth] User synced successfully:", syncedUser.id);
       } catch (error) {
         console.error("Failed to sync user with database:", error);
-        // Still allow access even if DB sync fails (for development)
+        // Still allow access even if DB sync fails (fallback to clerk user)
         setDbUser({
           id: clerkUserId,
           email: userEmail || "",
@@ -91,7 +95,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
         });
         syncedUserIdRef.current = clerkUserId; // Still mark as synced to prevent retries
       } finally {
-        setIsLoading(false);
+        setIsDbSyncing(false);
       }
     }
 
@@ -100,9 +104,12 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
 
   const contextValue: AuthContextType = {
     dbUser,
-    isLoading: !clerkLoaded || isLoading,
-    userId: dbUser?.id || null,
-    clerkUserId: user?.id || null,
+    // isLoading is now just Clerk loading - DB sync happens in background
+    isLoading: !clerkLoaded,
+    // userId uses clerkUserId as fallback for parallel data loading
+    userId: dbUser?.id || clerkUserId || null,
+    clerkUserId: clerkUserId || null,
+    isDbSyncing,
   };
 
   return (
