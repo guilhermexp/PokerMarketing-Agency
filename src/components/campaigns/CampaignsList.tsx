@@ -198,36 +198,38 @@ const CampaignCard: React.FC<{
         {/* Preview Images */}
         {totalAssets > 0 ? (
           <div className="px-4 pb-4">
-            <div
-              className={`grid gap-1.5 ${
-                columns === 1
-                  ? "grid-cols-1"
-                  : columns === 2
-                    ? "grid-cols-2"
-                    : "grid-cols-3"
-              }`}
-            >
-              {previewItems.map((item) => (
-                <div
-                  key={item.type}
-                  className="relative overflow-hidden rounded-lg aspect-square bg-white/[0.02]"
-                >
-                  {item.url ? (
-                    <img
-                      src={item.url}
-                      alt={item.label}
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                      <Icon name={item.icon} className="w-4 h-4 text-white/10" />
-                      <span className="text-[9px] text-white/30 uppercase tracking-wide">
-                        {item.label}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div className="w-full aspect-[4/3]">
+              <div
+                className={`grid gap-1.5 h-full grid-rows-1 ${
+                  columns === 1
+                    ? "grid-cols-1"
+                    : columns === 2
+                      ? "grid-cols-2"
+                      : "grid-cols-3"
+                }`}
+              >
+                {previewItems.map((item) => (
+                  <div
+                    key={item.type}
+                    className="relative overflow-hidden rounded-lg h-full bg-white/[0.02]"
+                  >
+                    {item.url ? (
+                      <img
+                        src={item.url}
+                        alt={item.label}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                        <Icon name={item.icon} className="w-4 h-4 text-white/10" />
+                        <span className="text-[9px] text-white/30 uppercase tracking-wide">
+                          {item.label}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Counts */}
