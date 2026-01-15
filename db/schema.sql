@@ -54,8 +54,7 @@ CREATE TYPE instagram_content_type AS ENUM (
 );
 
 CREATE TYPE image_model AS ENUM (
-    'gemini-3-pro-image-preview',
-    'imagen-4.0-generate-001'
+    'gemini-3-pro-image-preview'
 );
 
 CREATE TYPE image_size AS ENUM (
@@ -1125,7 +1124,6 @@ INSERT INTO model_pricing (provider, model_id, display_name, input_cost_per_mill
 -- Google
 ('google', 'gemini-3-pro-preview', 'Gemini 3 Pro', 125, 500, NULL, NULL, NULL),
 ('google', 'gemini-3-pro-image-preview', 'Gemini 3 Pro Image', NULL, NULL, 4, NULL, NULL),
-('google', 'imagen-4.0-generate-001', 'Imagen 4', NULL, NULL, 4, NULL, NULL),
 ('google', 'gemini-2.5-flash-preview-tts', 'Gemini TTS', NULL, NULL, NULL, NULL, 1500),
 -- OpenRouter
 ('openrouter', 'openai/gpt-5.2', 'GPT-5.2', 500, 1500, NULL, NULL, NULL),

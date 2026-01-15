@@ -24,12 +24,12 @@ Esta é a funcionalidade mais básica, usada quando uma imagem precisa ser criad
 
 ### Modelos Suportados
 
-A aplicação suporta dois modelos, selecionáveis pela interface do usuário através do tipo `ImageModel` (`'gemini-imagen' | 'bytedance-seedream'`).
+A aplicação suporta dois modelos, selecionáveis pela interface do usuário através do tipo `ImageModel` (`'gemini-3-pro-image-preview' | 'bytedance-seedream'`).
 
-#### a) Google Gemini (Imagen 4.0)
+#### a) Google Gemini 3 Pro Image
 
-- **ID na Aplicação:** `gemini-imagen`
-- **Modelo Real:** `imagen-4.0-generate-001`
+- **ID na Aplicação:** `gemini-3-pro-image-preview`
+- **Modelo Real:** `gemini-3-pro-image-preview`
 - **Uso:** É o modelo padrão. O prompt do usuário é enriquecido com um prefixo para garantir um estilo consistente: `Imagem de marketing vibrante e de alta qualidade para um post de rede social. O estilo deve ser moderno e limpo. Assunto: ${prompt}`.
 - **Quando Usar:** É a escolha principal para resultados de alta qualidade, especialmente quando se busca um estilo mais limpo e corporativo.
 

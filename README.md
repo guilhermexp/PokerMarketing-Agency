@@ -29,7 +29,7 @@ A aplicação é um Single Page Application (SPA) construído com as seguintes t
 - **Serviços de IA e Backend:**
   - **Google Gemini API (`@google/genai`):**
     - `gemini-2.5-flash`: Utilizado para tarefas de texto, como a geração de campanhas e a lógica do assistente.
-    - `imagen-4.0-generate-001`: Modelo principal para geração de imagens (text-to-image).
+    - `gemini-3-pro-image-preview`: Modelo principal para geração de imagens (text-to-image).
     - `gemini-2.5-flash-image-preview`: Modelo multimodal para edição avançada de imagens, variações de marca e geração de flyers com inputs visuais.
     - `veo-2.0-generate-001`: Utilizado para a geração de vídeos a partir de roteiros.
   - **Fal.ai API:**

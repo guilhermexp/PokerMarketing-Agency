@@ -313,7 +313,6 @@ INSERT INTO model_pricing (provider, model_id, display_name, input_cost_per_mill
 -- Google Gemini Text
 ('google', 'gemini-3-pro-preview', 'Gemini 3 Pro', 125, 500, NULL, NULL, NULL, NULL),
 ('google', 'gemini-3-pro-image-preview', 'Gemini 3 Pro Image', NULL, NULL, 4, NULL, NULL, NULL),
-('google', 'imagen-4.0-generate-001', 'Imagen 4', NULL, NULL, 4, NULL, NULL, NULL),
 ('google', 'gemini-2.5-flash-preview-tts', 'Gemini TTS', NULL, NULL, NULL, NULL, NULL, 1500),
 
 -- OpenRouter Models (prices vary, these are estimates)

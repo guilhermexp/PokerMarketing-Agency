@@ -55,8 +55,7 @@ CREATE TYPE instagram_content_type AS ENUM (
 );
 
 CREATE TYPE image_model AS ENUM (
-    'gemini-3-pro-image-preview',
-    'imagen-4.0-generate-001'
+    'gemini-3-pro-image-preview'
 );
 
 CREATE TYPE image_size AS ENUM (

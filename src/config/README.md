@@ -62,7 +62,6 @@ O modelo aparecerá automaticamente nas configurações da marca.
 
 Definidos em `IMAGE_GENERATION_MODELS`:
 - `gemini-3-pro-image-preview` - Geração de imagens
-- `imagen-4.0-generate-001` - Google Imagen (alternativo)
 
 ## Modelos de Vídeo
 

@@ -1883,7 +1883,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
               src: persistedUrl,
               prompt: sceneNarration.slice(0, 200),
               source: `Narracao-${getAudioKey()}`,
-              model: "gemini-3-pro-speech" as never,
+              model: "tts-generation" as never,
               mediaType: "audio",
               duration: audioDuration,
               video_script_id: clip.id, // Link to video_clip_script for campaign filtering
