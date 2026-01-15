@@ -45,7 +45,6 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     maskCanvasRef,
     containerRef,
     originalDimensions,
-    displayDimensions,
     isLoadingImage,
     imageLoadError,
     startDrawing,
@@ -215,7 +214,6 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             resizedPreview={resizedPreview}
             editPreview={editPreview}
             originalDimensions={originalDimensions}
-            displayDimensions={displayDimensions}
             isLoadingImage={isLoadingImage}
             imageLoadError={imageLoadError}
             imageCanvasRef={imageCanvasRef}

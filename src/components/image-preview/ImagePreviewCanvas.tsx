@@ -19,7 +19,6 @@ export const ImagePreviewCanvas: React.FC<ImagePreviewCanvasProps> = ({
   resizedPreview,
   editPreview,
   originalDimensions,
-  displayDimensions,
   isLoadingImage,
   imageLoadError,
   imageCanvasRef,

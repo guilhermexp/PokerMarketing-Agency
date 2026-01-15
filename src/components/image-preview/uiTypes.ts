@@ -34,7 +34,6 @@ export interface ImagePreviewCanvasProps {
   resizedPreview: ResizedPreview | null;
   editPreview: EditPreview | null;
   originalDimensions: Dimensions;
-  displayDimensions: Dimensions;
   isLoadingImage: boolean;
   imageLoadError: string | null;
   imageCanvasRef: RefObject<HTMLCanvasElement>;
