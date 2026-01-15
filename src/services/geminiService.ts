@@ -16,6 +16,7 @@ import type {
 } from "../types";
 import { generateVideo as generateServerVideo, type ApiVideoModel } from "./apiClient";
 import { uploadImageToBlob } from "./blobService";
+import { buildLogoPrompt } from "@/ai-prompts";
 
 // Convert VideoModel to ApiVideoModel for server calls
 const toApiVideoModel = (model: VideoModel): ApiVideoModel => {
@@ -71,6 +72,7 @@ export const generateCampaign = async (
     inspirationImages: input.inspirationImages,
     collabLogo: input.collabLogo,
     compositionAssets: input.compositionAssets,
+    toneOfVoiceOverride: input.toneOfVoiceOverride,
   });
 
   // Include the model used for generation
@@ -128,6 +130,7 @@ export const generateImage = async (
     productImages?: ImageFile[];
     styleReferenceImage?: ImageFile;
     personReferenceImage?: ImageFile;
+    compositionAssets?: ImageFile[];
   },
 ): Promise<string> => {
   const response = await apiCall("/api/ai/image", {
@@ -139,6 +142,7 @@ export const generateImage = async (
     productImages: options.productImages,
     styleReferenceImage: options.styleReferenceImage,
     personReferenceImage: options.personReferenceImage,
+    compositionAssets: options.compositionAssets,
   });
 
   return response.imageUrl;
@@ -206,7 +210,7 @@ export const generateLogo = async (
   prompt: string,
 ): Promise<string> => {
   const response = await apiCall("/api/ai/image", {
-    prompt: `Logo vetorial moderno e minimalista: ${prompt}`,
+    prompt: buildLogoPrompt(prompt),
     brandProfile: {
       name: "Logo",
       primaryColor: "#000000",

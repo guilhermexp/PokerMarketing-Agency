@@ -12,6 +12,7 @@ import type { Currency, TimePeriod } from "@/types/flyer.types";
 import { Button } from "../common/Button";
 import { Icon } from '../common/Icon';
 import { generateFlyer } from "../../services/geminiService";
+import { buildDailyFlyerPromptDetailed } from "@/ai-prompts";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import { QuickPostModal } from "../common/QuickPostModal";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";
@@ -196,82 +197,29 @@ export const PeriodCard: React.FC<{
                 // Prompt específico para HIGHLIGHTS (apenas 3 torneios)
                 const isHighlights = period === "HIGHLIGHTS";
 
-                const prompt = isHighlights
-                    ? `
-        TIPO: Flyer de Destaques do Dia - TOP 3 TORNEIOS
-        TÍTULO: ${label.toUpperCase()}
-        DATA: ${dayInfo}
+                const labelUpper = label.toUpperCase();
+                const secondEventText = otherEvents[0]
+                    ? `${otherEvents[0].times?.["-3"]} | ${otherEvents[0].name} | Buy-in: ${formatCurrencyValue(otherEvents[0].buyIn, currency)} | GTD: ${formatCurrencyValue(otherEvents[0].gtd, currency)}`
+                    : "";
+                const thirdEventText = otherEvents[1]
+                    ? `${otherEvents[1].times?.["-3"]} | ${otherEvents[1].name} | Buy-in: ${formatCurrencyValue(otherEvents[1].buyIn, currency)} | GTD: ${formatCurrencyValue(otherEvents[1].gtd, currency)}`
+                    : "";
+                const topEventGtdValue = topEvent ? formatCurrencyValue(topEvent.gtd, currency) : "";
 
-        REGRA CRÍTICA: Este flyer mostra EXATAMENTE 3 torneios. NÃO ADICIONE, NÃO DUPLIQUE, NÃO REPITA nenhum torneio.
-
-        OS 3 TORNEIOS (em ordem de importância):
-
-        TORNEIO PRINCIPAL (MAIOR GTD - área principal):
-        ${topEventText}
-
-        SEGUNDO TORNEIO:
-        ${otherEvents[0] ? `${otherEvents[0].times?.["-3"]} | ${otherEvents[0].name} | Buy-in: ${formatCurrencyValue(otherEvents[0].buyIn, currency)} | GTD: ${formatCurrencyValue(otherEvents[0].gtd, currency)}` : ""}
-
-        TERCEIRO TORNEIO:
-        ${otherEvents[1] ? `${otherEvents[1].times?.["-3"]} | ${otherEvents[1].name} | Buy-in: ${formatCurrencyValue(otherEvents[1].buyIn, currency)} | GTD: ${formatCurrencyValue(otherEvents[1].gtd, currency)}` : ""}
-
-        LAYOUT OBRIGATÓRIO:
-        - O torneio principal (${topEvent?.name}) ocupa a METADE SUPERIOR com visual impactante
-        - Os outros 2 torneios ficam na METADE INFERIOR em formato de cards ou lista
-        - TOTAL DE ITENS NA IMAGEM: EXATAMENTE 3 torneios
-        - NÃO crie linhas extras, NÃO repita nenhum nome
-
-        DESIGN:
-        - Logo da marca no topo
-        - Título "${label}" logo após o logo
-        - Data "${dayInfo}" em tamanho discreto (menor que o título)
-        - GTD em cor ${brandProfile.secondaryColor}
-        - Fundo baseado em ${brandProfile.primaryColor}
-        - Visual premium e sofisticado
-        - Efeitos visuais: partículas, brilhos, elementos decorativos
-        `
-                    : `
-        TIPO: Grade de Programação com Torneio Principal
-        TÍTULO DA SESSÃO: ${label.toUpperCase()}
-        DATA: ${dayInfo}
-
-        ESTRUTURA OBRIGATÓRIA - 2 SEÇÕES DISTINTAS:
-
-        SEÇÃO 1 - TORNEIO PRINCIPAL (TOPO - 40% do espaço):
-
-        TORNEIO EM EVIDÊNCIA (maior GTD):
-        ${topEventText}
-
-        REGRAS:
-        - Esta seção deve ocupar aproximadamente 40% da área do flyer
-        - Nome do torneio em FONTE GIGANTE E BOLD
-        - GTD (${topEvent ? formatCurrencyValue(topEvent.gtd, currency) : ""}) deve ser o MAIOR elemento visual - cor ${brandProfile.secondaryColor}
-        - Efeitos visuais: partículas, brilhos, explosão de elementos dinâmicos
-        - Background desta área pode ter gradiente ou elementos visuais dinâmicos
-        - Horário e Buy-in em tamanho médio, bem legíveis
-
-        SEÇÃO 2 - GRADE DE OUTROS TORNEIOS (60% do espaço):
-
-        LISTA DOS DEMAIS TORNEIOS (cada torneio aparece UMA ÚNICA VEZ, não repita):
-        ${otherEventsList}
-
-        FORMATO DA GRADE:
-        - Layout tipo tabela/lista profissional
-        - Cada linha: [HORÁRIO] | [NOME] | [BUY-IN] | [GTD]
-        - IMPORTANTE: Cada torneio deve aparecer EXATAMENTE 1 vez na grade
-        - GTD em cor ${brandProfile.secondaryColor} (menor que o destaque, mas visível)
-        - Linhas alternadas ou separadores para facilitar leitura
-        - Fonte menor que o destaque, mas perfeitamente legível
-        - Espaçamento uniforme entre linhas
-
-        DESIGN GERAL:
-        - Logo da marca no topo
-        - Título "${label}" logo após o logo
-        - Data "${dayInfo}" em tamanho discreto (menor que o título)
-        - Fundo baseado em ${brandProfile.primaryColor}
-        - Contraste forte entre o torneio principal (topo) e a grade (inferior)
-        - Visual profissional e premium
-        `;
+                const prompt = buildDailyFlyerPromptDetailed({
+                    isHighlights,
+                    label,
+                    labelUpper,
+                    dayInfo,
+                    topEventText,
+                    secondEventText,
+                    thirdEventText,
+                    otherEventsList,
+                    topEventName: topEvent?.name || "",
+                    topEventGtdValue,
+                    brandPrimaryColor: brandProfile.primaryColor,
+                    brandSecondaryColor: brandProfile.secondaryColor,
+                });
 
                 // Use background job if userId is available AND we're not in dev mode
                 if (userId && !isDevMode) {

@@ -5,15 +5,16 @@
 
 import { motion } from 'framer-motion';
 import React, { useRef, useState } from 'react';
-import { Download, AlertCircle, Sparkles, ImageIcon, Volume2, VolumeX } from 'lucide-react';
+import { Download, AlertCircle, Sparkles, ImageIcon, Volume2, VolumeX, Wand2 } from 'lucide-react';
 import { FeedPost, PostStatus, MediaType } from './types';
 import { VeoLogo } from './VeoLogo';
 
 interface VideoCardProps {
   post: FeedPost;
+  onAddToPrompt?: (imageUrl: string) => void;
 }
 
-export const VideoCard: React.FC<VideoCardProps> = ({ post }) => {
+export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [_isHovered, setIsHovered] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
@@ -202,6 +203,16 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post }) => {
                 title={isMuted ? "Ativar audio" : "Desativar audio"}
               >
                 {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </button>
+            )}
+            {/* Add to Prompt button - only for images */}
+            {post.mediaType === MediaType.IMAGE && post.imageUrl && onAddToPrompt && (
+              <button
+                onClick={() => onAddToPrompt(post.imageUrl!)}
+                className="p-3 rounded-full bg-purple-500/20 border border-purple-500/40 backdrop-blur-xl hover:bg-purple-500/40 transition-all text-purple-300 shadow-[0_4px_12px_rgba(168,85,247,0.3)] hover:scale-105"
+                title="Adicionar ao prompt para editar"
+              >
+                <Wand2 className="w-5 h-5" />
               </button>
             )}
             <button

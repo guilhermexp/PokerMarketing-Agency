@@ -5,6 +5,7 @@ import type {
   GalleryImage,
   StyleReference,
   ScheduledPost,
+  ImageFile,
 } from "../../types";
 import { QuickPostModal } from "../common/QuickPostModal";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";
@@ -30,6 +31,7 @@ export interface ClipsTabProps {
   onSchedulePost?: (
     post: Omit<ScheduledPost, "id" | "createdAt" | "updatedAt">,
   ) => void;
+  productImages?: ImageFile[] | null;
 }
 
 export const ClipsTab: React.FC<ClipsTabProps> = ({
@@ -46,6 +48,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
   campaignId,
   instagramContext,
   onSchedulePost,
+  productImages,
 }) => {
   // QuickPost and Schedule modals
   const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(
@@ -69,6 +72,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
     userId,
     onAddImageToGallery,
     onUpdateGalleryImage,
+    productImages,
   });
 
   return (
@@ -109,6 +113,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
           onQuickPost={setQuickPostImage}
           onSchedulePost={onSchedulePost ? setScheduleImage : undefined}
           userId={userId}
+          productImages={productImages}
         />
       ))}
 

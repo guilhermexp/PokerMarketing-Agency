@@ -33,6 +33,7 @@ export interface ContentInput {
   inspirationImages: { base64: string; mimeType: string }[] | null;
   collabLogo?: { base64: string; mimeType: string } | null;
   compositionAssets?: { base64: string; mimeType: string }[] | null;
+  toneOfVoiceOverride?: ToneOfVoice | null;
 }
 
 export interface VideoClipScript {

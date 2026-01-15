@@ -3,9 +3,13 @@
  */
 
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import type { BrandProfile, ImageFile, CarouselScript } from '../../../types';
+import type { BrandProfile, ImageFile, CarouselScript, ChatReferenceImage, StyleReference } from '../../../types';
 import { generateImage } from '../../../services/geminiService';
 import { uploadImageToBlob } from '../../../services/blobService';
+import {
+  buildCarouselCampaignSlidePrompt,
+  buildCarouselCoverPrompt,
+} from '@/ai-prompts';
 import { urlToBase64 } from '../../../utils/imageHelpers';
 import {
   updateCarouselCover,
@@ -16,6 +20,11 @@ import { toCarouselScript } from '../utils';
 
 interface GenerationContext {
   brandProfile: BrandProfile;
+  chatReferenceImage?: ChatReferenceImage | null;
+  selectedStyleReference?: StyleReference | null;
+  compositionAssets?: { base64: string; mimeType: string }[]; // Assets (ativos) for composition
+  productImages?: ImageFile[];
+  shouldPause?: () => boolean;
   setGeneratingCarousel: Dispatch<SetStateAction<Record<string, boolean>>>;
   setLocalCarousels: Dispatch<SetStateAction<CarouselScript[]>>;
   localCarouselsRef: MutableRefObject<CarouselScript[]>;
@@ -32,13 +41,39 @@ export const generateCampaignCover = async (
   context.setGeneratingCarousel((prev) => ({ ...prev, [key]: true }));
 
   try {
-    const prompt = `CAPA DE CARROSSEL INSTAGRAM - SLIDE PRINCIPAL
-
-${carousel.cover_prompt}
-
-Esta imagem define o estilo visual (tipografia, cores, composição) para todos os slides do carrossel.`;
+    const prompt = buildCarouselCoverPrompt(carousel.cover_prompt);
 
     const productImages: ImageFile[] = [];
+
+    if (context.productImages && context.productImages.length > 0) {
+      productImages.push(...context.productImages);
+    }
+
+    // Use chat reference image if available
+    if (context.chatReferenceImage) {
+      const src = context.chatReferenceImage.src;
+      if (src.startsWith('data:')) {
+        const matches = src.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          productImages.push({ base64: matches[2], mimeType: matches[1] });
+        }
+      } else {
+        try {
+          const response = await fetch(src);
+          const blob = await response.blob();
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          const base64Data = base64.split(',')[1];
+          productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
+        } catch (err) {
+          console.error('[CarrosselTab] Failed to fetch chat reference image:', err);
+        }
+      }
+    }
+
     if (context.brandProfile.logo) {
       if (context.brandProfile.logo.startsWith('data:')) {
         productImages.push({
@@ -48,10 +83,36 @@ Esta imagem define o estilo visual (tipografia, cores, composição) para todos 
       }
     }
 
+    // Use selected style reference (favoritos) if available
+    if (context.selectedStyleReference?.src) {
+      const src = context.selectedStyleReference.src;
+      if (src.startsWith('data:')) {
+        const matches = src.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          productImages.push({ base64: matches[2], mimeType: matches[1] });
+        }
+      } else {
+        try {
+          const response = await fetch(src);
+          const blob = await response.blob();
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          const base64Data = base64.split(',')[1];
+          productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
+        } catch (err) {
+          console.error('[CarrosselTab] Failed to fetch style reference image:', err);
+        }
+      }
+    }
+
     const imageDataUrl = await generateImage(prompt, context.brandProfile, {
       aspectRatio: '4:5',
       model: 'gemini-3-pro-image-preview',
       productImages: productImages.length > 0 ? productImages : undefined,
+      compositionAssets: context.compositionAssets?.length > 0 ? context.compositionAssets : undefined,
     });
 
     const base64Data = imageDataUrl.split(',')[1];
@@ -106,14 +167,43 @@ export const generateCampaignSlide = async (
       mimeType: coverData.mimeType,
     };
 
-    const prompt = `SLIDE ${slideNumber} DE UM CARROSSEL - DEVE USAR A MESMA TIPOGRAFIA DA IMAGEM DE REFERÊNCIA
-
-Descrição visual: ${slide.visual}
-Texto para incluir: ${slide.text}
-
-IMPORTANTE: Este slide faz parte de uma sequência. A tipografia (fonte, peso, cor, efeitos) DEVE ser IDÊNTICA à imagem de referência anexada. NÃO use fontes diferentes.`;
+    const prompt = buildCarouselCampaignSlidePrompt({
+      slideNumber,
+      visual: slide.visual,
+      text: slide.text,
+    });
 
     const productImages: ImageFile[] = [];
+
+    if (context.productImages && context.productImages.length > 0) {
+      productImages.push(...context.productImages);
+    }
+
+    // Use chat reference image if available
+    if (context.chatReferenceImage) {
+      const src = context.chatReferenceImage.src;
+      if (src.startsWith('data:')) {
+        const matches = src.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          productImages.push({ base64: matches[2], mimeType: matches[1] });
+        }
+      } else {
+        try {
+          const response = await fetch(src);
+          const blob = await response.blob();
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          const base64Data = base64.split(',')[1];
+          productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
+        } catch (err) {
+          console.error('[CarrosselTab] Failed to fetch chat reference image:', err);
+        }
+      }
+    }
+
     if (context.brandProfile.logo) {
       if (context.brandProfile.logo.startsWith('data:')) {
         productImages.push({
@@ -123,11 +213,37 @@ IMPORTANTE: Este slide faz parte de uma sequência. A tipografia (fonte, peso, c
       }
     }
 
+    // Use selected style reference (favoritos) if available
+    if (context.selectedStyleReference?.src) {
+      const src = context.selectedStyleReference.src;
+      if (src.startsWith('data:')) {
+        const matches = src.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          productImages.push({ base64: matches[2], mimeType: matches[1] });
+        }
+      } else {
+        try {
+          const response = await fetch(src);
+          const blob = await response.blob();
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          const base64Data = base64.split(',')[1];
+          productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
+        } catch (err) {
+          console.error('[CarrosselTab] Failed to fetch style reference image:', err);
+        }
+      }
+    }
+
     const imageDataUrl = await generateImage(prompt, context.brandProfile, {
       aspectRatio: '4:5',
       model: 'gemini-3-pro-image-preview',
       styleReferenceImage: styleRef,
       productImages: productImages.length > 0 ? productImages : undefined,
+      compositionAssets: context.compositionAssets?.length > 0 ? context.compositionAssets : undefined,
     });
 
     const base64Data = imageDataUrl.split(',')[1];
@@ -172,10 +288,19 @@ export const generateAllCampaignCarouselImages = async (
       carousel;
 
     if (!currentCarousel.cover_url) {
+      if (context.shouldPause?.()) {
+        console.debug('[CarrosselTab] Generation paused before cover');
+        return;
+      }
       console.debug('[CarrosselTab] Generating cover...');
       await generateCampaignCover(currentCarousel, context);
 
       await new Promise((resolve) => setTimeout(resolve, 800));
+
+      if (context.shouldPause?.()) {
+        console.debug('[CarrosselTab] Generation paused after cover');
+        return;
+      }
 
       currentCarousel =
         context.localCarouselsRef.current.find((c) => c.id === carouselId) ||
@@ -188,6 +313,10 @@ export const generateAllCampaignCarouselImages = async (
 
     console.debug('[CarrosselTab] Generating slides...');
     for (let i = 0; i < currentCarousel.slides.length; i++) {
+      if (context.shouldPause?.()) {
+        console.debug('[CarrosselTab] Generation paused during slides');
+        break;
+      }
       currentCarousel =
         context.localCarouselsRef.current.find((c) => c.id === carouselId) ||
         currentCarousel;

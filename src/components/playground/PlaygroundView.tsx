@@ -62,39 +62,6 @@ const sampleVideos: FeedPost[] = [
     status: PostStatus.SUCCESS,
     aspectRatio: PlaygroundAspectRatio.PORTRAIT,
   },
-  {
-    id: 's4',
-    videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-logan.mp4',
-    mediaType: MediaType.VIDEO,
-    username: 'OfficialLoganK',
-    avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Jocelyn',
-    description: 'Vibe coding no topo de uma montanha.',
-    modelTag: 'Veo Fast',
-    status: PostStatus.SUCCESS,
-    aspectRatio: PlaygroundAspectRatio.PORTRAIT,
-  },
-  {
-    id: 's5',
-    videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-kat.mp4',
-    mediaType: MediaType.VIDEO,
-    username: 'kat_kampf',
-    avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Jameson',
-    description: 'Explorando um templo majestoso em uma floresta.',
-    modelTag: 'Veo Fast',
-    status: PostStatus.SUCCESS,
-    aspectRatio: PlaygroundAspectRatio.PORTRAIT,
-  },
-  {
-    id: 's6',
-    videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-josh.mp4',
-    mediaType: MediaType.VIDEO,
-    username: 'joshwoodward',
-    avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Jade',
-    description: 'No palco principal de um evento de tecnologia.',
-    modelTag: 'Veo Fast',
-    status: PostStatus.SUCCESS,
-    aspectRatio: PlaygroundAspectRatio.PORTRAIT,
-  },
 ];
 
 interface PlaygroundViewProps {
@@ -106,6 +73,8 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
   const [feed, setFeed] = useState<FeedPost[]>(sampleVideos);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  // Image to edit (passed from VideoCard when clicking "Add to prompt")
+  const [editingImage, setEditingImage] = useState<{ url: string; base64: string; mimeType: string } | null>(null);
 
   // Background jobs for video generation
   const { onJobComplete, onJobFailed } = useBackgroundJobs();
@@ -129,6 +98,11 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
         post.id === id ? { ...post, ...updates } : post
       )
     );
+  }, []);
+
+  // Handle clearing editing image after generation
+  const handleClearEditingImage = useCallback(() => {
+    setEditingImage(null);
   }, []);
 
   // Handle background job completion
@@ -306,6 +280,29 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
     }
   }, [brandProfile, updateFeedPost, userId]);
 
+  // Handle adding an image to the prompt for editing
+  const handleAddToPrompt = useCallback(async (imageUrl: string) => {
+    try {
+      // Fetch the image and convert to base64
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+      const base64Data = base64.split(',')[1];
+
+      setEditingImage({
+        url: imageUrl,
+        base64: base64Data,
+        mimeType: blob.type || 'image/png',
+      });
+    } catch (error) {
+      console.error('Failed to load image for editing:', error);
+      setErrorToast('Falha ao carregar imagem para edição');
+    }
+  }, []);
 
   const handleGenerate = useCallback(async (params: GenerateVideoParams) => {
     const newPostId = Date.now().toString();
@@ -387,14 +384,21 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             <AnimatePresence initial={false}>
               {feed.map((post) => (
-                <VideoCard key={post.id} post={post} />
+                <VideoCard key={post.id} post={post} onAddToPrompt={handleAddToPrompt} />
               ))}
             </AnimatePresence>
           </div>
         </div>
       </main>
 
-      <BottomPromptBar onGenerate={handleGenerate} />
+      <BottomPromptBar
+        onGenerate={handleGenerate}
+        editingImage={editingImage}
+        onClearEditingImage={handleClearEditingImage}
+        setFeed={setFeed}
+        setErrorToast={setErrorToast}
+        brandProfile={brandProfile}
+      />
     </div>
   );
 };

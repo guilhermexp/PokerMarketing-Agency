@@ -5,9 +5,10 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useRef, useState, useEffect } from 'react';
-import { ArrowUp, Plus, User, Video, ImageIcon, Palette, Upload, X, Sparkles, Image as _ImageLucide } from 'lucide-react';
+import { ArrowUp, Plus, User, Video, ImageIcon, Palette, Upload, X, Sparkles, Image as _ImageLucide, Edit3 } from 'lucide-react';
 import {
   CameoProfile,
+  FeedPost,
   GenerateVideoParams,
   GenerationMode,
   MediaType,
@@ -17,7 +18,9 @@ import {
   PlaygroundVeoModel,
   PlaygroundImageSize,
   ImageFile,
+  PostStatus,
 } from './types';
+import { editImage } from '../../services/geminiService';
 
 const defaultCameoProfiles: CameoProfile[] = [
   { id: '1', name: 'asr', imageUrl: 'https://api.dicebear.com/7.x/avataaars/png?seed=asr&backgroundColor=transparent' },
@@ -81,9 +84,21 @@ const fileToImageFile = (file: File): Promise<PlaygroundImageFile> => {
 
 interface BottomPromptBarProps {
   onGenerate: (params: GenerateVideoParams) => void;
+  editingImage?: { url: string; base64: string; mimeType: string } | null;
+  onClearEditingImage?: () => void;
+  setFeed?: React.Dispatch<React.SetStateAction<FeedPost[]>>;
+  setErrorToast?: (message: string) => void;
+  brandProfile?: { name?: string; logo?: string };
 }
 
-export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) => {
+export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
+  onGenerate,
+  editingImage,
+  onClearEditingImage,
+  setFeed,
+  setErrorToast,
+  brandProfile,
+}) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [prompt, setPrompt] = useState('');
   const [mediaType, setMediaType] = useState<MediaType>(MediaType.VIDEO);
@@ -98,6 +113,14 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
   const [imageSize, setImageSize] = useState<PlaygroundImageSize>(PlaygroundImageSize.K1);
   const [productImages, setProductImages] = useState<(ImageFile & { preview: string })[]>([]);
   const [styleReference, setStyleReference] = useState<(ImageFile & { preview: string }) | null>(null);
+
+  // Expand when editing image is provided
+  useEffect(() => {
+    if (editingImage) {
+      setIsExpanded(true);
+      setMediaType(MediaType.IMAGE);
+    }
+  }, [editingImage]);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -206,7 +229,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
     const files = e.target.files;
     if (!files) return;
 
-    const remainingSlots = 5 - productImages.length;
+    const remainingSlots = 14 - productImages.length;
     const filesToProcess = Array.from(files as FileList).slice(0, remainingSlots) as File[];
 
     for (const file of filesToProcess) {
@@ -262,6 +285,50 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
   const handleSubmit = async () => {
     if (!prompt.trim()) return;
 
+    // Handle image editing mode
+    if (editingImage && mediaType === MediaType.IMAGE) {
+      try {
+        const resultUrl = await editImage(
+          editingImage.base64,
+          editingImage.mimeType,
+          prompt,
+          undefined, // no mask
+          undefined, // no reference image
+        );
+
+        // Create a new post with the edited image
+        const newPostId = Date.now().toString();
+        const newPost = {
+          id: newPostId,
+          mediaType: MediaType.IMAGE,
+          username: (brandProfile?.name || 'voce'),
+          avatarUrl: brandProfile?.logo || 'https://api.dicebear.com/7.x/avataaars/svg?seed=voce',
+          description: prompt,
+          modelTag: 'Gemini Edit',
+          status: PostStatus.SUCCESS,
+          aspectRatio: PlaygroundAspectRatio.SQUARE,
+          imageUrl: resultUrl,
+        };
+
+        // Add to feed
+        setFeed?.(prev => [newPost, ...prev]);
+
+        // Clear editing state
+        setPrompt('');
+        onClearEditingImage?.();
+
+        if (inputRef.current) {
+          inputRef.current.style.height = '28px';
+          inputRef.current.focus();
+        }
+      } catch (error) {
+        console.error('Image edit failed:', error);
+        setErrorToast?.('Falha ao editar imagem');
+      }
+      return;
+    }
+
+    // Normal generation mode
     let mode = GenerationMode.TEXT_TO_VIDEO;
     let referenceImages: PlaygroundImageFile[] | undefined = undefined;
     let selectedModel = PlaygroundVeoModel.VEO_FAST;
@@ -400,6 +467,35 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
                 </div>
 
                 <div className="flex flex-wrap gap-4 px-1">
+                  {/* Editing Image Panel */}
+                  {editingImage && (
+                    <div className="flex flex-col gap-1 w-full">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-purple-400 uppercase tracking-wide flex items-center gap-1">
+                          <Edit3 className="w-3 h-3" />
+                          Editando Imagem
+                        </span>
+                        <button
+                          onClick={onClearEditingImage}
+                          className="text-[10px] text-white/40 hover:text-white/70 transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                        <img
+                          src={editingImage.url}
+                          alt="Editando"
+                          className="w-12 h-12 object-cover rounded-lg border border-white/10"
+                        />
+                        <div className="flex-1">
+                          <p className="text-xs text-white/80">Descreva as alteracoes:</p>
+                          <p className="text-[10px] text-white/50">Ex: "Adicione um chapéu", "Mude a cor do fundo para azul"</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Quality Selector */}
                   <div className="flex flex-col gap-1">
                     <span className="text-[10px] text-white/40 uppercase tracking-wide">Qualidade</span>
@@ -448,7 +544,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
 
                   {/* Product Images / Assets */}
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] text-white/40 uppercase tracking-wide">Ativos ({productImages.length}/5)</span>
+                    <span className="text-[10px] text-white/40 uppercase tracking-wide">Ativos ({productImages.length}/14)</span>
                     <div className="flex items-center gap-1.5">
                       {productImages.map((img, index) => (
                         <div key={index} className="relative group">
@@ -465,7 +561,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({ onGenerate }) 
                           </button>
                         </div>
                       ))}
-                      {productImages.length < 5 && (
+                      {productImages.length < 14 && (
                         <label className="w-8 h-8 bg-black/60 border border-white/10 rounded-lg flex items-center justify-center cursor-pointer hover:border-white/20 transition-colors">
                           <Plus className="w-4 h-4 text-white/40" />
                           <input

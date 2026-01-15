@@ -220,6 +220,9 @@ function AppContent() {
   const [campaignProductImages, setCampaignProductImages] = useState<
     { base64: string; mimeType: string }[] | null
   >(null);
+  const [campaignCompositionAssets, setCampaignCompositionAssets] = useState<
+    { base64: string; mimeType: string }[] | null
+  >(null);
 
   // Helper to save productImages to localStorage
   const saveProductImagesToStorage = (campaignId: string, images: { base64: string; mimeType: string }[] | null) => {
@@ -303,8 +306,10 @@ function AppContent() {
   );
 
   // Instagram accounts for multi-tenant publishing
-  const { accounts: instagramAccounts, fetchAccounts: fetchInstagramAccounts } =
-    useInstagramAccounts(userId || "", organizationId);
+  const { accounts: instagramAccounts } = useInstagramAccounts(
+    userId || "",
+    organizationId,
+  );
 
 
 
@@ -691,7 +696,7 @@ function AppContent() {
         },
       ]);
     }
-  }, [brandProfile]); // Removed chatHistory.length to avoid infinite loop
+  }, [brandProfile, chatHistory.length]);
 
   const handleAddImageToGallery = (
     image: Omit<GalleryImage, "id">,
@@ -1099,6 +1104,9 @@ function AppContent() {
     // Store product images for use in PostsTab and AdCreativesTab
     console.debug("[App] Storing productImages:", input.productImages ? `${input.productImages.length} image(s)` : "null");
     setCampaignProductImages(input.productImages);
+    // Store composition assets for use in image generation
+    console.debug("[App] Storing compositionAssets:", options.compositionAssets ? `${options.compositionAssets.length} asset(s)` : "null");
+    setCampaignCompositionAssets(options.compositionAssets || null);
     try {
       const r = await generateCampaign(brandProfile!, input, options);
 
@@ -1919,12 +1927,14 @@ function AppContent() {
             brandProfile={brandProfile!}
             campaign={campaign}
             productImages={campaignProductImages}
+            compositionAssets={campaignCompositionAssets}
             onGenerate={handleGenerateCampaign}
             isGenerating={isGenerating}
             onEditProfile={() => setIsEditingProfile(true)}
             onResetCampaign={() => {
               setCampaign(null);
               setCampaignProductImages(null);
+              setCampaignCompositionAssets(null);
             }}
             isAssistantOpen={isAssistantOpen}
             onToggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}

@@ -20,9 +20,11 @@ interface CampaignCarouselCardProps {
   hasCover: boolean;
   allGenerated: boolean;
   isGeneratingAny: boolean;
+  isPaused: boolean;
   publishing: boolean;
   captions: Record<string, string>;
   onGenerateAll: () => void;
+  onTogglePause: () => void;
   onSchedule?: () => void;
   onPublish?: () => void;
   onReorder: (newOrder: GalleryImage[]) => void;
@@ -45,9 +47,11 @@ export const CampaignCarouselCard: React.FC<CampaignCarouselCardProps> = ({
   hasCover,
   allGenerated,
   isGeneratingAny,
+  isPaused,
   publishing,
   captions,
   onGenerateAll,
+  onTogglePause,
   onSchedule,
   onPublish,
   onReorder,
@@ -115,6 +119,18 @@ export const CampaignCarouselCard: React.FC<CampaignCarouselCardProps> = ({
               </>
             )}
           </button>
+
+          {isGeneratingAny && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePause();
+              }}
+              className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-white/10 text-white/70 hover:bg-white/15 transition-colors whitespace-nowrap"
+            >
+              {isPaused ? 'Retomar' : 'Pausar'}
+            </button>
+          )}
 
           {onSchedule && hasAnyImages && orderedImages.length >= 2 && (
             <button

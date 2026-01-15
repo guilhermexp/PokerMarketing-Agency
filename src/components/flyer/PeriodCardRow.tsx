@@ -13,6 +13,7 @@ import { Button } from "../common/Button";
 import { Loader } from "../common/Loader";
 import { Icon } from "../common/Icon";
 import { generateFlyer } from "../../services/geminiService";
+import { buildDailyFlyerPromptCompact } from "@/ai-prompts";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import { QuickPostModal } from "../common/QuickPostModal";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";
@@ -210,33 +211,26 @@ export const PeriodCardRow: React.FC<{
 
                 const isHighlights = period === "HIGHLIGHTS";
 
-                const prompt = isHighlights
-                    ? `
-        TIPO: Flyer de Destaques do Dia - TOP 3 TORNEIOS
-        TÍTULO: ${label.toUpperCase()}
-        DATA: ${dayInfo}
+                const labelUpper = label.toUpperCase();
+                const secondEventText = otherEvents[0]
+                    ? `${otherEvents[0].times?.["-3"]} | ${otherEvents[0].name} | GTD: ${formatCurrencyValue(otherEvents[0].gtd, currency)}`
+                    : "";
+                const thirdEventText = otherEvents[1]
+                    ? `${otherEvents[1].times?.["-3"]} | ${otherEvents[1].name} | GTD: ${formatCurrencyValue(otherEvents[1].gtd, currency)}`
+                    : "";
 
-        REGRA CRÍTICA: Este flyer mostra EXATAMENTE 3 torneios.
-
-        OS 3 TORNEIOS (em ordem de importância):
-        TORNEIO PRINCIPAL: ${topEventText}
-        SEGUNDO TORNEIO: ${otherEvents[0] ? `${otherEvents[0].times?.["-3"]} | ${otherEvents[0].name} | GTD: ${formatCurrencyValue(otherEvents[0].gtd, currency)}` : ""}
-        TERCEIRO TORNEIO: ${otherEvents[1] ? `${otherEvents[1].times?.["-3"]} | ${otherEvents[1].name} | GTD: ${formatCurrencyValue(otherEvents[1].gtd, currency)}` : ""}
-
-        DESIGN: Logo no topo, título "${label}", data "${dayInfo}" em tamanho discreto, GTD em cor ${brandProfile.secondaryColor}, fundo ${brandProfile.primaryColor}
-        `
-                    : `
-        TIPO: Grade de Programação com Torneio Principal
-        TÍTULO: ${label.toUpperCase()}
-        DATA: ${dayInfo}
-
-        TORNEIO PRINCIPAL (maior GTD): ${topEventText}
-
-        LISTA DOS DEMAIS TORNEIOS:
-        ${otherEventsList}
-
-        DESIGN: Logo no topo, título "${label}", data "${dayInfo}" em tamanho discreto, GTD em ${brandProfile.secondaryColor}, fundo ${brandProfile.primaryColor}
-        `;
+                const prompt = buildDailyFlyerPromptCompact({
+                    isHighlights,
+                    label,
+                    labelUpper,
+                    dayInfo,
+                    topEventText,
+                    secondEventText,
+                    thirdEventText,
+                    otherEventsList,
+                    brandPrimaryColor: brandProfile.primaryColor,
+                    brandSecondaryColor: brandProfile.secondaryColor,
+                });
 
                 // Use background job if userId is available AND we're not in dev mode
                 if (userId && !isDevMode) {

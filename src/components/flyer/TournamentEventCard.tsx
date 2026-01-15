@@ -17,6 +17,7 @@ import { SchedulePostModal } from '@/components/calendar/SchedulePostModal';
 import { useBackgroundJobs, type ActiveJob } from '@/hooks/useBackgroundJobs';
 import { urlToBase64 } from '@/utils/imageHelpers';
 import { generateFlyer } from '@/services/geminiService';
+import { buildSingleEventFlyerPromptExtended } from '@/ai-prompts';
 import type { BrandProfile, TournamentEvent, GalleryImage, ImageModel, ImageSize, ImageFile } from '@/types';
 import type { GenerationJobConfig } from '@/services/apiClient';
 import type { Currency } from '@/types/flyer.types';
@@ -152,27 +153,14 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
     const biVal = formatCurrencyValue(event.buyIn, currency);
     const gtdVal = formatCurrencyValue(event.gtd, currency);
 
-    const prompt = `
-      TIPO: Flyer de Torneio Individual (single event highlight)
-
-      DADOS DO EVENTO:
-      • Torneio: ${event.name}
-      • Garantido (GTD): ${gtdVal} ← DESTAQUE MÁXIMO
-      • Buy-in: ${biVal}
-      • Horário: ${event.times?.['-3']} (GMT-3)
-
-      ESTRUTURA DO LAYOUT:
-      1. TOPO: Logo da marca centralizado ou canto superior
-      2. CENTRO: Nome do torneio + Valor GTD em GRANDE DESTAQUE
-      3. INFERIOR: Horário e buy-in com boa legibilidade
-
-      REGRAS VISUAIS:
-      - O GTD (${gtdVal}) deve ocupar pelo menos 30% da área visual
-      - Use a cor ${brandProfile.secondaryColor} no valor GTD
-      - Fundo escuro/elegante baseado em ${brandProfile.primaryColor}
-      - Atmosfera: ambiente premium, elegante e sofisticado
-      - Tipografia impactante e moderna para o valor monetário
-    `;
+    const prompt = buildSingleEventFlyerPromptExtended({
+      eventName: event.name,
+      gtdValue: gtdVal,
+      buyInValue: biVal,
+      eventTime: event.times?.['-3'],
+      brandPrimaryColor: brandProfile.primaryColor,
+      brandSecondaryColor: brandProfile.secondaryColor,
+    });
 
     // Use background job if userId is available AND we're not in dev mode
     if (userId && !isDevMode) {

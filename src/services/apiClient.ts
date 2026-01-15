@@ -945,6 +945,7 @@ export interface GenerationJobConfig {
   collabLogo?: string;
   styleReference?: string;
   compositionAssets?: string[];
+  productImages?: string[];
   source: string;
 }
 
@@ -1048,6 +1049,7 @@ export interface ImageJobConfig {
   source?: string;
   referenceImage?: string;
   sourceImage?: string; // For image editing
+  productImages?: string[];
   systemPrompt?: string;
 }
 

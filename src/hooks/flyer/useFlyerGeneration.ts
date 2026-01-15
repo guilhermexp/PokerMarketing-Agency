@@ -8,6 +8,10 @@ import { useCallback, useState } from 'react';
 import { useFlyerStore } from '@/stores/flyerStore';
 import { generateFlyer } from '@/services/geminiService';
 import { urlToBase64 } from '@/utils/imageHelpers';
+import {
+  buildBackgroundFlyerPrompt,
+  buildSingleEventFlyerPrompt,
+} from '@/ai-prompts';
 import type { BrandProfile, GalleryImage, ImageSize, TournamentEvent } from '@/types';
 import type { GenerationJobConfig } from '@/services/apiClient';
 
@@ -51,25 +55,14 @@ export const useFlyerGeneration = ({
         const biVal = event.buyIn || '0';
         const gtdVal = event.gtd || '0';
 
-        const prompt = `
-          TIPO: Flyer de Torneio Individual (single event highlight)
-
-          DADOS DO EVENTO:
-          • Torneio: ${event.name}
-          • Garantido (GTD): ${gtdVal} ← DESTAQUE MÁXIMO
-          • Buy-in: ${biVal}
-          • Horário: ${event.times?.['-3']} (GMT-3)
-
-          ESTRUTURA DO LAYOUT:
-          1. TOPO: Logo da marca centralizado ou canto superior
-          2. CENTRO: Nome do torneio + Valor GTD em GRANDE DESTAQUE
-          3. INFERIOR: Horário e buy-in com boa legibilidade
-
-          REGRAS VISUAIS:
-          - O GTD (${gtdVal}) deve ocupar pelo menos 30% da área visual
-          - Use a cor ${brandProfile.secondaryColor} no valor GTD
-          - Fundo escuro/elegante baseado em ${brandProfile.primaryColor}
-        `;
+        const prompt = buildSingleEventFlyerPrompt({
+          eventName: event.name,
+          gtdValue: gtdVal,
+          buyInValue: biVal,
+          eventTime: event.times?.['-3'],
+          brandPrimaryColor: brandProfile.primaryColor,
+          brandSecondaryColor: brandProfile.secondaryColor,
+        });
 
         // Convert assets to base64
         const [logoToUse, refData] = await Promise.all([
@@ -185,7 +178,7 @@ export const useFlyerGeneration = ({
           source: 'Flyer',
         };
 
-        const _prompt = `Generate flyer for ${event.name} with GTD ${event.gtd}`;
+        const _prompt = buildBackgroundFlyerPrompt(event.name, event.gtd);
 
         // This would call the queueJob function from useBackgroundJobs
         // For now, we'll just trigger the callback

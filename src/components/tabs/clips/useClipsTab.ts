@@ -13,6 +13,9 @@ import {
 } from "../../../services/apiClient";
 import { uploadImageToBlob } from "../../../services/blobService";
 import { urlToBase64 } from "../../../utils/imageHelpers";
+import { buildThumbnailPrompt } from "@/ai-prompts";
+
+const CLIP_ASPECT_RATIO = "9:16" as const;
 import {
     useBackgroundJobs,
     type ActiveJob,
@@ -25,6 +28,7 @@ interface UseClipsTabProps {
     userId?: string | null;
     onAddImageToGallery: (image: Omit<GalleryImage, "id">) => GalleryImage;
     onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
+    productImages?: ImageFile[] | null;
 }
 
 export const useClipsTab = ({
@@ -34,6 +38,7 @@ export const useClipsTab = ({
     userId,
     onAddImageToGallery,
     onUpdateGalleryImage,
+    productImages,
 }: UseClipsTabProps) => {
     const [thumbnails, setThumbnails] = useState<(GalleryImage | null)[]>([]);
     const [extraInstructions, setExtraInstructions] = useState<string[]>([]);
@@ -239,15 +244,6 @@ export const useClipsTab = ({
         selectedImageModel,
     ]);
 
-    const buildThumbnailPrompt = (
-        basePrompt: string,
-        extraInstruction?: string
-    ) => {
-        const extra = extraInstruction?.trim();
-        if (!extra) return basePrompt;
-        return `${basePrompt}\n\nInstrucoes extras: ${extra}`;
-    };
-
     const handleGenerateThumbnail = useCallback(
         async (index: number, extraInstruction?: string) => {
             const isDevMode =
@@ -281,15 +277,24 @@ export const useClipsTab = ({
 
             if (userId && !isDevMode) {
                 try {
+                    const productImageDataUrls = (productImages || []).map(
+                        (img) => `data:${img.mimeType};base64,${img.base64}`
+                    );
+
+                    if (brandProfile.logo?.startsWith("data:")) {
+                        productImageDataUrls.push(brandProfile.logo);
+                    }
+
                     const config: GenerationJobConfig = {
                         brandName: brandProfile.name,
                         brandDescription: brandProfile.description,
                         brandToneOfVoice: brandProfile.toneOfVoice,
                         brandPrimaryColor: brandProfile.primaryColor,
                         brandSecondaryColor: brandProfile.secondaryColor,
-                        aspectRatio: "16:9",
+                        aspectRatio: CLIP_ASPECT_RATIO,
                         model: selectedImageModel,
                         logo: brandProfile.logo || undefined,
+                        productImages: productImageDataUrls.length > 0 ? productImageDataUrls : undefined,
                         source: "Clipe",
                     };
 
@@ -301,21 +306,24 @@ export const useClipsTab = ({
             }
 
             try {
-                const productImages: ImageFile[] = [];
+                const productImagesToUse: ImageFile[] = [...(productImages || [])];
                 if (brandProfile.logo) {
-                    productImages.push({
-                        base64: brandProfile.logo.split(",")[1],
-                        mimeType: brandProfile.logo.match(/:(.*?);/)?.[1] || "image/png",
-                    });
+                    const logoData = await urlToBase64(brandProfile.logo);
+                    if (logoData?.base64) {
+                        productImagesToUse.push({
+                            base64: logoData.base64,
+                            mimeType: logoData.mimeType || "image/png",
+                        });
+                    }
                 }
 
                 const generatedImageDataUrl = await generateImage(
                     prompt,
                     brandProfile,
                     {
-                        aspectRatio: "16:9",
+                        aspectRatio: CLIP_ASPECT_RATIO,
                         model: selectedImageModel,
-                        productImages: productImages.length > 0 ? productImages : undefined,
+                        productImages: productImagesToUse.length > 0 ? productImagesToUse : undefined,
                     }
                 );
 
@@ -377,6 +385,7 @@ export const useClipsTab = ({
             brandProfile,
             queueJob,
             onAddImageToGallery,
+            productImages,
         ]
     );
 

@@ -142,8 +142,8 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
           ...prev,
           logo: file,
           primaryColor: colors.primaryColor,
-          secondaryColor: colors.secondaryColor || prev.secondaryColor,
-          tertiaryColor: colors.tertiaryColor || '',
+          secondaryColor: colors.secondaryColor ?? prev.secondaryColor,
+          tertiaryColor: colors.tertiaryColor ?? '',
         }));
       } catch (error) {
         console.error("Failed to extract colors:", error);

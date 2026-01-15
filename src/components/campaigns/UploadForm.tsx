@@ -4,6 +4,7 @@ import type {
   GenerationOptions,
   BrandProfile,
   StyleReference,
+  ToneOfVoice,
 } from "../../types";
 import { Icon } from "../common/Icon";
 import { GenerationOptionsModal } from "./GenerationOptionsModal";
@@ -24,6 +25,13 @@ const creativeModelLabels = Object.fromEntries(
   ]),
 );
 const DEFAULT_MODEL = getDefaultModelId();
+const TONE_OPTIONS: ToneOfVoice[] = [
+  "Profissional",
+  "Espirituoso",
+  "Casual",
+  "Inspirador",
+  "Técnico",
+];
 
 interface ImageFile {
   base64: string;
@@ -107,15 +115,18 @@ export const UploadForm: React.FC<UploadFormProps> = ({
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
+  const [isToneSelectorOpen, setIsToneSelectorOpen] = useState(false);
+  const [toneOverride, setToneOverride] = useState<ToneOfVoice | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
   const inspirationInputRef = useRef<HTMLInputElement>(null);
   const collabLogoInputRef = useRef<HTMLInputElement>(null);
   const assetsInputRef = useRef<HTMLInputElement>(null);
   const modelSelectorRef = useRef<HTMLDivElement>(null);
+  const toneSelectorRef = useRef<HTMLDivElement>(null);
   const favoritesPanelRef = useRef<HTMLDivElement>(null);
 
-  // Close model selector when clicking outside
+  // Close selectors when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -124,10 +135,21 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       ) {
         setIsModelSelectorOpen(false);
       }
+
+      if (
+        toneSelectorRef.current &&
+        !toneSelectorRef.current.contains(e.target as Node)
+      ) {
+        setIsToneSelectorOpen(false);
+      }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
+
 
   // Persist collabLogo to localStorage
   useEffect(() => {
@@ -316,6 +338,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
             mimeType: img.mimeType,
           }))
           : null,
+      toneOfVoiceOverride: toneOverride,
     };
     setPendingContentInput(contentInput);
     setIsOptionsModalOpen(true);
@@ -449,6 +472,56 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                         <span className="text-[9px] text-white/25">
                           {creativeModelLabels[model]?.provider}
                         </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Tone Selector */}
+              <div className="relative" ref={toneSelectorRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsToneSelectorOpen(!isToneSelectorOpen)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-white/30 hover:text-white/50 hover:bg-white/[0.04] transition-all cursor-pointer"
+                  title="Tom da campanha"
+                >
+                  <Icon name="sliders" className="w-3 h-3" />
+                  <span className="text-[10px] font-medium uppercase tracking-wide">
+                    {toneOverride || brandProfile.toneOfVoice}
+                  </span>
+                  <Icon name="chevron-down" className="w-2.5 h-2.5" />
+                </button>
+
+                {isToneSelectorOpen && (
+                  <div className="absolute top-full left-0 mt-1 py-1 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 min-w-[200px] backdrop-blur-xl">
+                    <button
+                      onClick={() => {
+                        setToneOverride(null);
+                        setIsToneSelectorOpen(false);
+                      }}
+                      className={`w-full px-3 py-2.5 text-left text-xs transition-colors ${
+                        toneOverride === null
+                          ? "bg-white/[0.08] text-white"
+                          : "text-white/50 hover:bg-white/[0.04] hover:text-white/70"
+                      }`}
+                    >
+                      Padrão da marca ({brandProfile.toneOfVoice})
+                    </button>
+                    {TONE_OPTIONS.map((tone) => (
+                      <button
+                        key={tone}
+                        onClick={() => {
+                          setToneOverride(tone);
+                          setIsToneSelectorOpen(false);
+                        }}
+                        className={`w-full px-3 py-2.5 text-left text-xs transition-colors ${
+                          toneOverride === tone
+                            ? "bg-white/[0.08] text-white"
+                            : "text-white/50 hover:bg-white/[0.04] hover:text-white/70"
+                        }`}
+                      >
+                        {tone}
                       </button>
                     ))}
                   </div>

@@ -2988,7 +2988,13 @@ const generateGeminiImage = async (
     }),
   );
 
-  for (const part of response.candidates[0].content.parts) {
+  const responseParts = response?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(responseParts)) {
+    console.error("[Image API] Unexpected response:", JSON.stringify(response, null, 2));
+    throw new Error("Failed to generate image - invalid response structure");
+  }
+
+  for (const part of responseParts) {
     if (part.inlineData) {
       return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
     }
@@ -3106,7 +3112,14 @@ const getToneText = (brandProfile, target) => {
   return shouldUseTone(brandProfile, target) ? brandProfile.toneOfVoice : "";
 };
 
-const buildImagePrompt = (prompt, brandProfile, hasStyleReference = false, hasLogo = false, hasPersonReference = false) => {
+const buildImagePrompt = (
+  prompt,
+  brandProfile,
+  hasStyleReference = false,
+  hasLogo = false,
+  hasPersonReference = false,
+  hasProductImages = false,
+) => {
   const toneText = getToneText(brandProfile, "images");
   let fullPrompt = `PROMPT TÉCNICO: ${prompt}
 ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
@@ -3129,6 +3142,15 @@ ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryCo
 - Use o LOGO EXATO fornecido na imagem de referência anexada - NÃO CRIE UM LOGO DIFERENTE
 - O logo deve aparecer de forma clara e legível na composição
 - Mantenha as proporções e cores originais do logo`;
+  }
+
+  if (hasProductImages) {
+    fullPrompt += `
+
+**IMAGENS DE PRODUTO (OBRIGATÓRIO):**
+- As imagens anexadas são referências de produto
+- Preserve fielmente o produto (forma, cores e detalhes principais)
+- O produto deve aparecer com destaque na composição`;
   }
 
   if (hasStyleReference) {
@@ -3374,6 +3396,7 @@ app.post("/api/ai/campaign", async (req, res) => {
       inspirationImages,
       collabLogo,
       compositionAssets,
+      toneOfVoiceOverride,
     } = req.body;
 
     if (!brandProfile || !transcript || !options) {
@@ -3388,6 +3411,7 @@ app.post("/api/ai/campaign", async (req, res) => {
       inspirationImages: inspirationImages?.length || 0,
       collabLogo: !!collabLogo,
       compositionAssets: compositionAssets?.length || 0,
+      toneOverride: toneOfVoiceOverride || null,
     });
 
     // Collect all images for vision models
@@ -3403,11 +3427,14 @@ app.post("/api/ai/campaign", async (req, res) => {
     const isOpenRouter = model.includes("/");
 
     const quantityInstructions = buildQuantityInstructions(options, "dev");
+    const effectiveBrandProfile = toneOfVoiceOverride
+      ? { ...brandProfile, toneOfVoice: toneOfVoiceOverride }
+      : brandProfile;
     const prompt = buildCampaignPrompt(
-      brandProfile,
+      effectiveBrandProfile,
       transcript,
       quantityInstructions,
-      getToneText(brandProfile, "campaigns"),
+      getToneText(effectiveBrandProfile, "campaigns"),
     );
 
     let result;
@@ -3554,6 +3581,13 @@ REGRAS CRÍTICAS:
       videoScriptsCount: campaign.videoClipScripts?.length,
       hasCarousels: !!campaign.carousels,
       carouselsCount: campaign.carousels?.length,
+      hasProductImages: !!productImages?.length,
+      productImagesCount: productImages?.length || 0,
+      hasInspirationImages: !!inspirationImages?.length,
+      inspirationImagesCount: inspirationImages?.length || 0,
+      hasCollabLogo: !!collabLogo,
+      compositionAssetsCount: compositionAssets?.length || 0,
+      toneOverride: toneOfVoiceOverride || null,
     });
 
     console.log("[Campaign API] Campaign generated successfully");
@@ -3755,7 +3789,7 @@ app.post("/api/ai/image", async (req, res) => {
     }
 
     console.log(
-      `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}${personReferenceImage ? ', with person reference' : ''}`,
+      `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}${personReferenceImage ? ', with person reference' : ''} | productImages: ${productImages?.length || 0}`,
     );
 
     // Prepare product images array, including brand logo if available
@@ -3787,7 +3821,12 @@ app.post("/api/ai/image", async (req, res) => {
       !!styleReferenceImage,
       hasLogo,
       hasPersonReference,
+      !!productImages?.length,
     );
+
+    console.log("[Image API] Prompt:");
+    console.log(fullPrompt);
+
     const imageDataUrl = await generateGeminiImage(
       fullPrompt,
       aspectRatio,

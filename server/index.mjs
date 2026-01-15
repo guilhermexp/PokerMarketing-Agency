@@ -267,7 +267,13 @@ const generateGeminiImage = async (
     }),
   );
 
-  for (const part of response.candidates[0].content.parts) {
+  const responseParts = response?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(responseParts)) {
+    console.error("[Image API] Unexpected response:", JSON.stringify(response, null, 2));
+    throw new Error("Failed to generate image - invalid response structure");
+  }
+
+  for (const part of responseParts) {
     if (part.inlineData) {
       return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
     }
@@ -385,7 +391,13 @@ const getToneText = (brandProfile, target) => {
   return shouldUseTone(brandProfile, target) ? brandProfile.toneOfVoice : "";
 };
 
-const buildImagePrompt = (prompt, brandProfile, hasStyleReference = false, hasLogo = false) => {
+const buildImagePrompt = (
+  prompt,
+  brandProfile,
+  hasStyleReference = false,
+  hasLogo = false,
+  hasProductImages = false,
+) => {
   const toneText = getToneText(brandProfile, "images");
   let fullPrompt = `PROMPT TÉCNICO: ${prompt}
 ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
@@ -397,6 +409,15 @@ ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryCo
 - Use o LOGO EXATO fornecido na imagem de referência anexada - NÃO CRIE UM LOGO DIFERENTE
 - O logo deve aparecer de forma clara e legível na composição
 - Mantenha as proporções e cores originais do logo`;
+  }
+
+  if (hasProductImages) {
+    fullPrompt += `
+
+**IMAGENS DE PRODUTO (OBRIGATÓRIO):**
+- As imagens anexadas são referências de produto
+- Preserve fielmente o produto (forma, cores e detalhes principais)
+- O produto deve aparecer com destaque na composição`;
   }
 
   if (hasStyleReference) {
@@ -1031,6 +1052,31 @@ const processVideoGenerationJob = async (job, jobId, prompt, config, sql) => {
   return { resultUrl: blob.url };
 };
 
+const resolveJobImage = async (image) => {
+  if (!image) return null;
+
+  if (typeof image === "string") {
+    if (image.startsWith("data:")) {
+      const [header, data] = image.split(",");
+      const mimeType = header.match(/data:(.*?);/)?.[1] || "image/png";
+      return { base64: data, mimeType };
+    }
+
+    const base64 = await urlToBase64(image);
+    if (!base64) return null;
+    return { base64, mimeType: "image/png" };
+  }
+
+  if (image.base64) {
+    return {
+      base64: image.base64,
+      mimeType: image.mimeType || "image/png",
+    };
+  }
+
+  return null;
+};
+
 /**
  * Process generic image generation jobs (simple prompt-based)
  */
@@ -1066,6 +1112,18 @@ Mood: ${config.mood || "professional"}`;
     if (srcData) {
       parts.push({ text: "Edit this image according to the instructions:" });
       parts.push({ inlineData: { data: srcData, mimeType: "image/png" } });
+    }
+  }
+
+  if (config.productImages && config.productImages.length > 0) {
+    for (const image of config.productImages) {
+      const resolved = await resolveJobImage(image);
+      if (resolved) {
+        parts.push({ text: "Use this product image as reference:" });
+        parts.push({
+          inlineData: { data: resolved.base64, mimeType: resolved.mimeType },
+        });
+      }
     }
   }
 
@@ -1270,6 +1328,18 @@ const processGenerationJob = async (job) => {
           text: "USE ESTA IMAGEM COMO REFERÊNCIA DE LAYOUT E FONTES:",
         });
         parts.push({ inlineData: { data: refData, mimeType: "image/png" } });
+      }
+    }
+
+    if (config.productImages && config.productImages.length > 0) {
+      for (const image of config.productImages) {
+        const resolved = await resolveJobImage(image);
+        if (resolved) {
+          parts.push({ text: "Imagem de produto para referência:" });
+          parts.push({
+            inlineData: { data: resolved.base64, mimeType: resolved.mimeType },
+          });
+        }
       }
     }
 
@@ -4113,6 +4183,7 @@ app.post("/api/ai/campaign", requireAuthWithAiRateLimit, async (req, res) => {
       inspirationImages,
       collabLogo,
       compositionAssets,
+      toneOfVoiceOverride,
     } = req.body;
 
     if (!brandProfile || !transcript || !options) {
@@ -4139,12 +4210,14 @@ app.post("/api/ai/campaign", requireAuthWithAiRateLimit, async (req, res) => {
     const isOpenRouter = model.includes("/");
 
     const quantityInstructions = buildQuantityInstructions(options, "prod");
-    console.log("[Campaign API] Quantity instructions:", quantityInstructions);
+    const effectiveBrandProfile = toneOfVoiceOverride
+      ? { ...brandProfile, toneOfVoice: toneOfVoiceOverride }
+      : brandProfile;
     const prompt = buildCampaignPrompt(
-      brandProfile,
+      effectiveBrandProfile,
       transcript,
       quantityInstructions,
-      getToneText(brandProfile, "campaigns"),
+      getToneText(effectiveBrandProfile, "campaigns"),
     );
 
     // Collect all images for vision models
@@ -4249,6 +4322,24 @@ REGRAS CRÍTICAS:
     }
 
     const campaign = JSON.parse(result);
+
+    console.log("[Campaign API] Campaign structure:", {
+      hasPosts: !!campaign.posts,
+      postsCount: campaign.posts?.length,
+      hasAdCreatives: !!campaign.adCreatives,
+      adCreativesCount: campaign.adCreatives?.length,
+      hasVideoScripts: !!campaign.videoClipScripts,
+      videoScriptsCount: campaign.videoClipScripts?.length,
+      hasCarousels: !!campaign.carousels,
+      carouselsCount: campaign.carousels?.length,
+      hasProductImages: !!productImages?.length,
+      productImagesCount: productImages?.length || 0,
+      hasInspirationImages: !!inspirationImages?.length,
+      inspirationImagesCount: inspirationImages?.length || 0,
+      hasCollabLogo: !!collabLogo,
+      compositionAssetsCount: compositionAssets?.length || 0,
+      toneOverride: toneOfVoiceOverride || null,
+    });
 
     console.log("[Campaign API] Campaign generated successfully");
 
@@ -4445,7 +4536,7 @@ app.post("/api/ai/image", requireAuthWithAiRateLimit, async (req, res) => {
     }
 
     console.log(
-      `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}`,
+      `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio} | productImages: ${productImages?.length || 0}`,
     );
 
     // Prepare product images array, including brand logo if available
@@ -4475,7 +4566,11 @@ app.post("/api/ai/image", requireAuthWithAiRateLimit, async (req, res) => {
       brandProfile,
       !!styleReferenceImage,
       hasLogo,
+      !!productImages?.length,
     );
+
+    console.log("[Image API] Prompt:");
+    console.log(fullPrompt);
 
     const imageDataUrl = await generateGeminiImage(
       fullPrompt,
@@ -4939,8 +5034,22 @@ app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
       { inlineData: { data: image.base64, mimeType: image.mimeType } },
     ];
 
-    // Note: Gemini doesn't support traditional mask images, so we only use the text description
-    // The mask parameter is kept for potential future use or other providers
+    // Configurar máscara para inpainting (edição de área específica)
+    let imageConfig = { imageSize: "1K" };
+
+    if (mask) {
+      // Gemini suporta máscara binária (preto=editar, branco=preservar)
+      // A máscara deve ser uma imagem PNG com transparência ou escala de cinza
+      imageConfig.mask = {
+        image: {
+          inlineData: {
+            data: mask.base64,
+            mimeType: mask.mimeType || "image/png"
+          }
+        }
+      };
+      console.log("[Edit Image API] Mask applied");
+    }
 
     if (referenceImage) {
       parts.push({
@@ -4955,7 +5064,7 @@ app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
       ai.models.generateContent({
         model: DEFAULT_IMAGE_MODEL,
         contents: { parts },
-        config: { imageConfig: { imageSize: "1K" } },
+        config: { imageConfig },
       })
     );
 
@@ -5044,25 +5153,26 @@ app.post("/api/ai/extract-colors", async (req, res) => {
     };
 
     const response = await ai.models.generateContent({
-      model: DEFAULT_TEXT_MODEL,
+      model: DEFAULT_IMAGE_MODEL,
       contents: {
         parts: [
           {
-            text: `Analise este logo e extraia APENAS as cores que REALMENTE existem na imagem visível.
+            text: `Analise este logo e extraia as cores presentes na imagem.
 
-REGRAS IMPORTANTES:
-- Extraia somente cores que você pode ver nos pixels da imagem
-- NÃO invente cores que não existem
-- Ignore áreas transparentes (não conte transparência como cor)
-- Se o logo tiver apenas 1 cor visível, retorne null para secondaryColor e tertiaryColor
-- Se o logo tiver apenas 2 cores visíveis, retorne null para tertiaryColor
+REGRAS ESTRITAS:
+- Examine CADA pixel da imagem
+- primaryColor: cor que aparece em MAIOR área (OBRIGATÓRIO)
+- secondaryColor: segunda cor mais frequente (retorne null se não existir)
+- tertiaryColor: terceira cor de destaque (retorne null se não existir)
+- NÃO invente cores que não estão no logo
+- NÃO retorne preto (#000000) ou branco (#FFFFFF) a menos que estejam claramente visíveis
 
-PRIORIDADE DAS CORES:
-- primaryColor: A cor mais dominante/presente no logo (maior área)
-- secondaryColor: A segunda cor mais presente (se existir), ou null
-- tertiaryColor: Uma terceira cor de destaque/acento (se existir), ou null
+RESPONDA:
+- Se só houver 1 cor: {"primaryColor": "#COR", "secondaryColor": null, "tertiaryColor": null}
+- Se houver 2 cores: {"primaryColor": "#COR1", "secondaryColor": "#COR2", "tertiaryColor": null}
+- Se houver 3 cores: {"primaryColor": "#COR1", "secondaryColor": "#COR2", "tertiaryColor": "#COR3"}
 
-Retorne as cores em formato hexadecimal (#RRGGBB).`,
+Retorne APENAS o JSON, sem texto adicional.`,
           },
           { inlineData: { mimeType: logo.mimeType, data: logo.base64 } },
         ],
@@ -5082,8 +5192,8 @@ Retorne as cores em formato hexadecimal (#RRGGBB).`,
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/extract-colors',
-      operation: 'text',
-      model: DEFAULT_TEXT_MODEL,
+      operation: 'image',
+      model: DEFAULT_IMAGE_MODEL,
       inputTokens: tokens.inputTokens,
       outputTokens: tokens.outputTokens,
       latencyMs: timer(),
@@ -5096,8 +5206,8 @@ Retorne as cores em formato hexadecimal (#RRGGBB).`,
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/extract-colors',
-      operation: 'text',
-      model: DEFAULT_TEXT_MODEL,
+      operation: 'image',
+      model: DEFAULT_IMAGE_MODEL,
       latencyMs: timer(),
       status: 'failed',
       error: error.message,

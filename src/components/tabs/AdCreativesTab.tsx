@@ -39,6 +39,8 @@ interface AdCreativesTabProps {
   styleReferences?: StyleReference[];
   onAddStyleReference?: (ref: Omit<StyleReference, "id" | "createdAt">) => void;
   onRemoveStyleReference?: (id: string) => void;
+  selectedStyleReference?: StyleReference | null; // Selected favorite to use in generation
+  compositionAssets?: { base64: string; mimeType: string }[]; // Assets (ativos) for composition
   userId?: string | null;
   galleryImages?: GalleryImage[];
   campaignId?: string; // Campaign ID to filter images correctly
@@ -249,6 +251,8 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
   styleReferences,
   onAddStyleReference,
   onRemoveStyleReference,
+  selectedStyleReference,
+  compositionAssets,
   userId,
   galleryImages,
   campaignId,
@@ -533,6 +537,31 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
         }
       }
 
+      // Use selected style reference (favoritos) if available
+      if (selectedStyleReference?.src) {
+        const src = selectedStyleReference.src;
+        if (src.startsWith('data:')) {
+          const matches = src.match(/^data:([^;]+);base64,(.+)$/);
+          if (matches) {
+            productImages.push({ base64: matches[2], mimeType: matches[1] });
+          }
+        } else {
+          try {
+            const response = await fetch(src);
+            const blob = await response.blob();
+            const base64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+            const base64Data = base64.split(',')[1];
+            productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
+          } catch (err) {
+            console.error("[AdCreativesTab] Failed to fetch style reference image:", err);
+          }
+        }
+      }
+
       const generatedImageDataUrl = await generateImage(
         ad.image_prompt,
         brandProfile,
@@ -540,6 +569,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
           aspectRatio: "1.91:1",
           model: selectedImageModel,
           productImages: productImages.length > 0 ? productImages : undefined,
+          compositionAssets: compositionAssets?.length > 0 ? compositionAssets : undefined,
         },
       );
 

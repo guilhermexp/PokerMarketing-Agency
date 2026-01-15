@@ -9,6 +9,9 @@ import type {
   BrandProfile,
   ScheduledPost,
   CarouselScript,
+  ChatReferenceImage,
+  StyleReference,
+  ImageFile,
 } from "../../types";
 import { Icon } from "../common/Icon";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
@@ -33,6 +36,10 @@ export interface CarrosselTabProps {
   carousels?: CarouselScript[];
   galleryImages?: GalleryImage[];
   brandProfile: BrandProfile;
+  chatReferenceImage?: ChatReferenceImage | null; // Reference from chat takes priority
+  selectedStyleReference?: StyleReference | null; // Selected favorite to use in generation
+  compositionAssets?: { base64: string; mimeType: string }[]; // Assets (ativos) for composition
+  productImages?: ImageFile[] | null;
   onAddImageToGallery: (image: Omit<GalleryImage, "id">) => GalleryImage;
   onUpdateGalleryImage?: (imageId: string, newImageSrc: string) => void;
   onSetChatReference?: (image: GalleryImage | null) => void;
@@ -49,6 +56,10 @@ export const CarouselTab: React.FC<CarrosselTabProps> = ({
   carousels = [],
   galleryImages,
   brandProfile,
+  chatReferenceImage,
+  selectedStyleReference,
+  compositionAssets,
+  productImages,
   onAddImageToGallery,
   onUpdateGalleryImage,
   onSetChatReference,
@@ -83,6 +94,8 @@ export const CarouselTab: React.FC<CarrosselTabProps> = ({
   const [localCarousels, setLocalCarousels] = useState<CarouselScript[]>(carousels);
   // Ref to access latest carousel state in async functions
   const localCarouselsRef = React.useRef<CarouselScript[]>(carousels);
+  const [pausedGenerations, setPausedGenerations] = useState<Record<string, boolean>>({});
+  const pausedGenerationsRef = useRef<Record<string, boolean>>({});
 
   // Sync localCarousels with prop when it changes
   useEffect(() => {
@@ -94,6 +107,14 @@ export const CarouselTab: React.FC<CarrosselTabProps> = ({
   useEffect(() => {
     localCarouselsRef.current = localCarousels;
   }, [localCarousels]);
+
+  const setPauseState = useCallback((key: string, value: boolean) => {
+    pausedGenerationsRef.current = {
+      ...pausedGenerationsRef.current,
+      [key]: value,
+    };
+    setPausedGenerations((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
   // Auto-hide toast after 4 seconds
   useEffect(() => {
@@ -239,12 +260,18 @@ export const CarouselTab: React.FC<CarrosselTabProps> = ({
       next.delete(clipKey);
       return next;
     });
+    setPauseState(clipKey, false);
     await generateAllCarouselSlides4x5({
       clip,
       galleryImages,
       brandProfile,
+      chatReferenceImage,
+      selectedStyleReference,
+      compositionAssets,
+      productImages,
       onAddImageToGallery,
       setGenerating,
+      shouldPause: () => !!pausedGenerationsRef.current[clipKey],
     });
   };
 
@@ -279,12 +306,18 @@ export const CarouselTab: React.FC<CarrosselTabProps> = ({
       next.delete(carouselKey);
       return next;
     });
+    setPauseState(carouselKey, false);
     await generateAllCampaignCarouselImages(carousel, {
       brandProfile,
+      chatReferenceImage: chatReferenceImage || null,
+      selectedStyleReference: selectedStyleReference || null,
+      compositionAssets: compositionAssets || undefined,
+      productImages: productImages || undefined,
       setGeneratingCarousel,
       setLocalCarousels,
       localCarouselsRef,
       onCarouselUpdate,
+      shouldPause: () => !!pausedGenerationsRef.current[carouselKey],
     });
   };
 
@@ -353,6 +386,7 @@ export const CarouselTab: React.FC<CarrosselTabProps> = ({
             const isGeneratingAny = Object.entries(generatingCarousel).some(
               ([key, val]) => key.startsWith(`${carousel.id}-`) && val,
             );
+            const isPaused = !!pausedGenerations[carouselKey];
             const orderedImages = customOrders[carouselKey] || previewImages;
             const generatingSlides = Object.fromEntries(
               Object.entries(generatingCarousel).filter(([key]) => key.startsWith(`${carousel.id}-`))
@@ -382,9 +416,11 @@ export const CarouselTab: React.FC<CarrosselTabProps> = ({
                 hasCover={hasCover}
                 allGenerated={allGenerated}
                 isGeneratingAny={isGeneratingAny}
+                isPaused={isPaused}
                 publishing={publishing[carouselKey] || false}
                 captions={captions}
                 onGenerateAll={() => handleGenerateAllCarouselImages(carousel, carouselKey)}
+                onTogglePause={() => setPauseState(carouselKey, !pausedGenerationsRef.current[carouselKey])}
                 onSchedule={
                   onSchedulePost && hasAnyImages && orderedImages.length >= 2
                     ? () => setSchedulingClip({
@@ -437,6 +473,7 @@ export const CarouselTab: React.FC<CarrosselTabProps> = ({
         );
 
         const clipKey = clip.id || `clip-${index}`;
+        const isPaused = !!pausedGenerations[clipKey];
         const isExpanded = !collapsedClips.has(clipKey);
         const orderedImages = customOrders[clipKey] || carrosselImages;
 
@@ -464,17 +501,18 @@ export const CarouselTab: React.FC<CarrosselTabProps> = ({
             hasAnyOriginal={hasAnyOriginal}
             allGenerated={allGenerated}
             isGeneratingAny={isGeneratingAny}
+            isPaused={isPaused}
             publishing={publishing[clipKey] || false}
             caption={captions[clipKey] || ''}
             onGenerateAll={() => handleGenerateAll(clip, clipKey)}
+            onTogglePause={() => setPauseState(clipKey, !pausedGenerationsRef.current[clipKey])}
             onSchedule={
               onSchedulePost && hasCarrosselImages && orderedImages.length >= 2
-                ? () =>
-                    setSchedulingClip({
-                      clipKey,
-                      images: orderedImages,
-                      title: clip.title,
-                    })
+                ? () => setSchedulingClip({
+                    clipKey,
+                    images: orderedImages,
+                    title: clip.title,
+                  })
                 : undefined
             }
             onPublish={

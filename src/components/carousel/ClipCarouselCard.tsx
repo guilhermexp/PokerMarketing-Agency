@@ -20,9 +20,11 @@ interface ClipCarouselCardProps {
   hasAnyOriginal: boolean;
   allGenerated: boolean;
   isGeneratingAny: boolean;
+  isPaused: boolean;
   publishing: boolean;
   caption: string;
   onGenerateAll: () => void;
+  onTogglePause: () => void;
   onSchedule?: () => void;
   onPublish?: () => void;
   onReorder: (newOrder: GalleryImage[]) => void;
@@ -45,9 +47,11 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
   hasAnyOriginal,
   allGenerated,
   isGeneratingAny,
+  isPaused,
   publishing,
   caption,
   onGenerateAll,
+  onTogglePause,
   onSchedule,
   onPublish,
   onReorder,
@@ -101,6 +105,18 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               : allGenerated
                 ? 'Regenerar 4:5'
                 : 'Gerar 4:5'}
+          </button>
+        )}
+
+        {isGeneratingAny && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePause();
+            }}
+            className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-white/10 text-white/70 hover:bg-white/15 transition-colors whitespace-nowrap"
+          >
+            {isPaused ? 'Retomar' : 'Pausar'}
           </button>
         )}
 

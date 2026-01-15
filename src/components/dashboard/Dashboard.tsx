@@ -15,7 +15,6 @@ import type {
   InstagramPublishState,
   CampaignSummary,
   CreativeModel,
-  ImageFile,
 } from "../../types";
 import type { InstagramContext } from "../../services/rubeService";
 import type { WeekScheduleWithCount } from "../../services/apiClient";
@@ -45,6 +44,7 @@ interface DashboardProps {
   brandProfile: BrandProfile;
   campaign: MarketingCampaign | null;
   productImages?: { base64: string; mimeType: string }[] | null;
+  compositionAssets?: { base64: string; mimeType: string }[] | null; // Assets (ativos) for composition
   onGenerate: (input: ContentInput, options: GenerationOptions) => void;
   isGenerating: boolean;
   onEditProfile: () => void;
@@ -135,6 +135,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     brandProfile,
     campaign,
     productImages,
+    compositionAssets,
     onGenerate,
     isGenerating,
     onEditProfile,
@@ -229,28 +230,6 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     });
   };
 
-  // Convert ChatReferenceImage to ImageFile for use in tabs
-  const chatReferenceAsImageFile = useMemo((): ImageFile | null => {
-    if (!chatReferenceImage) return null;
-
-    const src = chatReferenceImage.src;
-    if (src.startsWith('data:')) {
-      // Already a data URL - extract base64 and mimeType
-      const matches = src.match(/^data:([^;]+);base64,(.+)$/);
-      if (matches) {
-        return { base64: matches[2], mimeType: matches[1] };
-      }
-    }
-    // For HTTP URLs, we'll need to fetch and convert
-    // Return null and let the tab handle the conversion
-    return null;
-  }, [chatReferenceImage]);
-
-  // Get effective reference image: chat reference takes priority, then product images
-  const effectiveReferenceImage = chatReferenceImage
-    ? (productImages?.[0] || null) // Will be converted by tab
-    : (productImages?.[0] || null);
-
   // Format date string (handles both ISO and DD/MM formats)
   const formatDateDisplay = (dateStr: string) => {
     if (!dateStr) return "";
@@ -330,12 +309,38 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             )}
             {isGenerating && (
               <>
+                <style>{`
+                  @keyframes shimmerText {
+                    0% {
+                      background-position: -200% 0;
+                    }
+                    100% {
+                      background-position: 200% 0;
+                    }
+                  }
+
+                  .shimmer-text {
+                    background: linear-gradient(
+                      90deg,
+                      rgba(255, 255, 255, 0.85) 0%,
+                      rgba(255, 255, 255, 0.25) 40%,
+                      rgba(255, 255, 255, 0.95) 50%,
+                      rgba(255, 255, 255, 0.25) 60%,
+                      rgba(255, 255, 255, 0.85) 100%
+                    );
+                    background-size: 200% 100%;
+                    -webkit-background-clip: text;
+                    background-clip: text;
+                    color: transparent;
+                    animation: shimmerText 2.4s ease-in-out infinite;
+                  }
+                `}</style>
                 <div className="flex flex-col items-center justify-center text-center p-32 aura-card border-white/5 bg-white/[0.01]">
-                  <h2 className="text-4xl font-black tracking-[-0.05em] uppercase">
-                    Synthesizing Identity
+                  <h2 className="text-4xl font-black tracking-[-0.05em] uppercase shimmer-text">
+                    Gerando sua campanha
                   </h2>
                   <p className="text-white/40 mt-4 max-w-xs text-xs font-medium tracking-wide">
-                    Autonomous agents are configuring your marketing ecosystem.
+                    Agentes autônomos estão configurando seu ecossistema de marketing.
                   </p>
                 </div>
                 <div className="flex justify-center mt-20">
@@ -395,21 +400,22 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 {/* Content */}
                 <div className="space-y-4">
                   {activeTab === "clips" && (
-                    <ClipsTab
-                      brandProfile={brandProfile}
-                      videoClipScripts={campaign.videoClipScripts}
-                      onAddImageToGallery={onAddImageToGallery}
-                      onUpdateGalleryImage={onUpdateGalleryImage}
-                      onSetChatReference={onSetChatReference}
-                      styleReferences={styleReferences}
-                      onAddStyleReference={onAddStyleReference}
-                      onRemoveStyleReference={onRemoveStyleReference}
-                      userId={userId}
-                      galleryImages={galleryImages}
-                      campaignId={campaign.id}
-                      instagramContext={instagramContext}
-                      onSchedulePost={onSchedulePost}
-                    />
+                      <ClipsTab
+                        brandProfile={brandProfile}
+                        videoClipScripts={campaign.videoClipScripts}
+                        onAddImageToGallery={onAddImageToGallery}
+                        onUpdateGalleryImage={onUpdateGalleryImage}
+                        onSetChatReference={onSetChatReference}
+                        styleReferences={styleReferences}
+                        onAddStyleReference={onAddStyleReference}
+                        onRemoveStyleReference={onRemoveStyleReference}
+                        userId={userId}
+                        galleryImages={galleryImages}
+                        campaignId={campaign.id}
+                        instagramContext={instagramContext}
+                        onSchedulePost={onSchedulePost}
+                        productImages={productImages}
+                      />
                   )}
                   {activeTab === "carrossel" && (
                     <CarrosselTab
@@ -417,6 +423,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       carousels={campaign.carousels}
                       galleryImages={galleryImages}
                       brandProfile={brandProfile}
+                      chatReferenceImage={chatReferenceImage || undefined}
+                      selectedStyleReference={selectedStyleReference || undefined}
+                      compositionAssets={compositionAssets || undefined}
+                      productImages={productImages || undefined}
                       onAddImageToGallery={onAddImageToGallery}
                       onUpdateGalleryImage={onUpdateGalleryImage}
                       onSetChatReference={onSetChatReference}
@@ -437,6 +447,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       styleReferences={styleReferences}
                       onAddStyleReference={onAddStyleReference}
                       onRemoveStyleReference={onRemoveStyleReference}
+                      selectedStyleReference={selectedStyleReference || undefined}
+                      compositionAssets={compositionAssets || undefined}
                       userId={userId}
                       galleryImages={galleryImages}
                       campaignId={campaign.id}
@@ -475,6 +487,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       styleReferences={styleReferences}
                       onAddStyleReference={onAddStyleReference}
                       onRemoveStyleReference={onRemoveStyleReference}
+                      selectedStyleReference={selectedStyleReference || undefined}
+                      compositionAssets={compositionAssets || undefined}
                       userId={userId}
                       galleryImages={galleryImages}
                       campaignId={campaign.id}

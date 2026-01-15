@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type {
   VideoClipScript,
   BrandProfile,
@@ -18,6 +18,11 @@ import {
   generateSpeech,
   convertToJsonPrompt,
 } from "../../../services/geminiService";
+import {
+  buildClipSceneImagePrompt,
+  buildSoraScenePrompt,
+  buildVeoScenePrompt,
+} from "@/ai-prompts";
 import {
   generateVideo as generateServerVideo,
   updateClipThumbnail,
@@ -49,6 +54,8 @@ import {
 const isDevMode =
   import.meta.env.DEV ||
   (typeof window !== "undefined" && window.location.hostname === "localhost");
+
+const CLIP_ASPECT_RATIO = "9:16" as const;
 
 import { ClipSettingsModal } from "./ClipSettingsModal";
 import {
@@ -105,6 +112,7 @@ export interface ClipCardProps {
   campaignId?: string;
   onGenerateAllClipImages?: () => void; // Generate thumbnail + all scene images for this clip
   isGeneratingAllClipImages?: boolean;
+  productImages?: ImageFile[] | null;
   // QuickPost & Schedule
   onQuickPost?: (image: GalleryImage) => void;
   onSchedulePost?: (image: GalleryImage) => void;
@@ -135,6 +143,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
   onQuickPost,
   onSchedulePost,
   userId,
+  productImages,
 }) => {
   // Background jobs for video generation
   const { onJobComplete, onJobFailed } = useBackgroundJobs();
@@ -175,6 +184,28 @@ export const ClipCard: React.FC<ClipCardProps> = ({
   const [editingThumbnail, setEditingThumbnail] = useState<GalleryImage | null>(
     null,
   );
+
+  const productImageDataUrls = useMemo(
+    () =>
+      (productImages || []).map(
+        (img) => `data:${img.mimeType};base64,${img.base64}`,
+      ),
+    [productImages],
+  );
+
+  const buildProductImages = useCallback(async () => {
+    const images: ImageFile[] = [...(productImages || [])];
+    if (brandProfile.logo) {
+      const logoData = await urlToBase64(brandProfile.logo);
+      if (logoData?.base64) {
+        images.push({
+          base64: logoData.base64,
+          mimeType: logoData.mimeType || "image/png",
+        });
+      }
+    }
+    return images;
+  }, [productImages, brandProfile.logo]);
   const [editingSceneImage, setEditingSceneImage] = useState<{
     sceneNumber: number;
     image: GalleryImage;
@@ -1012,24 +1043,12 @@ export const ClipCard: React.FC<ClipCardProps> = ({
       const currentScene = scenes.find((s) => s.sceneNumber === sceneNumber);
       if (!currentScene) return "";
 
-      const narrationBlock = includeNarration
-        ? `\n\nCONTEXTO DA NARRAÇÃO: "${currentScene.narration}"`
-        : "";
-
-      const brandContext = brandProfile.description
-        ? `\n\nCONTEXTO DA MARCA: ${brandProfile.name} - ${brandProfile.description}`
-        : `\n\nMARCA: ${brandProfile.name}`;
-
-      return `Cena de vídeo promocional:
-
-VISUAL: ${currentScene.visual}
-${narrationBlock}
-${brandContext}
-
-Estilo: ${brandProfile.toneOfVoice}, cinematográfico, cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.
-Movimento de câmera suave, iluminação dramática profissional. Criar visual que combine com o contexto da narração e identidade da marca.
-
-TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCULAS, impactante.`;
+      return buildSoraScenePrompt({
+        sceneVisual: currentScene.visual,
+        narration: currentScene.narration,
+        brandProfile,
+        includeNarration,
+      });
     },
     [scenes, brandProfile, includeNarration],
   );
@@ -1040,24 +1059,12 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
       const currentScene = scenes.find((s) => s.sceneNumber === sceneNumber);
       if (!currentScene) return "";
 
-      const narrationBlock = includeNarration
-        ? `\n\nNARRAÇÃO (falar em português brasileiro, voz empolgante e profissional): "${currentScene.narration}"`
-        : "";
-
-      const brandContext = brandProfile.description
-        ? `\n\nCONTEXTO DA MARCA: ${brandProfile.name} - ${brandProfile.description}`
-        : `\n\nMARCA: ${brandProfile.name}`;
-
-      return `Cena de vídeo promocional:
-
-VISUAL: ${currentScene.visual}
-${narrationBlock}
-${brandContext}
-
-Estilo: ${brandProfile.toneOfVoice}, cinematográfico, cores ${brandProfile.primaryColor} e ${brandProfile.secondaryColor}.
-Movimento de câmera suave, iluminação dramática profissional.
-
-TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCULAS, impactante.`;
+      return buildVeoScenePrompt({
+        sceneVisual: currentScene.visual,
+        narration: currentScene.narration,
+        brandProfile,
+        includeNarration,
+      });
     },
     [scenes, brandProfile, includeNarration],
   );
@@ -1118,7 +1125,7 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
         const jsonPrompt = await convertToJsonPrompt(
           genericPrompt,
           currentScene.duration,
-          "16:9",
+          CLIP_ASPECT_RATIO,
         );
 
         console.debug(
@@ -1223,7 +1230,7 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
             );
             const jobConfig: VideoJobConfig = {
               model: apiModel,
-              aspectRatio: "16:9",
+              aspectRatio: CLIP_ASPECT_RATIO,
               imageUrl,
               lastFrameUrl,
               sceneDuration:
@@ -1286,7 +1293,7 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
           // Use fal.ai (Sora 2) via server API
           videoUrl = await generateServerVideo({
             prompt: jsonPrompt,
-            aspectRatio: "16:9",
+            aspectRatio: CLIP_ASPECT_RATIO,
             model: apiModel,
             imageUrl,
             sceneDuration: currentScene.duration,
@@ -1298,7 +1305,7 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
           );
           videoUrl = await generateServerVideo({
             prompt: jsonPrompt,
-            aspectRatio: "16:9",
+            aspectRatio: CLIP_ASPECT_RATIO,
             model: apiModel,
             imageUrl,
             lastFrameUrl,
@@ -1360,7 +1367,7 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
           // Pass includeNarration to control audio generation (with voice narration or just ambient)
           const result = await generateVideo(
             jsonPrompt,
-            "16:9",
+            CLIP_ASPECT_RATIO,
             selectedVideoModel,
             referenceImage,
             useFallbackDirectly,
@@ -1569,6 +1576,8 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
         mimeType: thumbnailData.mimeType,
       };
 
+      const productImagesToUse = await buildProductImages();
+
       // Generate image for each scene sequentially
       for (const scene of scenes) {
         // Skip if scene already has an image in state
@@ -1602,17 +1611,17 @@ TIPOGRAFIA (se houver texto na tela): fonte BOLD CONDENSED SANS-SERIF, MAIÚSCUL
             [scene.sceneNumber]: { dataUrl: "", isUploading: true },
           }));
 
-          const prompt = `CENA ${scene.sceneNumber} DE UM VÍDEO - DEVE USAR A MESMA TIPOGRAFIA DA IMAGEM DE REFERÊNCIA
-
-Descrição visual: ${scene.visual}
-Texto/Narração para incluir: ${scene.narration}
-
-IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, cor, efeitos) DEVE ser IDÊNTICA à imagem de referência anexada. NÃO use fontes diferentes.`;
+          const prompt = buildClipSceneImagePrompt({
+            sceneNumber: scene.sceneNumber,
+            visual: scene.visual,
+            narration: scene.narration,
+          });
 
           const resultImgUrl = await generateImage(prompt, brandProfile, {
-            aspectRatio: "16:9",
+            aspectRatio: CLIP_ASPECT_RATIO,
             model: "gemini-3-pro-image-preview",
             styleReferenceImage: styleRef,
+            productImages: productImagesToUse.length > 0 ? productImagesToUse : undefined,
           });
 
           if (resultImgUrl) {
@@ -1669,10 +1678,10 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     galleryImages,
     clip.id,
     clip.title,
-    selectedImageModel,
     brandProfile,
     getSceneSource,
     onAddImageToGallery,
+    buildProductImages,
   ]);
 
 
@@ -1692,16 +1701,12 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     if (!scene) return;
 
     // Build prompt
-    let prompt = `CENA ${scene.sceneNumber} DE UM VÍDEO - DEVE USAR A MESMA TIPOGRAFIA DA IMAGEM DE REFERÊNCIA
-
-Descrição visual: ${scene.visual}
-Texto/Narração para incluir: ${scene.narration}
-
-IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, cor, efeitos) DEVE ser IDÊNTICA à imagem de referência anexada. NÃO use fontes diferentes.`;
-
-    if (extraInstructions && extraInstructions.trim()) {
-      prompt += `\n\nInstruções extras: ${extraInstructions.trim()}`;
-    }
+    const prompt = buildClipSceneImagePrompt({
+      sceneNumber: scene.sceneNumber,
+      visual: scene.visual,
+      narration: scene.narration,
+      extraInstructions,
+    });
 
     // Set loading state
     setSceneImages((prev) => ({
@@ -1717,23 +1722,17 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           ? thumbnail.src
           : `data:image/png;base64,${thumbnail.src}`;
 
-        // Build product images array with brand logo
-        const productImages: { base64: string; mimeType: string }[] = [];
-        if (brandProfile.logo) {
-          // Parse logo data URL directly (sync, no fetch needed)
-          const logoBase64 = brandProfile.logo.split(",")[1];
-          const logoMimeType = brandProfile.logo.match(/:(.*?);/)?.[1] || "image/png";
-          if (logoBase64) {
-            productImages.push({ base64: logoBase64, mimeType: logoMimeType });
-          }
+        const jobProductImages = [...productImageDataUrls];
+        if (brandProfile.logo?.startsWith("data:")) {
+          jobProductImages.push(brandProfile.logo);
         }
 
         const config: ImageJobConfig = {
           model: "gemini-3-pro-image-preview",
-          aspectRatio: "16:9",
+          aspectRatio: CLIP_ASPECT_RATIO,
           referenceImage: styleRefBase64,
           source: getSceneSource(sceneNumber),
-          productImages: productImages.length > 0 ? productImages : undefined,
+          productImages: jobProductImages.length > 0 ? jobProductImages : undefined,
         };
 
         const context = `scene-${clip.id}-${sceneNumber}`;
@@ -1755,20 +1754,13 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
         mimeType: thumbnailData.mimeType,
       };
 
-      // Build product images array with brand logo
-      const productImages: { base64: string; mimeType: string }[] = [];
-      if (brandProfile.logo) {
-        const logoData = await urlToBase64(brandProfile.logo);
-        if (logoData?.base64) {
-          productImages.push({ base64: logoData.base64, mimeType: logoData.mimeType });
-        }
-      }
+      const productImagesToUse = await buildProductImages();
 
       const imageDataUrl = await generateImage(prompt, brandProfile, {
-        aspectRatio: "16:9",
+        aspectRatio: CLIP_ASPECT_RATIO,
         model: "gemini-3-pro-image-preview",
         styleReferenceImage: styleRef,
-        productImages: productImages.length > 0 ? productImages : undefined,
+        productImages: productImagesToUse.length > 0 ? productImagesToUse : undefined,
       });
 
       // Upload to Vercel Blob
@@ -1818,11 +1810,12 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
     thumbnail,
     scenes,
     userId,
-    selectedImageModel,
     clip.id,
     brandProfile,
     getSceneSource,
     onAddImageToGallery,
+    productImageDataUrls,
+    buildProductImages,
   ]);
 
   const handleGenerateAudio = async () => {
@@ -2116,7 +2109,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
             model: "video-export" as ImageModel,
             mediaType: "video",
             duration: totalDuration,
-            aspectRatio: "16:9",
+            aspectRatio: CLIP_ASPECT_RATIO,
             video_script_id: clip.id,
           });
         }
@@ -2377,7 +2370,7 @@ IMPORTANTE: Esta cena faz parte de uma sequência. A tipografia (fonte, peso, co
           model: "video-export" as ImageModel, // Cast to ImageModel since we extended the type
           mediaType: "video",
           duration: totalDuration,
-          aspectRatio: "16:9",
+          aspectRatio: CLIP_ASPECT_RATIO,
           video_script_id: clip.id, // Link to video_clip_script for campaign filtering
         });
 

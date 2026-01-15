@@ -93,7 +93,6 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
   const {
     accounts: instagramAccounts,
     loading: loadingAccounts,
-    fetchAccounts,
     addAccount,
     removeAccount
   } = useInstagramAccounts(user?.id || '', organization?.id);
