@@ -1,4 +1,4 @@
-import type { BrandProfile } from '@/types';
+import type { BrandProfile } from "@/types";
 
 interface ScenePromptParams {
   sceneVisual: string;
@@ -15,7 +15,7 @@ export const buildSoraScenePrompt = ({
 }: ScenePromptParams): string => {
   const narrationBlock = includeNarration
     ? `\n\nCONTEXTO DA NARRAÇÃO: "${narration}"`
-    : '';
+    : "";
 
   const brandContext = brandProfile.description
     ? `\n\nCONTEXTO DA MARCA: ${brandProfile.name} - ${brandProfile.description}`
@@ -41,7 +41,7 @@ export const buildVeoScenePrompt = ({
 }: ScenePromptParams): string => {
   const narrationBlock = includeNarration
     ? `\n\nNARRAÇÃO (falar em português brasileiro, voz empolgante e profissional): "${narration}"`
-    : '';
+    : "";
 
   const brandContext = brandProfile.description
     ? `\n\nCONTEXTO DA MARCA: ${brandProfile.name} - ${brandProfile.description}`
@@ -93,7 +93,8 @@ export const buildThumbnailPrompt = (
   extraInstruction?: string,
 ): string => {
   const formatBlock = "\n\nFORMATO OBRIGATÓRIO: 9:16 VERTICAL (REELS/STORIES)";
-  const noTextBlock = "\n\nSEM TEXTO NA IMAGEM: não renderizar tipografia, títulos ou legendas na capa";
+  const noTextBlock =
+    "\n\nSEM TEXTO DE NARRACAO NA IMAGEM: não gerar tipografia, títulos ou legendas na capa";
   const extra = extraInstruction?.trim();
   if (!extra) return `${basePrompt}${formatBlock}${noTextBlock}`;
   return `${basePrompt}${formatBlock}${noTextBlock}\n\nInstrucoes extras: ${extra}`;
