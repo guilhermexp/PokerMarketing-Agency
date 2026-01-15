@@ -6,6 +6,7 @@ import type {
   GalleryImage,
   ImageModel,
   StyleReference,
+  ChatReferenceImage,
 } from "../../types";
 import { Button } from "../common/Button";
 import { Icon } from "../common/Icon";
@@ -31,6 +32,7 @@ interface AdCreativesTabProps {
   adCreatives: AdCreative[];
   brandProfile: BrandProfile;
   referenceImage: NonNullable<ContentInput["productImages"]>[number] | null;
+  chatReferenceImage?: ChatReferenceImage | null; // Reference from chat takes priority
   onAddImageToGallery: (image: Omit<GalleryImage, "id">) => GalleryImage;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
@@ -240,6 +242,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
   adCreatives,
   brandProfile,
   referenceImage,
+  chatReferenceImage,
   onAddImageToGallery,
   onUpdateGalleryImage,
   onSetChatReference,
@@ -493,9 +496,36 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
     // Local generation (dev mode or no userId or queue failed)
     try {
       const productImages: { base64: string; mimeType: string }[] = [];
-      if (referenceImage) {
+
+      // Use chatReferenceImage if available (takes priority), otherwise use referenceImage
+      if (chatReferenceImage) {
+        // Convert ChatReferenceImage to ImageFile
+        const src = chatReferenceImage.src;
+        if (src.startsWith('data:')) {
+          const matches = src.match(/^data:([^;]+);base64,(.+)$/);
+          if (matches) {
+            productImages.push({ base64: matches[2], mimeType: matches[1] });
+          }
+        } else {
+          // Fetch HTTP URL and convert to base64
+          try {
+            const response = await fetch(src);
+            const blob = await response.blob();
+            const base64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+            const base64Data = base64.split(',')[1];
+            productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
+          } catch (err) {
+            console.error("[AdCreativesTab] Failed to fetch chat reference image:", err);
+          }
+        }
+      } else if (referenceImage) {
         productImages.push(referenceImage);
       }
+
       if (brandProfile.logo) {
         const logoData = await urlToBase64(brandProfile.logo);
         if (logoData?.base64) {

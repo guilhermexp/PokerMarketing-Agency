@@ -15,6 +15,7 @@ import type {
   InstagramPublishState,
   CampaignSummary,
   CreativeModel,
+  ImageFile,
 } from "../../types";
 import type { InstagramContext } from "../../services/rubeService";
 import type { WeekScheduleWithCount } from "../../services/apiClient";
@@ -228,6 +229,28 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     });
   };
 
+  // Convert ChatReferenceImage to ImageFile for use in tabs
+  const chatReferenceAsImageFile = useMemo((): ImageFile | null => {
+    if (!chatReferenceImage) return null;
+
+    const src = chatReferenceImage.src;
+    if (src.startsWith('data:')) {
+      // Already a data URL - extract base64 and mimeType
+      const matches = src.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches) {
+        return { base64: matches[2], mimeType: matches[1] };
+      }
+    }
+    // For HTTP URLs, we'll need to fetch and convert
+    // Return null and let the tab handle the conversion
+    return null;
+  }, [chatReferenceImage]);
+
+  // Get effective reference image: chat reference takes priority, then product images
+  const effectiveReferenceImage = chatReferenceImage
+    ? (productImages?.[0] || null) // Will be converted by tab
+    : (productImages?.[0] || null);
+
   // Format date string (handles both ISO and DD/MM formats)
   const formatDateDisplay = (dateStr: string) => {
     if (!dateStr) return "";
@@ -407,6 +430,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       posts={campaign.posts}
                       brandProfile={brandProfile}
                       referenceImage={productImages?.[0] || null}
+                      chatReferenceImage={chatReferenceImage || undefined}
                       onAddImageToGallery={onAddImageToGallery}
                       onUpdateGalleryImage={onUpdateGalleryImage}
                       onSetChatReference={onSetChatReference}
@@ -444,6 +468,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       adCreatives={campaign.adCreatives}
                       brandProfile={brandProfile}
                       referenceImage={productImages?.[0] || null}
+                      chatReferenceImage={chatReferenceImage || undefined}
                       onAddImageToGallery={onAddImageToGallery}
                       onUpdateGalleryImage={onUpdateGalleryImage}
                       onSetChatReference={onSetChatReference}
