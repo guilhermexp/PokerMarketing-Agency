@@ -1,0 +1,544 @@
+import React, { useState, useEffect, useCallback } from "react";
+import type {
+    BrandProfile,
+    TournamentEvent,
+    GalleryImage,
+    ImageModel,
+    ImageSize,
+    ImageFile,
+} from "@/types";
+import type { InstagramContext } from "@/services/rubeService";
+import type { Currency, TimePeriod } from "@/types/flyer.types";
+import { Button } from "../common/Button";
+import { Loader } from "../common/Loader";
+import { Icon } from "../common/Icon";
+import { generateFlyer } from "../../services/geminiService";
+import { ImagePreviewModal } from "../common/ImagePreviewModal";
+import { QuickPostModal } from "../common/QuickPostModal";
+import { SchedulePostModal } from "../calendar/SchedulePostModal";
+import { useBackgroundJobs, type ActiveJob } from "../../hooks/useBackgroundJobs";
+import type { GenerationJobConfig } from "../../services/apiClient";
+import { urlToBase64, downloadImage } from "../../utils/imageHelpers";
+import { addDailyFlyer } from "../../services/apiClient";
+import { FlyerThumbStrip } from "./FlyerThumbStrip";
+import {
+    formatCurrencyValue,
+    getInitialTimeForPeriod,
+    isDevMode,
+    getSortValue,
+    parseGtd
+} from "./utils";
+
+const handleDownloadFlyer = (src: string, filename: string) => {
+    downloadImage(src, filename);
+};
+
+export const PeriodCardRow: React.FC<{
+    period: TimePeriod;
+    label: string;
+    dayInfo: string;
+    scheduleDate?: string; // YYYY-MM-DD format for scheduling
+    events: TournamentEvent[];
+    brandProfile: BrandProfile;
+    aspectRatio: string;
+    currency: Currency;
+    model: ImageModel;
+    imageSize: ImageSize;
+    compositionAssets: ImageFile[];
+    language: "pt" | "en";
+    scheduleId?: string; // For saving daily flyers to database
+    onAddImageToGallery: (image: Omit<GalleryImage, "id">) => GalleryImage;
+    onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
+    onSetChatReference: (image: GalleryImage | null) => void;
+    generatedFlyers: (GalleryImage | "loading")[];
+    setGeneratedFlyers: (
+        updater: (
+            prev: (GalleryImage | "loading")[],
+        ) => (GalleryImage | "loading")[],
+    ) => void;
+    triggerBatch: boolean;
+    styleReference: GalleryImage | null;
+    onCloneStyle: (image: GalleryImage) => void;
+    collabLogo: string | null;
+    onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
+    userId?: string | null;
+    instagramContext?: InstagramContext;
+    galleryImages?: GalleryImage[];
+    onSchedulePost?: (
+        post: Omit<
+            import("@/types").ScheduledPost,
+            "id" | "createdAt" | "updatedAt"
+        >,
+    ) => void;
+    onDownloadAll?: (images: GalleryImage[], title: string) => void;
+}> = ({
+    period,
+    label,
+    dayInfo,
+    scheduleDate,
+    events,
+    brandProfile,
+    aspectRatio,
+    currency,
+    model,
+    imageSize,
+    compositionAssets,
+    language: _language,
+    scheduleId,
+    onAddImageToGallery,
+    onUpdateGalleryImage,
+    onSetChatReference,
+    generatedFlyers,
+    setGeneratedFlyers,
+    triggerBatch,
+    styleReference,
+    onCloneStyle,
+    collabLogo,
+    onPublishToCampaign,
+    userId,
+    instagramContext,
+    galleryImages = [],
+    onSchedulePost,
+    onDownloadAll,
+}) => {
+        const [isGenerating, setIsGenerating] = useState(false);
+        // Auto-expand if there are already generated flyers
+        const hasExistingFlyers = generatedFlyers.some((f) => f !== "loading");
+        const [isExpanded, setIsExpanded] = useState(hasExistingFlyers);
+        const [editingFlyer, setEditingFlyer] = useState<GalleryImage | null>(null);
+        const [quickPostFlyer, setQuickPostFlyer] = useState<GalleryImage | null>(
+            null,
+        );
+        const [scheduleFlyer, setScheduleFlyer] = useState<GalleryImage | null>(null);
+        const [scheduledUrls, setScheduledUrls] = useState<Set<string>>(new Set());
+
+        const { queueJob, onJobComplete, onJobFailed, getJobByContext } =
+            useBackgroundJobs();
+        const jobContext = `flyer-period-${period}`;
+        const pendingJob = getJobByContext(jobContext);
+
+        // Listen for job completion
+        useEffect(() => {
+            const unsubComplete = onJobComplete((job: ActiveJob) => {
+                if (job.context === jobContext && job.result_url) {
+                    // Use the gallery ID from the job (already saved by backend) instead of creating new entry
+                    const newImage: GalleryImage = {
+                        id: job.result_gallery_id || `temp-${Date.now()}`,
+                        src: job.result_url,
+                        prompt: "",
+                        source: "Flyer Diário",
+                        model,
+                        aspectRatio,
+                        imageSize,
+                    };
+                    setGeneratedFlyers((prev) =>
+                        prev.map((f) => (f === "loading" ? newImage : f)),
+                    );
+                    setIsGenerating(false);
+                    setIsExpanded(true); // Auto-expand when generation completes
+                }
+            });
+
+            const unsubFailed = onJobFailed((job: ActiveJob) => {
+                if (job.context === jobContext) {
+                    setGeneratedFlyers((prev) => prev.filter((f) => f !== "loading"));
+                    setIsGenerating(false);
+                }
+            });
+
+            return () => {
+                unsubComplete();
+                unsubFailed();
+            };
+        }, [
+            jobContext,
+            onJobComplete,
+            onJobFailed,
+            model,
+            aspectRatio,
+            imageSize,
+            setGeneratedFlyers,
+        ]);
+
+        // Restore loading state from pending job
+        useEffect(() => {
+            if (
+                pendingJob &&
+                (pendingJob.status === "queued" || pendingJob.status === "processing") &&
+                !isGenerating
+            ) {
+                setIsGenerating(true);
+                if (!generatedFlyers.includes("loading")) {
+                    setGeneratedFlyers((prev) => ["loading", ...prev]);
+                }
+            }
+        }, [pendingJob, isGenerating, generatedFlyers, setGeneratedFlyers]);
+
+        // Auto-expand when flyers are loaded from storage
+        useEffect(() => {
+            if (hasExistingFlyers && !isExpanded) {
+                setIsExpanded(true);
+            }
+        }, [hasExistingFlyers, isExpanded]);
+
+        const handleGenerate = useCallback(
+            async (forced: boolean = false) => {
+                if (isGenerating || events.length === 0) return;
+                if (triggerBatch && !forced && generatedFlyers.length > 0) return;
+
+                const sortedByGtd = [...events].sort(
+                    (a, b) => parseGtd(b.gtd) - parseGtd(a.gtd),
+                );
+                const topEvent = sortedByGtd[0];
+                const otherEvents = sortedByGtd
+                    .slice(1)
+                    .sort(
+                        (a, b) =>
+                            getSortValue(a.times?.["-3"] || "") -
+                            getSortValue(b.times?.["-3"] || ""),
+                    );
+
+                const topEventText = topEvent
+                    ? `${topEvent.name} - GTD: ${formatCurrencyValue(topEvent.gtd, currency)} - Horário: ${topEvent.times?.["-3"]} - Buy-in: ${formatCurrencyValue(topEvent.buyIn, currency)}`
+                    : "";
+                const otherEventsList = otherEvents
+                    .map(
+                        (e) =>
+                            `${e.times?.["-3"]} | ${e.name} | Buy-in: ${formatCurrencyValue(e.buyIn, currency)} | GTD: ${formatCurrencyValue(e.gtd, currency)}`,
+                    )
+                    .join("\n");
+
+                const isHighlights = period === "HIGHLIGHTS";
+
+                const prompt = isHighlights
+                    ? `
+        TIPO: Flyer de Destaques do Dia - TOP 3 TORNEIOS
+        TÍTULO: ${label.toUpperCase()}
+        DATA: ${dayInfo}
+
+        REGRA CRÍTICA: Este flyer mostra EXATAMENTE 3 torneios.
+
+        OS 3 TORNEIOS (em ordem de importância):
+        TORNEIO PRINCIPAL: ${topEventText}
+        SEGUNDO TORNEIO: ${otherEvents[0] ? `${otherEvents[0].times?.["-3"]} | ${otherEvents[0].name} | GTD: ${formatCurrencyValue(otherEvents[0].gtd, currency)}` : ""}
+        TERCEIRO TORNEIO: ${otherEvents[1] ? `${otherEvents[1].times?.["-3"]} | ${otherEvents[1].name} | GTD: ${formatCurrencyValue(otherEvents[1].gtd, currency)}` : ""}
+
+        DESIGN: Logo no topo, título "${label}", data "${dayInfo}" em tamanho discreto, GTD em cor ${brandProfile.secondaryColor}, fundo ${brandProfile.primaryColor}
+        `
+                    : `
+        TIPO: Grade de Programação com Torneio Principal
+        TÍTULO: ${label.toUpperCase()}
+        DATA: ${dayInfo}
+
+        TORNEIO PRINCIPAL (maior GTD): ${topEventText}
+
+        LISTA DOS DEMAIS TORNEIOS:
+        ${otherEventsList}
+
+        DESIGN: Logo no topo, título "${label}", data "${dayInfo}" em tamanho discreto, GTD em ${brandProfile.secondaryColor}, fundo ${brandProfile.primaryColor}
+        `;
+
+                // Use background job if userId is available AND we're not in dev mode
+                if (userId && !isDevMode) {
+                    setIsGenerating(true);
+                    setGeneratedFlyers((prev) => ["loading", ...prev]);
+
+                    try {
+                        const config: GenerationJobConfig = {
+                            brandName: brandProfile.name,
+                            brandDescription: brandProfile.description,
+                            brandToneOfVoice: brandProfile.toneOfVoice,
+                            brandPrimaryColor: brandProfile.primaryColor,
+                            brandSecondaryColor: brandProfile.secondaryColor,
+                            aspectRatio,
+                            model,
+                            imageSize,
+                            logo: brandProfile.logo || undefined,
+                            collabLogo: collabLogo || undefined,
+                            styleReference: styleReference?.src || undefined,
+                            compositionAssets: compositionAssets.map(
+                                (a) => `data:${a.mimeType};base64,${a.base64}`,
+                            ),
+                            source: "Flyer Diário",
+                        };
+
+                        await queueJob(userId, "flyer_daily", prompt, config, jobContext);
+                    } catch (err) {
+                        console.error("[PeriodCardRow] Failed to queue job:", err);
+                        setGeneratedFlyers((prev) => prev.filter((f) => f !== "loading"));
+                        setIsGenerating(false);
+                    }
+                    return;
+                }
+
+                // Local generation (dev mode or no userId)
+                setIsGenerating(true);
+                setGeneratedFlyers((prev) => ["loading", ...prev]);
+
+                try {
+                    // Convert all image sources to base64 (handles both data URLs and HTTP URLs)
+                    const [logoToUse, collabLogoToUse, refData] = await Promise.all([
+                        brandProfile.logo ? urlToBase64(brandProfile.logo) : null,
+                        collabLogo ? urlToBase64(collabLogo) : null,
+                        styleReference?.src ? urlToBase64(styleReference.src) : null,
+                    ]);
+                    const assetsToUse = compositionAssets.map((a) => ({
+                        base64: a.base64,
+                        mimeType: a.mimeType,
+                    }));
+                    const imageUrl = await generateFlyer(
+                        prompt,
+                        brandProfile,
+                        logoToUse,
+                        refData,
+                        aspectRatio,
+                        model,
+                        collabLogoToUse,
+                        imageSize,
+                        assetsToUse,
+                    );
+                    const newImage = onAddImageToGallery({
+                        src: imageUrl,
+                        prompt,
+                        source: "Flyer Diário",
+                        model,
+                        aspectRatio,
+                        imageSize,
+                        week_schedule_id: scheduleId, // Link to schedule for persistence
+                        daily_flyer_period: period, // Track which period this flyer is for
+                    });
+                    setGeneratedFlyers((prev) =>
+                        prev.map((f) => (f === "loading" ? newImage : f)),
+                    );
+                    setIsExpanded(true); // Auto-expand when generation completes
+
+                    // Save daily flyer URL to database for persistence
+                    if (scheduleId && imageUrl) {
+                        try {
+                            await addDailyFlyer(scheduleId, period, imageUrl);
+                        } catch (err) {
+                            console.error(
+                                "[FlyerGenerator] Failed to save daily flyer to database:",
+                                err,
+                            );
+                        }
+                    }
+                } catch (err) {
+                    setGeneratedFlyers((prev) => prev.filter((f) => f !== "loading"));
+                } finally {
+                    setIsGenerating(false);
+                }
+            },
+            [
+                isGenerating,
+                events,
+                triggerBatch,
+                generatedFlyers.length,
+                model,
+                brandProfile,
+                aspectRatio,
+                currency,
+                scheduleId,
+                period,
+                styleReference,
+                onAddImageToGallery,
+                setGeneratedFlyers,
+                label,
+                collabLogo,
+                imageSize,
+                compositionAssets,
+                userId,
+                queueJob,
+                jobContext,
+                dayInfo,
+            ],
+        );
+
+        useEffect(() => {
+            if (triggerBatch && events.length > 0) handleGenerate();
+        }, [triggerBatch, events.length, handleGenerate]);
+
+        const totalGtd = events.reduce((sum, e) => sum + parseGtd(e.gtd), 0);
+
+        return (
+            <div
+                className={`bg-[#0a0a0a] border rounded-xl overflow-hidden transition-all mb-2 ${isGenerating ? "border-primary/30 animate-pulse" : "border-white/[0.05] hover:border-white/[0.08]"}`}
+            >
+                <div
+                    className="px-5 py-4 flex items-center justify-between cursor-pointer"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                >
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-6 items-center text-left">
+                        <div className="flex items-center gap-3">
+                            {isGenerating && <Loader className="w-4 h-4 flex-shrink-0" />}
+                            <div>
+                                <h3 className="text-xs font-bold text-white tracking-wide">
+                                    {label}
+                                </h3>
+                                <p className="text-[10px] text-white/30 mt-0.5">
+                                    {isGenerating
+                                        ? "Gerando flyer..."
+                                        : `${events.length} torneios neste período`}
+                                </p>
+                            </div>
+                        </div>
+                        <div>
+                            <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider block mb-1">
+                                Período • <span className="text-white/50">{dayInfo}</span>
+                            </span>
+                            <span className="text-sm font-semibold text-white">
+                                {period === "ALL"
+                                    ? "Dia Completo"
+                                    : period === "MORNING"
+                                        ? "06h - 12h"
+                                        : period === "AFTERNOON"
+                                            ? "12h - 18h"
+                                            : period === "NIGHT"
+                                                ? "18h - 06h"
+                                                : "Top 3"}
+                            </span>
+                        </div>
+                        <div>
+                            <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider block mb-1">
+                                GTD Total
+                            </span>
+                            <span className="text-sm font-bold text-primary">
+                                {formatCurrencyValue(String(totalGtd), currency)}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                        {/* Schedule button - only show if there are generated flyers */}
+                        {onSchedulePost &&
+                            generatedFlyers.some((f) => f !== "loading") &&
+                            (() => {
+                                const firstFlyer = generatedFlyers.find(
+                                    (f) => f !== "loading",
+                                ) as GalleryImage;
+                                const isScheduled =
+                                    firstFlyer && scheduledUrls.has(firstFlyer.src);
+                                return isScheduled ? (
+                                    <span className="px-2 py-1 text-[9px] font-bold text-green-400 bg-green-500/10 rounded-lg">
+                                        Agendado
+                                    </span>
+                                ) : (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (firstFlyer) setScheduleFlyer(firstFlyer);
+                                        }}
+                                        className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                                        title="Agendar publicação"
+                                    >
+                                        <Icon name="calendar" className="w-4 h-4 text-white/60" />
+                                    </button>
+                                );
+                            })()}
+                        <Button
+                            size="small"
+                            variant={events.length > 0 ? "primary" : "secondary"}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleGenerate(true);
+                            }}
+                            isLoading={isGenerating}
+                            disabled={events.length === 0}
+                        >
+                            Gerar
+                        </Button>
+                        {/* Download all button */}
+                        {onDownloadAll &&
+                            generatedFlyers.some((f) => f !== "loading") &&
+                            (() => {
+                                const flyerImages = generatedFlyers.filter(
+                                    (f) => f !== "loading",
+                                ) as GalleryImage[];
+                                return (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onDownloadAll(flyerImages, `${label}-${dayInfo}`);
+                                        }}
+                                        className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                                        title="Baixar todas as imagens"
+                                    >
+                                        <Icon name="download" className="w-4 h-4 text-white/60" />
+                                    </button>
+                                );
+                            })()}
+                        <Icon
+                            name={isExpanded ? "chevron-up" : "chevron-down"}
+                            className="w-4 h-4 text-white/20"
+                        />
+                    </div>
+                </div>
+                {isExpanded && (
+                    <div className="px-4 pb-4 pt-3 border-t border-white/5 animate-fade-in-up">
+                        <FlyerThumbStrip
+                            images={generatedFlyers}
+                            onEdit={setEditingFlyer}
+                            onQuickPost={setQuickPostFlyer}
+                            onSchedule={undefined}
+                            onPublish={(f) =>
+                                onPublishToCampaign(`Campanha para grade ${label}`, f)
+                            }
+                            onDownload={(f, index) =>
+                                handleDownloadFlyer(f.src, `period-${period}-${index}.png`)
+                            }
+                            onCloneStyle={onCloneStyle}
+                            emptyTitle="Nenhum flyer gerado"
+                            emptyDescription='Clique em "Gerar" para criar um flyer.'
+                        />
+                    </div>
+                )}
+                {editingFlyer && (
+                    <ImagePreviewModal
+                        image={editingFlyer}
+                        onClose={() => setEditingFlyer(null)}
+                        onImageUpdate={(src) => {
+                            onUpdateGalleryImage(editingFlyer.id, src);
+                            setGeneratedFlyers((prev) =>
+                                prev.map((f) =>
+                                    f !== "loading" && f.id === editingFlyer.id ? { ...f, src } : f,
+                                ),
+                            );
+                        }}
+                        onSetChatReference={onSetChatReference}
+                        onQuickPost={setQuickPostFlyer}
+                        onPublish={(f) =>
+                            onPublishToCampaign(`Campanha para grade ${label}`, f)
+                        }
+                        onCloneStyle={onCloneStyle}
+                        downloadFilename={`period-${period}.png`}
+                    />
+                )}
+                {quickPostFlyer && (
+                    <QuickPostModal
+                        isOpen={!!quickPostFlyer}
+                        onClose={() => setQuickPostFlyer(null)}
+                        image={quickPostFlyer}
+                        brandProfile={brandProfile}
+                        context={`Sessão: ${label}. Grade:\n${events.map((e) => e.name).join(", ")}`}
+                        instagramContext={instagramContext}
+                    />
+                )}
+                {scheduleFlyer && onSchedulePost && (
+                    <SchedulePostModal
+                        isOpen={!!scheduleFlyer}
+                        onClose={() => setScheduleFlyer(null)}
+                        galleryImages={galleryImages}
+                        onSchedule={(post) => {
+                            onSchedulePost(post);
+                            // Mark as scheduled
+                            if (scheduleFlyer?.src) {
+                                setScheduledUrls((prev) => new Set(prev).add(scheduleFlyer.src));
+                            }
+                        }}
+                        initialImage={scheduleFlyer}
+                        initialDate={scheduleDate}
+                        initialTime={getInitialTimeForPeriod(period)}
+                    />
+                )}
+            </div>
+        );
+    };
