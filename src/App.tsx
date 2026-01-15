@@ -1127,6 +1127,7 @@ function AppContent() {
             generation_options: {
               ...options,
               toneOfVoiceOverride: input.toneOfVoiceOverride || null,
+              toneOfVoiceUsed: input.toneOfVoiceOverride || brandProfile!.toneOfVoice,
             } as unknown as Record<string, unknown>,
             status: "completed",
             organization_id: organizationId,

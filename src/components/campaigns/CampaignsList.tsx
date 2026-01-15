@@ -20,6 +20,8 @@ interface CampaignWithCounts {
   postPreviewUrl: string | null;
   adPreviewUrl: string | null;
   inputTranscript: string | null;
+  toneOfVoiceOverride: string | null;
+  toneOfVoiceUsed: string | null;
 }
 
 interface CampaignsListProps {
@@ -60,6 +62,24 @@ const CampaignCard: React.FC<{
 
     const totalAssets =
       campaign.clipsCount + campaign.postsCount + campaign.adsCount;
+  const toneLabel = campaign.toneOfVoiceOverride || campaign.toneOfVoiceUsed;
+  const previewItems = [
+      campaign.clipsCount > 0
+        ? { type: "clips", url: campaign.clipPreviewUrl, icon: "film", label: "Clip" }
+        : null,
+      campaign.postsCount > 0
+        ? { type: "posts", url: campaign.postPreviewUrl, icon: "image", label: "Post" }
+        : null,
+      campaign.adsCount > 0
+        ? { type: "ads", url: campaign.adPreviewUrl, icon: "zap", label: "Ad" }
+        : null,
+    ].filter(Boolean) as Array<{
+      type: "clips" | "posts" | "ads";
+      url: string | null;
+      icon: string;
+      label: string;
+    }>;
+  const columns = Math.min(previewItems.length, 3) || 1;
 
     return (
       <div
@@ -178,52 +198,36 @@ const CampaignCard: React.FC<{
         {/* Preview Images */}
         {totalAssets > 0 ? (
           <div className="px-4 pb-4">
-            <div className="grid grid-cols-3 gap-1.5">
-              {campaign.clipsCount > 0 && (
-                <div className="relative overflow-hidden rounded-lg aspect-square bg-white/[0.02]">
-                  {campaign.clipPreviewUrl ? (
+            <div
+              className={`grid gap-1.5 ${
+                columns === 1
+                  ? "grid-cols-1"
+                  : columns === 2
+                    ? "grid-cols-2"
+                    : "grid-cols-3"
+              }`}
+            >
+              {previewItems.map((item) => (
+                <div
+                  key={item.type}
+                  className="relative overflow-hidden rounded-lg aspect-square bg-white/[0.02]"
+                >
+                  {item.url ? (
                     <img
-                      src={campaign.clipPreviewUrl}
-                      alt="Clip"
+                      src={item.url}
+                      alt={item.label}
                       className="absolute inset-0 w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Icon name="film" className="w-4 h-4 text-white/10" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                      <Icon name={item.icon} className="w-4 h-4 text-white/10" />
+                      <span className="text-[9px] text-white/30 uppercase tracking-wide">
+                        {item.label}
+                      </span>
                     </div>
                   )}
                 </div>
-              )}
-              {campaign.postsCount > 0 && (
-                <div className="relative overflow-hidden rounded-lg aspect-square bg-white/[0.02]">
-                  {campaign.postPreviewUrl ? (
-                    <img
-                      src={campaign.postPreviewUrl}
-                      alt="Post"
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Icon name="image" className="w-4 h-4 text-white/10" />
-                    </div>
-                  )}
-                </div>
-              )}
-              {campaign.adsCount > 0 && (
-                <div className="relative overflow-hidden rounded-lg aspect-square bg-white/[0.02]">
-                  {campaign.adPreviewUrl ? (
-                    <img
-                      src={campaign.adPreviewUrl}
-                      alt="Ad"
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Icon name="zap" className="w-4 h-4 text-white/10" />
-                    </div>
-                  )}
-                </div>
-              )}
+              ))}
             </div>
 
             {/* Counts */}
@@ -237,6 +241,7 @@ const CampaignCard: React.FC<{
               {campaign.adsCount > 0 && (
                 <span>{campaign.adsCount} ad{campaign.adsCount !== 1 ? 's' : ''}</span>
               )}
+              {toneLabel && <span>Tom: {toneLabel}</span>}
               {isSelected && (
                 <span className="ml-auto text-primary/60 font-medium">Aberta</span>
               )}
@@ -319,22 +324,32 @@ export function CampaignsList({
 
   // Transform DB campaigns to display format (memoized to avoid recalc)
   const campaigns = useMemo<CampaignWithCounts[]>(() => {
-    return dbCampaigns.map((c: DbCampaign) => ({
-      id: c.id,
-      name: c.name,
-      status: c.status,
-      createdAt: c.created_at,
-      creatorName: c.creator_name || null,
-      clipsCount: Number(c.clips_count) || 0,
-      postsCount: Number(c.posts_count) || 0,
-      adsCount: Number(c.ads_count) || 0,
-      postsBreakdown: c.posts_breakdown || {},
-      adsBreakdown: c.ads_breakdown || {},
-      clipPreviewUrl: c.clip_preview_url || null,
-      postPreviewUrl: c.post_preview_url || null,
-      adPreviewUrl: c.ad_preview_url || null,
-      inputTranscript: c.input_transcript || null,
-    }));
+    return dbCampaigns.map((c: DbCampaign) => {
+      const toneData = c.generation_options as
+        | { toneOfVoiceOverride?: string | null; toneOfVoiceUsed?: string | null }
+        | null;
+      const toneOverride = toneData?.toneOfVoiceOverride || null;
+      const toneOfVoiceUsed = toneData?.toneOfVoiceUsed || null;
+
+      return {
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        createdAt: c.created_at,
+        creatorName: c.creator_name || null,
+        clipsCount: Number(c.clips_count) || 0,
+        postsCount: Number(c.posts_count) || 0,
+        adsCount: Number(c.ads_count) || 0,
+        postsBreakdown: c.posts_breakdown || {},
+        adsBreakdown: c.ads_breakdown || {},
+        clipPreviewUrl: c.clip_preview_url || null,
+        postPreviewUrl: c.post_preview_url || null,
+        adPreviewUrl: c.ad_preview_url || null,
+        inputTranscript: c.input_transcript || null,
+        toneOfVoiceOverride: toneOverride,
+        toneOfVoiceUsed,
+      };
+    });
   }, [dbCampaigns]);
 
   const handleSelectCampaign = (campaignId: string) => {
