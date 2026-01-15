@@ -9,7 +9,7 @@ O sistema de geração de vídeos usa **Google Veo API** como provedor principal
 ```
 Frontend (ClipsTab.tsx)
     ↓
-API Client (geminiService.ts / apiClient.ts)
+API Client (geminiService.ts / services/api)
     ↓
 Server API (server/dev-api.mjs ou api/ai/video.ts)
     ↓
@@ -27,7 +27,7 @@ Vercel Blob (armazenamento permanente)
 | `api/ai/convert-prompt.ts` | Converte prompts genéricos em JSON estruturado |
 | `components/tabs/ClipsTab.tsx` | UI de geração de vídeos |
 | `services/geminiService.ts` | Cliente de serviços AI |
-| `services/apiClient.ts` | Cliente HTTP para APIs |
+| `services/services/api` | Cliente HTTP para APIs |
 
 ## Configuração do Google Veo API
 

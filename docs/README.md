@@ -65,7 +65,7 @@ A aplicação é uma SPA React com backend Express, otimizada para deploy em Rai
 │       └── job-queue.mjs      # BullMQ queue e worker
 │
 ├── services/
-│   ├── apiClient.ts           # Cliente HTTP para todas as APIs
+│   ├── services/api (compat via services/apiClient.ts)           # Cliente HTTP para todas as APIs
 │   ├── geminiService.ts       # Wrapper para /api/ai/* endpoints
 │   ├── blobService.ts         # Upload para Vercel Blob
 │   └── rubeService.ts         # Geração de vídeo (Veo/Fal.ai)

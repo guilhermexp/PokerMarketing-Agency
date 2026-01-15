@@ -177,7 +177,7 @@ function AppContent() {
 }
 ```
 
-#### 2. API Client (services/apiClient.ts)
+#### 2. API Client (services/api, compat via services/apiClient.ts)
 
 Todas as funções de dados aceitam `organizationId`:
 
