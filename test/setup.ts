@@ -12,12 +12,6 @@ vi.stubGlobal('import.meta.env', {
   DEV: true,
   PROD: false,
   MODE: 'test',
-  VITE_USE_ZUSTAND_STORES: 'false',
-  VITE_USE_NEW_API_CLIENT: 'false',
-  VITE_USE_NEW_IMAGE_PREVIEW: 'false',
-  VITE_USE_NEW_CLIPS_TAB: 'false',
-  VITE_USE_NEW_FLYER_GENERATOR: 'false',
-  VITE_USE_NEW_CAROUSEL_TAB: 'false',
 });
 
 // Mock do fetch para testes

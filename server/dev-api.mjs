@@ -36,6 +36,15 @@ config();
 const app = express();
 const PORT = 3002;
 
+// Surface fatal errors during dev so the API doesn't silently exit.
+process.on("uncaughtException", (error) => {
+  console.error("[Dev API] uncaughtException:", error);
+});
+
+process.on("unhandledRejection", (error) => {
+  console.error("[Dev API] unhandledRejection:", error);
+});
+
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 
@@ -3719,9 +3728,9 @@ app.post("/api/ai/image", async (req, res) => {
     // Prepare product images array, including brand logo if available
     let allProductImages = productImages ? [...productImages] : [];
 
-    // Auto-include brand logo as reference if it's an HTTP URL and not already passed by frontend
+    // Auto-include brand logo as reference if it's an HTTP URL
     // (Frontend handles data URLs, server handles HTTP URLs)
-    if (brandProfile.logo && brandProfile.logo.startsWith('http') && allProductImages.length === 0) {
+    if (brandProfile.logo && brandProfile.logo.startsWith('http')) {
       try {
         const logoBase64 = await urlToBase64(brandProfile.logo);
         if (logoBase64) {
@@ -4176,17 +4185,42 @@ app.post("/api/ai/edit-image", async (req, res) => {
       return res.status(400).json({ error: "image and prompt are required" });
     }
 
-    console.log("[Edit Image API] Editing image...");
+    console.log("[Edit Image API] Editing image...", {
+      imageSize: image?.base64?.length,
+      mimeType: image?.mimeType,
+      promptLength: prompt?.length,
+      hasMask: !!mask,
+      hasReference: !!referenceImage,
+    });
 
     const ai = getGeminiAi();
     const instructionPrompt = `DESIGNER SÊNIOR: Execute alteração profissional: ${prompt}. Texto original e logos são SAGRADOS, preserve informações importantes visíveis.`;
 
+    // Validate and clean base64 data
+    let cleanBase64 = image.base64;
+    if (cleanBase64.startsWith('data:')) {
+      cleanBase64 = cleanBase64.split(',')[1];
+    }
+    // Check for valid base64
+    if (cleanBase64.length % 4 !== 0) {
+      console.log("[Edit Image API] Warning: base64 length is not multiple of 4, padding...");
+      cleanBase64 = cleanBase64.padEnd(Math.ceil(cleanBase64.length / 4) * 4, '=');
+    }
+
+    console.log("[Edit Image API] parts structure:", {
+      textLength: instructionPrompt.length,
+      imageBase64Length: cleanBase64.length,
+      mimeType: image.mimeType,
+      partsCount: 2 + (!!mask) + (!!referenceImage)
+    });
+
     const parts = [
       { text: instructionPrompt },
-      { inlineData: { data: image.base64, mimeType: image.mimeType } },
+      { inlineData: { data: cleanBase64, mimeType: image.mimeType } },
     ];
 
     if (mask) {
+      console.log("[Edit Image API] Adding mask, size:", mask.base64?.length);
       parts.push({
         inlineData: { data: mask.base64, mimeType: mask.mimeType },
       });
@@ -4200,22 +4234,28 @@ app.post("/api/ai/edit-image", async (req, res) => {
       });
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-pro-image-preview",
-      contents: { parts },
-      config: { imageConfig: { imageSize: "1K" } },
-    });
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: "gemini-3-pro-image-preview",
+        contents: { parts },
+        config: { imageConfig: { imageSize: "1K" } },
+      })
+    );
 
     let imageDataUrl = null;
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        break;
+    const contentParts = response.candidates?.[0]?.content?.parts;
+    if (Array.isArray(contentParts)) {
+      for (const part of contentParts) {
+        if (part.inlineData) {
+          imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          break;
+        }
       }
     }
 
     if (!imageDataUrl) {
-      throw new Error("Failed to edit image");
+      console.log("[Edit Image API] Empty response:", JSON.stringify(response, null, 2).substring(0, 1000));
+      throw new Error("Failed to edit image - API returned empty response");
     }
 
     console.log("[Edit Image API] Image edited successfully");
@@ -4832,33 +4872,16 @@ app.post("/api/ai/video", async (req, res) => {
     let videoUrl;
     let usedProvider = "google";
 
-    // For Veo 3.1, try Google API first, then fallback to FAL.ai
+    // For Veo 3.1, use Google API only (no fallback).
     if (model === "veo-3.1" || model === "veo-3.1-fast-generate-preview") {
-      try {
-        // Try Google Veo API first (supports first/last frame interpolation)
-        videoUrl = await generateVideoWithGoogleVeo(
-          prompt,
-          aspectRatio,
-          imageUrl,
-          isInterpolationMode ? lastFrameUrl : null,
-        );
-      } catch (googleError) {
-        // Log the Google API error and fallback to FAL.ai
-        console.log(`[Video API] Google Veo failed: ${googleError.message}`);
-        console.log("[Video API] Falling back to FAL.ai...");
-        usedProvider = "fal.ai";
-        // FAL.ai doesn't support first/last frame, use standard image-to-video
-        videoUrl = await generateVideoWithFal(
-          prompt,
-          aspectRatio,
-          model,
-          imageUrl,
-          sceneDuration,
-          generateAudio,
-        );
-      }
+      videoUrl = await generateVideoWithGoogleVeo(
+        prompt,
+        aspectRatio,
+        imageUrl,
+        isInterpolationMode ? lastFrameUrl : null,
+      );
     } else {
-      // For Sora-2 or other models, use FAL.ai directly
+      // For Sora-2 or other models, use FAL.ai directly.
       usedProvider = "fal.ai";
       videoUrl = await generateVideoWithFal(
         prompt,

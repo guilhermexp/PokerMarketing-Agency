@@ -4891,7 +4891,6 @@ REGRAS:
   }
 });
 
-// AI Edit Image
 app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
@@ -4968,16 +4967,19 @@ app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
     }
 
     let imageDataUrl = null;
-    const parts_response = response.candidates?.[0]?.content?.parts || [];
-    for (const part of parts_response) {
-      if (part.inlineData) {
-        imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        break;
+    const parts_response = response.candidates?.[0]?.content?.parts;
+    // Check if parts_response is an array (not empty object or undefined)
+    if (Array.isArray(parts_response)) {
+      for (const part of parts_response) {
+        if (part.inlineData) {
+          imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          break;
+        }
       }
     }
 
     if (!imageDataUrl) {
-      console.log("[Edit Image API] No image in response:", JSON.stringify(response.candidates?.[0], null, 2));
+      console.log("[Edit Image API] No image in response:", JSON.stringify(response, null, 2).substring(0, 1000));
       throw new Error("O modelo não retornou uma imagem. Tente novamente com uma instrução diferente.");
     }
 
@@ -5019,10 +5021,6 @@ app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
 
 // AI Extract Colors from Logo
 app.post("/api/ai/extract-colors", async (req, res) => {
-  const timer = createTimer();
-  const auth = getAuth(req);
-  const organizationId = auth?.orgId || null;
-  const sql = getSql();
 
   try {
     const { logo } = req.body;

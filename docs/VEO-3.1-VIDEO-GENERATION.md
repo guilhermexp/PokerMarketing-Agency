@@ -48,7 +48,7 @@ type VideoModel =
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                     SERVICES (Cliente)                           │
-│  services/apiClient.ts                                          │
+│  services/apiClient.ts (compat -> services/api)                                          │
 │  ├── generateVideo() - chamada HTTP para /api/ai/video          │
 │  ├── queueVideoJob() - enfileira job para background            │
 │  └── VideoJobConfig - interface de configuração                  │
@@ -567,7 +567,7 @@ interface VideoJobConfig {
 | Arquivo | Responsabilidade |
 |---------|------------------|
 | `components/tabs/ClipsTab.tsx` | UI, lógica de geração, toggle de interpolação |
-| `services/apiClient.ts` | Cliente HTTP, interface `VideoJobConfig` |
+| `services/apiClient.ts (compat -> services/api)` | Cliente HTTP, interface `VideoJobConfig` |
 | `services/geminiService.ts` | Wrapper para chamadas de AI |
 | `server/index.mjs` | Endpoint produção, `generateVideoWithGoogleVeo` |
 | `server/dev-api.mjs` | Endpoint desenvolvimento |
