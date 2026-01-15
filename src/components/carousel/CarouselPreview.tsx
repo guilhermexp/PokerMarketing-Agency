@@ -381,7 +381,7 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
             Array.from({ length: Math.min(totalExpectedSlides - images.length, 5) }).map((_, idx) => (
               <div
                 key={`skeleton-${idx}`}
-                className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-lg animate-pulse"
+                className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-lg"
                 style={{
                   width: "7rem",
                   height: "28rem",
