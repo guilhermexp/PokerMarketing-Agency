@@ -40,7 +40,7 @@ export const buildVeoScenePrompt = ({
   includeNarration,
 }: ScenePromptParams): string => {
   const narrationBlock = includeNarration
-    ? `\n\nNARRAÇÃO (falar em português brasileiro, voz empolgante e profissional): "${narration}"`
+    ? `\n\nNARRAÇÃO (falar em português brasileiro, voz impactante, empolgante e profissional): "${narration}"`
     : "";
 
   const brandContext = brandProfile.description
