@@ -33,6 +33,14 @@ const TONE_OPTIONS: ToneOfVoice[] = [
   "Técnico",
 ];
 
+const TONE_DESCRIPTIONS: Record<ToneOfVoice, string> = {
+  Profissional: "Linguagem formal, objetiva e corporativa nas gerações.",
+  Espirituoso: "Tom leve, criativo e com humor sutil.",
+  Casual: "Comunicação simples, próxima e natural.",
+  Inspirador: "Mensagem motivacional, positiva e aspiracional.",
+  Técnico: "Texto preciso, informativo e detalhado.",
+};
+
 interface ImageFile {
   base64: string;
   mimeType: string;
@@ -117,6 +125,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
   const [isToneSelectorOpen, setIsToneSelectorOpen] = useState(false);
   const [toneOverride, setToneOverride] = useState<ToneOfVoice | null>(null);
+  const [toneToast, setToneToast] = useState<{ title: string; description: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
   const inspirationInputRef = useRef<HTMLInputElement>(null);
@@ -149,6 +158,12 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    if (!toneToast) return;
+    const timer = setTimeout(() => setToneToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toneToast]);
 
 
   // Persist collabLogo to localStorage
@@ -275,6 +290,24 @@ export const UploadForm: React.FC<UploadFormProps> = ({
     } finally {
       setIsEnhancing(false);
     }
+  };
+
+  const handleToneSelect = (tone: ToneOfVoice | null) => {
+    setToneOverride(tone);
+    setIsToneSelectorOpen(false);
+
+    if (tone) {
+      setToneToast({
+        title: `Tom da campanha: ${tone}`,
+        description: TONE_DESCRIPTIONS[tone],
+      });
+      return;
+    }
+
+    setToneToast({
+      title: `Tom da campanha: padrão da marca (${brandProfile.toneOfVoice})`,
+      description: TONE_DESCRIPTIONS[brandProfile.toneOfVoice],
+    });
   };
 
   const handleRemoveImage = (
@@ -496,10 +529,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                 {isToneSelectorOpen && (
                   <div className="absolute top-full left-0 mt-1 py-1 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 min-w-[200px] backdrop-blur-xl">
                     <button
-                      onClick={() => {
-                        setToneOverride(null);
-                        setIsToneSelectorOpen(false);
-                      }}
+                      onClick={() => handleToneSelect(null)}
                       className={`w-full px-3 py-2.5 text-left text-xs transition-colors ${
                         toneOverride === null
                           ? "bg-white/[0.08] text-white"
@@ -511,10 +541,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                     {TONE_OPTIONS.map((tone) => (
                       <button
                         key={tone}
-                        onClick={() => {
-                          setToneOverride(tone);
-                          setIsToneSelectorOpen(false);
-                        }}
+                        onClick={() => handleToneSelect(tone)}
                         className={`w-full px-3 py-2.5 text-left text-xs transition-colors ${
                           toneOverride === tone
                             ? "bg-white/[0.08] text-white"
@@ -809,6 +836,26 @@ export const UploadForm: React.FC<UploadFormProps> = ({
           </p>
         </div>
       </div>
+
+      {toneToast && (
+        <div className="fixed bottom-6 right-6 z-[400] animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border border-white/10 bg-[#0b1220]/90 backdrop-blur-sm">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white/10">
+              <Icon name="check" className="w-4 h-4 text-white/70" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white/90">{toneToast.title}</p>
+              <p className="text-xs text-white/50">{toneToast.description}</p>
+            </div>
+            <button
+              onClick={() => setToneToast(null)}
+              className="p-1 rounded-full hover:bg-white/10 transition-colors ml-2"
+            >
+              <Icon name="x" className="w-3.5 h-3.5 text-white/50" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <GenerationOptionsModal
         isOpen={isOptionsModalOpen}
