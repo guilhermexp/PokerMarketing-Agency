@@ -365,6 +365,11 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       {campaign.videoClipScripts?.length || 0} clips •{" "}
                       {campaign.posts?.length || 0} posts •{" "}
                       {campaign.adCreatives?.length || 0} anúncios
+                      {campaign.toneOfVoiceUsed && (
+                        <span className="ml-2 text-white/20">
+                          • Tom: {campaign.toneOfVoiceUsed}
+                        </span>
+                      )}
                       {campaign.generatedWithModel && (
                         <span className="ml-2 text-white/20">
                           • {campaign.generatedWithModel.split("/").pop()}

@@ -1109,6 +1109,8 @@ function AppContent() {
     setCampaignCompositionAssets(options.compositionAssets || null);
     try {
       const r = await generateCampaign(brandProfile!, input, options);
+      const toneUsed = input.toneOfVoiceOverride || brandProfile!.toneOfVoice;
+      r.toneOfVoiceUsed = toneUsed;
 
       // Save campaign to database if authenticated
       if (userId) {
@@ -1122,7 +1124,10 @@ function AppContent() {
           const savedCampaign = await createCampaignApi(userId, {
             name: campaignName,
             input_transcript: input.transcript,
-            generation_options: options as unknown as Record<string, unknown>,
+            generation_options: {
+              ...options,
+              toneOfVoiceOverride: input.toneOfVoiceOverride || null,
+            } as unknown as Record<string, unknown>,
             status: "completed",
             organization_id: organizationId,
             video_clip_scripts: (r.videoClipScripts || []).map((v) => ({
@@ -1246,7 +1251,12 @@ function AppContent() {
       );
       console.debug("[Campaign] API response:", fullCampaign);
 
-      if (fullCampaign) {
+        if (fullCampaign) {
+        const toneOverride = (fullCampaign.generation_options as { toneOfVoiceOverride?: string } | null)
+          ?.toneOfVoiceOverride;
+        const toneOfVoiceUsed =
+          typeof toneOverride === "string" ? toneOverride : brandProfile?.toneOfVoice;
+
         const loadedCampaign: MarketingCampaign = {
           id: fullCampaign.id,
           name: fullCampaign.name || undefined,
@@ -1294,6 +1304,7 @@ function AppContent() {
             caption: c.caption || "",
             slides: c.slides || [],
           })),
+          toneOfVoiceUsed: toneOfVoiceUsed as MarketingCampaign["toneOfVoiceUsed"],
         };
         console.debug(
           "[Campaign] Loaded:",

@@ -106,6 +106,7 @@ export interface MarketingCampaign {
   createdAt?: string; // ISO timestamp
   updatedAt?: string; // ISO timestamp
   generatedWithModel?: string; // AI model used to generate
+  toneOfVoiceUsed?: ToneOfVoice; // Tom aplicado na geração
 }
 
 // Summary for campaigns list

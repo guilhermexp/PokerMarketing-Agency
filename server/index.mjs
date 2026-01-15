@@ -397,10 +397,20 @@ const buildImagePrompt = (
   hasStyleReference = false,
   hasLogo = false,
   hasProductImages = false,
+  jsonPrompt = null,
 ) => {
   const toneText = getToneText(brandProfile, "images");
   let fullPrompt = `PROMPT TÉCNICO: ${prompt}
 ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
+
+  if (jsonPrompt) {
+    fullPrompt += `
+
+JSON ESTRUTURADO (REFERÊNCIA):
+\`\`\`json
+${jsonPrompt}
+\`\`\``;
+  }
 
   if (hasLogo) {
     fullPrompt += `
@@ -431,6 +441,91 @@ ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryCo
   }
 
   return fullPrompt;
+};
+
+const convertImagePromptToJson = async (
+  prompt,
+  aspectRatio,
+  organizationId,
+  sql,
+) => {
+  const timer = createTimer();
+
+  try {
+    const ai = getGeminiAi();
+    const systemPrompt = getImagePromptSystemPrompt(aspectRatio);
+
+    const response = await ai.models.generateContent({
+      model: DEFAULT_FAST_TEXT_MODEL,
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: `${systemPrompt}\n\nPROMPT: ${prompt}` }],
+        },
+      ],
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.2,
+      },
+    });
+
+    const text = response.text?.trim() || "";
+    let parsed = null;
+
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = null;
+    }
+
+    const result = JSON.stringify(
+      parsed || {
+        subject: "",
+        environment: "",
+        style: "",
+        camera: "",
+        text: {
+          enabled: false,
+          content: "",
+          language: "pt-BR",
+          placement: "",
+          font: "",
+        },
+        output: {
+          aspect_ratio: aspectRatio,
+          resolution: "2K",
+        },
+      },
+      null,
+      2,
+    );
+
+    const tokens = extractGeminiTokens(response);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/convert-image-prompt',
+      operation: 'text',
+      model: DEFAULT_FAST_TEXT_MODEL,
+      inputTokens: tokens.inputTokens,
+      outputTokens: tokens.outputTokens,
+      latencyMs: timer(),
+      status: 'success',
+    });
+
+    return result;
+  } catch (error) {
+    console.error('[Image Prompt JSON] Error:', error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/convert-image-prompt',
+      operation: 'text',
+      model: DEFAULT_FAST_TEXT_MODEL,
+      latencyMs: timer(),
+      status: 'failed',
+      error: error.message,
+    }).catch(() => {});
+    return null;
+  }
 };
 
 const buildFlyerPrompt = (brandProfile) => {
@@ -525,6 +620,38 @@ Se o vídeo contiver QUALQUER texto na tela (títulos, legendas, overlays, valor
 - PROIBIDO: fontes script/cursivas, serifadas, handwriting, ou fontes finas/light
 
 Mantenha a essência do prompt original mas expanda com detalhes visuais cinematográficos.`;
+};
+
+const getImagePromptSystemPrompt = (aspectRatio) => {
+  return `Você é especialista em prompt engineering para imagens de IA.
+Converta o prompt fornecido em um JSON estruturado para geração de imagens.
+
+REGRAS IMPORTANTES:
+- NÃO invente detalhes que não existam no prompt original.
+- Preserve exatamente o conteúdo e as instruções do prompt.
+- Se uma informação não estiver explícita, deixe como string vazia.
+- Use linguagem objetiva e direta.
+
+O JSON deve seguir esta estrutura:
+{
+  "subject": "",
+  "environment": "",
+  "style": "",
+  "camera": "",
+  "text": {
+    "enabled": false,
+    "content": "",
+    "language": "pt-BR",
+    "placement": "",
+    "font": ""
+  },
+  "output": {
+    "aspect_ratio": "${aspectRatio}",
+    "resolution": "2K"
+  }
+}
+
+Se houver texto na imagem, marque text.enabled como true e preencha content/placement/font conforme o prompt.`;
 };
 
 // Campaign schema for structured generation
@@ -4419,6 +4546,18 @@ app.post("/api/ai/flyer", requireAuthWithAiRateLimit, async (req, res) => {
       { text: `DADOS DO FLYER PARA INSERIR NA ARTE:\n${prompt}` },
     ];
 
+    const jsonPrompt = await convertImagePromptToJson(
+      prompt,
+      aspectRatio,
+      organizationId,
+      sql,
+    );
+    if (jsonPrompt) {
+      parts.push({
+        text: `JSON ESTRUTURADO (REFERÊNCIA):\n\`\`\`json\n${jsonPrompt}\n\`\`\``,
+      });
+    }
+
     if (logo) {
       parts.push({
         inlineData: { data: logo.base64, mimeType: logo.mimeType },
@@ -4561,12 +4700,19 @@ app.post("/api/ai/image", requireAuthWithAiRateLimit, async (req, res) => {
     }
 
     const hasLogo = !!brandProfile.logo && allProductImages.length > 0;
+    const jsonPrompt = await convertImagePromptToJson(
+      prompt,
+      aspectRatio,
+      organizationId,
+      sql,
+    );
     const fullPrompt = buildImagePrompt(
       prompt,
       brandProfile,
       !!styleReferenceImage,
       hasLogo,
       !!productImages?.length,
+      jsonPrompt,
     );
 
     console.log("[Image API] Prompt:");
