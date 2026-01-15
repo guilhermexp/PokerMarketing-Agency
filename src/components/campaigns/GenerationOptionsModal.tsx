@@ -13,52 +13,96 @@ interface GenerationOptionsModalProps {
   mode?: 'generate' | 'edit';
 }
 
-const ContentRow: React.FC<{
+const CountSelector: React.FC<{
+  count: number;
+  disabled?: boolean;
+  onChange: (count: number) => void;
+}> = ({ count, disabled, onChange }) => (
+  <div className={`flex items-center gap-1 ${disabled ? 'opacity-40' : ''}`}>
+    {[1, 2, 3].map((num) => (
+      <button
+        key={num}
+        onClick={() => onChange(num)}
+        disabled={disabled}
+        className={`
+          w-8 h-8 rounded-lg text-xs font-semibold transition-all
+          ${count === num
+            ? 'bg-white/15 text-white'
+            : 'text-white/40 hover:text-white/70 hover:bg-white/[0.06]'
+          }
+        `}
+      >
+        {num}
+      </button>
+    ))}
+  </div>
+);
+
+const SectionCard: React.FC<{
   icon: IconName;
-  label: string;
+  title: string;
+  description: string;
   enabled: boolean;
   count: number;
   onToggle: () => void;
   onCountChange: (count: number) => void;
-}> = ({ icon, label, enabled, count, onToggle, onCountChange }) => {
-  return (
-    <div className="flex items-center justify-between py-3">
-      <button
-        onClick={onToggle}
-        className="flex items-center gap-3 group"
-      >
-        <div className={`
-          w-4 h-4 rounded border-2 flex items-center justify-center transition-all
-          ${enabled ? 'border-white bg-white' : 'border-white/20 group-hover:border-white/40'}
-        `}>
-          {enabled && <Icon name="check" className="w-2.5 h-2.5 text-black" />}
+  children?: React.ReactNode;
+}> = ({
+  icon,
+  title,
+  description,
+  enabled,
+  count,
+  onToggle,
+  onCountChange,
+  children,
+}) => (
+  <div
+    className={`rounded-xl border p-3 sm:p-4 transition-all ${
+      enabled
+        ? 'border-white/10 bg-white/[0.03]'
+        : 'border-white/[0.06] bg-[#0e0e0e]'
+    }`}
+  >
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start gap-3">
+        <div
+          className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+            enabled ? 'bg-white/10 text-white' : 'bg-white/[0.03] text-white/40'
+          }`}
+        >
+          <Icon name={icon} className="w-4 h-4" />
         </div>
-        <Icon name={icon} className={`w-4 h-4 ${enabled ? 'text-white' : 'text-white/40'}`} />
-        <span className={`text-sm ${enabled ? 'text-white' : 'text-white/50'}`}>{label}</span>
-      </button>
-
-      {enabled && (
-        <div className="flex items-center gap-0.5">
-          {[1, 2, 3].map((num) => (
-            <button
-              key={num}
-              onClick={() => onCountChange(num)}
-              className={`
-                w-7 h-7 rounded text-xs font-medium transition-all
-                ${count === num
-                  ? 'bg-white/10 text-white'
-                  : 'text-white/30 hover:text-white/60'
-                }
-              `}
-            >
-              {num}
-            </button>
-          ))}
+        <div>
+          <p className={`text-sm font-semibold ${enabled ? 'text-white' : 'text-white/60'}`}>
+            {title}
+          </p>
+          <p className="text-[11px] text-white/40 mt-0.5">{description}</p>
         </div>
-      )}
+      </div>
+      <div className="flex flex-col items-end gap-1">
+        <button
+          onClick={onToggle}
+          className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide transition-all ${
+            enabled
+              ? 'bg-emerald-500/20 text-emerald-300'
+              : 'bg-white/[0.06] text-white/40 hover:text-white/60'
+          }`}
+        >
+          {enabled ? 'Ativo' : 'Desativado'}
+        </button>
+        <span className="text-[10px] text-white/30">Clique para ativar/desativar</span>
+      </div>
     </div>
-  );
-};
+
+    <div className="mt-4 flex items-center justify-between">
+      <span className="text-[11px] text-white/40">Quantidade</span>
+      <CountSelector count={count} disabled={!enabled} onChange={onCountChange} />
+    </div>
+
+    {enabled && children && <div className="mt-3">{children}</div>}
+  </div>
+);
 
 const SubOption: React.FC<{
   label: string;
@@ -68,13 +112,20 @@ const SubOption: React.FC<{
   <button
     onClick={onToggle}
     className={`
-      px-3 py-1.5 rounded-full text-xs transition-all
+      px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5
       ${enabled
-        ? 'bg-white/10 text-white'
-        : 'text-white/30 hover:text-white/50'
+        ? 'bg-white/12 text-white border border-white/20'
+        : 'text-white/35 hover:text-white/60 border border-white/10 hover:border-white/20'
       }
     `}
   >
+    <span
+      className={`w-3 h-3 rounded-sm border flex items-center justify-center ${
+        enabled ? 'border-white bg-white' : 'border-white/30'
+      }`}
+    >
+      {enabled && <Icon name="check" className="w-2 h-2 text-black" />}
+    </span>
     {label}
   </button>
 );
@@ -174,93 +225,100 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
-      <div
-        className="bg-[#111] rounded-xl w-full max-w-sm border border-white/[0.08]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-4 border-b border-white/[0.06]">
-          <h2 className="text-sm font-medium text-white">Gerar conteúdo</h2>
-        </div>
+        <div className="bg-black rounded-xl w-full max-w-md border border-white/[0.08]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-4 border-b border-white/[0.06]">
+            <h2 className="text-sm font-medium text-white">Gerar conteúdo</h2>
+            <p className="text-[11px] text-white/40 mt-1">
+              Escolha o que será criado e a quantidade por formato.
+            </p>
+          </div>
 
-        <div className="px-4 divide-y divide-white/[0.04]">
-          {/* Video Scripts */}
-          <ContentRow
-            icon="film"
-            label="Roteiros de vídeo"
-            enabled={options.videoClipScripts.generate}
-            count={options.videoClipScripts.count}
-            onToggle={() => setOptions(prev => ({
-              ...prev,
-              videoClipScripts: { ...prev.videoClipScripts, generate: !prev.videoClipScripts.generate }
-            }))}
-            onCountChange={(count) => setOptions(prev => ({
-              ...prev,
-              videoClipScripts: { ...prev.videoClipScripts, count }
-            }))}
-          />
+          <div className="px-4 py-4 space-y-3">
+            <SectionCard
+              icon="film"
+              title="Roteiros de vídeo | Carrosséis"
+              description="Clips com cenas e narração prontas; além de carrosséis que saem das capas dos clips."
+              enabled={options.videoClipScripts.generate}
+              count={options.videoClipScripts.count}
+              onToggle={() => setOptions(prev => ({
+                ...prev,
+                videoClipScripts: { ...prev.videoClipScripts, generate: !prev.videoClipScripts.generate }
+              }))}
+              onCountChange={(count) => setOptions(prev => ({
+                ...prev,
+                videoClipScripts: { ...prev.videoClipScripts, count }
+              }))}
+            />
 
-          {/* Posts */}
-          <div>
-            <ContentRow
+            <SectionCard
               icon="image"
-              label="Posts"
+              title="Posts"
+              description="Textos e imagens prontos para redes sociais."
               enabled={postsEnabled}
               count={getPostsCount()}
               onToggle={togglePosts}
               onCountChange={setPostsCount}
-            />
-            {postsEnabled && (
-              <div className="flex flex-wrap gap-2 pb-3 pl-7">
-                <SubOption
-                  label="Instagram"
-                  enabled={options.posts.instagram.generate}
-                  onToggle={() => togglePostPlatform('instagram')}
-                />
-                <SubOption
-                  label="Facebook"
-                  enabled={options.posts.facebook.generate}
-                  onToggle={() => togglePostPlatform('facebook')}
-                />
-                <SubOption
-                  label="Twitter"
-                  enabled={options.posts.twitter.generate}
-                  onToggle={() => togglePostPlatform('twitter')}
-                />
-                <SubOption
-                  label="LinkedIn"
-                  enabled={options.posts.linkedin.generate}
-                  onToggle={() => togglePostPlatform('linkedin')}
-                />
+            >
+              <div className="bg-black/30 border border-white/10 rounded-lg p-2">
+                <p className="text-[10px] text-white/40 mb-2">
+                  Selecione as redes em que deseja publicar.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <SubOption
+                    label="Instagram"
+                    enabled={options.posts.instagram.generate}
+                    onToggle={() => togglePostPlatform('instagram')}
+                  />
+                  <SubOption
+                    label="Facebook"
+                    enabled={options.posts.facebook.generate}
+                    onToggle={() => togglePostPlatform('facebook')}
+                  />
+                  <SubOption
+                    label="Twitter"
+                    enabled={options.posts.twitter.generate}
+                    onToggle={() => togglePostPlatform('twitter')}
+                  />
+                  <SubOption
+                    label="LinkedIn"
+                    enabled={options.posts.linkedin.generate}
+                    onToggle={() => togglePostPlatform('linkedin')}
+                  />
+                </div>
               </div>
-            )}
-          </div>
+            </SectionCard>
 
-          {/* Ads */}
-          <div>
-            <ContentRow
+            <SectionCard
               icon="megaphone"
-              label="Anúncios"
+              title="Anúncios"
+              description="Criativos completos para campanhas pagas."
               enabled={adsEnabled}
               count={getAdsCount()}
               onToggle={toggleAds}
               onCountChange={setAdsCount}
-            />
-            {adsEnabled && (
-              <div className="flex flex-wrap gap-2 pb-3 pl-7">
-                <SubOption
-                  label="Meta Ads"
-                  enabled={options.adCreatives.facebook.generate}
-                  onToggle={() => toggleAdPlatform('facebook')}
-                />
-                <SubOption
-                  label="Google Ads"
-                  enabled={options.adCreatives.google.generate}
-                  onToggle={() => toggleAdPlatform('google')}
-                />
+            >
+              <div className="bg-black/30 border border-white/10 rounded-lg p-2">
+                <p className="text-[10px] text-white/40 mb-2">
+                  Selecione os canais de anúncios desejados.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <SubOption
+                    label="Meta Ads"
+                    enabled={options.adCreatives.facebook.generate}
+                    onToggle={() => toggleAdPlatform('facebook')}
+                  />
+                  <SubOption
+                    label="Google Ads"
+                    enabled={options.adCreatives.google.generate}
+                    onToggle={() => toggleAdPlatform('google')}
+                  />
+                </div>
               </div>
-            )}
+            </SectionCard>
           </div>
-        </div>
+
 
         <div className="p-4 flex items-center justify-between border-t border-white/[0.06]">
           <span className="text-xs text-white/30">
