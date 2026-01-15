@@ -4437,12 +4437,23 @@ app.post("/api/ai/edit-image", async (req, res) => {
       { inlineData: { data: cleanBase64, mimeType: image.mimeType } },
     ];
 
+    let imageConfig = { imageSize: "1K" };
+
     if (mask) {
       console.log("[Edit Image API] Adding mask, size:", mask.base64?.length);
-      parts.push({
-        inlineData: { data: mask.base64, mimeType: mask.mimeType },
-      });
+      imageConfig = {
+        ...imageConfig,
+        mask: {
+          image: {
+            inlineData: {
+              data: mask.base64,
+              mimeType: mask.mimeType || "image/png",
+            },
+          },
+        },
+      };
     }
+
     if (referenceImage) {
       parts.push({
         inlineData: {
@@ -4456,7 +4467,7 @@ app.post("/api/ai/edit-image", async (req, res) => {
       ai.models.generateContent({
         model: "gemini-3-pro-image-preview",
         contents: { parts },
-        config: { imageConfig: { imageSize: "1K" } },
+        config: { imageConfig },
       })
     );
 

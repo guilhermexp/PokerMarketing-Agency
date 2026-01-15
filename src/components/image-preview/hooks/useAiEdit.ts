@@ -29,7 +29,7 @@ interface UseAiEditProps {
 
 export function useAiEdit({
   imageSrc,
-  getMaskData: _getMaskData,
+  getMaskData,
   getMaskRegion,
   clearMask,
   onImageUpdate,
@@ -66,6 +66,7 @@ export function useAiEdit({
       );
 
       const maskRegion = getMaskRegion();
+      const maskData = getMaskData();
 
       const refImageData = referenceImage
         ? await resizeBase64Image(referenceImage.base64, referenceImage.mimeType, 1024)
@@ -75,7 +76,7 @@ export function useAiEdit({
         imgBase64,
         imgMimeType,
         editPrompt,
-        undefined,
+        maskData,
         refImageData,
         maskRegion,
       );
@@ -91,7 +92,7 @@ export function useAiEdit({
     } finally {
       setIsEditing(false);
     }
-  }, [editPrompt, imageSrc, getMaskRegion, referenceImage, clearMask, setError]);
+  }, [editPrompt, imageSrc, getMaskRegion, getMaskData, referenceImage, clearMask, setError]);
 
   const handleRemoveBackground = useCallback(async () => {
     setIsRemovingBackground(true);
