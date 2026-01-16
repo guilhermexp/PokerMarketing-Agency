@@ -307,6 +307,95 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 onClearSelectedStyleReference={onClearSelectedStyleReference}
               />
             )}
+
+            {/* Recent Campaigns Preview - shown below upload form */}
+            {showUploadForm && campaigns.length > 0 && (
+              <div className="mt-6 flex flex-col items-center">
+                <div className="flex items-center justify-between mb-4 w-full max-w-4xl">
+                  <h3 className="text-xs font-bold text-white/40 uppercase tracking-wider">
+                    Últimas Campanhas
+                  </h3>
+                  <button
+                    onClick={() => onViewChange("campaigns")}
+                    className="text-[10px] text-white/35 hover:text-white/70 transition-colors"
+                  >
+                    Ver todas →
+                  </button>
+                </div>
+                <div className="flex gap-4 justify-center w-full max-w-4xl">
+                  {campaigns.slice(0, 3).map((camp) => {
+                    const previewItems = [
+                      camp.clip_preview_url ? { url: camp.clip_preview_url, type: 'clip' } : null,
+                      camp.post_preview_url ? { url: camp.post_preview_url, type: 'post' } : null,
+                      camp.ad_preview_url ? { url: camp.ad_preview_url, type: 'ad' } : null,
+                    ].filter(Boolean) as Array<{ url: string; type: string }>;
+                    const columns = Math.min(previewItems.length, 3) || 1;
+                    const totalAssets = Number(camp.clips_count || 0) + Number(camp.posts_count || 0) + Number(camp.ads_count || 0);
+
+                    return (
+                      <div
+                        key={camp.id}
+                        onClick={() => onLoadCampaign(camp.id)}
+                        className="flex-1 max-w-[320px] cursor-pointer bg-[#0a0a0a] rounded-xl overflow-hidden border border-white/[0.06] hover:border-white/[0.12] transition-all hover:scale-[1.02]"
+                      >
+                        {/* Preview Images */}
+                        {totalAssets > 0 && previewItems.length > 0 ? (
+                          <>
+                            <div className="h-40">
+                              <div
+                                className={`grid gap-1 h-full grid-rows-1 ${
+                                  columns === 1
+                                    ? "grid-cols-1"
+                                    : columns === 2
+                                      ? "grid-cols-2"
+                                      : "grid-cols-3"
+                                }`}
+                              >
+                                {previewItems.map((item, i) => (
+                                  <div
+                                    key={i}
+                                    className="relative overflow-hidden h-full bg-white/[0.02]"
+                                  >
+                                    <img
+                                      src={item.url}
+                                      alt={item.type}
+                                      className="absolute inset-0 w-full h-full object-cover"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Info */}
+                            <div className="px-4 py-3">
+                              <h4 className="text-xs font-semibold text-white/80 truncate">
+                                {camp.name || "Sem título"}
+                              </h4>
+                              <p className="text-[10px] text-white/35 mt-1">
+                                {Number(camp.clips_count) > 0 && `${camp.clips_count} clip${Number(camp.clips_count) !== 1 ? 's' : ''}`}
+                                {Number(camp.posts_count) > 0 && ` • ${camp.posts_count} post${Number(camp.posts_count) !== 1 ? 's' : ''}`}
+                                {Number(camp.ads_count) > 0 && ` • ${camp.ads_count} ad${Number(camp.ads_count) !== 1 ? 's' : ''}`}
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="h-40 bg-white/[0.01] flex items-center justify-center">
+                              <p className="text-[10px] text-white/25">Vazia</p>
+                            </div>
+                            <div className="px-4 py-3">
+                              <h4 className="text-xs font-semibold text-white/80 truncate">
+                                {camp.name || "Sem título"}
+                              </h4>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {isGenerating && (
               <>
                 <style>{`

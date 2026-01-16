@@ -215,11 +215,11 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
     )}
 
     {!isExpanded && hasCarrosselImages && (
-      <div className="px-4 py-3 flex gap-2 overflow-x-auto">
-        {orderedImages.slice(0, 6).map((img, idx) => (
+      <div className="px-4 py-3 flex gap-3 overflow-x-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+        {orderedImages.slice(0, 8).map((img, idx) => (
           <div
             key={img.id || idx}
-            className="w-12 h-15 flex-shrink-0 rounded overflow-hidden border border-white/10 cursor-pointer hover:border-white/30 transition-colors"
+            className="w-20 h-25 flex-shrink-0 rounded-lg overflow-hidden border-2 border-white/10 cursor-pointer hover:border-white/30 hover:scale-105 transition-all shadow-lg"
             onClick={() => onOpenEditor(img)}
           >
             <img
@@ -229,9 +229,11 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
             />
           </div>
         ))}
-        {orderedImages.length > 6 && (
-          <div className="w-12 h-15 flex-shrink-0 rounded bg-white/5 flex items-center justify-center text-xs text-white/40">
-            +{orderedImages.length - 6}
+        {orderedImages.length > 8 && (
+          <div className="w-20 h-25 flex-shrink-0 rounded-lg bg-white/5 border-2 border-white/10 flex items-center justify-center">
+            <span className="text-sm font-medium text-white/50">
+              +{orderedImages.length - 8}
+            </span>
           </div>
         )}
       </div>
