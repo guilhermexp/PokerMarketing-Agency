@@ -30,6 +30,7 @@ import {
   createTimer,
 } from "./helpers/usage-tracking.mjs";
 import { urlToBase64 } from "./helpers/image-helpers.mjs";
+import { chatHandler } from "./api/chat/route.mjs";
 
 config();
 
@@ -92,6 +93,58 @@ async function resolveOrganizationContext(sql, userId, organizationId) {
 }
 
 const DATABASE_URL = process.env.DATABASE_URL;
+
+// ============================================================================
+// RATE LIMITING FOR AI ENDPOINTS
+// ============================================================================
+const rateLimitStore = new Map();
+const AI_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const AI_RATE_LIMIT_MAX_REQUESTS = 30; // max AI requests per window
+
+function checkAiRateLimit(identifier) {
+  const key = `ai:${identifier}`;
+  const now = Date.now();
+  const record = rateLimitStore.get(key);
+
+  if (!record || now - record.windowStart > AI_RATE_LIMIT_WINDOW_MS) {
+    rateLimitStore.set(key, { windowStart: now, count: 1 });
+    return { allowed: true, remaining: AI_RATE_LIMIT_MAX_REQUESTS - 1 };
+  }
+
+  if (record.count >= AI_RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  record.count++;
+  return { allowed: true, remaining: AI_RATE_LIMIT_MAX_REQUESTS - record.count };
+}
+
+// Middleware for AI endpoints with stricter rate limiting
+function requireAuthWithAiRateLimit(req, res, next) {
+  const auth = getAuth(req);
+
+  if (!auth?.userId) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "UNAUTHORIZED",
+    });
+  }
+
+  // Apply stricter AI rate limiting
+  const rateLimit = checkAiRateLimit(auth.userId);
+  res.setHeader("X-RateLimit-Remaining", rateLimit.remaining);
+
+  if (!rateLimit.allowed) {
+    return res.status(429).json({
+      error: "AI rate limit exceeded. Please try again later.",
+      code: "AI_RATE_LIMIT_EXCEEDED",
+    });
+  }
+
+  req.authUserId = auth.userId;
+  req.authOrgId = auth.orgId || null;
+  next();
+}
 
 // ============================================================================
 // LOGGING: Clean, organized request tracking
@@ -4800,7 +4853,21 @@ app.post("/api/ai/speech", async (req, res) => {
   }
 });
 
-// AI Assistant Streaming Endpoint
+// ============================================================================
+// NEW: Vercel AI SDK Chat Endpoint (Feature Flag)
+// ============================================================================
+app.post("/api/chat", requireAuthWithAiRateLimit, async (req, res) => {
+  // Feature flag: only enable if VITE_USE_VERCEL_AI_SDK=true
+  if (process.env.VITE_USE_VERCEL_AI_SDK !== 'true') {
+    return res.status(404).json({ error: 'Endpoint not available' });
+  }
+
+  return chatHandler(req, res);
+});
+
+// ============================================================================
+// AI Assistant Streaming Endpoint (Legacy - will be deprecated)
+// ============================================================================
 app.post("/api/ai/assistant", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);

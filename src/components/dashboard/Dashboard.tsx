@@ -27,6 +27,7 @@ import { AdCreativesTab } from "../tabs/AdCreativesTab";
 import { Icon } from "../common/Icon";
 import { FlyerGenerator, TimePeriod } from "../flyer/FlyerGenerator";
 import { AssistantPanel } from "../assistant/AssistantPanel";
+import { AssistantPanelNew } from "../assistant/AssistantPanelNew";
 import { GalleryView } from "../gallery/GalleryView";
 import { CalendarView } from "../calendar/CalendarView";
 import { CampaignsList } from "../campaigns/CampaignsList";
@@ -755,15 +756,26 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         )}
       </main>
 
-      <AssistantPanel
-        isOpen={isAssistantOpen}
-        onClose={onToggleAssistant}
-        history={assistantHistory}
-        isLoading={isAssistantLoading}
-        onSendMessage={onAssistantSendMessage}
-        referenceImage={chatReferenceImage}
-        onClearReference={() => onSetChatReference(null)}
-      />
+      {/* Feature Flag: Vercel AI SDK */}
+      {import.meta.env.VITE_USE_VERCEL_AI_SDK === 'true' ? (
+        <AssistantPanelNew
+          isOpen={isAssistantOpen}
+          onClose={onToggleAssistant}
+          referenceImage={chatReferenceImage}
+          onClearReference={() => onSetChatReference(null)}
+          brandProfile={brandProfile}
+        />
+      ) : (
+        <AssistantPanel
+          isOpen={isAssistantOpen}
+          onClose={onToggleAssistant}
+          history={assistantHistory}
+          isLoading={isAssistantLoading}
+          onSendMessage={onAssistantSendMessage}
+          referenceImage={chatReferenceImage}
+          onClearReference={() => onSetChatReference(null)}
+        />
+      )}
       {/* Assistant Toggle Button - Desktop */}
       {!isAssistantOpen && (
         <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 hidden sm:block">

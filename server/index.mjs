@@ -45,6 +45,7 @@ import {
   extractOpenRouterTokens,
   createTimer,
 } from "./helpers/usage-tracking.mjs";
+import { chatHandler } from "./api/chat/route.mjs";
 
 config();
 
@@ -5435,7 +5436,21 @@ app.post("/api/ai/speech", requireAuthWithAiRateLimit, async (req, res) => {
   }
 });
 
-// AI Assistant Streaming Endpoint
+// ============================================================================
+// NEW: Vercel AI SDK Chat Endpoint (Feature Flag)
+// ============================================================================
+app.post("/api/chat", requireAuthWithAiRateLimit, async (req, res) => {
+  // Feature flag: only enable if NEXT_PUBLIC_USE_VERCEL_AI_SDK=true
+  if (process.env.NEXT_PUBLIC_USE_VERCEL_AI_SDK !== 'true') {
+    return res.status(404).json({ error: 'Endpoint not available' });
+  }
+
+  return chatHandler(req, res);
+});
+
+// ============================================================================
+// AI Assistant Streaming Endpoint (Legacy - will be deprecated)
+// ============================================================================
 app.post("/api/ai/assistant", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);

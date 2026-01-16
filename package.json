@@ -24,6 +24,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/gateway": "^3.0.15",
+    "@ai-sdk/google": "^3.0.9",
+    "@ai-sdk/react": "^3.0.39",
     "@clerk/backend": "^2.29.0",
     "@clerk/clerk-react": "^5.59.2",
     "@clerk/express": "^1.7.60",
@@ -32,12 +35,14 @@
     "@ffmpeg/util": "^0.12.2",
     "@google/genai": "^1.17.0",
     "@neondatabase/serverless": "^1.0.2",
+    "@openrouter/ai-sdk-provider": "^1.5.4",
     "@openrouter/sdk": "^0.3.10",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@upstash/qstash": "^2.8.4",
     "@upstash/ratelimit": "^2.0.7",
     "@upstash/redis": "^1.36.0",
     "@vercel/blob": "^2.0.0",
+    "ai": "^6.0.37",
     "bullmq": "^5.66.4",
     "cloudinary": "^2.8.0",
     "framer-motion": "^12.24.10",
@@ -49,9 +54,12 @@
     "react-dropzone": "^14.3.8",
     "react-router-dom": "^7.11.0",
     "recharts": "^3.6.0",
+    "resumable-stream": "^2.2.10",
+    "streamdown": "^2.0.1",
     "swr": "^2.3.8",
     "tesseract.js": "^7.0.0",
     "xlsx": "0.18.5",
+    "zod": "^4.3.5",
     "zustand": "^5.0.10"
   },
   "devDependencies": {

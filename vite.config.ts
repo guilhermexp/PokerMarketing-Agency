@@ -28,6 +28,10 @@ export default defineConfig(({ mode }) => {
         "Cross-Origin-Opener-Policy": "same-origin",
       },
       proxy: {
+        "/api/chat": {
+          target: "http://localhost:3002",
+          changeOrigin: true,
+        },
         "/api/db": {
           target: "http://localhost:3002",
           changeOrigin: true,
