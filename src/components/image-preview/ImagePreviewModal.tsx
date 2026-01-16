@@ -54,6 +54,8 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     getMaskData,
     getMaskRegion,
     redrawCanvas,
+    brushSize,
+    setBrushSize,
   } = useImageCanvas({ imageSrc: image.src });
 
   const {
@@ -266,6 +268,8 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
               setEditPrompt,
               referenceImage,
               setReferenceImage,
+              brushSize,
+              setBrushSize,
               editPreview,
               error,
               cropAspect,

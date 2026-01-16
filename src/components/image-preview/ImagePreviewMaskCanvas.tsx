@@ -35,7 +35,7 @@ export const ImagePreviewMaskCanvas: React.FC<ImagePreviewMaskCanvasProps> = ({
         <canvas
           ref={maskCanvasRef}
           data-role="mask"
-          className={`absolute top-0 left-0 cursor-crosshair opacity-60 mix-blend-screen ${
+          className={`absolute top-0 left-0 cursor-crosshair opacity-60 ${
             useProtectionMask ? 'hidden' : ''
           }`}
           style={{ width: '100%', height: '100%' }}

@@ -103,6 +103,8 @@ export interface UseImageCanvasReturn {
   getMaskData: () => { base64: string; mimeType: string } | undefined;
   getMaskRegion: () => MaskRegion | undefined;
   redrawCanvas: () => void;
+  brushSize: number;
+  setBrushSize: (size: number) => void;
 }
 
 export interface UseProtectionCanvasReturn {

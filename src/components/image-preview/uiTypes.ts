@@ -80,6 +80,8 @@ export interface ImagePreviewSidebarProps {
   setEditPrompt: (prompt: string) => void;
   referenceImage: ImageFile | null;
   setReferenceImage: (image: ImageFile | null) => void;
+  brushSize: number;
+  setBrushSize: (size: number) => void;
   editPreview: EditPreview | null;
   error: string | null;
   cropAspect: 'original' | '1:1' | '4:5' | '16:9';
@@ -185,6 +187,8 @@ export interface AiEditSectionProps {
   setEditPrompt: (prompt: string) => void;
   referenceImage: ImageFile | null;
   setReferenceImage: (image: ImageFile | null) => void;
+  brushSize: number;
+  setBrushSize: (size: number) => void;
 }
 
 export interface ErrorBannerProps {

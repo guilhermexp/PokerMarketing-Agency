@@ -21,6 +21,7 @@ export function useImageCanvas({ imageSrc }: UseImageCanvasProps): UseImageCanva
   const [isLoadingImage, setIsLoadingImage] = useState(false);
   const [imageLoadError, setImageLoadError] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [brushSize, setBrushSize] = useState(60);
 
   // Calculate display dimensions based on container size and natural image size
   const calculateDisplayDimensions = useCallback((
@@ -244,12 +245,14 @@ export function useImageCanvas({ imageSrc }: UseImageCanvasProps): UseImageCanva
     const ctx = maskCanvasRef.current?.getContext('2d');
     if (!ctx) return;
     ctx.lineTo(x, y);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.lineWidth = 60;
+    // Use red for visibility (will be converted to black for Gemini API)
+    // Gemini format: Black = area to edit, White = area to preserve
+    ctx.strokeStyle = 'rgba(255, 50, 50, 0.8)';
+    ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
-  }, [isDrawing, getCoords]);
+  }, [isDrawing, getCoords, brushSize]);
 
   // Stop drawing
   const stopDrawing = useCallback(() => {
@@ -278,7 +281,33 @@ export function useImageCanvas({ imageSrc }: UseImageCanvasProps): UseImageCanva
 
     if (!hasDrawing) return undefined;
 
-    const maskDataUrl = maskCanvas.toDataURL('image/png');
+    // Convert red mask to black (Gemini format: black = edit, white = preserve)
+    // Create a new canvas for the black mask
+    const blackMaskCanvas = document.createElement('canvas');
+    blackMaskCanvas.width = maskCanvas.width;
+    blackMaskCanvas.height = maskCanvas.height;
+    const blackCtx = blackMaskCanvas.getContext('2d');
+
+    if (blackCtx && imageData) {
+      const blackImageData = blackCtx.createImageData(maskCanvas.width, maskCanvas.height);
+      const blackData = blackImageData.data;
+
+      // Convert any drawn pixel (red) to black
+      for (let i = 0; i < data.length; i += 4) {
+        const hasColor = data[i] !== 0 || data[i + 1] !== 0 || data[i + 2] !== 0 || data[i + 3] !== 0;
+        if (hasColor) {
+          blackData[i] = 0;       // R = 0 (black)
+          blackData[i + 1] = 0;   // G = 0 (black)
+          blackData[i + 2] = 0;   // B = 0 (black)
+          blackData[i + 3] = 255; // A = opaque
+        }
+        // else: leave as transparent (0,0,0,0)
+      }
+
+      blackCtx.putImageData(blackImageData, 0, 0);
+    }
+
+    const maskDataUrl = blackMaskCanvas.toDataURL('image/png');
     const [, maskBase64] = maskDataUrl.split(',');
     return { base64: maskBase64, mimeType: 'image/png' };
   }, []);
@@ -342,5 +371,7 @@ export function useImageCanvas({ imageSrc }: UseImageCanvasProps): UseImageCanva
     getMaskData,
     getMaskRegion,
     redrawCanvas: drawCanvases,
+    brushSize,
+    setBrushSize,
   };
 }

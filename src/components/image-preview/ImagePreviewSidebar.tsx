@@ -56,6 +56,8 @@ export const ImagePreviewSidebar: React.FC<ImagePreviewSidebarProps> = React.mem
   setEditPrompt,
   referenceImage,
   setReferenceImage,
+  brushSize,
+  setBrushSize,
   editPreview,
   error,
   cropAspect,
@@ -126,6 +128,8 @@ export const ImagePreviewSidebar: React.FC<ImagePreviewSidebarProps> = React.mem
                 setEditPrompt={setEditPrompt}
                 referenceImage={referenceImage}
                 setReferenceImage={setReferenceImage}
+                brushSize={brushSize}
+                setBrushSize={setBrushSize}
               />
             </SidebarSection>
           </>

@@ -294,18 +294,20 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         {activeView === "campaign" && (
           <div className="px-4 py-4 sm:px-6 sm:py-5">
             {showUploadForm && (
-              <UploadForm
-                onGenerate={onGenerate}
-                isGenerating={isGenerating}
-                brandProfile={brandProfile}
-                onUpdateCreativeModel={
-                  props.onUpdateCreativeModel || (() => { })
-                }
-                styleReferences={styleReferences}
-                selectedStyleReference={selectedStyleReference}
-                onSelectStyleReference={onSelectStyleReference}
-                onClearSelectedStyleReference={onClearSelectedStyleReference}
-              />
+              <div className="mb-2">
+                <UploadForm
+                  onGenerate={onGenerate}
+                  isGenerating={isGenerating}
+                  brandProfile={brandProfile}
+                  onUpdateCreativeModel={
+                    props.onUpdateCreativeModel || (() => { })
+                  }
+                  styleReferences={styleReferences}
+                  selectedStyleReference={selectedStyleReference}
+                  onSelectStyleReference={onSelectStyleReference}
+                  onClearSelectedStyleReference={onClearSelectedStyleReference}
+                />
+              </div>
             )}
 
             {/* Recent Campaigns Preview - shown below upload form */}
