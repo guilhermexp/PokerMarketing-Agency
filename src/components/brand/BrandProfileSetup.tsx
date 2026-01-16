@@ -132,12 +132,18 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       const file = acceptedFiles[0];
+      console.log('[BrandProfile] Logo dropped:', { name: file.name, type: file.type, size: file.size });
       setProfile(prev => ({ ...prev, logo: file }));
       setIsAnalyzingLogo(true);
       try {
         const { base64, mimeType, dataUrl } = await fileToBase64(file);
+        console.log('[BrandProfile] Logo converted to base64:', { mimeType, base64Length: base64.length });
         setLogoPreview(dataUrl);
+
+        console.log('[BrandProfile] Calling extractColorsFromLogo...');
         const colors = await extractColorsFromLogo({ base64, mimeType });
+        console.log('[BrandProfile] Colors extracted:', colors);
+
         setProfile(prev => ({
           ...prev,
           logo: file,
@@ -145,8 +151,10 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
           secondaryColor: colors.secondaryColor ?? prev.secondaryColor,
           tertiaryColor: colors.tertiaryColor ?? '',
         }));
+        console.log('[BrandProfile] Profile updated with colors');
       } catch (error) {
-        console.error("Failed to extract colors:", error);
+        console.error("[BrandProfile] Failed to extract colors:", error);
+        alert(`Erro ao extrair cores: ${error.message}`);
       } finally {
         setIsAnalyzingLogo(false);
       }

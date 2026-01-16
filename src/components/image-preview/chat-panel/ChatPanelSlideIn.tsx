@@ -18,23 +18,28 @@ export const ChatPanelSlideIn = ({
 }: ChatPanelSlideInProps) => {
   const { mobile } = useResponsive();
 
+  // Debug: Log rendering state
+  console.log('[ChatPanel] Rendering:', {
+    open,
+    chatComponent: !!chatComponent,
+    mobile,
+    imageId: image?.id
+  });
+
   if (mobile) {
-    // Mobile: Bottom Sheet
+    // Mobile: Bottom Sheet - Renderizar chat diretamente
     return (
       <Drawer
         placement="bottom"
         open={open}
         onClose={onClose}
-        height="80%"
+        height="90%"
         styles={{
-          body: { padding: 0, height: '100%' },
+          body: { padding: 0, height: '100%', background: 'transparent' },
         }}
-        closeIcon={<X size={20} />}
-        title="Chat Assistant"
+        closeIcon={null}
       >
-        <div className="h-full overflow-hidden">
-          {chatComponent}
-        </div>
+        {chatComponent}
       </Drawer>
     );
   }
@@ -42,19 +47,9 @@ export const ChatPanelSlideIn = ({
   // Desktop: Slide-in lateral
   return (
     <div className={`edit-panel-slide ${open ? 'open' : 'closed'}`}>
-      {/* Header */}
-      <div className="panel-header">
-        <h3>Chat Assistant</h3>
-        <button className="close-button" onClick={onClose} aria-label="Fechar painel">
-          <X size={20} />
-        </button>
-      </div>
-
-      {/* Content (scrollable) */}
-      <div className="panel-scroll-content" style={{ padding: 0 }}>
-        <div className="h-full overflow-hidden">
-          {chatComponent}
-        </div>
+      {/* Wrapper flex para garantir expansão completa */}
+      <div className="flex flex-col w-full h-full">
+        {chatComponent}
       </div>
     </div>
   );
