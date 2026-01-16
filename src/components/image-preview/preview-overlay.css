@@ -1,0 +1,343 @@
+/* ========================================
+   Image Preview Overlay - Estilos principais
+   ======================================== */
+
+/* Overlay fullscreen */
+.image-preview-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Backdrop escuro */
+.overlay-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+}
+
+/* Container principal */
+.preview-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+}
+
+/* ========================================
+   Botão Close (Canto Superior Direito)
+   ======================================== */
+
+.preview-close-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1001;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preview-close-button:hover {
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ========================================
+   Toolbar Inferior (Flutuante)
+   ======================================== */
+
+.preview-toolbar-bottom {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+}
+
+.preview-toolbar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(12px);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 4px;
+}
+
+/* ========================================
+   Conteúdo (Viewer + Painel)
+   ======================================== */
+
+.preview-content {
+  position: relative;
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Viewer de imagem */
+.image-viewer-canvas {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+/* Quando painel aberto: viewer reduz no desktop */
+@media (min-width: 768px) {
+  .preview-content.panel-open .image-viewer-canvas {
+    margin-right: 400px; /* Largura do painel */
+  }
+}
+
+/* ========================================
+   Painel de Edição (Desktop - Slide-in)
+   ======================================== */
+
+.edit-panel-slide {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 420px;
+  background: #000000;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.edit-panel-slide.open {
+  transform: translateX(0);
+}
+
+/* Header do painel */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: #000000;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.close-button {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  border-radius: 6px;
+}
+
+.close-button:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Conteúdo scrollable do painel */
+.panel-scroll-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #000000;
+}
+
+.panel-scroll-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.panel-scroll-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel-scroll-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.panel-scroll-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Conteúdo interno do painel */
+.edit-panel-content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Seções com estilo de card */
+.edit-section-card {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.2s;
+}
+
+.edit-section-card:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #1e1e1e;
+}
+
+/* Título da seção */
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 16px;
+}
+
+/* Divisor de seção */
+.section-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.05);
+  margin: 24px 0;
+}
+
+/* ========================================
+   Responsividade Mobile
+   ======================================== */
+
+@media (max-width: 767px) {
+  .preview-toolbar {
+    padding: 6px 12px;
+    gap: 2px;
+    font-size: 14px;
+  }
+
+  .preview-toolbar-bottom {
+    bottom: 16px;
+  }
+
+  .preview-close-button {
+    top: 12px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .image-viewer-canvas {
+    padding: 16px;
+  }
+
+  /* Desktop slide-in escondido no mobile (usa Drawer do Ant Design) */
+  .edit-panel-slide {
+    display: none;
+  }
+
+  /* Esconder dimensões no mobile para economizar espaço */
+  .preview-toolbar .toolbar-separator + span {
+    display: none;
+  }
+}
+
+/* ========================================
+   Animações e Transições
+   ======================================== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.image-preview-overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.edit-panel-slide.open {
+  animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========================================
+   Utilitários
+   ======================================== */
+
+/* Classe helper para quando o painel está aberto */
+.preview-content.panel-open {
+  /* usado pelo JavaScript para aplicar estilos condicionais */
+}
+
+/* Classe para desabilitar pointer events durante animações */
+.preview-content.animating {
+  pointer-events: none;
+}
+
+/* ========================================
+   Dark Mode (opcional - já está dark por padrão)
+   ======================================== */
+
+/* Caso queira adicionar suporte a tema claro no futuro */
+@media (prefers-color-scheme: light) {
+  /* .image-preview-overlay { } */
+  /* Manter dark mesmo em light mode */
+}

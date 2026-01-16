@@ -4,7 +4,7 @@
  * Handles AI image editing, background removal, and preview management.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { editImage } from '../../../services/geminiService';
 import { uploadImageToBlob } from '../../../services/blobService';
 import { resizeBase64Image, urlToBase64 } from '../../../utils/imageHelpers';
@@ -29,6 +29,7 @@ interface UseAiEditProps {
   // Tool approval mode props
   pendingToolEdit?: PendingToolEdit | null;
   onToolEditComplete?: (imageUrl: string) => void;
+  initialEditPreview?: EditPreview | null;
 }
 
 export function useAiEdit({
@@ -46,10 +47,12 @@ export function useAiEdit({
   resetEditorState,
   pendingToolEdit,
   onToolEditComplete,
+  initialEditPreview,
 }: UseAiEditProps): UseAiEditReturn {
   const [isEditing, setIsEditing] = useState(false);
   const [isRemovingBackground, setIsRemovingBackground] = useState(false);
   const [editPreview, setEditPreview] = useState<EditPreview | null>(null);
+  const initialPreviewAppliedRef = useRef(false);
 
   const handleEdit = useCallback(async () => {
     if (!editPrompt.trim()) {
@@ -174,6 +177,17 @@ export function useAiEdit({
     setEditPreview(null);
     resetEditorState();
   }, [resetEditorState]);
+
+  useEffect(() => {
+    initialPreviewAppliedRef.current = false;
+  }, [initialEditPreview?.dataUrl]);
+
+  useEffect(() => {
+    if (initialEditPreview && !editPreview && !initialPreviewAppliedRef.current) {
+      setEditPreview(initialEditPreview);
+      initialPreviewAppliedRef.current = true;
+    }
+  }, [initialEditPreview, editPreview]);
 
   // Auto-execute edit for tool approval mode
   useEffect(() => {

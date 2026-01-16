@@ -19,6 +19,7 @@ import {
   type InstagramContext,
 } from "./services/rubeService";
 import { uploadDataUrlToBlob } from "./services/blobService";
+import type { EditPreview } from "./components/image-preview/types";
 import type {
   BrandProfile,
   MarketingCampaign,
@@ -276,6 +277,7 @@ function AppContent() {
   // Tool edit approval integration with AI Studio
   const [pendingToolEdit, setPendingToolEdit] = useState<PendingToolEdit | null>(null);
   const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
+  const [toolEditPreview, setToolEditPreview] = useState<EditPreview | null>(null);
 
   // Track context to prevent flashing between screens
   const contextRef = useRef({ userId, organizationId });
@@ -1949,6 +1951,50 @@ function AppContent() {
     }, 100);
   }, []);
 
+  const handleShowToolEditPreview = useCallback((payload: {
+    toolCallId: string;
+    imageUrl: string;
+    prompt?: string;
+    referenceImageId?: string;
+    referenceImageUrl?: string;
+  }) => {
+    const {
+      toolCallId,
+      imageUrl,
+      prompt,
+      referenceImageId,
+      referenceImageUrl,
+    } = payload;
+
+    const imageFromGallery = referenceImageId
+      ? galleryImages.find(img => img.id === referenceImageId)
+      : null;
+
+    const previewImage = imageFromGallery || (referenceImageUrl ? {
+      id: referenceImageId || `tool-edit-${toolCallId}`,
+      src: referenceImageUrl,
+      source: 'ai-tool-edit',
+      model: 'gemini-3-pro-image-preview',
+    } as GalleryImage : null);
+
+    if (!previewImage) {
+      console.warn('[App] Tool edit preview skipped: reference image not found');
+      return;
+    }
+
+    setEditingImage(previewImage);
+    setToolEditPreview({
+      dataUrl: imageUrl,
+      type: 'edit',
+      prompt,
+    });
+  }, [galleryImages]);
+
+  const handleCloseImageEditor = useCallback(() => {
+    setEditingImage(null);
+    setToolEditPreview(null);
+  }, []);
+
   const chatContextValue = useMemo(() => ({
     onSetChatReference: handleSetChatReference,
     isAssistantOpen,
@@ -2227,7 +2273,9 @@ function AppContent() {
             onRequestImageEdit={handleRequestImageEdit}
             onToolEditApproved={handleToolEditApproved}
             onToolEditRejected={handleToolEditRejected}
-            onCloseImageEditor={() => setEditingImage(null)}
+            onShowToolEditPreview={handleShowToolEditPreview}
+            toolEditPreview={toolEditPreview}
+            onCloseImageEditor={handleCloseImageEditor}
           />
           </ChatProvider>
         </>

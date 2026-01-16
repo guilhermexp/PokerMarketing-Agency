@@ -5,9 +5,9 @@
  */
 
 import React from 'react';
-import { Icon } from '../common/Icon';
-import { Loader } from '../common/Loader';
-import type { ResizeWithProtectionProps } from './uiTypes';
+import { Icon } from '../../../common/Icon';
+import { Loader } from '../../../common/Loader';
+import type { ResizeWithProtectionProps } from '../../uiTypes';
 
 export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = ({
   originalDimensions: _originalDimensions,

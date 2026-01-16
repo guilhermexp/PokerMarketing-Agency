@@ -3,9 +3,9 @@
  */
 
 import React from 'react';
-import { Icon } from '../common/Icon';
-import { MinimalImageUploader } from './MinimalImageUploader';
-import type { AiEditSectionProps } from './uiTypes';
+import { Icon } from '../../../common/Icon';
+import { MinimalImageUploader } from '../../MinimalImageUploader';
+import type { AiEditSectionProps } from '../../uiTypes';
 
 export const AiEditSection: React.FC<AiEditSectionProps> = React.memo(({
   editPrompt,
@@ -15,11 +15,9 @@ export const AiEditSection: React.FC<AiEditSectionProps> = React.memo(({
   brushSize,
   setBrushSize,
 }) => (
-  <section className="space-y-2.5">
-    <div className="flex items-center justify-between">
-      <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">
-        Editar com IA
-      </span>
+  <section className="edit-section-card">
+    <div className="flex items-center justify-between mb-4">
+      <h4 className="section-title">Editar com IA</h4>
       {editPrompt && (
         <button
           onClick={() => setEditPrompt('')}
@@ -29,6 +27,7 @@ export const AiEditSection: React.FC<AiEditSectionProps> = React.memo(({
         </button>
       )}
     </div>
+    <div className="space-y-2.5">
     <textarea
       value={editPrompt}
       onChange={(e) => setEditPrompt(e.target.value)}
@@ -79,6 +78,7 @@ export const AiEditSection: React.FC<AiEditSectionProps> = React.memo(({
       ) : (
         <MinimalImageUploader onImageChange={setReferenceImage} />
       )}
+    </div>
     </div>
   </section>
 ));

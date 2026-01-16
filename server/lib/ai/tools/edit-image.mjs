@@ -17,6 +17,28 @@ import { z } from 'zod';
  * @param {object} context.referenceImage - Imagem de referência (URL ou base64)
  * @returns {Tool} - Tool configurada
  */
+const getInternalBaseUrl = () => {
+  const fallbackPort = process.env.PORT || '3002';
+  return process.env.BASE_URL || process.env.INTERNAL_API_BASE_URL || `http://localhost:${fallbackPort}`;
+};
+
+const getInternalHeaders = (userId, orgId) => {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  const internalToken = process.env.INTERNAL_API_TOKEN;
+  if (internalToken) {
+    headers['X-Internal-Token'] = internalToken;
+    headers['X-Internal-User-Id'] = userId;
+    if (orgId) {
+      headers['X-Internal-Org-Id'] = orgId;
+    }
+  } else {
+    headers['Authorization'] = `Bearer ${userId}`;
+  }
+  return headers;
+};
+
 export const editImageTool = ({ userId, orgId, dataStream, referenceImage }) =>
   tool({
     description: 'Edita a imagem atualmente em foco. Use quando o usuário pedir para modificar/ajustar/editar a imagem atual.',
@@ -25,8 +47,7 @@ export const editImageTool = ({ userId, orgId, dataStream, referenceImage }) =>
       prompt: z.string().describe('Descrição das alterações desejadas em português (ex: "mudar cor de fundo para azul")')
     }),
 
-    // TEMPORARIAMENTE DESABILITADO PARA DEBUG
-    // needsApproval: true, // Requer confirmação do usuário
+    needsApproval: true, // Requer confirmação do usuário
 
     // Metadata para preview (UI)
     metadata: {
@@ -72,21 +93,28 @@ export const editImageTool = ({ userId, orgId, dataStream, referenceImage }) =>
 
         // 3. Baixar e converter imagem para base64
         console.log(`[Tool:editImage] Baixando imagem: ${referenceImage.src}`);
-        const imageResponse = await fetch(referenceImage.src);
-        const imageBuffer = await imageResponse.arrayBuffer();
-        const base64Data = Buffer.from(imageBuffer).toString('base64');
-        const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+        let base64Data = '';
+        let mimeType = 'image/jpeg';
+        if (referenceImage.src.startsWith('data:')) {
+          const [header, data] = referenceImage.src.split(',');
+          const match = header.match(/data:(.*?);base64/);
+          mimeType = match?.[1] || 'image/png';
+          base64Data = data || '';
+        } else {
+          const imageResponse = await fetch(referenceImage.src);
+          const imageBuffer = await imageResponse.arrayBuffer();
+          base64Data = Buffer.from(imageBuffer).toString('base64');
+          mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+        }
 
         console.log(`[Tool:editImage] Imagem convertida para base64: ${base64Data.length} bytes, ${mimeType}`);
         console.log(`[Tool:editImage] Prompt da edição: "${prompt}"`);
 
         // 4. Chamar API de edição de imagem
-        const response = await fetch(`${process.env.BASE_URL || 'http://localhost:3002'}/api/ai/edit-image`, {
+        const baseUrl = getInternalBaseUrl();
+        const response = await fetch(`${baseUrl}/api/ai/edit-image`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${userId}`,
-          },
+          headers: getInternalHeaders(userId, orgId),
           body: JSON.stringify({
             image: {
               base64: base64Data,
@@ -94,6 +122,7 @@ export const editImageTool = ({ userId, orgId, dataStream, referenceImage }) =>
             },
             prompt,
             mask: referenceImage.maskData || null,
+            maskRegion: referenceImage.maskRegion || null,
           })
         });
 
@@ -110,12 +139,9 @@ export const editImageTool = ({ userId, orgId, dataStream, referenceImage }) =>
         });
 
         // 5. Salvar na gallery (nova versão editada)
-        const galleryResponse = await fetch(`${process.env.BASE_URL || 'http://localhost:3002'}/api/db/gallery`, {
+        const galleryResponse = await fetch(`${baseUrl}/api/db/gallery`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${userId}`,
-          },
+          headers: getInternalHeaders(userId, orgId),
           body: JSON.stringify({
             user_id: userId,
             organization_id: orgId,
@@ -155,6 +181,9 @@ export const editImageTool = ({ userId, orgId, dataStream, referenceImage }) =>
           success: true,
           imageId: savedImage?.id,
           imageUrl: data.imageUrl,
+          referenceImageId: referenceImage.id,
+          referenceImageUrl: referenceImage.src,
+          prompt,
           message: `Imagem editada com sucesso!`
         };
       } catch (error) {

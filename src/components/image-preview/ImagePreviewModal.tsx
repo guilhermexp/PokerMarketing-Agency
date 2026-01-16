@@ -2,15 +2,13 @@
  * ImagePreviewModal
  *
  * Container for the image preview and editing experience.
+ * REFATORADO: Agora usa a nova arquitetura com ImagePreviewOverlay
  */
 
 import React, { useState, useEffect } from 'react';
-import { downloadImage } from '../../utils/imageHelpers';
 import type { ImagePreviewModalProps } from './types';
 import type { ImageFile } from './types.ts';
-import { ImagePreviewHeader } from './ImagePreviewHeader';
-import { ImageViewer } from './ImageViewer';
-import { ImageEditor } from './ImageEditor';
+import { ImagePreviewOverlay } from './overlay/ImagePreviewOverlay';
 import { useAiEdit } from './hooks/useAiEdit';
 import { useImageCanvas } from './hooks/useImageCanvas';
 import { useImageResize } from './hooks/useImageResize';
@@ -37,6 +35,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   pendingToolEdit,
   onToolEditApproved,
   onToolEditRejected,
+  initialEditPreview,
 }) => {
   const [error, setError] = useState<string | null>(null);
   // Editor state - controlled by this component
@@ -115,6 +114,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         onToolEditApproved(pendingToolEdit.toolCallId, imageUrl);
       }
     },
+    initialEditPreview,
   });
 
   const {
@@ -165,19 +165,6 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   const { videoRef, videoDimensions, isVerticalVideo, handleLoadedMetadata } =
     useVideoPlayer({ src: image.src });
 
-  const isVideo =
-    image.src?.endsWith('.mp4') ||
-    image.src?.includes('video') ||
-    image.source?.startsWith('Video-');
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
   // Reset editor state when image actually changes (not just reloaded)
   const prevImageSrcRef = React.useRef<string | null>(null);
   useEffect(() => {
@@ -188,147 +175,77 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     }
   }, [image.src]);
 
-  const handleDownload = () => {
-    downloadImage(image.src, downloadFilename || 'edited-image.png');
-  };
-
-  const handleUseInChat = () => {
-    onSetChatReference(image);
-    onClose();
-  };
-
   const isActionRunning =
     isEditing || isRemovingBackground || isResizing || isCropping || isApplyingFilter;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/95 flex items-center justify-center z-[60] p-3 md:p-6"
-      onClick={onClose}
-    >
-      <div
-        className="bg-[#0a0a0a] rounded-2xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden border border-white/[0.06] relative shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <ImagePreviewHeader
-          image={image}
-          onClose={onClose}
-          onQuickPost={onQuickPost}
-          onPublish={onPublish}
-          onSchedulePost={onSchedulePost}
-          onUseInChat={handleUseInChat}
-          onDownload={handleDownload}
-        />
-
-        <div className="flex-grow flex flex-col lg:flex-row overflow-hidden min-h-0 min-w-0">
-          <ImageViewer
-            image={image}
-            isVideo={isVideo}
-            videoRef={videoRef}
-            isVerticalVideo={isVerticalVideo}
-            handleLoadedMetadata={handleLoadedMetadata}
-            resizedPreview={resizedPreview}
-            editPreview={editPreview}
-            originalDimensions={originalDimensions}
-            isLoadingImage={isLoadingImage}
-            imageLoadError={imageLoadError}
-            imageCanvasRef={imageCanvasRef}
-            maskCanvasRef={maskCanvasRef}
-            protectionCanvasRef={protectionCanvasRef}
-            containerRef={containerRef}
-            useProtectionMask={useProtectionMask}
-            drawMode={drawMode}
-            startDrawing={startDrawing}
-            draw={draw}
-            stopDrawing={stopDrawing}
-            startProtectionDrawing={startProtectionDrawing}
-            drawProtection={drawProtection}
-            stopProtectionDrawing={stopProtectionDrawing}
-            isActionRunning={isActionRunning}
-            isResizing={isResizing}
-            resizeProgress={resizeProgress}
-            filterStyle={filterStyle}
-            onNavigatePrev={onNavigatePrev}
-            onNavigateNext={onNavigateNext}
-            hasPrev={hasPrev}
-            hasNext={hasNext}
-          />
-
-          <ImageEditor
-            sidebar={{
-              image,
-              isVideo,
-              videoDimensions,
-              isVerticalVideo,
-              originalDimensions,
-              widthPercent,
-              heightPercent,
-              isResizing,
-              resizeProgress,
-              resizedPreview,
-              handleResize,
-              handleSaveResize,
-              handleDiscardResize,
-              useProtectionMask,
-              drawMode,
-              setUseProtectionMask,
-              setDrawMode,
-              handleAutoDetectText,
-              isDetectingText,
-              detectProgress,
-              hasProtectionDrawing,
-              clearProtectionMask,
-              editPrompt,
-              setEditPrompt,
-              referenceImage,
-              setReferenceImage,
-              brushSize,
-              setBrushSize,
-              editPreview,
-              error,
-              cropAspect,
-              setCropAspect,
-              isCropping,
-              handleApplyCrop,
-              handleResetCrop,
-              filterPreset,
-              setFilterPreset,
-              isApplyingFilter,
-              handleApplyFilter,
-              handleResetFilter,
-            }}
-            footer={{
-              isVideo,
-              editPreview,
-              isEditing,
-              isRemovingBackground,
-              isActionRunning,
-              editPrompt,
-              clearMask,
-              handleRemoveBackground,
-              handleEdit,
-              handleDiscardEdit,
-              handleSaveEdit,
-              // Tool approval mode
-              isToolApprovalMode,
-              onApprove: () => {
-                handleSaveEdit();
-              },
-              onReject: () => {
-                if (onToolEditRejected && pendingToolEdit) {
-                  onToolEditRejected(pendingToolEdit.toolCallId);
-                }
-                onClose();
-              },
-            }}
-            mobileActions={{
-              image,
-              onQuickPost,
-              onSchedulePost,
-              onClose,
-            }}
-          />
-        </div>
-      </div>
-    </div>
+    <ImagePreviewOverlay
+      visible={true}
+      image={image}
+      onClose={onClose}
+      onImageUpdate={onImageUpdate}
+      onSetChatReference={onSetChatReference}
+      downloadFilename={downloadFilename}
+      onQuickPost={onQuickPost}
+      onPublish={onPublish}
+      onSchedulePost={onSchedulePost}
+      pendingToolEdit={pendingToolEdit}
+      onToolEditApproved={onToolEditApproved}
+      onToolEditRejected={onToolEditRejected}
+      initialEditPreview={initialEditPreview}
+      // Editor state props
+      editPrompt={editPrompt}
+      setEditPrompt={setEditPrompt}
+      referenceImage={referenceImage}
+      setReferenceImage={setReferenceImage}
+      brushSize={brushSize}
+      setBrushSize={setBrushSize}
+      // Resize props
+      originalDimensions={originalDimensions}
+      widthPercent={widthPercent}
+      heightPercent={heightPercent}
+      isResizing={isResizing}
+      resizeProgress={resizeProgress}
+      resizedPreview={resizedPreview}
+      handleResize={handleResize}
+      handleSaveResize={handleSaveResize}
+      handleDiscardResize={handleDiscardResize}
+      // Protection props
+      useProtectionMask={useProtectionMask}
+      drawMode={drawMode}
+      setUseProtectionMask={setUseProtectionMask}
+      setDrawMode={setDrawMode}
+      handleAutoDetectText={handleAutoDetectText}
+      isDetectingText={isDetectingText}
+      detectProgress={detectProgress}
+      hasProtectionDrawing={hasProtectionDrawing}
+      clearProtectionMask={clearProtectionMask}
+      // Crop & Filter props
+      cropAspect={cropAspect}
+      setCropAspect={setCropAspect}
+      isCropping={isCropping}
+      handleApplyCrop={handleApplyCrop}
+      handleResetCrop={handleResetCrop}
+      filterPreset={filterPreset}
+      setFilterPreset={setFilterPreset}
+      isApplyingFilter={isApplyingFilter}
+      handleApplyFilter={handleApplyFilter}
+      handleResetFilter={handleResetFilter}
+      // Video props
+      videoDimensions={videoDimensions}
+      isVerticalVideo={isVerticalVideo}
+      // Edit preview props
+      editPreview={editPreview}
+      isEditing={isEditing}
+      isRemovingBackground={isRemovingBackground}
+      isActionRunning={isActionRunning}
+      clearMask={clearMask}
+      handleRemoveBackground={handleRemoveBackground}
+      handleEdit={handleEdit}
+      handleDiscardEdit={handleDiscardEdit}
+      handleSaveEdit={handleSaveEdit}
+      // Error
+      error={error}
+    />
   );
 };

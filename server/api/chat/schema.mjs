@@ -18,14 +18,30 @@ const textPartSchema = z.object({
   text: z.string().min(1).max(5000)
 });
 
+const isValidUrl = (value) => {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Part de arquivo (imagem)
  */
 const filePartSchema = z.object({
   type: z.literal('file'),
   mediaType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
-  name: z.string(),
-  url: z.string().url()
+  name: z.string().optional(),
+  filename: z.string().optional(),
+  url: z.string().refine(
+    (value) => value.startsWith('data:') || isValidUrl(value),
+    { message: 'url must be a valid URL or data URL' }
+  )
+}).refine((data) => data.name || data.filename, {
+  message: 'name or filename is required',
+  path: ['name']
 });
 
 /**

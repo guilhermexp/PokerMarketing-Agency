@@ -5,8 +5,9 @@
  * mas usando useChat hook do Vercel AI SDK internamente
  */
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@ai-sdk/react';
+import { lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import type { ChatReferenceImage, BrandProfile, GalleryImage, PendingToolEdit } from '../../types';
 import { useChatImageSync } from '../../hooks/useChatImageSync';
 import { Icon } from '../common/Icon';
@@ -36,6 +37,13 @@ interface AssistantPanelNewProps {
   }) => void;
   onToolEditApproved?: (toolCallId: string, imageUrl: string) => void;
   onToolEditRejected?: (toolCallId: string, reason?: string) => void;
+  onShowToolEditPreview?: (payload: {
+    toolCallId: string;
+    imageUrl: string;
+    prompt?: string;
+    referenceImageId?: string;
+    referenceImageUrl?: string;
+  }) => void;
 }
 
 // Helper: converter File para base64
@@ -50,6 +58,11 @@ const fileToDataUrl = (file: File): Promise<string> =>
 // Helper: inferir mediaType da URL da imagem
 const getImageMediaType = (url: string): 'image/jpeg' | 'image/png' | 'image/webp' => {
   const lowerUrl = url.toLowerCase();
+  if (lowerUrl.startsWith('data:image/')) {
+    if (lowerUrl.includes('image/jpeg')) return 'image/jpeg';
+    if (lowerUrl.includes('image/webp')) return 'image/webp';
+    return 'image/png';
+  }
   if (lowerUrl.includes('.jpg') || lowerUrl.includes('.jpeg')) return 'image/jpeg';
   if (lowerUrl.includes('.webp')) return 'image/webp';
   return 'image/png'; // default
@@ -73,11 +86,10 @@ const ChatBubble: React.FC<{ message: any; onApprove?: (id: string) => void; onD
   const fileParts = message.parts
     ?.filter((part: any) => part.type === 'file') || [];
 
-  // Tool calls (aguardando aprovação)
-  // IMPORTANTE: Filtrar editImage tool calls (serão tratados via AI Studio)
-  const toolCalls = message.toolInvocations?.filter((inv: any) =>
-    inv.state === 'call' && inv.toolName !== 'editImage'
-  ) || [];
+  // Tool approvals (AI SDK v6)
+  const toolApprovals = message.parts
+    ?.filter((part: any) => typeof part.type === 'string' && part.type.startsWith('tool-'))
+    ?.filter((part: any) => part.state === 'approval-requested' && part.approval?.id) || [];
 
   return (
     <div className={`flex flex-col ${isAssistant ? 'items-start' : 'items-end'} space-y-2 animate-fade-in-up`}>
@@ -92,11 +104,11 @@ const ChatBubble: React.FC<{ message: any; onApprove?: (id: string) => void; onD
               >
                 <img
                   src={file.url}
-                  alt={file.name}
+                  alt={file.filename || file.name}
                   className="max-w-full max-h-[300px] object-contain"
                 />
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                  <p className="text-[10px] text-white/70 truncate">{file.name}</p>
+                  <p className="text-[10px] text-white/70 truncate">{file.filename || file.name}</p>
                 </div>
               </div>
             ))}
@@ -133,13 +145,13 @@ const ChatBubble: React.FC<{ message: any; onApprove?: (id: string) => void; onD
       )}
 
       {/* Tool Approval UI com ToolPreview */}
-      {toolCalls.map((toolCall: any) => (
-        <div key={toolCall.toolCallId} className="max-w-[90%]">
+      {toolApprovals.filter((toolPart: any) => toolPart.type !== 'tool-editImage').map((toolPart: any) => (
+        <div key={toolPart.toolCallId} className="max-w-[90%]">
           <ToolPreview
-            toolCallId={toolCall.toolCallId}
-            toolName={toolCall.toolName}
-            args={toolCall.args}
-            metadata={toolCall.metadata?.preview}
+            toolCallId={toolPart.approval.id}
+            toolName={toolPart.type.replace('tool-', '')}
+            args={toolPart.input || toolPart.rawInput || {}}
+            metadata={toolPart.metadata?.preview}
             onApprove={onApprove!}
             onDeny={onDeny!}
             onAlwaysAllow={(toolName) => console.log('Always allow:', toolName)}
@@ -158,23 +170,28 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
   onUpdateReference,
   galleryImages,
   brandProfile,
-  pendingToolEdit,
-  onRequestImageEdit,
-  onToolEditApproved,
-  onToolEditRejected
+  pendingToolEdit: _pendingToolEdit,
+  onRequestImageEdit: _onRequestImageEdit,
+  onToolEditApproved: _onToolEditApproved,
+  onToolEditRejected: _onToolEditRejected,
+  onShowToolEditPreview
 }) => {
   const [input, setInput] = useState('');
   const [dataStream, setDataStream] = useState<any[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [chatId] = useState(() => crypto.randomUUID());
   const [isDragging, setIsDragging] = useState(false);
   const [isSending, setIsSending] = useState(false); // Estado local para feedback imediato
+  const handledEditResultsRef = useRef<Set<string>>(new Set());
+  const handledEditApprovalsRef = useRef<Set<string>>(new Set());
+  const editApprovalIdByToolCallRef = useRef<Map<string, string>>(new Map());
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // useChat hook do Vercel AI SDK
-  const { messages, sendMessage, isLoading, stop, addToolResult, setMessages } = useChat({
+  const { messages, sendMessage, status, stop, addToolApprovalResponse, addToolOutput, setMessages } = useChat({
     api: '/api/chat',
     id: chatId,
     body: {
@@ -182,6 +199,9 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
       chatReferenceImage: referenceImage,
       selectedChatModel: brandProfile?.preferredAIModel || 'x-ai/grok-4.1-fast'
     },
+    sendAutomaticallyWhen: ({ messages }) =>
+      lastAssistantMessageIsCompleteWithToolCalls({ messages }) ||
+      lastAssistantMessageIsCompleteWithApprovalResponses({ messages }),
     onResponse: (response) => {
       console.log('[AssistantPanel] Response received', response.status);
     },
@@ -194,16 +214,20 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
     onFinish: (message) => {
       console.log('[AssistantPanel] Message finished:', {
         role: message.role,
-        content: message.content?.substring(0, 100),
-        toolInvocations: message.toolInvocations?.length || 0,
-        toolInvocationsDetails: message.toolInvocations?.map(inv => ({
-          toolName: inv.toolName,
-          state: inv.state,
-          toolCallId: inv.toolCallId
-        }))
+        partsCount: message.parts?.length || 0
       });
     }
   });
+
+  const isLoading = status === 'streaming' || status === 'submitted';
+  const lastMessage = messages[messages.length - 1];
+  const shouldShowLoading = isSending || (isLoading && lastMessage?.role === 'user');
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // ========================================================================
   // SINCRONIZAÇÃO AUTOMÁTICA DE IMAGENS
@@ -224,79 +248,109 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
   });
 
   // ========================================================================
-  // TOOL EDIT APPROVAL - Detectar editImage tool calls
-  // ========================================================================
-  const editImageToolCalls = useMemo(() => {
-    const allToolInvocations = messages.flatMap(msg => msg.toolInvocations || []);
-    const editImageCalls = allToolInvocations.filter(inv => inv.state === 'call' && inv.toolName === 'editImage');
-
-    if (editImageCalls.length > 0) {
-      console.log('[AssistantPanel] Found editImage calls:', editImageCalls.length);
-    }
-
-    return editImageCalls;
-  }, [messages]);
-
-  // Disparar request para abrir AI Studio quando detectar editImage tool call
-  useEffect(() => {
-    if (editImageToolCalls.length > 0 && !pendingToolEdit && onRequestImageEdit) {
-      const toolCall = editImageToolCalls[0]; // Processar primeira da fila
-
-      console.debug('[AssistantPanel] editImage tool call detected:', toolCall);
-
-      // Disparar request para abrir AI Studio
-      onRequestImageEdit({
-        toolCallId: toolCall.toolCallId,
-        toolName: 'editImage',
-        prompt: toolCall.args.prompt,
-        imageId: referenceImage?.id || '', // Imagem em foco
-      });
-    }
-  }, [editImageToolCalls, pendingToolEdit, referenceImage, onRequestImageEdit]);
-
-  // Processar resultado de aprovação/rejeição do AI Studio
-  useEffect(() => {
-    if (!pendingToolEdit) return;
-
-    const result = (pendingToolEdit as any).result;
-    const imageUrl = (pendingToolEdit as any).imageUrl;
-    const error = (pendingToolEdit as any).error;
-
-    if (result === 'approved' && imageUrl && addToolResult) {
-      console.debug('[AssistantPanel] Tool edit approved, sending result:', { toolCallId: pendingToolEdit.toolCallId, imageUrl });
-
-      addToolResult({
-        toolCallId: pendingToolEdit.toolCallId,
-        result: {
-          approved: true,
-          imageUrl: imageUrl
-        }
-      });
-    } else if (result === 'rejected' && addToolResult) {
-      console.debug('[AssistantPanel] Tool edit rejected, sending error:', { toolCallId: pendingToolEdit.toolCallId, error });
-
-      addToolResult({
-        toolCallId: pendingToolEdit.toolCallId,
-        result: {
-          approved: false,
-          error: error || 'Edição rejeitada pelo usuário'
-        }
-      });
-    }
-  }, [pendingToolEdit, addToolResult]);
-
-  // Debug: monitorar tool invocations
+  // Debug: monitorar tool parts
   useEffect(() => {
     messages.forEach((msg, idx) => {
-      if (msg.toolInvocations && msg.toolInvocations.length > 0) {
-        console.log(`[Chat] Message ${idx} has tool invocations:`, msg.toolInvocations.map(inv => ({
-          toolName: inv.toolName,
-          state: inv.state,
-          toolCallId: inv.toolCallId
+      const toolParts = msg.parts?.filter((part: any) => typeof part.type === 'string' && part.type.startsWith('tool-')) || [];
+      if (toolParts.length > 0) {
+        console.log(`[Chat] Message ${idx} has tool parts:`, toolParts.map((part: any) => ({
+          toolName: part.type?.replace('tool-', ''),
+          state: part.state,
+          toolCallId: part.toolCallId
         })));
       }
     });
   }, [messages]);
+
+  useEffect(() => {
+    if (!_onRequestImageEdit) return;
+
+    for (const msg of messages) {
+      const toolParts = msg.parts?.filter((part: any) => part.type === 'tool-editImage') || [];
+      for (const part of toolParts) {
+        if (part.state !== 'approval-requested' || !part.toolCallId) continue;
+        if (part.approval?.id) {
+          editApprovalIdByToolCallRef.current.set(part.toolCallId, part.approval.id);
+        }
+        if (handledEditApprovalsRef.current.has(part.toolCallId)) continue;
+        handledEditApprovalsRef.current.add(part.toolCallId);
+        _onRequestImageEdit({
+          toolCallId: part.toolCallId,
+          toolName: 'editImage',
+          prompt: part.input?.prompt || '',
+          imageId: referenceImage?.id || '',
+        });
+      }
+    }
+  }, [messages, _onRequestImageEdit, referenceImage]);
+
+  useEffect(() => {
+    const pending = _pendingToolEdit as any;
+    if (!pending?.result || !pending?.toolCallId) return;
+    if (!addToolOutput) return;
+    if (handledEditResultsRef.current.has(pending.toolCallId)) return;
+
+    if (pending.result === 'approved' && pending.imageUrl) {
+      const approvalId = editApprovalIdByToolCallRef.current.get(pending.toolCallId);
+      if (approvalId) {
+        addToolApprovalResponse({
+          id: approvalId,
+          approved: true
+        });
+      }
+      handledEditResultsRef.current.add(pending.toolCallId);
+      addToolOutput({
+        toolCallId: pending.toolCallId,
+        output: {
+          imageUrl: pending.imageUrl,
+          prompt: pending.prompt,
+          referenceImageId: pending.imageId,
+          referenceImageUrl: referenceImage?.src,
+        }
+      });
+      setMessages((prev) => [...prev]);
+      setToast({ message: 'Edicao aprovada e enviada ao chat.', type: 'success' });
+    } else if (pending.result === 'rejected') {
+      const approvalId = editApprovalIdByToolCallRef.current.get(pending.toolCallId);
+      if (approvalId) {
+        addToolApprovalResponse({
+          id: approvalId,
+          approved: false,
+          reason: pending.error || 'Edição rejeitada pelo usuário'
+        });
+      }
+      handledEditResultsRef.current.add(pending.toolCallId);
+      addToolOutput({
+        toolCallId: pending.toolCallId,
+        state: 'output-denied',
+        errorText: pending.error || 'Edição rejeitada pelo usuário'
+      });
+      setMessages((prev) => [...prev]);
+      setToast({ message: 'Edicao rejeitada.', type: 'error' });
+    }
+  }, [addToolApprovalResponse, addToolOutput, referenceImage, _pendingToolEdit, setMessages]);
+
+  useEffect(() => {
+    if (!onShowToolEditPreview) return;
+
+    for (const msg of messages) {
+      const toolParts = msg.parts?.filter((part: any) => part.type === 'tool-editImage') || [];
+      for (const part of toolParts) {
+        if (part.state !== 'output-available' || !part.toolCallId) continue;
+        if (handledEditResultsRef.current.has(part.toolCallId)) continue;
+        const output = part.output;
+        if (!output?.imageUrl) continue;
+        handledEditResultsRef.current.add(part.toolCallId);
+        onShowToolEditPreview({
+          toolCallId: part.toolCallId,
+          imageUrl: output.imageUrl,
+          prompt: output.prompt,
+          referenceImageId: output.referenceImageId,
+          referenceImageUrl: output.referenceImageUrl
+        });
+      }
+    }
+  }, [messages, onShowToolEditPreview]);
 
   // Auto-scroll
   useEffect(() => {
@@ -307,7 +361,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() && !referenceImage) return;
-    if (isLoading || isSending) return;
+    if (status === 'streaming' || status === 'submitted' || isSending) return;
 
     // Limpar erro anterior
     setErrorMessage(null);
@@ -338,7 +392,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
         messageParts.push({
           type: 'file',
           mediaType: getImageMediaType(referenceImage.src),
-          name: referenceImage.id,
+          filename: referenceImage.id,
           url: referenceImage.src
         });
       }
@@ -380,7 +434,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
           {
             type: 'file',
             mediaType: file.type as any,
-            name: file.name,
+            filename: file.name,
             url: dataUrl
           }
         ]
@@ -436,7 +490,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
         {
           type: 'file',
           mediaType: file.type as any,
-          name: file.name,
+          filename: file.name,
           url: dataUrl
         }
       ]
@@ -444,18 +498,19 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
   };
 
   // Aprovar tool
-  const handleApprove = (toolCallId: string) => {
-    addToolResult({
-      toolCallId,
-      result: { approved: true }
+  const handleApprove = (approvalId: string) => {
+    addToolApprovalResponse({
+      id: approvalId,
+      approved: true
     });
   };
 
   // Negar tool
-  const handleDeny = (toolCallId: string) => {
-    addToolResult({
-      toolCallId,
-      result: { approved: false }
+  const handleDeny = (approvalId: string) => {
+    addToolApprovalResponse({
+      id: approvalId,
+      approved: false,
+      reason: 'Rejeitado pelo usuário'
     });
   };
 
@@ -486,7 +541,14 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
         </div>
 
         {/* Chat Flow */}
-        <div className="flex-1 p-4 space-y-4 overflow-y-auto scroll-smooth custom-scrollbar">
+        <div className="flex-1 p-4 space-y-4 overflow-y-auto scroll-smooth custom-scrollbar relative">
+          {toast && (
+            <div className="sticky top-0 z-10 flex justify-center">
+              <div className={`px-3 py-2 rounded-md border text-[11px] backdrop-blur-sm ${toast.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
+                {toast.message}
+              </div>
+            </div>
+          )}
           {messages.map((msg) => (
             <ChatBubble key={msg.id} message={msg} onApprove={handleApprove} onDeny={handleDeny} />
           ))}
@@ -502,7 +564,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
           )}
 
           {/* Indicador de loading/processamento */}
-          {(isLoading || isSending) && (
+          {shouldShowLoading && (
             <LoadingIndicator
               stage={isSending ? 'thinking' : 'generating'}
             />

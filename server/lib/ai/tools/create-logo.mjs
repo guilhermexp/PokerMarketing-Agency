@@ -17,6 +17,28 @@ import { z } from 'zod';
  * @param {object} context.brandProfile - Profile da marca
  * @returns {Tool} - Tool configurada
  */
+const getInternalBaseUrl = () => {
+  const fallbackPort = process.env.PORT || '3002';
+  return process.env.BASE_URL || process.env.INTERNAL_API_BASE_URL || `http://localhost:${fallbackPort}`;
+};
+
+const getInternalHeaders = (userId, orgId) => {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  const internalToken = process.env.INTERNAL_API_TOKEN;
+  if (internalToken) {
+    headers['X-Internal-Token'] = internalToken;
+    headers['X-Internal-User-Id'] = userId;
+    if (orgId) {
+      headers['X-Internal-Org-Id'] = orgId;
+    }
+  } else {
+    headers['Authorization'] = `Bearer ${userId}`;
+  }
+  return headers;
+};
+
 export const createLogoTool = ({ userId, orgId, dataStream, brandProfile }) =>
   tool({
     description: 'Cria um novo logo para a marca. Use quando o usuário pedir especificamente por um logo/logotipo.',
@@ -78,12 +100,10 @@ Requisitos:
         `.trim();
 
         // 3. Chamar API de geração de imagem (formato quadrado 1:1)
-        const response = await fetch(`${process.env.BASE_URL || 'http://localhost:5010'}/api/ai/image`, {
+        const baseUrl = getInternalBaseUrl();
+        const response = await fetch(`${baseUrl}/api/ai/image`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${userId}`,
-          },
+          headers: getInternalHeaders(userId, orgId),
           body: JSON.stringify({
             prompt: logoPrompt,
             brandProfile,
@@ -100,17 +120,18 @@ Requisitos:
         const data = await response.json();
 
         // 4. Salvar na gallery
-        const galleryResponse = await fetch(`${process.env.BASE_URL || 'http://localhost:5010'}/api/db/gallery`, {
+        const galleryResponse = await fetch(`${baseUrl}/api/db/gallery`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${userId}`,
-          },
+          headers: getInternalHeaders(userId, orgId),
           body: JSON.stringify({
-            image_data_url: data.imageUrl,
+            user_id: userId,
+            organization_id: orgId,
+            src_url: data.imageUrl,
             prompt: `Logo: ${prompt}`,
+            source: 'ai-tool-logo',
+            model: data.model || 'gemini-3-pro-image-preview',
             aspect_ratio: '1:1',
-            organization_id: orgId
+            image_size: '1K'
           })
         });
 

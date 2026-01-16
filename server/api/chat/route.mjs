@@ -101,7 +101,7 @@ export async function chatHandler(req, res) {
           const filePart = msg.parts.find(p => p.type === 'file');
           if (filePart) {
             chatReferenceImage = {
-              id: filePart.name,
+              id: filePart.filename || filePart.name,
               src: filePart.url
             };
             console.log('[Chat API] Found reference image in message history:', chatReferenceImage.id);

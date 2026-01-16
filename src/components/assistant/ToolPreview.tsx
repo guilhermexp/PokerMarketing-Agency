@@ -67,40 +67,40 @@ export function ToolPreview({
   const icon = metadata?.icon || 'zap';
 
   return (
-    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 animate-fade-in-up">
+    <div className="bg-black/70 border border-white/10 rounded-lg p-3 animate-fade-in-up">
       {/* Header com ícone e título */}
-      <div className="flex items-start gap-3 mb-3">
-        <div className="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
-          <Icon name={icon as any} className="w-5 h-5 text-yellow-400" />
+      <div className="flex items-start gap-2 mb-2">
+        <div className="w-7 h-7 rounded-md bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0">
+          <Icon name={icon as any} className="w-3.5 h-3.5 text-white/70" />
         </div>
 
         <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-semibold text-yellow-200">{title}</h4>
+          <h4 className="text-[11px] font-semibold text-white/90">{title}</h4>
           {description && (
-            <p className="text-xs text-yellow-300/70 mt-1">{description}</p>
+            <p className="text-[11px] text-white/50 mt-0.5">{description}</p>
           )}
         </div>
       </div>
 
       {/* Parâmetros */}
-      <div className="bg-black/30 rounded-lg p-3 mb-3">
-        <p className="text-xs text-white/50 mb-2">Parâmetros:</p>
-        <pre className="text-xs text-white/80 overflow-x-auto">
+      <div className="bg-black/40 border border-white/5 rounded-md p-2 mb-2">
+        <p className="text-[10px] text-white/40 mb-1">Parâmetros</p>
+        <pre className="text-[10px] text-white/70 overflow-x-auto">
           {JSON.stringify(args, null, 2)}
         </pre>
       </div>
 
       {/* O que a tool vai fazer */}
       {metadata?.willDo && metadata.willDo.length > 0 && (
-        <div className="mb-3">
-          <p className="text-xs text-white/50 mb-2">Esta ferramenta irá:</p>
-          <ul className="space-y-1">
+        <div className="mb-2">
+          <p className="text-[10px] text-white/40 mb-1">Ações</p>
+          <ul className="space-y-0.5">
             {metadata.willDo.map((item, index) => (
               <li
                 key={index}
-                className="text-xs text-white/70 flex items-start gap-2"
+                className="text-[10px] text-white/60 flex items-start gap-1.5"
               >
-                <Icon name="check" className="w-3 h-3 text-green-400 mt-0.5 flex-shrink-0" />
+                <Icon name="check" className="w-3 h-3 text-white/40 mt-0.5 flex-shrink-0" />
                 <span>{item}</span>
               </li>
             ))}
@@ -110,16 +110,16 @@ export function ToolPreview({
 
       {/* Estimativas (tempo e custo) */}
       {(metadata?.estimatedTime || metadata?.cost) && (
-        <div className="flex gap-3 mb-4 text-xs">
+        <div className="flex gap-2 mb-3 text-[10px] text-white/40">
           {metadata.estimatedTime && (
-            <div className="flex items-center gap-1.5 text-white/50">
-              <Icon name="clock" className="w-3 h-3" />
+            <div className="flex items-center gap-1">
+              <Icon name="clock" className="w-3 h-3 text-white/30" />
               <span>{metadata.estimatedTime}</span>
             </div>
           )}
           {metadata.cost && (
-            <div className="flex items-center gap-1.5 text-white/50">
-              <Icon name="dollar-sign" className="w-3 h-3" />
+            <div className="flex items-center gap-1">
+              <Icon name="dollar-sign" className="w-3 h-3 text-white/30" />
               <span>{metadata.cost}</span>
             </div>
           )}
@@ -127,25 +127,25 @@ export function ToolPreview({
       )}
 
       {/* Ações de aprovação */}
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
         <button
           onClick={() => onApprove(toolCallId)}
-          className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
+          className="flex-1 h-8 bg-white/10 hover:bg-white/15 text-white text-[11px] font-medium rounded-md transition-colors"
         >
-          ✓ Aprovar
+          Aprovar
         </button>
 
         <button
           onClick={() => onDeny(toolCallId)}
-          className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm font-medium rounded-lg transition-colors"
+          className="h-8 px-3 bg-transparent border border-white/10 hover:border-white/20 text-white/60 text-[11px] font-medium rounded-md transition-colors"
         >
-          ✗ Negar
+          Negar
         </button>
 
         {onAlwaysAllow && (
           <button
             onClick={() => onAlwaysAllow(toolName)}
-            className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white/70 text-xs rounded-lg transition-colors whitespace-nowrap"
+            className="h-8 px-3 bg-white/5 hover:bg-white/10 text-white/50 text-[10px] rounded-md transition-colors whitespace-nowrap"
             title="Sempre permitir esta ferramenta sem pedir aprovação"
           >
             Sempre permitir

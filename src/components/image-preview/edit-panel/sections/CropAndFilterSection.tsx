@@ -4,8 +4,8 @@
  */
 
 import React from 'react';
-import { Icon } from '../common/Icon';
-import type { ImageCropperProps, ImageFiltersProps } from './uiTypes';
+import { Icon } from '../../../common/Icon';
+import type { ImageCropperProps, ImageFiltersProps } from '../../uiTypes';
 
 type CropAspect = ImageCropperProps['cropAspect'];
 type FilterPreset = ImageFiltersProps['filterPreset'];
@@ -56,15 +56,11 @@ export const CropAndFilterSection: React.FC<CropAndFilterSectionProps> = ({
   const isFilterActive = filterPreset !== 'none';
 
   return (
-    <section className="space-y-3">
+    <section className="edit-section-card">
+      <div className="space-y-3">
       {/* Crop options */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Icon name="crop" className="w-3 h-3 text-white/30" />
-          <span className="text-[8px] font-medium text-white/40 uppercase tracking-wider">
-            Recorte
-          </span>
-        </div>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="section-title mb-0">Recorte</h4>
         <button
           onClick={handleResetCrop}
           className="text-[8px] text-white/25 hover:text-white/40 transition-colors"
@@ -89,14 +85,11 @@ export const CropAndFilterSection: React.FC<CropAndFilterSectionProps> = ({
         ))}
       </div>
 
+      <div className="section-divider" />
+
       {/* Filter options */}
-      <div className="flex items-center justify-between pt-2 border-t border-white/[0.06]">
-        <div className="flex items-center gap-2">
-          <Icon name="sliders" className="w-3 h-3 text-white/30" />
-          <span className="text-[8px] font-medium text-white/40 uppercase tracking-wider">
-            Filtro
-          </span>
-        </div>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="section-title mb-0">Filtro</h4>
         <button
           onClick={handleResetFilter}
           className="text-[8px] text-white/25 hover:text-white/40 transition-colors"
@@ -151,6 +144,7 @@ export const CropAndFilterSection: React.FC<CropAndFilterSectionProps> = ({
             </>
           )}
         </button>
+      </div>
       </div>
     </section>
   );

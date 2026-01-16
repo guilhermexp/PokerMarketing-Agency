@@ -3,14 +3,16 @@
  */
 
 import React from 'react';
-import type { VideoMetaSectionProps } from './uiTypes';
+import type { VideoMetaSectionProps } from '../../uiTypes';
 
 export const VideoMetaSection: React.FC<VideoMetaSectionProps> = ({
   image,
   videoDimensions,
   isVerticalVideo,
 }) => (
-  <div className="space-y-2 text-[11px] text-white/50">
+  <section className="edit-section-card">
+    <h4 className="section-title">Informações do Vídeo</h4>
+    <div className="space-y-2 text-[11px] text-white/50">
     <div className="flex justify-between">
       <span className="text-white/30">Fonte</span>
       <span>{image.source}</span>
@@ -35,5 +37,6 @@ export const VideoMetaSection: React.FC<VideoMetaSectionProps> = ({
         </div>
       </>
     )}
-  </div>
+    </div>
+  </section>
 );

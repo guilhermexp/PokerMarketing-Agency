@@ -113,8 +113,9 @@ export function useChatImageSync({
 
         let partsNeedUpdate = false;
         const updatedParts = msg.parts.map(part => {
-          if (part.type === 'file' && imageIdToUrlMap.has(part.name)) {
-            const newUrl = imageIdToUrlMap.get(part.name)!;
+          const fileId = (part as any).filename || (part as any).name;
+          if (part.type === 'file' && fileId && imageIdToUrlMap.has(fileId)) {
+            const newUrl = imageIdToUrlMap.get(fileId)!;
             if (newUrl !== part.url) {
               partsNeedUpdate = true;
               return { ...part, url: newUrl };

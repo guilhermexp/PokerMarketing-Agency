@@ -30,6 +30,7 @@ export interface ImagePreviewModalProps {
   pendingToolEdit?: PendingToolEdit | null;
   onToolEditApproved?: (toolCallId: string, imageUrl: string) => void;
   onToolEditRejected?: (toolCallId: string, reason?: string) => void;
+  initialEditPreview?: EditPreview | null;
 }
 
 // =============================================================================

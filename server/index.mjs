@@ -105,6 +105,26 @@ app.use(
   }),
 );
 
+const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
+const getHeaderValue = (value) => Array.isArray(value) ? value[0] : value;
+
+// Internal auth bridge for server-to-server tool calls
+app.use((req, res, next) => {
+  const token = getHeaderValue(req.headers["x-internal-token"]);
+  if (INTERNAL_API_TOKEN && token === INTERNAL_API_TOKEN) {
+    const userId = getHeaderValue(req.headers["x-internal-user-id"]) || req.body?.user_id;
+    const orgId = getHeaderValue(req.headers["x-internal-org-id"]) || req.body?.organization_id || null;
+    if (!userId) {
+      return res.status(400).json({ error: "internal user id is required" });
+    }
+    req.auth = {
+      userId,
+      orgId,
+    };
+  }
+  next();
+});
+
 // Helper to get Clerk org context from request
 function getClerkOrgContext(req) {
   const auth = getAuth(req);

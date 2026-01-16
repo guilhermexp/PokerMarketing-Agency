@@ -140,6 +140,14 @@ interface DashboardProps {
   }) => void;
   onToolEditApproved?: (toolCallId: string, imageUrl: string) => void;
   onToolEditRejected?: (toolCallId: string, reason?: string) => void;
+  onShowToolEditPreview?: (payload: {
+    toolCallId: string;
+    imageUrl: string;
+    prompt?: string;
+    referenceImageId?: string;
+    referenceImageUrl?: string;
+  }) => void;
+  toolEditPreview?: import("../image-preview/types").EditPreview | null;
   onCloseImageEditor?: () => void;
 }
 
@@ -791,6 +799,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           onRequestImageEdit={props.onRequestImageEdit}
           onToolEditApproved={props.onToolEditApproved}
           onToolEditRejected={props.onToolEditRejected}
+          onShowToolEditPreview={props.onShowToolEditPreview}
         />
       ) : (
         <AssistantPanel
@@ -856,6 +865,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           pendingToolEdit={pendingToolEdit}
           onToolEditApproved={onToolEditApproved}
           onToolEditRejected={onToolEditRejected}
+          initialEditPreview={props.toolEditPreview || null}
         />
       )}
 

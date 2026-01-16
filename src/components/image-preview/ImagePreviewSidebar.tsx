@@ -3,11 +3,11 @@
  */
 
 import React from 'react';
-import { ResizeWithProtectionSection } from './ResizeWithProtectionSection';
-import { CropAndFilterSection } from './CropAndFilterSection';
-import { AiEditSection } from './AiEditSection';
+import { ResizeWithProtectionSection } from './edit-panel/sections/ResizeWithProtectionSection';
+import { CropAndFilterSection } from './edit-panel/sections/CropAndFilterSection';
+import { AiEditSection } from './edit-panel/sections/AiEditSection';
 import { ErrorBanner } from './ErrorBanner';
-import { VideoMetaSection } from './VideoMetaSection';
+import { VideoMetaSection } from './edit-panel/sections/VideoMetaSection';
 import { PreviewReadyNote } from './PreviewReadyNote';
 import type { ImagePreviewSidebarProps } from './uiTypes';
 
