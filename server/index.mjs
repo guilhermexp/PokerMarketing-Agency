@@ -2078,9 +2078,11 @@ app.get("/api/db/init", requireResourceAccess, async (req, res) => {
         ? sql`SELECT * FROM brand_profiles WHERE organization_id = ${organization_id} AND deleted_at IS NULL LIMIT 1`
         : sql`SELECT * FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`,
 
+      // OPTIMIZATION: Exclude 'src' column (base64 image data) to reduce egress
+      // Only return lightweight metadata for gallery listing
       isOrgContext
-        ? sql`SELECT * FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50`
-        : sql`SELECT * FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50`,
+        ? sql`SELECT id, user_id, organization_id, source, thumbnail_url, created_at, updated_at, deleted_at FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50`
+        : sql`SELECT id, user_id, organization_id, source, thumbnail_url, created_at, updated_at, deleted_at FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50`,
 
       isOrgContext
         ? sql`SELECT * FROM scheduled_posts WHERE organization_id = ${organization_id} ORDER BY scheduled_timestamp ASC LIMIT 100`
@@ -2479,7 +2481,7 @@ app.put("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
 app.get("/api/db/gallery", requireResourceAccess, async (req, res) => {
   try {
     const sql = getSql();
-    const { user_id, organization_id, source, limit } = req.query;
+    const { user_id, organization_id, source, limit, include_src } = req.query;
 
     if (!user_id) {
       return res.status(400).json({ error: "user_id is required" });
@@ -2493,19 +2495,25 @@ app.get("/api/db/gallery", requireResourceAccess, async (req, res) => {
     let query;
     const limitNum = parseInt(limit) || 50;
 
+    // OPTIMIZATION: Only include src (base64 image data) when explicitly requested
+    // This dramatically reduces egress data transfer (50-250MB → 50KB per request)
+    const selectColumns = include_src === 'true'
+      ? '*'
+      : 'id, user_id, organization_id, source, thumbnail_url, created_at, updated_at, deleted_at';
+
     if (organization_id) {
       await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
       if (source) {
         query = await sql`
-          SELECT * FROM gallery_images
+          SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
           WHERE organization_id = ${organization_id} AND source = ${source} AND deleted_at IS NULL
           ORDER BY created_at DESC
           LIMIT ${limitNum}
         `;
       } else {
         query = await sql`
-          SELECT * FROM gallery_images
+          SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
           WHERE organization_id = ${organization_id} AND deleted_at IS NULL
           ORDER BY created_at DESC
           LIMIT ${limitNum}
@@ -2514,14 +2522,14 @@ app.get("/api/db/gallery", requireResourceAccess, async (req, res) => {
     } else {
       if (source) {
         query = await sql`
-          SELECT * FROM gallery_images
+          SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
           WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND source = ${source} AND deleted_at IS NULL
           ORDER BY created_at DESC
           LIMIT ${limitNum}
         `;
       } else {
         query = await sql`
-          SELECT * FROM gallery_images
+          SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
           WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL
           ORDER BY created_at DESC
           LIMIT ${limitNum}
