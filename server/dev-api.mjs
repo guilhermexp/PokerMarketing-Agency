@@ -4578,7 +4578,8 @@ app.post("/api/ai/edit-image", async (req, res) => {
     });
 
     const ai = getGeminiAi();
-    const instructionPrompt = `DESIGNER SÊNIOR: Execute alteração profissional: ${prompt}. Texto original e logos são SAGRADOS, preserve informações importantes visíveis.`;
+    // Usar prompt direto sem adicionar texto extra que pode confundir o modelo
+    const instructionPrompt = prompt;
 
     // Validate and clean base64 data
     let cleanBase64 = image.base64;

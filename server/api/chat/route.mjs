@@ -93,16 +93,21 @@ export async function chatHandler(req, res) {
     // =========================================================================
     let chatReferenceImage = req.body.chatReferenceImage || null;
 
-    // Extrair imagem dos parts da última mensagem do usuário (se houver)
-    const lastUserMessage = [...messagesToProcess].reverse().find(m => m.role === 'user');
-    if (lastUserMessage?.parts) {
-      const filePart = lastUserMessage.parts.find(p => p.type === 'file');
-      if (filePart) {
-        chatReferenceImage = {
-          id: filePart.name,
-          src: filePart.url
-        };
-        console.log('[Chat API] Extracted reference image from parts:', chatReferenceImage.id);
+    // PROCURAR IMAGEM EM TODAS AS MENSAGENS (da mais recente para a mais antiga)
+    if (!chatReferenceImage) {
+      const allMessages = [...messagesToProcess].reverse(); // Mais recente primeiro
+      for (const msg of allMessages) {
+        if (msg.role === 'user' && msg.parts) {
+          const filePart = msg.parts.find(p => p.type === 'file');
+          if (filePart) {
+            chatReferenceImage = {
+              id: filePart.name,
+              src: filePart.url
+            };
+            console.log('[Chat API] Found reference image in message history:', chatReferenceImage.id);
+            break; // Usar a imagem mais recente
+          }
+        }
       }
     }
 
@@ -140,6 +145,10 @@ export async function chatHandler(req, res) {
 
     console.log(`[Chat API] Starting streamText | activeTools: ${activeTools.length}`);
     console.log(`[Chat API] Usando OpenRouter para modelo: ${selectedChatModel}`);
+    console.log(`[Chat API] Reference image:`, chatReferenceImage ? `id=${chatReferenceImage.id}` : 'none');
+
+    const systemMessage = systemPrompt({ brandProfile, selectedChatModel });
+    console.log(`[Chat API] System prompt length: ${systemMessage.length} chars`);
 
     // =========================================================================
     // 6. STREAM DE TEXTO COM VERCEL AI SDK
@@ -150,14 +159,42 @@ export async function chatHandler(req, res) {
 
     const result = streamText({
       model: openrouter.chat(selectedChatModel),
-      system: systemPrompt({ brandProfile, selectedChatModel }),
+      system: systemMessage,
       messages: convertedMessages,
       tools,
       experimental_activeTools: activeTools,
       experimental_transform: smoothStream({
         chunking: 'word'
       }),
-      temperature: 0.7
+      temperature: 0.7,
+      maxSteps: 5, // Permitir até 5 steps de tool calling
+      onStepFinish: ({ text, toolCalls, toolResults, finishReason, usage }) => {
+        console.log('[Chat API] Step finished:', {
+          text: text?.substring(0, 100) + '...',
+          toolCallsCount: toolCalls?.length || 0,
+          toolCalls: toolCalls?.map(tc => ({ name: tc.toolName, state: tc.type })),
+          toolResultsCount: toolResults?.length || 0,
+          toolResults: toolResults?.map(tr => {
+            let resultPreview = 'undefined';
+            try {
+              if (typeof tr.result === 'string') {
+                resultPreview = tr.result.substring(0, 200);
+              } else if (tr.result) {
+                resultPreview = JSON.stringify(tr.result).substring(0, 200);
+              }
+            } catch (e) {
+              resultPreview = 'error serializing result';
+            }
+            return {
+              toolCallId: tr.toolCallId,
+              toolName: tr.toolName,
+              result: resultPreview
+            };
+          }),
+          finishReason,
+          usage
+        });
+      }
     });
 
     console.log('[Chat API] Streaming started');

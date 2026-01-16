@@ -1,6 +1,8 @@
 import React from "react";
 import { Icon } from "./Icon";
+import { SendToChatButton } from "./SendToChatButton";
 import { Loader } from "./Loader";
+import type { GalleryImage } from "../../types";
 
 interface GoogleAdPreviewProps {
   image: string | null;
@@ -13,6 +15,7 @@ interface GoogleAdPreviewProps {
   onImageClick?: () => void;
   imagePrompt?: string;
   error?: string | null;
+  galleryImage?: GalleryImage;
 }
 
 export const GoogleAdPreview: React.FC<GoogleAdPreviewProps> = ({
@@ -26,6 +29,7 @@ export const GoogleAdPreview: React.FC<GoogleAdPreviewProps> = ({
   onImageClick,
   imagePrompt,
   error,
+  galleryImage,
 }) => {
   const domain = `${username.toLowerCase().replace(/\s+/g, '')}.com.br`;
 
@@ -50,11 +54,16 @@ export const GoogleAdPreview: React.FC<GoogleAdPreviewProps> = ({
                 className="w-full h-full object-cover"
                 draggable={false}
               />
-              {onImageClick && (
-                <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center">
-                  <div className="px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur-sm text-xs text-white font-medium">
-                    Editar
-                  </div>
+              {(onImageClick || galleryImage) && (
+                <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                  {galleryImage && (
+                    <SendToChatButton image={galleryImage} />
+                  )}
+                  {onImageClick && (
+                    <div className="px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur-sm text-xs text-white font-medium cursor-pointer">
+                      Editar
+                    </div>
+                  )}
                 </div>
               )}
               {/* Ad badge */}

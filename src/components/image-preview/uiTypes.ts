@@ -108,6 +108,10 @@ export interface ImagePreviewFooterProps {
   handleEdit: () => Promise<void>;
   handleDiscardEdit: () => void;
   handleSaveEdit: () => Promise<void>;
+  // Tool approval mode
+  isToolApprovalMode?: boolean;
+  onApprove?: () => void;
+  onReject?: () => void;
 }
 
 export interface ImagePreviewMobileActionsProps {

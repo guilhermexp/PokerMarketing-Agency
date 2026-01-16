@@ -4,12 +4,13 @@
  * Handles AI image editing, background removal, and preview management.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { editImage } from '../../../services/geminiService';
 import { uploadImageToBlob } from '../../../services/blobService';
 import { resizeBase64Image, urlToBase64 } from '../../../utils/imageHelpers';
 import type { EditPreview, MaskRegion, UseAiEditReturn } from '../types';
 import type { ImageFile } from '../types.ts';
+import type { PendingToolEdit } from '../../../types';
 
 interface UseAiEditProps {
   imageSrc: string;
@@ -25,6 +26,9 @@ interface UseAiEditProps {
   referenceImage: ImageFile | null;
   setReferenceImage: (image: ImageFile | null) => void;
   resetEditorState: () => void;
+  // Tool approval mode props
+  pendingToolEdit?: PendingToolEdit | null;
+  onToolEditComplete?: (imageUrl: string) => void;
 }
 
 export function useAiEdit({
@@ -40,6 +44,8 @@ export function useAiEdit({
   referenceImage,
   setReferenceImage,
   resetEditorState,
+  pendingToolEdit,
+  onToolEditComplete,
 }: UseAiEditProps): UseAiEditReturn {
   const [isEditing, setIsEditing] = useState(false);
   const [isRemovingBackground, setIsRemovingBackground] = useState(false);
@@ -151,18 +157,38 @@ export function useAiEdit({
       resetEditorState();
       setEditPreview(null);
 
+      // Notify tool edit completion
+      if (onToolEditComplete) {
+        onToolEditComplete(finalImageUrl);
+      }
+
       setTimeout(() => redrawCanvas(), 100);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar a edição.');
     } finally {
       setIsEditing(false);
     }
-  }, [editPreview, onImageUpdate, redrawCanvas, resetEditorState, setError]);
+  }, [editPreview, onImageUpdate, redrawCanvas, resetEditorState, setError, onToolEditComplete]);
 
   const handleDiscardEdit = useCallback(() => {
     setEditPreview(null);
     resetEditorState();
   }, [resetEditorState]);
+
+  // Auto-execute edit for tool approval mode
+  useEffect(() => {
+    if (pendingToolEdit && !editPreview && !isEditing && pendingToolEdit.prompt) {
+      console.debug('[useAiEdit] Auto-executing edit for tool approval:', pendingToolEdit);
+
+      // Set prompt from tool call
+      setEditPrompt(pendingToolEdit.prompt);
+
+      // Execute edit automatically after prompt is set
+      setTimeout(() => {
+        handleEdit();
+      }, 100);
+    }
+  }, [pendingToolEdit, editPreview, isEditing, handleEdit, setEditPrompt]);
 
   return {
     editPrompt,

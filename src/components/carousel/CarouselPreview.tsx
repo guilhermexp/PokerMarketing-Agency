@@ -5,6 +5,7 @@
 import React, { useRef, useState } from 'react';
 import type { GalleryImage } from '../../types';
 import { Icon } from '../common/Icon';
+import { SendToChatButton } from '../common/SendToChatButton';
 import { Loader } from '../common/Loader';
 
 interface CarouselPreviewProps {
@@ -360,18 +361,23 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/70 text-sm text-white font-medium">
                 {idx + 1}
               </div>
-              {/* Edit button - appears on hover */}
-              {onOpenEditor && !isGenerating && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenEditor(img);
-                  }}
-                  className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-black/70 hover:bg-primary text-white/70 hover:text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                  title="Editar no AI Studio"
-                >
-                  <Icon name="edit" className="w-4 h-4" />
-                </button>
+              {/* Action buttons - appear on hover */}
+              {!isGenerating && (
+                <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
+                  <SendToChatButton image={img} />
+                  {onOpenEditor && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenEditor(img);
+                      }}
+                      className="w-8 h-8 rounded-lg bg-black/70 hover:bg-primary text-white/70 hover:text-black flex items-center justify-center transition-all"
+                      title="Editar no AI Studio"
+                    >
+                      <Icon name="edit" className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               )}
             </div>
             );

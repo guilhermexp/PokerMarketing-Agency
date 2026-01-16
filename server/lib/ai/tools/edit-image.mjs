@@ -25,7 +25,8 @@ export const editImageTool = ({ userId, orgId, dataStream, referenceImage }) =>
       prompt: z.string().describe('Descrição das alterações desejadas em português (ex: "mudar cor de fundo para azul")')
     }),
 
-    needsApproval: true, // Requer confirmação do usuário
+    // TEMPORARIAMENTE DESABILITADO PARA DEBUG
+    // needsApproval: true, // Requer confirmação do usuário
 
     // Metadata para preview (UI)
     metadata: {
@@ -69,17 +70,30 @@ export const editImageTool = ({ userId, orgId, dataStream, referenceImage }) =>
 
         console.log(`[Tool:editImage] Editando imagem | orgId: ${orgId} | refId: ${referenceImage.id}`);
 
-        // 3. Chamar API de edição de imagem existente
-        const response = await fetch(`${process.env.BASE_URL || 'http://localhost:5010'}/api/ai/edit-image`, {
+        // 3. Baixar e converter imagem para base64
+        console.log(`[Tool:editImage] Baixando imagem: ${referenceImage.src}`);
+        const imageResponse = await fetch(referenceImage.src);
+        const imageBuffer = await imageResponse.arrayBuffer();
+        const base64Data = Buffer.from(imageBuffer).toString('base64');
+        const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+        console.log(`[Tool:editImage] Imagem convertida para base64: ${base64Data.length} bytes, ${mimeType}`);
+        console.log(`[Tool:editImage] Prompt da edição: "${prompt}"`);
+
+        // 4. Chamar API de edição de imagem
+        const response = await fetch(`${process.env.BASE_URL || 'http://localhost:3002'}/api/ai/edit-image`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${userId}`,
           },
           body: JSON.stringify({
+            image: {
+              base64: base64Data,
+              mimeType: mimeType
+            },
             prompt,
-            imageDataUrl: referenceImage.src,
-            maskData: referenceImage.maskData || null, // Mask opcional
+            mask: referenceImage.maskData || null,
           })
         });
 
@@ -90,32 +104,46 @@ export const editImageTool = ({ userId, orgId, dataStream, referenceImage }) =>
 
         const data = await response.json();
 
-        // 4. Salvar na gallery (nova versão editada)
-        const galleryResponse = await fetch(`${process.env.BASE_URL || 'http://localhost:5010'}/api/db/gallery`, {
+        console.log(`[Tool:editImage] Resposta da API:`, {
+          success: data.success,
+          imageUrlLength: data.imageUrl?.length
+        });
+
+        // 5. Salvar na gallery (nova versão editada)
+        const galleryResponse = await fetch(`${process.env.BASE_URL || 'http://localhost:3002'}/api/db/gallery`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${userId}`,
           },
           body: JSON.stringify({
-            image_data_url: data.editedImageUrl,
+            user_id: userId,
+            organization_id: orgId,
+            src_url: data.imageUrl,
             prompt: `Edição: ${prompt}`,
-            organization_id: orgId
+            source: 'ai-tool-edit',
+            model: 'gemini-3-pro-image-preview',
+            aspect_ratio: '1:1',
+            image_size: '1K'
           })
         });
 
         let savedImage = null;
         if (galleryResponse.ok) {
           savedImage = await galleryResponse.json();
+          console.log(`[Tool:editImage] Imagem salva na galeria:`, savedImage?.id);
+        } else {
+          const errorData = await galleryResponse.json().catch(() => ({ error: 'unknown' }));
+          console.error(`[Tool:editImage] Erro ao salvar na galeria:`, galleryResponse.status, errorData);
         }
 
-        // 5. Enviar evento de conclusão (se dataStream disponível)
+        // 6. Enviar evento de conclusão (se dataStream disponível)
         if (dataStream) {
           dataStream.write({
             type: 'data-imageEdited',
             data: {
               id: savedImage?.id || null,
-              url: data.editedImageUrl,
+              url: data.imageUrl,
               prompt
             }
           });
@@ -126,7 +154,7 @@ export const editImageTool = ({ userId, orgId, dataStream, referenceImage }) =>
         return {
           success: true,
           imageId: savedImage?.id,
-          imageUrl: data.editedImageUrl,
+          imageUrl: data.imageUrl,
           message: `Imagem editada com sucesso!`
         };
       } catch (error) {

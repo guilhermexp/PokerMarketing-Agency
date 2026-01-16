@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { GalleryImage, StyleReference } from "../../types";
 import { Icon } from "../common/Icon";
+import { SendToChatButton } from "../common/SendToChatButton";
 import { Button } from "../common/Button";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 
@@ -188,6 +189,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
             >
               <Icon name="heart" className="w-3.5 h-3.5" />
             </button>
+            <SendToChatButton image={image} />
             <button
               onClick={(e) => {
                 e.stopPropagation();

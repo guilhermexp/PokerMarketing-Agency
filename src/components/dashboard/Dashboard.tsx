@@ -15,6 +15,7 @@ import type {
   InstagramPublishState,
   CampaignSummary,
   CreativeModel,
+  PendingToolEdit,
 } from "../../types";
 import type { InstagramContext } from "../../services/rubeService";
 import type { WeekScheduleWithCount } from "../../services/apiClient";
@@ -35,6 +36,7 @@ import { SchedulesListView } from "../schedules/SchedulesListView";
 import { QuickPostModal } from "../common/QuickPostModal";
 import { FloatingSidebar } from "../layout/FloatingSidebar";
 import { LimelightNav } from "../ui/limelight-nav";
+import { ImagePreviewModal } from "../image-preview/ImagePreviewModal";
 import { Zap, Layers, Image, Calendar, LayoutGrid, Video } from "lucide-react";
 import type { ScheduledPost } from "../../types";
 import { PlaygroundView } from "../playground";
@@ -127,6 +129,18 @@ interface DashboardProps {
   instagramContext?: InstagramContext;
   // Carousel updates
   onCarouselUpdate?: (carousel: import("../../types").CarouselScript) => void;
+  // Tool edit approval
+  pendingToolEdit?: PendingToolEdit | null;
+  editingImage?: GalleryImage | null;
+  onRequestImageEdit?: (request: {
+    toolCallId: string;
+    toolName: string;
+    prompt: string;
+    imageId: string;
+  }) => void;
+  onToolEditApproved?: (toolCallId: string, imageUrl: string) => void;
+  onToolEditRejected?: (toolCallId: string, reason?: string) => void;
+  onCloseImageEditor?: () => void;
 }
 
 type Tab = "clips" | "carrossel" | "posts" | "ads";
@@ -188,6 +202,13 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     onMarkGalleryImagePublished,
     instagramContext,
     onCarouselUpdate,
+    // Tool edit approval
+    editingImage,
+    pendingToolEdit,
+    onRequestImageEdit,
+    onToolEditApproved,
+    onToolEditRejected,
+    onCloseImageEditor,
   } = props;
 
   // Debug log for productImages
@@ -763,7 +784,13 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           onClose={onToggleAssistant}
           referenceImage={chatReferenceImage}
           onClearReference={() => onSetChatReference(null)}
+          onUpdateReference={(ref) => onSetChatReference({ id: ref.id, src: ref.src })}
+          galleryImages={galleryImages}
           brandProfile={brandProfile}
+          pendingToolEdit={props.pendingToolEdit}
+          onRequestImageEdit={props.onRequestImageEdit}
+          onToolEditApproved={props.onToolEditApproved}
+          onToolEditRejected={props.onToolEditRejected}
         />
       ) : (
         <AssistantPanel
@@ -816,6 +843,21 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           </div>
         );
       })()}
+
+      {/* ImagePreviewModal for Tool Edit Approval */}
+      {editingImage && (
+        <ImagePreviewModal
+          image={editingImage}
+          onClose={onCloseImageEditor || (() => {})}
+          onImageUpdate={(newSrc) => {
+            // Update gallery image
+            onUpdateGalleryImage?.(editingImage.id, newSrc);
+          }}
+          pendingToolEdit={pendingToolEdit}
+          onToolEditApproved={onToolEditApproved}
+          onToolEditRejected={onToolEditRejected}
+        />
+      )}
 
       {/* QuickPost Modal for Gallery */}
       {quickPostImage && (

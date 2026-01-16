@@ -5,9 +5,10 @@
  * mas usando useChat hook do Vercel AI SDK internamente
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useChat } from '@ai-sdk/react';
-import type { ChatReferenceImage, BrandProfile } from '../../types';
+import type { ChatReferenceImage, BrandProfile, GalleryImage, PendingToolEdit } from '../../types';
+import { useChatImageSync } from '../../hooks/useChatImageSync';
 import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 import { DataStreamProvider } from './DataStreamProvider';
@@ -22,7 +23,19 @@ interface AssistantPanelNewProps {
   onClose: () => void;
   referenceImage: ChatReferenceImage | null;
   onClearReference: () => void;
+  onUpdateReference: (ref: ChatReferenceImage) => void;
+  galleryImages: GalleryImage[];
   brandProfile?: BrandProfile;
+  // Tool edit approval
+  pendingToolEdit?: PendingToolEdit | null;
+  onRequestImageEdit?: (request: {
+    toolCallId: string;
+    toolName: string;
+    prompt: string;
+    imageId: string;
+  }) => void;
+  onToolEditApproved?: (toolCallId: string, imageUrl: string) => void;
+  onToolEditRejected?: (toolCallId: string, reason?: string) => void;
 }
 
 // Helper: converter File para base64
@@ -61,7 +74,10 @@ const ChatBubble: React.FC<{ message: any; onApprove?: (id: string) => void; onD
     ?.filter((part: any) => part.type === 'file') || [];
 
   // Tool calls (aguardando aprovação)
-  const toolCalls = message.toolInvocations?.filter((inv: any) => inv.state === 'call') || [];
+  // IMPORTANTE: Filtrar editImage tool calls (serão tratados via AI Studio)
+  const toolCalls = message.toolInvocations?.filter((inv: any) =>
+    inv.state === 'call' && inv.toolName !== 'editImage'
+  ) || [];
 
   return (
     <div className={`flex flex-col ${isAssistant ? 'items-start' : 'items-end'} space-y-2 animate-fade-in-up`}>
@@ -139,7 +155,13 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
   onClose,
   referenceImage,
   onClearReference,
-  brandProfile
+  onUpdateReference,
+  galleryImages,
+  brandProfile,
+  pendingToolEdit,
+  onRequestImageEdit,
+  onToolEditApproved,
+  onToolEditRejected
 }) => {
   const [input, setInput] = useState('');
   const [dataStream, setDataStream] = useState<any[]>([]);
@@ -152,7 +174,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // useChat hook do Vercel AI SDK
-  const { messages, sendMessage, isLoading, stop, addToolResult } = useChat({
+  const { messages, sendMessage, isLoading, stop, addToolResult, setMessages } = useChat({
     api: '/api/chat',
     id: chatId,
     body: {
@@ -170,14 +192,111 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
       setTimeout(() => setErrorMessage(null), 5000);
     },
     onFinish: (message) => {
-      console.log('[AssistantPanel] Message finished', message);
+      console.log('[AssistantPanel] Message finished:', {
+        role: message.role,
+        content: message.content?.substring(0, 100),
+        toolInvocations: message.toolInvocations?.length || 0,
+        toolInvocationsDetails: message.toolInvocations?.map(inv => ({
+          toolName: inv.toolName,
+          state: inv.state,
+          toolCallId: inv.toolCallId
+        }))
+      });
     }
   });
 
-  // Debug: monitorar estado de loading
+  // ========================================================================
+  // SINCRONIZAÇÃO AUTOMÁTICA DE IMAGENS
+  // ========================================================================
+  // Hook para atualizar URLs de imagens quando editadas
+  useChatImageSync({
+    galleryImages,
+    chatReferenceImage: referenceImage,
+    setChatReferenceImage: (ref) => {
+      if (ref) {
+        onUpdateReference(ref);
+      } else {
+        onClearReference();
+      }
+    },
+    messages,
+    setMessages
+  });
+
+  // ========================================================================
+  // TOOL EDIT APPROVAL - Detectar editImage tool calls
+  // ========================================================================
+  const editImageToolCalls = useMemo(() => {
+    const allToolInvocations = messages.flatMap(msg => msg.toolInvocations || []);
+    const editImageCalls = allToolInvocations.filter(inv => inv.state === 'call' && inv.toolName === 'editImage');
+
+    if (editImageCalls.length > 0) {
+      console.log('[AssistantPanel] Found editImage calls:', editImageCalls.length);
+    }
+
+    return editImageCalls;
+  }, [messages]);
+
+  // Disparar request para abrir AI Studio quando detectar editImage tool call
   useEffect(() => {
-    console.log('[Chat] isLoading:', isLoading, '| isSending:', isSending, '| messages:', messages.length);
-  }, [isLoading, isSending, messages.length]);
+    if (editImageToolCalls.length > 0 && !pendingToolEdit && onRequestImageEdit) {
+      const toolCall = editImageToolCalls[0]; // Processar primeira da fila
+
+      console.debug('[AssistantPanel] editImage tool call detected:', toolCall);
+
+      // Disparar request para abrir AI Studio
+      onRequestImageEdit({
+        toolCallId: toolCall.toolCallId,
+        toolName: 'editImage',
+        prompt: toolCall.args.prompt,
+        imageId: referenceImage?.id || '', // Imagem em foco
+      });
+    }
+  }, [editImageToolCalls, pendingToolEdit, referenceImage, onRequestImageEdit]);
+
+  // Processar resultado de aprovação/rejeição do AI Studio
+  useEffect(() => {
+    if (!pendingToolEdit) return;
+
+    const result = (pendingToolEdit as any).result;
+    const imageUrl = (pendingToolEdit as any).imageUrl;
+    const error = (pendingToolEdit as any).error;
+
+    if (result === 'approved' && imageUrl && addToolResult) {
+      console.debug('[AssistantPanel] Tool edit approved, sending result:', { toolCallId: pendingToolEdit.toolCallId, imageUrl });
+
+      addToolResult({
+        toolCallId: pendingToolEdit.toolCallId,
+        result: {
+          approved: true,
+          imageUrl: imageUrl
+        }
+      });
+    } else if (result === 'rejected' && addToolResult) {
+      console.debug('[AssistantPanel] Tool edit rejected, sending error:', { toolCallId: pendingToolEdit.toolCallId, error });
+
+      addToolResult({
+        toolCallId: pendingToolEdit.toolCallId,
+        result: {
+          approved: false,
+          error: error || 'Edição rejeitada pelo usuário'
+        }
+      });
+    }
+  }, [pendingToolEdit, addToolResult]);
+
+  // Debug: monitorar tool invocations
+  useEffect(() => {
+    messages.forEach((msg, idx) => {
+      if (msg.toolInvocations && msg.toolInvocations.length > 0) {
+        console.log(`[Chat] Message ${idx} has tool invocations:`, msg.toolInvocations.map(inv => ({
+          toolName: inv.toolName,
+          state: inv.state,
+          toolCallId: inv.toolCallId
+        })));
+      }
+    });
+  }, [messages]);
 
   // Auto-scroll
   useEffect(() => {

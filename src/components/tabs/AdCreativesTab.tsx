@@ -717,6 +717,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
                 onImageClick={image ? () => setEditingAdImage({ image, index, platform: ad.platform }) : undefined}
                 imagePrompt={ad.image_prompt}
                 error={generationState.errors[index]}
+                galleryImage={image}
               />
             );
           }
@@ -736,6 +737,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
                 onImageClick={image ? () => setEditingAdImage({ image, index, platform: ad.platform }) : undefined}
                 imagePrompt={ad.image_prompt}
                 error={generationState.errors[index]}
+                galleryImage={image}
               />
             );
           }

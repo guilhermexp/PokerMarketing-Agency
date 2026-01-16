@@ -746,6 +746,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
                 onImageClick={image ? () => setEditingInstagramImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
                 error={generationState.errors[index]}
+                galleryImage={image}
               />
             );
           }
@@ -765,6 +766,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
                 onImageClick={image ? () => setEditingFacebookImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
                 error={generationState.errors[index]}
+                galleryImage={image}
               />
             );
           }
@@ -784,6 +786,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
                 onImageClick={image ? () => setEditingTwitterImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
                 error={generationState.errors[index]}
+                galleryImage={image}
               />
             );
           }
@@ -804,6 +807,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
                 onImageClick={image ? () => setEditingLinkedInImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
                 error={generationState.errors[index]}
+                galleryImage={image}
               />
             );
           }

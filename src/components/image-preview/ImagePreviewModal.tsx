@@ -34,11 +34,17 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   onNavigateNext,
   hasPrev,
   hasNext,
+  pendingToolEdit,
+  onToolEditApproved,
+  onToolEditRejected,
 }) => {
   const [error, setError] = useState<string | null>(null);
   // Editor state - controlled by this component
   const [editPrompt, setEditPrompt] = useState('');
   const [referenceImage, setReferenceImage] = useState<ImageFile | null>(null);
+
+  // Tool approval mode detection
+  const isToolApprovalMode = Boolean(pendingToolEdit);
 
   const {
     imageCanvasRef,
@@ -101,6 +107,13 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     resetEditorState: () => {
       setEditPrompt('');
       setReferenceImage(null);
+    },
+    // Tool approval mode
+    pendingToolEdit,
+    onToolEditComplete: (imageUrl: string) => {
+      if (isToolApprovalMode && onToolEditApproved && pendingToolEdit) {
+        onToolEditApproved(pendingToolEdit.toolCallId, imageUrl);
+      }
     },
   });
 
@@ -295,6 +308,17 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
               handleEdit,
               handleDiscardEdit,
               handleSaveEdit,
+              // Tool approval mode
+              isToolApprovalMode,
+              onApprove: () => {
+                handleSaveEdit();
+              },
+              onReject: () => {
+                if (onToolEditRejected && pendingToolEdit) {
+                  onToolEditRejected(pendingToolEdit.toolCallId);
+                }
+                onClose();
+              },
             }}
             mobileActions={{
               image,

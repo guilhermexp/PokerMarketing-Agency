@@ -1,6 +1,8 @@
 import React from "react";
 import { Icon } from "./Icon";
+import { SendToChatButton } from "./SendToChatButton";
 import { Loader } from "./Loader";
+import type { GalleryImage } from "../../types";
 
 interface FacebookPostPreviewProps {
   image: string | null;
@@ -12,6 +14,7 @@ interface FacebookPostPreviewProps {
   onImageClick?: () => void;
   imagePrompt?: string;
   error?: string | null;
+  galleryImage?: GalleryImage;
 }
 
 export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
@@ -24,6 +27,7 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
   onImageClick,
   imagePrompt,
   error,
+  galleryImage,
 }) => {
   const cleanHashtags = hashtags.map(h => h.startsWith('#') ? h : `#${h}`);
 
@@ -87,11 +91,16 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
                 className="w-full h-full object-cover"
                 draggable={false}
               />
-              {onImageClick && (
-                <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center">
-                  <div className="px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur-sm text-xs text-white font-medium">
-                    Editar
-                  </div>
+              {(onImageClick || galleryImage) && (
+                <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                  {galleryImage && (
+                    <SendToChatButton image={galleryImage} />
+                  )}
+                  {onImageClick && (
+                    <div className="px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur-sm text-xs text-white font-medium cursor-pointer">
+                      Editar
+                    </div>
+                  )}
                 </div>
               )}
             </div>

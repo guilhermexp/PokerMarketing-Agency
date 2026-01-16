@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { BrandProfileSetup } from "./components/brand/BrandProfileSetup";
 import { Dashboard } from "./components/dashboard/Dashboard";
@@ -36,6 +36,7 @@ import type {
   InstagramPublishState,
   CreativeModel,
   AssistantFunctionCall,
+  PendingToolEdit,
 } from "./types";
 import { Icon } from "./components/common/Icon";
 import {
@@ -45,6 +46,7 @@ import {
 import { useOrganization } from "@clerk/clerk-react";
 import { BackgroundJobsProvider } from "./hooks/useBackgroundJobs";
 import { BackgroundJobsIndicator } from "./components/common/BackgroundJobsIndicator";
+import { ChatProvider } from "./contexts/ChatContext";
 import {
   getBrandProfile,
   createBrandProfile,
@@ -270,6 +272,10 @@ function AppContent() {
     useState<ChatReferenceImage | null>(null);
   const [lastUploadedImage, setLastUploadedImage] =
     useState<ChatReferenceImage | null>(null);
+
+  // Tool edit approval integration with AI Studio
+  const [pendingToolEdit, setPendingToolEdit] = useState<PendingToolEdit | null>(null);
+  const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
 
   // Track context to prevent flashing between screens
   const contextRef = useRef({ userId, organizationId });
@@ -1872,6 +1878,83 @@ function AppContent() {
     });
   };
 
+  // ========================================================================
+  // CHAT CONTEXT - Callbacks otimizados
+  // ========================================================================
+
+  const handleSetChatReference = useCallback((img: GalleryImage | null) => {
+    setChatReferenceImage(img ? { id: img.id, src: img.src } : null);
+    if (img && !isAssistantOpen) setIsAssistantOpen(true);
+  }, [isAssistantOpen]);
+
+  // Tool edit approval handlers
+  const handleRequestImageEdit = useCallback((request: {
+    toolCallId: string;
+    toolName: string;
+    prompt: string;
+    imageId: string;
+  }) => {
+    console.debug('[App] Tool edit requested:', request);
+
+    // Find image in gallery
+    const image = galleryImages.find(img => img.id === request.imageId);
+
+    if (!image) {
+      console.error('[App] Image not found:', request.imageId);
+      // Auto-reject if image not found
+      setPendingToolEdit({
+        ...request,
+        result: 'rejected',
+        error: 'Imagem não encontrada na galeria'
+      } as any);
+      return;
+    }
+
+    // Open AI Studio with the image
+    setEditingImage(image);
+    setPendingToolEdit(request);
+  }, [galleryImages]);
+
+  const handleToolEditApproved = useCallback((toolCallId: string, imageUrl: string) => {
+    console.debug('[App] Tool edit approved:', { toolCallId, imageUrl });
+
+    // Update pending state to mark as approved
+    setPendingToolEdit(prev => prev ? {
+      ...prev,
+      result: 'approved',
+      imageUrl
+    } as any : null);
+
+    // Clear states (will be handled by AssistantPanelNew after it gets the result)
+    setTimeout(() => {
+      setPendingToolEdit(null);
+      setEditingImage(null);
+    }, 100);
+  }, []);
+
+  const handleToolEditRejected = useCallback((toolCallId: string, reason?: string) => {
+    console.debug('[App] Tool edit rejected:', { toolCallId, reason });
+
+    // Update pending state to mark as rejected
+    setPendingToolEdit(prev => prev ? {
+      ...prev,
+      result: 'rejected',
+      error: reason || 'Edição rejeitada pelo usuário'
+    } as any : null);
+
+    // Clear states (will be handled by AssistantPanelNew after it gets the result)
+    setTimeout(() => {
+      setPendingToolEdit(null);
+      setEditingImage(null);
+    }, 100);
+  }, []);
+
+  const chatContextValue = useMemo(() => ({
+    onSetChatReference: handleSetChatReference,
+    isAssistantOpen,
+    setIsAssistantOpen
+  }), [handleSetChatReference, isAssistantOpen]);
+
   // Show loader while:
   // 1. Authentication is loading
   // 2. Initial data is loading
@@ -1992,8 +2075,9 @@ function AppContent() {
               }
             }}
           />
-          <Dashboard
-            brandProfile={brandProfile!}
+          <ChatProvider value={chatContextValue}>
+            <Dashboard
+              brandProfile={brandProfile!}
             campaign={campaign}
             productImages={campaignProductImages}
             compositionAssets={campaignCompositionAssets}
@@ -2011,10 +2095,7 @@ function AppContent() {
             isAssistantLoading={isAssistantLoading}
             onAssistantSendMessage={handleAssistantSendMessage}
             chatReferenceImage={chatReferenceImage}
-            onSetChatReference={(img) => {
-              setChatReferenceImage(img ? { id: img.id, src: img.src } : null);
-              if (img && !isAssistantOpen) setIsAssistantOpen(true);
-            }}
+            onSetChatReference={handleSetChatReference}
             theme={theme}
             onThemeToggle={() =>
               setTheme((t) => (t === "light" ? "dark" : "light"))
@@ -2141,7 +2222,14 @@ function AppContent() {
                 };
               });
             }}
+            pendingToolEdit={pendingToolEdit}
+            editingImage={editingImage}
+            onRequestImageEdit={handleRequestImageEdit}
+            onToolEditApproved={handleToolEditApproved}
+            onToolEditRejected={handleToolEditRejected}
+            onCloseImageEditor={() => setEditingImage(null)}
           />
+          </ChatProvider>
         </>
       )}
       <BackgroundJobsIndicator isAssistantOpen={isAssistantOpen} />

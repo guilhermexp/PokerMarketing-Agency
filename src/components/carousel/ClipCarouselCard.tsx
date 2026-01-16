@@ -5,6 +5,7 @@
 import React from 'react';
 import type { GalleryImage, VideoClipScript } from '../../types';
 import { Icon } from '../common/Icon';
+import { SendToChatButton } from '../common/SendToChatButton';
 import { Loader } from '../common/Loader';
 import { CarouselPreview } from './CarouselPreview';
 
@@ -219,14 +220,23 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
         {orderedImages.slice(0, 8).map((img, idx) => (
           <div
             key={img.id || idx}
-            className="w-20 h-25 flex-shrink-0 rounded-lg overflow-hidden border-2 border-white/10 cursor-pointer hover:border-white/30 hover:scale-105 transition-all shadow-lg"
-            onClick={() => onOpenEditor(img)}
+            className="relative w-20 h-25 flex-shrink-0 rounded-lg overflow-hidden border-2 border-white/10 hover:border-white/30 hover:scale-105 transition-all shadow-lg group"
           >
             <img
               src={img.src}
               alt={`Preview ${idx + 1}`}
               className="w-full h-full object-cover"
             />
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-1.5">
+              <SendToChatButton image={img} />
+              <button
+                onClick={() => onOpenEditor(img)}
+                className="w-7 h-7 rounded-lg bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/80 hover:bg-black/80 hover:text-primary transition-all"
+                title="Editar"
+              >
+                <Icon name="edit" className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         ))}
         {orderedImages.length > 8 && (

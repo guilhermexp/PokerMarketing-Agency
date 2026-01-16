@@ -5,7 +5,7 @@
  */
 
 import type { RefObject, MouseEvent, TouchEvent, SyntheticEvent } from 'react';
-import type { GalleryImage } from '../../types';
+import type { GalleryImage, PendingToolEdit } from '../../types';
 
 // =============================================================================
 // Props Types
@@ -15,7 +15,7 @@ export interface ImagePreviewModalProps {
   image: GalleryImage;
   onClose: () => void;
   onImageUpdate: (newImageUrl: string) => void;
-  onSetChatReference: (image: GalleryImage) => void;
+  onSetChatReference?: (image: GalleryImage) => void;
   downloadFilename?: string;
   // Action props
   onQuickPost?: (image: GalleryImage) => void;
@@ -26,6 +26,10 @@ export interface ImagePreviewModalProps {
   onNavigateNext?: () => void;
   hasPrev?: boolean;
   hasNext?: boolean;
+  // Tool edit approval props
+  pendingToolEdit?: PendingToolEdit | null;
+  onToolEditApproved?: (toolCallId: string, imageUrl: string) => void;
+  onToolEditRejected?: (toolCallId: string, reason?: string) => void;
 }
 
 // =============================================================================

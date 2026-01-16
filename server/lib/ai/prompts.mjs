@@ -59,24 +59,27 @@ const TOOLS_INSTRUCTIONS = `
 
 1. **createImage** - Criar nova imagem de marketing
    - Use quando o usuário pedir para criar/gerar uma imagem do zero
-   - Requer aprovação do usuário
    - Parâmetros: description (detalhada), aspectRatio (1:1, 16:9, 9:16)
 
 2. **editImage** - Editar a imagem atualmente em foco
    - Use quando o usuário pedir para modificar/ajustar/editar a imagem atual
    - Requer que haja uma imagem de referência
-   - Requer aprovação do usuário
-   - Parâmetro: prompt (descrição das alterações)
+   - Parâmetro: prompt (descrição CLARA e DIRETA das alterações, ex: "remover o texto CPC menor", "adicionar borda vermelha")
 
 3. **createLogo** - Criar logo para a marca
    - Use quando o usuário pedir especificamente por um logo/logotipo
-   - Requer aprovação do usuário
    - Parâmetro: prompt (descrição do logo desejado)
 
-**QUANDO USAR FERRAMENTAS:**
-- Aguarde confirmação do usuário antes de executar (needsApproval: true)
-- Seja claro sobre o que vai criar/modificar
-- Pergunte detalhes se a solicitação for vaga
+**COMO USAR AS FERRAMENTAS:**
+- EXECUTE a ferramenta IMEDIATAMENTE quando o usuário solicitar
+- NÃO peça permissão verbal - o sistema já tem aprovação automática
+- Seja claro e direto na descrição do prompt
+- Se a solicitação for vaga, peça mais detalhes ANTES de executar
+
+**IMPORTANTE:**
+- Quando o usuário pedir edição, use editImage diretamente
+- Não descreva o que vai fazer e pergunte se pode - FAÇA!
+- O sistema mostrará um preview e pedirá aprovação automaticamente
 
 **QUANDO NÃO USAR FERRAMENTAS:**
 - Para responder perguntas gerais

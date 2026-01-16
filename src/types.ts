@@ -215,6 +215,13 @@ export interface ChatReferenceImage {
   src: string;
 }
 
+export interface PendingToolEdit {
+  toolCallId: string;
+  toolName: string;
+  prompt: string;
+  imageId: string;
+}
+
 export interface ChatPart {
   text?: string;
   inlineData?: {
