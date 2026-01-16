@@ -37,6 +37,39 @@
 }
 
 /* ========================================
+   Toolbar Superior de Ações (Quick Post, Agendar, Campanha)
+   ======================================== */
+
+.preview-actions-bar {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+}
+
+.actions-toolbar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 16px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(12px);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  min-height: 48px;
+}
+
+/* Garantir alinhamento vertical */
+.actions-toolbar > * {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ========================================
    Botão Close (Canto Superior Direito)
    ======================================== */
 
@@ -81,19 +114,29 @@
   justify-content: center;
   align-items: center;
   gap: 4px;
-  padding: 8px 16px;
+  padding: 10px 16px;
   background: rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(12px);
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  min-height: 48px;
+}
+
+/* Garantir alinhamento vertical de todos os elementos */
+.preview-toolbar > * {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .toolbar-separator {
   width: 1px;
-  height: 20px;
+  height: 24px;
   background: rgba(255, 255, 255, 0.15);
-  margin: 0 4px;
+  margin: 0 6px;
+  align-self: center;
+  flex-shrink: 0;
 }
 
 /* ========================================
@@ -119,10 +162,22 @@
   position: relative;
 }
 
+/* Canvas de edição dentro do overlay */
+.preview-content > div[class*="relative flex-1"] {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* Quando painel aberto: viewer reduz no desktop */
 @media (min-width: 768px) {
   .preview-content.panel-open .image-viewer-canvas {
-    margin-right: 400px; /* Largura do painel */
+    margin-right: 420px; /* Largura do painel */
+  }
+
+  .preview-content.panel-open > div[class*="relative flex-1"] {
+    margin-right: 420px; /* Largura do painel */
   }
 }
 
@@ -264,6 +319,16 @@
 
   .preview-toolbar-bottom {
     bottom: 16px;
+  }
+
+  .preview-actions-bar {
+    top: 16px;
+  }
+
+  .actions-toolbar {
+    padding: 6px 12px;
+    gap: 2px;
+    min-height: 40px;
   }
 
   .preview-close-button {

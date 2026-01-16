@@ -10,6 +10,8 @@ import {
   Edit3,
   Maximize2,
   Scan,
+  Crop,
+  MessageSquare,
 } from 'lucide-react';
 
 interface ImagePreviewToolbarProps {
@@ -20,7 +22,10 @@ interface ImagePreviewToolbarProps {
   onRotateRight: () => void;
   onDownload: () => void;
   onToggleEditPanel: () => void;
+  onToggleCrop: () => void;
+  onSendToChat?: () => void;
   editPanelOpen: boolean;
+  cropActive: boolean;
   imageDimensions?: { width: number; height: number } | null;
   onFitToScreen: () => void;
   onOriginalSize: () => void;
@@ -35,7 +40,10 @@ export const ImagePreviewToolbar = ({
   onRotateRight,
   onDownload,
   onToggleEditPanel,
+  onToggleCrop,
+  onSendToChat,
   editPanelOpen,
+  cropActive,
   imageDimensions,
   onFitToScreen,
   onOriginalSize,
@@ -116,6 +124,17 @@ export const ImagePreviewToolbar = ({
       />
 
       <ActionIcon
+        icon={Crop}
+        onClick={onToggleCrop}
+        title="Recortar (C)"
+        size="small"
+        style={{
+          background: cropActive ? 'rgba(34, 197, 94, 0.2)' : 'transparent',
+          color: cropActive ? '#22c55e' : 'inherit',
+        }}
+      />
+
+      <ActionIcon
         icon={Edit3}
         onClick={onToggleEditPanel}
         title="Editar (E)"
@@ -125,6 +144,15 @@ export const ImagePreviewToolbar = ({
           color: editPanelOpen ? '#1890ff' : 'inherit',
         }}
       />
+
+      {onSendToChat && (
+        <ActionIcon
+          icon={MessageSquare}
+          onClick={onSendToChat}
+          title="Enviar para o chat"
+          size="small"
+        />
+      )}
 
       <ActionIcon
         icon={Download}

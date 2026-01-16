@@ -36,6 +36,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   onToolEditApproved,
   onToolEditRejected,
   initialEditPreview,
+  chatComponent,
 }) => {
   const [error, setError] = useState<string | null>(null);
   // Editor state - controlled by this component
@@ -178,6 +179,11 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   const isActionRunning =
     isEditing || isRemovingBackground || isResizing || isCropping || isApplyingFilter;
 
+  const isVideo =
+    image.src?.endsWith('.mp4') ||
+    image.src?.includes('video') ||
+    image.source?.startsWith('Video-');
+
   return (
     <ImagePreviewOverlay
       visible={true}
@@ -193,6 +199,21 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       onToolEditApproved={onToolEditApproved}
       onToolEditRejected={onToolEditRejected}
       initialEditPreview={initialEditPreview}
+      // Canvas refs and handlers
+      imageCanvasRef={imageCanvasRef}
+      maskCanvasRef={maskCanvasRef}
+      protectionCanvasRef={protectionCanvasRef}
+      startDrawing={startDrawing}
+      draw={draw}
+      stopDrawing={stopDrawing}
+      startProtectionDrawing={startProtectionDrawing}
+      drawProtection={drawProtection}
+      stopProtectionDrawing={stopProtectionDrawing}
+      isLoadingImage={isLoadingImage}
+      imageLoadError={imageLoadError}
+      // Video props
+      videoRef={videoRef}
+      handleLoadedMetadata={handleLoadedMetadata}
       // Editor state props
       editPrompt={editPrompt}
       setEditPrompt={setEditPrompt}
@@ -231,6 +252,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       isApplyingFilter={isApplyingFilter}
       handleApplyFilter={handleApplyFilter}
       handleResetFilter={handleResetFilter}
+      filterStyle={filterStyle}
       // Video props
       videoDimensions={videoDimensions}
       isVerticalVideo={isVerticalVideo}
@@ -246,6 +268,8 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       handleSaveEdit={handleSaveEdit}
       // Error
       error={error}
+      // Chat
+      chatComponent={chatComponent}
     />
   );
 };

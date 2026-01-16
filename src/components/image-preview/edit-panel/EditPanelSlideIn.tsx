@@ -2,7 +2,7 @@ import { Drawer } from 'antd';
 import { useResponsive } from 'antd-style';
 import { X } from 'lucide-react';
 import { AiEditSection } from './sections/AiEditSection';
-import { CropAndFilterSection } from './sections/CropAndFilterSection';
+import { FilterSection } from './sections/CropAndFilterSection';
 import { VideoMetaSection } from './sections/VideoMetaSection';
 import { ErrorBanner } from '../ErrorBanner';
 import { ImagePreviewFooter } from '../ImagePreviewFooter';
@@ -50,12 +50,7 @@ interface EditPanelSlideInProps {
   hasProtectionDrawing?: () => boolean;
   clearProtectionMask?: () => void;
 
-  // Props para CropAndFilterSection
-  cropAspect?: 'original' | '1:1' | '4:5' | '16:9';
-  setCropAspect?: (aspect: 'original' | '1:1' | '4:5' | '16:9') => void;
-  isCropping?: boolean;
-  handleApplyCrop?: () => Promise<void>;
-  handleResetCrop?: () => void;
+  // Props para FilterSection
   filterPreset?: 'none' | 'bw' | 'warm' | 'cool' | 'vivid';
   setFilterPreset?: (preset: 'none' | 'bw' | 'warm' | 'cool' | 'vivid') => void;
   isApplyingFilter?: boolean;
@@ -111,12 +106,7 @@ const EditPanelContent = (props: Omit<EditPanelSlideInProps, 'open' | 'onClose'>
     detectProgress,
     hasProtectionDrawing,
     clearProtectionMask,
-    // Crop & Filter props
-    cropAspect,
-    setCropAspect,
-    isCropping,
-    handleApplyCrop,
-    handleResetCrop,
+    // Filter props
     filterPreset,
     setFilterPreset,
     isApplyingFilter,
@@ -162,14 +152,9 @@ const EditPanelContent = (props: Omit<EditPanelSlideInProps, 'open' | 'onClose'>
         />
       )}
 
-      {/* Crop and Filter Section */}
-      {setCropAspect && setFilterPreset && (
-        <CropAndFilterSection
-          cropAspect={cropAspect || 'original'}
-          setCropAspect={setCropAspect}
-          isCropping={isCropping || false}
-          handleApplyCrop={handleApplyCrop || (async () => {})}
-          handleResetCrop={handleResetCrop || (() => {})}
+      {/* Filter Section */}
+      {setFilterPreset && (
+        <FilterSection
           filterPreset={filterPreset || 'none'}
           setFilterPreset={setFilterPreset}
           isApplyingFilter={isApplyingFilter || false}

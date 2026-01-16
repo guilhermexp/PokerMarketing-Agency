@@ -862,10 +862,29 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             // Update gallery image
             onUpdateGalleryImage?.(editingImage.id, newSrc);
           }}
+          onSetChatReference={onSetChatReference}
           pendingToolEdit={pendingToolEdit}
           onToolEditApproved={onToolEditApproved}
           onToolEditRejected={onToolEditRejected}
           initialEditPreview={props.toolEditPreview || null}
+          chatComponent={
+            import.meta.env.VITE_USE_VERCEL_AI_SDK === 'true' ? (
+              <AssistantPanelNew
+                isOpen={true}
+                onClose={() => {}}
+                referenceImage={chatReferenceImage}
+                onClearReference={() => onSetChatReference(null)}
+                onUpdateReference={(ref) => onSetChatReference({ id: ref.id, src: ref.src })}
+                galleryImages={galleryImages}
+                brandProfile={brandProfile}
+                pendingToolEdit={props.pendingToolEdit}
+                onRequestImageEdit={props.onRequestImageEdit}
+                onToolEditApproved={props.onToolEditApproved}
+                onToolEditRejected={props.onToolEditRejected}
+                onShowToolEditPreview={props.onShowToolEditPreview}
+              />
+            ) : null
+          }
         />
       )}
 

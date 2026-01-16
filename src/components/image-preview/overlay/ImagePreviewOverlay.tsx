@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import { useResponsive } from 'antd-style';
 import { X } from 'lucide-react';
 import { ImagePreviewToolbar } from './ImagePreviewToolbar';
+import { ImagePreviewActionsBar } from './ImagePreviewActionsBar';
 import { ImageViewerCanvas } from './ImageViewerCanvas';
+import { ImagePreviewCanvas } from '../ImagePreviewCanvas';
 import { EditPanelSlideIn } from '../edit-panel/EditPanelSlideIn';
+import { ChatPanelSlideIn } from '../chat-panel/ChatPanelSlideIn';
+import { FreeCropOverlay } from '../FreeCropOverlay';
 import type { GalleryImage, PendingToolEdit, EditPreview, ImageFile, Dimensions, ResizedPreview } from '../types';
 import '../preview-overlay.css';
 
@@ -21,6 +25,24 @@ interface ImagePreviewOverlayProps {
   onQuickPost?: () => void;
   onPublish?: () => void;
   onSchedulePost?: () => void;
+  chatComponent?: React.ReactNode;
+
+  // Canvas refs and handlers (needed by ImagePreviewCanvas)
+  imageCanvasRef?: React.RefObject<HTMLCanvasElement>;
+  maskCanvasRef?: React.RefObject<HTMLCanvasElement>;
+  protectionCanvasRef?: React.RefObject<HTMLCanvasElement>;
+  startDrawing?: (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => void;
+  draw?: (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => void;
+  stopDrawing?: () => void;
+  startProtectionDrawing?: (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => void;
+  drawProtection?: (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => void;
+  stopProtectionDrawing?: () => void;
+  isLoadingImage?: boolean;
+  imageLoadError?: string | null;
+
+  // Video props
+  videoRef?: React.RefObject<HTMLVideoElement>;
+  handleLoadedMetadata?: (event: React.SyntheticEvent<HTMLVideoElement>) => void;
 
   // Editor state props
   editPrompt?: string;
@@ -63,6 +85,7 @@ interface ImagePreviewOverlayProps {
   isApplyingFilter?: boolean;
   handleApplyFilter?: () => Promise<void>;
   handleResetFilter?: () => void;
+  filterStyle?: string;
 
   // Video props
   videoDimensions?: Dimensions | null;
@@ -95,15 +118,21 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
   const { mobile } = useResponsive();
 
   // Estado do preview
-  const [editPanelOpen, setEditPanelOpen] = useState(!!pendingToolEdit);
+  const [activePanel, setActivePanel] = useState<'edit' | 'chat' | null>(
+    pendingToolEdit ? 'edit' : null
+  );
+  const [cropActive, setCropActive] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
 
+  const editPanelOpen = activePanel === 'edit';
+  const chatPanelOpen = activePanel === 'chat';
+
   // Abre painel automaticamente quando há pendingToolEdit
   useEffect(() => {
     if (pendingToolEdit) {
-      setEditPanelOpen(true);
+      setActivePanel('edit');
     }
   }, [pendingToolEdit]);
 
@@ -173,17 +202,48 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
     link.click();
   };
 
+  // Handler de crop
+  const handleToggleCrop = () => {
+    setCropActive(!cropActive);
+  };
+
+  const handleCropComplete = (croppedImageUrl: string) => {
+    // Atualiza a imagem com o crop
+    onImageUpdate(croppedImageUrl);
+    setCropActive(false);
+  };
+
+  const handleCropCancel = () => {
+    setCropActive(false);
+  };
+
+  // Handler de enviar para o chat
+  const handleSendToChat = () => {
+    if (props.onSetChatReference) {
+      props.onSetChatReference(image);
+    }
+    // Abre o painel do chat
+    setActivePanel('chat');
+  };
+
   // Handler de fechar com ESC
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (editPanelOpen) {
-          setEditPanelOpen(false);
+        if (cropActive) {
+          handleCropCancel();
+        } else if (activePanel) {
+          setActivePanel(null);
         } else {
           onClose();
         }
+      } else if (cropActive) {
+        // Bloquear todos os outros atalhos quando crop está ativo
+        return;
+      } else if (e.key === 'c' || e.key === 'C') {
+        handleToggleCrop();
       } else if (e.key === 'e' || e.key === 'E') {
-        setEditPanelOpen(!editPanelOpen);
+        setActivePanel(activePanel === 'edit' ? null : 'edit');
       } else if (e.key === '+' || e.key === '=') {
         handleZoomIn();
       } else if (e.key === '-' || e.key === '_') {
@@ -203,7 +263,7 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [visible, editPanelOpen, onClose]);
+  }, [visible, activePanel, cropActive, onClose]);
 
   if (!visible) return null;
 
@@ -214,6 +274,13 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
 
       {/* Container principal */}
       <div className="preview-container">
+        {/* Toolbar de ações superior (Quick Post, Agendar, Campanha) */}
+        <ImagePreviewActionsBar
+          onQuickPost={props.onQuickPost}
+          onSchedulePost={props.onSchedulePost}
+          onPublish={props.onPublish}
+        />
+
         {/* Botão close no canto superior direito */}
         <button
           onClick={onClose}
@@ -224,13 +291,34 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
         </button>
 
         {/* Conteúdo principal (viewer + painel) */}
-        <div className={`preview-content ${editPanelOpen ? 'panel-open' : ''}`}>
-          {/* Viewer de imagem */}
-          <ImageViewerCanvas
-            image={image}
-            zoom={zoom}
-            rotation={rotation}
-            onWheel={handleWheel}
+        <div className={`preview-content ${activePanel ? 'panel-open' : ''}`}>
+          {/* Canvas de imagem com edição */}
+          <ImagePreviewCanvas
+            image={props.image}
+            isVideo={props.image.src?.endsWith('.mp4') || props.image.src?.includes('video') || props.image.source?.startsWith('Video-') || false}
+            videoRef={props.videoRef || { current: null } as React.RefObject<HTMLVideoElement>}
+            isVerticalVideo={props.isVerticalVideo || false}
+            handleLoadedMetadata={props.handleLoadedMetadata || (() => {})}
+            resizedPreview={props.resizedPreview || null}
+            editPreview={props.editPreview || null}
+            originalDimensions={props.originalDimensions || { width: 0, height: 0 }}
+            isLoadingImage={props.isLoadingImage || false}
+            imageLoadError={props.imageLoadError || null}
+            imageCanvasRef={props.imageCanvasRef || { current: null } as React.RefObject<HTMLCanvasElement>}
+            maskCanvasRef={props.maskCanvasRef || { current: null } as React.RefObject<HTMLCanvasElement>}
+            protectionCanvasRef={props.protectionCanvasRef || { current: null } as React.RefObject<HTMLCanvasElement>}
+            useProtectionMask={props.useProtectionMask || false}
+            drawMode={props.drawMode || 'brush'}
+            startDrawing={props.startDrawing || (() => {})}
+            draw={props.draw || (() => {})}
+            stopDrawing={props.stopDrawing || (() => {})}
+            startProtectionDrawing={props.startProtectionDrawing || (() => {})}
+            drawProtection={props.drawProtection || (() => {})}
+            stopProtectionDrawing={props.stopProtectionDrawing || (() => {})}
+            isActionRunning={props.isActionRunning || false}
+            isResizing={props.isResizing || false}
+            resizeProgress={props.resizeProgress || 0}
+            filterStyle={props.filterStyle}
           />
 
           {/* Toolbar flutuante na parte inferior */}
@@ -242,8 +330,11 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
               onRotateLeft={handleRotateLeft}
               onRotateRight={handleRotateRight}
               onDownload={handleDownload}
-              onToggleEditPanel={() => setEditPanelOpen(!editPanelOpen)}
+              onToggleEditPanel={() => setActivePanel(activePanel === 'edit' ? null : 'edit')}
+              onToggleCrop={handleToggleCrop}
+              onSendToChat={props.onSetChatReference ? handleSendToChat : undefined}
               editPanelOpen={editPanelOpen}
+              cropActive={cropActive}
               imageDimensions={imageDimensions}
               onFitToScreen={handleFitToScreen}
               onOriginalSize={handleOriginalSize}
@@ -255,10 +346,29 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
           <EditPanelSlideIn
             {...props}
             open={editPanelOpen}
-            onClose={() => setEditPanelOpen(false)}
+            onClose={() => setActivePanel(null)}
           />
+
+          {/* Painel de chat (slide-in lateral ou bottom sheet) */}
+          {props.chatComponent && (
+            <ChatPanelSlideIn
+              open={chatPanelOpen}
+              image={image}
+              onClose={() => setActivePanel(null)}
+              chatComponent={props.chatComponent}
+            />
+          )}
         </div>
       </div>
+
+      {/* Crop Overlay (quando ativo) */}
+      {cropActive && (
+        <FreeCropOverlay
+          imageSrc={image.src}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+        />
+      )}
     </div>
   );
 };

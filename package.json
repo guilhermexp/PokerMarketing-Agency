@@ -56,6 +56,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-dropzone": "^14.3.8",
+    "react-image-crop": "^11.0.10",
     "react-router-dom": "^7.11.0",
     "recharts": "^3.6.0",
     "resumable-stream": "^2.2.10",
