@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import type {
   ContentInput,
   GenerationOptions,
@@ -216,11 +216,23 @@ export const UploadForm: React.FC<UploadFormProps> = ({
   };
 
   // Auto-resize textarea based on content
-  useEffect(() => {
+  // Using useLayoutEffect to avoid visual flicker
+  useLayoutEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
+      // Only reset height if content is shrinking
+      const currentHeight = textarea.clientHeight;
       textarea.style.height = 'auto';
-      textarea.style.height = `${Math.max(90, Math.min(textarea.scrollHeight, 400))}px`;
+      const newHeight = Math.max(90, Math.min(textarea.scrollHeight, 400));
+
+      // Smooth transition when growing, instant when shrinking
+      if (newHeight > currentHeight) {
+        textarea.style.transition = 'height 0.1s ease-out';
+      } else {
+        textarea.style.transition = 'none';
+      }
+
+      textarea.style.height = `${newHeight}px`;
     }
   }, [transcript]);
 

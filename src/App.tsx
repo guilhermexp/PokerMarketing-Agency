@@ -204,7 +204,13 @@ const getTruncatedHistory = (
 };
 
 function AppContent() {
-  const { userId, clerkUserId, isLoading: authLoading } = useAuth();
+  const {
+    userId,
+    clerkUserId,
+    isLoading: authLoading,
+    isDbSyncing,
+    dbUser,
+  } = useAuth();
   const { organization, isLoaded: orgLoaded } = useOrganization();
   const organizationId = organization?.id || null;
 
@@ -265,14 +271,38 @@ function AppContent() {
   const [lastUploadedImage, setLastUploadedImage] =
     useState<ChatReferenceImage | null>(null);
 
+  // Track context to prevent flashing between screens
+  const contextRef = useRef({ userId, organizationId });
+  const hasInitialDataLoadedOnce = useRef(false);
+
+  const initialDataUserId = dbUser?.id || null;
+
   // === OPTIMIZED: Single request to load ALL initial data ===
-  // This replaces 6 separate API calls with 1!
-  // clerkUserId is passed for parallel loading (data can load while user syncs)
   const { data: initialData, isLoading: isInitialLoading } = useInitialData(
-    userId,
+    initialDataUserId,
     organizationId,
     clerkUserId,
   );
+
+  // Check if context changed (compare current context with what initialData was loaded for)
+  // This prevents showing stale UI while waiting for new context data
+  const isContextChanging =
+    contextRef.current.userId !== userId ||
+    contextRef.current.organizationId !== organizationId;
+
+  // On first mount, always show loader until initialData loads at least once
+  const isInitialMount = !hasInitialDataLoadedOnce.current && !initialData;
+
+  if (isContextChanging || isInitialMount) {
+    console.debug(
+      "[App] Showing loader -",
+      isContextChanging ? "context changing" : "initial mount",
+      "ref:",
+      contextRef.current,
+      "current:",
+      { userId, organizationId }
+    );
+  }
 
   // === SWR CACHED DATA HOOKS (now just read from cache populated by useInitialData) ===
   const {
@@ -498,28 +528,45 @@ function AppContent() {
   }, [userId, organizationId]);
 
   // === OPTIMIZED: Use initialData from unified endpoint ===
-  // Brand profile is now loaded via useInitialData (single request for ALL data)
+  // Clear brandProfile when switching contexts (user/organization)
   useEffect(() => {
-    if (initialData?.brandProfile && !brandProfile) {
-      const dbBrandProfile = initialData.brandProfile;
-      setBrandProfile({
-        name: dbBrandProfile.name,
-        description: dbBrandProfile.description || "",
-        logo: dbBrandProfile.logo_url || null,
-        primaryColor: dbBrandProfile.primary_color,
-        secondaryColor: dbBrandProfile.secondary_color,
-        tertiaryColor: dbBrandProfile.tertiary_color || "",
-        toneOfVoice:
-          dbBrandProfile.tone_of_voice as BrandProfile["toneOfVoice"],
-        toneTargets:
-          (dbBrandProfile.settings
-            ?.toneTargets as BrandProfile["toneTargets"]) || undefined,
-        creativeModel:
-          (dbBrandProfile.settings
-            ?.creativeModel as BrandProfile["creativeModel"]) || undefined,
-      });
+    console.debug("[App] Context changed, clearing brandProfile");
+    setBrandProfile(null);
+  }, [userId, organizationId]);
+
+  // Brand profile is now loaded via useInitialData (single request for ALL data)
+  // Update contextRef ONLY when data is loaded for the new context
+  useEffect(() => {
+    if (initialData) {
+      console.debug("[App] InitialData loaded, updating contextRef and marking as loaded");
+      // Mark that initialData has loaded at least once
+      hasInitialDataLoadedOnce.current = true;
+      // Data loaded for current context - update ref to mark context as stable
+      contextRef.current = { userId, organizationId };
+
+      // Set brand profile if it exists
+      if (initialData.brandProfile && !brandProfile) {
+        console.debug("[App] Setting brandProfile from initialData");
+        const dbBrandProfile = initialData.brandProfile;
+        setBrandProfile({
+          name: dbBrandProfile.name,
+          description: dbBrandProfile.description || "",
+          logo: dbBrandProfile.logo_url || null,
+          primaryColor: dbBrandProfile.primary_color,
+          secondaryColor: dbBrandProfile.secondary_color,
+          tertiaryColor: dbBrandProfile.tertiary_color || "",
+          toneOfVoice:
+            dbBrandProfile.tone_of_voice as BrandProfile["toneOfVoice"],
+          toneTargets:
+            (dbBrandProfile.settings
+              ?.toneTargets as BrandProfile["toneTargets"]) || undefined,
+          creativeModel:
+            (dbBrandProfile.settings
+              ?.creativeModel as BrandProfile["creativeModel"]) || undefined,
+        });
+      }
     }
-  }, [initialData?.brandProfile, brandProfile]);
+  }, [initialData, brandProfile, userId, organizationId]);
 
   // Load style references from localStorage (local only, not from DB)
   // Key by organization or user to prevent mixing between brands
@@ -1105,8 +1152,8 @@ function AppContent() {
     console.debug("[App] Storing productImages:", input.productImages ? `${input.productImages.length} image(s)` : "null");
     setCampaignProductImages(input.productImages);
     // Store composition assets for use in image generation
-    console.debug("[App] Storing compositionAssets:", options.compositionAssets ? `${options.compositionAssets.length} asset(s)` : "null");
-    setCampaignCompositionAssets(options.compositionAssets || null);
+    console.debug("[App] Storing compositionAssets:", input.compositionAssets ? `${input.compositionAssets.length} asset(s)` : "null");
+    setCampaignCompositionAssets(input.compositionAssets || null);
     try {
       const r = await generateCampaign(brandProfile!, input, options);
       const toneUsed = input.toneOfVoiceOverride || brandProfile!.toneOfVoice;
@@ -1830,9 +1877,19 @@ function AppContent() {
   // 2. Initial data is loading
   // 3. Organization context is not loaded
   // 4. Brand profile exists in initialData but hasn't been set to local state yet (race condition fix)
+  // 5. Context is changing (userId or organizationId changed - prevents flashing BrandProfileSetup screen)
+  // 6. Initial mount - first render before any data loaded (prevents flash on app startup)
   const isBrandProfilePending = !!(initialData?.brandProfile && !brandProfile);
 
-  if (authLoading || isInitialLoading || !orgLoaded || isBrandProfilePending)
+  if (
+    authLoading ||
+    isDbSyncing ||
+    isInitialLoading ||
+    !orgLoaded ||
+    isBrandProfilePending ||
+    isContextChanging ||
+    isInitialMount
+  )
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <Loader className="h-16 w-16" />

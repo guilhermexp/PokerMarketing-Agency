@@ -275,63 +275,48 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       )}
 
       {/* Calendar Controls */}
-      <div className="flex flex-col gap-3 px-3 sm:px-4 py-3 bg-[#111111] border border-white/5 rounded-xl">
-        {/* Top row: Navigation + Period + Today */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Navigation */}
-            <div className="flex items-center">
-              <button
-                onClick={
-                  viewType === "monthly" ? goToPreviousMonth : goToPreviousWeek
-                }
-                className="p-2.5 sm:p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-colors active:scale-95"
-              >
-                <Icon name="chevron-left" className="w-5 h-5 sm:w-4 sm:h-4" />
-              </button>
-              <button
-                onClick={viewType === "monthly" ? goToNextMonth : goToNextWeek}
-                className="p-2.5 sm:p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-colors active:scale-95"
-              >
-                <Icon name="chevron-right" className="w-5 h-5 sm:w-4 sm:h-4" />
-              </button>
-            </div>
-
-            {/* Current Period */}
-            <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wide">
-              {viewType === "monthly"
-                ? `${monthNames[currentMonth]} ${currentYear}`
-                : `Semana de ${currentDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`}
-            </h3>
-          </div>
-
-          {/* Today Button */}
+      <div className="flex flex-col gap-2 px-3 py-2 bg-[#0a0a0a] border border-white/[0.03] rounded-lg">
+        {/* Top row: Navigation + Period */}
+        <div className="flex items-center gap-2">
           <button
-            onClick={goToToday}
-            className="px-3 py-2 sm:py-1.5 text-[9px] sm:text-[8px] font-black uppercase tracking-wider text-white/40 hover:text-white border border-white/10 hover:border-white/20 rounded-lg transition-colors active:scale-95"
+            onClick={
+              viewType === "monthly" ? goToPreviousMonth : goToPreviousWeek
+            }
+            className="p-1.5 text-white/30 hover:text-white/60 hover:bg-white/5 rounded transition-colors"
           >
-            Hoje
+            <Icon name="chevron-left" className="w-4 h-4" />
           </button>
+          <button
+            onClick={viewType === "monthly" ? goToNextMonth : goToNextWeek}
+            className="p-1.5 text-white/30 hover:text-white/60 hover:bg-white/5 rounded transition-colors"
+          >
+            <Icon name="chevron-right" className="w-4 h-4" />
+          </button>
+          <h3 className="text-xs font-medium text-white/60 uppercase tracking-wide">
+            {viewType === "monthly"
+              ? `${monthNames[currentMonth]} ${currentYear}`
+              : `Semana de ${currentDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`}
+          </h3>
         </div>
 
         {/* Bottom row: View Toggle (full width on mobile) */}
-        <div className="flex items-center gap-1 p-1 bg-black/40 rounded-lg w-full sm:w-auto sm:self-end">
+        <div className="flex items-center gap-1 p-0.5 bg-black/20 rounded w-full sm:w-auto sm:self-end">
           <button
             onClick={() => setViewType("monthly")}
-            className={`flex-1 sm:flex-none px-4 sm:px-3 py-2 sm:py-1.5 text-[10px] sm:text-[8px] font-black uppercase tracking-wider rounded-md transition-all active:scale-95 ${
+            className={`flex-1 sm:flex-none px-3 py-1 text-[9px] font-medium uppercase tracking-wide rounded transition-all ${
               viewType === "monthly"
                 ? "bg-white text-black"
-                : "text-white/40 hover:text-white"
+                : "text-white/40 hover:text-white/60"
             }`}
           >
             Mensal
           </button>
           <button
             onClick={() => setViewType("weekly")}
-            className={`flex-1 sm:flex-none px-4 sm:px-3 py-2 sm:py-1.5 text-[10px] sm:text-[8px] font-black uppercase tracking-wider rounded-md transition-all active:scale-95 ${
+            className={`flex-1 sm:flex-none px-3 py-1 text-[9px] font-medium uppercase tracking-wide rounded transition-all ${
               viewType === "weekly"
                 ? "bg-white text-black"
-                : "text-white/40 hover:text-white"
+                : "text-white/40 hover:text-white/60"
             }`}
           >
             Semanal

@@ -115,20 +115,9 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
 
         {/* Empty State */}
         <div className="flex items-center justify-center w-full min-h-[60vh]">
-          <div className="bg-[#111] border border-white/[0.06] rounded-2xl px-16 py-20 flex flex-col items-center justify-center text-center min-w-[320px]">
-            <div className="grid grid-cols-2 gap-1.5 mb-6">
-              <div className="w-6 h-6 rounded border border-white/20" />
-              <div className="w-6 h-6 rounded border border-white/20" />
-              <div className="w-6 h-6 rounded border border-white/20" />
-              <div className="w-6 h-6 rounded border border-white/20" />
-            </div>
-            <p className="text-white/40 text-sm mb-4">
-              Nenhuma planilha ainda
-            </p>
-            <p className="text-white/30 text-xs">
-              Carregue uma planilha ou adicione torneios manualmente
-            </p>
-          </div>
+          <p className="text-white/30 text-sm">
+            Nenhuma planilha ainda
+          </p>
         </div>
 
         {/* Manual Event Modal */}

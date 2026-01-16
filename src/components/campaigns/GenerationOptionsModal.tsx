@@ -225,7 +225,7 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
-        <div className="bg-black rounded-xl w-full max-w-md border border-white/[0.08]"
+        <div className="bg-black rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-white/[0.08]"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="p-4 border-b border-white/[0.06]">
@@ -235,7 +235,7 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
             </p>
           </div>
 
-          <div className="px-4 py-4 space-y-3">
+          <div className="px-4 py-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
             <SectionCard
               icon="film"
               title="Roteiros de vídeo | Carrosséis"
@@ -290,15 +290,16 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
               </div>
             </SectionCard>
 
-            <SectionCard
-              icon="megaphone"
-              title="Anúncios"
-              description="Criativos completos para campanhas pagas."
-              enabled={adsEnabled}
-              count={getAdsCount()}
-              onToggle={toggleAds}
-              onCountChange={setAdsCount}
-            >
+            <div className="lg:col-span-2">
+              <SectionCard
+                icon="megaphone"
+                title="Anúncios"
+                description="Criativos completos para campanhas pagas."
+                enabled={adsEnabled}
+                count={getAdsCount()}
+                onToggle={toggleAds}
+                onCountChange={setAdsCount}
+              >
               <div className="bg-black/30 border border-white/10 rounded-lg p-2">
                 <p className="text-[10px] text-white/40 mb-2">
                   Selecione os canais de anúncios desejados.
@@ -316,7 +317,8 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
                   />
                 </div>
               </div>
-            </SectionCard>
+              </SectionCard>
+            </div>
           </div>
 
 

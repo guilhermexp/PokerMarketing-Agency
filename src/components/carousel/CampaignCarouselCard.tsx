@@ -255,7 +255,7 @@ export const CampaignCarouselCard: React.FC<CampaignCarouselCardProps> = ({
                     (_, idx) => (
                       <div
                         key={`skeleton-${idx}`}
-                        className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-lg animate-pulse"
+                        className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-lg"
                         style={{
                           width: idx === 0 ? '10rem' : '5rem',
                           height: '20rem',

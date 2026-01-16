@@ -6,7 +6,7 @@
 import express from "express";
 import cors from "cors";
 import { neon } from "@neondatabase/serverless";
-import { put } from "@vercel/blob";
+import { put, del } from "@vercel/blob";
 import { config } from "dotenv";
 import { fal } from "@fal-ai/client";
 import { clerkMiddleware, getAuth } from "@clerk/express";
@@ -781,6 +781,7 @@ app.get("/api/db/init", async (req, res) => {
     // RLS policies protect direct database access (psql, DB clients)
 
     // Run ALL queries in parallel - this is the key optimization!
+    // PERFORMANCE: Tournaments are now loaded lazily (only when user opens tournaments tab)
     const isOrgContext = !!organization_id;
 
     const [
@@ -788,7 +789,6 @@ app.get("/api/db/init", async (req, res) => {
       galleryResult,
       scheduledPostsResult,
       campaignsResult,
-      tournamentResult,
       schedulesListResult,
     ] = await Promise.all([
       // 1. Brand Profile
@@ -796,17 +796,33 @@ app.get("/api/db/init", async (req, res) => {
         ? sql`SELECT * FROM brand_profiles WHERE organization_id = ${organization_id} AND deleted_at IS NULL LIMIT 1`
         : sql`SELECT * FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`,
 
-      // 2. Gallery Images (limited to 50 most recent)
+      // 2. Gallery Images (limited to 20 most recent for faster initial load)
       isOrgContext
-        ? sql`SELECT * FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50`
-        : sql`SELECT * FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50`,
+        ? sql`SELECT * FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20`
+        : sql`SELECT * FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20`,
 
-      // 3. Scheduled Posts
+      // 3. Scheduled Posts (SMART LOADING: last 7 days + next 60 days)
+      // Shows recent activity + upcoming schedule without arbitrary limits
+      // NOTE: scheduled_timestamp is bigint (unix ms), convert NOW() to match
       isOrgContext
-        ? sql`SELECT * FROM scheduled_posts WHERE organization_id = ${organization_id} ORDER BY scheduled_timestamp ASC LIMIT 100`
-        : sql`SELECT * FROM scheduled_posts WHERE user_id = ${resolvedUserId} AND organization_id IS NULL ORDER BY scheduled_timestamp ASC LIMIT 100`,
+        ? sql`
+          SELECT * FROM scheduled_posts
+          WHERE organization_id = ${organization_id}
+            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
+            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
+          ORDER BY scheduled_timestamp ASC
+        `
+        : sql`
+          SELECT * FROM scheduled_posts
+          WHERE user_id = ${resolvedUserId}
+            AND organization_id IS NULL
+            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
+            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
+          ORDER BY scheduled_timestamp ASC
+        `,
 
-      // 4. Campaigns with counts (optimized single query)
+      // 4. Campaigns with counts (OPTIMIZED: simple subqueries for preview URLs)
+      // Only fetch from main tables (posts/ads/clips), not from gallery_images
       isOrgContext
         ? sql`
           SELECT
@@ -814,34 +830,13 @@ app.get("/api/db/init", async (req, res) => {
             COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
             COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
             COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-            COALESCE(
-              (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE video_script_id IN (SELECT id FROM video_clip_scripts WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1)
-            ) as clip_preview_url,
-            COALESCE(
-              (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE post_id IN (SELECT id FROM posts WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1)
-            ) as post_preview_url,
-            COALESCE(
-              (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE ad_creative_id IN (SELECT id FROM ad_creatives WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1)
-            ) as ad_preview_url
+            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
+            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
+            (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url
           FROM campaigns c
           WHERE c.organization_id = ${organization_id} AND c.deleted_at IS NULL
           ORDER BY c.created_at DESC
-          LIMIT 20
+          LIMIT 10
         `
         : sql`
           SELECT
@@ -849,115 +844,66 @@ app.get("/api/db/init", async (req, res) => {
             COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
             COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
             COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-            COALESCE(
-              (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE video_script_id IN (SELECT id FROM video_clip_scripts WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1)
-            ) as clip_preview_url,
-            COALESCE(
-              (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE post_id IN (SELECT id FROM posts WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1)
-            ) as post_preview_url,
-            COALESCE(
-              (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE ad_creative_id IN (SELECT id FROM ad_creatives WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1)
-            ) as ad_preview_url
+            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
+            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
+            (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url
           FROM campaigns c
           WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL
           ORDER BY c.created_at DESC
-          LIMIT 20
+          LIMIT 10
         `,
 
-      // 5. Current tournament schedule + events (combined)
+      // 5. Week schedules list (for flyers page - show saved spreadsheets)
       isOrgContext
         ? sql`
           SELECT
-            ws.*,
-            COALESCE(
-              (SELECT json_agg(te ORDER BY te.day_of_week, te.name)
-               FROM tournament_events te
-               WHERE te.week_schedule_id = ws.id),
-              '[]'::json
-            ) as events
+            ws.id,
+            ws.user_id,
+            ws.organization_id,
+            ws.original_filename as name,
+            ws.start_date,
+            ws.end_date,
+            ws.created_at,
+            ws.updated_at,
+            COUNT(te.id)::int as event_count
           FROM week_schedules ws
+          LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id
           WHERE ws.organization_id = ${organization_id}
+          GROUP BY ws.id, ws.original_filename
           ORDER BY ws.created_at DESC
-          LIMIT 1
         `
         : sql`
           SELECT
-            ws.*,
-            COALESCE(
-              (SELECT json_agg(te ORDER BY te.day_of_week, te.name)
-               FROM tournament_events te
-               WHERE te.week_schedule_id = ws.id),
-              '[]'::json
-            ) as events
+            ws.id,
+            ws.user_id,
+            ws.organization_id,
+            ws.original_filename as name,
+            ws.start_date,
+            ws.end_date,
+            ws.created_at,
+            ws.updated_at,
+            COUNT(te.id)::int as event_count
           FROM week_schedules ws
+          LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id
           WHERE ws.user_id = ${resolvedUserId} AND ws.organization_id IS NULL
+          GROUP BY ws.id, ws.original_filename
           ORDER BY ws.created_at DESC
-          LIMIT 1
-        `,
-
-      // 6. All schedules list (for schedule selector)
-      isOrgContext
-        ? sql`
-          SELECT ws.*, COUNT(te.id)::int as event_count
-          FROM week_schedules ws
-          LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id
-          WHERE ws.organization_id = ${organization_id}
-          GROUP BY ws.id
-          ORDER BY ws.start_date DESC
-          LIMIT 10
-        `
-        : sql`
-          SELECT ws.*, COUNT(te.id)::int as event_count
-          FROM week_schedules ws
-          LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id
-          WHERE ws.user_id = ${resolvedUserId} AND ws.organization_id IS NULL
-          GROUP BY ws.id
-          ORDER BY ws.start_date DESC
-          LIMIT 10
         `,
     ]);
 
-    // Extract tournament data
-    const tournamentData = tournamentResult[0] || null;
-
+    // PERFORMANCE: Only tournament schedule/events are loaded lazily via /api/db/tournaments
+    // schedulesList is loaded here because it's essential for flyers page
     res.json({
       brandProfile: brandProfileResult[0] || null,
       gallery: galleryResult,
       scheduledPosts: scheduledPostsResult,
       campaigns: campaignsResult,
-      tournamentSchedule: tournamentData
-        ? {
-            id: tournamentData.id,
-            user_id: tournamentData.user_id,
-            organization_id: tournamentData.organization_id,
-            start_date: tournamentData.start_date,
-            end_date: tournamentData.end_date,
-            filename: tournamentData.filename,
-            daily_flyer_urls: tournamentData.daily_flyer_urls || {},
-            created_at: tournamentData.created_at,
-            updated_at: tournamentData.updated_at,
-          }
-        : null,
-      tournamentEvents: tournamentData?.events || [],
-      schedulesList: schedulesListResult,
+      tournamentSchedule: null, // Loaded lazily
+      tournamentEvents: [], // Loaded lazily
+      schedulesList: schedulesListResult, // List of saved spreadsheets
       _meta: {
         loadTime: Date.now() - start,
-        queriesExecuted: 6,
+        queriesExecuted: 5, // Reduced from 6 to 5
         timestamp: new Date().toISOString(),
       },
     });
@@ -1375,9 +1321,9 @@ app.delete("/api/db/gallery", async (req, res) => {
       return res.status(400).json({ error: "id is required" });
     }
 
-    // Check if image belongs to an organization and verify permission
+    // Get image info including src_url before deleting
     const image =
-      await sql`SELECT organization_id FROM gallery_images WHERE id = ${id} AND deleted_at IS NULL`;
+      await sql`SELECT organization_id, src_url FROM gallery_images WHERE id = ${id} AND deleted_at IS NULL`;
     if (image.length === 0) {
       return res.status(404).json({ error: "Image not found" });
     }
@@ -1398,7 +1344,29 @@ app.delete("/api/db/gallery", async (req, res) => {
       }
     }
 
-    await sql`UPDATE gallery_images SET deleted_at = NOW() WHERE id = ${id}`;
+    const srcUrl = image[0].src_url;
+
+    // HARD DELETE: Permanently remove from database
+    await sql`DELETE FROM gallery_images WHERE id = ${id}`;
+
+    // Delete physical file from Vercel Blob Storage if applicable
+    if (
+      srcUrl &&
+      (srcUrl.includes(".public.blob.vercel-storage.com/") ||
+        srcUrl.includes(".blob.vercel-storage.com/"))
+    ) {
+      try {
+        await del(srcUrl);
+        console.log(`[Gallery] Deleted file from Vercel Blob: ${srcUrl}`);
+      } catch (blobError) {
+        console.error(
+          `[Gallery] Failed to delete file from Vercel Blob: ${srcUrl}`,
+          blobError
+        );
+        // Don't fail the request if blob deletion fails - DB record is already deleted
+      }
+    }
+
     res.status(204).end();
   } catch (error) {
     if (
@@ -1485,6 +1453,9 @@ app.get("/api/db/scheduled-posts", async (req, res) => {
       return res.json([]); // No user found, return empty array
     }
 
+    // SMART LOADING: Load posts in relevant time window (last 7 days + next 60 days)
+    // Shows recent activity + upcoming schedule without arbitrary quantity limits
+    // NOTE: scheduled_timestamp is bigint (unix ms), convert NOW() to match
     let query;
     if (organization_id) {
       // Organization context - verify membership
@@ -1493,13 +1464,18 @@ app.get("/api/db/scheduled-posts", async (req, res) => {
       if (status) {
         query = await sql`
           SELECT * FROM scheduled_posts
-          WHERE organization_id = ${organization_id} AND status = ${status}
+          WHERE organization_id = ${organization_id}
+            AND status = ${status}
+            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
+            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
           ORDER BY scheduled_timestamp ASC
         `;
       } else {
         query = await sql`
           SELECT * FROM scheduled_posts
           WHERE organization_id = ${organization_id}
+            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
+            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
           ORDER BY scheduled_timestamp ASC
         `;
       }
@@ -1508,13 +1484,20 @@ app.get("/api/db/scheduled-posts", async (req, res) => {
       if (status) {
         query = await sql`
           SELECT * FROM scheduled_posts
-          WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND status = ${status}
+          WHERE user_id = ${resolvedUserId}
+            AND organization_id IS NULL
+            AND status = ${status}
+            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
+            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
           ORDER BY scheduled_timestamp ASC
         `;
       } else {
         query = await sql`
           SELECT * FROM scheduled_posts
-          WHERE user_id = ${resolvedUserId} AND organization_id IS NULL
+          WHERE user_id = ${resolvedUserId}
+            AND organization_id IS NULL
+            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
+            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
           ORDER BY scheduled_timestamp ASC
         `;
       }
@@ -2008,13 +1991,145 @@ app.delete("/api/db/campaigns", async (req, res) => {
       }
     }
 
-    await sql`
-      UPDATE campaigns
-      SET deleted_at = NOW()
-      WHERE id = ${id}
+    console.log(`[Campaign Delete] Starting cascade delete for campaign: ${id}`);
+
+    // ========================================================================
+    // CASCADE DELETE: Delete all resources associated with the campaign
+    // ========================================================================
+
+    // 1. Get all images from gallery that belong to this campaign
+    const campaignImages = await sql`
+      SELECT id, src_url FROM gallery_images
+      WHERE (post_id IN (SELECT id FROM posts WHERE campaign_id = ${id})
+         OR ad_creative_id IN (SELECT id FROM ad_creatives WHERE campaign_id = ${id})
+         OR video_script_id IN (SELECT id FROM video_clip_scripts WHERE campaign_id = ${id}))
+      AND deleted_at IS NULL
     `;
 
-    res.status(200).json({ success: true });
+    console.log(`[Campaign Delete] Found ${campaignImages.length} gallery images to delete`);
+
+    // 2. Get all posts with their image URLs
+    const posts = await sql`
+      SELECT id, image_url FROM posts WHERE campaign_id = ${id}
+    `;
+
+    // 3. Get all ads with their image URLs
+    const ads = await sql`
+      SELECT id, image_url FROM ad_creatives WHERE campaign_id = ${id}
+    `;
+
+    // 4. Get all video clips with their thumbnail URLs
+    const clips = await sql`
+      SELECT id, thumbnail_url, video_url FROM video_clip_scripts WHERE campaign_id = ${id}
+    `;
+
+    console.log(`[Campaign Delete] Found ${posts.length} posts, ${ads.length} ads, ${clips.length} clips`);
+
+    // Collect all URLs that need to be deleted from Vercel Blob
+    const urlsToDelete = [];
+
+    // Add gallery image URLs
+    campaignImages.forEach((img) => {
+      if (
+        img.src_url &&
+        (img.src_url.includes(".public.blob.vercel-storage.com/") ||
+          img.src_url.includes(".blob.vercel-storage.com/"))
+      ) {
+        urlsToDelete.push(img.src_url);
+      }
+    });
+
+    // Add post image URLs
+    posts.forEach((post) => {
+      if (
+        post.image_url &&
+        (post.image_url.includes(".public.blob.vercel-storage.com/") ||
+          post.image_url.includes(".blob.vercel-storage.com/"))
+      ) {
+        urlsToDelete.push(post.image_url);
+      }
+    });
+
+    // Add ad image URLs
+    ads.forEach((ad) => {
+      if (
+        ad.image_url &&
+        (ad.image_url.includes(".public.blob.vercel-storage.com/") ||
+          ad.image_url.includes(".blob.vercel-storage.com/"))
+      ) {
+        urlsToDelete.push(ad.image_url);
+      }
+    });
+
+    // Add clip thumbnail and video URLs
+    clips.forEach((clip) => {
+      if (
+        clip.thumbnail_url &&
+        (clip.thumbnail_url.includes(".public.blob.vercel-storage.com/") ||
+          clip.thumbnail_url.includes(".blob.vercel-storage.com/"))
+      ) {
+        urlsToDelete.push(clip.thumbnail_url);
+      }
+      if (
+        clip.video_url &&
+        (clip.video_url.includes(".public.blob.vercel-storage.com/") ||
+          clip.video_url.includes(".blob.vercel-storage.com/"))
+      ) {
+        urlsToDelete.push(clip.video_url);
+      }
+    });
+
+    // Delete all files from Vercel Blob Storage
+    console.log(`[Campaign Delete] Deleting ${urlsToDelete.length} files from Vercel Blob`);
+    for (const url of urlsToDelete) {
+      try {
+        await del(url);
+        console.log(`[Campaign Delete] Deleted file: ${url}`);
+      } catch (blobError) {
+        console.error(`[Campaign Delete] Failed to delete file: ${url}`, blobError);
+        // Continue even if blob deletion fails
+      }
+    }
+
+    // HARD DELETE: Permanently remove all records from database
+    console.log(`[Campaign Delete] Deleting database records...`);
+
+    // Delete gallery images (already have the IDs)
+    if (campaignImages.length > 0) {
+      const imageIds = campaignImages.map((img) => img.id);
+      await sql`DELETE FROM gallery_images WHERE id = ANY(${imageIds})`;
+      console.log(`[Campaign Delete] Deleted ${imageIds.length} gallery images from DB`);
+    }
+
+    // Delete posts
+    await sql`DELETE FROM posts WHERE campaign_id = ${id}`;
+    console.log(`[Campaign Delete] Deleted posts from DB`);
+
+    // Delete ad creatives
+    await sql`DELETE FROM ad_creatives WHERE campaign_id = ${id}`;
+    console.log(`[Campaign Delete] Deleted ad creatives from DB`);
+
+    // Delete video clip scripts
+    await sql`DELETE FROM video_clip_scripts WHERE campaign_id = ${id}`;
+    console.log(`[Campaign Delete] Deleted video clips from DB`);
+
+    // Finally, delete the campaign itself
+    await sql`DELETE FROM campaigns WHERE id = ${id}`;
+    console.log(`[Campaign Delete] Deleted campaign from DB`);
+
+    console.log(`[Campaign Delete] Cascade delete completed successfully for campaign: ${id}`);
+
+    res.status(200).json({
+      success: true,
+      deleted: {
+        campaign: 1,
+        posts: posts.length,
+        ads: ads.length,
+        clips: clips.length,
+        galleryImages: campaignImages.length,
+        files: urlsToDelete.length,
+      }
+    });
   } catch (error) {
     if (
       error instanceof OrganizationAccessError ||
@@ -4276,9 +4391,9 @@ app.post("/api/ai/enhance-prompt", async (req, res) => {
       return res.status(400).json({ error: "prompt is required" });
     }
 
-    console.log("[Enhance Prompt API] Enhancing prompt...");
+    console.log("[Enhance Prompt API] Enhancing prompt with Grok...");
 
-    const ai = getGeminiAi();
+    const openrouter = getOpenRouter();
 
     const systemPrompt = `Você é um especialista em marketing digital e criação de conteúdo multiplataforma. Sua função é aprimorar briefings de campanhas para gerar máximo engajamento em TODOS os formatos de conteúdo.
 
@@ -4340,31 +4455,29 @@ REGRAS:
 8. Mantenha tamanho similar ou ligeiramente maior que o original
 9. Use formatação markdown para estruturar (negrito, listas, etc)`;
 
-    const result = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: systemPrompt + "\n\nBRIEFING ORIGINAL:\n" + prompt }],
-        },
+    const userPrompt = `BRIEFING ORIGINAL:\n${prompt}`;
+
+    const response = await openrouter.chat.send({
+      model: "x-ai/grok-4.1-fast",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
       ],
-      config: {
-        temperature: 0.5,
-        maxOutputTokens: 2048,
-      },
+      temperature: 0.5,
+      max_tokens: 2048,
     });
 
-    const enhancedPrompt = result.text?.trim() || "";
+    const enhancedPrompt = response.choices[0]?.message?.content?.trim() || "";
 
-    console.log("[Enhance Prompt API] Successfully enhanced prompt");
+    console.log("[Enhance Prompt API] Successfully enhanced prompt with Grok");
 
     // Log AI usage
-    const tokens = extractGeminiTokens(result);
+    const tokens = extractOpenRouterTokens(response);
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/enhance-prompt',
       operation: 'text',
-      model: 'gemini-3-flash-preview',
+      model: 'x-ai/grok-4.1-fast',
       inputTokens: tokens.inputTokens,
       outputTokens: tokens.outputTokens,
       latencyMs: timer(),
@@ -4378,7 +4491,7 @@ REGRAS:
       organizationId,
       endpoint: '/api/ai/enhance-prompt',
       operation: 'text',
-      model: 'gemini-3-flash-preview',
+      model: 'x-ai/grok-4.1-fast',
       latencyMs: timer(),
       status: 'failed',
       error: error.message,

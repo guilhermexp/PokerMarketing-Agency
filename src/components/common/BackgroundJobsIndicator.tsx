@@ -1,7 +1,6 @@
 /**
  * Background Jobs Indicator
- * Shows a floating indicator when there are background jobs running
- * Also shows notifications for scheduled post status changes
+ * Shows a floating indicator when there are background jobs running (images, videos, flyers via BullMQ)
  * Click to expand and see details
  */
 
@@ -25,13 +24,8 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
     pendingJobs,
     completedJobs,
     failedJobs: _failedJobs,
-    scheduledPostNotifications,
-    pendingScheduledPosts,
-    clearScheduledPostNotification,
     onJobComplete,
     onJobFailed: _onJobFailed,
-    onScheduledPostPublished,
-    onScheduledPostFailed,
     refreshJobs,
   } = useBackgroundJobs();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -100,33 +94,8 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
     return unsubComplete;
   }, [onJobComplete]);
 
-  // Listen for scheduled post status changes
-  useEffect(() => {
-    const unsubPublished = onScheduledPostPublished((_post) => {
-      setNotificationMessage(`✓ Post publicado no Instagram!`);
-      setNotificationType("success");
-      setShowNotification(true);
-      setTimeout(() => setShowNotification(false), 4000);
-    });
-
-    const unsubFailed = onScheduledPostFailed((_post) => {
-      setNotificationMessage(`✗ Falha ao publicar post`);
-      setNotificationType("error");
-      setShowNotification(true);
-      setTimeout(() => setShowNotification(false), 5000);
-    });
-
-    return () => {
-      unsubPublished();
-      unsubFailed();
-    };
-  }, [onScheduledPostPublished, onScheduledPostFailed]);
-
   // Don't render if nothing to show
-  const hasContent = pendingJobs.length > 0 ||
-    recentlyCompleted.length > 0 ||
-    scheduledPostNotifications.length > 0 ||
-    pendingScheduledPosts.length > 0;
+  const hasContent = pendingJobs.length > 0 || recentlyCompleted.length > 0;
 
   if (!hasContent) {
     return null;
@@ -318,70 +287,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
                 </div>
               )}
 
-              {/* Scheduled Posts Notifications */}
-              {(scheduledPostNotifications.length > 0 || pendingScheduledPosts.length > 0) && (
-                <div className="p-2 border-t border-white/5">
-                  {pendingScheduledPosts.length > 0 && (
-                    <>
-                      <p className="text-[9px] font-bold text-blue-400 uppercase tracking-wider px-2 mb-1">
-                        Publicando ({pendingScheduledPosts.length})
-                      </p>
-                      {pendingScheduledPosts.slice(0, 3).map((post) => (
-                        <div
-                          key={post.id}
-                          className="px-2 py-1.5 rounded-lg bg-blue-500/10 flex items-center gap-2 mb-1"
-                        >
-                          <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                          <span className="text-[10px] text-white/70 flex-1 truncate">
-                            {post.caption?.substring(0, 30) || "Post agendado"}...
-                          </span>
-                        </div>
-                      ))}
-                    </>
-                  )}
-                  {scheduledPostNotifications.length > 0 && (
-                    <>
-                      <div className="flex items-center justify-between px-2 mb-1 mt-2">
-                        <p className="text-[9px] font-bold text-purple-400 uppercase tracking-wider">
-                          Posts Instagram
-                        </p>
-                        <button
-                          onClick={() => {
-                            scheduledPostNotifications.forEach(n => clearScheduledPostNotification(n.post.id));
-                          }}
-                          className="text-[9px] font-bold text-white/40 hover:text-white/70 transition-colors"
-                        >
-                          Limpar
-                        </button>
-                      </div>
-                      {scheduledPostNotifications.map((notification) => (
-                        <div
-                          key={notification.post.id}
-                          className={`px-2 py-1.5 rounded-lg flex items-center gap-2 mb-1 ${notification.status === "published"
-                            ? "bg-green-500/10"
-                            : "bg-red-500/10"
-                            }`}
-                        >
-                          {notification.status === "published" ? (
-                            <Icon name="check" className="w-3 h-3 text-green-400" />
-                          ) : (
-                            <Icon name="x" className="w-3 h-3 text-red-400" />
-                          )}
-                          <span className="text-[10px] text-white/70 flex-1 truncate">
-                            {notification.post.caption?.substring(0, 25) || "Post"}...
-                          </span>
-                          <span className={`text-[9px] ${notification.status === "published" ? "text-green-400" : "text-red-400"
-                            }`}>
-                            {notification.status === "published" ? "Publicado" : "Falhou"}
-                          </span>
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {pendingJobs.length === 0 && recentlyCompleted.length === 0 && scheduledPostNotifications.length === 0 && pendingScheduledPosts.length === 0 && (
+              {pendingJobs.length === 0 && recentlyCompleted.length === 0 && (
                 <p className="px-4 py-6 text-center text-[10px] text-white/30">
                   Nenhum job ativo
                 </p>
@@ -396,26 +302,22 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
           className={`
             w-9 h-9 sm:w-10 sm:h-10 rounded-full shadow-xl flex items-center justify-center
             transition-all duration-300 hover:scale-105
-            ${pendingJobs.length > 0 || pendingScheduledPosts.length > 0
+            ${pendingJobs.length > 0
               ? "bg-amber-500 text-black"
-              : scheduledPostNotifications.some(n => n.status === "failed")
-                ? "bg-red-500 text-white"
-                : "bg-green-500 text-white"
+              : "bg-green-500 text-white"
             }
           `}
         >
-          {pendingJobs.length > 0 || pendingScheduledPosts.length > 0 ? (
+          {pendingJobs.length > 0 ? (
             <div className="relative">
               <Icon
                 name="zap"
                 className="w-5 h-5 animate-pulse"
               />
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-black text-amber-500 text-[9px] font-black rounded-full flex items-center justify-center">
-                {pendingJobs.length + pendingScheduledPosts.length}
+                {pendingJobs.length}
               </span>
             </div>
-          ) : scheduledPostNotifications.some(n => n.status === "failed") ? (
-            <Icon name="alertTriangle" className="w-5 h-5" />
           ) : (
             <Icon name="check" className="w-5 h-5" />
           )}
