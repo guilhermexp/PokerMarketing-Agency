@@ -872,8 +872,8 @@ app.get("/api/db/init", async (req, res) => {
       // 2. Gallery Images (limited to 20 most recent for faster initial load)
       // OPTIMIZATION: Exclude 'src' column (base64 image data) to reduce egress
       isOrgContext
-        ? sql`SELECT id, user_id, organization_id, source, thumbnail_url, created_at, updated_at, deleted_at FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20`
-        : sql`SELECT id, user_id, organization_id, source, thumbnail_url, created_at, updated_at, deleted_at FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20`,
+        ? sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20`
+        : sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20`,
 
       // 3. Scheduled Posts (SMART LOADING: last 7 days + next 60 days)
       // Shows recent activity + upcoming schedule without arbitrary limits
