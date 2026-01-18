@@ -307,6 +307,13 @@ const iconPaths: Record<string, React.ReactNode> = {
       <polyline points="2 12 12 17 22 12"></polyline>
     </>
   ),
+  kanban: (
+    <>
+      <rect x="3" y="3" width="5" height="18" rx="1"></rect>
+      <rect x="10" y="3" width="5" height="12" rx="1"></rect>
+      <rect x="17" y="3" width="5" height="15" rx="1"></rect>
+    </>
+  ),
   'trash-2': (
     <>
       <polyline points="3 6 5 6 21 6"></polyline>

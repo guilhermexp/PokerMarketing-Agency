@@ -469,7 +469,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               {/* Row 1: Title and Stats/Actions */}
               <div className="flex items-start justify-between">
                 <div>
-                  <h1 className="text-2xl font-semibold text-white">
+                  <h1 className="text-3xl font-semibold text-white tracking-tight">
                     {viewMode === "gallery" ? "Galeria" : "Favoritos"}
                   </h1>
                   <p className="text-sm text-white/50 mt-1">

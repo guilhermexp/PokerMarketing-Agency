@@ -220,7 +220,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             {/* Row 1: Title */}
             <div className="flex items-start justify-between">
               <div>
-                <h1 className="text-2xl font-semibold text-white">Agenda de Publicações</h1>
+                <h1 className="text-3xl font-semibold text-white tracking-tight">Agenda de Publicações</h1>
                 <p className="text-sm text-white/50 mt-1">Gerencie seus posts agendados</p>
               </div>
             </div>

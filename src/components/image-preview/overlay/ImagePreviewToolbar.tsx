@@ -1,5 +1,4 @@
-import { ActionIcon } from '@lobehub/ui';
-import { Button, Space, Typography } from 'antd';
+import { Typography } from 'antd';
 import {
   ZoomIn,
   ZoomOut,
@@ -13,6 +12,31 @@ import {
   Crop,
   MessageSquare,
 } from 'lucide-react';
+
+interface ToolbarButtonProps {
+  icon: React.ComponentType<any>;
+  onClick: () => void;
+  title?: string;
+  disabled?: boolean;
+  active?: boolean;
+}
+
+const ToolbarButton = ({ icon: Icon, onClick, title, disabled = false, active = false }: ToolbarButtonProps) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={title}
+    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+      disabled
+        ? 'opacity-30 cursor-not-allowed'
+        : active
+        ? 'bg-white/20 text-white hover:bg-white/30'
+        : 'bg-transparent text-white/60 hover:text-white hover:bg-white/10'
+    }`}
+  >
+    <Icon size={16} />
+  </button>
+);
 
 interface ImagePreviewToolbarProps {
   zoom: number;
@@ -52,50 +76,44 @@ export const ImagePreviewToolbar = ({
   return (
     <div className="preview-toolbar">
       {/* Controles em linha única */}
-      <ActionIcon
+      <ToolbarButton
         icon={Maximize2}
         onClick={onFitToScreen}
         title="Ajustar à tela (F)"
-        size="small"
       />
 
       <div className="toolbar-separator" />
 
-      <ActionIcon
+      <ToolbarButton
         icon={Scan}
         onClick={onOriginalSize}
         title="Tamanho original (O)"
-        size="small"
       />
 
-      <ActionIcon
+      <ToolbarButton
         icon={RotateCcw}
         onClick={onRotateLeft}
         title="Rotacionar à esquerda"
-        size="small"
       />
 
-      <ActionIcon
+      <ToolbarButton
         icon={RotateCw}
         onClick={onRotateRight}
         title="Rotacionar à direita (R)"
-        size="small"
       />
 
-      <ActionIcon
+      <ToolbarButton
         icon={ZoomOut}
         onClick={onZoomOut}
         title="Diminuir zoom (-)"
         disabled={zoom <= 0.5}
-        size="small"
       />
 
-      <ActionIcon
+      <ToolbarButton
         icon={ZoomIn}
         onClick={onZoomIn}
         title="Aumentar zoom (+)"
         disabled={zoom >= 3}
-        size="small"
       />
 
       {/* Dimensões e controles extras - desktop only */}
@@ -116,49 +134,38 @@ export const ImagePreviewToolbar = ({
 
       <div className="toolbar-separator" />
 
-      <ActionIcon
+      <ToolbarButton
         icon={RotateCcw}
         onClick={onReset}
         title="Resetar (0)"
-        size="small"
       />
 
-      <ActionIcon
+      <ToolbarButton
         icon={Crop}
         onClick={onToggleCrop}
         title="Recortar (C)"
-        size="small"
-        style={{
-          background: cropActive ? 'rgba(34, 197, 94, 0.2)' : 'transparent',
-          color: cropActive ? '#22c55e' : 'inherit',
-        }}
+        active={cropActive}
       />
 
-      <ActionIcon
+      <ToolbarButton
         icon={Edit3}
         onClick={onToggleEditPanel}
         title="Editar (E)"
-        size="small"
-        style={{
-          background: editPanelOpen ? 'rgba(24, 144, 255, 0.2)' : 'transparent',
-          color: editPanelOpen ? '#1890ff' : 'inherit',
-        }}
+        active={editPanelOpen}
       />
 
       {onSendToChat && (
-        <ActionIcon
+        <ToolbarButton
           icon={MessageSquare}
           onClick={onSendToChat}
           title="Enviar para o chat"
-          size="small"
         />
       )}
 
-      <ActionIcon
+      <ToolbarButton
         icon={Download}
         onClick={onDownload}
         title="Baixar imagem"
-        size="small"
       />
     </div>
   );

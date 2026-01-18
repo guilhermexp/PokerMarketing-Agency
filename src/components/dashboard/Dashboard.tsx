@@ -808,7 +808,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           </div>
         )}
         {activeView === "playground" && (
-          <div className="h-full">
+          <div className="h-full lg:-ml-20 lg:pl-20">
             <PlaygroundView brandProfile={brandProfile} userId={userId} />
           </div>
         )}
@@ -943,7 +943,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
         <button
           onClick={() => signOut()}
-          className="flex items-center justify-center p-2.5 cursor-pointer text-white/50 hover:text-red-400 active:scale-95 transition-all rounded-xl hover:bg-white/5"
+          className="flex items-center justify-center p-2.5 cursor-pointer text-white hover:text-red-400 active:scale-95 transition-all rounded-xl hover:bg-white/5"
           title="Sair"
         >
           <Icon name="log-out" className="w-5 h-5" />

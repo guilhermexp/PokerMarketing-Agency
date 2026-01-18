@@ -2011,8 +2011,8 @@ app.post("/api/db/campaigns", async (req, res) => {
       for (let i = 0; i < carousel_scripts.length; i++) {
         const carousel = carousel_scripts[i];
         const result = await sql`
-          INSERT INTO carousel_scripts (campaign_id, user_id, organization_id, title, hook, cover_prompt, caption, slides, sort_order)
-          VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${carousel.title}, ${carousel.hook}, ${carousel.cover_prompt || null}, ${carousel.caption || null}, ${JSON.stringify(carousel.slides || [])}, ${i})
+          INSERT INTO carousel_scripts (campaign_id, user_id, organization_id, title, hook, cover_prompt, cover_url, caption, slides, sort_order)
+          VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${carousel.title}, ${carousel.hook}, ${carousel.cover_prompt || null}, ${carousel.cover_url || null}, ${carousel.caption || null}, ${JSON.stringify(carousel.slides || [])}, ${i})
           RETURNING *
         `;
         createdCarouselScripts.push(result[0]);

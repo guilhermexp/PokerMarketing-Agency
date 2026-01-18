@@ -14,7 +14,7 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { icon: "zap", label: "Direct", key: "campaign" },
-  { icon: "layers", label: "Campanhas", key: "campaigns" },
+  { icon: "kanban", label: "Campanhas", key: "campaigns" },
   { icon: "image", label: "Flyers", key: "flyer" },
   { icon: "calendar", label: "Agenda", key: "calendar" },
   { icon: "layout", label: "Galeria", key: "gallery" },
@@ -56,13 +56,15 @@ export const FloatingSidebar: React.FC<FloatingSidebarProps> = ({
           <Tooltip key={item.key} content={item.label} side="right" sideOffset={12}>
             <button
               onClick={() => onViewChange(item.key)}
-              className="relative flex items-center justify-center p-2.5 cursor-pointer active:scale-95 transition-transform"
+              className={`relative flex items-center justify-center p-2.5 rounded-lg cursor-pointer active:scale-95 transition-all ${
+                activeView === item.key
+                  ? 'bg-white/20'
+                  : 'bg-transparent hover:bg-white/10'
+              }`}
             >
               <Icon
                 name={item.icon}
-                className={`w-6 h-6 transition-all duration-150 ease-out ${
-                  activeView === item.key ? 'opacity-100 scale-110' : 'opacity-35'
-                }`}
+                className="w-6 h-6 text-white transition-all duration-150 ease-out"
               />
             </button>
           </Tooltip>

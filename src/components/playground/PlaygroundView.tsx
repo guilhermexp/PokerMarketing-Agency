@@ -342,7 +342,7 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
   };
 
   return (
-    <div className="h-full w-full bg-black text-white flex flex-col overflow-hidden font-sans selection:bg-white/20 selection:text-white">
+    <div className="min-h-screen w-full bg-[#0a0a0a] text-white flex flex-col font-sans selection:bg-white/20 selection:text-white">
       {showApiKeyDialog && (
         <ApiKeyDialog onContinue={handleApiKeyDialogContinue} />
       )}
@@ -355,7 +355,7 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
             animate={{ opacity: 1, y: 24, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed top-0 left-1/2 -translate-x-1/2 z-[60] bg-neutral-900/80 border border-white/10 text-white px-5 py-3 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl max-w-md text-center text-sm font-medium flex items-center gap-3"
+            className="fixed top-0 left-1/2 -translate-x-1/2 z-[60] bg-[#0a0a0a]/95 border border-white/[0.08] text-white px-5 py-3 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl max-w-md text-center text-sm font-medium flex items-center gap-3"
           >
             <div className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse"></div>
             {errorToast}
@@ -363,24 +363,18 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
         )}
       </AnimatePresence>
 
-      <main className="flex-1 h-full relative overflow-y-auto overflow-x-hidden no-scrollbar bg-black">
-        {/* Ambient background light */}
-        <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,_rgba(255,255,255,0.03),_transparent_70%)]"></div>
-
+      <main className="flex-1 relative overflow-y-auto overflow-x-hidden no-scrollbar bg-[#0a0a0a]">
         {/* Top Bar */}
-        <header className="sticky top-0 z-30 w-full px-6 py-6 pointer-events-none">
-          <div className="absolute inset-0 bg-black/20 backdrop-blur-xl" style={{ maskImage: 'linear-gradient(to bottom, black, transparent)' }} />
+        <header className="sticky top-0 z-30 w-full px-6 py-4 pointer-events-none">
+          <div className="absolute inset-0 bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-white/[0.05]" style={{ maskImage: 'linear-gradient(to bottom, black, transparent)' }} />
 
           <div className="relative flex items-center text-white pointer-events-auto max-w-[1600px] mx-auto w-full">
-            <div className="flex items-center gap-3.5">
-              <Clapperboard className="w-8 h-8 text-white" />
-              <h1 className="text-3xl text-white tracking-wide drop-shadow-sm font-bold">PLAYGROUND</h1>
-            </div>
+            <h1 className="text-3xl font-semibold text-white tracking-tight">Playground</h1>
           </div>
         </header>
 
         {/* Video Grid */}
-        <div className="w-full max-w-[1600px] mx-auto p-4 md:p-6 pb-48 relative z-10">
+        <div className="w-full max-w-[1600px] mx-auto p-4 md:p-6 pt-2 md:pt-3 pb-48 relative z-10">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             <AnimatePresence initial={false}>
               {feed.map((post) => (

@@ -99,7 +99,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               onGenerateAll();
             }}
             disabled={isGeneratingAny}
-            className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-white/10 text-white/70 hover:bg-white/15 transition-colors disabled:opacity-50 whitespace-nowrap"
+            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {isGeneratingAny
               ? 'Gerando...'
@@ -115,7 +115,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               e.stopPropagation();
               onTogglePause();
             }}
-            className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-white/10 text-white/70 hover:bg-white/15 transition-colors whitespace-nowrap"
+            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] whitespace-nowrap"
           >
             {isPaused ? 'Retomar' : 'Pausar'}
           </button>
@@ -127,9 +127,9 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               e.stopPropagation();
               onSchedule();
             }}
-            className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-white/10 text-white/70 hover:bg-white/15 transition-colors flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex items-center gap-1.5 whitespace-nowrap"
           >
-            <Icon name="calendar" className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+            <Icon name="calendar" className="w-3.5 h-3.5" />
             Agendar
           </button>
         )}
@@ -141,7 +141,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               onPublish();
             }}
             disabled={publishing}
-            className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-white/10 text-white/70 hover:bg-white/15 transition-colors disabled:opacity-50 flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
           >
             {publishing ? (
               <>
@@ -150,7 +150,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               </>
             ) : (
               <>
-                <Icon name="send" className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+                <Icon name="send" className="w-3.5 h-3.5" />
                 Publicar
               </>
             )}
@@ -163,9 +163,9 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               e.stopPropagation();
               onDownloadAll();
             }}
-            className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md bg-white/10 text-white/70 hover:bg-white/15 transition-colors flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex items-center gap-1.5 whitespace-nowrap"
           >
-            <Icon name="download" className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+            <Icon name="download" className="w-3.5 h-3.5" />
             Baixar Todas
           </button>
         )}

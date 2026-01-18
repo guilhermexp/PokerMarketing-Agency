@@ -413,7 +413,7 @@ export function CampaignsList({
         style={{ animation: "fadeSlideIn 0.4s ease-out" }}
       >
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
+          <h1 className="text-3xl font-semibold text-white tracking-tight">
             Campanhas
           </h1>
           {!isLoading && (

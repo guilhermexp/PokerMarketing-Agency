@@ -397,7 +397,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
 
       <motion.div
         ref={barRef}
-        className="w-full max-w-2xl mx-4 bg-neutral-900/90 border border-white/10 backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.7)] overflow-hidden pointer-events-auto relative ring-1 ring-white/5 group rounded-[32px]"
+        className="w-full max-w-2xl mx-4 bg-[#0a0a0a]/95 border border-white/[0.08] backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.7)] overflow-hidden pointer-events-auto relative ring-1 ring-white/[0.02] group rounded-[32px]"
         initial={false}
         animate={{
           height: 'auto',
@@ -413,7 +413,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
               transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
               className="px-3 pt-3"
             >
-              <div className="bg-black/40 rounded-2xl p-2 border border-white/5 shadow-inner">
+              <div className="bg-[#0a0a0a]/60 rounded-2xl p-2 border border-white/[0.06] shadow-inner">
                 <div className="flex items-center gap-2 mb-1 px-2 text-white/70 pt-1">
                   <User className="w-3.5 h-3.5" />
                   <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">Selecionar Rosto</p>
@@ -460,7 +460,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
               transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
               className="px-3 pt-3"
             >
-              <div className="bg-black/40 rounded-2xl p-3 border border-white/5 shadow-inner">
+              <div className="bg-[#0a0a0a]/60 rounded-2xl p-3 border border-white/[0.06] shadow-inner">
                 <div className="flex items-center gap-2 mb-2 px-1 text-white/70">
                   <Sparkles className="w-3.5 h-3.5" />
                   <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">Opcoes de Imagem</p>
@@ -502,7 +502,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                     <select
                       value={imageSize}
                       onChange={(e) => setImageSize(e.target.value as PlaygroundImageSize)}
-                      className="bg-black/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/80 appearance-none cursor-pointer hover:border-white/20 focus:outline-none focus:border-white/30"
+                      className="bg-[#0a0a0a]/80 border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white/80 appearance-none cursor-pointer hover:border-white/20 focus:outline-none focus:border-white/30 backdrop-blur-xl"
                     >
                       <option value={PlaygroundImageSize.K1}>1K</option>
                       <option value={PlaygroundImageSize.K2}>2K</option>
@@ -528,7 +528,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                         </button>
                       </div>
                     ) : (
-                      <label className="bg-black/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 flex items-center gap-1.5 cursor-pointer hover:border-white/20 transition-colors">
+                      <label className="bg-[#0a0a0a]/80 border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white/60 flex items-center gap-1.5 cursor-pointer hover:border-white/20 hover:bg-[#0a0a0a] transition-colors backdrop-blur-xl">
                         <Upload className="w-3 h-3" />
                         <span>Add</span>
                         <input
@@ -562,7 +562,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                         </div>
                       ))}
                       {productImages.length < 14 && (
-                        <label className="w-8 h-8 bg-black/60 border border-white/10 rounded-lg flex items-center justify-center cursor-pointer hover:border-white/20 transition-colors">
+                        <label className="w-8 h-8 bg-[#0a0a0a]/80 border border-white/[0.08] rounded-lg flex items-center justify-center cursor-pointer hover:border-white/20 hover:bg-[#0a0a0a] transition-colors backdrop-blur-xl">
                           <Plus className="w-4 h-4 text-white/40" />
                           <input
                             type="file"
@@ -590,13 +590,13 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                 setTimeout(() => inputRef.current?.focus(), 100);
               }
             }}
-            className={`w-11 h-11 flex items-center justify-center rounded-full transition-all duration-300 shrink-0 shadow-lg ${isExpanded ? 'bg-white/10 text-white hover:bg-white/20 border border-white/10 rotate-45' : 'text-white bg-gradient-to-br from-indigo-500 to-purple-600 hover:scale-105 shadow-[0_0_15px_rgba(99,102,241,0.5)]'}`}
+            className={`w-11 h-11 flex items-center justify-center rounded-full transition-all duration-300 shrink-0 shadow-lg backdrop-blur-xl ${isExpanded ? 'bg-white/10 text-white hover:bg-white/20 border border-white/[0.08] rotate-45' : 'text-white bg-gradient-to-br from-indigo-500 to-purple-600 hover:scale-105 shadow-[0_0_15px_rgba(99,102,241,0.5)]'}`}
           >
             <Plus className="w-5 h-5" />
           </button>
 
           {/* Media Type Toggle */}
-          <div className="flex items-center bg-black/40 rounded-full p-1 border border-white/10 shrink-0">
+          <div className="flex items-center bg-[#0a0a0a]/60 rounded-full p-1 border border-white/[0.08] shrink-0 backdrop-blur-xl">
             <button
               onClick={() => setMediaType(MediaType.VIDEO)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${mediaType === MediaType.VIDEO
@@ -622,9 +622,9 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
           {/* Brand Profile Toggle - smaller */}
           <button
             onClick={() => setUseBrandProfile(!useBrandProfile)}
-            className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 shrink-0 ${useBrandProfile
+            className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 shrink-0 backdrop-blur-xl ${useBrandProfile
                 ? 'bg-white text-black shadow-md'
-                : 'bg-black/40 text-white/60 border border-white/10 hover:text-white'
+                : 'bg-[#0a0a0a]/60 text-white/60 border border-white/[0.08] hover:text-white hover:border-white/20'
               }`}
             title={useBrandProfile ? "Usando cores e tom da marca" : "Sem personalização de marca"}
           >
@@ -648,7 +648,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                   <motion.button
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="ml-2 px-1.5 py-0.5 rounded border border-white/20 bg-white/5 text-[10px] font-mono text-white/50 uppercase flex items-center gap-1 pointer-events-auto cursor-pointer hover:bg-white/10 hover:text-white/70 transition-colors"
+                    className="ml-2 px-1.5 py-0.5 rounded border border-white/[0.08] bg-white/5 text-[10px] font-mono text-white/50 uppercase flex items-center gap-1 pointer-events-auto cursor-pointer hover:bg-white/10 hover:text-white/70 transition-colors backdrop-blur-xl"
                     onClick={fillPrompt}
                   >
                     Tab
@@ -682,9 +682,9 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                   initial={{ width: 0, opacity: 0, scale: 0.9 }}
                   animate={{ width: 'auto', opacity: 1, scale: 1 }}
                   exit={{ width: 0, opacity: 0, scale: 0.9 }}
-                  className="overflow-hidden flex items-center justify-center h-11 px-1.5 bg-white/10 border border-white/10 backdrop-blur-md text-white rounded-xl"
+                  className="overflow-hidden flex items-center justify-center h-11 px-1.5 bg-white/10 border border-white/[0.08] backdrop-blur-xl text-white rounded-xl"
                 >
-                  <img src={selectedProfile.imageUrl} alt={selectedProfile.name} className="w-8 h-8 rounded-lg object-cover bg-black/50" />
+                  <img src={selectedProfile.imageUrl} alt={selectedProfile.name} className="w-8 h-8 rounded-lg object-cover bg-[#0a0a0a]/60" />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -692,9 +692,9 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
             <button
               onClick={handleSubmit}
               disabled={!prompt.trim()}
-              className={`w-11 h-11 flex items-center justify-center rounded-full transition-all duration-300 ${prompt.trim()
+              className={`w-11 h-11 flex items-center justify-center rounded-full transition-all duration-300 backdrop-blur-xl ${prompt.trim()
                   ? 'bg-white text-black hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.6)]'
-                  : 'bg-white/5 text-white/30 border border-white/5 cursor-not-allowed'
+                  : 'bg-white/5 text-white/30 border border-white/[0.05] cursor-not-allowed'
                 }`}
             >
               <ArrowUp className="w-5 h-5" />
