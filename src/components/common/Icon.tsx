@@ -309,9 +309,29 @@ const iconPaths: Record<string, React.ReactNode> = {
   ),
   kanban: (
     <>
-      <rect x="3" y="3" width="5" height="18" rx="1"></rect>
-      <rect x="10" y="3" width="5" height="12" rx="1"></rect>
-      <rect x="17" y="3" width="5" height="15" rx="1"></rect>
+      <rect width="7" height="7" x="3" y="3" rx="1"></rect>
+      <rect width="7" height="7" x="14" y="3" rx="1"></rect>
+      <rect width="7" height="7" x="14" y="14" rx="1"></rect>
+      <rect width="7" height="7" x="3" y="14" rx="1"></rect>
+    </>
+  ),
+  'folder-open': (
+    <>
+      <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"></path>
+    </>
+  ),
+  'poker-chip': (
+    <>
+      <circle cx="12" cy="12" r="9"></circle>
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="3" x2="12" y2="7"></line>
+      <line x1="12" y1="17" x2="12" y2="21"></line>
+      <line x1="3" y1="12" x2="7" y2="12"></line>
+      <line x1="17" y1="12" x2="21" y2="12"></line>
+      <line x1="5.64" y1="5.64" x2="8.46" y2="8.46"></line>
+      <line x1="15.54" y1="15.54" x2="18.36" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="15.54" y2="8.46"></line>
+      <line x1="8.46" y1="15.54" x2="5.64" y2="18.36"></line>
     </>
   ),
   'trash-2': (

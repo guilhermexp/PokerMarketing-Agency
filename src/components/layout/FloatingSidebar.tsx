@@ -13,11 +13,11 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  { icon: "zap", label: "Direct", key: "campaign" },
+  { icon: "palette", label: "Dashboard", key: "campaign" },
   { icon: "kanban", label: "Campanhas", key: "campaigns" },
-  { icon: "image", label: "Flyers", key: "flyer" },
+  { icon: "poker-chip", label: "Tournament Flyers", key: "flyer" },
   { icon: "calendar", label: "Agenda", key: "calendar" },
-  { icon: "layout", label: "Galeria", key: "gallery" },
+  { icon: "folder-open", label: "Galeria", key: "gallery" },
   { icon: "video", label: "Playground", key: "playground" },
 ];
 
