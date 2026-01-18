@@ -312,20 +312,20 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[300] flex items-center justify-center p-4 md:p-8"
+      className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-4 md:p-8"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-6xl max-h-[90vh] bg-[#0a0a0a] rounded-xl border border-white/[0.06] shadow-2xl flex flex-col overflow-hidden"
+        className="w-full max-w-6xl max-h-[90vh] bg-[#0a0a0a]/95 rounded-2xl border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-3 border-b border-white/[0.05] flex justify-between items-center shrink-0">
+        <div className="px-6 py-4 border-b border-white/[0.08] flex justify-between items-center shrink-0">
           <div>
-            <h2 className="text-sm font-bold text-white uppercase tracking-wide">
+            <h2 className="text-lg font-semibold text-white">
               Agendar Publicação
             </h2>
-            <p className="text-[9px] text-white/30 mt-0.5">
+            <p className="text-xs text-white/60 mt-1">
               {isCarousel
                 ? `Selecione até 10 imagens (${selectedImages.length}/10)`
                 : 'Selecione uma imagem da galeria'
@@ -334,9 +334,9 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-white/30 hover:text-white/60 rounded-md transition-colors"
+            className="p-2 text-white/60 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
           >
-            <Icon name="x" className="w-4 h-4" />
+            <Icon name="x" className="w-5 h-5" />
           </button>
         </div>
 
@@ -345,7 +345,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           {/* Gallery Grid */}
           <div className="flex-1 overflow-y-auto border-b lg:border-b-0 lg:border-r border-white/[0.05] flex flex-col">
             {/* Gallery Filter */}
-            <div className="px-4 pt-3 pb-2 flex gap-1 shrink-0">
+            <div className="px-4 pt-3 pb-2 flex gap-2 shrink-0">
               {[
                 { id: 'all', label: 'Todos' },
                 { id: 'flyers', label: 'Flyers' },
@@ -355,10 +355,10 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 <button
                   key={filter.id}
                   onClick={() => setGalleryFilter(filter.id as typeof galleryFilter)}
-                  className={`px-2.5 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-wide transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     galleryFilter === filter.id
-                      ? 'bg-primary/10 text-primary/80 border border-primary/20'
-                      : 'text-white/40 hover:text-white/60 border border-transparent hover:border-white/[0.06]'
+                      ? 'bg-white text-black'
+                      : 'text-white/60 hover:text-white bg-[#0a0a0a]/60 border border-white/[0.08] hover:bg-white/10 backdrop-blur-xl'
                   }`}
                 >
                   {filter.label}
@@ -855,7 +855,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             </div>
 
             {/* Content Type - Right below preview */}
-            <div className="px-3 py-2 flex gap-1 justify-center border-t border-white/[0.05]">
+            <div className="px-3 py-2 flex gap-1.5 justify-center border-t border-white/[0.05]">
               {[
                 { id: 'photo', label: 'Feed' },
                 { id: 'carousel', label: 'Carousel' },
@@ -865,10 +865,10 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 <button
                   key={t.id}
                   onClick={() => handleContentTypeChange(t.id as InstagramContentType)}
-                  className={`px-3 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-wide transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     contentType === t.id
-                      ? 'bg-primary/10 text-primary/80 border border-primary/20'
-                      : 'text-white/40 hover:text-white/60 border border-transparent hover:border-white/[0.06]'
+                      ? 'bg-white text-black'
+                      : 'text-white/60 hover:text-white bg-[#0a0a0a]/60 border border-white/[0.08] hover:bg-white/10 backdrop-blur-xl'
                   }`}
                 >
                   {t.label}
@@ -880,7 +880,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             <div className="p-3 space-y-3 border-t border-white/[0.05]">
               {/* Caption Input */}
               <div>
-                <label className="text-[9px] font-bold text-white/30 uppercase tracking-wide mb-1.5 block">
+                <label className="text-xs font-medium text-white/60 mb-2 block">
                   Legenda
                 </label>
                 <textarea
@@ -888,13 +888,13 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder="Escreva a legenda..."
                   rows={2}
-                  className="w-full bg-transparent border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 outline-none focus:border-white/[0.1] resize-none"
+                  className="w-full bg-transparent border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 outline-none focus:border-white/20 resize-none transition-all"
                 />
               </div>
 
               {/* Hashtags Input */}
               <div>
-                <label className="text-[9px] font-bold text-white/30 uppercase tracking-wide mb-1.5 block">
+                <label className="text-xs font-medium text-white/60 mb-2 block">
                   Hashtags
                 </label>
                 <input
@@ -902,7 +902,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   value={hashtags}
                   onChange={(e) => setHashtags(e.target.value)}
                   placeholder="#poker #torneio"
-                  className="w-full bg-transparent border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 outline-none focus:border-white/[0.1]"
+                  className="w-full bg-transparent border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 outline-none focus:border-white/20 transition-all"
                 />
               </div>
 
@@ -910,20 +910,20 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
               <div className="flex gap-1.5">
                 <button
                   onClick={() => setPublishNow(true)}
-                  className={`flex-1 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-wide transition-all ${
+                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
                     publishNow
-                      ? 'bg-primary/10 text-primary/80 border border-primary/20'
-                      : 'text-white/40 border border-white/[0.06] hover:border-white/[0.1]'
+                      ? 'bg-white text-black'
+                      : 'text-white/60 hover:text-white bg-[#0a0a0a]/60 border border-white/[0.08] hover:bg-white/10 backdrop-blur-xl'
                   }`}
                 >
                   Agora
                 </button>
                 <button
                   onClick={() => setPublishNow(false)}
-                  className={`flex-1 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-wide transition-all ${
+                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
                     !publishNow
-                      ? 'bg-primary/10 text-primary/80 border border-primary/20'
-                      : 'text-white/40 border border-white/[0.06] hover:border-white/[0.1]'
+                      ? 'bg-white text-black'
+                      : 'text-white/60 hover:text-white bg-[#0a0a0a]/60 border border-white/[0.08] hover:bg-white/10 backdrop-blur-xl'
                   }`}
                 >
                   Agendar
@@ -938,14 +938,14 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                     value={scheduledDate}
                     onChange={(e) => setScheduledDate(e.target.value)}
                     min={todayStr}
-                    className="flex-1 bg-transparent border border-white/[0.06] rounded-md px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/[0.1]"
+                    className="flex-1 bg-transparent border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-white/20 transition-all"
                   />
                   <input
                     type="time"
                     value={scheduledTime}
                     onChange={(e) => setScheduledTime(e.target.value)}
-                    className={`flex-1 bg-transparent border rounded-md px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/[0.1] ${
-                      isTimeInPast ? 'border-red-500/30' : 'border-white/[0.06]'
+                    className={`flex-1 bg-transparent border rounded-lg px-3 py-2 text-xs text-white outline-none transition-all ${
+                      isTimeInPast ? 'border-red-500/30 focus:border-red-500/50' : 'border-white/[0.08] focus:border-white/20'
                     }`}
                   />
                 </div>
@@ -955,17 +955,17 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-white/[0.05] flex gap-2 shrink-0">
+        <div className="px-4 py-3 border-t border-white/[0.08] flex gap-2 shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2 text-xs font-bold text-white/40 hover:text-white/60 transition-colors"
+            className="flex-1 py-2.5 text-xs font-medium text-white/60 hover:text-white transition-colors rounded-lg hover:bg-white/5"
           >
             Cancelar
           </button>
           <button
             onClick={handleSubmit}
             disabled={selectedImages.length === 0 || isTimeInPast}
-            className="flex-1 py-2 bg-primary/10 text-primary/80 border border-primary/20 text-xs font-bold rounded-lg hover:bg-primary/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            className="flex-1 py-2.5 bg-white text-black text-xs font-semibold rounded-lg hover:bg-white/90 active:scale-[0.99] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
           >
             {publishNow ? 'Publicar' : 'Agendar'}
           </button>
