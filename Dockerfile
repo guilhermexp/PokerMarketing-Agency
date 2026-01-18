@@ -1,12 +1,13 @@
-FROM node:20-alpine
+FROM oven/bun:1-alpine
 
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json bun.lockb* ./
 
 # Install dependencies (including devDependencies for build)
-RUN npm install
+# Bun is more flexible with peer dependencies than npm
+RUN bun install
 
 # Copy source code (cache bust: 2026-01-18-v2)
 COPY . .
@@ -42,12 +43,12 @@ RUN echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env && \
     echo "FAL_KEY=$FAL_KEY" >> .env && \
     echo "=== .env file ===" && cat .env && \
     echo "=== Building ===" && \
-    npm run build && \
+    bun run build && \
     echo "=== Build complete ===" && \
     ls -la dist/assets/
 
 # Remove devDependencies to reduce image size
-RUN npm prune --production
+RUN bun pm cache rm && rm -rf node_modules && bun install --production
 
 # Expose port
 EXPOSE 8080
