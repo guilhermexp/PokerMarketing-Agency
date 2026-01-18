@@ -8,7 +8,7 @@ COPY package*.json ./
 # Install dependencies (including devDependencies for build)
 RUN npm install
 
-# Copy source code (cache bust: 2026-01-06-v1)
+# Copy source code (cache bust: 2026-01-18-v2)
 COPY . .
 
 # Get build args from Railway
