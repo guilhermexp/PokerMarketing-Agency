@@ -97,28 +97,37 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
   if (variant === 'compact') {
     return (
       <>
-        {/* Simple indicator dot */}
+        {/* Simple card */}
         <button
           onClick={(e) => { e.stopPropagation(); setIsExpanded(true); }}
-          className={`
-            w-full p-1 rounded-md border cursor-pointer transition-all
-            ${statusColors[post.status]}
-            hover:scale-105
-          `}
+          className="w-full p-2 rounded-lg bg-black/40 border border-white/10 cursor-pointer transition-all hover:bg-black/60 hover:border-white/20 text-left"
           title={`${post.scheduledTime} - ${post.platforms}${contentTypeLabel ? ` - ${contentTypeLabel}` : ''}`}
         >
-          <div className="flex items-center gap-1">
+          <div className="flex items-start gap-2">
             <Icon
               name={platformIcons[post.platforms] as IconName}
-              className="w-2.5 h-2.5 flex-shrink-0"
+              className="w-3 h-3 flex-shrink-0 text-white/40 mt-0.5"
             />
-            <span className="text-[7px] font-bold truncate">
-              {post.scheduledTime}
-            </span>
-            {contentTypeLabel && (
-              <span className="text-[8px] font-bold text-white/50 uppercase ml-auto">
-                {contentTypeLabel}
-              </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-[10px] font-medium text-white/80">
+                  {post.scheduledTime}
+                </span>
+                {contentTypeLabel && (
+                  <span className="text-[8px] font-medium text-white/40">
+                    {contentTypeLabel}
+                  </span>
+                )}
+              </div>
+              <p className="text-[9px] text-white/40 truncate">
+                {post.caption.substring(0, 40)}...
+              </p>
+            </div>
+            {post.status === 'published' && (
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 mt-1" />
+            )}
+            {post.status === 'failed' && (
+              <div className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0 mt-1" />
             )}
           </div>
         </button>
@@ -126,35 +135,35 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
         {/* Expanded View - Portal-like fixed overlay */}
         {isExpanded && (
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsExpanded(false); }}
             onMouseMove={(e) => e.stopPropagation()}
             onMouseEnter={(e) => e.stopPropagation()}
             onMouseLeave={(e) => e.stopPropagation()}
           >
             <div
-              className="bg-[#111111] border border-white/10 rounded-2xl max-w-sm w-full mx-4 overflow-hidden"
+              className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl max-w-sm w-full mx-4 overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onMouseMove={(e) => e.stopPropagation()}
             >
               {/* Header - Minimal */}
-              <div className="px-3 py-2 flex justify-between items-center">
+              <div className="px-4 py-3 flex justify-between items-center border-b border-white/10">
                 <div className="flex items-center gap-2">
-                  <div className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${statusColors[post.status]}`}>
+                  <div className={`px-2.5 py-1 rounded-lg text-[9px] font-medium ${statusColors[post.status]}`}>
                     {statusLabels[post.status]}
                   </div>
-                  <span className="text-[9px] text-white/40">
+                  <span className="text-[10px] text-white/50 font-medium">
                     {post.scheduledTime}
                   </span>
                   {post.instagramContentType && (
-                    <span className="text-[8px] text-white/30 uppercase">
+                    <span className="text-[9px] text-white/40 font-medium">
                       {post.instagramContentType === 'story' ? 'Story' : 'Feed'}
                     </span>
                   )}
                 </div>
                 <button
                   onClick={() => setIsExpanded(false)}
-                  className="p-1 text-white/40 hover:text-white transition-colors"
+                  className="p-1.5 text-white/40 hover:text-white transition-colors rounded-lg hover:bg-white/10"
                 >
                   <Icon name="x" className="w-4 h-4" />
                 </button>
@@ -162,7 +171,7 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
 
               {/* Image Preview - Larger */}
               {post.imageUrl && (
-                <div className="px-3">
+                <div className="px-4 py-3">
                   <div className="w-full rounded-xl overflow-hidden border border-white/10">
                     <img src={post.imageUrl} alt="" className="w-full h-auto object-contain" />
                   </div>
@@ -244,69 +253,69 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
               )}
 
               {/* Actions - Compact */}
-              <div className="p-3 flex gap-2">
+              <div className="p-4 flex gap-2 border-t border-white/10">
                 {post.status === 'scheduled' && (
                   <>
                     {canPublishToInstagram && onPublishToInstagram && (
                       <button
                         onClick={() => onPublishToInstagram(post)}
                         disabled={isPublishing}
-                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[9px] font-bold uppercase transition-all ${isPublishing
-                            ? 'bg-white/10 text-white/50 cursor-wait'
-                            : 'bg-white/10 hover:bg-white/20 text-white/80'
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-[10px] font-medium transition-all ${isPublishing
+                            ? 'bg-white/10 text-white/50 cursor-wait border border-white/10'
+                            : 'bg-black/40 backdrop-blur-2xl border border-white/10 text-white/80 hover:border-white/30'
                           }`}
                       >
                         {isPublishing ? (
                           <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         ) : (
-                          <Icon name="send" className="w-3 h-3" />
+                          <Icon name="send" className="w-3.5 h-3.5" />
                         )}
                         Publicar
                       </button>
                     )}
                     <button
                       onClick={handleCopyCaption}
-                      className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/50 transition-colors"
+                      className="p-2 bg-black/40 backdrop-blur-2xl border border-white/10 hover:border-white/30 rounded-full text-white/50 transition-all"
                       title="Copiar"
                     >
-                      <Icon name="copy" className="w-3.5 h-3.5" />
+                      <Icon name="copy" className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => setIsEditingDate(!isEditingDate)}
-                      className={`p-2 rounded-lg transition-colors ${isEditingDate ? 'bg-primary/20 text-primary' : 'bg-white/5 hover:bg-white/10 text-white/50'}`}
+                      className={`p-2 rounded-full transition-all ${isEditingDate ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-black/40 backdrop-blur-2xl border border-white/10 hover:border-white/30 text-white/50'}`}
                       title="Editar data"
                     >
-                      <Icon name="calendar" className="w-3.5 h-3.5" />
+                      <Icon name="calendar" className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleOpenPlatform('instagram')}
-                      className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/50 transition-colors"
+                      className="p-2 bg-black/40 backdrop-blur-2xl border border-white/10 hover:border-white/30 rounded-full text-white/50 transition-all"
                       title="Abrir Instagram"
                     >
-                      <Icon name="external-link" className="w-3.5 h-3.5" />
+                      <Icon name="external-link" className="w-4 h-4" />
                     </button>
                     <button
                       onClick={handleMarkAsPublished}
-                      className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/50 transition-colors"
+                      className="p-2 bg-black/40 backdrop-blur-2xl border border-white/10 hover:border-white/30 rounded-full text-white/50 transition-all"
                       title="Marcar como publicado"
                     >
-                      <Icon name="check" className="w-3.5 h-3.5" />
+                      <Icon name="check" className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => { onDelete(post.id); setIsExpanded(false); }}
-                      className="p-2 bg-white/5 hover:bg-red-500/10 rounded-lg text-white/40 hover:text-red-400 transition-colors"
+                      className="p-2 bg-black/40 backdrop-blur-2xl border border-white/10 hover:bg-red-500/10 rounded-full text-white/40 hover:text-red-400 transition-all"
                       title="Excluir"
                     >
-                      <Icon name="trash" className="w-3.5 h-3.5" />
+                      <Icon name="trash" className="w-4 h-4" />
                     </button>
                   </>
                 )}
                 {post.status !== 'scheduled' && (
                   <button
                     onClick={() => { onDelete(post.id); setIsExpanded(false); }}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-red-500/10 rounded-lg text-[9px] font-bold text-white/40 hover:text-red-400 uppercase transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 hover:bg-red-500/10 rounded-full text-[10px] font-medium text-white/40 hover:text-red-400 transition-all"
                   >
-                    <Icon name="trash" className="w-3 h-3" />
+                    <Icon name="trash" className="w-3.5 h-3.5" />
                     Excluir
                   </button>
                 )}

@@ -74,31 +74,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       `}
       style={{ animation: "fadeSlideIn 0.6s ease-out" }}
     >
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div
-          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${classes.blur} bg-primary/[0.02] rounded-full blur-3xl`}
-        />
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/[0.01] rounded-full blur-2xl" />
-        {/* Grid pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.02]"
-          style={{
-            backgroundImage: `
-              linear-gradient(to right, white 1px, transparent 1px),
-              linear-gradient(to bottom, white 1px, transparent 1px)
-            `,
-            backgroundSize: "40px 40px",
-          }}
-        />
-      </div>
-
       {/* Icon */}
       <div className="relative inline-flex items-center justify-center mb-6">
-        <div
-          className="absolute inset-0 bg-primary/10 rounded-full blur-2xl animate-pulse"
-          style={{ animationDuration: "3s" }}
-        />
         <div
           className={`relative ${classes.iconWrapper} bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] flex items-center justify-center`}
         >

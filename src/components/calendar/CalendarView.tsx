@@ -7,9 +7,6 @@ import type {
 } from "../../types";
 import type { DbCampaign } from "../../services/apiClient";
 import { Icon } from "../common/Icon";
-import { Button } from "../common/Button";
-import { MonthlyCalendar } from "./MonthlyCalendar";
-import { WeeklyCalendar } from "./WeeklyCalendar";
 import { SchedulePostModal } from "./SchedulePostModal";
 import { isRubeConfigured } from "../../services/rubeService";
 
@@ -29,6 +26,23 @@ interface CalendarViewProps {
   publishingStates: Record<string, InstagramPublishState>;
 }
 
+const monthNames = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+const dayNames = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
 export const CalendarView: React.FC<CalendarViewProps> = ({
   scheduledPosts,
   onSchedulePost,
@@ -39,29 +53,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onPublishToInstagram,
   publishingStates,
 }) => {
-  const [viewType, setViewType] = useState<CalendarViewType>("weekly");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [selectedPostForEdit, setSelectedPostForEdit] = useState<ScheduledPost | null>(null);
+  const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
+  const [postDialogOpen, setPostDialogOpen] = useState(false);
   const [showNotificationBanner, setShowNotificationBanner] = useState(false);
   const [pendingPosts, setPendingPosts] = useState<ScheduledPost[]>([]);
-
-  const monthNames = [
-    "Janeiro",
-    "Fevereiro",
-    "Março",
-    "Abril",
-    "Maio",
-    "Junho",
-    "Julho",
-    "Agosto",
-    "Setembro",
-    "Outubro",
-    "Novembro",
-    "Dezembro",
-  ];
 
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
@@ -74,26 +74,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
   };
 
-  const goToPreviousWeek = () => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() - 7);
-    setCurrentDate(newDate);
-  };
-
-  const goToNextWeek = () => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + 7);
-    setCurrentDate(newDate);
-  };
-
   const goToToday = () => {
     setCurrentDate(new Date());
   };
 
-  const handleDayClick = (date: string, hour?: number) => {
+  const handleDayClick = (date: string) => {
     setSelectedDate(date);
-    // Format hour as HH:00 if provided
-    setSelectedTime(hour !== undefined ? `${String(hour).padStart(2, "0")}:00` : null);
+    setSelectedTime(null);
     setIsScheduleModalOpen(true);
   };
 
@@ -104,6 +91,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setIsScheduleModalOpen(false);
     setSelectedDate(null);
     setSelectedTime(null);
+  };
+
+  const handlePostClick = (post: ScheduledPost) => {
+    setSelectedPost(post);
+    setPostDialogOpen(true);
   };
 
   // Stats
@@ -118,17 +110,58 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return { scheduled, published, failed, total: scheduledPosts.length };
   }, [scheduledPosts]);
 
-  // Notification system - check for pending/overdue posts
+  // Generate month calendar
+  const monthCalendar = useMemo(() => {
+    const year = currentYear;
+    const month = currentMonth;
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+
+    let startDay = firstDay.getDay();
+
+    const calendar: { date: number | null; dateStr: string | null; posts: ScheduledPost[] }[] = [];
+
+    // Empty cells before first day
+    for (let i = 0; i < startDay; i++) {
+      calendar.push({ date: null, dateStr: null, posts: [] });
+    }
+
+    // Days of month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const dayPosts = scheduledPosts.filter((post) => post.scheduledDate === dateStr);
+      calendar.push({ date: day, dateStr, posts: dayPosts });
+    }
+
+    // Fill remaining cells
+    const remainingCells = (7 - (calendar.length % 7)) % 7;
+    for (let i = 0; i < remainingCells; i++) {
+      calendar.push({ date: null, dateStr: null, posts: [] });
+    }
+
+    return calendar;
+  }, [currentDate, scheduledPosts]);
+
+  const isToday = (date: number | null) => {
+    if (!date) return false;
+    const today = new Date();
+    return (
+      date === today.getDate() &&
+      currentMonth === today.getMonth() &&
+      currentYear === today.getFullYear()
+    );
+  };
+
+  // Notification system
   useEffect(() => {
     const checkNotifications = () => {
       const now = Date.now();
       const fifteenMinutes = 15 * 60 * 1000;
 
-      // Find posts due in next 15 minutes or overdue
       const pending = scheduledPosts.filter((post) => {
         if (post.status !== "scheduled") return false;
         const timeUntil = post.scheduledTimestamp - now;
-        // Due in next 15 minutes OR overdue
         return timeUntil <= fifteenMinutes;
       });
 
@@ -136,7 +169,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         setPendingPosts(pending);
         setShowNotificationBanner(true);
 
-        // Browser notification if permitted
         if ("Notification" in window && Notification.permission === "granted") {
           const overdue = pending.filter((p) => p.scheduledTimestamp < now);
           if (overdue.length > 0) {
@@ -153,11 +185,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     };
 
     checkNotifications();
-    const interval = setInterval(checkNotifications, 60000); // Check every minute
+    const interval = setInterval(checkNotifications, 60000);
     return () => clearInterval(interval);
   }, [scheduledPosts]);
 
-  // Request notification permission on mount
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
@@ -170,190 +201,297 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     );
     for (const post of instagramPosts) {
       onPublishToInstagram(post);
-      // Small delay between publications to avoid rate limits
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   };
 
+  const formatDateRange = (post: ScheduledPost) => {
+    const date = new Date(post.scheduledDate);
+    const options: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" };
+    return date.toLocaleDateString("pt-BR", options);
+  };
+
   return (
-    <div className="space-y-6 animate-fade-in-up h-full flex flex-col">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:gap-4">
-        <div className="flex justify-between items-start">
-          <div className="text-left">
-            <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
-              Agenda
-            </h2>
-            <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
-              Agendamento de Publicações
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setSelectedDate(null);
-              setIsScheduleModalOpen(true);
-            }}
-            className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95"
-          >
-            <Icon name="plus" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
-            <span className="hidden sm:inline">Agendar Post</span>
-            <span className="sm:hidden">Novo</span>
-          </button>
-        </div>
-        {/* Stats - scrollable on mobile */}
-        <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 -mx-1 px-1">
-          <div className="flex items-center gap-2 sm:gap-3 px-3 py-2 bg-[#0a0a0a] border border-white/10 rounded-lg flex-shrink-0">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-amber-500" />
-              <span className="text-[9px] font-black text-white/40 uppercase whitespace-nowrap">
-                {stats.scheduled} agendados
-              </span>
+    <div className="min-h-screen flex flex-col">
+      {/* Sticky Header */}
+      <header className="sticky top-0 bg-black border-b border-white/10 z-50">
+        <div className="px-6 py-4">
+          <div className="flex flex-col gap-4">
+            {/* Row 1: Title */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold text-white">Agenda de Publicações</h1>
+                <p className="text-sm text-white/50 mt-1">Gerencie seus posts agendados</p>
+              </div>
             </div>
-            <div className="h-3 w-px bg-white/10" />
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-[9px] font-black text-white/40 uppercase whitespace-nowrap">
-                {stats.published} publicados
-              </span>
-            </div>
-            {stats.failed > 0 && (
-              <>
-                <div className="h-3 w-px bg-white/10" />
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-red-500" />
-                  <span className="text-[9px] font-black text-red-400 uppercase whitespace-nowrap">
-                    {stats.failed} falhas
-                  </span>
+
+            {/* Row 2: Controls */}
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={goToPreviousMonth}
+                  className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <Icon name="chevron-left" className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={goToNextMonth}
+                  className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <Icon name="chevron-right" className="w-4 h-4" />
+                </button>
+                <h3 className="text-sm font-medium text-white/70">
+                  {monthNames[currentMonth]} {currentYear}
+                </h3>
+
+                <button
+                  onClick={goToToday}
+                  className="px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-lg text-xs font-medium text-white/60 hover:text-white hover:border-white/30 transition-all"
+                >
+                  Hoje
+                </button>
+              </div>
+
+              <div className="flex items-center gap-4">
+                {/* Stats */}
+                <div className="flex items-center gap-3 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span className="text-[10px] font-medium text-white/60">
+                      {stats.scheduled} agendados
+                    </span>
+                  </div>
+                  <div className="h-3 w-px bg-white/10" />
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <span className="text-[10px] font-medium text-white/60">
+                      {stats.published} publicados
+                    </span>
+                  </div>
                 </div>
-              </>
-            )}
+
+                <button
+                  onClick={() => {
+                    setSelectedDate(null);
+                    setIsScheduleModalOpen(true);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                >
+                  <Icon name="plus" className="w-4 h-4" />
+                  Agendar Post
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Day headers */}
+          <div className="flex mt-4">
+            <div className="flex-1 grid grid-cols-7">
+              {dayNames.map((day) => (
+                <div key={day} className="p-2 text-center font-medium text-sm text-white/40">
+                  {day}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Notification Banner */}
       {showNotificationBanner && pendingPosts.length > 0 && (
-        <div className="px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between animate-fade-in-up">
+        <div className="px-6 py-3 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-              <Icon name="bell" className="w-4 h-4 text-amber-400" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-amber-400">
-                {pendingPosts.length} post{pendingPosts.length > 1 ? "s" : ""}{" "}
-                pendente{pendingPosts.length > 1 ? "s" : ""}
-              </p>
-              <p className="text-[9px] text-amber-400/60">
-                {pendingPosts.some((p) => p.scheduledTimestamp < Date.now())
-                  ? "Alguns posts estao atrasados!"
-                  : "Pronto para publicar"}
-              </p>
-            </div>
+            <Icon name="bell" className="w-4 h-4 text-amber-400" />
+            <p className="text-xs font-semibold text-amber-400">
+              {pendingPosts.length} post{pendingPosts.length > 1 ? "s" : ""} pendente
+              {pendingPosts.length > 1 ? "s" : ""}
+            </p>
           </div>
           <div className="flex items-center gap-2">
-            {isRubeConfigured() &&
-              pendingPosts.some(
-                (p) => p.platforms === "instagram" || p.platforms === "both",
-              ) && (
-                <Button
-                  onClick={handlePublishAll}
-                  variant="primary"
-                  size="small"
-                  icon="send"
-                >
-                  Publicar Todos
-                </Button>
-              )}
+            {isRubeConfigured() && (
+              <button
+                onClick={handlePublishAll}
+                className="flex items-center gap-2 px-3 py-1.5 bg-black/40 border border-white/10 rounded-full text-xs font-medium text-white/90 hover:border-white/30 transition-all"
+              >
+                <Icon name="send" className="w-3 h-3" />
+                Publicar Todos
+              </button>
+            )}
             <button
               onClick={() => setShowNotificationBanner(false)}
-              className="p-1.5 text-amber-400/40 hover:text-amber-400 transition-colors"
+              className="p-1 text-amber-400/40 hover:text-amber-400"
             >
-              <Icon name="x" className="w-4 h-4" />
+              <Icon name="x" className="w-3 h-3" />
             </button>
           </div>
         </div>
       )}
 
-      {/* Calendar Controls */}
-      <div className="flex flex-col gap-2 px-3 py-2 bg-[#0a0a0a] border border-white/[0.03] rounded-lg">
-        {/* Top row: Navigation + Period */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={
-              viewType === "monthly" ? goToPreviousMonth : goToPreviousWeek
-            }
-            className="p-1.5 text-white/30 hover:text-white/60 hover:bg-white/5 rounded transition-colors"
-          >
-            <Icon name="chevron-left" className="w-4 h-4" />
-          </button>
-          <button
-            onClick={viewType === "monthly" ? goToNextMonth : goToNextWeek}
-            className="p-1.5 text-white/30 hover:text-white/60 hover:bg-white/5 rounded transition-colors"
-          >
-            <Icon name="chevron-right" className="w-4 h-4" />
-          </button>
-          <h3 className="text-xs font-medium text-white/60 uppercase tracking-wide">
-            {viewType === "monthly"
-              ? `${monthNames[currentMonth]} ${currentYear}`
-              : `Semana de ${currentDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`}
-          </h3>
-        </div>
-
-        {/* Bottom row: View Toggle (full width on mobile) */}
-        <div className="flex items-center gap-1 p-0.5 bg-black/20 rounded w-full sm:w-auto sm:self-end">
-          <button
-            onClick={() => setViewType("monthly")}
-            className={`flex-1 sm:flex-none px-3 py-1 text-[9px] font-medium uppercase tracking-wide rounded transition-all ${
-              viewType === "monthly"
-                ? "bg-white text-black"
-                : "text-white/40 hover:text-white/60"
-            }`}
-          >
-            Mensal
-          </button>
-          <button
-            onClick={() => setViewType("weekly")}
-            className={`flex-1 sm:flex-none px-3 py-1 text-[9px] font-medium uppercase tracking-wide rounded transition-all ${
-              viewType === "weekly"
-                ? "bg-white text-black"
-                : "text-white/40 hover:text-white/60"
-            }`}
-          >
-            Semanal
-          </button>
-        </div>
-      </div>
-
       {/* Calendar Grid */}
-      <div className="flex-1 bg-[#111111] border border-white/5 rounded-xl overflow-hidden">
-        {viewType === "monthly" ? (
-          <MonthlyCalendar
-            currentDate={currentDate}
-            scheduledPosts={scheduledPosts}
-            onDayClick={handleDayClick}
-            onUpdatePost={onUpdateScheduledPost}
-            onDeletePost={onDeleteScheduledPost}
-            onPublishToInstagram={onPublishToInstagram}
-            publishingStates={publishingStates}
-          />
-        ) : (
-          <WeeklyCalendar
-            currentDate={currentDate}
-            scheduledPosts={scheduledPosts}
-            onDayClick={handleDayClick}
-            onUpdatePost={onUpdateScheduledPost}
-            onDeletePost={onDeleteScheduledPost}
-            onPostClick={(post) => {
-              setSelectedPostForEdit(post);
-              setSelectedDate(post.scheduledDate);
-              setSelectedTime(post.scheduledTime);
-              setIsScheduleModalOpen(true);
-            }}
-            onPublishToInstagram={onPublishToInstagram}
-            publishingStates={publishingStates}
-          />
-        )}
-      </div>
+      <main className="flex-1 px-6 py-6">
+        <div className="grid grid-cols-7 gap-px bg-white/5 border border-white/10 rounded-lg overflow-hidden">
+          {monthCalendar.map((day, index) => (
+            <div
+              key={index}
+              onClick={() => day.dateStr && handleDayClick(day.dateStr)}
+              className={`bg-black min-h-[140px] p-3 transition-all hover:bg-black/80 ${
+                day.date ? "cursor-pointer" : ""
+              } ${isToday(day.date) ? "ring-2 ring-inset ring-primary" : ""}`}
+            >
+              {day.date && (
+                <>
+                  <h3
+                    className={`mb-3 font-light text-7xl ${
+                      isToday(day.date) ? "text-primary" : "text-white/80"
+                    }`}
+                  >
+                    {day.date}
+                  </h3>
+                  <div className="space-y-2">
+                    {day.posts.slice(0, 3).map((post) => (
+                      <div
+                        key={post.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePostClick(post);
+                        }}
+                        className="text-xs p-2 border-l-2 border-primary bg-white/5 hover:bg-white/10 transition-all hover:pl-3 cursor-pointer group relative"
+                      >
+                        <div className="font-medium text-white/90 truncate">{post.scheduledTime}</div>
+                        <div className="text-white/50 text-[10px] truncate mt-1">
+                          {post.caption?.substring(0, 40)}...
+                        </div>
+                        {post.status === "published" && (
+                          <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500" />
+                        )}
+                        {post.status === "failed" && (
+                          <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />
+                        )}
+                      </div>
+                    ))}
+                    {day.posts.length > 3 && (
+                      <div className="text-[10px] text-white/40 pl-2">
+                        +{day.posts.length - 3} mais
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      </main>
+
+      {/* Post Detail Dialog */}
+      {postDialogOpen && selectedPost && (
+        <div
+          className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+          onClick={() => setPostDialogOpen(false)}
+        >
+          <div
+            className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl max-w-lg w-full overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-white/10 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-white">{formatDateRange(selectedPost)}</h3>
+                <p className="text-sm text-white/50 mt-0.5">{selectedPost.scheduledTime}</p>
+              </div>
+              <button
+                onClick={() => setPostDialogOpen(false)}
+                className="p-2 text-white/40 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <Icon name="x" className="w-4 h-4" />
+              </button>
+            </div>
+
+            {selectedPost.imageUrl && (
+              <div className="px-5 py-4">
+                <img
+                  src={selectedPost.imageUrl}
+                  alt=""
+                  className="w-full rounded-lg border border-white/10"
+                />
+              </div>
+            )}
+
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <p className="text-xs text-white/50 mb-1">Legenda</p>
+                <p className="text-sm text-white/80">{selectedPost.caption || "Sem legenda"}</p>
+              </div>
+
+              {selectedPost.hashtags && selectedPost.hashtags.length > 0 && (
+                <div>
+                  <p className="text-xs text-white/50 mb-1">Hashtags</p>
+                  <p className="text-sm text-white/80">{selectedPost.hashtags.join(" ")}</p>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-block text-xs px-2.5 py-1 rounded-full ${
+                    selectedPost.status === "scheduled"
+                      ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                      : selectedPost.status === "published"
+                        ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                        : "bg-red-500/10 text-red-400 border border-red-500/20"
+                  }`}
+                >
+                  {selectedPost.status === "scheduled"
+                    ? "Agendado"
+                    : selectedPost.status === "published"
+                      ? "Publicado"
+                      : "Falhou"}
+                </span>
+                <span className="text-xs text-white/50">{selectedPost.platforms}</span>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-white/10 flex gap-2">
+              {selectedPost.status === "scheduled" && (
+                <>
+                  {isRubeConfigured() && (
+                    <button
+                      onClick={() => {
+                        onPublishToInstagram(selectedPost);
+                        setPostDialogOpen(false);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all"
+                    >
+                      <Icon name="send" className="w-4 h-4" />
+                      Publicar Agora
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setSelectedPostForEdit(selectedPost);
+                      setSelectedDate(selectedPost.scheduledDate);
+                      setSelectedTime(selectedPost.scheduledTime);
+                      setPostDialogOpen(false);
+                      setIsScheduleModalOpen(true);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all"
+                  >
+                    <Icon name="edit" className="w-4 h-4" />
+                    Editar
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => {
+                  onDeleteScheduledPost(selectedPost.id);
+                  setPostDialogOpen(false);
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 hover:bg-red-500/10 rounded-full text-sm font-medium text-white/40 hover:text-red-400 transition-all"
+              >
+                <Icon name="trash" className="w-4 h-4" />
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Schedule Modal */}
       {isScheduleModalOpen && (
@@ -366,7 +504,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             setSelectedPostForEdit(null);
           }}
           onSchedule={(newPost) => {
-            // If editing, delete old post first then create new
             if (selectedPostForEdit) {
               onDeleteScheduledPost(selectedPostForEdit.id);
             }

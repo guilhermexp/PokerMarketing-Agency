@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
@@ -86,7 +86,7 @@ const CampaignCard: React.FC<{
         onClick={onSelect}
         className={`
         group relative cursor-pointer
-        bg-[#0a0a0a] rounded-xl overflow-hidden
+        bg-[#0a0a0a] rounded-lg overflow-hidden
         border transition-all duration-300
         ${isSelected
             ? "border-primary/30 ring-1 ring-primary/20"
@@ -102,12 +102,12 @@ const CampaignCard: React.FC<{
         }}
       >
         {/* Header - Minimal */}
-        <div className="relative px-4 py-3 flex items-center justify-between gap-3">
+        <div className="relative px-3 py-2 flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <h3 className="text-[13px] font-semibold text-white truncate">
+            <h3 className="text-[12px] font-semibold text-white truncate">
               {campaign.name || "Campanha sem título"}
             </h3>
-            <p className="text-[10px] text-white/25 mt-0.5 flex items-center gap-1.5">
+            <p className="text-[9px] text-white/25 mt-0.5 flex items-center gap-1.5">
               <span>{formatDate(campaign.createdAt)}</span>
               {campaign.creatorName && (
                 <>
@@ -118,29 +118,29 @@ const CampaignCard: React.FC<{
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {campaign.inputTranscript && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowPrompt(true);
                 }}
-                className="p-1.5 rounded-md text-white/30 hover:text-white/60 hover:bg-white/5 transition-all"
+                className="p-1 rounded-md text-white/30 hover:text-white/60 hover:bg-white/5 transition-all"
                 title="Ver prompt"
               >
-                <Icon name="eye" className="w-3.5 h-3.5" />
+                <Icon name="eye" className="w-3 h-3" />
               </button>
             )}
             <button
               onClick={onDelete}
               disabled={isDeleting}
-              className="p-1.5 rounded-md text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
+              className="p-1 rounded-md text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
               title="Excluir"
             >
               {isDeleting ? (
-                <Loader className="w-3.5 h-3.5" />
+                <Loader className="w-3 h-3" />
               ) : (
-                <Icon name="trash-2" className="w-3.5 h-3.5" />
+                <Icon name="trash-2" className="w-3 h-3" />
               )}
             </button>
           </div>
@@ -199,10 +199,10 @@ const CampaignCard: React.FC<{
 
         {/* Preview Images */}
         {totalAssets > 0 ? (
-          <div className="px-4 pb-4">
-            <div className="w-full aspect-[4/3]">
+          <div className="px-3 pb-3">
+            <div className="w-full aspect-[5/3]">
               <div
-                className={`grid gap-1.5 h-full grid-rows-1 ${
+                className={`grid gap-1 h-full grid-rows-1 ${
                   columns === 1
                     ? "grid-cols-1"
                     : columns === 2
@@ -213,7 +213,7 @@ const CampaignCard: React.FC<{
                 {previewItems.map((item) => (
                   <div
                     key={item.type}
-                    className="relative overflow-hidden rounded-lg h-full bg-white/[0.02]"
+                    className="relative overflow-hidden rounded-md h-full bg-white/[0.02]"
                   >
                     {item.url ? (
                       <img
@@ -223,8 +223,8 @@ const CampaignCard: React.FC<{
                       />
                     ) : (
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                        <Icon name={item.icon} className="w-4 h-4 text-white/10" />
-                        <span className="text-[9px] text-white/30 uppercase tracking-wide">
+                        <Icon name={item.icon} className="w-3.5 h-3.5 text-white/10" />
+                        <span className="text-[8px] text-white/30 uppercase tracking-wide">
                           {item.label}
                         </span>
                       </div>
@@ -235,7 +235,7 @@ const CampaignCard: React.FC<{
             </div>
 
             {/* Counts */}
-            <div className="flex items-center gap-3 mt-3 text-[9px] text-white/25">
+            <div className="flex items-center gap-2.5 mt-2 text-[8px] text-white/25">
               {campaign.clipsCount > 0 && (
                 <span>{campaign.clipsCount} clip{campaign.clipsCount !== 1 ? 's' : ''}</span>
               )}
@@ -252,9 +252,9 @@ const CampaignCard: React.FC<{
             </div>
           </div>
         ) : (
-          <div className="px-4 pb-4">
-            <div className="text-center py-6 rounded-lg bg-white/[0.01]">
-              <p className="text-[10px] text-white/20">Campanha vazia</p>
+          <div className="px-3 pb-3">
+            <div className="text-center py-5 rounded-lg bg-white/[0.01]">
+              <p className="text-[9px] text-white/20">Campanha vazia</p>
             </div>
           </div>
         )}
@@ -273,24 +273,24 @@ const CampaignsEmptyState: React.FC = () => (
 
 // Loading skeleton - minimal
 const LoadingSkeleton: React.FC = () => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
     {[0, 1, 2].map((i) => (
       <div
         key={i}
-        className="bg-[#0a0a0a] rounded-xl border border-white/[0.05] overflow-hidden"
+        className="bg-[#0a0a0a] rounded-lg border border-white/[0.05] overflow-hidden"
         style={{
           animationDelay: `${i * 80}ms`,
           animation: "pulse 1.5s ease-in-out infinite",
         }}
       >
-        <div className="px-4 py-3">
-          <div className="h-4 bg-white/[0.04] rounded w-2/3 mb-1.5" />
-          <div className="h-3 bg-white/[0.03] rounded w-1/3" />
+        <div className="px-3 py-2">
+          <div className="h-3 bg-white/[0.04] rounded w-2/3 mb-1" />
+          <div className="h-2.5 bg-white/[0.03] rounded w-1/3" />
         </div>
-        <div className="px-4 pb-4">
-          <div className="grid grid-cols-3 gap-1.5">
+        <div className="px-3 pb-3">
+          <div className="grid grid-cols-3 gap-1">
             {[0, 1, 2].map((j) => (
-              <div key={j} className="aspect-square bg-white/[0.02] rounded-lg" />
+              <div key={j} className="aspect-square bg-white/[0.02] rounded-md" />
             ))}
           </div>
         </div>
@@ -317,9 +317,11 @@ export function CampaignsList({
     null,
   );
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
 
   // Transform DB campaigns to display format (memoized to avoid recalc)
-  const campaigns = useMemo<CampaignWithCounts[]>(() => {
+  const allCampaigns = useMemo<CampaignWithCounts[]>(() => {
     return dbCampaigns.map((c: DbCampaign) => {
       const toneData = c.generation_options as
         | { toneOfVoiceOverride?: string | null; toneOfVoiceUsed?: string | null }
@@ -347,6 +349,19 @@ export function CampaignsList({
       };
     });
   }, [dbCampaigns]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(allCampaigns.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const campaigns = allCampaigns.slice(startIndex, endIndex);
+
+  // Reset to page 1 when campaigns change
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleSelectCampaign = (campaignId: string) => {
     setLoadingCampaignId(campaignId);
@@ -403,8 +418,11 @@ export function CampaignsList({
           </h1>
           {!isLoading && (
             <p className="text-[11px] text-white/30 uppercase tracking-wider mt-1">
-              {campaigns.length} campanha{campaigns.length !== 1 ? "s" : ""}{" "}
-              salva{campaigns.length !== 1 ? "s" : ""}
+              {allCampaigns.length} campanha{allCampaigns.length !== 1 ? "s" : ""}{" "}
+              salva{allCampaigns.length !== 1 ? "s" : ""}
+              {totalPages > 1 && (
+                <span className="text-white/20"> • Página {currentPage} de {totalPages}</span>
+              )}
             </p>
           )}
         </div>
@@ -421,23 +439,50 @@ export function CampaignsList({
       {/* Content */}
       {isLoading ? (
         <LoadingSkeleton />
-      ) : campaigns.length === 0 ? (
+      ) : allCampaigns.length === 0 ? (
         <CampaignsEmptyState />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {campaigns.map((campaign, index) => (
-            <CampaignCard
-              key={campaign.id}
-              campaign={campaign}
-              isSelected={currentCampaignId === campaign.id}
-              isLoading={loadingCampaignId === campaign.id}
-              isDeleting={deletingId === campaign.id}
-              onSelect={() => handleSelectCampaign(campaign.id)}
-              onDelete={(e) => handleDeleteCampaign(campaign.id, e)}
-              index={index}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {campaigns.map((campaign, index) => (
+              <CampaignCard
+                key={campaign.id}
+                campaign={campaign}
+                isSelected={currentCampaignId === campaign.id}
+                isLoading={loadingCampaignId === campaign.id}
+                isDeleting={deletingId === campaign.id}
+                onSelect={() => handleSelectCampaign(campaign.id)}
+                onDelete={(e) => handleDeleteCampaign(campaign.id, e)}
+                index={index}
+              />
+            ))}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 mt-8">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+              >
+                <Icon name="chevron-left" className="w-4 h-4" />
+                Anterior
+              </button>
+              <span className="text-sm text-white/50 font-medium px-4">
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+              >
+                Próxima
+                <Icon name="chevron-right" className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

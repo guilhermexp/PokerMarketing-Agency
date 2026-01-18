@@ -75,31 +75,30 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
     return (
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 animate-fade-in-up">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
           <div>
-            <h1 className="text-2xl font-black text-white uppercase tracking-tight">
+            <h1 className="text-3xl font-semibold text-white tracking-tight">
               Lista de Torneios
             </h1>
-            <p className="text-[11px] text-white/30 uppercase tracking-wider mt-1">
+            <p className="text-sm text-white/50 mt-2">
               0 semanas salvas
             </p>
           </div>
           <div className="flex items-center gap-2">
             {onAddEvent && (
-              <Button
-                variant="primary"
-                size="small"
-                icon="edit"
+              <button
                 onClick={() => setIsManualModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
               >
+                <Icon name="edit" className="w-4 h-4" />
                 Torneio Manual
-              </Button>
+              </button>
             )}
             <label
               className={`cursor-pointer ${isUploading ? "pointer-events-none opacity-70" : ""}`}
             >
-              <span className="flex items-center gap-1.5 px-3 py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all">
-                <Icon name="upload" className="w-3 h-3" />
+              <span className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                <Icon name="upload" className="w-4 h-4" />
                 {isUploading ? "Carregando..." : "Nova Planilha"}
               </span>
               <input
@@ -140,37 +139,31 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="text-left">
-          <h2 className="text-2xl font-black text-white uppercase tracking-tight">
+          <h2 className="text-3xl font-semibold text-white tracking-tight">
             Lista de Torneios
           </h2>
-          <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
+          <p className="text-sm text-white/50 mt-2">
             {schedules.length} semana{schedules.length !== 1 ? "s" : ""} salva
             {schedules.length !== 1 ? "s" : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {onAddEvent && (
-            <Button
-              variant="primary"
-              size="small"
-              icon="edit"
+            <button
               onClick={() => setIsManualModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
+              <Icon name="edit" className="w-4 h-4" />
               Torneio Manual
-            </Button>
+            </button>
           )}
           <label
             className={`cursor-pointer ${isUploading ? "pointer-events-none opacity-70" : ""}`}
           >
-            <Button
-              as="span"
-              variant="secondary"
-              size="small"
-              icon="upload"
-              isLoading={isUploading}
-            >
+            <span className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+              <Icon name="upload" className="w-4 h-4" />
               {isUploading ? "Carregando..." : "Nova Planilha"}
-            </Button>
+            </span>
             <input
               type="file"
               className="hidden"
@@ -195,9 +188,9 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
               role="button"
               tabIndex={0}
               onKeyDown={(e) => e.key === "Enter" && onSelectSchedule(schedule)}
-              className={`w-full flex items-center justify-between gap-4 p-4 rounded-xl border transition-all hover:bg-white/[0.02] active:scale-[0.99] text-left cursor-pointer ${isSelected
-                ? "bg-white/[0.04] border-white/10"
-                : "bg-[#0d0d0d] border-white/[0.06] hover:border-white/10"
+              className={`w-full flex items-center justify-between gap-4 p-4 rounded-2xl border transition-all active:scale-[0.99] text-left cursor-pointer backdrop-blur-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isSelected
+                ? "bg-black/40 border-white/10"
+                : "bg-black/40 border-white/10 hover:border-white/30"
                 }`}
             >
               <div className="flex items-center gap-4 min-w-0">
@@ -244,7 +237,7 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
                         onDeleteSchedule(schedule.id);
                       }
                     }}
-                    className="w-8 h-8 rounded-lg bg-white/5 hover:bg-red-500/20 flex items-center justify-center text-white/30 hover:text-red-400 transition-all"
+                    className="w-8 h-8 rounded-xl bg-white/5 hover:bg-red-500/20 flex items-center justify-center text-white/40 hover:text-red-400 transition-all"
                     title="Excluir planilha"
                   >
                     <Icon name="trash" className="w-4 h-4" />

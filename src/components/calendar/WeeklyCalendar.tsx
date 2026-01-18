@@ -119,27 +119,27 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
     <div className="h-full flex flex-col overflow-hidden">
       {/* Day Headers */}
       <div className="overflow-x-auto flex-shrink-0">
-        <div className="grid grid-cols-8 border-b border-white/5 min-w-[720px]">
+        <div className="grid grid-cols-8 border-b border-white/10 min-w-[720px] bg-black/20">
           {/* Time column header */}
-          <div className="py-3 px-2 text-center text-[9px] font-black text-white/20 uppercase tracking-wider border-r border-white/5">
+          <div className="py-3 px-2 text-center text-[10px] font-medium text-white/30 border-r border-white/10">
             Hora
           </div>
           {/* Day columns */}
           {weekDays.map((day) => (
             <div
               key={day.date}
-              className={`py-3 px-2 text-center border-r border-white/5 last:border-r-0 ${day.isToday ? "bg-primary/10" : ""
+              className={`py-3 px-2 text-center border-r border-white/10 last:border-r-0 ${day.isToday ? "bg-white/5" : ""
                 }`}
             >
-              <div className="text-[8px] font-black text-white/30 uppercase tracking-wider">
+              <div className="text-[10px] font-medium text-white/40">
                 {day.dayName}
               </div>
               <div
-                className={`text-lg font-black ${day.isToday ? "text-primary" : "text-white/60"}`}
+                className={`text-2xl font-light mt-1 ${day.isToday ? "text-white" : "text-white/70"}`}
               >
                 {day.dayNumber}
               </div>
-              <div className="text-[8px] text-white/20 uppercase">
+              <div className="text-[9px] text-white/30 mt-0.5">
                 {day.month}
               </div>
             </div>
@@ -208,11 +208,11 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
       </div>
 
       {/* Summary Footer */}
-      <div className="border-t border-white/5 bg-black/40 flex-shrink-0 overflow-x-auto">
+      <div className="border-t border-white/10 bg-black/20 flex-shrink-0 overflow-x-auto">
         <div className="grid grid-cols-8 min-w-[720px]">
           {/* Label column */}
-          <div className="p-3 border-r border-white/5 flex flex-col justify-center">
-            <div className="text-[8px] font-black text-white/20 uppercase tracking-wider text-center">
+          <div className="p-3 border-r border-white/10 flex flex-col justify-center">
+            <div className="text-[10px] font-medium text-white/30 text-center">
               Resumo
             </div>
           </div>
@@ -238,8 +238,8 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                   dayNumber: day.dayNumber,
                   month: day.month,
                 })}
-                className={`p-2 border-r border-white/5 last:border-r-0 min-h-[80px] ${day.isToday ? "bg-primary/5" : ""
-                  } ${hasActivity ? "cursor-pointer hover:bg-white/5 transition-colors" : ""}`}
+                className={`p-2 border-r border-white/10 last:border-r-0 min-h-[80px] ${day.isToday ? "bg-white/5" : ""
+                  } ${hasActivity ? "cursor-pointer hover:bg-white/[0.02] transition-colors" : ""}`}
               >
                 {hasActivity ? (
                   <div className="space-y-1.5">
@@ -326,30 +326,30 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
       {/* Day Summary Modal */}
       {selectedDaySummary && (
         <div
-          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4"
           onClick={() => setSelectedDaySummary(null)}
         >
           <div
-            className="bg-[#0a0a0a] border border-white/[0.06] rounded-xl w-full max-w-xl max-h-[85vh] overflow-hidden"
+            className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-xl max-h-[85vh] overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header - Minimal */}
-            <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-white/[0.03] border border-white/[0.06] flex flex-col items-center justify-center">
-                  <span className="text-xs font-black text-white">{selectedDaySummary.dayNumber}</span>
-                  <span className="text-[8px] text-white/40 uppercase">{selectedDaySummary.month}</span>
+                <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 flex flex-col items-center justify-center">
+                  <span className="text-xl font-light text-white">{selectedDaySummary.dayNumber}</span>
+                  <span className="text-[9px] text-white/40">{selectedDaySummary.month}</span>
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white/90">{selectedDaySummary.dayName}</h3>
-                  <p className="text-[10px] text-white/40">
+                  <h3 className="text-base font-semibold text-white">{selectedDaySummary.dayName}</h3>
+                  <p className="text-xs text-white/50 mt-0.5">
                     {getPostsForDate(selectedDaySummary.date).length} posts agendados
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedDaySummary(null)}
-                className="p-1.5 text-white/30 hover:text-white/60 transition-colors"
+                className="p-2 text-white/40 hover:text-white transition-colors rounded-lg hover:bg-white/10"
               >
                 <Icon name="x" className="w-4 h-4" />
               </button>
@@ -368,7 +368,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                   return (
                     <div
                       key={post.id}
-                      className="group flex items-center gap-4 p-3 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/[0.06]"
+                      className="group flex items-center gap-4 p-3 rounded-xl bg-black/20 border border-white/10 hover:bg-black/30 hover:border-white/20 transition-all"
                     >
                       {/* Thumbnail - Clickable */}
                       <div
@@ -381,12 +381,12 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                         className={onPostClick ? "cursor-pointer" : ""}
                       >
                         {post.imageUrl ? (
-                          <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-white/5 border border-white/10 hover:border-white/30 transition-colors">
+                          <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-black/40 border border-white/10 hover:border-white/30 transition-colors">
                             <img src={post.imageUrl} alt="" className="w-full h-full object-cover" />
                           </div>
                         ) : (
-                          <div className="w-24 h-24 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 border border-white/10 hover:border-white/30 transition-colors">
-                            <Icon name="image" className="w-8 h-8 text-white/20" />
+                          <div className="w-20 h-20 rounded-lg bg-black/40 flex items-center justify-center flex-shrink-0 border border-white/10 hover:border-white/30 transition-colors">
+                            <Icon name="image" className="w-6 h-6 text-white/20" />
                           </div>
                         )}
                       </div>
@@ -394,15 +394,15 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-bold text-white/90">{post.scheduledTime}</span>
+                          <span className="text-sm font-semibold text-white">{post.scheduledTime}</span>
                           {typeLabel && (
-                            <span className="text-[10px] font-bold text-white/40 uppercase px-1.5 py-0.5 bg-white/5 rounded">{typeLabel}</span>
+                            <span className="text-[9px] font-medium text-white/50 px-2 py-0.5 bg-black/40 border border-white/10 rounded-full">{typeLabel}</span>
                           )}
                           {post.status === 'published' && (
-                            <span className="text-[10px] font-bold text-emerald-400 uppercase px-1.5 py-0.5 bg-emerald-500/10 rounded">Publicado</span>
+                            <span className="text-[9px] font-medium text-emerald-400 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full">Publicado</span>
                           )}
                           {post.status === 'failed' && (
-                            <span className="text-[10px] font-bold text-red-400 uppercase px-1.5 py-0.5 bg-red-500/10 rounded">Falhou</span>
+                            <span className="text-[9px] font-medium text-red-400 px-2 py-0.5 bg-red-500/10 border border-red-500/20 rounded-full">Falhou</span>
                           )}
                         </div>
                         <p className="text-xs text-white/50 line-clamp-2">
@@ -411,16 +411,16 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-0.5">
+                      <div className="flex items-center gap-1">
                         {post.status === 'scheduled' && (
                           <>
                             {onPublishToInstagram && (
                               <button
                                 onClick={() => onPublishToInstagram(post)}
-                                className="p-1.5 text-white/30 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                                className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                                 title="Publicar agora"
                               >
-                                <Icon name="send" className="w-3.5 h-3.5" />
+                                <Icon name="send" className="w-4 h-4" />
                               </button>
                             )}
                             <button
@@ -430,28 +430,28 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                                   onUpdatePost(post.id, { scheduledTime: newTime });
                                 }
                               }}
-                              className="p-1.5 text-white/30 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                              className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                               title="Reagendar"
                             >
-                              <Icon name="clock" className="w-3.5 h-3.5" />
+                              <Icon name="clock" className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => {
                                 onUpdatePost(post.id, { status: 'published', publishedAt: Date.now() });
                               }}
-                              className="p-1.5 text-white/30 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-colors"
+                              className="p-2 text-white/40 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
                               title="Marcar como publicado"
                             >
-                              <Icon name="check" className="w-3.5 h-3.5" />
+                              <Icon name="check" className="w-4 h-4" />
                             </button>
                           </>
                         )}
                         <button
                           onClick={() => onDeletePost(post.id)}
-                          className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
+                          className="p-2 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                           title="Excluir"
                         >
-                          <Icon name="trash" className="w-3.5 h-3.5" />
+                          <Icon name="trash" className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -461,15 +461,16 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
             </div>
 
             {/* Modal Footer - Minimal */}
-            <div className="px-3 pb-3">
+            <div className="px-5 pb-4 pt-3 border-t border-white/10">
               <button
                 onClick={() => {
                   setSelectedDaySummary(null);
                   onDayClick(selectedDaySummary.date);
                 }}
-                className="w-full py-2.5 text-[10px] font-bold text-primary/80 uppercase tracking-wide bg-primary/10 hover:bg-primary/15 border border-primary/20 rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white/90 bg-black/40 backdrop-blur-2xl border border-white/10 hover:border-white/30 rounded-full transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
               >
-                + Novo agendamento
+                <Icon name="plus" className="w-4 h-4" />
+                Novo Agendamento
               </button>
             </div>
           </div>

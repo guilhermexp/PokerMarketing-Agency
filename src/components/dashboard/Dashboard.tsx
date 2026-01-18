@@ -315,14 +315,24 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
       <FloatingSidebar
         activeView={activeView}
         onViewChange={onViewChange}
-        brandProfile={brandProfile}
-        onEditProfile={onEditProfile}
-        onSignOut={() => signOut()}
       />
 
-      <main className="flex-1 overflow-y-auto relative z-10 bg-[#070707] pb-24 sm:pb-[env(safe-area-inset-bottom)] sm:pl-16">
+      <main className="flex-1 overflow-y-auto relative z-10 bg-black pb-24 sm:pb-[env(safe-area-inset-bottom)] lg:pl-20">
+        {activeView === "campaign" && showUploadForm && (
+          <>
+            {/* Dot Grid Background - only on upload form */}
+            <div className="fixed inset-0 pointer-events-none z-0">
+              <div className="absolute inset-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)', backgroundSize: '40px 40px', backgroundPosition: '10px 10px' }} />
+              <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)', backgroundSize: '20px 20px', backgroundPosition: '10px 10px' }} />
+              <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)', backgroundSize: '50px 50px', backgroundPosition: '15px 15px' }} />
+              <div className="absolute inset-0 opacity-25" style={{ backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)', backgroundSize: '30px 30px', backgroundPosition: '15px 15px' }} />
+              <div className="absolute inset-0" style={{ background: 'radial-gradient(80% 70%, transparent 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.9) 75%, black 100%)' }} />
+            </div>
+          </>
+        )}
+
         {activeView === "campaign" && (
-          <div className="px-4 py-4 sm:px-6 sm:py-5">
+          <div className="px-4 py-4 sm:px-6 sm:py-5 relative z-10">
             {showUploadForm && (
               <div className="mb-2">
                 <UploadForm
@@ -342,19 +352,53 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
             {/* Recent Campaigns Preview - shown below upload form */}
             {showUploadForm && campaigns.length > 0 && (
-              <div className="mt-6 flex flex-col items-center">
-                <div className="flex items-center justify-between mb-4 w-full max-w-4xl">
-                  <h3 className="text-xs font-bold text-white/40 uppercase tracking-wider">
-                    Últimas Campanhas
-                  </h3>
-                  <button
-                    onClick={() => onViewChange("campaigns")}
-                    className="text-[10px] text-white/35 hover:text-white/70 transition-colors"
-                  >
-                    Ver todas →
-                  </button>
+              <div className="mt-8 sm:mt-12 flex flex-col items-center px-3 sm:px-0">
+                {/* Header with Tabs */}
+                <div className="w-full max-w-6xl mb-8">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-8">
+                      <button className="text-[15px] font-semibold text-white pb-2 border-b-2 border-white/90">
+                        Todas
+                      </button>
+                      <button className="text-[15px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors pb-2">
+                        Vídeos
+                      </button>
+                      <button className="text-[15px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors pb-2">
+                        Posts
+                      </button>
+                      <button className="text-[15px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors pb-2">
+                        Ads
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => onViewChange("campaigns")}
+                      className="text-sm text-zinc-400 hover:text-white transition-colors flex items-center gap-1.5 font-medium"
+                    >
+                      Ver todas
+                      <Icon name="arrow-right" className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Filter Tags */}
+                  <div className="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-hide">
+                    <button className="px-4 py-2 rounded-full text-sm font-medium bg-black/40 backdrop-blur-2xl border border-white/10 text-white/90 whitespace-nowrap shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                      Todas templates
+                    </button>
+                    <button className="px-4 py-2 rounded-full text-sm font-medium bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all whitespace-nowrap shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                      Populares
+                    </button>
+                    <button className="px-4 py-2 rounded-full text-sm font-medium bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all whitespace-nowrap shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                      Marketing
+                    </button>
+                    <button className="px-4 py-2 rounded-full text-sm font-medium bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all whitespace-nowrap shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                      Social Media
+                    </button>
+                    <button className="px-4 py-2 rounded-full text-sm font-medium bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all whitespace-nowrap shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                      Promoções
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-4 justify-center w-full max-w-4xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-6xl">
                   {campaigns.slice(0, 3).map((camp) => {
                     const previewItems = [
                       camp.clip_preview_url ? { url: camp.clip_preview_url, type: 'clip' } : null,
@@ -368,59 +412,45 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       <div
                         key={camp.id}
                         onClick={() => onLoadCampaign(camp.id)}
-                        className="flex-1 max-w-[320px] cursor-pointer bg-[#0a0a0a] rounded-xl overflow-hidden border border-white/[0.06] hover:border-white/[0.12] transition-all hover:scale-[1.02]"
+                        className="group cursor-pointer rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
                       >
-                        {/* Preview Images */}
+                        {/* Preview Images with Overlay Text */}
                         {totalAssets > 0 && previewItems.length > 0 ? (
-                          <>
-                            <div className="h-40">
-                              <div
-                                className={`grid gap-1 h-full grid-rows-1 ${
-                                  columns === 1
-                                    ? "grid-cols-1"
-                                    : columns === 2
-                                      ? "grid-cols-2"
-                                      : "grid-cols-3"
-                                }`}
-                              >
-                                {previewItems.map((item, i) => (
-                                  <div
-                                    key={i}
-                                    className="relative overflow-hidden h-full bg-white/[0.02]"
-                                  >
-                                    <img
-                                      src={item.url}
-                                      alt={item.type}
-                                      className="absolute inset-0 w-full h-full object-cover"
-                                    />
-                                  </div>
-                                ))}
-                              </div>
+                          <div className="aspect-video relative overflow-hidden bg-black ring-1 ring-zinc-800/50">
+                            {/* Image Grid */}
+                            <div
+                              className={`grid gap-0.5 h-full grid-rows-1 ${
+                                columns === 1
+                                  ? "grid-cols-1"
+                                  : columns === 2
+                                    ? "grid-cols-2"
+                                    : "grid-cols-3"
+                              }`}
+                            >
+                              {previewItems.map((item, i) => (
+                                <div
+                                  key={i}
+                                  className="relative overflow-hidden h-full"
+                                >
+                                  <img
+                                    src={item.url}
+                                    alt={item.type}
+                                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                  />
+                                </div>
+                              ))}
                             </div>
-
-                            {/* Info */}
-                            <div className="px-4 py-3">
-                              <h4 className="text-xs font-semibold text-white/80 truncate">
-                                {camp.name || "Sem título"}
-                              </h4>
-                              <p className="text-[10px] text-white/35 mt-1">
-                                {Number(camp.clips_count) > 0 && `${camp.clips_count} clip${Number(camp.clips_count) !== 1 ? 's' : ''}`}
-                                {Number(camp.posts_count) > 0 && ` • ${camp.posts_count} post${Number(camp.posts_count) !== 1 ? 's' : ''}`}
-                                {Number(camp.ads_count) > 0 && ` • ${camp.ads_count} ad${Number(camp.ads_count) !== 1 ? 's' : ''}`}
-                              </p>
-                            </div>
-                          </>
+                          </div>
                         ) : (
-                          <>
-                            <div className="h-40 bg-white/[0.01] flex items-center justify-center">
-                              <p className="text-[10px] text-white/25">Vazia</p>
-                            </div>
-                            <div className="px-4 py-3">
-                              <h4 className="text-xs font-semibold text-white/80 truncate">
+                          <div className="aspect-video relative overflow-hidden bg-zinc-900 flex items-center justify-center ring-1 ring-zinc-800/50">
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                            <p className="text-sm text-zinc-500 relative z-10">Sem conteúdo</p>
+                            <div className="absolute bottom-0 left-0 right-0 p-5">
+                              <h4 className="text-lg font-semibold text-white line-clamp-1">
                                 {camp.name || "Sem título"}
                               </h4>
                             </div>
-                          </>
+                          </div>
                         )}
                       </div>
                     );
@@ -475,24 +505,24 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
               </>
             )}
             {campaign && (
-              <div className="animate-fade-in-up space-y-6">
+              <div className="animate-fade-in-up space-y-8">
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div className="text-left">
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">
+                    <h2 className="text-3xl font-semibold text-white tracking-tight">
                       Campanha Gerada
                     </h2>
-                    <p className="text-[9px] font-bold text-white/30 uppercase tracking-wider mt-1">
+                    <p className="text-sm text-white/50 mt-2">
                       {campaign.videoClipScripts?.length || 0} clips •{" "}
                       {campaign.posts?.length || 0} posts •{" "}
                       {campaign.adCreatives?.length || 0} anúncios
                       {campaign.toneOfVoiceUsed && (
-                        <span className="ml-2 text-white/20">
+                        <span className="ml-2">
                           • Tom: {campaign.toneOfVoiceUsed}
                         </span>
                       )}
                       {campaign.generatedWithModel && (
-                        <span className="ml-2 text-white/20">
+                        <span className="ml-2">
                           • {campaign.generatedWithModel.split("/").pop()}
                         </span>
                       )}
@@ -504,20 +534,19 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all duration-200 ${activeTab === tab.id
-                          ? "bg-primary/10 text-primary/80 border border-primary/20"
-                          : "bg-transparent text-white/50 hover:text-white/70 hover:border-white/[0.1] border border-white/[0.06]"
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 backdrop-blur-2xl border shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${activeTab === tab.id
+                          ? "bg-black/40 border-white/10 text-white/90"
+                          : "bg-black/40 border-white/10 text-white/60 hover:text-white/90 hover:border-white/30"
                           }`}
                       >
                         {tab.label}
                       </button>
                     ))}
-                    <div className="w-px h-6 bg-white/[0.06] mx-1"></div>
                     <button
                       onClick={onResetCampaign}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all"
+                      className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
                     >
-                      <Icon name="zap" className="w-3 h-3" />
+                      <Icon name="zap" className="w-4 h-4" />
                       Nova Campanha
                     </button>
                   </div>
@@ -812,17 +841,6 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           onClearReference={() => onSetChatReference(null)}
         />
       )}
-      {/* Assistant Toggle Button - Desktop */}
-      {!isAssistantOpen && (
-        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 hidden sm:block">
-          <button
-            onClick={onToggleAssistant}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-105 bg-white/10 backdrop-blur-xl text-white/60 hover:text-white border border-white/5"
-          >
-            <Icon name="zap" className="w-5 h-5" />
-          </button>
-        </div>
-      )}
 
       {/* Mobile Bottom Navigation */}
       {(() => {
@@ -900,6 +918,37 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           instagramContext={instagramContext}
         />
       )}
+
+      {/* Footer - Desktop only */}
+      <footer className="fixed bottom-4 left-4 z-[10000] pointer-events-auto hidden lg:flex flex-col items-center gap-2 rounded-2xl bg-black/40 backdrop-blur-2xl border border-white/10 p-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
+        <button
+          onClick={onEditProfile}
+          className="flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+          title={brandProfile.name}
+        >
+          {brandProfile.logo ? (
+            <img
+              src={brandProfile.logo}
+              alt="Logo"
+              className="w-10 h-10 rounded-xl object-cover"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white">
+              <span className="text-sm font-semibold">
+                {brandProfile.name.substring(0, 1).toUpperCase()}
+              </span>
+            </div>
+          )}
+        </button>
+
+        <button
+          onClick={() => signOut()}
+          className="flex items-center justify-center p-2.5 cursor-pointer text-white/50 hover:text-red-400 active:scale-95 transition-all rounded-xl hover:bg-white/5"
+          title="Sair"
+        >
+          <Icon name="log-out" className="w-5 h-5" />
+        </button>
+      </footer>
     </div>
   );
 };

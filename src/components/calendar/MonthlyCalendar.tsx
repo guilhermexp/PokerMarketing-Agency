@@ -12,7 +12,7 @@ interface MonthlyCalendarProps {
   publishingStates: Record<string, InstagramPublishState>;
 }
 
-const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
 export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
   currentDate,
@@ -97,11 +97,11 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Day Headers */}
-      <div className="grid grid-cols-7 border-b border-white/5">
+      <div className="grid grid-cols-7 border-b border-white/10 bg-black/20">
         {dayNames.map(day => (
           <div
             key={day}
-            className="py-3 text-center text-[9px] font-black text-white/30 uppercase tracking-wider"
+            className="py-3 text-center text-[10px] font-medium text-white/40"
           >
             {day}
           </div>
@@ -121,21 +121,21 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
               key={index}
               onClick={() => onDayClick(day.date)}
               className={`
-                min-h-[100px] p-2 border-b border-r border-white/5 cursor-pointer
-                transition-colors hover:bg-white/5
-                ${!day.isCurrentMonth ? 'bg-black/20' : ''}
-                ${day.isToday ? 'bg-primary/5' : ''}
+                min-h-[120px] p-3 border-b border-r border-white/5 cursor-pointer
+                transition-all hover:bg-white/[0.02]
+                ${!day.isCurrentMonth ? 'bg-black/10' : ''}
+                ${day.isToday ? 'border-2 border-white/20' : ''}
               `}
             >
               {/* Day Number */}
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-3">
                 <span
                   className={`
-                    text-xs font-bold
+                    text-3xl font-light
                     ${day.isToday
-                      ? 'w-6 h-6 flex items-center justify-center rounded-full bg-primary text-black'
+                      ? 'text-white'
                       : day.isCurrentMonth
-                        ? 'text-white/60'
+                        ? 'text-white/80'
                         : 'text-white/20'
                     }
                   `}
@@ -154,8 +154,8 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
               </div>
 
               {/* Scheduled Posts Preview */}
-              <div className="space-y-1">
-                {posts.slice(0, 2).map(post => (
+              <div className="space-y-1.5">
+                {posts.slice(0, 3).map(post => (
                   <ScheduledPostCard
                     key={post.id}
                     post={post}
@@ -166,9 +166,9 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
                     publishingState={publishingStates[post.id] || null}
                   />
                 ))}
-                {posts.length > 2 && (
-                  <div className="text-[8px] font-bold text-white/30 uppercase tracking-wider pl-1">
-                    +{posts.length - 2} mais
+                {posts.length > 3 && (
+                  <div className="text-[9px] font-medium text-white/30 pl-1">
+                    +{posts.length - 3} mais
                   </div>
                 )}
               </div>

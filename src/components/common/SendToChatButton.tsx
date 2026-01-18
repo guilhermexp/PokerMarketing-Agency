@@ -5,7 +5,7 @@
  * - w-7 h-7
  * - bg-black/60 backdrop-blur-sm
  * - hover:bg-black/80 hover:text-primary
- * - Ícone paperclip 3.5x3.5
+ * - Ícone message-circle 3.5x3.5
  *
  * Uso:
  * <SendToChatButton image={galleryImage} />
@@ -39,7 +39,7 @@ export const SendToChatButton: React.FC<SendToChatButtonProps> = ({
       className={`w-7 h-7 rounded-lg bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/80 hover:bg-black/80 hover:text-primary transition-all ${className}`}
       title="Enviar para Chat"
     >
-      <Icon name="paperclip" className="w-3.5 h-3.5" />
+      <Icon name="message-circle" className="w-3.5 h-3.5" />
     </button>
   );
 };

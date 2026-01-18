@@ -356,7 +356,7 @@ export const PeriodCardRow: React.FC<{
 
         return (
             <div
-                className={`bg-[#0a0a0a] border rounded-xl overflow-hidden transition-all mb-2 ${isGenerating ? "border-primary/30 animate-pulse" : "border-white/[0.05] hover:border-white/[0.08]"}`}
+                className={`bg-black/40 backdrop-blur-2xl border rounded-2xl overflow-hidden transition-all mb-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isGenerating ? "border-primary/30 animate-pulse" : "border-white/10 hover:border-white/20"}`}
             >
                 <div
                     className="px-5 py-4 flex items-center justify-between cursor-pointer"
@@ -366,10 +366,10 @@ export const PeriodCardRow: React.FC<{
                         <div className="flex items-center gap-3">
                             {isGenerating && <Loader className="w-4 h-4 flex-shrink-0" />}
                             <div>
-                                <h3 className="text-xs font-bold text-white tracking-wide">
+                                <h3 className="text-sm font-bold text-white tracking-wide">
                                     {label}
                                 </h3>
-                                <p className="text-[10px] text-white/30 mt-0.5">
+                                <p className="text-[10px] text-white/40 mt-0.5">
                                     {isGenerating
                                         ? "Gerando flyer..."
                                         : `${events.length} torneios neste período`}
@@ -377,10 +377,10 @@ export const PeriodCardRow: React.FC<{
                             </div>
                         </div>
                         <div>
-                            <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider block mb-1">
+                            <span className="text-[9px] font-semibold text-white/40 uppercase tracking-wider block mb-1">
                                 Período • <span className="text-white/50">{dayInfo}</span>
                             </span>
-                            <span className="text-sm font-semibold text-white">
+                            <span className="text-sm font-semibold text-white/90">
                                 {period === "ALL"
                                     ? "Dia Completo"
                                     : period === "MORNING"
@@ -393,10 +393,10 @@ export const PeriodCardRow: React.FC<{
                             </span>
                         </div>
                         <div>
-                            <span className="text-[9px] font-medium text-white/30 uppercase tracking-wider block mb-1">
+                            <span className="text-[9px] font-semibold text-white/40 uppercase tracking-wider block mb-1">
                                 GTD Total
                             </span>
-                            <span className="text-sm font-bold text-primary">
+                            <span className="text-sm font-bold text-primary/90">
                                 {formatCurrencyValue(String(totalGtd), currency)}
                             </span>
                         </div>
@@ -421,7 +421,7 @@ export const PeriodCardRow: React.FC<{
                                             e.stopPropagation();
                                             if (firstFlyer) setScheduleFlyer(firstFlyer);
                                         }}
-                                        className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                                        className="p-2 bg-black/40 backdrop-blur-sm hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20"
                                         title="Agendar publicação"
                                     >
                                         <Icon name="calendar" className="w-4 h-4 text-white/60" />
@@ -453,7 +453,7 @@ export const PeriodCardRow: React.FC<{
                                             e.stopPropagation();
                                             onDownloadAll(flyerImages, `${label}-${dayInfo}`);
                                         }}
-                                        className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                                        className="p-2 bg-black/40 backdrop-blur-sm hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20"
                                         title="Baixar todas as imagens"
                                     >
                                         <Icon name="download" className="w-4 h-4 text-white/60" />
@@ -462,12 +462,12 @@ export const PeriodCardRow: React.FC<{
                             })()}
                         <Icon
                             name={isExpanded ? "chevron-up" : "chevron-down"}
-                            className="w-4 h-4 text-white/20"
+                            className="w-4 h-4 text-white/30"
                         />
                     </div>
                 </div>
                 {isExpanded && (
-                    <div className="px-4 pb-4 pt-3 border-t border-white/5 animate-fade-in-up">
+                    <div className="px-4 pb-4 pt-3 border-t border-white/10 animate-fade-in-up">
                         <FlyerThumbStrip
                             images={generatedFlyers}
                             onEdit={setEditingFlyer}
