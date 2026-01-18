@@ -68,6 +68,9 @@ COPY --from=builder /app/dist ./dist
 # Copy server code
 COPY server ./server
 
+# Copy public assets if they exist
+COPY --from=builder /app/public ./public 2>/dev/null || true
+
 # Get runtime args from Railway
 ARG GEMINI_API_KEY
 ARG VITE_CLERK_PUBLISHABLE_KEY
@@ -92,5 +95,5 @@ ENV NODE_ENV=production
 # Expose port
 EXPOSE 8080
 
-# Start the server with Node (compatible with both Node and Bun)
-CMD ["node", "server/index.mjs"]
+# Start the server with Bun (faster and fully Node.js compatible)
+CMD ["bun", "run", "server/index.mjs"]

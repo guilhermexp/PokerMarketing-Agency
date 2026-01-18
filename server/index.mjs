@@ -1,14 +1,12 @@
 /**
- * Production Server for Railway
- * Serves both the static frontend and API routes
+ * Development API Server
+ * Runs alongside Vite to handle API routes during development
  */
 
 import express from "express";
 import cors from "cors";
-import path from "path";
-import { fileURLToPath } from "url";
 import { neon } from "@neondatabase/serverless";
-import { put } from "@vercel/blob";
+import { put, del } from "@vercel/blob";
 import { config } from "dotenv";
 import { fal } from "@fal-ai/client";
 import { clerkMiddleware, getAuth } from "@clerk/express";
@@ -22,82 +20,37 @@ import {
   createOrgContext,
 } from "./helpers/organization-context.mjs";
 import {
-  getImageQueue,
-  addJob,
-  initializeWorker,
-  initializeScheduledPostsChecker,
-  schedulePostForPublishing,
-  cancelScheduledPost,
-  closeQueue,
-} from "./helpers/job-queue.mjs";
-import {
-  checkAndPublishScheduledPosts,
-  publishScheduledPostById,
-} from "./helpers/scheduled-publisher.mjs";
-import {
   buildCampaignPrompt,
   buildQuantityInstructions,
 } from "./helpers/campaign-prompts.mjs";
-import { urlToBase64 } from "./helpers/image-helpers.mjs";
 import {
   logAiUsage,
   extractGeminiTokens,
   extractOpenRouterTokens,
   createTimer,
 } from "./helpers/usage-tracking.mjs";
+import { urlToBase64 } from "./helpers/image-helpers.mjs";
 import { chatHandler } from "./api/chat/route.mjs";
 
 config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
-// Railway provides PORT environment variable
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3002;
 
-// CORS configuration - Allow same-origin and configured origins
-const configuredOrigins = (process.env.CORS_ORIGIN || "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+// Surface fatal errors during dev so the API doesn't silently exit.
+process.on("uncaughtException", (error) => {
+  console.error("[Dev API] uncaughtException:", error);
+});
 
-// Default allowed domains (Railway, Vercel, localhost)
-const defaultAllowedPatterns = [
-  ".up.railway.app",
-  ".vercel.app",
-  "localhost",
-  "127.0.0.1",
-];
+process.on("unhandledRejection", (error) => {
+  console.error("[Dev API] unhandledRejection:", error);
+});
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (same-origin, mobile apps, curl, etc.)
-      if (!origin) return callback(null, true);
-
-      // Check configured origins first
-      if (configuredOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      // Check against default allowed patterns (Railway, Vercel, localhost)
-      if (defaultAllowedPatterns.some((pattern) => origin.includes(pattern))) {
-        return callback(null, true);
-      }
-
-      console.warn("[CORS] Blocked request from unauthorized origin:", origin);
-      return callback(new Error("CORS not allowed"), false);
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }),
-);
-
+app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 
 // Clerk authentication middleware
+// Adds auth object to all requests (non-blocking)
 app.use(
   clerkMiddleware({
     publishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
@@ -132,7 +85,10 @@ function getClerkOrgContext(req) {
 }
 
 // Legacy helper for organization context resolution
+// In Clerk system, we trust the JWT claims instead of DB validation
+// This is a simplified version that returns org context based on Clerk auth
 async function resolveOrganizationContext(sql, userId, organizationId) {
+  // If no organization_id, it's personal context - full access
   if (!organizationId) {
     return {
       organizationId: null,
@@ -142,903 +98,26 @@ async function resolveOrganizationContext(sql, userId, organizationId) {
     };
   }
 
+  // Organization context - return member-level context
+  // Note: With Clerk, actual permissions come from JWT, this is just for compatibility
   return {
     organizationId,
     isPersonal: false,
-    orgRole: "org:member",
-    hasPermission: (permission) => true,
+    orgRole: "org:member", // Default to member, actual role comes from Clerk auth
+    hasPermission: (permission) => {
+      // For legacy compatibility, allow all permissions
+      // Real permission checks should use getClerkOrgContext(req)
+      return true;
+    },
   };
 }
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
-// Cache for resolved user IDs (5 minute TTL)
-const userIdCache = new Map();
-const USER_CACHE_TTL = 5 * 60 * 1000;
-
-function getCachedUserId(clerkId) {
-  const cached = userIdCache.get(clerkId);
-  if (cached && Date.now() - cached.timestamp < USER_CACHE_TTL) {
-    return cached.userId;
-  }
-  return null;
-}
-
-function setCachedUserId(clerkId, userId) {
-  userIdCache.set(clerkId, { userId, timestamp: Date.now() });
-}
-
-function getSql() {
-  if (!DATABASE_URL) {
-    throw new Error("DATABASE_URL not configured");
-  }
-  return neon(DATABASE_URL);
-}
-
 // ============================================================================
-// AI HELPERS (Gemini + OpenRouter)
+// RATE LIMITING FOR AI ENDPOINTS
 // ============================================================================
-
-// Gemini client
-const getGeminiAi = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY not configured");
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
-// OpenRouter client
-const getOpenRouter = () => {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY not configured");
-  }
-  return new OpenRouter({ apiKey });
-};
-
-// Model defaults
-const DEFAULT_TEXT_MODEL = "gemini-3-flash-preview";
-const DEFAULT_FAST_TEXT_MODEL = "gemini-3-flash-preview";
-const DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview";
-const DEFAULT_ASSISTANT_MODEL = "gemini-3-flash-preview";
-
-// Retry helper for 503 errors
-const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
-  let lastError = null;
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error;
-      const isRetryable =
-        error?.message?.includes("503") ||
-        error?.message?.includes("overloaded") ||
-        error?.message?.includes("UNAVAILABLE") ||
-        error?.status === 503;
-
-      if (isRetryable && attempt < maxRetries) {
-        console.log(
-          `[Gemini] Retry ${attempt}/${maxRetries} after ${delayMs}ms...`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
-        continue;
-      }
-      throw error;
-    }
-  }
-  throw lastError;
-};
-
-// Map aspect ratios
-const mapAspectRatio = (ratio) => {
-  const map = {
-    "1:1": "1:1",
-    "9:16": "9:16",
-    "16:9": "16:9",
-    "1.91:1": "16:9",
-    "4:5": "4:5",
-    "3:4": "3:4",
-    "4:3": "4:3",
-    "2:3": "2:3",
-    "3:2": "3:2",
-  };
-  return map[ratio] || "1:1";
-};
-
-// Generate image with Gemini
-const generateGeminiImage = async (
-  prompt,
-  aspectRatio,
-  model = DEFAULT_IMAGE_MODEL,
-  imageSize = "1K",
-  productImages,
-  styleReferenceImage,
-) => {
-  const ai = getGeminiAi();
-  const parts = [{ text: prompt }];
-
-  if (styleReferenceImage) {
-    parts.push({
-      inlineData: {
-        data: styleReferenceImage.base64,
-        mimeType: styleReferenceImage.mimeType,
-      },
-    });
-  }
-
-  if (productImages) {
-    productImages.forEach((img) => {
-      parts.push({
-        inlineData: { data: img.base64, mimeType: img.mimeType },
-      });
-    });
-  }
-
-  const response = await withRetry(() =>
-    ai.models.generateContent({
-      model,
-      contents: { parts },
-      config: {
-        imageConfig: {
-          aspectRatio: mapAspectRatio(aspectRatio),
-          imageSize,
-        },
-      },
-    }),
-  );
-
-  const responseParts = response?.candidates?.[0]?.content?.parts;
-  if (!Array.isArray(responseParts)) {
-    console.error("[Image API] Unexpected response:", JSON.stringify(response, null, 2));
-    throw new Error("Failed to generate image - invalid response structure");
-  }
-
-  for (const part of responseParts) {
-    if (part.inlineData) {
-      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-    }
-  }
-
-  throw new Error("Failed to generate image");
-};
-
-// Generate structured content with Gemini
-const generateStructuredContent = async (
-  model,
-  parts,
-  responseSchema,
-  temperature = 0.7,
-) => {
-  const ai = getGeminiAi();
-
-  const response = await ai.models.generateContent({
-    model,
-    contents: { parts },
-    config: {
-      responseMimeType: "application/json",
-      responseSchema,
-      temperature,
-    },
-  });
-
-  return response.text.trim();
-};
-
-// Generate text with OpenRouter
-const generateTextWithOpenRouter = async (
-  model,
-  systemPrompt,
-  userPrompt,
-  temperature = 0.7,
-) => {
-  const openrouter = getOpenRouter();
-
-  const response = await openrouter.chat.send({
-    model,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    responseFormat: { type: "json_object" },
-    temperature,
-  });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error(`OpenRouter (${model}) no content returned`);
-  }
-
-  return content;
-};
-
-// Generate text with OpenRouter + Vision
-const generateTextWithOpenRouterVision = async (
-  model,
-  textParts,
-  imageParts,
-  temperature = 0.7,
-) => {
-  const openrouter = getOpenRouter();
-
-  const content = textParts.map((text) => ({ type: "text", text }));
-
-  for (const img of imageParts) {
-    content.push({
-      type: "image_url",
-      imageUrl: {
-        url: `data:${img.mimeType};base64,${img.base64}`,
-      },
-    });
-  }
-
-  const response = await openrouter.chat.send({
-    model,
-    messages: [{ role: "user", content }],
-    responseFormat: { type: "json_object" },
-    temperature,
-  });
-
-  const result = response.choices[0]?.message?.content;
-  if (!result) {
-    throw new Error(`OpenRouter (${model}) no content returned`);
-  }
-
-  return result;
-};
-
-// Schema Type constants
-const Type = {
-  OBJECT: "OBJECT",
-  ARRAY: "ARRAY",
-  STRING: "STRING",
-  INTEGER: "INTEGER",
-  BOOLEAN: "BOOLEAN",
-  NUMBER: "NUMBER",
-};
-
-// Prompt builders
-const shouldUseTone = (brandProfile, target) => {
-  const targets = brandProfile.toneTargets || [
-    "campaigns",
-    "posts",
-    "images",
-    "flyers",
-  ];
-  return targets.includes(target);
-};
-
-const getToneText = (brandProfile, target) => {
-  return shouldUseTone(brandProfile, target) ? brandProfile.toneOfVoice : "";
-};
-
-const buildImagePrompt = (
-  prompt,
-  brandProfile,
-  hasStyleReference = false,
-  hasLogo = false,
-  hasProductImages = false,
-  jsonPrompt = null,
-) => {
-  const toneText = getToneText(brandProfile, "images");
-  let fullPrompt = `PROMPT TÉCNICO: ${prompt}
-ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
-
-  if (jsonPrompt) {
-    fullPrompt += `
-
-JSON ESTRUTURADO (REFERÊNCIA):
-\`\`\`json
-${jsonPrompt}
-\`\`\``;
-  }
-
-  if (hasLogo) {
-    fullPrompt += `
-
-**LOGO DA MARCA (OBRIGATÓRIO):**
-- Use o LOGO EXATO fornecido na imagem de referência anexada - NÃO CRIE UM LOGO DIFERENTE
-- O logo deve aparecer de forma clara e legível na composição
-- Mantenha as proporções e cores originais do logo`;
-  }
-
-  if (hasProductImages) {
-    fullPrompt += `
-
-**IMAGENS DE PRODUTO (OBRIGATÓRIO):**
-- As imagens anexadas são referências de produto
-- Preserve fielmente o produto (forma, cores e detalhes principais)
-- O produto deve aparecer com destaque na composição`;
-  }
-
-  if (hasStyleReference) {
-    fullPrompt += `
-
-**TIPOGRAFIA OBRIGATÓRIA PARA CENAS (REGRA INVIOLÁVEL):**
-- Use EXCLUSIVAMENTE fonte BOLD CONDENSED SANS-SERIF (estilo Bebas Neue, Oswald, Impact, ou similar)
-- TODOS os textos devem usar a MESMA família tipográfica - PROIBIDO misturar estilos
-- Títulos em MAIÚSCULAS com peso BLACK ou EXTRA-BOLD
-- PROIBIDO: fontes script/cursivas, serifadas clássicas, handwriting, ou fontes finas/light`;
-  }
-
-  return fullPrompt;
-};
-
-const convertImagePromptToJson = async (
-  prompt,
-  aspectRatio,
-  organizationId,
-  sql,
-) => {
-  const timer = createTimer();
-
-  try {
-    const ai = getGeminiAi();
-    const systemPrompt = getImagePromptSystemPrompt(aspectRatio);
-
-    const response = await ai.models.generateContent({
-      model: DEFAULT_FAST_TEXT_MODEL,
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: `${systemPrompt}\n\nPROMPT: ${prompt}` }],
-        },
-      ],
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.2,
-      },
-    });
-
-    const text = response.text?.trim() || "";
-    let parsed = null;
-
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      parsed = null;
-    }
-
-    const result = JSON.stringify(
-      parsed || {
-        subject: "",
-        environment: "",
-        style: "",
-        camera: "",
-        text: {
-          enabled: false,
-          content: "",
-          language: "pt-BR",
-          placement: "",
-          font: "",
-        },
-        output: {
-          aspect_ratio: aspectRatio,
-          resolution: "2K",
-        },
-      },
-      null,
-      2,
-    );
-
-    const tokens = extractGeminiTokens(response);
-    await logAiUsage(sql, {
-      organizationId,
-      endpoint: '/api/ai/convert-image-prompt',
-      operation: 'text',
-      model: DEFAULT_FAST_TEXT_MODEL,
-      inputTokens: tokens.inputTokens,
-      outputTokens: tokens.outputTokens,
-      latencyMs: timer(),
-      status: 'success',
-    });
-
-    return result;
-  } catch (error) {
-    console.error('[Image Prompt JSON] Error:', error);
-    await logAiUsage(sql, {
-      organizationId,
-      endpoint: '/api/ai/convert-image-prompt',
-      operation: 'text',
-      model: DEFAULT_FAST_TEXT_MODEL,
-      latencyMs: timer(),
-      status: 'failed',
-      error: error.message,
-    }).catch(() => {});
-    return null;
-  }
-};
-
-const buildFlyerPrompt = (brandProfile) => {
-  const toneText = getToneText(brandProfile, "flyers");
-
-  return `
-**PERSONA:** Você é Diretor de Arte Sênior de uma agência de publicidade internacional de elite.
-
-**MISSÃO CRÍTICA:**
-Crie materiais visuais de alta qualidade que representem fielmente a marca e comuniquem a mensagem de forma impactante.
-Se houver valores ou informações importantes no conteúdo, destaque-os visualmente (fonte negrito, cor vibrante ou tamanho maior).
-
-**REGRAS DE CONTEÚDO:**
-1. Destaque informações importantes (valores, datas, horários) de forma clara e legível.
-2. Use a marca ${brandProfile.name}.
-3. Siga a identidade visual da marca em todos os elementos.
-
-**IDENTIDADE DA MARCA - ${brandProfile.name}:**
-${brandProfile.description ? `- Descrição: ${brandProfile.description}` : ""}
-${toneText ? `- Tom de Comunicação: ${toneText}` : ""}
-- Cor Primária (dominante): ${brandProfile.primaryColor}
-- Cor de Acento (destaques, CTAs): ${brandProfile.secondaryColor}
-
-**PRINCÍPIOS DE DESIGN PROFISSIONAL:**
-
-1. HARMONIA CROMÁTICA:
-   - Use APENAS as cores da marca: ${brandProfile.primaryColor} (primária) e ${brandProfile.secondaryColor} (acento)
-   - Crie variações tonais dessas cores para profundidade
-   - Evite introduzir cores aleatórias
-
-2. RESPIRAÇÃO VISUAL (Anti-Poluição):
-   - Menos é mais: priorize espaços negativos estratégicos
-   - Não sobrecarregue com elementos decorativos desnecessários
-   - Hierarquia visual clara
-
-3. TIPOGRAFIA CINEMATOGRÁFICA:
-   - Máximo 2-3 famílias tipográficas diferentes
-   - Contraste forte entre títulos (bold/black) e corpo (regular/medium)
-
-4. ESTÉTICA PREMIUM SEM CLICHÊS:
-   - Evite excesso de efeitos (brilhos, sombras, neons chamativos)
-   - Prefira elegância sutil a ostentação visual
-
-**ATMOSFERA FINAL:**
-- Alta classe, luxo e sofisticação
-- Cinematográfico mas não exagerado
-- Profissional mas criativo
-- Impactante mas elegante`;
-};
-
-const buildQuickPostPrompt = (brandProfile, context) => {
-  const toneText = getToneText(brandProfile, "posts");
-
-  return `
-Você é Social Media Manager de elite. Crie um post de INSTAGRAM de alta performance.
-
-**CONTEXTO:**
-${context}
-
-**MARCA:** ${brandProfile.name}${brandProfile.description ? ` - ${brandProfile.description}` : ""}${toneText ? ` | **TOM:** ${toneText}` : ""}
-
-**REGRAS DE OURO:**
-1. GANCHO EXPLOSIVO com emojis relevantes ao tema.
-2. DESTAQUE informações importantes (valores, datas, ofertas).
-3. CTA FORTE (ex: Link na Bio, Saiba Mais).
-4. 5-8 Hashtags estratégicas relevantes à marca e ao conteúdo.
-
-Responda apenas JSON:
-{ "platform": "Instagram", "content": "Texto Legenda", "hashtags": ["tag1", "tag2"], "image_prompt": "descrição visual" }`;
-};
-
-/**
- * Video prompt JSON conversion system prompt
- */
-const getVideoPromptSystemPrompt = (duration, aspectRatio) => {
-  return `Você é um especialista em prompt engineering para vídeo de IA.
-Converta o prompt genérico fornecido em um JSON estruturado e aninhado otimizado para modelos de geração de vídeo (Veo 3, Sora 2).
-
-O JSON deve incluir detalhes ricos sobre:
-- visual_style: estética, paleta de cores, iluminação
-- camera: movimentos de câmera cinematográficos, posições inicial e final
-- subject: personagem/objeto principal, ação, expressão/estado
-- environment: cenário, props relevantes, atmosfera
-- scene_sequence: 2-3 beats de ação para criar dinamismo
-- technical: duração (${duration} seconds), aspect ratio (${aspectRatio}), tokens de qualidade
-
-**TIPOGRAFIA OBRIGATÓRIA (REGRA CRÍTICA PARA CONSISTÊNCIA VISUAL):**
-Se o vídeo contiver QUALQUER texto na tela (títulos, legendas, overlays, valores, CTAs):
-- Use EXCLUSIVAMENTE fonte BOLD CONDENSED SANS-SERIF (estilo Bebas Neue, Oswald, Impact)
-- TODOS os textos devem usar a MESMA família tipográfica
-- Textos em MAIÚSCULAS com peso BLACK ou EXTRA-BOLD
-- PROIBIDO: fontes script/cursivas, serifadas, handwriting, ou fontes finas/light
-
-Mantenha a essência do prompt original mas expanda com detalhes visuais cinematográficos.`;
-};
-
-const getImagePromptSystemPrompt = (aspectRatio) => {
-  return `Você é especialista em prompt engineering para imagens de IA.
-Converta o prompt fornecido em um JSON estruturado para geração de imagens.
-
-REGRAS IMPORTANTES:
-- NÃO invente detalhes que não existam no prompt original.
-- Preserve exatamente o conteúdo e as instruções do prompt.
-- Se uma informação não estiver explícita, deixe como string vazia.
-- Use linguagem objetiva e direta.
-
-O JSON deve seguir esta estrutura:
-{
-  "subject": "",
-  "environment": "",
-  "style": "",
-  "camera": "",
-  "text": {
-    "enabled": false,
-    "content": "",
-    "language": "pt-BR",
-    "placement": "",
-    "font": ""
-  },
-  "output": {
-    "aspect_ratio": "${aspectRatio}",
-    "resolution": "2K"
-  }
-}
-
-Se houver texto na imagem, marque text.enabled como true e preencha content/placement/font conforme o prompt.`;
-};
-
-// Campaign schema for structured generation
-const campaignSchema = {
-  type: Type.OBJECT,
-  properties: {
-    videoClipScripts: {
-      type: Type.ARRAY,
-      description: "Roteiros para vídeos curtos (Reels/Shorts/TikTok).",
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING },
-          hook: { type: Type.STRING },
-          scenes: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                scene: { type: Type.INTEGER },
-                visual: { type: Type.STRING },
-                narration: { type: Type.STRING },
-                duration_seconds: { type: Type.INTEGER },
-              },
-              required: ["scene", "visual", "narration", "duration_seconds"],
-            },
-          },
-          image_prompt: { type: Type.STRING },
-          audio_script: { type: Type.STRING },
-        },
-        required: ["title", "hook", "scenes", "image_prompt", "audio_script"],
-      },
-    },
-    posts: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          platform: { type: Type.STRING },
-          content: { type: Type.STRING },
-          hashtags: { type: Type.ARRAY, items: { type: Type.STRING } },
-          image_prompt: { type: Type.STRING },
-        },
-        required: ["platform", "content", "hashtags", "image_prompt"],
-      },
-    },
-    adCreatives: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          platform: { type: Type.STRING },
-          headline: { type: Type.STRING },
-          body: { type: Type.STRING },
-          cta: { type: Type.STRING },
-          image_prompt: { type: Type.STRING },
-        },
-        required: ["platform", "headline", "body", "cta", "image_prompt"],
-      },
-    },
-    carousels: {
-      type: Type.ARRAY,
-      description: "Carrosséis para Instagram (4-6 slides cada).",
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING },
-          hook: { type: Type.STRING },
-          cover_prompt: { type: Type.STRING },
-          slides: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                slide: { type: Type.INTEGER },
-                visual: { type: Type.STRING },
-                text: { type: Type.STRING },
-              },
-              required: ["slide", "visual", "text"],
-            },
-          },
-        },
-        required: ["title", "hook", "cover_prompt", "slides"],
-      },
-    },
-  },
-  required: ["videoClipScripts", "posts", "adCreatives", "carousels"],
-};
-
-// Quick post schema
-const quickPostSchema = {
-  type: Type.OBJECT,
-  properties: {
-    platform: { type: Type.STRING },
-    content: { type: Type.STRING },
-    hashtags: { type: Type.ARRAY, items: { type: Type.STRING } },
-    image_prompt: { type: Type.STRING },
-  },
-  required: ["platform", "content", "hashtags", "image_prompt"],
-};
-
-// Helper to resolve user ID (handles both Clerk IDs and UUIDs)
-async function resolveUserId(sql, userId) {
-  if (!userId) return null;
-
-  const uuidPattern =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (uuidPattern.test(userId)) {
-    return userId;
-  }
-
-  const cachedId = getCachedUserId(userId);
-  if (cachedId) {
-    return cachedId;
-  }
-
-  const result = await sql`
-    SELECT id FROM users
-    WHERE auth_provider_id = ${userId}
-    AND deleted_at IS NULL
-    LIMIT 1
-  `;
-
-  if (result.length > 0) {
-    const resolvedId = result[0].id;
-    setCachedUserId(userId, resolvedId);
-    return resolvedId;
-  }
-
-  console.log("[User Lookup] No user found for auth_provider_id:", userId);
-  return null;
-}
-
-// ============================================================================
-// SECURITY: Authentication & Authorization Middleware
-// ============================================================================
-
-// Rate limiting storage (in-memory, use Redis in production for distributed)
 const rateLimitStore = new Map();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 100; // max requests per window
-
-function checkRateLimit(identifier) {
-  const now = Date.now();
-  const record = rateLimitStore.get(identifier);
-
-  if (!record || now - record.windowStart > RATE_LIMIT_WINDOW_MS) {
-    rateLimitStore.set(identifier, { windowStart: now, count: 1 });
-    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1 };
-  }
-
-  if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return { allowed: false, remaining: 0 };
-  }
-
-  record.count++;
-  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - record.count };
-}
-
-// Clean up old rate limit entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, record] of rateLimitStore) {
-    if (now - record.windowStart > RATE_LIMIT_WINDOW_MS * 2) {
-      rateLimitStore.delete(key);
-    }
-  }
-}, 5 * 60 * 1000);
-
-// Middleware: Require authentication
-function requireAuth(req, res, next) {
-  const auth = getAuth(req);
-
-  if (!auth?.userId) {
-    return res.status(401).json({
-      error: "Authentication required",
-      code: "UNAUTHORIZED",
-    });
-  }
-
-  // Apply rate limiting per user
-  const rateLimit = checkRateLimit(auth.userId);
-  res.setHeader("X-RateLimit-Remaining", rateLimit.remaining);
-
-  if (!rateLimit.allowed) {
-    return res.status(429).json({
-      error: "Too many requests. Please try again later.",
-      code: "RATE_LIMIT_EXCEEDED",
-    });
-  }
-
-  req.authUserId = auth.userId;
-  req.authOrgId = auth.orgId || null;
-  next();
-}
-
-// Middleware: Verify user owns the requested resource
-async function requireResourceAccess(req, res, next) {
-  const auth = getAuth(req);
-
-  if (!auth?.userId) {
-    return res.status(401).json({
-      error: "Authentication required",
-      code: "UNAUTHORIZED",
-    });
-  }
-
-  // Get user_id from query or body
-  const requestedUserId =
-    req.query.user_id || req.body?.user_id || req.params?.user_id;
-  const requestedOrgId =
-    req.query.organization_id ||
-    req.body?.organization_id ||
-    req.params?.organization_id;
-
-  // If no user_id provided, attach auth user
-  if (!requestedUserId && !requestedOrgId) {
-    req.authUserId = auth.userId;
-    req.authOrgId = auth.orgId || null;
-    return next();
-  }
-
-  try {
-    const sql = getSql();
-
-    // Resolve the authenticated user's database ID
-    const authDbUser = await sql`
-      SELECT id FROM users
-      WHERE auth_provider_id = ${auth.userId}
-      AND deleted_at IS NULL
-      LIMIT 1
-    `;
-
-    if (authDbUser.length === 0) {
-      return res.status(403).json({
-        error: "User not found in database",
-        code: "USER_NOT_FOUND",
-      });
-    }
-
-    const authDbUserId = authDbUser[0].id;
-
-    // If requesting by organization_id, verify org membership via Clerk
-    if (requestedOrgId) {
-      // Clerk provides orgId in the auth object if user is in that org
-      if (auth.orgId === requestedOrgId) {
-        req.authUserId = auth.userId;
-        req.authDbUserId = authDbUserId;
-        req.authOrgId = requestedOrgId;
-        return next();
-      }
-
-      // Check if user has access to this org
-      return res.status(403).json({
-        error: "Access denied to this organization",
-        code: "ORG_ACCESS_DENIED",
-      });
-    }
-
-    // If requesting by user_id, verify it matches the authenticated user
-    if (requestedUserId) {
-      const resolvedRequestedId = await resolveUserId(sql, requestedUserId);
-
-      // Allow if the requested user_id matches the authenticated user
-      if (
-        resolvedRequestedId === authDbUserId ||
-        requestedUserId === auth.userId
-      ) {
-        req.authUserId = auth.userId;
-        req.authDbUserId = authDbUserId;
-        req.authOrgId = auth.orgId || null;
-        return next();
-      }
-
-      console.warn(
-        `[Security] User ${auth.userId} attempted to access resources for user ${requestedUserId}`,
-      );
-      return res.status(403).json({
-        error: "Access denied to this resource",
-        code: "RESOURCE_ACCESS_DENIED",
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error("[Auth Middleware] Error:", error);
-    return res.status(500).json({ error: "Authentication error" });
-  }
-}
-
-// ============================================================================
-// SECURITY: Input Validation & Sanitization
-// ============================================================================
-
-// Sanitize string input to prevent XSS and injection attacks
-function sanitizeString(input, maxLength = 10000) {
-  if (typeof input !== "string") return "";
-
-  return input
-    .slice(0, maxLength)
-    .replace(/[<>]/g, "") // Remove potential HTML tags
-    .replace(/javascript:/gi, "") // Remove javascript: protocol
-    .replace(/on\w+=/gi, "") // Remove event handlers
-    .trim();
-}
-
-// Validate and sanitize AI prompt input
-function validatePrompt(prompt, fieldName = "prompt") {
-  if (!prompt || typeof prompt !== "string") {
-    return { valid: false, error: `${fieldName} is required and must be a string` };
-  }
-
-  const sanitized = sanitizeString(prompt, 50000);
-
-  if (sanitized.length < 1) {
-    return { valid: false, error: `${fieldName} cannot be empty` };
-  }
-
-  return { valid: true, value: sanitized };
-}
-
-// Validate user_id format
-function validateUserId(userId) {
-  if (!userId) return { valid: false, error: "user_id is required" };
-
-  const uuidPattern =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const clerkPattern = /^user_[a-zA-Z0-9]+$/;
-
-  if (uuidPattern.test(userId) || clerkPattern.test(userId)) {
-    return { valid: true, value: userId };
-  }
-
-  return { valid: false, error: "Invalid user_id format" };
-}
-
-// Validate URL format
-function validateUrl(url, allowedDomains = []) {
-  if (!url) return { valid: true, value: null };
-
-  try {
-    const parsed = new URL(url);
-
-    // Only allow http and https protocols
-    if (!["http:", "https:"].includes(parsed.protocol)) {
-      return { valid: false, error: "Invalid URL protocol" };
-    }
-
-    // If allowed domains specified, check against them
-    if (allowedDomains.length > 0) {
-      const isAllowed = allowedDomains.some(
-        (domain) =>
-          parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`),
-      );
-      if (!isAllowed) {
-        return { valid: false, error: "URL domain not allowed" };
-      }
-    }
-
-    return { valid: true, value: url };
-  } catch {
-    return { valid: false, error: "Invalid URL format" };
-  }
-}
-
-// Rate limit for AI endpoints (stricter than general rate limit)
 const AI_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const AI_RATE_LIMIT_MAX_REQUESTS = 30; // max AI requests per window
 
@@ -1088,540 +167,212 @@ function requireAuthWithAiRateLimit(req, res, next) {
 }
 
 // ============================================================================
-// BULLMQ JOB PROCESSOR
+// LOGGING: Clean, organized request tracking
+// ============================================================================
+let requestCounter = 0;
+const requestLog = new Map();
+
+// ANSI colors for terminal
+const colors = {
+  reset: "\x1b[0m",
+  dim: "\x1b[2m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  blue: "\x1b[34m",
+  cyan: "\x1b[36m",
+  red: "\x1b[31m",
+  magenta: "\x1b[35m",
+};
+
+// ============================================================================
+// LOGGING HELPERS
 // ============================================================================
 
-/**
- * Process video generation jobs
- */
-const processVideoGenerationJob = async (job, jobId, prompt, config, sql) => {
-  console.log(`[JobProcessor] Processing VIDEO job ${jobId}`);
-
-  const {
-    model,
-    aspectRatio,
-    imageUrl,
-    lastFrameUrl,
-    sceneDuration,
-    useInterpolation,
-  } = config;
-  const isInterpolationMode = useInterpolation && lastFrameUrl;
-
-  job.updateProgress(20);
-
-  let videoUrl;
-  let result;
-
-  // Use fal.ai for video generation (or Google API for interpolation)
-  if (model === "sora-2") {
-    // Sora model
-    if (imageUrl) {
-      result = await fal.subscribe("fal-ai/sora-2/image-to-video", {
-        input: {
-          prompt,
-          image_url: imageUrl,
-          duration: sceneDuration || 5,
-          aspect_ratio: aspectRatio || "9:16",
-          delete_video: false,
-        },
-      });
-    } else {
-      result = await fal.subscribe("fal-ai/sora-2/text-to-video", {
-        input: {
-          prompt,
-          duration: sceneDuration || 5,
-          aspect_ratio: aspectRatio || "9:16",
-          delete_video: false,
-        },
-      });
-    }
-    videoUrl = result?.data?.video?.url || result?.video?.url || "";
-  } else {
-    // Veo 3.1 model - try Google API first, fallback to FAL.ai
-    try {
-      videoUrl = await generateVideoWithGoogleVeo(
-        prompt,
-        aspectRatio || "9:16",
-        imageUrl,
-        isInterpolationMode ? lastFrameUrl : null,
-      );
-    } catch (googleError) {
-      console.log(
-        `[JobProcessor] Google Veo failed: ${googleError.message}`,
-      );
-      console.log("[JobProcessor] Falling back to FAL.ai...");
-      const duration = isInterpolationMode
-        ? "8s"
-        : sceneDuration
-          ? String(sceneDuration)
-          : "5";
-      if (imageUrl) {
-        result = await fal.subscribe("fal-ai/veo3.1/fast/image-to-video", {
-          input: {
-            prompt,
-            image_url: imageUrl,
-            duration,
-            aspect_ratio: aspectRatio || "9:16",
-          },
-        });
-      } else {
-        result = await fal.subscribe("fal-ai/veo3.1/fast", {
-          input: {
-            prompt,
-            duration,
-            aspect_ratio: aspectRatio || "9:16",
-          },
-        });
-      }
-      videoUrl = result?.data?.video?.url || result?.video?.url || "";
-    }
-  }
-
-  job.updateProgress(70);
-
-  if (!videoUrl) {
-    throw new Error("Failed to generate video - invalid response");
-  }
-
-  console.log(`[JobProcessor] Video generated: ${videoUrl}`);
-
-  // Download video and upload to Vercel Blob for persistence
-  const videoResponse = await fetch(videoUrl);
-  const videoBlob = await videoResponse.blob();
-
-  const filename = `${model || "veo"}-video-${jobId}.mp4`;
-  const blob = await put(filename, videoBlob, {
-    access: "public",
-    contentType: "video/mp4",
-  });
-
-  job.updateProgress(90);
-
-  return { resultUrl: blob.url };
-};
-
-const resolveJobImage = async (image) => {
-  if (!image) return null;
-
-  if (typeof image === "string") {
-    if (image.startsWith("data:")) {
-      const [header, data] = image.split(",");
-      const mimeType = header.match(/data:(.*?);/)?.[1] || "image/png";
-      return { base64: data, mimeType };
-    }
-
-    const base64 = await urlToBase64(image);
-    if (!base64) return null;
-    return { base64, mimeType: "image/png" };
-  }
-
-  if (image.base64) {
-    return {
-      base64: image.base64,
-      mimeType: image.mimeType || "image/png",
-    };
-  }
-
-  return null;
-};
-
-/**
- * Process generic image generation jobs (simple prompt-based)
- */
-const processImageGenerationJob = async (job, jobId, prompt, config, sql) => {
-  console.log(`[JobProcessor] Processing IMAGE job ${jobId}`);
-
-  const ai = getGeminiAi();
-  const model = config.model || DEFAULT_IMAGE_MODEL;
-
-  // Build parts array
-  const parts = [];
-
-  // Add system instruction for image generation
-  const systemPrompt = config.systemPrompt || `You are an expert image generator. Create a high-quality image based on the user's description.
-Style: ${config.style || "photorealistic"}
-Mood: ${config.mood || "professional"}`;
-
-  parts.push({ text: systemPrompt });
-  parts.push({ text: `Generate an image: ${prompt}` });
-
-  // Add reference image if provided
-  if (config.referenceImage) {
-    const refData = await urlToBase64(config.referenceImage);
-    if (refData) {
-      parts.push({ text: "Use this as style reference:" });
-      parts.push({ inlineData: { data: refData, mimeType: "image/png" } });
-    }
-  }
-
-  // Add edit source image if provided (for image editing)
-  if (config.sourceImage) {
-    const srcData = await urlToBase64(config.sourceImage);
-    if (srcData) {
-      parts.push({ text: "Edit this image according to the instructions:" });
-      parts.push({ inlineData: { data: srcData, mimeType: "image/png" } });
-    }
-  }
-
-  if (config.productImages && config.productImages.length > 0) {
-    for (const image of config.productImages) {
-      const resolved = await resolveJobImage(image);
-      if (resolved) {
-        parts.push({ text: "Use this product image as reference:" });
-        parts.push({
-          inlineData: { data: resolved.base64, mimeType: resolved.mimeType },
-        });
-      }
-    }
-  }
-
-  job.updateProgress(30);
-
-  // Generate image
-  const response = await withRetry(() =>
-    ai.models.generateContent({
-      model,
-      contents: { parts },
-      config: {
-        imageConfig: {
-          aspectRatio: mapAspectRatio(config.aspectRatio || "1:1"),
-          imageSize: config.imageSize || "1K",
-        },
-      },
-    }),
+function logExternalAPI(service, action, details = "") {
+  const timestamp = new Date().toLocaleTimeString("pt-BR");
+  console.log(
+    `${colors.magenta}[${service}]${colors.reset} ${colors.cyan}${action}${colors.reset}${details ? ` ${colors.dim}${details}${colors.reset}` : ""}`,
   );
+}
 
-  job.updateProgress(70);
+function logExternalAPIResult(service, action, duration, success = true) {
+  const status = success
+    ? `${colors.green}✓${colors.reset}`
+    : `${colors.red}✗${colors.reset}`;
+  console.log(
+    `${colors.magenta}[${service}]${colors.reset} ${status} ${action} ${colors.dim}${duration}ms${colors.reset}`,
+  );
+}
 
-  // Extract image from response
-  let imageDataUrl = null;
-  for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) {
-      imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      break;
-    }
+function logError(context, error) {
+  console.error(`\n${colors.red}━━━ ERROR: ${context} ━━━${colors.reset}`);
+  console.error(`${colors.red}Message:${colors.reset}`, error.message);
+  if (error.stack) {
+    console.error(`${colors.dim}${error.stack}${colors.reset}`);
   }
-
-  if (!imageDataUrl) {
-    throw new Error("AI failed to generate image");
-  }
-
-  // Upload to Vercel Blob
-  const matches = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
-  if (!matches) throw new Error("Invalid image data");
-
-  const [, mimeType, base64Data] = matches;
-  const buffer = Buffer.from(base64Data, "base64");
-  const extension = mimeType.split("/")[1] || "png";
-
-  const blob = await put(`generated/image-${jobId}.${extension}`, buffer, {
-    access: "public",
-    contentType: mimeType,
-  });
-
-  job.updateProgress(90);
-
-  // Get owner info
-  const jobOwner = await sql`
-    SELECT user_id, organization_id FROM generation_jobs WHERE id = ${jobId}
-  `;
-
-  if (jobOwner.length === 0) {
-    throw new Error("Job record not found");
-  }
-
-  // Save to gallery
-  const galleryResult = await sql`
-    INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, source, model, aspect_ratio, image_size)
-    VALUES (
-      ${jobOwner[0].user_id},
-      ${jobOwner[0].organization_id},
-      ${blob.url},
-      ${prompt},
-      ${config.source || "AI Generated"},
-      ${model},
-      ${config.aspectRatio || "1:1"},
-      ${config.imageSize || "1K"}
-    )
-    RETURNING id
-  `;
-
-  const galleryId = galleryResult[0]?.id;
-
-  // Mark as completed
-  await sql`
-    UPDATE generation_jobs
-    SET status = 'completed',
-        result_url = ${blob.url},
-        result_gallery_id = ${galleryId},
-        completed_at = NOW(),
-        progress = 100
-    WHERE id = ${jobId}
-  `;
-
-  return { resultUrl: blob.url, galleryId };
-};
-
-/**
- * Process all generation jobs from BullMQ queue
- */
-const processGenerationJob = async (job) => {
-  const { jobId, prompt, config } = job.data;
-  const sql = getSql();
-
-  console.log(`[JobProcessor] Processing job ${jobId}`);
-
-  try {
-    // Get job type from database
-    const jobRecord = await sql`
-      SELECT job_type, user_id, organization_id FROM generation_jobs WHERE id = ${jobId}
-    `;
-
-    if (jobRecord.length === 0) {
-      throw new Error("Job record not found");
-    }
-
-    const jobType = jobRecord[0].job_type;
-
-    // Mark as processing
-    await sql`
-      UPDATE generation_jobs
-      SET status = 'processing',
-          started_at = NOW(),
-          attempts = COALESCE(attempts, 0) + 1
-      WHERE id = ${jobId}
-    `;
-
-    job.updateProgress(10);
-
-    // Handle video jobs
-    if (jobType === "video") {
-      const { resultUrl } = await processVideoGenerationJob(
-        job,
-        jobId,
-        prompt,
-        config,
-        sql,
-      );
-
-      // Mark as completed
-      await sql`
-        UPDATE generation_jobs
-        SET status = 'completed',
-            result_url = ${resultUrl},
-            completed_at = NOW(),
-            progress = 100
-        WHERE id = ${jobId}
-      `;
-
-      console.log(`[JobProcessor] Completed VIDEO job ${jobId}`);
-      return { success: true, resultUrl };
-    }
-
-    // Handle generic image jobs (simple prompt-based generation)
-    if (jobType === "image") {
-      const { resultUrl, galleryId } = await processImageGenerationJob(
-        job,
-        jobId,
-        prompt,
-        config,
-        sql,
-      );
-
-      console.log(`[JobProcessor] Completed IMAGE job ${jobId}`);
-      return { success: true, resultUrl, galleryId };
-    }
-
-    // Continue with flyer/branded image generation for other job types...
-
-    // Build brand profile object for helpers
-    const brandProfile = {
-      name: config.brandName,
-      description: config.brandDescription,
-      toneOfVoice: config.brandToneOfVoice,
-      primaryColor: config.brandPrimaryColor,
-      secondaryColor: config.brandSecondaryColor,
-    };
-
-    // Generate the image using existing helper
-    const ai = getGeminiAi();
-    const brandingInstruction = buildFlyerPrompt(brandProfile);
-
-    const parts = [
-      { text: brandingInstruction },
-      { text: `DADOS DO FLYER PARA INSERIR NA ARTE:\n${prompt}` },
-    ];
-
-    // Add logo if provided (handles data URLs, HTTP URLs, and raw base64)
-    if (config.logo) {
-      const logoData = await urlToBase64(config.logo);
-      if (logoData) {
-        parts.push({ inlineData: { data: logoData, mimeType: "image/png" } });
-      }
-    }
-
-    // Add collab logo if provided
-    if (config.collabLogo) {
-      const collabData = await urlToBase64(config.collabLogo);
-      if (collabData) {
-        parts.push({ inlineData: { data: collabData, mimeType: "image/png" } });
-      }
-    }
-
-    // Add style reference if provided
-    if (config.styleReference) {
-      const refData = await urlToBase64(config.styleReference);
-      if (refData) {
-        parts.push({
-          text: "USE ESTA IMAGEM COMO REFERÊNCIA DE LAYOUT E FONTES:",
-        });
-        parts.push({ inlineData: { data: refData, mimeType: "image/png" } });
-      }
-    }
-
-    if (config.productImages && config.productImages.length > 0) {
-      for (const image of config.productImages) {
-        const resolved = await resolveJobImage(image);
-        if (resolved) {
-          parts.push({ text: "Imagem de produto para referência:" });
-          parts.push({
-            inlineData: { data: resolved.base64, mimeType: resolved.mimeType },
-          });
-        }
-      }
-    }
-
-    // Add composition assets
-    if (config.compositionAssets && config.compositionAssets.length > 0) {
-      for (let i = 0; i < config.compositionAssets.length; i++) {
-        const assetData = await urlToBase64(config.compositionAssets[i]);
-        if (assetData) {
-          parts.push({ text: `Ativo de composição ${i + 1}:` });
-          parts.push({
-            inlineData: { data: assetData, mimeType: "image/png" },
-          });
-        }
-      }
-    }
-
-    job.updateProgress(30);
-
-    const response = await withRetry(() =>
-      ai.models.generateContent({
-        model: config.model || "gemini-3-pro-image-preview",
-        contents: { parts },
-        config: {
-          imageConfig: {
-            aspectRatio: mapAspectRatio(config.aspectRatio),
-            imageSize: config.imageSize || "1K",
-          },
-        },
-      }),
+  if (error.response?.data) {
+    console.error(
+      `${colors.yellow}Response:${colors.reset}`,
+      JSON.stringify(error.response.data, null, 2),
     );
+  }
+  console.error(`${colors.red}━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}\n`);
+}
 
-    job.updateProgress(70);
+function logQuery(requestId, _endpoint, _queryName) {
+  if (!requestLog.has(requestId)) {
+    requestLog.set(requestId, 0);
+  }
+  requestLog.set(requestId, requestLog.get(requestId) + 1);
+}
 
-    // Extract image from response
-    let imageDataUrl = null;
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        break;
-      }
-    }
+function logRequestSummary(requestId, _endpoint) {
+  requestLog.delete(requestId);
+}
 
-    if (!imageDataUrl) {
-      throw new Error("AI failed to generate image");
-    }
+// Cache for resolved user IDs (5 minute TTL)
+const userIdCache = new Map();
+const USER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-    // Upload to Vercel Blob
-    const matches = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    if (!matches) throw new Error("Invalid image data");
+function getCachedUserId(clerkId) {
+  const cached = userIdCache.get(clerkId);
+  if (cached && Date.now() - cached.timestamp < USER_CACHE_TTL) {
+    return cached.userId;
+  }
+  return null;
+}
 
-    const [, mimeType, base64Data] = matches;
-    const buffer = Buffer.from(base64Data, "base64");
-    const extension = mimeType.split("/")[1] || "png";
+function setCachedUserId(clerkId, userId) {
+  userIdCache.set(clerkId, { userId, timestamp: Date.now() });
+}
 
-    const blob = await put(`generated/${jobId}.${extension}`, buffer, {
-      access: "public",
-      contentType: mimeType,
-    });
+function getSql() {
+  if (!DATABASE_URL) {
+    throw new Error("DATABASE_URL not configured");
+  }
+  return neon(DATABASE_URL);
+}
 
-    job.updateProgress(90);
-
-    // Get user_id from job record
-    const jobOwner = await sql`
-      SELECT user_id, organization_id FROM generation_jobs WHERE id = ${jobId}
+async function ensureGallerySourceType(sql) {
+  try {
+    const result = await sql`
+      SELECT data_type, udt_name
+      FROM information_schema.columns
+      WHERE table_name = 'gallery_images' AND column_name = 'source'
+      LIMIT 1
     `;
 
-    if (jobOwner.length === 0) {
-      throw new Error("Job record not found");
-    }
+    const column = result?.[0];
+    if (!column) return;
 
-    // Save to gallery
-    const galleryResult = await sql`
-      INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, source, model, aspect_ratio, image_size)
-      VALUES (
-        ${jobOwner[0].user_id},
-        ${jobOwner[0].organization_id},
-        ${blob.url},
-        ${prompt},
-        ${config.source || "Flyer"},
-        ${config.model || "gemini-3-pro-image-preview"},
-        ${config.aspectRatio},
-        ${config.imageSize || "1K"}
-      )
-      RETURNING id
-    `;
-
-    const galleryId = galleryResult[0]?.id;
-
-    // Mark as completed
-    await sql`
-      UPDATE generation_jobs
-      SET status = 'completed',
-          result_url = ${blob.url},
-          result_gallery_id = ${galleryId},
-          completed_at = NOW(),
-          progress = 100
-      WHERE id = ${jobId}
-    `;
+    const isEnum =
+      column.data_type === "USER-DEFINED" && column.udt_name === "image_source";
+    if (!isEnum) return;
 
     console.log(
-      `[JobProcessor] Completed job ${jobId}, gallery ID: ${galleryId}`,
+      "[Dev API Server] Migrating gallery_images.source from enum to varchar...",
+    );
+    await sql`ALTER TABLE gallery_images ALTER COLUMN source TYPE VARCHAR(100) USING source::text`;
+    await sql`DROP TYPE IF EXISTS image_source`;
+    console.log("[Dev API Server] gallery_images.source migration complete");
+  } catch (error) {
+    console.error(
+      "[Dev API Server] Failed to migrate gallery_images.source:",
+      error?.message || error,
+    );
+  }
+}
+
+// Helper to resolve user ID (handles both Clerk IDs and UUIDs)
+// Clerk IDs look like: user_2qyqJjnqMXEGJWJNf9jx86C0oQT
+// UUIDs look like: 550e8400-e29b-41d4-a716-446655440000
+// NOW WITH CACHING to avoid repeated DB lookups!
+async function resolveUserId(sql, userId, requestId = 0) {
+  if (!userId) return null;
+
+  // Check if it's a UUID format (8-4-4-4-12 hex characters)
+  const uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidPattern.test(userId)) {
+    return userId; // Already a UUID
+  }
+
+  // Check cache first
+  const cachedId = getCachedUserId(userId);
+  if (cachedId) {
+    return cachedId;
+  }
+
+  // It's a Clerk ID - look up the user by auth_provider_id
+  logQuery(requestId, "resolveUserId", "users.auth_provider_id lookup");
+  const result = await sql`
+    SELECT id FROM users
+    WHERE auth_provider_id = ${userId}
+    AND deleted_at IS NULL
+    LIMIT 1
+  `;
+
+  if (result.length > 0) {
+    const resolvedId = result[0].id;
+    setCachedUserId(userId, resolvedId); // Cache it!
+    return resolvedId;
+  }
+
+  // User doesn't exist - return the original ID (will fail on insert, but that's expected)
+  console.log("[User Lookup] No user found for auth_provider_id:", userId);
+  return null;
+}
+
+// ============================================================================
+// RLS: Set session variables for Row Level Security
+// This MUST be called before any queries that should be protected by RLS
+// ============================================================================
+async function setRLSContext(sql, userId, organizationId = null) {
+  if (!userId) return;
+
+  try {
+    // Set both variables in a single query for efficiency
+    await sql`
+      SELECT
+        set_config('app.user_id', ${userId}, true),
+        set_config('app.organization_id', ${organizationId || ""}, true)
+    `;
+  } catch (error) {
+    // Don't fail the request if RLS context can't be set
+    // The application-level security (WHERE clauses) will still work
+    console.warn("[RLS] Failed to set context:", error.message);
+  }
+}
+
+// ============================================================================
+// Request logging middleware - clean, organized output
+// ============================================================================
+app.use("/api/db", (req, res, next) => {
+  const reqId = ++requestCounter;
+  req.requestId = reqId;
+  const start = Date.now();
+
+  // Extract clean endpoint name
+  const endpoint = req.originalUrl.split("?")[0].replace("/api/db/", "");
+  const method = req.method.padEnd(4);
+
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    const status = res.statusCode;
+    const statusColor = status < 400 ? colors.green : colors.red;
+    const durationColor = duration > 500 ? colors.yellow : colors.dim;
+
+    console.log(
+      `${colors.cyan}${method}${colors.reset} /${endpoint} ${statusColor}${status}${colors.reset} ${durationColor}${duration}ms${colors.reset}`,
     );
 
-    return { success: true, resultUrl: blob.url, galleryId };
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    console.error(`[JobProcessor] Error for job ${jobId}:`, errorMessage);
+    logRequestSummary(reqId, req.originalUrl);
+  });
 
-    // Update job as failed
-    await sql`
-      UPDATE generation_jobs
-      SET status = 'failed',
-          error_message = ${errorMessage}
-      WHERE id = ${jobId}
-    `;
-
-    throw error;
-  }
-};
-
-// Redis URL for BullMQ (initialized after server starts)
-const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL;
-
-// ============================================================================
-// API ROUTES
-// ============================================================================
-
-// Simple health check (no DB dependency - for Railway healthcheck)
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+  next();
 });
 
-// DB Health check
+// Health check
 app.get("/api/db/health", async (req, res) => {
   try {
     const sql = getSql();
@@ -1675,43 +426,12 @@ async function requireSuperAdmin(req, res, next) {
   }
 }
 
-// Admin: Verify if current user is admin (for frontend to check admin status securely)
-app.get("/api/admin/verify-admin", requireAuth, async (req, res) => {
-  try {
-    const auth = getAuth(req);
-    if (!auth?.userId) {
-      return res.json({ isAdmin: false });
-    }
-
-    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
-    const userResponse = await fetch(
-      `https://api.clerk.com/v1/users/${auth.userId}`,
-      {
-        headers: { Authorization: `Bearer ${clerkSecretKey}` },
-      },
-    );
-
-    if (!userResponse.ok) {
-      return res.json({ isAdmin: false });
-    }
-
-    const userData = await userResponse.json();
-    const userEmail =
-      userData.email_addresses?.[0]?.email_address?.toLowerCase();
-
-    const isAdmin = userEmail && SUPER_ADMIN_EMAILS.includes(userEmail);
-    res.json({ isAdmin });
-  } catch (error) {
-    console.error("[Admin] Verify admin error:", error);
-    res.json({ isAdmin: false });
-  }
-});
-
 // Admin: Get overview stats
 app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
   try {
     const sql = getSql();
 
+    // Get all stats in parallel
     // Note: organizations are managed by Clerk, not in our DB
     const [
       usersResult,
@@ -1741,7 +461,7 @@ app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
 
     res.json({
       totalUsers: parseInt(usersResult[0]?.count || 0),
-      activeUsersToday: 0,
+      activeUsersToday: 0, // Would need session tracking
       totalOrganizations: parseInt(orgCountResult[0]?.count || 0),
       totalCampaigns: parseInt(campaignsResult[0]?.count || 0),
       totalScheduledPosts: parseInt(postsResult[0]?.count || 0),
@@ -1775,6 +495,7 @@ app.get("/api/admin/usage", requireSuperAdmin, async (req, res) => {
       ORDER BY date DESC
     `;
 
+    // Aggregate by date
     const aggregated = {};
     for (const row of timeline) {
       const dateKey = row.date instanceof Date
@@ -2039,31 +760,101 @@ app.get("/api/admin/logs", requireSuperAdmin, async (req, res) => {
   }
 });
 
-// Unified initial data endpoint - Protected
-app.get("/api/db/init", requireResourceAccess, async (req, res) => {
+// ============================================================================
+// DEBUG: Stats endpoint to monitor database usage
+// ============================================================================
+app.get("/api/db/stats", (req, res) => {
+  res.json({
+    totalRequests: requestCounter,
+    totalQueries: queryCounter,
+    avgQueriesPerRequest:
+      requestCounter > 0 ? (queryCounter / requestCounter).toFixed(2) : 0,
+    cachedUserIds: userIdCache.size,
+    timestamp: new Date().toISOString(),
+    message: "Check server console for detailed per-request logging",
+  });
+});
+
+// Reset stats (useful for testing)
+app.post("/api/db/stats/reset", (req, res) => {
+  requestCounter = 0;
+  queryCounter = 0;
+  userIdCache.clear();
+  console.log("[STATS] Counters reset");
+  res.json({ success: true, message: "Stats reset" });
+});
+
+// ============================================================================
+// OPTIMIZED: Unified initial data endpoint
+// Loads ALL user data in a SINGLE request instead of 6 separate requests
+// This dramatically reduces network transfer and connection overhead
+// ============================================================================
+app.get("/api/db/init", async (req, res) => {
+  const reqId = req.requestId || ++requestCounter;
   const start = Date.now();
 
   try {
     const sql = getSql();
-    const { user_id, organization_id } = req.query;
+    const { user_id, organization_id, clerk_user_id } = req.query;
 
-    if (!user_id) {
-      return res.status(400).json({ error: "user_id is required" });
+    if (!user_id && !clerk_user_id) {
+      return res.status(400).json({ error: "user_id or clerk_user_id is required" });
     }
 
-    const resolvedUserId = await resolveUserId(sql, user_id);
-    if (!resolvedUserId) {
-      return res.json({
-        brandProfile: null,
-        gallery: [],
-        scheduledPosts: [],
-        campaigns: [],
-        tournamentSchedule: null,
-        tournamentEvents: [],
-        schedulesList: [],
-      });
+    // If clerk_user_id is provided explicitly, try to find/create user
+    let resolvedUserId = null;
+    if (clerk_user_id) {
+      // First check if it's a UUID (db user id)
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidPattern.test(clerk_user_id)) {
+        resolvedUserId = clerk_user_id;
+      } else {
+        // It's a Clerk ID - look up or create the user
+        resolvedUserId = await resolveUserId(sql, clerk_user_id, reqId);
+        if (!resolvedUserId) {
+          // User doesn't exist yet - this happens during parallel loading
+          // Return empty data - the frontend will retry after user sync completes
+          console.log("[Init API] User not found for clerk_user_id:", clerk_user_id);
+          return res.json({
+            brandProfile: null,
+            gallery: [],
+            scheduledPosts: [],
+            campaigns: [],
+            tournamentSchedule: null,
+            tournamentEvents: [],
+            schedulesList: [],
+            _meta: {
+              loadTime: Date.now() - start,
+              queriesExecuted: 0,
+              timestamp: new Date().toISOString(),
+              userNotFound: true, // Signal to frontend to retry
+            },
+          });
+        }
+      }
+    } else if (user_id) {
+      // Original behavior: resolve user_id
+      resolvedUserId = await resolveUserId(sql, user_id, reqId);
+      if (!resolvedUserId) {
+        console.log("[Init API] User not found, returning empty data");
+        return res.json({
+          brandProfile: null,
+          gallery: [],
+          scheduledPosts: [],
+          campaigns: [],
+          tournamentSchedule: null,
+          tournamentEvents: [],
+          schedulesList: [],
+        });
+      }
     }
 
+    // Note: RLS context via session vars doesn't work with Neon serverless pooler
+    // Security is enforced via WHERE clauses in each query (application-level)
+    // RLS policies protect direct database access (psql, DB clients)
+
+    // Run ALL queries in parallel - this is the key optimization!
+    // PERFORMANCE: Tournaments are now loaded lazily (only when user opens tournaments tab)
     const isOrgContext = !!organization_id;
 
     const [
@@ -2071,195 +862,133 @@ app.get("/api/db/init", requireResourceAccess, async (req, res) => {
       galleryResult,
       scheduledPostsResult,
       campaignsResult,
-      tournamentResult,
       schedulesListResult,
     ] = await Promise.all([
+      // 1. Brand Profile
       isOrgContext
         ? sql`SELECT * FROM brand_profiles WHERE organization_id = ${organization_id} AND deleted_at IS NULL LIMIT 1`
         : sql`SELECT * FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`,
 
+      // 2. Gallery Images (limited to 20 most recent for faster initial load)
       // OPTIMIZATION: Exclude 'src' column (base64 image data) to reduce egress
-      // Only return lightweight metadata for gallery listing
       isOrgContext
-        ? sql`SELECT id, user_id, organization_id, source, thumbnail_url, created_at, updated_at, deleted_at FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50`
-        : sql`SELECT id, user_id, organization_id, source, thumbnail_url, created_at, updated_at, deleted_at FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50`,
+        ? sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20`
+        : sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20`,
 
+      // 3. Scheduled Posts (SMART LOADING: last 7 days + next 60 days)
+      // Shows recent activity + upcoming schedule without arbitrary limits
+      // NOTE: scheduled_timestamp is bigint (unix ms), convert NOW() to match
       isOrgContext
-        ? sql`SELECT * FROM scheduled_posts WHERE organization_id = ${organization_id} ORDER BY scheduled_timestamp ASC LIMIT 100`
-        : sql`SELECT * FROM scheduled_posts WHERE user_id = ${resolvedUserId} AND organization_id IS NULL ORDER BY scheduled_timestamp ASC LIMIT 100`,
+        ? sql`
+          SELECT * FROM scheduled_posts
+          WHERE organization_id = ${organization_id}
+            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
+            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
+          ORDER BY scheduled_timestamp ASC
+        `
+        : sql`
+          SELECT * FROM scheduled_posts
+          WHERE user_id = ${resolvedUserId}
+            AND organization_id IS NULL
+            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
+            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
+          ORDER BY scheduled_timestamp ASC
+        `,
 
+      // 4. Campaigns with counts (OPTIMIZED: simple subqueries for preview URLs)
+      // Only fetch from main tables (posts/ads/clips), not from gallery_images
       isOrgContext
         ? sql`
           SELECT
-            c.id, c.user_id, c.organization_id, c.name, c.description, c.status, c.created_at, c.updated_at,
+            c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at,
             COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
             COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
             COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-            COALESCE(
-              (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE video_script_id IN (SELECT id FROM video_clip_scripts WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1)
-            ) as clip_preview_url,
-            COALESCE(
-              (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
-              (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL AND cover_url NOT LIKE 'data:%' LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE post_id IN (SELECT id FROM posts WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE carousel_script_id IN (SELECT id FROM carousel_scripts WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1)
-            ) as post_preview_url,
-            COALESCE(
-              (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE ad_creative_id IN (SELECT id FROM ad_creatives WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1)
-            ) as ad_preview_url
+            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
+            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
+            (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url
           FROM campaigns c
           WHERE c.organization_id = ${organization_id} AND c.deleted_at IS NULL
           ORDER BY c.created_at DESC
-          LIMIT 20
+          LIMIT 10
         `
         : sql`
           SELECT
-            c.id, c.user_id, c.organization_id, c.name, c.description, c.status, c.created_at, c.updated_at,
+            c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at,
             COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
             COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
             COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-            COALESCE(
-              (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE video_script_id IN (SELECT id FROM video_clip_scripts WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1)
-            ) as clip_preview_url,
-            COALESCE(
-              (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
-              (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL AND cover_url NOT LIKE 'data:%' LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE post_id IN (SELECT id FROM posts WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE carousel_script_id IN (SELECT id FROM carousel_scripts WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1)
-            ) as post_preview_url,
-            COALESCE(
-              (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
-              (SELECT src_url FROM gallery_images
-               WHERE ad_creative_id IN (SELECT id FROM ad_creatives WHERE campaign_id = c.id)
-                 AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-               ORDER BY created_at DESC
-               LIMIT 1)
-            ) as ad_preview_url
+            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
+            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
+            (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url
           FROM campaigns c
           WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL
           ORDER BY c.created_at DESC
-          LIMIT 20
+          LIMIT 10
         `,
 
+      // 5. Week schedules list (for flyers page - show saved spreadsheets)
       isOrgContext
         ? sql`
           SELECT
-            ws.*,
-            COALESCE(
-              (SELECT json_agg(te ORDER BY te.day_of_week, te.name)
-               FROM tournament_events te
-               WHERE te.week_schedule_id = ws.id),
-              '[]'::json
-            ) as events
+            ws.id,
+            ws.user_id,
+            ws.organization_id,
+            ws.original_filename as name,
+            ws.start_date,
+            ws.end_date,
+            ws.created_at,
+            ws.updated_at,
+            COUNT(te.id)::int as event_count
           FROM week_schedules ws
+          LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id
           WHERE ws.organization_id = ${organization_id}
+          GROUP BY ws.id, ws.original_filename
           ORDER BY ws.created_at DESC
-          LIMIT 1
         `
         : sql`
           SELECT
-            ws.*,
-            COALESCE(
-              (SELECT json_agg(te ORDER BY te.day_of_week, te.name)
-               FROM tournament_events te
-               WHERE te.week_schedule_id = ws.id),
-              '[]'::json
-            ) as events
+            ws.id,
+            ws.user_id,
+            ws.organization_id,
+            ws.original_filename as name,
+            ws.start_date,
+            ws.end_date,
+            ws.created_at,
+            ws.updated_at,
+            COUNT(te.id)::int as event_count
           FROM week_schedules ws
+          LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id
           WHERE ws.user_id = ${resolvedUserId} AND ws.organization_id IS NULL
+          GROUP BY ws.id, ws.original_filename
           ORDER BY ws.created_at DESC
-          LIMIT 1
-        `,
-
-      isOrgContext
-        ? sql`
-          SELECT ws.*, COUNT(te.id)::int as event_count
-          FROM week_schedules ws
-          LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id
-          WHERE ws.organization_id = ${organization_id}
-          GROUP BY ws.id
-          ORDER BY ws.start_date DESC
-          LIMIT 10
-        `
-        : sql`
-          SELECT ws.*, COUNT(te.id)::int as event_count
-          FROM week_schedules ws
-          LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id
-          WHERE ws.user_id = ${resolvedUserId} AND ws.organization_id IS NULL
-          GROUP BY ws.id
-          ORDER BY ws.start_date DESC
-          LIMIT 10
         `,
     ]);
 
-    const duration = Date.now() - start;
-    const tournamentData = tournamentResult[0] || null;
-
+    // PERFORMANCE: Only tournament schedule/events are loaded lazily via /api/db/tournaments
+    // schedulesList is loaded here because it's essential for flyers page
     res.json({
       brandProfile: brandProfileResult[0] || null,
       gallery: galleryResult,
       scheduledPosts: scheduledPostsResult,
       campaigns: campaignsResult,
-      tournamentSchedule: tournamentData
-        ? {
-            id: tournamentData.id,
-            user_id: tournamentData.user_id,
-            organization_id: tournamentData.organization_id,
-            start_date: tournamentData.start_date,
-            end_date: tournamentData.end_date,
-            filename: tournamentData.filename,
-            daily_flyer_urls: tournamentData.daily_flyer_urls || {},
-            created_at: tournamentData.created_at,
-            updated_at: tournamentData.updated_at,
-          }
-        : null,
-      tournamentEvents: tournamentData?.events || [],
-      schedulesList: schedulesListResult,
+      tournamentSchedule: null, // Loaded lazily
+      tournamentEvents: [], // Loaded lazily
+      schedulesList: schedulesListResult, // List of saved spreadsheets
       _meta: {
-        loadTime: duration,
-        queriesExecuted: 6,
+        loadTime: Date.now() - start,
+        queriesExecuted: 5, // Reduced from 6 to 5
         timestamp: new Date().toISOString(),
       },
     });
   } catch (error) {
-    console.error("[Init API] Error:", error);
+    logError("Init API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Users API - Protected: requires authentication
-app.get("/api/db/users", requireAuth, async (req, res) => {
+// Users API
+app.get("/api/db/users", async (req, res) => {
   try {
     const sql = getSql();
     const { email, id } = req.query;
@@ -2278,12 +1007,12 @@ app.get("/api/db/users", requireAuth, async (req, res) => {
 
     return res.status(400).json({ error: "email or id is required" });
   } catch (error) {
-    console.error("[Users API] Error:", error);
+    logError("Users API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post("/api/db/users", requireAuth, async (req, res) => {
+app.post("/api/db/users", async (req, res) => {
   try {
     const sql = getSql();
     const { email, name, avatar_url, auth_provider, auth_provider_id } =
@@ -2297,16 +1026,8 @@ app.post("/api/db/users", requireAuth, async (req, res) => {
       await sql`SELECT * FROM users WHERE email = ${email} AND deleted_at IS NULL LIMIT 1`;
 
     if (existing.length > 0) {
-      // Update auth_provider info and last_login
-      const updated = await sql`
-        UPDATE users
-        SET last_login_at = NOW(),
-            auth_provider = COALESCE(${auth_provider}, auth_provider),
-            auth_provider_id = COALESCE(${auth_provider_id}, auth_provider_id)
-        WHERE id = ${existing[0].id}
-        RETURNING *
-      `;
-      return res.json(updated[0]);
+      await sql`UPDATE users SET last_login_at = NOW() WHERE id = ${existing[0].id}`;
+      return res.json(existing[0]);
     }
 
     const result = await sql`
@@ -2317,13 +1038,13 @@ app.post("/api/db/users", requireAuth, async (req, res) => {
 
     res.status(201).json(result[0]);
   } catch (error) {
-    console.error("[Users API] Error:", error);
+    logError("Users API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Brand Profiles API - Protected: requires resource access verification
-app.get("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
+// Brand Profiles API
+app.get("/api/db/brand-profiles", async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, id, organization_id } = req.query;
@@ -2335,13 +1056,15 @@ app.get("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
     }
 
     if (user_id) {
+      // Resolve user_id (handles both Clerk IDs and UUIDs)
       const resolvedUserId = await resolveUserId(sql, user_id);
       if (!resolvedUserId) {
-        return res.json(null);
+        return res.json(null); // No user found, return null
       }
 
       let result;
       if (organization_id) {
+        // Organization context - verify membership
         await resolveOrganizationContext(sql, resolvedUserId, organization_id);
         result = await sql`
           SELECT * FROM brand_profiles
@@ -2349,6 +1072,7 @@ app.get("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
           LIMIT 1
         `;
       } else {
+        // Personal context
         result = await sql`
           SELECT * FROM brand_profiles
           WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL
@@ -2363,12 +1087,12 @@ app.get("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Brand Profiles API] Error:", error);
+    logError("Brand Profiles API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
+app.post("/api/db/brand-profiles", async (req, res) => {
   try {
     const sql = getSql();
     const {
@@ -2386,11 +1110,13 @@ app.post("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
       return res.status(400).json({ error: "user_id and name are required" });
     }
 
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
       return res.status(400).json({ error: "User not found" });
     }
 
+    // Verify organization membership and permission if organization_id provided
     if (organization_id) {
       const context = await resolveOrganizationContext(
         sql,
@@ -2419,12 +1145,12 @@ app.post("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Brand Profiles API] Error:", error);
+    logError("Brand Profiles API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.put("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
+app.put("/api/db/brand-profiles", async (req, res) => {
   try {
     const sql = getSql();
     const { id } = req.query;
@@ -2442,12 +1168,14 @@ app.put("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
       return res.status(400).json({ error: "id is required" });
     }
 
+    // Get the brand profile to check organization
     const existing =
       await sql`SELECT organization_id FROM brand_profiles WHERE id = ${id} AND deleted_at IS NULL`;
     if (existing.length === 0) {
       return res.status(404).json({ error: "Brand profile not found" });
     }
 
+    // If profile belongs to an organization, verify permission
     if (existing[0].organization_id && user_id) {
       const resolvedUserId = await resolveUserId(sql, user_id);
       if (resolvedUserId) {
@@ -2484,13 +1212,13 @@ app.put("/api/db/brand-profiles", requireResourceAccess, async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Brand Profiles API] Error:", error);
+    logError("Brand Profiles API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Gallery Images API - Protected: requires resource access verification
-app.get("/api/db/gallery", requireResourceAccess, async (req, res) => {
+// Gallery Images API
+app.get("/api/db/gallery", async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id, source, limit, include_src } = req.query;
@@ -2499,9 +1227,10 @@ app.get("/api/db/gallery", requireResourceAccess, async (req, res) => {
       return res.status(400).json({ error: "user_id is required" });
     }
 
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
-      return res.json([]);
+      return res.json([]); // No user found, return empty array
     }
 
     let query;
@@ -2514,6 +1243,7 @@ app.get("/api/db/gallery", requireResourceAccess, async (req, res) => {
       : 'id, user_id, organization_id, source, thumbnail_url, created_at, updated_at, deleted_at';
 
     if (organization_id) {
+      // Organization context - verify membership
       await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
       if (source) {
@@ -2532,6 +1262,7 @@ app.get("/api/db/gallery", requireResourceAccess, async (req, res) => {
         `;
       }
     } else {
+      // Personal context
       if (source) {
         query = await sql`
           SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
@@ -2554,12 +1285,12 @@ app.get("/api/db/gallery", requireResourceAccess, async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Gallery API] Error:", error);
+    logError("Gallery API GET", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post("/api/db/gallery", requireResourceAccess, async (req, res) => {
+app.post("/api/db/gallery", async (req, res) => {
   try {
     const sql = getSql();
     const {
@@ -2586,11 +1317,13 @@ app.post("/api/db/gallery", requireResourceAccess, async (req, res) => {
         .json({ error: "user_id, src_url, source, and model are required" });
     }
 
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
       return res.status(400).json({ error: "User not found" });
     }
 
+    // Verify organization membership if organization_id provided
     if (organization_id) {
       const context = await resolveOrganizationContext(
         sql,
@@ -2624,11 +1357,12 @@ app.post("/api/db/gallery", requireResourceAccess, async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Gallery API] Error:", error);
+    logError("Gallery API POST", error);
     res.status(500).json({ error: error.message });
   }
 });
 
+// Gallery PATCH - Update gallery image (e.g., mark as published)
 app.patch("/api/db/gallery", async (req, res) => {
   try {
     const sql = getSql();
@@ -2653,12 +1387,12 @@ app.patch("/api/db/gallery", async (req, res) => {
 
     return res.status(200).json(result[0]);
   } catch (error) {
-    console.error("[Gallery API] PATCH Error:", error);
+    logError("Gallery API PATCH", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.delete("/api/db/gallery", requireResourceAccess, async (req, res) => {
+app.delete("/api/db/gallery", async (req, res) => {
   try {
     const sql = getSql();
     const { id, user_id } = req.query;
@@ -2667,8 +1401,9 @@ app.delete("/api/db/gallery", requireResourceAccess, async (req, res) => {
       return res.status(400).json({ error: "id is required" });
     }
 
+    // Get image info including src_url before deleting
     const image =
-      await sql`SELECT organization_id FROM gallery_images WHERE id = ${id} AND deleted_at IS NULL`;
+      await sql`SELECT organization_id, src_url FROM gallery_images WHERE id = ${id} AND deleted_at IS NULL`;
     if (image.length === 0) {
       return res.status(404).json({ error: "Image not found" });
     }
@@ -2689,7 +1424,29 @@ app.delete("/api/db/gallery", requireResourceAccess, async (req, res) => {
       }
     }
 
-    await sql`UPDATE gallery_images SET deleted_at = NOW() WHERE id = ${id}`;
+    const srcUrl = image[0].src_url;
+
+    // HARD DELETE: Permanently remove from database
+    await sql`DELETE FROM gallery_images WHERE id = ${id}`;
+
+    // Delete physical file from Vercel Blob Storage if applicable
+    if (
+      srcUrl &&
+      (srcUrl.includes(".public.blob.vercel-storage.com/") ||
+        srcUrl.includes(".blob.vercel-storage.com/"))
+    ) {
+      try {
+        await del(srcUrl);
+        console.log(`[Gallery] Deleted file from Vercel Blob: ${srcUrl}`);
+      } catch (blobError) {
+        console.error(
+          `[Gallery] Failed to delete file from Vercel Blob: ${srcUrl}`,
+          blobError
+        );
+        // Don't fail the request if blob deletion fails - DB record is already deleted
+      }
+    }
+
     res.status(204).end();
   } catch (error) {
     if (
@@ -2698,12 +1455,12 @@ app.delete("/api/db/gallery", requireResourceAccess, async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Gallery API] Error:", error);
+    logError("Gallery API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Posts API
+// Posts API - Update image_url
 app.patch("/api/db/posts", async (req, res) => {
   try {
     const sql = getSql();
@@ -2726,12 +1483,12 @@ app.patch("/api/db/posts", async (req, res) => {
 
     res.json(result[0]);
   } catch (error) {
-    console.error("[Posts API] Error:", error);
+    logError("Posts API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Ad Creatives API
+// Ad Creatives API - Update image_url
 app.patch("/api/db/ad-creatives", async (req, res) => {
   try {
     const sql = getSql();
@@ -2754,54 +1511,73 @@ app.patch("/api/db/ad-creatives", async (req, res) => {
 
     res.json(result[0]);
   } catch (error) {
-    console.error("[Ad Creatives API] Error:", error);
+    logError("Ad Creatives API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Scheduled Posts API
-app.get("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
+app.get("/api/db/scheduled-posts", async (req, res) => {
   try {
     const sql = getSql();
-    const { user_id, organization_id, status } = req.query;
+    const { user_id, organization_id, status, start_date, end_date } =
+      req.query;
 
     if (!user_id) {
       return res.status(400).json({ error: "user_id is required" });
     }
 
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
-      return res.json([]);
+      return res.json([]); // No user found, return empty array
     }
 
+    // SMART LOADING: Load posts in relevant time window (last 7 days + next 60 days)
+    // Shows recent activity + upcoming schedule without arbitrary quantity limits
+    // NOTE: scheduled_timestamp is bigint (unix ms), convert NOW() to match
     let query;
     if (organization_id) {
+      // Organization context - verify membership
       await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
       if (status) {
         query = await sql`
           SELECT * FROM scheduled_posts
-          WHERE organization_id = ${organization_id} AND status = ${status}
+          WHERE organization_id = ${organization_id}
+            AND status = ${status}
+            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
+            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
           ORDER BY scheduled_timestamp ASC
         `;
       } else {
         query = await sql`
           SELECT * FROM scheduled_posts
           WHERE organization_id = ${organization_id}
+            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
+            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
           ORDER BY scheduled_timestamp ASC
         `;
       }
     } else {
+      // Personal context
       if (status) {
         query = await sql`
           SELECT * FROM scheduled_posts
-          WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND status = ${status}
+          WHERE user_id = ${resolvedUserId}
+            AND organization_id IS NULL
+            AND status = ${status}
+            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
+            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
           ORDER BY scheduled_timestamp ASC
         `;
       } else {
         query = await sql`
           SELECT * FROM scheduled_posts
-          WHERE user_id = ${resolvedUserId} AND organization_id IS NULL
+          WHERE user_id = ${resolvedUserId}
+            AND organization_id IS NULL
+            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
+            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
           ORDER BY scheduled_timestamp ASC
         `;
       }
@@ -2812,12 +1588,12 @@ app.get("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Scheduled Posts API] Error:", error);
+    logError("Scheduled Posts API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
+app.post("/api/db/scheduled-posts", async (req, res) => {
   try {
     const sql = getSql();
     const {
@@ -2826,7 +1602,6 @@ app.post("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
       content_type,
       content_id,
       image_url,
-      carousel_image_urls,
       caption,
       hashtags,
       scheduled_date,
@@ -2850,11 +1625,13 @@ app.post("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
       return res.status(400).json({ error: "User not found" });
     }
 
+    // Verify organization membership and permission if organization_id provided
     if (organization_id) {
       const context = await resolveOrganizationContext(
         sql,
@@ -2868,6 +1645,7 @@ app.post("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
       }
     }
 
+    // Convert scheduled_timestamp to bigint (milliseconds) if it's a string
     const timestampMs =
       typeof scheduled_timestamp === "string"
         ? new Date(scheduled_timestamp).getTime()
@@ -2875,11 +1653,11 @@ app.post("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
 
     const result = await sql`
       INSERT INTO scheduled_posts (
-        user_id, organization_id, content_type, content_id, image_url, carousel_image_urls, caption, hashtags,
+        user_id, organization_id, content_type, content_id, image_url, caption, hashtags,
         scheduled_date, scheduled_time, scheduled_timestamp, timezone,
         platforms, instagram_content_type, instagram_account_id, created_from
       ) VALUES (
-        ${resolvedUserId}, ${organization_id || null}, ${content_type || "flyer"}, ${content_id || null}, ${image_url}, ${carousel_image_urls || null}, ${caption || ""},
+        ${resolvedUserId}, ${organization_id || null}, ${content_type || "flyer"}, ${content_id || null}, ${image_url}, ${caption || ""},
         ${hashtags || []}, ${scheduled_date}, ${scheduled_time}, ${timestampMs},
         ${timezone || "America/Sao_Paulo"}, ${platforms || "instagram"},
         ${instagram_content_type || "photo"}, ${instagram_account_id || null}, ${created_from || null}
@@ -2887,31 +1665,7 @@ app.post("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
       RETURNING *
     `;
 
-    const newPost = result[0];
-
-    // Schedule the job for exact-time publishing (if Redis is available)
-    const REDIS_AVAILABLE =
-      process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL;
-    if (REDIS_AVAILABLE && newPost.status === "scheduled") {
-      try {
-        const jobResult = await schedulePostForPublishing(
-          newPost.id,
-          resolvedUserId,
-          timestampMs,
-        );
-        console.log(
-          `[Scheduled Posts API] Job scheduled for post ${newPost.id}: ${jobResult.scheduledFor}`,
-        );
-      } catch (jobError) {
-        // Don't fail the request, fallback checker will handle it
-        console.warn(
-          `[Scheduled Posts API] Failed to schedule job, will use fallback:`,
-          jobError.message,
-        );
-      }
-    }
-
-    res.status(201).json(newPost);
+    res.status(201).json(result[0]);
   } catch (error) {
     if (
       error instanceof OrganizationAccessError ||
@@ -2919,12 +1673,12 @@ app.post("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Scheduled Posts API] Error:", error);
+    logError("Scheduled Posts API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.put("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
+app.put("/api/db/scheduled-posts", async (req, res) => {
   try {
     const sql = getSql();
     const { id } = req.query;
@@ -2934,6 +1688,7 @@ app.put("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
       return res.status(400).json({ error: "id is required" });
     }
 
+    // Check if post belongs to an organization and verify permission
     const post =
       await sql`SELECT organization_id FROM scheduled_posts WHERE id = ${id}`;
     if (post.length === 0) {
@@ -2956,6 +1711,7 @@ app.put("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
       }
     }
 
+    // Simple update with raw SQL (not ideal but works for now)
     const result = await sql`
       UPDATE scheduled_posts
       SET status = COALESCE(${updates.status || null}, status),
@@ -2976,12 +1732,12 @@ app.put("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Scheduled Posts API] Error:", error);
+    logError("Scheduled Posts API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.delete("/api/db/scheduled-posts", requireResourceAccess, async (req, res) => {
+app.delete("/api/db/scheduled-posts", async (req, res) => {
   try {
     const sql = getSql();
     const { id, user_id } = req.query;
@@ -2990,6 +1746,7 @@ app.delete("/api/db/scheduled-posts", requireResourceAccess, async (req, res) =>
       return res.status(400).json({ error: "id is required" });
     }
 
+    // Check if post belongs to an organization and verify permission
     const post =
       await sql`SELECT organization_id FROM scheduled_posts WHERE id = ${id}`;
     if (post.length === 0) {
@@ -3012,17 +1769,6 @@ app.delete("/api/db/scheduled-posts", requireResourceAccess, async (req, res) =>
       }
     }
 
-    // Cancel the scheduled job if Redis is available
-    const REDIS_AVAILABLE =
-      process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL;
-    if (REDIS_AVAILABLE) {
-      try {
-        await cancelScheduledPost(id);
-      } catch (e) {
-        // Ignore - job may not exist
-      }
-    }
-
     await sql`DELETE FROM scheduled_posts WHERE id = ${id}`;
     res.status(204).end();
   } catch (error) {
@@ -3032,330 +1778,18 @@ app.delete("/api/db/scheduled-posts", requireResourceAccess, async (req, res) =>
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Scheduled Posts API] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// INSTAGRAM ACCOUNTS API (Multi-tenant Rube MCP)
-// ============================================================================
-
-const RUBE_MCP_URL = "https://rube.app/mcp";
-
-// Validate Rube token by calling Instagram API
-async function validateRubeToken(rubeToken) {
-  try {
-    const request = {
-      jsonrpc: "2.0",
-      id: `validate_${Date.now()}`,
-      method: "tools/call",
-      params: {
-        name: "RUBE_MULTI_EXECUTE_TOOL",
-        arguments: {
-          tools: [
-            {
-              tool_slug: "INSTAGRAM_GET_USER_INFO",
-              arguments: { fields: "id,username" },
-            },
-          ],
-          sync_response_to_workbench: false,
-          memory: {},
-          session_id: "validate",
-          thought: "Validating Instagram connection",
-        },
-      },
-    };
-
-    const response = await fetch(RUBE_MCP_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-        Authorization: `Bearer ${rubeToken}`,
-      },
-      body: JSON.stringify(request),
-    });
-
-    const text = await response.text();
-
-    if (text.startsWith("<!DOCTYPE") || text.startsWith("<html")) {
-      return {
-        success: false,
-        error: "Token inválido ou expirado. Gere um novo token no Rube.",
-      };
-    }
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: `Erro ao validar token (${response.status})`,
-      };
-    }
-
-    // Parse SSE response
-    const lines = text.split("\n");
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        try {
-          const json = JSON.parse(line.substring(6));
-          if (json?.error) {
-            return {
-              success: false,
-              error: "Instagram não conectado no Rube.",
-            };
-          }
-          const nestedData = json?.result?.content?.[0]?.text;
-          if (nestedData) {
-            const parsed = JSON.parse(nestedData);
-            if (parsed?.error || parsed?.data?.error) {
-              return {
-                success: false,
-                error: "Instagram não conectado no Rube.",
-              };
-            }
-            const results =
-              parsed?.data?.data?.results || parsed?.data?.results;
-            if (results && results.length > 0) {
-              const userData = results[0]?.response?.data;
-              if (userData?.id) {
-                return {
-                  success: true,
-                  instagramUserId: String(userData.id),
-                  instagramUsername: userData.username || "unknown",
-                };
-              }
-            }
-          }
-        } catch (e) {
-          console.error("[Instagram Accounts] Parse error:", e);
-        }
-      }
-    }
-    return { success: false, error: "Instagram não conectado no Rube." };
-  } catch (error) {
-    return { success: false, error: error.message || "Erro ao validar token" };
-  }
-}
-
-// GET - List Instagram accounts
-// For organizations: returns all accounts connected to the org (shared by all members)
-// For personal: returns accounts owned by the user
-app.get("/api/db/instagram-accounts", requireResourceAccess, async (req, res) => {
-  try {
-    const sql = getSql();
-    const { user_id, organization_id, id } = req.query;
-
-    if (id) {
-      const result = await sql`
-        SELECT id, user_id, organization_id, instagram_user_id, instagram_username,
-               is_active, connected_at, last_used_at, created_at, updated_at, connected_by_user_id
-        FROM instagram_accounts WHERE id = ${id}
-      `;
-      return res.json(result[0] || null);
-    }
-
-    if (!user_id) {
-      return res.status(400).json({ error: "user_id is required" });
-    }
-
-    // user_id can be either DB UUID or Clerk ID - try both
-    let resolvedUserId = user_id;
-
-    // Check if it's a Clerk ID (starts with 'user_')
-    if (user_id.startsWith("user_")) {
-      const userResult =
-        await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
-      resolvedUserId = userResult[0]?.id;
-      if (!resolvedUserId) {
-        console.log("[Instagram] User not found for Clerk ID:", user_id);
-        return res.json([]);
-      }
-    } else {
-      // Assume it's a DB UUID - verify it exists
-      const userResult =
-        await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
-      if (userResult.length === 0) {
-        console.log("[Instagram] User not found for DB UUID:", user_id);
-        return res.json([]);
-      }
-    }
-    console.log("[Instagram] Resolved user ID:", resolvedUserId);
-
-    // For organizations: get accounts connected to the org (any member can use)
-    // For personal: get accounts owned by the user
-    const result = organization_id
-      ? await sql`
-          SELECT id, user_id, organization_id, instagram_user_id, instagram_username,
-                 is_active, connected_at, last_used_at, created_at, updated_at, connected_by_user_id
-          FROM instagram_accounts
-          WHERE organization_id = ${organization_id} AND is_active = TRUE
-          ORDER BY connected_at DESC
-        `
-      : await sql`
-          SELECT id, user_id, organization_id, instagram_user_id, instagram_username,
-                 is_active, connected_at, last_used_at, created_at, updated_at, connected_by_user_id
-          FROM instagram_accounts
-          WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND is_active = TRUE
-          ORDER BY connected_at DESC
-        `;
-
-    res.json(result);
-  } catch (error) {
-    console.error("[Instagram Accounts API] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// POST - Connect new Instagram account
-// For organizations: account is shared by all org members
-// For personal: account is owned by the user
-app.post("/api/db/instagram-accounts", requireResourceAccess, async (req, res) => {
-  try {
-    const sql = getSql();
-    const { user_id, organization_id, rube_token } = req.body;
-
-    if (!user_id || !rube_token) {
-      return res
-        .status(400)
-        .json({ error: "user_id and rube_token are required" });
-    }
-
-    // Resolve Clerk ID to DB UUID (for tracking who connected)
-    const userResult =
-      await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
-    const resolvedUserId = userResult[0]?.id;
-    if (!resolvedUserId) {
-      return res.status(400).json({ error: "User not found" });
-    }
-
-    // Validate the Rube token
-    const validation = await validateRubeToken(rube_token);
-    if (!validation.success) {
-      return res
-        .status(400)
-        .json({ error: validation.error || "Token inválido" });
-    }
-
-    const { instagramUserId, instagramUsername } = validation;
-
-    // Check if already connected based on context (org or personal)
-    let existing;
-    if (organization_id) {
-      // For organizations: check if this Instagram is already connected to the ORG
-      existing = await sql`
-        SELECT id FROM instagram_accounts
-        WHERE organization_id = ${organization_id} AND instagram_user_id = ${instagramUserId}
-      `;
-    } else {
-      // For personal: check if this Instagram is already connected to the USER
-      existing = await sql`
-        SELECT id FROM instagram_accounts
-        WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND instagram_user_id = ${instagramUserId}
-      `;
-    }
-
-    if (existing.length > 0) {
-      // Update existing - reconnect with new token
-      const result = await sql`
-        UPDATE instagram_accounts
-        SET rube_token = ${rube_token}, instagram_username = ${instagramUsername},
-            is_active = TRUE, connected_at = NOW(), updated_at = NOW(),
-            connected_by_user_id = ${resolvedUserId}
-        WHERE id = ${existing[0].id}
-        RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
-                  is_active, connected_at, last_used_at, created_at, updated_at, connected_by_user_id
-      `;
-      return res.json({
-        success: true,
-        account: result[0],
-        message: "Conta reconectada!",
-      });
-    }
-
-    // Create new account
-    // For org accounts: user_id is null, organization_id is the owner
-    // For personal accounts: user_id is the owner, organization_id is null
-    const ownerUserId = organization_id ? null : resolvedUserId;
-
-    const result = await sql`
-      INSERT INTO instagram_accounts (user_id, organization_id, instagram_user_id, instagram_username, rube_token, connected_by_user_id)
-      VALUES (${ownerUserId}, ${organization_id || null}, ${instagramUserId}, ${instagramUsername}, ${rube_token}, ${resolvedUserId})
-      RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
-                is_active, connected_at, last_used_at, created_at, updated_at, connected_by_user_id
-    `;
-
-    res.status(201).json({
-      success: true,
-      account: result[0],
-      message: `Conta @${instagramUsername} conectada!`,
-    });
-  } catch (error) {
-    console.error("[Instagram Accounts API] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// PUT - Update Instagram account token
-app.put("/api/db/instagram-accounts", requireResourceAccess, async (req, res) => {
-  try {
-    const sql = getSql();
-    const { id } = req.query;
-    const { rube_token } = req.body;
-
-    if (!id || !rube_token) {
-      return res.status(400).json({ error: "id and rube_token are required" });
-    }
-
-    const validation = await validateRubeToken(rube_token);
-    if (!validation.success) {
-      return res.status(400).json({ error: validation.error });
-    }
-
-    const result = await sql`
-      UPDATE instagram_accounts
-      SET rube_token = ${rube_token}, instagram_username = ${validation.instagramUsername},
-          updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
-                is_active, connected_at, last_used_at, created_at, updated_at
-    `;
-
-    res.json({
-      success: true,
-      account: result[0],
-      message: "Token atualizado!",
-    });
-  } catch (error) {
-    console.error("[Instagram Accounts API] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// DELETE - Disconnect Instagram account (soft delete)
-app.delete("/api/db/instagram-accounts", requireResourceAccess, async (req, res) => {
-  try {
-    const sql = getSql();
-    const { id } = req.query;
-
-    if (!id) {
-      return res.status(400).json({ error: "id is required" });
-    }
-
-    await sql`UPDATE instagram_accounts SET is_active = FALSE, updated_at = NOW() WHERE id = ${id}`;
-    res.json({ success: true, message: "Conta desconectada." });
-  } catch (error) {
-    console.error("[Instagram Accounts API] Error:", error);
+    logError("Scheduled Posts API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Campaigns API
-app.get("/api/db/campaigns", requireResourceAccess, async (req, res) => {
+app.get("/api/db/campaigns", async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id, id, include_content } = req.query;
 
+    // Get single campaign by ID
     if (id) {
       const result = await sql`
         SELECT * FROM campaigns
@@ -3367,6 +1801,7 @@ app.get("/api/db/campaigns", requireResourceAccess, async (req, res) => {
         return res.status(200).json(null);
       }
 
+      // If include_content is true, also fetch video_clip_scripts, posts, ad_creatives and carousel_scripts
       if (include_content === "true") {
         const campaign = result[0];
 
@@ -3409,57 +1844,60 @@ app.get("/api/db/campaigns", requireResourceAccess, async (req, res) => {
       return res.status(400).json({ error: "user_id is required" });
     }
 
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
       return res.status(200).json([]);
     }
 
+    // OPTIMIZED: Single query with all counts and previews using subqueries
+    // This replaces the N+1 problem (was doing 6 queries PER campaign!)
     let result;
     if (organization_id) {
+      // Organization context - verify membership
       await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
       result = await sql`
         SELECT
-          c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at,
-          u.name as creator_name,
+          c.id,
+          c.user_id,
+          c.organization_id,
+          c.name,
+          c.description,
+          c.input_transcript,
+          c.status,
+          c.created_at,
+          c.updated_at,
           COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
           COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
           COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
           (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
-          COALESCE(
-            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
-            (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL AND cover_url NOT LIKE 'data:%' LIMIT 1),
-            (SELECT src_url FROM gallery_images
-             WHERE carousel_script_id IN (SELECT id FROM carousel_scripts WHERE campaign_id = c.id)
-               AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-             ORDER BY created_at DESC LIMIT 1)
-          ) as post_preview_url,
+          (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
           (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url
         FROM campaigns c
-        LEFT JOIN users u ON u.id = c.user_id
         WHERE c.organization_id = ${organization_id} AND c.deleted_at IS NULL
         ORDER BY c.created_at DESC
       `;
     } else {
+      // Personal context
       result = await sql`
         SELECT
-          c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at,
-          u.name as creator_name,
+          c.id,
+          c.user_id,
+          c.organization_id,
+          c.name,
+          c.description,
+          c.input_transcript,
+          c.status,
+          c.created_at,
+          c.updated_at,
           COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
           COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
           COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
           (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
-          COALESCE(
-            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1),
-            (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL AND cover_url NOT LIKE 'data:%' LIMIT 1),
-            (SELECT src_url FROM gallery_images
-             WHERE carousel_script_id IN (SELECT id FROM carousel_scripts WHERE campaign_id = c.id)
-               AND src_url IS NOT NULL AND src_url NOT LIKE 'data:%'
-             ORDER BY created_at DESC LIMIT 1)
-          ) as post_preview_url,
+          (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
           (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url
         FROM campaigns c
-        LEFT JOIN users u ON u.id = c.user_id
         WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL
         ORDER BY c.created_at DESC
       `;
@@ -3470,12 +1908,12 @@ app.get("/api/db/campaigns", requireResourceAccess, async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Campaigns API] Error:", error);
+    logError("Campaigns API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post("/api/db/campaigns", requireResourceAccess, async (req, res) => {
+app.post("/api/db/campaigns", async (req, res) => {
   try {
     const sql = getSql();
     const {
@@ -3496,14 +1934,13 @@ app.post("/api/db/campaigns", requireResourceAccess, async (req, res) => {
       return res.status(400).json({ error: "user_id is required" });
     }
 
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
-      return res.status(400).json({
-        error:
-          "User not found. Please ensure user exists before creating campaigns.",
-      });
+      return res.status(400).json({ error: "User not found" });
     }
 
+    // Verify organization membership and permission if organization_id provided
     if (organization_id) {
       const context = await resolveOrganizationContext(
         sql,
@@ -3517,6 +1954,7 @@ app.post("/api/db/campaigns", requireResourceAccess, async (req, res) => {
       }
     }
 
+    // Create campaign
     const result = await sql`
       INSERT INTO campaigns (user_id, organization_id, name, brand_profile_id, input_transcript, generation_options, status)
       VALUES (${resolvedUserId}, ${organization_id || null}, ${name || null}, ${brand_profile_id || null}, ${input_transcript || null}, ${JSON.stringify(generation_options) || null}, ${status || "draft"})
@@ -3596,12 +2034,12 @@ app.post("/api/db/campaigns", requireResourceAccess, async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Campaigns API] Error:", error);
+    logError("Campaigns API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.delete("/api/db/campaigns", requireResourceAccess, async (req, res) => {
+app.delete("/api/db/campaigns", async (req, res) => {
   try {
     const sql = getSql();
     const { id, user_id } = req.query;
@@ -3610,6 +2048,7 @@ app.delete("/api/db/campaigns", requireResourceAccess, async (req, res) => {
       return res.status(400).json({ error: "id is required" });
     }
 
+    // Check if campaign belongs to an organization and verify permission
     const campaign =
       await sql`SELECT organization_id FROM campaigns WHERE id = ${id} AND deleted_at IS NULL`;
     if (campaign.length === 0) {
@@ -3632,13 +2071,145 @@ app.delete("/api/db/campaigns", requireResourceAccess, async (req, res) => {
       }
     }
 
-    await sql`
-      UPDATE campaigns
-      SET deleted_at = NOW()
-      WHERE id = ${id}
+    console.log(`[Campaign Delete] Starting cascade delete for campaign: ${id}`);
+
+    // ========================================================================
+    // CASCADE DELETE: Delete all resources associated with the campaign
+    // ========================================================================
+
+    // 1. Get all images from gallery that belong to this campaign
+    const campaignImages = await sql`
+      SELECT id, src_url FROM gallery_images
+      WHERE (post_id IN (SELECT id FROM posts WHERE campaign_id = ${id})
+         OR ad_creative_id IN (SELECT id FROM ad_creatives WHERE campaign_id = ${id})
+         OR video_script_id IN (SELECT id FROM video_clip_scripts WHERE campaign_id = ${id}))
+      AND deleted_at IS NULL
     `;
 
-    res.status(200).json({ success: true });
+    console.log(`[Campaign Delete] Found ${campaignImages.length} gallery images to delete`);
+
+    // 2. Get all posts with their image URLs
+    const posts = await sql`
+      SELECT id, image_url FROM posts WHERE campaign_id = ${id}
+    `;
+
+    // 3. Get all ads with their image URLs
+    const ads = await sql`
+      SELECT id, image_url FROM ad_creatives WHERE campaign_id = ${id}
+    `;
+
+    // 4. Get all video clips with their thumbnail URLs
+    const clips = await sql`
+      SELECT id, thumbnail_url, video_url FROM video_clip_scripts WHERE campaign_id = ${id}
+    `;
+
+    console.log(`[Campaign Delete] Found ${posts.length} posts, ${ads.length} ads, ${clips.length} clips`);
+
+    // Collect all URLs that need to be deleted from Vercel Blob
+    const urlsToDelete = [];
+
+    // Add gallery image URLs
+    campaignImages.forEach((img) => {
+      if (
+        img.src_url &&
+        (img.src_url.includes(".public.blob.vercel-storage.com/") ||
+          img.src_url.includes(".blob.vercel-storage.com/"))
+      ) {
+        urlsToDelete.push(img.src_url);
+      }
+    });
+
+    // Add post image URLs
+    posts.forEach((post) => {
+      if (
+        post.image_url &&
+        (post.image_url.includes(".public.blob.vercel-storage.com/") ||
+          post.image_url.includes(".blob.vercel-storage.com/"))
+      ) {
+        urlsToDelete.push(post.image_url);
+      }
+    });
+
+    // Add ad image URLs
+    ads.forEach((ad) => {
+      if (
+        ad.image_url &&
+        (ad.image_url.includes(".public.blob.vercel-storage.com/") ||
+          ad.image_url.includes(".blob.vercel-storage.com/"))
+      ) {
+        urlsToDelete.push(ad.image_url);
+      }
+    });
+
+    // Add clip thumbnail and video URLs
+    clips.forEach((clip) => {
+      if (
+        clip.thumbnail_url &&
+        (clip.thumbnail_url.includes(".public.blob.vercel-storage.com/") ||
+          clip.thumbnail_url.includes(".blob.vercel-storage.com/"))
+      ) {
+        urlsToDelete.push(clip.thumbnail_url);
+      }
+      if (
+        clip.video_url &&
+        (clip.video_url.includes(".public.blob.vercel-storage.com/") ||
+          clip.video_url.includes(".blob.vercel-storage.com/"))
+      ) {
+        urlsToDelete.push(clip.video_url);
+      }
+    });
+
+    // Delete all files from Vercel Blob Storage
+    console.log(`[Campaign Delete] Deleting ${urlsToDelete.length} files from Vercel Blob`);
+    for (const url of urlsToDelete) {
+      try {
+        await del(url);
+        console.log(`[Campaign Delete] Deleted file: ${url}`);
+      } catch (blobError) {
+        console.error(`[Campaign Delete] Failed to delete file: ${url}`, blobError);
+        // Continue even if blob deletion fails
+      }
+    }
+
+    // HARD DELETE: Permanently remove all records from database
+    console.log(`[Campaign Delete] Deleting database records...`);
+
+    // Delete gallery images (already have the IDs)
+    if (campaignImages.length > 0) {
+      const imageIds = campaignImages.map((img) => img.id);
+      await sql`DELETE FROM gallery_images WHERE id = ANY(${imageIds})`;
+      console.log(`[Campaign Delete] Deleted ${imageIds.length} gallery images from DB`);
+    }
+
+    // Delete posts
+    await sql`DELETE FROM posts WHERE campaign_id = ${id}`;
+    console.log(`[Campaign Delete] Deleted posts from DB`);
+
+    // Delete ad creatives
+    await sql`DELETE FROM ad_creatives WHERE campaign_id = ${id}`;
+    console.log(`[Campaign Delete] Deleted ad creatives from DB`);
+
+    // Delete video clip scripts
+    await sql`DELETE FROM video_clip_scripts WHERE campaign_id = ${id}`;
+    console.log(`[Campaign Delete] Deleted video clips from DB`);
+
+    // Finally, delete the campaign itself
+    await sql`DELETE FROM campaigns WHERE id = ${id}`;
+    console.log(`[Campaign Delete] Deleted campaign from DB`);
+
+    console.log(`[Campaign Delete] Cascade delete completed successfully for campaign: ${id}`);
+
+    res.status(200).json({
+      success: true,
+      deleted: {
+        campaign: 1,
+        posts: posts.length,
+        ads: ads.length,
+        clips: clips.length,
+        galleryImages: campaignImages.length,
+        files: urlsToDelete.length,
+      }
+    });
   } catch (error) {
     if (
       error instanceof OrganizationAccessError ||
@@ -3646,12 +2217,12 @@ app.delete("/api/db/campaigns", requireResourceAccess, async (req, res) => {
     ) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Campaigns API] Error:", error);
+    logError("Campaigns API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Update clip thumbnail
+// Campaigns API - Update clip thumbnail_url
 app.patch("/api/db/campaigns", async (req, res) => {
   try {
     const sql = getSql();
@@ -3662,13 +2233,10 @@ app.patch("/api/db/campaigns", async (req, res) => {
       return res.status(400).json({ error: "clip_id is required" });
     }
 
-    if (!thumbnail_url) {
-      return res.status(400).json({ error: "thumbnail_url is required" });
-    }
-
     const result = await sql`
       UPDATE video_clip_scripts
-      SET thumbnail_url = ${thumbnail_url}, updated_at = NOW()
+      SET thumbnail_url = ${thumbnail_url || null},
+          updated_at = NOW()
       WHERE id = ${clip_id}
       RETURNING *
     `;
@@ -3677,15 +2245,14 @@ app.patch("/api/db/campaigns", async (req, res) => {
       return res.status(404).json({ error: "Clip not found" });
     }
 
-    console.log(`[Campaigns API] Updated clip ${clip_id} thumbnail`);
-    res.status(200).json(result[0]);
+    res.json(result[0]);
   } catch (error) {
-    console.error("[Campaigns API] Error updating clip thumbnail:", error);
+    logError("Campaigns API (PATCH clip)", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Update scene image_url in scenes JSONB
+// Campaigns API - Update scene image_url in scenes JSONB
 app.patch("/api/db/campaigns/scene", async (req, res) => {
   try {
     const sql = getSql();
@@ -3728,12 +2295,9 @@ app.patch("/api/db/campaigns/scene", async (req, res) => {
       RETURNING *
     `;
 
-    console.log(
-      `[Campaigns API] Updated scene ${sceneNum} image for clip ${clip_id}`,
-    );
     res.json(result[0]);
   } catch (error) {
-    console.error("[Campaigns API] Error updating scene image:", error);
+    logError("Campaigns API (PATCH scene)", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -3749,6 +2313,23 @@ app.patch("/api/db/carousels", async (req, res) => {
       return res.status(400).json({ error: "id is required" });
     }
 
+    // Build dynamic update
+    const updates = [];
+    const values = [];
+
+    if (cover_url !== undefined) {
+      updates.push("cover_url = $1");
+      values.push(cover_url);
+    }
+    if (caption !== undefined) {
+      updates.push(`caption = $${values.length + 1}`);
+      values.push(caption);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
     const result = await sql`
       UPDATE carousel_scripts
       SET cover_url = COALESCE(${cover_url}, cover_url),
@@ -3762,10 +2343,9 @@ app.patch("/api/db/carousels", async (req, res) => {
       return res.status(404).json({ error: "Carousel not found" });
     }
 
-    console.log(`[Carousels API] Updated carousel ${id}`);
     res.json(result[0]);
   } catch (error) {
-    console.error("[Carousels API] Error updating carousel:", error);
+    logError("Carousels API (PATCH)", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -3812,18 +2392,15 @@ app.patch("/api/db/carousels/slide", async (req, res) => {
       RETURNING *
     `;
 
-    console.log(
-      `[Carousels API] Updated slide ${slideNum} image for carousel ${carousel_id}`,
-    );
     res.json(result[0]);
   } catch (error) {
-    console.error("[Carousels API] Error updating slide image:", error);
+    logError("Carousels API (PATCH slide)", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Tournaments API
-app.get("/api/db/tournaments/list", requireResourceAccess, async (req, res) => {
+// Tournaments API - List all schedules for a user
+app.get("/api/db/tournaments/list", async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id } = req.query;
@@ -3832,13 +2409,15 @@ app.get("/api/db/tournaments/list", requireResourceAccess, async (req, res) => {
       return res.status(400).json({ error: "user_id is required" });
     }
 
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
-      return res.json({ schedules: [] });
+      return res.json({ schedules: [] }); // No user found
     }
 
     let schedules;
     if (organization_id) {
+      // Organization context - verify membership
       await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
       schedules = await sql`
@@ -3852,6 +2431,7 @@ app.get("/api/db/tournaments/list", requireResourceAccess, async (req, res) => {
         ORDER BY ws.start_date DESC
       `;
     } else {
+      // Personal context
       schedules = await sql`
         SELECT
           ws.*,
@@ -3869,12 +2449,13 @@ app.get("/api/db/tournaments/list", requireResourceAccess, async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Tournaments API] List Error:", error);
+    logError("Tournaments API List", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get("/api/db/tournaments", requireResourceAccess, async (req, res) => {
+// Tournaments API
+app.get("/api/db/tournaments", async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id, week_schedule_id } = req.query;
@@ -3883,11 +2464,13 @@ app.get("/api/db/tournaments", requireResourceAccess, async (req, res) => {
       return res.status(400).json({ error: "user_id is required" });
     }
 
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
-      return res.json({ schedule: null, events: [] });
+      return res.json({ schedule: null, events: [] }); // No user found
     }
 
+    // If week_schedule_id is provided, get events for that schedule
     if (week_schedule_id) {
       const events = await sql`
         SELECT * FROM tournament_events
@@ -3899,6 +2482,7 @@ app.get("/api/db/tournaments", requireResourceAccess, async (req, res) => {
 
     let schedules;
     if (organization_id) {
+      // Organization context - verify membership
       await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
       schedules = await sql`
@@ -3908,6 +2492,7 @@ app.get("/api/db/tournaments", requireResourceAccess, async (req, res) => {
         LIMIT 1
       `;
     } else {
+      // Personal context
       schedules = await sql`
         SELECT * FROM week_schedules
         WHERE user_id = ${resolvedUserId} AND organization_id IS NULL
@@ -3922,6 +2507,7 @@ app.get("/api/db/tournaments", requireResourceAccess, async (req, res) => {
 
     const schedule = schedules[0];
 
+    // Get events for this schedule
     const events = await sql`
       SELECT * FROM tournament_events
       WHERE week_schedule_id = ${schedule.id}
@@ -3933,12 +2519,12 @@ app.get("/api/db/tournaments", requireResourceAccess, async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Tournaments API] Error:", error);
+    logError("Tournaments API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post("/api/db/tournaments", requireResourceAccess, async (req, res) => {
+app.post("/api/db/tournaments", async (req, res) => {
   try {
     const sql = getSql();
     const { user_id, organization_id, start_date, end_date, filename, events } =
@@ -3950,15 +2536,18 @@ app.post("/api/db/tournaments", requireResourceAccess, async (req, res) => {
         .json({ error: "user_id, start_date, and end_date are required" });
     }
 
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
       return res.status(400).json({ error: "User not found" });
     }
 
+    // Verify organization membership if organization_id provided
     if (organization_id) {
       await resolveOrganizationContext(sql, resolvedUserId, organization_id);
     }
 
+    // Create week schedule
     const scheduleResult = await sql`
       INSERT INTO week_schedules (user_id, organization_id, start_date, end_date, filename, original_filename)
       VALUES (${resolvedUserId}, ${organization_id || null}, ${start_date}, ${end_date}, ${filename || null}, ${filename || null})
@@ -3967,12 +2556,24 @@ app.post("/api/db/tournaments", requireResourceAccess, async (req, res) => {
 
     const schedule = scheduleResult[0];
 
+    // Create events if provided - using parallel batch inserts for performance
     if (events && Array.isArray(events) && events.length > 0) {
-      const batchSize = 50;
+      console.log(
+        `[Tournaments API] Inserting ${events.length} events in parallel batches...`,
+      );
+
+      // Process in batches - each batch runs concurrently, batches run sequentially
+      const batchSize = 50; // 50 concurrent inserts per batch
+      const totalBatches = Math.ceil(events.length / batchSize);
 
       for (let i = 0; i < events.length; i += batchSize) {
         const batch = events.slice(i, i + batchSize);
+        const batchNum = Math.floor(i / batchSize) + 1;
+        console.log(
+          `[Tournaments API] Processing batch ${batchNum}/${totalBatches} (${batch.length} events)...`,
+        );
 
+        // Execute all inserts in this batch concurrently
         await Promise.all(
           batch.map(
             (event) =>
@@ -3992,6 +2593,9 @@ app.post("/api/db/tournaments", requireResourceAccess, async (req, res) => {
           ),
         );
       }
+      console.log(
+        `[Tournaments API] All ${events.length} events inserted successfully`,
+      );
     }
 
     res.status(201).json({
@@ -4002,12 +2606,12 @@ app.post("/api/db/tournaments", requireResourceAccess, async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Tournaments API] Error:", error);
+    logError("Tournaments API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.delete("/api/db/tournaments", requireResourceAccess, async (req, res) => {
+app.delete("/api/db/tournaments", async (req, res) => {
   try {
     const sql = getSql();
     const { id, user_id } = req.query;
@@ -4016,11 +2620,13 @@ app.delete("/api/db/tournaments", requireResourceAccess, async (req, res) => {
       return res.status(400).json({ error: "id and user_id are required" });
     }
 
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
       return res.status(400).json({ error: "User not found" });
     }
 
+    // Check if schedule belongs to an organization and verify membership
     const schedule =
       await sql`SELECT organization_id FROM week_schedules WHERE id = ${id}`;
     if (schedule.length > 0 && schedule[0].organization_id) {
@@ -4031,11 +2637,13 @@ app.delete("/api/db/tournaments", requireResourceAccess, async (req, res) => {
       );
     }
 
+    // Delete events first
     await sql`
       DELETE FROM tournament_events
       WHERE week_schedule_id = ${id}
     `;
 
+    // Delete schedule
     await sql`
       DELETE FROM week_schedules
       WHERE id = ${id}
@@ -4046,17 +2654,128 @@ app.delete("/api/db/tournaments", requireResourceAccess, async (req, res) => {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Tournaments API] Error:", error);
+    logError("Tournaments API", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Generation Jobs API
+// Tournaments API - Update event flyer_urls
+app.patch("/api/db/tournaments/event-flyer", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { event_id } = req.query;
+    const { flyer_url, action } = req.body; // action: 'add' or 'remove'
+
+    if (!event_id) {
+      return res.status(400).json({ error: "event_id is required" });
+    }
+
+    // Get current flyer_urls
+    const [event] = await sql`
+      SELECT flyer_urls FROM tournament_events WHERE id = ${event_id}
+    `;
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    let flyer_urls = event.flyer_urls || [];
+
+    if (action === "add" && flyer_url) {
+      // Add new flyer URL if not already present
+      if (!flyer_urls.includes(flyer_url)) {
+        flyer_urls = [...flyer_urls, flyer_url];
+      }
+    } else if (action === "remove" && flyer_url) {
+      // Remove flyer URL
+      flyer_urls = flyer_urls.filter((url) => url !== flyer_url);
+    } else if (action === "set" && Array.isArray(req.body.flyer_urls)) {
+      // Replace all flyer URLs
+      flyer_urls = req.body.flyer_urls;
+    }
+
+    // Update database
+    const result = await sql`
+      UPDATE tournament_events
+      SET flyer_urls = ${JSON.stringify(flyer_urls)}::jsonb,
+          updated_at = NOW()
+      WHERE id = ${event_id}
+      RETURNING *
+    `;
+
+    res.json(result[0]);
+  } catch (error) {
+    logError("Tournaments API (PATCH event-flyer)", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Tournaments API - Update daily flyer_urls for week schedule
+app.patch("/api/db/tournaments/daily-flyer", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { schedule_id, period } = req.query; // period: 'MORNING', 'AFTERNOON', 'NIGHT', 'HIGHLIGHTS'
+    const { flyer_url, action } = req.body; // action: 'add' or 'remove'
+
+    if (!schedule_id || !period) {
+      return res
+        .status(400)
+        .json({ error: "schedule_id and period are required" });
+    }
+
+    // Get current daily_flyer_urls
+    const [schedule] = await sql`
+      SELECT daily_flyer_urls FROM week_schedules WHERE id = ${schedule_id}
+    `;
+
+    if (!schedule) {
+      return res.status(404).json({ error: "Schedule not found" });
+    }
+
+    let daily_flyer_urls = schedule.daily_flyer_urls || {};
+    let periodUrls = daily_flyer_urls[period] || [];
+
+    if (action === "add" && flyer_url) {
+      // Add new flyer URL if not already present
+      if (!periodUrls.includes(flyer_url)) {
+        periodUrls = [...periodUrls, flyer_url];
+      }
+    } else if (action === "remove" && flyer_url) {
+      // Remove flyer URL
+      periodUrls = periodUrls.filter((url) => url !== flyer_url);
+    } else if (action === "set" && Array.isArray(req.body.flyer_urls)) {
+      // Replace all flyer URLs for this period
+      periodUrls = req.body.flyer_urls;
+    }
+
+    daily_flyer_urls[period] = periodUrls;
+
+    // Update database
+    const result = await sql`
+      UPDATE week_schedules
+      SET daily_flyer_urls = ${JSON.stringify(daily_flyer_urls)}::jsonb,
+          updated_at = NOW()
+      WHERE id = ${schedule_id}
+      RETURNING *
+    `;
+
+    res.json(result[0]);
+  } catch (error) {
+    logError("Tournaments API (PATCH daily-flyer)", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// Generation Jobs API (Background Processing)
+// Note: In dev mode, QStash callback won't work (needs public URL)
+// Jobs are created but will remain in 'queued' status until deployed
+// ============================================================================
+
 app.post("/api/generate/queue", async (req, res) => {
   try {
     const sql = getSql();
-    const { userId, organizationId, jobType, prompt, config, context } =
-      req.body;
+    const { userId, organizationId, jobType, prompt, config } = req.body;
 
     if (!userId || !jobType || !prompt || !config) {
       return res.status(400).json({
@@ -4064,6 +2783,7 @@ app.post("/api/generate/queue", async (req, res) => {
       });
     }
 
+    // Verify organization membership if organizationId provided
     if (organizationId) {
       const resolvedUserId = await resolveUserId(sql, userId);
       if (resolvedUserId) {
@@ -4071,43 +2791,32 @@ app.post("/api/generate/queue", async (req, res) => {
       }
     }
 
-    // Insert job into database (context is used to match job with UI component)
+    // Create job in database
     const result = await sql`
-      INSERT INTO generation_jobs (user_id, organization_id, job_type, prompt, config, status, context)
-      VALUES (${userId}, ${organizationId || null}, ${jobType}, ${prompt}, ${JSON.stringify(config)}, 'queued', ${context || null})
+      INSERT INTO generation_jobs (user_id, organization_id, job_type, prompt, config, status)
+      VALUES (${userId}, ${organizationId || null}, ${jobType}, ${prompt}, ${JSON.stringify(config)}, 'queued')
       RETURNING id, created_at
     `;
 
-    const dbJob = result[0];
+    const job = result[0];
+    console.log(`[Generate Queue] Created job ${job.id} for user ${userId}`);
 
-    // Add to BullMQ queue if Redis is configured
-    const redisUrl = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL;
-    if (redisUrl) {
-      try {
-        await addJob(dbJob.id, { prompt, config });
-        console.log(`[Generate Queue] Job ${dbJob.id} added to BullMQ queue`);
-      } catch (queueError) {
-        console.error(
-          `[Generate Queue] Failed to add to BullMQ, job will be processed by fallback:`,
-          queueError.message,
-        );
-      }
-    } else {
-      console.log(
-        `[Generate Queue] No Redis configured, job ${dbJob.id} saved to DB only`,
-      );
-    }
+    // In dev mode, we just return the job ID
+    // QStash won't work locally, so jobs will stay in 'queued' status
+    // For full testing, deploy to Vercel or use ngrok
 
     res.json({
       success: true,
-      jobId: dbJob.id,
+      jobId: job.id,
+      messageId: "dev-mode-no-qstash",
       status: "queued",
+      note: "Dev mode: QStash disabled. Job created but won't process automatically. Deploy to Vercel for full functionality.",
     });
   } catch (error) {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
     }
-    console.error("[Generate Queue] Error:", error);
+    logError("Generate Queue", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -4115,14 +2824,21 @@ app.post("/api/generate/queue", async (req, res) => {
 app.get("/api/generate/status", async (req, res) => {
   try {
     const sql = getSql();
-    const { jobId, userId, status: filterStatus, limit } = req.query;
+    const {
+      jobId,
+      userId,
+      organizationId,
+      status: filterStatus,
+      limit,
+    } = req.query;
 
+    // Single job query
     if (jobId) {
       const jobs = await sql`
         SELECT
-          id, user_id, job_type, status, progress,
+          id, user_id, organization_id, job_type, status, progress,
           result_url, result_gallery_id, error_message,
-          created_at, started_at, completed_at, attempts, context
+          created_at, started_at, completed_at, attempts
         FROM generation_jobs
         WHERE id = ${jobId}
         LIMIT 1
@@ -4135,38 +2851,62 @@ app.get("/api/generate/status", async (req, res) => {
       return res.json(jobs[0]);
     }
 
+    // List jobs for user
     if (userId) {
-      // Resolve Clerk ID to database UUID if needed
-      const resolvedUserId = await resolveUserId(sql, userId);
-      if (!resolvedUserId) {
-        return res.json({ jobs: [], total: 0 });
-      }
-
       let jobs;
       const limitNum = parseInt(limit) || 50;
 
-      if (filterStatus) {
-        jobs = await sql`
-          SELECT
-            id, user_id, job_type, status, progress,
-            result_url, result_gallery_id, error_message,
-            created_at, started_at, completed_at, context
-          FROM generation_jobs
-          WHERE user_id = ${resolvedUserId} AND status = ${filterStatus}
-          ORDER BY created_at DESC
-          LIMIT ${limitNum}
-        `;
+      // Filter by organization context
+      if (organizationId) {
+        // Organization context - show only org jobs
+        if (filterStatus) {
+          jobs = await sql`
+            SELECT
+              id, user_id, organization_id, job_type, status, progress,
+              result_url, result_gallery_id, error_message,
+              created_at, started_at, completed_at
+            FROM generation_jobs
+            WHERE organization_id = ${organizationId} AND status = ${filterStatus}
+            ORDER BY created_at DESC
+            LIMIT ${limitNum}
+          `;
+        } else {
+          jobs = await sql`
+            SELECT
+              id, user_id, organization_id, job_type, status, progress,
+              result_url, result_gallery_id, error_message,
+              created_at, started_at, completed_at
+            FROM generation_jobs
+            WHERE organization_id = ${organizationId}
+            ORDER BY created_at DESC
+            LIMIT ${limitNum}
+          `;
+        }
       } else {
-        jobs = await sql`
-          SELECT
-            id, user_id, job_type, status, progress,
-            result_url, result_gallery_id, error_message,
-            created_at, started_at, completed_at, context
-          FROM generation_jobs
-          WHERE user_id = ${resolvedUserId}
-          ORDER BY created_at DESC
-          LIMIT ${limitNum}
-        `;
+        // Personal context - show only personal jobs (no organization)
+        if (filterStatus) {
+          jobs = await sql`
+            SELECT
+              id, user_id, organization_id, job_type, status, progress,
+              result_url, result_gallery_id, error_message,
+              created_at, started_at, completed_at
+            FROM generation_jobs
+            WHERE user_id = ${userId} AND organization_id IS NULL AND status = ${filterStatus}
+            ORDER BY created_at DESC
+            LIMIT ${limitNum}
+          `;
+        } else {
+          jobs = await sql`
+            SELECT
+              id, user_id, organization_id, job_type, status, progress,
+              result_url, result_gallery_id, error_message,
+              created_at, started_at, completed_at
+            FROM generation_jobs
+            WHERE user_id = ${userId} AND organization_id IS NULL
+            ORDER BY created_at DESC
+            LIMIT ${limitNum}
+          `;
+        }
       }
 
       return res.json({ jobs, total: jobs.length });
@@ -4174,75 +2914,23 @@ app.get("/api/generate/status", async (req, res) => {
 
     return res.status(400).json({ error: "jobId or userId is required" });
   } catch (error) {
-    console.error("[Generate Status] Error:", error);
+    logError("Generate Status", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Cancel/Delete a job
-app.delete("/api/generate/job/:jobId", async (req, res) => {
-  try {
-    const sql = getSql();
-    const { jobId } = req.params;
+// ============================================================================
+// ORGANIZATIONS API - Managed by Clerk
+// Organization CRUD, members, roles, and invites are now handled by Clerk
+// See: https://clerk.com/docs/organizations/overview
+// ============================================================================
 
-    if (!jobId) {
-      return res.status(400).json({ error: "jobId is required" });
-    }
+// ============================================================================
+// VIDEO PROXY API (for COEP bypass in development)
+// Vercel Blob doesn't set Cross-Origin-Resource-Policy header, which is required
+// when the page has Cross-Origin-Embedder-Policy: require-corp (needed for FFmpeg WASM)
+// ============================================================================
 
-    // Cancel the job (mark as failed)
-    const result = await sql`
-      UPDATE generation_jobs
-      SET status = 'failed',
-          error_message = 'Cancelled by user'
-      WHERE id = ${jobId}
-      AND status IN ('queued', 'processing')
-      RETURNING id
-    `;
-
-    if (result.length === 0) {
-      return res
-        .status(404)
-        .json({ error: "Job not found or already completed" });
-    }
-
-    console.log(`[Generate] Job ${jobId} cancelled by user`);
-    res.json({ success: true, jobId });
-  } catch (error) {
-    console.error("[Generate Cancel] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Cancel all pending jobs for a user
-app.post("/api/generate/cancel-all", async (req, res) => {
-  try {
-    const sql = getSql();
-    const { userId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: "userId is required" });
-    }
-
-    const result = await sql`
-      UPDATE generation_jobs
-      SET status = 'failed',
-          error_message = 'Cancelled by user (bulk)'
-      WHERE user_id = ${userId}
-      AND status IN ('queued', 'processing')
-      RETURNING id
-    `;
-
-    console.log(
-      `[Generate] Cancelled ${result.length} jobs for user ${userId}`,
-    );
-    res.json({ success: true, cancelledCount: result.length });
-  } catch (error) {
-    console.error("[Generate Cancel All] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Video Proxy API
 app.get("/api/proxy-video", async (req, res) => {
   try {
     const { url } = req.query;
@@ -4251,6 +2939,7 @@ app.get("/api/proxy-video", async (req, res) => {
       return res.status(400).json({ error: "url parameter is required" });
     }
 
+    // Only allow proxying Vercel Blob URLs for security
     if (
       !url.includes(".public.blob.vercel-storage.com/") &&
       !url.includes(".blob.vercel-storage.com/")
@@ -4260,6 +2949,8 @@ app.get("/api/proxy-video", async (req, res) => {
         .json({ error: "Only Vercel Blob URLs are allowed" });
     }
 
+    console.log("[Video Proxy] Fetching:", url);
+
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -4268,6 +2959,7 @@ app.get("/api/proxy-video", async (req, res) => {
         .json({ error: `Failed to fetch video: ${response.statusText}` });
     }
 
+    // Set CORS and COEP-compatible headers
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader(
@@ -4280,6 +2972,7 @@ app.get("/api/proxy-video", async (req, res) => {
     );
     res.setHeader("Accept-Ranges", "bytes");
 
+    // Handle range requests for video seeking
     const range = req.headers.range;
     if (range) {
       const contentLength = parseInt(
@@ -4294,15 +2987,20 @@ app.get("/api/proxy-video", async (req, res) => {
       res.setHeader("Content-Length", end - start + 1);
     }
 
+    // Stream the video data
     const buffer = await response.arrayBuffer();
     res.send(Buffer.from(buffer));
   } catch (error) {
-    console.error("[Video Proxy] Error:", error);
+    logError("Video Proxy", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// File Upload API
+// ============================================================================
+// FILE UPLOAD API (Vercel Blob)
+// ============================================================================
+
+// Max file size: 100MB
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
 app.post("/api/upload", async (req, res) => {
@@ -4315,6 +3013,7 @@ app.post("/api/upload", async (req, res) => {
       });
     }
 
+    // Decode base64 data
     const buffer = Buffer.from(data, "base64");
 
     if (buffer.length > MAX_FILE_SIZE) {
@@ -4323,13 +3022,28 @@ app.post("/api/upload", async (req, res) => {
       });
     }
 
+    // Generate unique filename with timestamp
     const timestamp = Date.now();
     const uniqueFilename = `${timestamp}-${filename}`;
+
+    // Upload to Vercel Blob
+    logExternalAPI(
+      "Vercel Blob",
+      "Upload file",
+      `${contentType} | ${(buffer.length / 1024).toFixed(1)}KB`,
+    );
+    const uploadStart = Date.now();
 
     const blob = await put(uniqueFilename, buffer, {
       access: "public",
       contentType,
     });
+
+    logExternalAPIResult(
+      "Vercel Blob",
+      "Upload file",
+      Date.now() - uploadStart,
+    );
 
     return res.status(200).json({
       success: true,
@@ -4338,7 +3052,7 @@ app.post("/api/upload", async (req, res) => {
       size: buffer.length,
     });
   } catch (error) {
-    console.error("[Upload] Error:", error);
+    logError("Upload API", error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : "Unknown error",
     });
@@ -4346,11 +3060,650 @@ app.post("/api/upload", async (req, res) => {
 });
 
 // ============================================================================
+// AI HELPER FUNCTIONS
+// ============================================================================
+
+// Gemini client
+const getGeminiAi = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY not configured");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+// OpenRouter client
+const getOpenRouter = () => {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY not configured");
+  }
+  return new OpenRouter({ apiKey });
+};
+
+// Model defaults
+const DEFAULT_TEXT_MODEL = "gemini-3-flash-preview";
+const DEFAULT_FAST_TEXT_MODEL = "gemini-3-flash-preview";
+const DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview";
+const DEFAULT_ASSISTANT_MODEL = "gemini-3-flash-preview";
+
+// Retry helper for 503 errors
+const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      const isRetryable =
+        error?.message?.includes("503") ||
+        error?.message?.includes("overloaded") ||
+        error?.message?.includes("UNAVAILABLE") ||
+        error?.status === 503;
+
+      if (isRetryable && attempt < maxRetries) {
+        console.log(
+          `[Gemini] Retry ${attempt}/${maxRetries} after ${delayMs}ms...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+};
+
+// Map aspect ratios
+const mapAspectRatio = (ratio) => {
+  const map = {
+    "1:1": "1:1",
+    "9:16": "9:16",
+    "16:9": "16:9",
+    "1.91:1": "16:9",
+    "4:5": "4:5",
+    "3:4": "3:4",
+    "4:3": "4:3",
+    "2:3": "2:3",
+    "3:2": "3:2",
+  };
+  return map[ratio] || "1:1";
+};
+
+// Generate image with Gemini
+const generateGeminiImage = async (
+  prompt,
+  aspectRatio,
+  model = DEFAULT_IMAGE_MODEL,
+  imageSize = "1K",
+  productImages,
+  styleReferenceImage,
+  personReferenceImage,
+) => {
+  const ai = getGeminiAi();
+  const parts = [{ text: prompt }];
+
+  // Add person/face reference image first (highest priority for face consistency)
+  if (personReferenceImage) {
+    parts.push({
+      inlineData: {
+        data: personReferenceImage.base64,
+        mimeType: personReferenceImage.mimeType,
+      },
+    });
+  }
+
+  if (styleReferenceImage) {
+    parts.push({
+      inlineData: {
+        data: styleReferenceImage.base64,
+        mimeType: styleReferenceImage.mimeType,
+      },
+    });
+  }
+
+  if (productImages) {
+    productImages.forEach((img) => {
+      parts.push({
+        inlineData: { data: img.base64, mimeType: img.mimeType },
+      });
+    });
+  }
+
+  const response = await withRetry(() =>
+    ai.models.generateContent({
+      model,
+      contents: { parts },
+      config: {
+        imageConfig: {
+          aspectRatio: mapAspectRatio(aspectRatio),
+          imageSize,
+        },
+      },
+    }),
+  );
+
+  const responseParts = response?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(responseParts)) {
+    console.error("[Image API] Unexpected response:", JSON.stringify(response, null, 2));
+    throw new Error("Failed to generate image - invalid response structure");
+  }
+
+  for (const part of responseParts) {
+    if (part.inlineData) {
+      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+    }
+  }
+
+  throw new Error("Failed to generate image");
+};
+
+// Generate structured content with Gemini
+const generateStructuredContent = async (
+  model,
+  parts,
+  responseSchema,
+  temperature = 0.7,
+) => {
+  const ai = getGeminiAi();
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: { parts },
+    config: {
+      responseMimeType: "application/json",
+      responseSchema,
+      temperature,
+    },
+  });
+
+  return response.text.trim();
+};
+
+// Generate text with OpenRouter
+const generateTextWithOpenRouter = async (
+  model,
+  systemPrompt,
+  userPrompt,
+  temperature = 0.7,
+) => {
+  const openrouter = getOpenRouter();
+
+  const response = await openrouter.chat.send({
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    responseFormat: { type: "json_object" },
+    temperature,
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error(`OpenRouter (${model}) no content returned`);
+  }
+
+  return content;
+};
+
+// Generate text with OpenRouter + Vision
+const generateTextWithOpenRouterVision = async (
+  model,
+  textParts,
+  imageParts,
+  temperature = 0.7,
+) => {
+  const openrouter = getOpenRouter();
+
+  const content = textParts.map((text) => ({ type: "text", text }));
+
+  for (const img of imageParts) {
+    content.push({
+      type: "image_url",
+      imageUrl: {
+        url: `data:${img.mimeType};base64,${img.base64}`,
+      },
+    });
+  }
+
+  const response = await openrouter.chat.send({
+    model,
+    messages: [{ role: "user", content }],
+    responseFormat: { type: "json_object" },
+    temperature,
+  });
+
+  const result = response.choices[0]?.message?.content;
+  if (!result) {
+    throw new Error(`OpenRouter (${model}) no content returned`);
+  }
+
+  return result;
+};
+
+// Schema Type constants
+const Type = {
+  OBJECT: "OBJECT",
+  ARRAY: "ARRAY",
+  STRING: "STRING",
+  INTEGER: "INTEGER",
+  BOOLEAN: "BOOLEAN",
+  NUMBER: "NUMBER",
+};
+
+// Prompt builders
+const shouldUseTone = (brandProfile, target) => {
+  const targets = brandProfile.toneTargets || [
+    "campaigns",
+    "posts",
+    "images",
+    "flyers",
+  ];
+  return targets.includes(target);
+};
+
+const getToneText = (brandProfile, target) => {
+  return shouldUseTone(brandProfile, target) ? brandProfile.toneOfVoice : "";
+};
+
+const buildImagePrompt = (
+  prompt,
+  brandProfile,
+  hasStyleReference = false,
+  hasLogo = false,
+  hasPersonReference = false,
+  hasProductImages = false,
+  jsonPrompt = null,
+) => {
+  const toneText = getToneText(brandProfile, "images");
+  let fullPrompt = `PROMPT TÉCNICO: ${prompt}
+ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
+
+  if (jsonPrompt) {
+    fullPrompt += `
+
+JSON ESTRUTURADO (REFERÊNCIA):
+\`\`\`json
+${jsonPrompt}
+\`\`\``;
+  }
+
+  if (hasPersonReference) {
+    fullPrompt += `
+
+**PESSOA/ROSTO DE REFERÊNCIA (PRIORIDADE MÁXIMA):**
+- A primeira imagem anexada é uma FOTO DE REFERÊNCIA de uma pessoa
+- OBRIGATÓRIO: Use EXATAMENTE o rosto e aparência física desta pessoa na imagem gerada
+- Mantenha fielmente: formato do rosto, cor de pele, cabelo, olhos e características faciais
+- A pessoa deve ser o protagonista da cena, realizando a ação descrita no prompt
+- NÃO altere a identidade da pessoa - preserve sua aparência real`;
+  }
+
+  if (hasLogo) {
+    fullPrompt += `
+
+**LOGO DA MARCA (OBRIGATÓRIO):**
+- Use o LOGO EXATO fornecido na imagem de referência anexada - NÃO CRIE UM LOGO DIFERENTE
+- O logo deve aparecer de forma clara e legível na composição
+- Mantenha as proporções e cores originais do logo`;
+  }
+
+  if (hasProductImages) {
+    fullPrompt += `
+
+**IMAGENS DE PRODUTO (OBRIGATÓRIO):**
+- As imagens anexadas são referências de produto
+- Preserve fielmente o produto (forma, cores e detalhes principais)
+- O produto deve aparecer com destaque na composição`;
+  }
+
+  if (hasStyleReference) {
+    fullPrompt += `
+
+**TIPOGRAFIA OBRIGATÓRIA PARA CENAS (REGRA INVIOLÁVEL):**
+- Use EXCLUSIVAMENTE fonte BOLD CONDENSED SANS-SERIF (estilo Bebas Neue, Oswald, Impact, ou similar)
+- TODOS os textos devem usar a MESMA família tipográfica - PROIBIDO misturar estilos
+- Títulos em MAIÚSCULAS com peso BLACK ou EXTRA-BOLD
+- PROIBIDO: fontes script/cursivas, serifadas clássicas, handwriting, ou fontes finas/light`;
+  }
+
+  return fullPrompt;
+};
+
+const convertImagePromptToJson = async (
+  prompt,
+  aspectRatio,
+  organizationId,
+  sql,
+) => {
+  const timer = createTimer();
+
+  try {
+    const ai = getGeminiAi();
+    const systemPrompt = getImagePromptSystemPrompt(aspectRatio);
+
+    const response = await ai.models.generateContent({
+      model: DEFAULT_FAST_TEXT_MODEL,
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: `${systemPrompt}\n\nPROMPT: ${prompt}` }],
+        },
+      ],
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.2,
+      },
+    });
+
+    const text = response.text?.trim() || "";
+    let parsed = null;
+
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = null;
+    }
+
+    const result = JSON.stringify(
+      parsed || {
+        subject: "",
+        environment: "",
+        style: "",
+        camera: "",
+        text: {
+          enabled: false,
+          content: "",
+          language: "pt-BR",
+          placement: "",
+          font: "",
+        },
+        output: {
+          aspect_ratio: aspectRatio,
+          resolution: "2K",
+        },
+      },
+      null,
+      2,
+    );
+
+    const tokens = extractGeminiTokens(response);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/convert-image-prompt',
+      operation: 'text',
+      model: DEFAULT_FAST_TEXT_MODEL,
+      inputTokens: tokens.inputTokens,
+      outputTokens: tokens.outputTokens,
+      latencyMs: timer(),
+      status: 'success',
+    });
+
+    return result;
+  } catch (error) {
+    console.error('[Image Prompt JSON] Error:', error);
+    await logAiUsage(sql, {
+      organizationId,
+      endpoint: '/api/ai/convert-image-prompt',
+      operation: 'text',
+      model: DEFAULT_FAST_TEXT_MODEL,
+      latencyMs: timer(),
+      status: 'failed',
+      error: error.message,
+    }).catch(() => {});
+    return null;
+  }
+};
+
+const buildFlyerPrompt = (brandProfile) => {
+  const toneText = getToneText(brandProfile, "flyers");
+
+  return `
+**PERSONA:** Você é Diretor de Arte Sênior de uma agência de publicidade internacional de elite.
+
+**MISSÃO CRÍTICA:**
+Crie materiais visuais de alta qualidade que representem fielmente a marca e comuniquem a mensagem de forma impactante.
+Se houver valores ou informações importantes no conteúdo, destaque-os visualmente (fonte negrito, cor vibrante ou tamanho maior).
+
+**REGRAS DE CONTEÚDO:**
+1. Destaque informações importantes (valores, datas, horários) de forma clara e legível.
+2. Use a marca ${brandProfile.name}.
+3. Siga a identidade visual da marca em todos os elementos.
+
+**IDENTIDADE DA MARCA - ${brandProfile.name}:**
+${brandProfile.description ? `- Descrição: ${brandProfile.description}` : ""}
+${toneText ? `- Tom de Comunicação: ${toneText}` : ""}
+- Cor Primária (dominante): ${brandProfile.primaryColor}
+- Cor de Acento (destaques, CTAs): ${brandProfile.secondaryColor}
+
+**PRINCÍPIOS DE DESIGN PROFISSIONAL:**
+
+1. HARMONIA CROMÁTICA:
+   - Use APENAS as cores da marca: ${brandProfile.primaryColor} (primária) e ${brandProfile.secondaryColor} (acento)
+   - Crie variações tonais dessas cores para profundidade
+   - Evite introduzir cores aleatórias
+
+2. RESPIRAÇÃO VISUAL (Anti-Poluição):
+   - Menos é mais: priorize espaços negativos estratégicos
+   - Não sobrecarregue com elementos decorativos desnecessários
+   - Hierarquia visual clara
+
+3. TIPOGRAFIA CINEMATOGRÁFICA:
+   - Máximo 2-3 famílias tipográficas diferentes
+   - Contraste forte entre títulos (bold/black) e corpo (regular/medium)
+
+4. ESTÉTICA PREMIUM SEM CLICHÊS:
+   - Evite excesso de efeitos (brilhos, sombras, neons chamativos)
+   - Prefira elegância sutil a ostentação visual
+
+**ATMOSFERA FINAL:**
+- Alta classe, luxo e sofisticação
+- Cinematográfico mas não exagerado
+- Profissional mas criativo
+- Impactante mas elegante`;
+};
+
+const buildQuickPostPrompt = (brandProfile, context) => {
+  const toneText = getToneText(brandProfile, "posts");
+
+  return `
+Você é Social Media Manager de elite. Crie um post de INSTAGRAM de alta performance.
+
+**CONTEXTO:**
+${context}
+
+**MARCA:** ${brandProfile.name}${brandProfile.description ? ` - ${brandProfile.description}` : ""}${toneText ? ` | **TOM:** ${toneText}` : ""}
+
+**REGRAS DE OURO:**
+1. GANCHO EXPLOSIVO com emojis relevantes ao tema.
+2. DESTAQUE informações importantes (valores, datas, ofertas).
+3. CTA FORTE (ex: Link na Bio, Saiba Mais).
+4. 5-8 Hashtags estratégicas relevantes à marca e ao conteúdo.
+
+Responda apenas JSON:
+{ "platform": "Instagram", "content": "Texto Legenda", "hashtags": ["tag1", "tag2"], "image_prompt": "descrição visual" }`;
+};
+
+/**
+ * Video prompt JSON conversion system prompt
+ */
+const getVideoPromptSystemPrompt = (duration, aspectRatio) => {
+  return `Você é um especialista em prompt engineering para vídeo de IA.
+Converta o prompt genérico fornecido em um JSON estruturado e aninhado otimizado para modelos de geração de vídeo (Veo 3, Sora 2).
+
+O JSON deve incluir detalhes ricos sobre:
+- visual_style: estética, paleta de cores, iluminação
+- camera: movimentos de câmera cinematográficos, posições inicial e final
+- subject: personagem/objeto principal, ação, expressão/estado
+- environment: cenário, props relevantes, atmosfera
+- scene_sequence: 2-3 beats de ação para criar dinamismo
+- technical: duração (${duration} seconds), aspect ratio (${aspectRatio}), tokens de qualidade
+
+**TIPOGRAFIA OBRIGATÓRIA (REGRA CRÍTICA PARA CONSISTÊNCIA VISUAL):**
+Se o vídeo contiver QUALQUER texto na tela (títulos, legendas, overlays, valores, CTAs):
+- Use EXCLUSIVAMENTE fonte BOLD CONDENSED SANS-SERIF (estilo Bebas Neue, Oswald, Impact)
+- TODOS os textos devem usar a MESMA família tipográfica
+- Textos em MAIÚSCULAS com peso BLACK ou EXTRA-BOLD
+- PROIBIDO: fontes script/cursivas, serifadas, handwriting, ou fontes finas/light
+
+**ÁUDIO E NARRAÇÃO (OBRIGATÓRIO):**
+Se o prompt contiver uma NARRAÇÃO ou texto de fala, SEMPRE inclua o campo audio_context no JSON:
+- audio_context.voiceover: o texto exato da narração em português brasileiro
+- audio_context.language: "pt-BR"
+- audio_context.tone: tom da narração (ex: "Exciting, professional, persuasive" ou "Calm, informative, trustworthy")
+- audio_context.style: estilo de entrega (ex: "energetic announcer", "conversational", "dramatic narrator")
+
+Exemplo de audio_context:
+{
+  "audio_context": {
+    "voiceover": "Texto da narração aqui",
+    "language": "pt-BR",
+    "tone": "Exciting, professional, persuasive",
+    "style": "energetic announcer"
+  }
+}
+
+Mantenha a essência do prompt original mas expanda com detalhes visuais cinematográficos.`;
+};
+
+const getImagePromptSystemPrompt = (aspectRatio) => {
+  return `Você é especialista em prompt engineering para imagens de IA.
+Converta o prompt fornecido em um JSON estruturado para geração de imagens.
+
+REGRAS IMPORTANTES:
+- NÃO invente detalhes que não existam no prompt original.
+- Preserve exatamente o conteúdo e as instruções do prompt.
+- Se uma informação não estiver explícita, deixe como string vazia.
+- Use linguagem objetiva e direta.
+
+O JSON deve seguir esta estrutura:
+{
+  "subject": "",
+  "environment": "",
+  "style": "",
+  "camera": "",
+  "text": {
+    "enabled": false,
+    "content": "",
+    "language": "pt-BR",
+    "placement": "",
+    "font": ""
+  },
+  "output": {
+    "aspect_ratio": "${aspectRatio}",
+    "resolution": "2K"
+  }
+}
+
+Se houver texto na imagem, marque text.enabled como true e preencha content/placement/font conforme o prompt.`;
+};
+
+// Campaign schema for structured generation
+const campaignSchema = {
+  type: Type.OBJECT,
+  properties: {
+    videoClipScripts: {
+      type: Type.ARRAY,
+      description: "Roteiros para vídeos curtos (Reels/Shorts/TikTok).",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          hook: { type: Type.STRING },
+          scenes: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                scene: { type: Type.INTEGER },
+                visual: { type: Type.STRING },
+                narration: { type: Type.STRING },
+                duration_seconds: { type: Type.INTEGER },
+              },
+              required: ["scene", "visual", "narration", "duration_seconds"],
+            },
+          },
+          image_prompt: { type: Type.STRING },
+          audio_script: { type: Type.STRING },
+        },
+        required: ["title", "hook", "scenes", "image_prompt", "audio_script"],
+      },
+    },
+    posts: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          platform: { type: Type.STRING },
+          content: { type: Type.STRING },
+          hashtags: { type: Type.ARRAY, items: { type: Type.STRING } },
+          image_prompt: { type: Type.STRING },
+        },
+        required: ["platform", "content", "hashtags", "image_prompt"],
+      },
+    },
+    adCreatives: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          platform: { type: Type.STRING },
+          headline: { type: Type.STRING },
+          body: { type: Type.STRING },
+          cta: { type: Type.STRING },
+          image_prompt: { type: Type.STRING },
+        },
+        required: ["platform", "headline", "body", "cta", "image_prompt"],
+      },
+    },
+    carousels: {
+      type: Type.ARRAY,
+      description: "Carrosséis para Instagram (4-6 slides cada).",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          hook: { type: Type.STRING },
+          cover_prompt: { type: Type.STRING },
+          slides: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                slide: { type: Type.INTEGER },
+                visual: { type: Type.STRING },
+                text: { type: Type.STRING },
+              },
+              required: ["slide", "visual", "text"],
+            },
+          },
+        },
+        required: ["title", "hook", "cover_prompt", "slides"],
+      },
+    },
+  },
+  required: ["videoClipScripts", "posts", "adCreatives", "carousels"],
+};
+
+// Quick post schema
+const quickPostSchema = {
+  type: Type.OBJECT,
+  properties: {
+    platform: { type: Type.STRING },
+    content: { type: Type.STRING },
+    hashtags: { type: Type.ARRAY, items: { type: Type.STRING } },
+    image_prompt: { type: Type.STRING },
+  },
+  required: ["platform", "content", "hashtags", "image_prompt"],
+};
+
+// ============================================================================
 // AI GENERATION ENDPOINTS
 // ============================================================================
 
 // AI Campaign Generation
-app.post("/api/ai/campaign", requireAuthWithAiRateLimit, async (req, res) => {
+app.post("/api/ai/campaign", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
@@ -4375,23 +3728,27 @@ app.post("/api/ai/campaign", requireAuthWithAiRateLimit, async (req, res) => {
     }
 
     console.log("[Campaign API] Generating campaign...");
-    console.log(
-      "[Campaign API] Options received:",
-      JSON.stringify(options, null, 2),
-    );
     console.log("[Campaign API] Images:", {
       productImages: productImages?.length || 0,
       inspirationImages: inspirationImages?.length || 0,
       collabLogo: !!collabLogo,
       compositionAssets: compositionAssets?.length || 0,
+      toneOverride: toneOfVoiceOverride || null,
     });
+
+    // Collect all images for vision models
+    const allImages = [];
+    if (productImages) allImages.push(...productImages);
+    if (inspirationImages) allImages.push(...inspirationImages);
+    if (collabLogo) allImages.push(collabLogo);
+    if (compositionAssets) allImages.push(...compositionAssets);
 
     // Model selection - config in config/ai-models.ts
     // OpenRouter models have "/" in their ID (e.g., "openai/gpt-5.2")
     const model = brandProfile.creativeModel || DEFAULT_TEXT_MODEL;
     const isOpenRouter = model.includes("/");
 
-    const quantityInstructions = buildQuantityInstructions(options, "prod");
+    const quantityInstructions = buildQuantityInstructions(options, "dev");
     const effectiveBrandProfile = toneOfVoiceOverride
       ? { ...brandProfile, toneOfVoice: toneOfVoiceOverride }
       : brandProfile;
@@ -4401,13 +3758,6 @@ app.post("/api/ai/campaign", requireAuthWithAiRateLimit, async (req, res) => {
       quantityInstructions,
       getToneText(effectiveBrandProfile, "campaigns"),
     );
-
-    // Collect all images for vision models
-    const allImages = [];
-    if (productImages) allImages.push(...productImages);
-    if (inspirationImages) allImages.push(...inspirationImages);
-    if (collabLogo) allImages.push(collabLogo);
-    if (compositionAssets) allImages.push(...compositionAssets);
 
     let result;
 
@@ -4482,7 +3832,12 @@ REGRAS CRÍTICAS:
           0.7,
         );
       } else {
-        result = await generateTextWithOpenRouter(model, "", jsonSchemaPrompt, 0.7);
+        result = await generateTextWithOpenRouter(
+          model,
+          "",
+          jsonSchemaPrompt,
+          0.7,
+        );
       }
     } else {
       const parts = [{ text: prompt }];
@@ -4503,9 +3858,43 @@ REGRAS CRÍTICAS:
       );
     }
 
-    const campaign = JSON.parse(result);
+    // Clean markdown code blocks if present
+    let cleanResult = result.trim();
+    if (cleanResult.startsWith("```json")) {
+      cleanResult = cleanResult.slice(7);
+    } else if (cleanResult.startsWith("```")) {
+      cleanResult = cleanResult.slice(3);
+    }
+    if (cleanResult.endsWith("```")) {
+      cleanResult = cleanResult.slice(0, -3);
+    }
+    cleanResult = cleanResult.trim();
 
-    console.log("[Campaign API] Campaign structure:", {
+    const campaign = JSON.parse(cleanResult);
+
+    // Normalize field names (ensure arrays exist)
+    campaign.posts = campaign.posts || [];
+    campaign.adCreatives = campaign.adCreatives || campaign.ad_creatives || [];
+    campaign.videoClipScripts =
+      campaign.videoClipScripts || campaign.video_clip_scripts || [];
+
+    // Validate videoClipScripts have required fields
+    campaign.videoClipScripts = campaign.videoClipScripts
+      .filter(
+        (script) => script && script.title && script.hook && script.scenes,
+      )
+      .map((script) => ({
+        ...script,
+        title: script.title || "Sem título",
+        hook: script.hook || "",
+        scenes: script.scenes || [],
+        image_prompt: script.image_prompt || "",
+        audio_script: script.audio_script || "",
+      }));
+
+    // Debug: log structure for troubleshooting (v2 - with carousels)
+    console.log("[Campaign API v2] Raw carousels from AI:", JSON.stringify(campaign.carousels, null, 2));
+    console.log("[Campaign API v2] Campaign structure:", {
       hasPosts: !!campaign.posts,
       postsCount: campaign.posts?.length,
       hasAdCreatives: !!campaign.adCreatives,
@@ -4526,8 +3915,8 @@ REGRAS CRÍTICAS:
     console.log("[Campaign API] Campaign generated successfully");
 
     // Log AI usage
-    const inputTokens = prompt.length / 4;
-    const outputTokens = result.length / 4;
+    const inputTokens = prompt.length / 4; // Estimate: ~4 chars per token
+    const outputTokens = cleanResult.length / 4;
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/campaign',
@@ -4541,6 +3930,8 @@ REGRAS CRÍTICAS:
         productImagesCount: productImages?.length || 0,
         inspirationImagesCount: inspirationImages?.length || 0,
         hasCollabLogo: !!collabLogo,
+        postsCount: campaign.posts?.length || 0,
+        videoScriptsCount: campaign.videoClipScripts?.length || 0,
       }
     });
 
@@ -4551,6 +3942,7 @@ REGRAS CRÍTICAS:
     });
   } catch (error) {
     console.error("[Campaign API] Error:", error);
+    // Log failed usage
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/campaign',
@@ -4567,7 +3959,7 @@ REGRAS CRÍTICAS:
 });
 
 // AI Flyer Generation
-app.post("/api/ai/flyer", requireAuthWithAiRateLimit, async (req, res) => {
+app.post("/api/ai/flyer", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
@@ -4706,7 +4098,7 @@ app.post("/api/ai/flyer", requireAuthWithAiRateLimit, async (req, res) => {
 });
 
 // AI Image Generation
-app.post("/api/ai/image", requireAuthWithAiRateLimit, async (req, res) => {
+app.post("/api/ai/image", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
@@ -4720,6 +4112,7 @@ app.post("/api/ai/image", requireAuthWithAiRateLimit, async (req, res) => {
       imageSize = "1K",
       productImages,
       styleReferenceImage,
+      personReferenceImage,
     } = req.body;
     const model = DEFAULT_IMAGE_MODEL;
 
@@ -4730,15 +4123,15 @@ app.post("/api/ai/image", requireAuthWithAiRateLimit, async (req, res) => {
     }
 
     console.log(
-      `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio} | productImages: ${productImages?.length || 0}`,
+      `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}${personReferenceImage ? ', with person reference' : ''} | productImages: ${productImages?.length || 0}`,
     );
 
     // Prepare product images array, including brand logo if available
     let allProductImages = productImages ? [...productImages] : [];
 
-    // Auto-include brand logo as reference if it's an HTTP URL and not already passed by frontend
+    // Auto-include brand logo as reference if it's an HTTP URL
     // (Frontend handles data URLs, server handles HTTP URLs)
-    if (brandProfile.logo && brandProfile.logo.startsWith('http') && allProductImages.length === 0) {
+    if (brandProfile.logo && brandProfile.logo.startsWith('http')) {
       try {
         const logoBase64 = await urlToBase64(brandProfile.logo);
         if (logoBase64) {
@@ -4755,6 +4148,7 @@ app.post("/api/ai/image", requireAuthWithAiRateLimit, async (req, res) => {
     }
 
     const hasLogo = !!brandProfile.logo && allProductImages.length > 0;
+    const hasPersonReference = !!personReferenceImage;
     const jsonPrompt = await convertImagePromptToJson(
       prompt,
       aspectRatio,
@@ -4766,6 +4160,7 @@ app.post("/api/ai/image", requireAuthWithAiRateLimit, async (req, res) => {
       brandProfile,
       !!styleReferenceImage,
       hasLogo,
+      hasPersonReference,
       !!productImages?.length,
       jsonPrompt,
     );
@@ -4776,10 +4171,11 @@ app.post("/api/ai/image", requireAuthWithAiRateLimit, async (req, res) => {
     const imageDataUrl = await generateGeminiImage(
       fullPrompt,
       aspectRatio,
-      DEFAULT_IMAGE_MODEL,
+      model,
       imageSize,
       allProductImages.length > 0 ? allProductImages : undefined,
       styleReferenceImage,
+      personReferenceImage,
     );
 
     console.log("[Image API] Image generated successfully");
@@ -4902,7 +4298,7 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
 });
 
 // AI Text Generation
-app.post("/api/ai/text", requireAuthWithAiRateLimit, async (req, res) => {
+app.post("/api/ai/text", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
@@ -5065,6 +4461,7 @@ app.post("/api/ai/enhance-prompt", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
+
   const sql = getSql();
 
   try {
@@ -5074,9 +4471,9 @@ app.post("/api/ai/enhance-prompt", async (req, res) => {
       return res.status(400).json({ error: "prompt is required" });
     }
 
-    console.log("[Enhance Prompt API] Enhancing prompt...");
+    console.log("[Enhance Prompt API] Enhancing prompt with Grok...");
 
-    const ai = getGeminiAi();
+    const openrouter = getOpenRouter();
 
     const systemPrompt = `Você é um especialista em marketing digital e criação de conteúdo multiplataforma. Sua função é aprimorar briefings de campanhas para gerar máximo engajamento em TODOS os formatos de conteúdo.
 
@@ -5138,31 +4535,29 @@ REGRAS:
 8. Mantenha tamanho similar ou ligeiramente maior que o original
 9. Use formatação markdown para estruturar (negrito, listas, etc)`;
 
-    const result = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: systemPrompt + "\n\nBRIEFING ORIGINAL:\n" + prompt }],
-        },
+    const userPrompt = `BRIEFING ORIGINAL:\n${prompt}`;
+
+    const response = await openrouter.chat.send({
+      model: "x-ai/grok-4.1-fast",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
       ],
-      config: {
-        temperature: 0.5,
-        maxOutputTokens: 2048,
-      },
+      temperature: 0.5,
+      max_tokens: 2048,
     });
 
-    const enhancedPrompt = result.text?.trim() || "";
+    const enhancedPrompt = response.choices[0]?.message?.content?.trim() || "";
 
-    console.log("[Enhance Prompt API] Successfully enhanced prompt");
+    console.log("[Enhance Prompt API] Successfully enhanced prompt with Grok");
 
     // Log AI usage
-    const tokens = extractGeminiTokens(result);
+    const tokens = extractOpenRouterTokens(response);
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/enhance-prompt',
       operation: 'text',
-      model: 'gemini-3-flash-preview',
+      model: 'x-ai/grok-4.1-fast',
       inputTokens: tokens.inputTokens,
       outputTokens: tokens.outputTokens,
       latencyMs: timer(),
@@ -5176,7 +4571,7 @@ REGRAS:
       organizationId,
       endpoint: '/api/ai/enhance-prompt',
       operation: 'text',
-      model: 'gemini-3-flash-preview',
+      model: 'x-ai/grok-4.1-fast',
       latencyMs: timer(),
       status: 'failed',
       error: error.message,
@@ -5187,69 +4582,70 @@ REGRAS:
   }
 });
 
-app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
+// AI Edit Image
+app.post("/api/ai/edit-image", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
   const sql = getSql();
 
   try {
-    const { image, prompt, mask, maskRegion, referenceImage } = req.body;
+    const { image, prompt, mask, referenceImage } = req.body;
 
     if (!image || !prompt) {
       return res.status(400).json({ error: "image and prompt are required" });
     }
 
-    console.log("[Edit Image API] Editing image...", { hasMask: !!mask, hasMaskRegion: !!maskRegion });
+    console.log("[Edit Image API] Editing image...", {
+      imageSize: image?.base64?.length,
+      mimeType: image?.mimeType,
+      promptLength: prompt?.length,
+      hasMask: !!mask,
+      hasReference: !!referenceImage,
+    });
 
     const ai = getGeminiAi();
+    // Usar prompt direto sem adicionar texto extra que pode confundir o modelo
+    const instructionPrompt = prompt;
 
-    // Build location-aware prompt if mask region is provided
-    let locationHint = "";
-    if (maskRegion) {
-      const { x, y, width, height, imageWidth, imageHeight } = maskRegion;
-      // Calculate position as percentage and quadrant
-      const centerX = x + width / 2;
-      const centerY = y + height / 2;
-      const percX = Math.round((centerX / imageWidth) * 100);
-      const percY = Math.round((centerY / imageHeight) * 100);
-
-      // Determine quadrant/position description
-      let positionDesc = "";
-      if (percY < 33) {
-        positionDesc = percX < 33 ? "canto superior esquerdo" : percX > 66 ? "canto superior direito" : "parte superior central";
-      } else if (percY > 66) {
-        positionDesc = percX < 33 ? "canto inferior esquerdo" : percX > 66 ? "canto inferior direito" : "parte inferior central";
-      } else {
-        positionDesc = percX < 33 ? "lado esquerdo" : percX > 66 ? "lado direito" : "centro";
-      }
-
-      locationHint = ` ATENÇÃO: Edite SOMENTE a área marcada no ${positionDesc} da imagem (aproximadamente ${Math.round(width/imageWidth*100)}% de largura x ${Math.round(height/imageHeight*100)}% de altura). NÃO modifique outras partes da imagem.`;
-      console.log("[Edit Image API] Location hint:", locationHint);
+    // Validate and clean base64 data
+    let cleanBase64 = image.base64;
+    if (cleanBase64.startsWith('data:')) {
+      cleanBase64 = cleanBase64.split(',')[1];
+    }
+    // Check for valid base64
+    if (cleanBase64.length % 4 !== 0) {
+      console.log("[Edit Image API] Warning: base64 length is not multiple of 4, padding...");
+      cleanBase64 = cleanBase64.padEnd(Math.ceil(cleanBase64.length / 4) * 4, '=');
     }
 
-    const instructionPrompt = `DESIGNER SÊNIOR: Execute alteração profissional: ${prompt}.${locationHint} Texto original e logos são SAGRADOS, preserve informações importantes visíveis.`;
+    console.log("[Edit Image API] parts structure:", {
+      textLength: instructionPrompt.length,
+      imageBase64Length: cleanBase64.length,
+      mimeType: image.mimeType,
+      partsCount: 2 + (!!mask) + (!!referenceImage)
+    });
 
     const parts = [
       { text: instructionPrompt },
-      { inlineData: { data: image.base64, mimeType: image.mimeType } },
+      { inlineData: { data: cleanBase64, mimeType: image.mimeType } },
     ];
 
-    // Configurar máscara para inpainting (edição de área específica)
     let imageConfig = { imageSize: "1K" };
 
     if (mask) {
-      // Gemini suporta máscara binária (preto=editar, branco=preservar)
-      // A máscara deve ser uma imagem PNG com transparência ou escala de cinza
-      imageConfig.mask = {
-        image: {
-          inlineData: {
-            data: mask.base64,
-            mimeType: mask.mimeType || "image/png"
-          }
-        }
+      console.log("[Edit Image API] Adding mask, size:", mask.base64?.length);
+      imageConfig = {
+        ...imageConfig,
+        mask: {
+          image: {
+            inlineData: {
+              data: mask.base64,
+              mimeType: mask.mimeType || "image/png",
+            },
+          },
+        },
       };
-      console.log("[Edit Image API] Mask applied");
     }
 
     if (referenceImage) {
@@ -5263,24 +4659,16 @@ app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
 
     const response = await withRetry(() =>
       ai.models.generateContent({
-        model: DEFAULT_IMAGE_MODEL,
+        model: "gemini-3-pro-image-preview",
         contents: { parts },
         config: { imageConfig },
       })
     );
 
-    // Check for blocked content
-    if (response.candidates?.[0]?.finishReason === "SAFETY") {
-      const safetyRatings = response.candidates?.[0]?.safetyRatings || [];
-      console.log("[Edit Image API] Blocked by safety filters:", safetyRatings);
-      throw new Error("A edição foi bloqueada pelos filtros de segurança. Tente reformular o pedido.");
-    }
-
     let imageDataUrl = null;
-    const parts_response = response.candidates?.[0]?.content?.parts;
-    // Check if parts_response is an array (not empty object or undefined)
-    if (Array.isArray(parts_response)) {
-      for (const part of parts_response) {
+    const contentParts = response.candidates?.[0]?.content?.parts;
+    if (Array.isArray(contentParts)) {
+      for (const part of contentParts) {
         if (part.inlineData) {
           imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
           break;
@@ -5289,8 +4677,8 @@ app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
     }
 
     if (!imageDataUrl) {
-      console.log("[Edit Image API] No image in response:", JSON.stringify(response, null, 2).substring(0, 1000));
-      throw new Error("O modelo não retornou uma imagem. Tente novamente com uma instrução diferente.");
+      console.log("[Edit Image API] Empty response:", JSON.stringify(response, null, 2).substring(0, 1000));
+      throw new Error("Failed to edit image - API returned empty response");
     }
 
     console.log("[Edit Image API] Image edited successfully");
@@ -5331,6 +4719,10 @@ app.post("/api/ai/edit-image", requireAuthWithAiRateLimit, async (req, res) => {
 
 // AI Extract Colors from Logo
 app.post("/api/ai/extract-colors", async (req, res) => {
+  const timer = createTimer();
+  const auth = getAuth(req);
+  const organizationId = auth?.orgId || null;
+  const sql = getSql();
 
   try {
     const { logo } = req.body;
@@ -5354,26 +4746,25 @@ app.post("/api/ai/extract-colors", async (req, res) => {
     };
 
     const response = await ai.models.generateContent({
-      model: DEFAULT_IMAGE_MODEL,
+      model: DEFAULT_TEXT_MODEL,
       contents: {
         parts: [
           {
-            text: `Analise este logo e extraia as cores presentes na imagem.
+            text: `Analise este logo e extraia APENAS as cores que REALMENTE existem na imagem visível.
 
-REGRAS ESTRITAS:
-- Examine CADA pixel da imagem
-- primaryColor: cor que aparece em MAIOR área (OBRIGATÓRIO)
-- secondaryColor: segunda cor mais frequente (retorne null se não existir)
-- tertiaryColor: terceira cor de destaque (retorne null se não existir)
-- NÃO invente cores que não estão no logo
-- NÃO retorne preto (#000000) ou branco (#FFFFFF) a menos que estejam claramente visíveis
+REGRAS IMPORTANTES:
+- Extraia somente cores que você pode ver nos pixels da imagem
+- NÃO invente cores que não existem
+- Ignore áreas transparentes (não conte transparência como cor)
+- Se o logo tiver apenas 1 cor visível, retorne null para secondaryColor e tertiaryColor
+- Se o logo tiver apenas 2 cores visíveis, retorne null para tertiaryColor
 
-RESPONDA:
-- Se só houver 1 cor: {"primaryColor": "#COR", "secondaryColor": null, "tertiaryColor": null}
-- Se houver 2 cores: {"primaryColor": "#COR1", "secondaryColor": "#COR2", "tertiaryColor": null}
-- Se houver 3 cores: {"primaryColor": "#COR1", "secondaryColor": "#COR2", "tertiaryColor": "#COR3"}
+PRIORIDADE DAS CORES:
+- primaryColor: A cor mais dominante/presente no logo (maior área)
+- secondaryColor: A segunda cor mais presente (se existir), ou null
+- tertiaryColor: Uma terceira cor de destaque/acento (se existir), ou null
 
-Retorne APENAS o JSON, sem texto adicional.`,
+Retorne as cores em formato hexadecimal (#RRGGBB).`,
           },
           { inlineData: { mimeType: logo.mimeType, data: logo.base64 } },
         ],
@@ -5393,8 +4784,8 @@ Retorne APENAS o JSON, sem texto adicional.`,
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/extract-colors',
-      operation: 'image',
-      model: DEFAULT_IMAGE_MODEL,
+      operation: 'text',
+      model: DEFAULT_TEXT_MODEL,
       inputTokens: tokens.inputTokens,
       outputTokens: tokens.outputTokens,
       latencyMs: timer(),
@@ -5407,8 +4798,8 @@ Retorne APENAS o JSON, sem texto adicional.`,
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/extract-colors',
-      operation: 'image',
-      model: DEFAULT_IMAGE_MODEL,
+      operation: 'text',
+      model: DEFAULT_TEXT_MODEL,
       latencyMs: timer(),
       status: 'failed',
       error: error.message,
@@ -5420,7 +4811,7 @@ Retorne APENAS o JSON, sem texto adicional.`,
 });
 
 // AI Speech Generation (TTS)
-app.post("/api/ai/speech", requireAuthWithAiRateLimit, async (req, res) => {
+app.post("/api/ai/speech", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
@@ -5494,8 +4885,8 @@ app.post("/api/ai/speech", requireAuthWithAiRateLimit, async (req, res) => {
 // NEW: Vercel AI SDK Chat Endpoint (Feature Flag)
 // ============================================================================
 app.post("/api/chat", requireAuthWithAiRateLimit, async (req, res) => {
-  // Feature flag: only enable if NEXT_PUBLIC_USE_VERCEL_AI_SDK=true
-  if (process.env.NEXT_PUBLIC_USE_VERCEL_AI_SDK !== 'true') {
+  // Feature flag: only enable if VITE_USE_VERCEL_AI_SDK=true
+  if (process.env.VITE_USE_VERCEL_AI_SDK !== 'true') {
     return res.status(404).json({ error: 'Endpoint not available' });
   }
 
@@ -5655,7 +5046,11 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
   }
 });
 
-// AI Video Generation API
+// ============================================================================
+// AI VIDEO GENERATION API (Google Veo + FAL.ai fallback)
+// Server-side video generation - tries Google API first, falls back to FAL.ai
+// ============================================================================
+
 const configureFal = () => {
   const apiKey = process.env.FAL_KEY;
   if (!apiKey) {
@@ -5664,25 +5059,35 @@ const configureFal = () => {
   fal.config({ credentials: apiKey });
 };
 
-// Generate video using Google Veo API directly (supports first/last frame interpolation)
+// Generate video using Google Veo API directly
+// Nota: Google Veo SDK não suporta duration nem generateAudio
+// lastFrameUrl enables first/last frame interpolation mode (requires durationSeconds: 8)
 async function generateVideoWithGoogleVeo(
   prompt,
   aspectRatio,
   imageUrl,
   lastFrameUrl = null,
 ) {
-  const ai = getGeminiAi();
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY not configured");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   const isHttpUrl = imageUrl && imageUrl.startsWith("http");
+  const isDataUrl = imageUrl && imageUrl.startsWith("data:");
+  const hasImage = isHttpUrl || isDataUrl;
   const hasLastFrame = lastFrameUrl && lastFrameUrl.startsWith("http");
   const mode = hasLastFrame
     ? "first-last-frame"
-    : isHttpUrl
+    : hasImage
       ? "image-to-video"
       : "text-to-video";
 
-  console.log(`[Google Veo] Generating video: ${mode}, ${aspectRatio}`);
+  logExternalAPI("Google Veo", `Veo 3.1 ${mode}`, `720p | ${aspectRatio}`);
   const startTime = Date.now();
 
+  // Build request parameters according to SDK specs
   const generateParams = {
     model: "veo-3.1-fast-generate-preview",
     prompt,
@@ -5690,20 +5095,38 @@ async function generateVideoWithGoogleVeo(
       numberOfVideos: 1,
       resolution: "720p",
       aspectRatio,
+      // First/last frame interpolation requires 8 seconds duration
       ...(hasLastFrame && { durationSeconds: 8 }),
+      // Required for person generation in interpolation mode
       ...(hasLastFrame && { personGeneration: "allow_adult" }),
     },
   };
 
+  // Add first frame (image) for image-to-video or interpolation mode
   if (isHttpUrl) {
     const imageResponse = await fetch(imageUrl);
     const imageArrayBuffer = await imageResponse.arrayBuffer();
     const imageBase64 = Buffer.from(imageArrayBuffer).toString("base64");
     const contentType =
       imageResponse.headers.get("content-type") || "image/jpeg";
-    generateParams.image = { imageBytes: imageBase64, mimeType: contentType };
+
+    generateParams.image = {
+      imageBytes: imageBase64,
+      mimeType: contentType,
+    };
+  } else if (isDataUrl) {
+    // Parse data URL: data:image/png;base64,<base64data>
+    const matches = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (matches) {
+      const [, mimeType, base64Data] = matches;
+      generateParams.image = {
+        imageBytes: base64Data,
+        mimeType: mimeType,
+      };
+    }
   }
 
+  // Add last frame for interpolation mode
   if (hasLastFrame) {
     const lastFrameResponse = await fetch(lastFrameUrl);
     const lastFrameArrayBuffer = await lastFrameResponse.arrayBuffer();
@@ -5711,14 +5134,17 @@ async function generateVideoWithGoogleVeo(
       Buffer.from(lastFrameArrayBuffer).toString("base64");
     const lastFrameContentType =
       lastFrameResponse.headers.get("content-type") || "image/jpeg";
+
     generateParams.lastFrame = {
       imageBytes: lastFrameBase64,
       mimeType: lastFrameContentType,
     };
   }
 
+  // Start video generation (async operation)
   let operation = await ai.models.generateVideos(generateParams);
 
+  // Poll for completion (max 5 minutes)
   const maxWaitTime = 5 * 60 * 1000;
   const pollInterval = 10000;
   const startPoll = Date.now();
@@ -5727,12 +5153,14 @@ async function generateVideoWithGoogleVeo(
     if (Date.now() - startPoll > maxWaitTime) {
       throw new Error("Video generation timed out after 5 minutes");
     }
+
     await new Promise((resolve) => setTimeout(resolve, pollInterval));
     operation = await ai.operations.getVideosOperation({ operation });
   }
 
-  console.log(`[Google Veo] Video generated in ${Date.now() - startTime}ms`);
+  logExternalAPIResult("Google Veo", `Veo 3.1 ${mode}`, Date.now() - startTime);
 
+  // Get video URL from response
   const generatedVideos = operation.response?.generatedVideos;
   if (!generatedVideos || generatedVideos.length === 0) {
     throw new Error("No videos generated by Google Veo");
@@ -5743,19 +5171,119 @@ async function generateVideoWithGoogleVeo(
     throw new Error("Invalid video response from Google Veo");
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  return `${videoUri}&key=${apiKey}`;
+  // Append API key to download the video
+  const videoUrl = `${videoUri}&key=${apiKey}`;
+  return videoUrl;
 }
 
-app.post("/api/ai/video", requireAuthWithAiRateLimit, async (req, res) => {
+// Generate video using FAL.ai (fallback)
+async function generateVideoWithFal(
+  prompt,
+  aspectRatio,
+  model,
+  imageUrl,
+  sceneDuration,
+  generateAudio = true,
+) {
+  configureFal();
+
+  const isHttpUrl = imageUrl && imageUrl.startsWith("http");
+  const mode = isHttpUrl ? "image-to-video" : "text-to-video";
+
+  if (model === "sora-2") {
+    // Sora 2 - always use 12 seconds for best quality
+    const duration = 12;
+    const endpoint = isHttpUrl
+      ? "fal-ai/sora-2/image-to-video"
+      : "fal-ai/sora-2/text-to-video";
+
+    logExternalAPI("Fal.ai", `Sora 2 ${mode}`, `${duration}s | ${aspectRatio}`);
+    const startTime = Date.now();
+
+    let result;
+
+    if (isHttpUrl) {
+      result = await fal.subscribe(endpoint, {
+        input: {
+          prompt,
+          image_url: imageUrl,
+          resolution: "720p",
+          aspect_ratio: aspectRatio,
+          duration,
+          delete_video: false,
+        },
+        logs: true,
+      });
+    } else {
+      result = await fal.subscribe(endpoint, {
+        input: {
+          prompt,
+          resolution: "720p",
+          aspect_ratio: aspectRatio,
+          duration,
+          delete_video: false,
+        },
+        logs: true,
+      });
+    }
+
+    logExternalAPIResult("Fal.ai", `Sora 2 ${mode}`, Date.now() - startTime);
+    return result?.data?.video?.url || result?.video?.url || "";
+  } else {
+    // Veo 3.1 Fast via FAL.ai
+    const duration =
+      sceneDuration && sceneDuration <= 4
+        ? "4s"
+        : sceneDuration && sceneDuration <= 6
+          ? "6s"
+          : "8s";
+    const endpoint = isHttpUrl
+      ? "fal-ai/veo3.1/fast/image-to-video"
+      : "fal-ai/veo3.1/fast";
+
+    logExternalAPI("Fal.ai", `Veo 3.1 ${mode}`, `${duration} | ${aspectRatio}`);
+    const startTime = Date.now();
+
+    let result;
+
+    if (isHttpUrl) {
+      result = await fal.subscribe(endpoint, {
+        input: {
+          prompt,
+          image_url: imageUrl,
+          aspect_ratio: aspectRatio,
+          duration,
+          resolution: "720p",
+          generate_audio: generateAudio,
+        },
+        logs: true,
+      });
+    } else {
+      result = await fal.subscribe(endpoint, {
+        input: {
+          prompt,
+          aspect_ratio: aspectRatio,
+          duration,
+          resolution: "720p",
+          generate_audio: generateAudio,
+          auto_fix: true,
+        },
+        logs: true,
+      });
+    }
+
+    logExternalAPIResult("Fal.ai", `Veo 3.1 ${mode}`, Date.now() - startTime);
+    return result?.data?.video?.url || result?.video?.url || "";
+  }
+}
+
+app.post("/api/ai/video", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
   const organizationId = auth?.orgId || null;
   const sql = getSql();
 
   try {
-    configureFal();
-
     const {
       prompt,
       aspectRatio,
@@ -5763,6 +5291,7 @@ app.post("/api/ai/video", requireAuthWithAiRateLimit, async (req, res) => {
       imageUrl,
       lastFrameUrl,
       sceneDuration,
+      generateAudio = true,
       useInterpolation = false,
     } = req.body;
 
@@ -5774,104 +5303,45 @@ app.post("/api/ai/video", requireAuthWithAiRateLimit, async (req, res) => {
 
     const isInterpolationMode = useInterpolation && lastFrameUrl;
     console.log(
-      `[Video API] Generating video with ${model}, interpolation: ${isInterpolationMode}`,
+      `[Video API] Generating video with ${model}, audio: ${generateAudio}, interpolation: ${isInterpolationMode}`,
     );
 
     let videoUrl;
-    const isHttpUrl = imageUrl && imageUrl.startsWith("http");
+    let usedProvider = "google";
 
-    if (model === "sora-2") {
-      // Sora 2 via FAL.ai (doesn't support first/last frame)
-      const duration = 12;
-      let result;
-
-      if (isHttpUrl) {
-        result = await fal.subscribe("fal-ai/sora-2/image-to-video", {
-          input: {
-            prompt,
-            image_url: imageUrl,
-            resolution: "720p",
-            aspect_ratio: aspectRatio,
-            duration,
-            delete_video: false,
-          },
-          logs: true,
-        });
-      } else {
-        result = await fal.subscribe("fal-ai/sora-2/text-to-video", {
-          input: {
-            prompt,
-            resolution: "720p",
-            aspect_ratio: aspectRatio,
-            duration,
-            delete_video: false,
-          },
-          logs: true,
-        });
-      }
-
-      videoUrl = result?.data?.video?.url || result?.video?.url || "";
+    // For Veo 3.1, use Google API only (no fallback).
+    if (model === "veo-3.1" || model === "veo-3.1-fast-generate-preview") {
+      videoUrl = await generateVideoWithGoogleVeo(
+        prompt,
+        aspectRatio,
+        imageUrl,
+        isInterpolationMode ? lastFrameUrl : null,
+      );
     } else {
-      // Veo 3.1 - try Google API first, fallback to FAL.ai
-      try {
-        videoUrl = await generateVideoWithGoogleVeo(
-          prompt,
-          aspectRatio,
-          imageUrl,
-          isInterpolationMode ? lastFrameUrl : null,
-        );
-      } catch (googleError) {
-        console.log(
-          `[Video API] Google Veo failed: ${googleError.message}`,
-        );
-        console.log("[Video API] Falling back to FAL.ai...");
-        const duration = isInterpolationMode
-          ? "8s"
-          : sceneDuration && sceneDuration <= 4
-            ? "4s"
-            : sceneDuration && sceneDuration <= 6
-              ? "6s"
-              : "8s";
-
-        let result;
-
-        if (isHttpUrl) {
-          result = await fal.subscribe("fal-ai/veo3.1/fast/image-to-video", {
-            input: {
-              prompt,
-              image_url: imageUrl,
-              aspect_ratio: aspectRatio,
-              duration,
-              resolution: "720p",
-              generate_audio: true,
-            },
-            logs: true,
-          });
-        } else {
-          result = await fal.subscribe("fal-ai/veo3.1/fast", {
-            input: {
-              prompt,
-              aspect_ratio: aspectRatio,
-              duration,
-              resolution: "720p",
-              generate_audio: true,
-              auto_fix: true,
-            },
-            logs: true,
-          });
-        }
-
-        videoUrl = result?.data?.video?.url || result?.video?.url || "";
-      }
+      // For Sora-2 or other models, use FAL.ai directly.
+      usedProvider = "fal.ai";
+      videoUrl = await generateVideoWithFal(
+        prompt,
+        aspectRatio,
+        model,
+        imageUrl,
+        sceneDuration,
+        generateAudio,
+      );
     }
 
     if (!videoUrl) {
       throw new Error("Failed to generate video - invalid response");
     }
 
-    console.log(`[Video API] Video generated: ${videoUrl}`);
+    // Download video and upload to Vercel Blob for permanent storage
+    logExternalAPI(
+      "Vercel Blob",
+      "Upload video",
+      `${model} (via ${usedProvider})`,
+    );
+    const uploadStart = Date.now();
 
-    console.log("[Video API] Uploading to Vercel Blob...");
     const videoResponse = await fetch(videoUrl);
     const videoBlob = await videoResponse.blob();
 
@@ -5881,7 +5351,11 @@ app.post("/api/ai/video", requireAuthWithAiRateLimit, async (req, res) => {
       contentType: "video/mp4",
     });
 
-    console.log(`[Video API] Video stored: ${blob.url}`);
+    logExternalAPIResult(
+      "Vercel Blob",
+      "Upload video",
+      Date.now() - uploadStart,
+    );
 
     // Log AI usage - video is priced per second
     const durationSeconds = sceneDuration || 5; // Default 5 seconds
@@ -5893,16 +5367,17 @@ app.post("/api/ai/video", requireAuthWithAiRateLimit, async (req, res) => {
       videoDurationSeconds: durationSeconds,
       latencyMs: timer(),
       status: 'success',
-      metadata: { aspectRatio, hasImageUrl: !!imageUrl, isInterpolation: isInterpolationMode }
+      metadata: { aspectRatio, provider: usedProvider, hasImageUrl: !!imageUrl, isInterpolation: isInterpolationMode }
     });
 
     return res.status(200).json({
       success: true,
       url: blob.url,
       model,
+      provider: usedProvider,
     });
   } catch (error) {
-    console.error("[Video API] Error:", error);
+    logError("Video API", error);
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/video',
@@ -5920,71 +5395,386 @@ app.post("/api/ai/video", requireAuthWithAiRateLimit, async (req, res) => {
 });
 
 // ============================================================================
-// RUBE MCP PROXY - For Instagram Publishing
+// INSTAGRAM ACCOUNTS API (Multi-tenant Rube MCP)
 // ============================================================================
 
-// RUBE_MCP_URL already defined above at line 1752
+const RUBE_MCP_URL = "https://rube.app/mcp";
+
+// Validate Rube token by calling Instagram API
+async function validateRubeToken(rubeToken) {
+  try {
+    const request = {
+      jsonrpc: "2.0",
+      id: `validate_${Date.now()}`,
+      method: "tools/call",
+      params: {
+        name: "RUBE_MULTI_EXECUTE_TOOL",
+        arguments: {
+          tools: [
+            {
+              tool_slug: "INSTAGRAM_GET_USER_INFO",
+              arguments: { fields: "id,username" },
+            },
+          ],
+          sync_response_to_workbench: false,
+          memory: {},
+          session_id: "validate",
+          thought: "Validating Instagram connection",
+        },
+      },
+    };
+
+    console.log("[Instagram] Validating token with Rube MCP...");
+    const response = await fetch(RUBE_MCP_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        Authorization: `Bearer ${rubeToken}`,
+      },
+      body: JSON.stringify(request),
+    });
+
+    const text = await response.text();
+    console.log("[Instagram] Rube response status:", response.status);
+    console.log(
+      "[Instagram] Rube response (first 500 chars):",
+      text.substring(0, 500),
+    );
+
+    if (text.startsWith("<!DOCTYPE") || text.startsWith("<html")) {
+      return {
+        success: false,
+        error: "Token inválido ou expirado. Gere um novo token no Rube.",
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `Erro ao validar token (${response.status})`,
+      };
+    }
+
+    // Parse SSE response
+    const lines = text.split("\n");
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        try {
+          const json = JSON.parse(line.substring(6));
+          console.log(
+            "[Instagram] Parsed SSE data:",
+            JSON.stringify(json, null, 2).substring(0, 500),
+          );
+          if (json?.error) {
+            return {
+              success: false,
+              error: "Instagram não conectado no Rube.",
+            };
+          }
+          const nestedData = json?.result?.content?.[0]?.text;
+          if (nestedData) {
+            const parsed = JSON.parse(nestedData);
+            console.log(
+              "[Instagram] Nested data:",
+              JSON.stringify(parsed, null, 2).substring(0, 500),
+            );
+            if (parsed?.error || parsed?.data?.error) {
+              return {
+                success: false,
+                error: "Instagram não conectado no Rube.",
+              };
+            }
+            const results =
+              parsed?.data?.data?.results || parsed?.data?.results;
+            if (results && results.length > 0) {
+              const userData = results[0]?.response?.data;
+              if (userData?.id) {
+                console.log(
+                  "[Instagram] Found user:",
+                  userData.username,
+                  userData.id,
+                );
+                return {
+                  success: true,
+                  instagramUserId: String(userData.id),
+                  instagramUsername: userData.username || "unknown",
+                };
+              }
+            }
+          }
+        } catch (e) {
+          console.error("[Instagram] Parse error:", e);
+        }
+      }
+    }
+    return { success: false, error: "Instagram não conectado no Rube." };
+  } catch (error) {
+    console.error("[Instagram] Validation error:", error);
+    return { success: false, error: error.message || "Erro ao validar token" };
+  }
+}
+
+// GET - List Instagram accounts
+app.get("/api/db/instagram-accounts", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { user_id, organization_id, id } = req.query;
+
+    if (id) {
+      const result = await sql`
+        SELECT id, user_id, organization_id, instagram_user_id, instagram_username,
+               is_active, connected_at, last_used_at, created_at, updated_at
+        FROM instagram_accounts WHERE id = ${id}
+      `;
+      return res.json(result[0] || null);
+    }
+
+    if (!user_id) {
+      return res.status(400).json({ error: "user_id is required" });
+    }
+
+    // user_id can be either DB UUID or Clerk ID - try both
+    let resolvedUserId = user_id;
+
+    // Check if it's a Clerk ID (starts with 'user_')
+    if (user_id.startsWith("user_")) {
+      const userResult =
+        await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
+      resolvedUserId = userResult[0]?.id;
+      if (!resolvedUserId) {
+        console.log("[Instagram] User not found for Clerk ID:", user_id);
+        return res.json([]);
+      }
+    } else {
+      // Assume it's a DB UUID - verify it exists
+      const userResult =
+        await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
+      if (userResult.length === 0) {
+        console.log("[Instagram] User not found for DB UUID:", user_id);
+        return res.json([]);
+      }
+    }
+    console.log("[Instagram] Resolved user ID:", resolvedUserId);
+
+    const result = organization_id
+      ? await sql`
+          SELECT id, user_id, organization_id, instagram_user_id, instagram_username,
+                 is_active, connected_at, last_used_at, created_at, updated_at
+          FROM instagram_accounts
+          WHERE organization_id = ${organization_id} AND is_active = TRUE
+          ORDER BY connected_at DESC
+        `
+      : await sql`
+          SELECT id, user_id, organization_id, instagram_user_id, instagram_username,
+                 is_active, connected_at, last_used_at, created_at, updated_at
+          FROM instagram_accounts
+          WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND is_active = TRUE
+          ORDER BY connected_at DESC
+        `;
+
+    res.json(result);
+  } catch (error) {
+    console.error("[Instagram Accounts API] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST - Connect new Instagram account
+app.post("/api/db/instagram-accounts", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { user_id, organization_id, rube_token } = req.body;
+
+    console.log("[Instagram] POST request:", {
+      user_id,
+      organization_id,
+      hasToken: !!rube_token,
+    });
+
+    if (!user_id || !rube_token) {
+      return res
+        .status(400)
+        .json({ error: "user_id and rube_token are required" });
+    }
+
+    // user_id can be either DB UUID or Clerk ID - try both
+    let resolvedUserId = user_id;
+
+    if (user_id.startsWith("user_")) {
+      const userResult =
+        await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
+      resolvedUserId = userResult[0]?.id;
+      if (!resolvedUserId) {
+        console.log("[Instagram] User not found for Clerk ID:", user_id);
+        return res.status(400).json({ error: "User not found" });
+      }
+    } else {
+      const userResult =
+        await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
+      if (userResult.length === 0) {
+        console.log("[Instagram] User not found for DB UUID:", user_id);
+        return res.status(400).json({ error: "User not found" });
+      }
+    }
+    console.log("[Instagram] Resolved user ID:", resolvedUserId);
+
+    // Validate the Rube token
+    const validation = await validateRubeToken(rube_token);
+    console.log("[Instagram] Validation result:", validation);
+    if (!validation.success) {
+      return res
+        .status(400)
+        .json({ error: validation.error || "Token inválido" });
+    }
+
+    const { instagramUserId, instagramUsername } = validation;
+
+    // Check if already connected
+    const existing = await sql`
+      SELECT id FROM instagram_accounts
+      WHERE user_id = ${resolvedUserId} AND instagram_user_id = ${instagramUserId}
+    `;
+
+    if (existing.length > 0) {
+      // Update existing
+      const result = await sql`
+        UPDATE instagram_accounts
+        SET rube_token = ${rube_token}, instagram_username = ${instagramUsername},
+            is_active = TRUE, connected_at = NOW(), updated_at = NOW()
+        WHERE id = ${existing[0].id}
+        RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
+                  is_active, connected_at, last_used_at, created_at, updated_at
+      `;
+      return res.json({
+        success: true,
+        account: result[0],
+        message: "Conta reconectada!",
+      });
+    }
+
+    // Create new
+    const result = await sql`
+      INSERT INTO instagram_accounts (user_id, organization_id, instagram_user_id, instagram_username, rube_token)
+      VALUES (${resolvedUserId}, ${organization_id || null}, ${instagramUserId}, ${instagramUsername}, ${rube_token})
+      RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
+                is_active, connected_at, last_used_at, created_at, updated_at
+    `;
+
+    res.status(201).json({
+      success: true,
+      account: result[0],
+      message: `Conta @${instagramUsername} conectada!`,
+    });
+  } catch (error) {
+    console.error("[Instagram Accounts API] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT - Update Instagram account token
+app.put("/api/db/instagram-accounts", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { id } = req.query;
+    const { rube_token } = req.body;
+
+    if (!id || !rube_token) {
+      return res.status(400).json({ error: "id and rube_token are required" });
+    }
+
+    const validation = await validateRubeToken(rube_token);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    const result = await sql`
+      UPDATE instagram_accounts
+      SET rube_token = ${rube_token}, instagram_username = ${validation.instagramUsername},
+          updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
+                is_active, connected_at, last_used_at, created_at, updated_at
+    `;
+
+    res.json({
+      success: true,
+      account: result[0],
+      message: "Token atualizado!",
+    });
+  } catch (error) {
+    console.error("[Instagram Accounts API] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE - Disconnect Instagram account (soft delete)
+app.delete("/api/db/instagram-accounts", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { id } = req.query;
+
+    if (!id) {
+      return res.status(400).json({ error: "id is required" });
+    }
+
+    await sql`UPDATE instagram_accounts SET is_active = FALSE, updated_at = NOW() WHERE id = ${id}`;
+    res.json({ success: true, message: "Conta desconectada." });
+  } catch (error) {
+    console.error("[Instagram Accounts API] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// RUBE MCP PROXY - For Instagram Publishing (multi-tenant)
+// ============================================================================
+
+// RUBE_MCP_URL already defined above
 
 app.post("/api/rube", async (req, res) => {
   try {
     const sql = getSql();
-    const { instagram_account_id, user_id, organization_id, ...mcpRequest } = req.body;
+    const { instagram_account_id, user_id, ...mcpRequest } = req.body;
 
     let token;
     let instagramUserId;
 
-    // Multi-tenant mode: use token from database
-    // Supports both personal accounts (user_id) and organization accounts (organization_id)
-    if (instagram_account_id && (user_id || organization_id)) {
+    // Multi-tenant mode: use user's token from database
+    if (instagram_account_id && user_id) {
       console.log(
         "[Rube Proxy] Multi-tenant mode - fetching token for account:",
         instagram_account_id,
-        organization_id ? `(org: ${organization_id})` : "(personal)",
       );
 
-      // Resolve user_id if provided (for personal accounts or audit)
-      let resolvedUserId = null;
-      if (user_id) {
-        if (user_id.startsWith("user_")) {
-          const userResult =
-            await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
-          resolvedUserId = userResult[0]?.id;
-          if (!resolvedUserId) {
-            console.log("[Rube Proxy] User not found for Clerk ID:", user_id);
-            return res.status(400).json({ error: "User not found" });
-          }
-        } else {
-          resolvedUserId = user_id;
+      // Resolve user_id: can be DB UUID or Clerk ID
+      let resolvedUserId = user_id;
+      if (user_id.startsWith("user_")) {
+        const userResult =
+          await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
+        resolvedUserId = userResult[0]?.id;
+        if (!resolvedUserId) {
+          console.log("[Rube Proxy] User not found for Clerk ID:", user_id);
+          return res.status(400).json({ error: "User not found" });
         }
+        console.log(
+          "[Rube Proxy] Resolved Clerk ID to DB UUID:",
+          resolvedUserId,
+        );
       }
 
-      // Fetch account token based on context
-      // For organizations: any member can use org accounts
-      // For personal: only the owner can use the account
-      let accountResult;
-      if (organization_id) {
-        // Organization context: verify account belongs to the org
-        accountResult = await sql`
-          SELECT rube_token, instagram_user_id FROM instagram_accounts
-          WHERE id = ${instagram_account_id} AND organization_id = ${organization_id} AND is_active = TRUE
-          LIMIT 1
-        `;
-      } else if (resolvedUserId) {
-        // Personal context: verify account belongs to the user
-        accountResult = await sql`
-          SELECT rube_token, instagram_user_id FROM instagram_accounts
-          WHERE id = ${instagram_account_id} AND user_id = ${resolvedUserId} AND organization_id IS NULL AND is_active = TRUE
-          LIMIT 1
-        `;
-      } else {
-        return res.status(400).json({ error: "user_id or organization_id required" });
-      }
+      // Fetch account token and instagram_user_id
+      const accountResult = await sql`
+        SELECT rube_token, instagram_user_id FROM instagram_accounts
+        WHERE id = ${instagram_account_id} AND user_id = ${resolvedUserId} AND is_active = TRUE
+        LIMIT 1
+      `;
 
       if (accountResult.length === 0) {
-        console.log("[Rube Proxy] Instagram account not found or access denied");
+        console.log("[Rube Proxy] Instagram account not found or not active");
         return res
           .status(403)
-          .json({ error: "Instagram account not found or access denied" });
+          .json({ error: "Instagram account not found or inactive" });
       }
 
       token = accountResult[0].rube_token;
@@ -6029,6 +5819,8 @@ app.post("/api/rube", async (req, res) => {
       }
     }
 
+    console.log("[Rube Proxy] Calling Rube MCP:", mcpRequest.params?.name);
+
     const response = await fetch(RUBE_MCP_URL, {
       method: "POST",
       headers: {
@@ -6040,6 +5832,7 @@ app.post("/api/rube", async (req, res) => {
     });
 
     const text = await response.text();
+    console.log("[Rube Proxy] Response status:", response.status);
     res.status(response.status).send(text);
   } catch (error) {
     console.error("[Rube Proxy] Error:", error);
@@ -6049,244 +5842,32 @@ app.post("/api/rube", async (req, res) => {
   }
 });
 
-// ============================================================================
-// STATIC FILES - Serve frontend in production
-// ============================================================================
-
-// Serve static files from the dist directory
-app.use(
-  express.static(path.join(__dirname, "../dist"), {
-    setHeaders: (res, filePath) => {
-      // Set COEP headers for WASM support
-      if (filePath.endsWith(".html")) {
-        res.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
-        res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-      }
-    },
-  }),
-);
-
-// SPA fallback - serve index.html for all non-API routes
-app.use((req, res, next) => {
-  // Don't serve index.html for API routes
-  if (req.path.startsWith("/api/")) {
-    return res.status(404).json({ error: "Not found" });
+const startup = async () => {
+  if (DATABASE_URL) {
+    try {
+      const sql = getSql();
+      await ensureGallerySourceType(sql);
+    } catch (error) {
+      console.error(`${colors.red}✗ Startup check failed${colors.reset}`);
+    }
   }
 
-  res.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-  res.sendFile(path.join(__dirname, "../dist/index.html"));
-});
-
-// ============================================================================
-// AUTO-MIGRATION & START SERVER
-// ============================================================================
-
-async function runAutoMigrations() {
-  if (!DATABASE_URL) {
-    console.log("[Migration] Skipping - no DATABASE_URL configured");
-    return;
-  }
-
-  try {
-    const sql = getSql();
-
-    // Ensure context column exists (for job-to-UI matching)
-    await sql`
-      ALTER TABLE generation_jobs
-      ADD COLUMN IF NOT EXISTS context VARCHAR(255)
-    `;
-    console.log("[Migration] ✓ Ensured context column exists");
-
-    // Add 'clip' to generation_job_type enum if not exists
-    try {
-      await sql`ALTER TYPE generation_job_type ADD VALUE IF NOT EXISTS 'clip'`;
-      console.log("[Migration] ✓ Ensured 'clip' job type exists");
-    } catch (enumError) {
-      // Might already exist or different PG version
-      console.log("[Migration] Note: clip enum might already exist");
-    }
-
-    // Add 'video' to generation_job_type enum if not exists
-    try {
-      await sql`ALTER TYPE generation_job_type ADD VALUE IF NOT EXISTS 'video'`;
-      console.log("[Migration] ✓ Ensured 'video' job type exists");
-    } catch (enumError) {
-      // Might already exist or different PG version
-      console.log("[Migration] Note: video enum might already exist");
-    }
-
-    // Add 'image' to generation_job_type enum if not exists
-    try {
-      await sql`ALTER TYPE generation_job_type ADD VALUE IF NOT EXISTS 'image'`;
-      console.log("[Migration] ✓ Ensured 'image' job type exists");
-    } catch (enumError) {
-      // Might already exist or different PG version
-      console.log("[Migration] Note: image enum might already exist");
-    }
-
-    // Create instagram_accounts table if not exists
-    await sql`
-      CREATE TABLE IF NOT EXISTS instagram_accounts (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-        organization_id VARCHAR(50),
-        instagram_user_id VARCHAR(255) NOT NULL,
-        instagram_username VARCHAR(255),
-        rube_token TEXT NOT NULL,
-        is_active BOOLEAN DEFAULT TRUE,
-        connected_at TIMESTAMPTZ DEFAULT NOW(),
-        last_used_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `;
-    console.log("[Migration] ✓ Ensured instagram_accounts table exists");
-
-    // Migration 009: Add connected_by_user_id for org sharing (tracks who connected)
-    try {
-      await sql`
-        ALTER TABLE instagram_accounts
-        ADD COLUMN IF NOT EXISTS connected_by_user_id UUID REFERENCES users(id)
-      `;
-      console.log("[Migration] ✓ Added connected_by_user_id column");
-
-      // Copy existing user_id to connected_by_user_id for existing records
-      await sql`
-        UPDATE instagram_accounts
-        SET connected_by_user_id = user_id
-        WHERE connected_by_user_id IS NULL AND user_id IS NOT NULL
-      `;
-      console.log("[Migration] ✓ Copied user_id to connected_by_user_id");
-
-      // Make user_id nullable (for org accounts)
-      await sql`
-        ALTER TABLE instagram_accounts
-        ALTER COLUMN user_id DROP NOT NULL
-      `;
-      console.log("[Migration] ✓ Made user_id nullable for org accounts");
-    } catch (migError) {
-      console.log("[Migration] Note: instagram_accounts org sharing migration:", migError.message);
-    }
-
-    // Add instagram_account_id column to scheduled_posts if not exists
-    await sql`
-      ALTER TABLE scheduled_posts
-      ADD COLUMN IF NOT EXISTS instagram_account_id UUID REFERENCES instagram_accounts(id) ON DELETE SET NULL
-    `;
-    console.log(
-      "[Migration] ✓ Ensured instagram_account_id column in scheduled_posts",
-    );
-
-    // Migration 005: Create AI usage tracking enums and table
-    try {
-      // Create ai_provider enum
-      await sql`
-        DO $$ BEGIN
-          CREATE TYPE ai_provider AS ENUM ('google', 'openrouter', 'fal');
-        EXCEPTION WHEN duplicate_object THEN null;
-        END $$
-      `;
-
-      // Create ai_operation enum
-      await sql`
-        DO $$ BEGIN
-          CREATE TYPE ai_operation AS ENUM ('text', 'image', 'video', 'speech', 'flyer', 'edit_image', 'campaign');
-        EXCEPTION WHEN duplicate_object THEN null;
-        END $$
-      `;
-
-      // Create usage_status enum
-      await sql`
-        DO $$ BEGIN
-          CREATE TYPE usage_status AS ENUM ('success', 'failed', 'timeout', 'rate_limited');
-        EXCEPTION WHEN duplicate_object THEN null;
-        END $$
-      `;
-
-      // Create api_usage_logs table
-      await sql`
-        CREATE TABLE IF NOT EXISTS api_usage_logs (
-          id SERIAL PRIMARY KEY,
-          request_id UUID NOT NULL UNIQUE,
-          user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-          organization_id VARCHAR(50),
-          endpoint VARCHAR(255) NOT NULL,
-          operation ai_operation NOT NULL,
-          provider ai_provider NOT NULL,
-          model_id VARCHAR(100),
-          input_tokens INTEGER,
-          output_tokens INTEGER,
-          total_tokens INTEGER,
-          image_count INTEGER,
-          image_size VARCHAR(10),
-          video_duration_seconds INTEGER,
-          audio_duration_seconds INTEGER,
-          character_count INTEGER,
-          estimated_cost_cents INTEGER NOT NULL DEFAULT 0,
-          latency_ms INTEGER,
-          status usage_status NOT NULL DEFAULT 'success',
-          error_message TEXT,
-          metadata JSONB DEFAULT '{}',
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `;
-
-      // Create indexes
-      await sql`CREATE INDEX IF NOT EXISTS idx_usage_logs_user ON api_usage_logs(user_id, created_at DESC)`;
-      await sql`CREATE INDEX IF NOT EXISTS idx_usage_logs_org ON api_usage_logs(organization_id, created_at DESC)`;
-      await sql`CREATE INDEX IF NOT EXISTS idx_usage_logs_date ON api_usage_logs((created_at::DATE))`;
-
-      console.log("[Migration] ✓ Ensured api_usage_logs table and enums exist");
-    } catch (usageError) {
-      console.log("[Migration] Note: api_usage_logs migration:", usageError.message);
-    }
-  } catch (error) {
-    console.error("[Migration] Error:", error.message);
-    // Don't fail startup - column might already exist with different syntax
-  }
-}
-
-async function startServer() {
-  // Start server first (so healthcheck passes)
   app.listen(PORT, () => {
-    console.log(`[Production Server] Running on port ${PORT}`);
+    console.log("");
     console.log(
-      `[Production Server] Database: ${DATABASE_URL ? "Connected" : "NOT CONFIGURED"}`,
+      `${colors.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`,
     );
     console.log(
-      `[Production Server] Environment: ${process.env.NODE_ENV || "development"}`,
+      `${colors.green}  API Server${colors.reset}  http://localhost:${PORT}`,
     );
+    console.log(
+      `${colors.green}  Database${colors.reset}    ${DATABASE_URL ? `${colors.green}Connected${colors.reset}` : `${colors.red}NOT CONFIGURED${colors.reset}`}`,
+    );
+    console.log(
+      `${colors.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`,
+    );
+    console.log("");
   });
+};
 
-  // Initialize BullMQ workers after server starts (non-blocking)
-  if (REDIS_URL) {
-    console.log("[Server] Redis configured, initializing BullMQ worker...");
-    try {
-      initializeWorker(processGenerationJob);
-      await initializeScheduledPostsChecker(
-        checkAndPublishScheduledPosts,
-        publishScheduledPostById,
-      );
-      console.log("[Server] Scheduled posts publisher initialized");
-    } catch (err) {
-      console.error("[Server] Failed to initialize BullMQ:", err.message);
-    }
-  } else {
-    console.log(
-      "[Server] No Redis URL configured, background jobs will use polling fallback",
-    );
-  }
-
-  // Run migrations in background (non-blocking)
-  try {
-    await runAutoMigrations();
-  } catch (migrationError) {
-    console.error(
-      "[Migration] Failed but server is running:",
-      migrationError.message,
-    );
-  }
-}
-
-startServer();
+startup();
