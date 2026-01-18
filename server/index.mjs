@@ -373,6 +373,12 @@ app.use("/api/db", (req, res, next) => {
 });
 
 // Health check
+
+// Simple health check for Railway
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 app.get("/api/db/health", async (req, res) => {
   try {
     const sql = getSql();
