@@ -49,26 +49,26 @@ const CustomSelect: React.FC<{
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      <label className="block text-[7px] font-black text-white/30 uppercase tracking-[0.2em] mb-1.5">{label}</label>
+      <label className="block text-[10px] font-medium text-white/60 mb-1.5">{label}</label>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-[#111111] border border-white/5 rounded-xl p-3 flex items-center justify-between text-left transition-all hover:border-white/20 active:scale-[0.98] outline-none"
+        className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-lg p-2.5 flex items-center justify-between text-left transition-all hover:border-white/20 active:scale-[0.98] outline-none backdrop-blur-xl"
       >
-        <span className="text-[9px] font-black text-white uppercase tracking-widest truncate">{value}</span>
-        <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} className="w-2.5 h-2.5 text-white/20 flex-shrink-0 ml-1.5" />
+        <span className="text-xs font-medium text-white truncate">{value}</span>
+        <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} className="w-3 h-3 text-white/40 flex-shrink-0 ml-1.5" />
       </button>
 
       {isOpen && (
-        <div className="absolute z-[100] bottom-full mb-2 w-full bg-[#111] border border-white/10 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-fade-in-up">
+        <div className="absolute z-[100] bottom-full mb-2 w-full bg-[#0a0a0a]/95 border border-white/[0.08] rounded-xl overflow-hidden shadow-2xl backdrop-blur-xl">
           {options.map((opt) => (
             <button
               key={opt}
               type="button"
               onClick={() => { onChange(opt); setIsOpen(false); }}
-              className={`w-full px-4 py-2.5 text-left text-[8px] font-black uppercase tracking-widest transition-colors ${value === opt
-                ? 'bg-primary text-black'
-                : 'text-white/40 hover:bg-white/5 hover:text-white'
+              className={`w-full px-3 py-2 text-left text-xs font-medium transition-colors ${value === opt
+                ? 'bg-white text-black'
+                : 'text-white/60 hover:bg-white/5 hover:text-white'
                 }`}
             >
               {opt}
@@ -88,27 +88,24 @@ const ColorWidget: React.FC<{
   name: string;
   isAnalyzing: boolean;
 }> = ({ label, color, onChange, name, isAnalyzing }) => (
-  <div className="bg-[#111111] border border-white/5 p-3 rounded-xl flex items-center justify-between group transition-all hover:border-white/10 w-full overflow-hidden">
+  <div className="bg-[#0a0a0a]/60 border border-white/[0.08] p-2.5 rounded-lg flex items-center justify-between group transition-all hover:border-white/20 w-full overflow-hidden backdrop-blur-xl">
     <div className="flex flex-col min-w-0 flex-1 pr-1.5">
-      <label className="text-[7px] font-black text-white/30 uppercase tracking-[0.2em] mb-1 truncate">{label}</label>
-      <span className={`text-[8px] font-mono text-white/40 group-hover:text-white transition-colors truncate ${isAnalyzing ? 'animate-pulse' : ''}`}>
-        {isAnalyzing ? 'SYNC...' : color.toUpperCase()}
+      <label className="text-[10px] font-medium text-white/60 mb-0.5 truncate">{label}</label>
+      <span className={`text-[10px] font-mono text-white/40 group-hover:text-white transition-colors truncate ${isAnalyzing ? 'animate-pulse' : ''}`}>
+        {isAnalyzing ? 'Sync...' : color.toUpperCase()}
       </span>
     </div>
-    <div className="relative w-6 h-6 flex items-center justify-center flex-shrink-0">
-      <div className="absolute inset-0 border border-white/5 rounded-full"></div>
-      <div className={`absolute inset-0.5 border border-white/10 rounded-full border-dashed ${isAnalyzing ? 'animate-spin' : 'animate-[spin_20s_linear_infinite]'}`}></div>
-
+    <div className="relative w-7 h-7 flex items-center justify-center flex-shrink-0">
       <input
         type="color"
         name={name}
         value={color}
         onChange={onChange}
-        className="w-full h-full rounded-sm cursor-pointer bg-transparent border-none p-0 overflow-hidden relative z-10 opacity-0"
+        className="w-full h-full rounded-md cursor-pointer bg-transparent border-none p-0 overflow-hidden relative z-10 opacity-0"
       />
 
       <div
-        className="absolute w-3 h-3 rounded-sm pointer-events-none z-0 border border-white/20 shadow-lg transition-all duration-500"
+        className="absolute w-5 h-5 rounded-md pointer-events-none z-0 border border-white/20 shadow-md transition-all duration-500"
         style={{ backgroundColor: color }}
       ></div>
     </div>
@@ -191,124 +188,113 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
   const isFormValid = profile.name && profile.description;
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4 sm:p-6 relative overflow-hidden font-sans selection:bg-primary selection:text-black">
-      {/* Animated Background Elements */}
-      <div className="glow-spot top-[-20%] left-[-10%] opacity-20"></div>
-      <div className="glow-spot bottom-[-20%] right-[-10%] opacity-20" style={{ animationDelay: '-5s' }}></div>
-
+    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4 sm:p-6 relative overflow-hidden font-sans selection:bg-white/20 selection:text-white">
       <div className="max-w-[1280px] w-full z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center px-2">
 
         {/* Left Side Info */}
-        <div className="lg:col-span-4 flex flex-col justify-center animate-fade-in-up">
+        <div className="lg:col-span-4 flex flex-col justify-center">
           <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 aura-card flex items-center justify-center border-white/5 bg-white/5">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/[0.08] flex items-center justify-center backdrop-blur-xl">
                 <Icon name="logo" className="w-5 h-5 text-white" />
               </div>
-              <span className="text-[10px] font-black tracking-[0.5em] uppercase text-white/40">Socialab</span>
+              <span className="text-sm font-semibold text-white/60">CPC Agency</span>
             </div>
             <button
               type="button"
               onClick={() => signOut()}
-              className="flex items-center space-x-2 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white/40 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all text-[8px] font-black uppercase tracking-widest"
+              className="flex items-center space-x-2 px-3 py-2 bg-white/5 border border-white/[0.08] rounded-lg text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all text-xs font-medium backdrop-blur-xl"
             >
-              <Icon name="log-out" className="w-3 h-3" />
+              <Icon name="log-out" className="w-3.5 h-3.5" />
               <span>Sair</span>
             </button>
           </div>
 
-          <div className="space-y-1 mb-8">
-            <h1 className="text-5xl sm:text-6xl font-black text-white tracking-tighter leading-[0.85]">
-              Design.<br />
-              Control.<br />
-              <span className="text-white/10">Precision.</span>
+          <div className="space-y-2 mb-6">
+            <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight leading-tight">
+              Configure seu<br />
+              perfil de marca
             </h1>
           </div>
 
-          <p className="text-sm sm:text-base text-white/30 font-medium max-w-sm mb-10 leading-relaxed">
-            Sincronize a essência visual da sua marca com nosso motor neural para automação total de marketing.
+          <p className="text-sm text-white/60 font-normal max-w-sm mb-10 leading-relaxed">
+            Defina a identidade visual e o tom de voz da sua marca para personalizar todo o conteúdo gerado.
           </p>
 
           <div className="hidden lg:block space-y-4">
-            <div className="aura-card p-4 flex items-center justify-between border-white/10 bg-[#161616]">
+            <div className="rounded-xl p-4 flex items-center justify-between border border-white/[0.08] bg-[#0a0a0a]/80 backdrop-blur-xl">
               <div className="flex items-center space-x-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_#F59E0B]"></div>
+                <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
                 <div>
-                  <p className="text-[9px] font-black text-white uppercase tracking-wider">DNA Extraction</p>
-                  <p className="text-[8px] text-white/20 uppercase tracking-widest">{isAnalyzingLogo ? 'Scanning...' : 'Protocol Ready'}</p>
+                  <p className="text-xs font-medium text-white">Extração de cores</p>
+                  <p className="text-xs text-white/40">{isAnalyzingLogo ? 'Analisando...' : 'Pronto'}</p>
                 </div>
               </div>
-              {isAnalyzingLogo && <Loader className="w-3 h-3 text-primary" />}
+              {isAnalyzingLogo && <Loader className="w-4 h-4 text-white" />}
             </div>
           </div>
         </div>
 
         {/* Main Configuration Panel */}
         <div className="lg:col-span-8 w-full">
-          <div className="aura-card p-6 sm:p-8 md:p-10 shadow-[0_50px_100px_rgba(0,0,0,0.8)] border-white/10 bg-[#050505] relative overflow-hidden">
-            {/* ID Label */}
-            <div className="hidden sm:block absolute top-0 right-0 p-8">
-              <div className="text-[8px] font-mono text-white/20 bg-white/5 px-3 py-1 rounded-lg border border-white/5 tracking-[0.2em] uppercase">SY_INIT_2025</div>
-            </div>
-
-            <div className="flex items-center space-x-3 mb-10">
-              <div className="w-1 h-6 bg-primary rounded-full shadow-[0_0_15px_rgba(245,158,11,0.5)]"></div>
-              <h2 className="text-lg font-black text-white uppercase tracking-[0.2em]">Identity Protocol</h2>
+          <div className="rounded-2xl p-6 sm:p-8 md:p-10 shadow-2xl border border-white/[0.08] bg-[#0a0a0a]/95 backdrop-blur-xl relative overflow-hidden">
+            <div className="flex items-center space-x-3 mb-8">
+              <h2 className="text-xl font-semibold text-white">Perfil da Marca</h2>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-10">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-14">
                 {/* Inputs */}
-                <div className="space-y-10">
+                <div className="space-y-6">
                   <div className="group">
-                    <label className="block text-[8px] font-black text-white/30 uppercase tracking-[0.2em] mb-4 group-focus-within:text-white transition-colors">Label de Identidade</label>
+                    <label className="block text-xs font-medium text-white/60 mb-2 group-focus-within:text-white transition-colors">Nome da Marca</label>
                     <input
                       type="text"
                       name="name"
                       value={profile.name}
                       onChange={handleChange}
                       required
-                      placeholder="EX: NOME DA SUA MARCA"
-                      className="w-full bg-[#111111] border border-white/5 rounded-2xl p-4 text-white text-base font-bold focus:outline-none focus:border-primary/50 transition-all placeholder:text-white/5"
+                      placeholder="CPC POKER"
+                      className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-xl p-3 text-white text-sm font-medium focus:outline-none focus:border-white/30 transition-all placeholder:text-white/20 backdrop-blur-xl"
                     />
                   </div>
                   <div className="group">
-                    <label className="block text-[8px] font-black text-white/30 uppercase tracking-[0.2em] mb-4 group-focus-within:text-white transition-colors">Manifesto Core</label>
+                    <label className="block text-xs font-medium text-white/60 mb-2 group-focus-within:text-white transition-colors">Descrição</label>
                     <textarea
                       name="description"
                       value={profile.description}
                       onChange={handleChange}
                       required
                       rows={4}
-                      placeholder="Defina a essência da sua marca..."
-                      className="w-full bg-[#111111] border border-white/5 rounded-2xl p-4 text-white text-sm focus:outline-none focus:border-primary/50 transition-all resize-none placeholder:text-white/5"
+                      placeholder="Clube de Poker"
+                      className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-xl p-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all resize-none placeholder:text-white/20 backdrop-blur-xl"
                     />
                   </div>
                 </div>
 
                 {/* Assets */}
-                <div className="space-y-10">
+                <div className="space-y-6">
                   <div>
-                    <label className="block text-[8px] font-black text-white/30 uppercase tracking-[0.2em] mb-4">Master Logo Asset</label>
+                    <label className="block text-xs font-medium text-white/60 mb-2">Logo</label>
                     <div
                       {...getRootProps()}
-                      className={`group relative cursor-pointer bg-[#111111] border border-white/5 rounded-3xl p-6 h-[200px] flex flex-col items-center justify-center transition-all ${isDragActive ? 'border-primary' : 'hover:border-white/10'}`}
+                      className={`group relative cursor-pointer bg-[#0a0a0a]/60 border border-white/[0.08] rounded-2xl p-6 h-[200px] flex flex-col items-center justify-center transition-all backdrop-blur-xl ${isDragActive ? 'border-white/30' : 'hover:border-white/20'}`}
                     >
                       <input {...getInputProps()} />
                       {isAnalyzingLogo && (
-                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/95 rounded-3xl backdrop-blur-xl">
-                          <Loader className="w-8 h-8 mb-4 text-primary" />
-                          <span className="text-[9px] font-black text-white uppercase tracking-[0.4em] animate-pulse">Syncing...</span>
+                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#0a0a0a]/95 rounded-2xl backdrop-blur-xl">
+                          <Loader className="w-8 h-8 mb-4 text-white" />
+                          <span className="text-xs font-medium text-white/60 animate-pulse">Analisando...</span>
                         </div>
                       )}
                       {logoPreview ? (
-                        <img src={logoPreview} alt="Logo" className="max-h-32 max-w-full object-contain filter group-hover:scale-105 transition-transform duration-700" />
+                        <img src={logoPreview} alt="Logo" className="max-h-32 max-w-full object-contain filter group-hover:scale-105 transition-transform duration-500" />
                       ) : (
                         <div className="text-center">
-                          <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10 group-hover:bg-primary/10 transition-all">
-                            <Icon name="upload" className="w-5 h-5 text-white/10 group-hover:text-primary" />
+                          <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center mx-auto mb-3 border border-white/[0.08] group-hover:bg-white/10 transition-all">
+                            <Icon name="upload" className="w-5 h-5 text-white/40 group-hover:text-white" />
                           </div>
-                          <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Drop Asset</p>
+                          <p className="text-xs font-medium text-white/40">Arraste ou clique para fazer upload</p>
                         </div>
                       )}
                     </div>
@@ -349,22 +335,22 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                 </div>
               </div>
 
-              <div className="pt-8 border-t border-white/5">
+              <div className="pt-6 border-t border-white/[0.08]">
                 <Button
                   type="submit"
                   disabled={!isFormValid || isAnalyzingLogo}
                   size="large"
-                  className="w-full py-5 text-[10px] font-black tracking-[0.5em] bg-white text-black hover:bg-white active:scale-[0.99] rounded-2xl"
+                  className="w-full py-3.5 text-sm font-semibold bg-white text-black hover:bg-white/90 active:scale-[0.99] rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   variant="primary"
                 >
-                  {existingProfile ? 'SYNC_PROTOCOL' : 'INIT_IDENTITY'}
+                  {existingProfile ? 'Atualizar Perfil' : 'Salvar'}
                 </Button>
               </div>
             </form>
           </div>
 
-          <p className="text-center text-white/10 text-[8px] uppercase font-black tracking-[0.6em] mt-8">
-            Socialab • Integrated Core v2.5
+          <p className="text-center text-white/20 text-xs font-medium mt-6">
+            CPC Agency
           </p>
         </div>
       </div>

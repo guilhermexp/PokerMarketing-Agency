@@ -5,7 +5,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Clapperboard } from 'lucide-react';
+import { Clapperboard, Video, ImageIcon } from 'lucide-react';
 import { ApiKeyDialog } from './ApiKeyDialog';
 import { BottomPromptBar } from './BottomPromptBar';
 import { VideoCard } from './VideoCard';
@@ -73,6 +73,7 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
   const [feed, setFeed] = useState<FeedPost[]>(sampleVideos);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<MediaType>(MediaType.VIDEO);
   // Image to edit (passed from VideoCard when clicking "Add to prompt")
   const [editingImage, setEditingImage] = useState<{ url: string; base64: string; mimeType: string } | null>(null);
 
@@ -368,8 +369,34 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
         <header className="sticky top-0 z-30 w-full px-6 py-4 pointer-events-none">
           <div className="absolute inset-0 bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-white/[0.05]" style={{ maskImage: 'linear-gradient(to bottom, black, transparent)' }} />
 
-          <div className="relative flex items-center text-white pointer-events-auto max-w-[1600px] mx-auto w-full">
+          <div className="relative flex items-center justify-between text-white pointer-events-auto max-w-[1600px] mx-auto w-full">
             <h1 className="text-3xl font-semibold text-white tracking-tight">Playground</h1>
+
+            {/* Media Type Toggle */}
+            <div className="flex items-center bg-[#0a0a0a]/60 rounded-full p-1 border border-white/[0.08] backdrop-blur-xl">
+              <button
+                onClick={() => setMediaType(MediaType.VIDEO)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                  mediaType === MediaType.VIDEO
+                    ? 'bg-white text-black shadow-md'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <Video className="w-3.5 h-3.5" />
+                Video
+              </button>
+              <button
+                onClick={() => setMediaType(MediaType.IMAGE)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                  mediaType === MediaType.IMAGE
+                    ? 'bg-white text-black shadow-md'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                Imagem
+              </button>
+            </div>
           </div>
         </header>
 
@@ -392,6 +419,8 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
         setFeed={setFeed}
         setErrorToast={setErrorToast}
         brandProfile={brandProfile}
+        mediaType={mediaType}
+        setMediaType={setMediaType}
       />
     </div>
   );

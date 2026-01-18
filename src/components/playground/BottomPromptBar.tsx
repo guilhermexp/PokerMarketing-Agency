@@ -89,6 +89,8 @@ interface BottomPromptBarProps {
   setFeed?: React.Dispatch<React.SetStateAction<FeedPost[]>>;
   setErrorToast?: (message: string) => void;
   brandProfile?: { name?: string; logo?: string };
+  mediaType: MediaType;
+  setMediaType: (mediaType: MediaType) => void;
 }
 
 export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
@@ -98,10 +100,11 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
   setFeed,
   setErrorToast,
   brandProfile,
+  mediaType,
+  setMediaType,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [prompt, setPrompt] = useState('');
-  const [mediaType, setMediaType] = useState<MediaType>(MediaType.VIDEO);
   const [useBrandProfile, setUseBrandProfile] = useState(false);
   const [selectedCameoId, setSelectedCameoId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<CameoProfile[]>(defaultCameoProfiles);
@@ -594,30 +597,6 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
           >
             <Plus className="w-5 h-5" />
           </button>
-
-          {/* Media Type Toggle */}
-          <div className="flex items-center bg-[#0a0a0a]/60 rounded-full p-1 border border-white/[0.08] shrink-0 backdrop-blur-xl">
-            <button
-              onClick={() => setMediaType(MediaType.VIDEO)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${mediaType === MediaType.VIDEO
-                  ? 'bg-white text-black shadow-md'
-                  : 'text-white/60 hover:text-white'
-                }`}
-            >
-              <Video className="w-3.5 h-3.5" />
-              Video
-            </button>
-            <button
-              onClick={() => setMediaType(MediaType.IMAGE)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${mediaType === MediaType.IMAGE
-                  ? 'bg-white text-black shadow-md'
-                  : 'text-white/60 hover:text-white'
-                }`}
-            >
-              <ImageIcon className="w-3.5 h-3.5" />
-              Imagem
-            </button>
-          </div>
 
           {/* Brand Profile Toggle - smaller */}
           <button
