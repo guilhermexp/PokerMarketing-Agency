@@ -404,9 +404,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       camp.clip_preview_url ? { url: camp.clip_preview_url, type: 'clip' } : null,
                       camp.post_preview_url ? { url: camp.post_preview_url, type: 'post' } : null,
                       camp.ad_preview_url ? { url: camp.ad_preview_url, type: 'ad' } : null,
+                      camp.carousel_preview_url ? { url: camp.carousel_preview_url, type: 'carousel' } : null,
                     ].filter(Boolean) as Array<{ url: string; type: string }>;
-                    const columns = Math.min(previewItems.length, 3) || 1;
-                    const totalAssets = Number(camp.clips_count || 0) + Number(camp.posts_count || 0) + Number(camp.ads_count || 0);
+                    const columns = Math.min(previewItems.length, 4) || 1;
+                    const totalAssets = Number(camp.clips_count || 0) + Number(camp.posts_count || 0) + Number(camp.ads_count || 0) + Number(camp.carousels_count || 0);
 
                     return (
                       <div
@@ -424,7 +425,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                                   ? "grid-cols-1"
                                   : columns === 2
                                     ? "grid-cols-2"
-                                    : "grid-cols-3"
+                                    : columns === 3
+                                      ? "grid-cols-3"
+                                      : "grid-cols-4"
                               }`}
                             >
                               {previewItems.map((item, i) => (
@@ -808,7 +811,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           </div>
         )}
         {activeView === "playground" && (
-          <div className="h-full lg:-ml-20 lg:pl-20">
+          <div className="h-full">
             <PlaygroundView brandProfile={brandProfile} userId={userId} />
           </div>
         )}

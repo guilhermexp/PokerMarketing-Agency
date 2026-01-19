@@ -92,8 +92,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
     switch (status) {
       case PostStatus.GENERATING:
         return (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0a0a] p-6 text-center">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#121212] to-[#0a0a0a] animate-pulse"></div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0c0c0c] p-6 text-center">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#121212] to-[#0c0c0c] animate-pulse"></div>
 
             {post.referenceImageBase64 && (
               <div className="absolute inset-0 z-0 opacity-20 blur-md">
@@ -111,12 +111,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
                 <p className="text-xs text-white/60 line-clamp-2 px-2 max-w-[200px] mx-auto">"{post.description}"</p>
               </div>
             </div>
-            <div className="absolute inset-0 bg-[#0a0a0a]/30 pointer-events-none" />
+            <div className="absolute inset-0 bg-[#0c0c0c]/30 pointer-events-none" />
           </div>
         );
       case PostStatus.ERROR:
         return (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0a0a]/95 border border-red-500/30 p-6 text-center backdrop-blur-xl">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0c0c0c]/95 border border-red-500/30 p-6 text-center backdrop-blur-2xl">
             <AlertCircle className="w-10 h-10 text-red-500 mb-3 opacity-80" />
             <p className="text-sm font-bold uppercase tracking-widest text-white mb-1">Erro na Geracao</p>
             <p className="text-xs text-red-300 line-clamp-3 px-2">{post.errorMessage || "Ocorreu um erro inesperado."}</p>
@@ -150,7 +150,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
 
   return (
     <motion.div
-      className={`relative w-full h-full rounded-3xl overflow-hidden bg-[#0a0a0a]/95 border border-white/[0.08] ${aspectClass} group shadow-2xl shadow-black/50 ring-1 ring-white/[0.02] flex flex-col backdrop-blur-xl`}
+      className={`relative w-full h-full rounded-2xl overflow-hidden bg-[#0c0c0c]/95 border border-white/10 ${aspectClass} group shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex flex-col backdrop-blur-2xl`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -159,8 +159,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
       layout
     >
       {status === PostStatus.SUCCESS && post.status && (
-        <div className="absolute top-4 left-4 z-20 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-black flex items-center gap-1 shadow-[0_2px_10px_rgba(0,0,0,0.2)]">
-          <Sparkles className="w-3 h-3 text-black" />
+        <div className="absolute top-4 left-4 z-20 bg-primary/20 border border-primary/40 backdrop-blur-2xl px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+          <Sparkles className="w-3 h-3 text-primary" />
           Novo
         </div>
       )}
@@ -170,10 +170,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
       </div>
 
       {status === PostStatus.SUCCESS && (
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/20 via-transparent to-[#0a0a0a]/90 pointer-events-none transition-opacity duration-300 group-hover:opacity-90" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0c0c0c]/20 via-transparent to-[#0c0c0c]/90 pointer-events-none transition-opacity duration-300 group-hover:opacity-90" />
       )}
 
-      <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-[#0a0a0a]/60 border border-white/[0.08] backdrop-blur-xl px-2.5 py-1.5 rounded-full text-xs font-medium text-white/90 pointer-events-none shadow-lg z-20">
+      <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-black/40 border border-white/10 backdrop-blur-2xl px-2.5 py-1.5 rounded-full text-xs font-medium text-white/90 pointer-events-none shadow-[0_8px_30px_rgba(0,0,0,0.5)] z-20">
         {post.mediaType === MediaType.IMAGE ? (
           <ImageIcon className="w-3 h-3 opacity-80" />
         ) : (
@@ -182,7 +182,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
         {post.modelTag}
       </div>
 
-      <div className={`absolute bottom-0 left-0 w-full p-5 flex items-end justify-between z-20 pt-16 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/60 to-transparent transition-opacity duration-300 ${status !== PostStatus.SUCCESS ? 'opacity-50 pointer-events-none' : ''}`}>
+      <div className={`absolute bottom-0 left-0 w-full p-5 flex items-end justify-between z-20 pt-16 bg-gradient-to-t from-[#0c0c0c] via-[#0c0c0c]/60 to-transparent transition-opacity duration-300 ${status !== PostStatus.SUCCESS ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="flex-1 mr-4 pointer-events-none">
           <div className="flex items-center gap-2.5 mb-2">
             <img src={post.avatarUrl} alt={post.username} className="w-8 h-8 rounded-full border border-white/20 shadow-md" />
@@ -196,9 +196,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
             {post.mediaType === MediaType.VIDEO && post.videoUrl && (
               <button
                 onClick={handleToggleMute}
-                className={`p-3 rounded-full border backdrop-blur-xl transition-all text-white shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:scale-105 ${isMuted
-                    ? 'bg-white/10 border-white/[0.08] hover:bg-white/20 hover:border-white/20'
-                    : 'bg-white/30 border-white/[0.15] hover:bg-white/40'
+                className={`p-3 rounded-full border backdrop-blur-2xl transition-all text-white shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:scale-105 ${isMuted
+                    ? 'bg-white/10 border-white/10 hover:bg-white/20 hover:border-white/20'
+                    : 'bg-white/30 border-white/20 hover:bg-white/40'
                   }`}
                 title={isMuted ? "Ativar audio" : "Desativar audio"}
               >
@@ -209,7 +209,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
             {post.mediaType === MediaType.IMAGE && post.imageUrl && onAddToPrompt && (
               <button
                 onClick={() => onAddToPrompt(post.imageUrl!)}
-                className="p-3 rounded-full bg-purple-500/20 border border-purple-500/40 backdrop-blur-xl hover:bg-purple-500/40 transition-all text-purple-300 shadow-[0_4px_12px_rgba(168,85,247,0.3)] hover:scale-105"
+                className="p-3 rounded-full bg-purple-500/20 border border-purple-500/40 backdrop-blur-2xl hover:bg-purple-500/40 transition-all text-purple-300 shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:scale-105"
                 title="Adicionar ao prompt para editar"
               >
                 <Wand2 className="w-5 h-5" />
@@ -217,7 +217,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
             )}
             <button
               onClick={handleDownload}
-              className="p-3 rounded-full bg-white/10 border border-white/[0.08] backdrop-blur-xl hover:bg-white/20 transition-all text-white shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:scale-105 hover:border-white/20"
+              className="p-3 rounded-full bg-white/10 border border-white/10 backdrop-blur-2xl hover:bg-white/20 transition-all text-white shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:scale-105 hover:border-white/20"
               title={post.mediaType === MediaType.IMAGE ? "Download Imagem" : "Download Video"}
             >
               <Download className="w-5 h-5" />

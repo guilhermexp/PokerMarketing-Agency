@@ -14,11 +14,13 @@ interface CampaignWithCounts {
   clipsCount: number;
   postsCount: number;
   adsCount: number;
+  carouselsCount: number;
   postsBreakdown: Record<string, number>;
   adsBreakdown: Record<string, number>;
   clipPreviewUrl: string | null;
   postPreviewUrl: string | null;
   adPreviewUrl: string | null;
+  carouselPreviewUrl: string | null;
   inputTranscript: string | null;
   toneOfVoiceOverride: string | null;
   toneOfVoiceUsed: string | null;
@@ -61,7 +63,7 @@ const CampaignCard: React.FC<{
     };
 
     const totalAssets =
-      campaign.clipsCount + campaign.postsCount + campaign.adsCount;
+      campaign.clipsCount + campaign.postsCount + campaign.adsCount + campaign.carouselsCount;
   const toneLabel = campaign.toneOfVoiceOverride || campaign.toneOfVoiceUsed;
   const previewItems = [
       campaign.clipsCount > 0
@@ -73,13 +75,16 @@ const CampaignCard: React.FC<{
       campaign.adsCount > 0
         ? { type: "ads", url: campaign.adPreviewUrl, icon: "zap", label: "Ad" }
         : null,
+      campaign.carouselsCount > 0
+        ? { type: "carousels", url: campaign.carouselPreviewUrl, icon: "layers", label: "Carrossel" }
+        : null,
     ].filter(Boolean) as Array<{
-      type: "clips" | "posts" | "ads";
+      type: "clips" | "posts" | "ads" | "carousels";
       url: string | null;
       icon: string;
       label: string;
     }>;
-  const columns = Math.min(previewItems.length, 3) || 1;
+  const columns = Math.min(previewItems.length, 4) || 1;
 
     return (
       <div
@@ -207,7 +212,9 @@ const CampaignCard: React.FC<{
                     ? "grid-cols-1"
                     : columns === 2
                       ? "grid-cols-2"
-                      : "grid-cols-3"
+                      : columns === 3
+                        ? "grid-cols-3"
+                        : "grid-cols-4"
                 }`}
               >
                 {previewItems.map((item) => (
@@ -244,6 +251,9 @@ const CampaignCard: React.FC<{
               )}
               {campaign.adsCount > 0 && (
                 <span>{campaign.adsCount} ad{campaign.adsCount !== 1 ? 's' : ''}</span>
+              )}
+              {campaign.carouselsCount > 0 && (
+                <span>{campaign.carouselsCount} carrossel{campaign.carouselsCount !== 1 ? 'is' : ''}</span>
               )}
               {toneLabel && <span>Tom: {toneLabel}</span>}
               {isSelected && (
@@ -338,11 +348,13 @@ export function CampaignsList({
         clipsCount: Number(c.clips_count) || 0,
         postsCount: Number(c.posts_count) || 0,
         adsCount: Number(c.ads_count) || 0,
+        carouselsCount: Number(c.carousels_count) || 0,
         postsBreakdown: c.posts_breakdown || {},
         adsBreakdown: c.ads_breakdown || {},
         clipPreviewUrl: c.clip_preview_url || null,
         postPreviewUrl: c.post_preview_url || null,
         adPreviewUrl: c.ad_preview_url || null,
+        carouselPreviewUrl: c.carousel_preview_url || null,
         inputTranscript: c.input_transcript || null,
         toneOfVoiceOverride: toneOverride,
         toneOfVoiceUsed,

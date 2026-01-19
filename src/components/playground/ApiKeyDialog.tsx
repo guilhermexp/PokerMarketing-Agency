@@ -13,7 +13,7 @@ interface ApiKeyDialogProps {
 export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({ onContinue }) => {
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-opacity duration-300">
-      <div className="bg-neutral-900/60 border border-white/10 backdrop-blur-2xl rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] max-w-md w-full p-8 text-center flex flex-col items-center ring-1 ring-white/5 relative overflow-hidden">
+      <div className="bg-[#0c0c0c]/60 border border-white/10 backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] max-w-md w-full p-8 text-center flex flex-col items-center relative overflow-hidden">
 
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-20 bg-white/5 blur-3xl pointer-events-none"></div>
 
