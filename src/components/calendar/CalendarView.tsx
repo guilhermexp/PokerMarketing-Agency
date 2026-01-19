@@ -62,6 +62,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [postDialogOpen, setPostDialogOpen] = useState(false);
   const [showNotificationBanner, setShowNotificationBanner] = useState(false);
   const [pendingPosts, setPendingPosts] = useState<ScheduledPost[]>([]);
+  const [dayViewDialogOpen, setDayViewDialogOpen] = useState(false);
+  const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
 
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
@@ -82,6 +84,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setSelectedDate(date);
     setSelectedTime(null);
     setIsScheduleModalOpen(true);
+  };
+
+  const handleDayViewClick = (date: string) => {
+    setSelectedDayDate(date);
+    setDayViewDialogOpen(true);
   };
 
   const handleSchedulePost = (
@@ -333,17 +340,23 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           {monthCalendar.map((day, index) => (
             <div
               key={index}
-              onClick={() => day.dateStr && handleDayClick(day.dateStr)}
+              onClick={() => day.dateStr && day.posts.length === 0 && handleDayClick(day.dateStr)}
               className={`bg-black min-h-[140px] p-3 transition-all hover:bg-black/80 ${
-                day.date ? "cursor-pointer" : ""
+                day.date && day.posts.length === 0 ? "cursor-pointer" : ""
               } ${isToday(day.date) ? "ring-2 ring-inset ring-primary" : ""}`}
             >
               {day.date && (
                 <>
                   <h3
+                    onClick={(e) => {
+                      if (day.posts.length > 0 && day.dateStr) {
+                        e.stopPropagation();
+                        handleDayViewClick(day.dateStr);
+                      }
+                    }}
                     className={`mb-3 font-light text-7xl ${
                       isToday(day.date) ? "text-primary" : "text-white/80"
-                    }`}
+                    } ${day.posts.length > 0 ? "cursor-pointer hover:text-white transition-colors" : ""}`}
                   >
                     {day.date}
                   </h3>
@@ -370,7 +383,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       </div>
                     ))}
                     {day.posts.length > 3 && (
-                      <div className="text-[10px] text-white/40 pl-2">
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (day.dateStr) handleDayViewClick(day.dateStr);
+                        }}
+                        className="text-[10px] text-white/40 hover:text-white/70 pl-2 cursor-pointer transition-colors"
+                      >
                         +{day.posts.length - 3} mais
                       </div>
                     )}
@@ -487,6 +506,190 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               >
                 <Icon name="trash" className="w-4 h-4" />
                 Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Day View Dialog - Shows all posts for a specific day */}
+      {dayViewDialogOpen && selectedDayDate && (
+        <div
+          className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+          onClick={() => setDayViewDialogOpen(false)}
+        >
+          <div
+            className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 flex flex-col items-center justify-center">
+                  <span className="text-xl font-light text-white">
+                    {new Date(selectedDayDate).getDate()}
+                  </span>
+                  <span className="text-[9px] text-white/40">
+                    {new Date(selectedDayDate).toLocaleDateString("pt-BR", { month: "short" })}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white">
+                    {new Date(selectedDayDate).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
+                  </h3>
+                  <p className="text-xs text-white/50 mt-0.5">
+                    {scheduledPosts.filter((p) => p.scheduledDate === selectedDayDate).length} posts agendados
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDayViewDialogOpen(false)}
+                className="p-2 text-white/40 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+              >
+                <Icon name="x" className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Content - List of all posts */}
+            <div className="px-4 pb-4 overflow-y-auto max-h-[65vh]">
+              <div className="space-y-2 mt-4">
+                {scheduledPosts
+                  .filter((post) => post.scheduledDate === selectedDayDate)
+                  .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime))
+                  .map((post) => {
+                    const contentType = post.instagramContentType;
+                    const typeLabel =
+                      contentType === "story"
+                        ? "Story"
+                        : contentType === "carousel"
+                          ? "Carousel"
+                          : contentType === "reel"
+                            ? "Reel"
+                            : null;
+
+                    return (
+                      <div
+                        key={post.id}
+                        className="group flex items-center gap-4 p-3 rounded-xl bg-black/20 border border-white/10 hover:bg-black/30 hover:border-white/20 transition-all"
+                      >
+                        {/* Thumbnail - Clickable */}
+                        <div
+                          onClick={() => {
+                            setDayViewDialogOpen(false);
+                            handlePostClick(post);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          {post.imageUrl ? (
+                            <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-black/40 border border-white/10 hover:border-white/30 transition-colors">
+                              <img
+                                src={post.imageUrl}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-20 h-20 rounded-lg bg-black/40 flex items-center justify-center flex-shrink-0 border border-white/10 hover:border-white/30 transition-colors">
+                              <Icon name="image" className="w-6 h-6 text-white/20" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-semibold text-white">
+                              {post.scheduledTime}
+                            </span>
+                            {typeLabel && (
+                              <span className="text-[9px] font-medium text-white/50 px-2 py-0.5 bg-black/40 border border-white/10 rounded-full">
+                                {typeLabel}
+                              </span>
+                            )}
+                            {post.status === "published" && (
+                              <span className="text-[9px] font-medium text-emerald-400 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                                Publicado
+                              </span>
+                            )}
+                            {post.status === "failed" && (
+                              <span className="text-[9px] font-medium text-red-400 px-2 py-0.5 bg-red-500/10 border border-red-500/20 rounded-full">
+                                Falhou
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-white/50 line-clamp-2">
+                            {post.caption || "Sem legenda"}
+                          </p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1">
+                          {post.status === "scheduled" && (
+                            <>
+                              {onPublishToInstagram && (
+                                <button
+                                  onClick={() => {
+                                    onPublishToInstagram(post);
+                                    setDayViewDialogOpen(false);
+                                  }}
+                                  className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                  title="Publicar agora"
+                                >
+                                  <Icon name="send" className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setSelectedPostForEdit(post);
+                                  setSelectedDate(post.scheduledDate);
+                                  setSelectedTime(post.scheduledTime);
+                                  setDayViewDialogOpen(false);
+                                  setIsScheduleModalOpen(true);
+                                }}
+                                className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                title="Editar"
+                              >
+                                <Icon name="edit" className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  onUpdateScheduledPost(post.id, {
+                                    status: "published",
+                                    publishedAt: Date.now(),
+                                  });
+                                }}
+                                className="p-2 text-white/40 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                title="Marcar como publicado"
+                              >
+                                <Icon name="check" className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => onDeleteScheduledPost(post.id)}
+                            className="p-2 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                            title="Excluir"
+                          >
+                            <Icon name="trash" className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 pb-4 pt-3 border-t border-white/10">
+              <button
+                onClick={() => {
+                  setDayViewDialogOpen(false);
+                  handleDayClick(selectedDayDate);
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white/90 bg-black/40 backdrop-blur-2xl border border-white/10 hover:border-white/30 rounded-full transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              >
+                <Icon name="plus" className="w-4 h-4" />
+                Novo Agendamento
               </button>
             </div>
           </div>
