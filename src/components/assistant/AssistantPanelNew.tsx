@@ -15,9 +15,9 @@ import { Loader } from '../common/Loader';
 import { DataStreamProvider } from './DataStreamProvider';
 import { DataStreamHandler } from './DataStreamHandler';
 import { MessageResponse } from './MessageResponse';
-import { MessageActions } from './MessageActions';
-import { ToolPreview } from './ToolPreview';
-import { LoadingIndicator } from './LoadingIndicator';
+import { MessageActionsEnhanced } from './MessageActionsEnhanced';
+import { ToolWithApproval } from './ToolWithApproval';
+import { LoadingIndicatorEnhanced } from './LoadingIndicatorEnhanced';
 
 interface AssistantPanelNewProps {
   isOpen: boolean;
@@ -121,7 +121,7 @@ const ChatBubble: React.FC<{ message: any; onApprove?: (id: string) => void; onD
         <div className="group relative max-w-[90%]">
           {/* Ações (aparecem no hover) */}
           <div className="absolute top-2 right-2 z-10">
-            <MessageActions
+            <MessageActionsEnhanced
               messageId={message.id}
               content={textParts}
               onPin={() => console.log('Pin message:', message.id)}
@@ -144,14 +144,16 @@ const ChatBubble: React.FC<{ message: any; onApprove?: (id: string) => void; onD
         </div>
       )}
 
-      {/* Tool Approval UI com ToolPreview */}
+      {/* Tool Approval UI com ToolWithApproval */}
       {toolApprovals.filter((toolPart: any) => toolPart.type !== 'tool-editImage').map((toolPart: any) => (
         <div key={toolPart.toolCallId} className="max-w-[90%]">
-          <ToolPreview
-            toolCallId={toolPart.approval.id}
+          <ToolWithApproval
+            toolCallId={toolPart.toolCallId}
             toolName={toolPart.type.replace('tool-', '')}
             args={toolPart.input || toolPart.rawInput || {}}
             metadata={toolPart.metadata?.preview}
+            state={toolPart.state}
+            approvalId={toolPart.approval?.id}
             onApprove={onApprove!}
             onDeny={onDeny!}
             onAlwaysAllow={(toolName) => console.log('Always allow:', toolName)}
@@ -565,7 +567,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
 
           {/* Indicador de loading/processamento */}
           {shouldShowLoading && (
-            <LoadingIndicator
+            <LoadingIndicatorEnhanced
               stage={isSending ? 'thinking' : 'generating'}
             />
           )}

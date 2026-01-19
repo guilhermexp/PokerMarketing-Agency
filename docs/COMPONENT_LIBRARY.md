@@ -758,3 +758,77 @@ Para personalizar os componentes:
 5. Valide a acessibilidade
 
 Para mais detalhes sobre o sistema de design, consulte o [STYLE_GUIDE.md](./STYLE_GUIDE.md).
+
+---
+
+## AI Elements (Oficial)
+
+Componentes UI do Vercel AI SDK para chat, tools e aprovações.
+
+### Componentes Instalados
+
+- **Message**: Components oficiais para mensagens de chat
+  - `Message`, `MessageContent`, `MessageActions`, `MessageAction`
+  - `MessageResponse`, `MessageAttachment`, `MessageBranch`
+
+- **Tool**: Componentes para preview e execução de tools
+  - `Tool`, `ToolHeader`, `ToolContent`, `ToolInput`, `ToolOutput`
+
+- **Confirmation**: Componentes para aprovação de tools
+  - `Confirmation`, `ConfirmationRequest`, `ConfirmationActions`, `ConfirmationAction`
+
+- **Loader**: Spinner animado oficial
+
+- **Prompt Input**: Componentes de input de prompt
+  - `PromptInput`, `PromptInputTextarea`, `PromptInputSubmit`
+
+### Componentes Customizados (Extensões)
+
+**Baseados em ai-elements mas com funcionalidades adicionais do projeto:**
+
+#### ToolWithApproval
+Fluxo completo de aprovação de tools com preview e ações.
+
+```tsx
+<ToolWithApproval
+  toolCallId="abc123"
+  toolName="createImage"
+  args={{ description: "...", aspectRatio: "16:9" }}
+  metadata={{
+    title: "Criar Imagem",
+    estimatedTime: "15-30 segundos",
+    willDo: ["Gerar imagem com IA", "Salvar na galeria"]
+  }}
+  state="approval-requested"
+  approvalId="approval-123"
+  onApprove={handleApprove}
+  onDeny={handleDeny}
+  onAlwaysAllow={(toolName) => console.log('Always allow:', toolName)}
+/>
+```
+
+#### MessageActionsEnhanced
+Ações de mensagem com funcionalidades customizadas (Pin, Fork, Share).
+
+```tsx
+<MessageActionsEnhanced
+  messageId="msg-123"
+  content="Texto da mensagem..."
+  chatId="chat-456"
+  onPin={(id) => console.log('Pin:', id)}
+  onFork={(id) => console.log('Fork:', id)}
+/>
+```
+
+#### LoadingIndicatorEnhanced
+Loading com stages e skeleton placeholders.
+
+```tsx
+<LoadingIndicatorEnhanced stage="thinking" />
+<LoadingIndicatorEnhanced stage="generating" />
+<LoadingIndicatorEnhanced message="Analisando imagem..." />
+```
+
+### Documentação Completa
+
+Para guia detalhado de uso, instalação e arquitetura, consulte [AI_ELEMENTS_USAGE.md](./AI_ELEMENTS_USAGE.md).
