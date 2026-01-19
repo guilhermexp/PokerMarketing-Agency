@@ -401,7 +401,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </div>
       </main>
 
-      {/* Post Detail Dialog */}
+      {/* Post Detail Dialog - Single Post View */}
       {postDialogOpen && selectedPost && (
         <div
           className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4"
@@ -411,21 +411,25 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl max-w-lg w-full overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-4 border-b border-white/10 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-semibold text-white">{formatDateRange(selectedPost)}</h3>
-                <p className="text-sm text-white/50 mt-0.5">{selectedPost.scheduledTime}</p>
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-white/10">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <h3 className="text-base font-semibold text-white">{formatDateRange(selectedPost)}</h3>
+                  <p className="text-sm text-white/50 mt-1">{selectedPost.scheduledTime}</p>
+                </div>
+                <button
+                  onClick={() => setPostDialogOpen(false)}
+                  className="p-2 text-white/40 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <Icon name="x" className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                onClick={() => setPostDialogOpen(false)}
-                className="p-2 text-white/40 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
-              >
-                <Icon name="x" className="w-4 h-4" />
-              </button>
             </div>
 
+            {/* Image Preview */}
             {selectedPost.imageUrl && (
-              <div className="px-5 py-4">
+              <div className="px-6 py-4 bg-black/20">
                 <img
                   src={selectedPost.imageUrl}
                   alt=""
@@ -434,40 +438,52 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </div>
             )}
 
-            <div className="px-5 py-4 space-y-3">
+            {/* Content Details */}
+            <div className="px-6 py-4 space-y-4">
+              {/* Caption */}
               <div>
-                <p className="text-xs text-white/50 mb-1">Legenda</p>
-                <p className="text-sm text-white/80">{selectedPost.caption || "Sem legenda"}</p>
+                <p className="text-[10px] uppercase tracking-wider text-white/40 font-medium mb-2">Legenda</p>
+                <p className="text-sm text-white/80 leading-relaxed">
+                  {selectedPost.caption || <span className="italic text-white/40">Sem legenda</span>}
+                </p>
               </div>
 
+              {/* Hashtags */}
               {selectedPost.hashtags && selectedPost.hashtags.length > 0 && (
                 <div>
-                  <p className="text-xs text-white/50 mb-1">Hashtags</p>
-                  <p className="text-sm text-white/80">{selectedPost.hashtags.join(" ")}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-white/40 font-medium mb-2">Hashtags</p>
+                  <p className="text-sm text-white/60">{selectedPost.hashtags.join(" ")}</p>
                 </div>
               )}
 
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-block text-xs px-2.5 py-1 rounded-full ${
-                    selectedPost.status === "scheduled"
-                      ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                      : selectedPost.status === "published"
-                        ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                        : "bg-red-500/10 text-red-400 border border-red-500/20"
-                  }`}
-                >
+              {/* Status & Platform */}
+              <div className="flex items-center gap-2 pt-2">
+                <span className="text-[9px] font-medium text-white/60 px-2 py-1 bg-white/5 border border-white/10 rounded-full">
                   {selectedPost.status === "scheduled"
                     ? "Agendado"
                     : selectedPost.status === "published"
                       ? "Publicado"
                       : "Falhou"}
                 </span>
-                <span className="text-xs text-white/50">{selectedPost.platforms}</span>
+                {selectedPost.instagramContentType && (
+                  <span className="text-[9px] font-medium text-white/50 px-2 py-1 bg-black/40 border border-white/10 rounded-full">
+                    {selectedPost.instagramContentType === "story"
+                      ? "Story"
+                      : selectedPost.instagramContentType === "carousel"
+                        ? "Carousel"
+                        : selectedPost.instagramContentType === "reel"
+                          ? "Reel"
+                          : "Photo"}
+                  </span>
+                )}
+                <span className="text-[9px] font-medium text-white/50 px-2 py-1 bg-black/40 border border-white/10 rounded-full uppercase">
+                  {selectedPost.platforms}
+                </span>
               </div>
             </div>
 
-            <div className="px-5 py-4 border-t border-white/10 flex gap-2">
+            {/* Actions Footer */}
+            <div className="px-6 py-4 border-t border-white/10 flex gap-2">
               {selectedPost.status === "scheduled" && (
                 <>
                   {isRubeConfigured() && (
@@ -476,7 +492,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         onPublishToInstagram(selectedPost);
                         setPostDialogOpen(false);
                       }}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all"
                     >
                       <Icon name="send" className="w-4 h-4" />
                       Publicar Agora
@@ -490,7 +506,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       setPostDialogOpen(false);
                       setIsScheduleModalOpen(true);
                     }}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all"
                   >
                     <Icon name="edit" className="w-4 h-4" />
                     Editar
@@ -502,7 +518,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   onDeleteScheduledPost(selectedPost.id);
                   setPostDialogOpen(false);
                 }}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 hover:bg-red-500/10 rounded-full text-sm font-medium text-white/40 hover:text-red-400 transition-all"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/40 hover:text-white hover:border-white/30 transition-all"
               >
                 <Icon name="trash" className="w-4 h-4" />
                 Excluir
