@@ -408,7 +408,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           onClick={() => setPostDialogOpen(false)}
         >
           <div
-            className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl max-w-lg w-full overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
+            className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -427,19 +427,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </div>
             </div>
 
-            {/* Image Preview */}
-            {selectedPost.imageUrl && (
-              <div className="px-6 py-4 bg-black/20">
-                <img
-                  src={selectedPost.imageUrl}
-                  alt=""
-                  className="w-full rounded-lg border border-white/10"
-                />
-              </div>
-            )}
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Image Preview */}
+              {selectedPost.imageUrl && (
+                <div className="px-6 py-4 bg-black/20">
+                  <img
+                    src={selectedPost.imageUrl}
+                    alt=""
+                    className="w-full h-auto rounded-lg border border-white/10"
+                  />
+                </div>
+              )}
 
-            {/* Content Details */}
-            <div className="px-6 py-4 space-y-4">
+              {/* Content Details */}
+              <div className="px-6 py-4 space-y-4">
               {/* Caption */}
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-white/40 font-medium mb-2">Legenda</p>
@@ -480,10 +482,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   {selectedPost.platforms}
                 </span>
               </div>
+              </div>
             </div>
 
             {/* Actions Footer */}
-            <div className="px-6 py-4 border-t border-white/10 flex gap-2">
+            <div className="px-6 py-4 border-t border-white/10 flex gap-2 flex-shrink-0">
               {selectedPost.status === "scheduled" && (
                 <>
                   {isRubeConfigured() && (
