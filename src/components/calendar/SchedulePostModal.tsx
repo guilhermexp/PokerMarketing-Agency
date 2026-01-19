@@ -88,7 +88,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
         setCaption(initialCaption || '');
       } else if (initialImage) {
         setSelectedImages([initialImage]);
-        setCaption(initialImage.prompt || '');
+        setCaption(''); // Don't auto-fill with image prompt
       }
       // Set initial caption if provided separately
       if (initialCaption && !initialCarouselImages) {
