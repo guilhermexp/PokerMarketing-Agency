@@ -108,9 +108,11 @@ export default defineConfig(({ mode }) => {
           additionalManifestEntries: [],
           // Allow larger files to be cached (default is 2MB)
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+          // Don't restrict navigation fallback - allow all routes
+          runtimeCaching: [],
         },
         devOptions: {
-          enabled: true,
+          enabled: false, // Disable service worker in dev to avoid caching issues
         },
       }),
     ],

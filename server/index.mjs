@@ -766,6 +766,117 @@ app.get("/api/admin/logs", requireSuperAdmin, async (req, res) => {
   }
 });
 
+// Admin: Get single log details
+app.get("/api/admin/logs/:id", requireSuperAdmin, async (req, res) => {
+  try {
+    const sql = getSql();
+    const { id } = req.params;
+
+    const logs = await sql`
+      SELECT id, request_id, user_id, organization_id,
+             endpoint, operation, provider, model_id,
+             input_tokens, output_tokens, total_tokens,
+             image_count, image_size, video_duration_seconds,
+             estimated_cost_cents, latency_ms, status,
+             error_message, metadata, created_at
+      FROM api_usage_logs
+      WHERE id = ${id}
+    `;
+
+    if (!logs || logs.length === 0) {
+      return res.status(404).json({ error: 'Log not found' });
+    }
+
+    res.json(logs[0]);
+  } catch (error) {
+    console.error('[Admin] Log detail error:', error);
+    res.status(500).json({ error: 'Failed to fetch log details' });
+  }
+});
+
+// Cache for AI suggestions (1 hour TTL)
+const aiSuggestionsCache = new Map();
+const CACHE_DURATION_MS = 3600000; // 1 hour
+
+// Admin: Get AI suggestions for a log
+app.post("/api/admin/logs/:id/ai-suggestions", requireSuperAdmin, async (req, res) => {
+  try {
+    const sql = getSql();
+    const { id } = req.params;
+
+    // Check cache first
+    const cacheKey = `suggestions_${id}`;
+    const cached = aiSuggestionsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
+      return res.json({ suggestions: cached.suggestions, cached: true });
+    }
+
+    // Fetch log from database
+    const logs = await sql`
+      SELECT id, endpoint, operation, model_id, error_message,
+             metadata, latency_ms, status
+      FROM api_usage_logs
+      WHERE id = ${id}
+    `;
+
+    if (!logs || logs.length === 0) {
+      return res.status(404).json({ error: 'Log not found' });
+    }
+
+    const log = logs[0];
+
+    // Only generate suggestions for failed logs
+    if (log.status !== 'failed') {
+      return res.json({
+        suggestions: 'Este log não contém erros. Sugestões de IA estão disponíveis apenas para logs com status "failed".',
+        cached: false
+      });
+    }
+
+    // Construct prompt for AI
+    const prompt = `Você é um expert em análise de erros de API. Forneça sugestões para corrigir este erro:
+
+**Detalhes do Erro:**
+- Endpoint: ${log.endpoint || 'N/A'}
+- Operação: ${log.operation || 'N/A'}
+- Modelo: ${log.model_id || 'N/A'}
+- Mensagem: ${log.error_message || 'N/A'}
+- Metadata: ${log.metadata ? JSON.stringify(log.metadata) : 'N/A'}
+- Latência: ${log.latency_ms || 'N/A'}ms
+
+**Sua Tarefa:**
+1. Análise da causa raiz (2-3 frases)
+2. Correções específicas (3-5 bullet points)
+3. Estratégias de prevenção (2-3 bullet points)
+4. Exemplos de código se relevante
+
+Formate em markdown claro com seções.`;
+
+    // Call Gemini API
+    const gemini = getGeminiAi();
+    const result = await gemini.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }]
+    });
+
+    const suggestions = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || 'Não foi possível gerar sugestões.';
+
+    // Cache the result
+    aiSuggestionsCache.set(cacheKey, {
+      suggestions,
+      timestamp: Date.now()
+    });
+
+    res.json({ suggestions, cached: false });
+  } catch (error) {
+    console.error('[Admin] AI suggestions error:', error);
+    res.status(500).json({ error: 'Failed to generate AI suggestions' });
+  }
+});
+
 // ============================================================================
 // DEBUG: Stats endpoint to monitor database usage
 // ============================================================================

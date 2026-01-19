@@ -24,6 +24,8 @@
   bottom: 0;
   background: rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(4px);
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 /* Container principal */
@@ -33,7 +35,13 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  z-index: 1;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Elementos interativos recebem pointer-events auto */
+.preview-container > * {
+  pointer-events: auto;
 }
 
 /* ========================================
@@ -45,7 +53,8 @@
   top: 24px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 1001;
+  z-index: 1002;
+  pointer-events: auto;
 }
 
 .actions-toolbar {
@@ -60,13 +69,15 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   min-height: 48px;
+  pointer-events: auto;
 }
 
-/* Garantir alinhamento vertical */
+/* Garantir alinhamento vertical e clicabilidade */
 .actions-toolbar > * {
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: auto;
 }
 
 /* ========================================
@@ -77,7 +88,7 @@
   position: absolute;
   top: 16px;
   right: 16px;
-  z-index: 1001;
+  z-index: 1002;
   width: 40px;
   height: 40px;
   display: flex;
@@ -89,6 +100,7 @@
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   transition: all 0.2s ease;
+  pointer-events: auto;
 }
 
 .preview-close-button:hover {
@@ -106,7 +118,8 @@
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 1000;
+  z-index: 1002;
+  pointer-events: auto;
 }
 
 .preview-toolbar {
@@ -121,13 +134,19 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   min-height: 48px;
+  pointer-events: auto;
 }
 
-/* Garantir alinhamento vertical de todos os elementos */
+/* Garantir alinhamento vertical e clicabilidade de todos os elementos */
 .preview-toolbar > * {
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: auto;
+}
+
+.preview-toolbar button {
+  pointer-events: auto;
 }
 
 .toolbar-separator {
@@ -148,6 +167,12 @@
   flex: 1;
   display: flex;
   overflow: hidden;
+  pointer-events: none;
+}
+
+/* Canvas e painéis dentro do content recebem pointer-events */
+.preview-content > * {
+  pointer-events: auto;
 }
 
 /* Viewer de imagem */
@@ -160,6 +185,14 @@
   overflow: hidden;
   transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  pointer-events: none;
+}
+
+/* Canvas interativos dentro do viewer */
+.image-viewer-canvas canvas,
+.image-viewer-canvas video,
+.image-viewer-canvas img {
+  pointer-events: auto;
 }
 
 /* Canvas de edição dentro do overlay */
@@ -168,6 +201,15 @@
   min-height: 0;
   min-width: 0;
   transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+/* Elementos interativos dentro do canvas de edição */
+.preview-content > div[class*="relative flex-1"] canvas,
+.preview-content > div[class*="relative flex-1"] video,
+.preview-content > div[class*="relative flex-1"] img,
+.preview-content > div[class*="relative flex-1"] button {
+  pointer-events: auto;
 }
 
 /* Quando painel aberto: viewer reduz no desktop */

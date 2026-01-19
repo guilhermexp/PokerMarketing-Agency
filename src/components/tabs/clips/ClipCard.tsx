@@ -3611,7 +3611,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                 isLoading={audioState.isLoading}
                 size="small"
                 icon="mic"
-                className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
+                className="!rounded-full !px-3 !py-1.5 !text-xs !font-medium !bg-black/40 !backdrop-blur-2xl !border !border-white/10 !text-white/60 hover:!text-white/90 hover:!border-white/30 !transition-all !shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
                 title="Gerar narração de áudio"
               >
                 Áudio
@@ -3635,7 +3635,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                 }
                 size="small"
                 icon="zap"
-                className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-primary/10 !text-primary/80 !border !border-primary/20 hover:!bg-primary/20"
+                className="!rounded-full !px-3 !py-1.5 !text-xs !font-medium !bg-black/40 !backdrop-blur-2xl !border !border-white/10 !text-white/60 hover:!text-white/90 hover:!border-white/30 !transition-all !shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
                 title="Gerar capa + todas as imagens de referência deste clip"
               >
                 Gerar Todas
@@ -3647,7 +3647,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               disabled={isGeneratingImages || !thumbnail}
               size="small"
               icon="image"
-              className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
+              className="!rounded-full !px-3 !py-1.5 !text-xs !font-medium !bg-black/40 !backdrop-blur-2xl !border !border-white/10 !text-white/60 hover:!text-white/90 hover:!border-white/30 !transition-all !shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
               title={!thumbnail ? "Gere a capa primeiro" : undefined}
             >
               Imagens ({generatedImagesCount}/{scenes.length})
@@ -3660,7 +3660,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               }
               size="small"
               icon="zap"
-              className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
+              className="!rounded-full !px-3 !py-1.5 !text-xs !font-medium !bg-black/40 !backdrop-blur-2xl !border !border-white/10 !text-white/60 hover:!text-white/90 hover:!border-white/30 !transition-all !shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
               Vídeos ({generatedVideosCount}/{scenes.length})
             </Button>
@@ -3671,10 +3671,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                   disabled={isGeneratingAll || isMerging}
                   size="small"
                   icon={hasSavedSession ? "play" : "edit"}
-                  className={`!rounded-md !px-2.5 !py-1.5 !text-[9px] !border hover:!text-white/70 ${hasSavedSession
-                    ? "!bg-primary/10 !text-primary/80 !border-primary/20 hover:!bg-primary/20"
-                    : "!bg-transparent !text-white/40 !border-white/[0.06] hover:!bg-white/[0.03]"
-                    }`}
+                  className="!rounded-full !px-3 !py-1.5 !text-xs !font-medium !bg-black/40 !backdrop-blur-2xl !border !border-white/10 !text-white/60 hover:!text-white/90 hover:!border-white/30 !transition-all !shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
                   title={
                     hasSavedSession
                       ? "Continuar edição salva"
@@ -3689,7 +3686,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                     disabled={isGeneratingAll || isMerging}
                     size="small"
                     icon="plus"
-                    className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
+                    className="!rounded-full !px-3 !py-1.5 !text-xs !font-medium !bg-black/40 !backdrop-blur-2xl !border !border-white/10 !text-white/60 hover:!text-white/90 hover:!border-white/30 !transition-all !shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
                     title="Descartar edição salva e começar do zero"
                   >
                     Novo
@@ -3705,7 +3702,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               isLoading={isMerging}
               size="small"
               icon="video"
-              className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
+              className="!rounded-full !px-3 !py-1.5 !text-xs !font-medium !bg-black/40 !backdrop-blur-2xl !border !border-white/10 !text-white/60 hover:!text-white/90 hover:!border-white/30 !transition-all !shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
               Juntar ({generatedVideosCount})
             </Button>
@@ -3728,7 +3725,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                 disabled={isGeneratingAll}
                 size="small"
                 icon="refresh"
-                className="!rounded-md !px-2.5 !py-1.5 !text-[9px] !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
+                className="!rounded-full !px-3 !py-1.5 !text-xs !font-medium !bg-black/40 !backdrop-blur-2xl !border !border-white/10 !text-white/60 hover:!text-white/90 hover:!border-white/30 !transition-all !shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
                 title="Regenerar todos os vídeos com o modelo selecionado"
               >
                 Regenerar
@@ -4596,14 +4593,22 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                         </div>
                       </>
                     ) : (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-3">
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-2">
                         <Icon
                           name="image"
-                          className="w-6 h-6 text-white/10 mb-2"
+                          className="w-6 h-6 text-white/15 mb-1"
                         />
-                        <p className="text-[8px] text-white/20 text-center italic line-clamp-3">
-                          "{clip.image_prompt}"
-                        </p>
+                        <span className="text-[8px] text-white/20 uppercase tracking-wide font-medium">
+                          Capa
+                        </span>
+                        <span className="text-[7px] text-white/15 mb-2">
+                          Conteúdo ainda não gerado
+                        </span>
+                        <div className="w-full px-2">
+                          <p className="text-[7px] text-white/30 text-center leading-relaxed line-clamp-4 italic">
+                            Prompt: "{clip.image_prompt}"
+                          </p>
+                        </div>
                       </div>
                     )}
                     {/* Thumbnail Badge */}
@@ -4897,14 +4902,22 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
                             {/* Empty state - no image or video */}
                             {!hasImage && !hasVideo && (
-                              <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
+                              <div className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-2">
                                 <Icon
                                   name="image"
-                                  className="w-6 h-6 text-white/10 mb-1"
+                                  className="w-6 h-6 text-white/15 mb-1"
                                 />
-                                <p className="text-[7px] text-white/20 text-center line-clamp-3">
-                                  {scene.visual}
-                                </p>
+                                <span className="text-[8px] text-white/20 uppercase tracking-wide font-medium">
+                                  Cena {scene.sceneNumber}
+                                </span>
+                                <span className="text-[7px] text-white/15 mb-2">
+                                  Conteúdo ainda não gerado
+                                </span>
+                                <div className="w-full px-2">
+                                  <p className="text-[7px] text-white/30 text-center leading-relaxed line-clamp-4 italic">
+                                    Prompt: "{scene.visual}"
+                                  </p>
+                                </div>
                               </div>
                             )}
 

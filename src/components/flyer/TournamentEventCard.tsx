@@ -251,7 +251,8 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
   const gtdVal = formatCurrencyValue(event.gtd, currency);
 
   return (
-    <Card className="overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+    <>
+      <Card className="overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
       {/* Header */}
       <div
         className="flex items-center justify-between p-3 bg-black/20 border-b border-white/10 cursor-pointer hover:bg-white/5 transition-all"
@@ -334,8 +335,9 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
           />
         </div>
       )}
+      </Card>
 
-      {/* Modals */}
+      {/* Modals - Renderizados fora do Card para evitar problema de overflow */}
       {editingFlyer && (
         <ImagePreviewModal
           image={editingFlyer}
@@ -381,6 +383,6 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
           initialCaption={`Torneio: ${event.name}\n🚀 GTD: ${gtdVal}\n💰 Buy-in: ${biVal}\n⏰ Início: ${event.times?.['-3']}`}
         />
       )}
-    </Card>
+    </>
   );
 };

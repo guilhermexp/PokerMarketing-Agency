@@ -100,7 +100,7 @@ const ChatBubble: React.FC<{ message: any; onApprove?: (id: string) => void; onD
             {fileParts.map((file: any, idx: number) => (
               <div
                 key={idx}
-                className="relative rounded-xl overflow-hidden border border-white/10 bg-black/20 animate-fade-in-up"
+                className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/20 animate-fade-in-up"
               >
                 <img
                   src={file.url}
@@ -134,7 +134,7 @@ const ChatBubble: React.FC<{ message: any; onApprove?: (id: string) => void; onD
             className={`${
               isAssistant
                 ? 'px-1 text-white/90'
-                : 'bg-[#1a1a1a] rounded-2xl px-5 py-3.5 text-white/95'
+                : 'bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] rounded-2xl px-5 py-3.5 text-white/95'
             }`}
           >
             <MessageResponse className="text-[13px] leading-relaxed prose prose-invert">
@@ -522,7 +522,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
     <DataStreamProvider dataStream={dataStream} setDataStream={setDataStream}>
       <DataStreamHandler />
 
-      <aside className="w-full sm:w-[380px] h-full bg-[#080808] border-l border-white/10 flex flex-col flex-shrink-0">
+      <aside className="w-full sm:w-[380px] h-full bg-[#0a0a0a]/95 backdrop-blur-xl border-l border-white/[0.08] flex flex-col flex-shrink-0">
         {/* Header minimalista */}
         <div className="flex-shrink-0 h-14 flex items-center justify-between px-4">
           <img src="/icon.png" alt="Socialab" className="w-9 h-9 rounded-xl" />
@@ -569,6 +569,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
           {shouldShowLoading && (
             <LoadingIndicatorEnhanced
               stage={isSending ? 'thinking' : 'generating'}
+              showSkeleton={false}
             />
           )}
           <div ref={chatEndRef} />
@@ -581,7 +582,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
               <img
                 src={referenceImage.src}
                 alt="Reference"
-                className="w-10 h-10 object-cover rounded-md border border-white/10"
+                className="w-10 h-10 object-cover rounded-md border border-white/[0.08]"
               />
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-medium text-primary">
@@ -611,7 +612,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
             />
 
             <div
-              className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden focus-within:border-white/20 transition-colors relative"
+              className="bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] rounded-xl overflow-hidden focus-within:border-white/30 transition-colors relative"
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}

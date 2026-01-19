@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useResponsive } from 'antd-style';
 import { X } from 'lucide-react';
 import { ImagePreviewToolbar } from './ImagePreviewToolbar';
@@ -267,7 +268,7 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
 
   if (!visible) return null;
 
-  return (
+  return createPortal(
     <div className="image-preview-overlay">
       {/* Backdrop */}
       <div className="overlay-mask" onClick={onClose} />
@@ -369,6 +370,7 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
           onCancel={handleCropCancel}
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 };

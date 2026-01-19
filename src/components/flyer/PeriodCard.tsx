@@ -326,9 +326,10 @@ export const PeriodCard: React.FC<{
         }, [triggerBatch, events.length, handleGenerate]);
 
         return (
-            <div
-                className={`bg-[#0a0a0a] border rounded-xl overflow-hidden flex flex-col h-full transition-all ${styleReference ? "border-primary/20" : "border-white/[0.05]"}`}
-            >
+            <>
+                <div
+                    className={`bg-[#0a0a0a] border rounded-xl overflow-hidden flex flex-col h-full transition-all ${styleReference ? "border-primary/20" : "border-white/[0.05]"}`}
+                >
                 <div className="px-4 py-2.5 flex justify-between items-center">
                     <div className="text-left flex items-center gap-2">
                         {styleReference && (
@@ -404,54 +405,57 @@ export const PeriodCard: React.FC<{
                         emptyDescription='Clique em "Gerar" para criar um flyer.'
                     />
                 </div>
-                {editingFlyer && (
-                    <ImagePreviewModal
-                        image={editingFlyer}
-                        onClose={() => setEditingFlyer(null)}
-                        onImageUpdate={(src) => {
-                            onUpdateGalleryImage(editingFlyer.id, src);
-                            setGeneratedFlyers((prev) =>
-                                prev.map((f) =>
-                                    f !== "loading" && f.id === editingFlyer.id ? { ...f, src } : f,
-                                ),
-                            );
-                        }}
-                        onSetChatReference={onSetChatReference}
-                        onQuickPost={setQuickPostFlyer}
-                        onPublish={(f) =>
-                            onPublishToCampaign(`Campanha para grade ${label}`, f)
-                        }
-                        onCloneStyle={onCloneStyle}
-                        downloadFilename={`period-${period}.png`}
-                    />
-                )}
-                {quickPostFlyer && (
-                    <QuickPostModal
-                        isOpen={!!quickPostFlyer}
-                        onClose={() => setQuickPostFlyer(null)}
-                        image={quickPostFlyer}
-                        brandProfile={brandProfile}
-                        context={`Sessão: ${label}. Grade:\n${events.map((e) => e.name).join(", ")}`}
-                        instagramContext={instagramContext}
-                    />
-                )}
-                {scheduleFlyer && onSchedulePost && (
-                    <SchedulePostModal
-                        isOpen={!!scheduleFlyer}
-                        onClose={() => setScheduleFlyer(null)}
-                        galleryImages={galleryImages}
-                        onSchedule={(post) => {
-                            onSchedulePost(post);
-                            // Mark as scheduled
-                            if (scheduleFlyer?.src) {
-                                setScheduledUrls((prev) => new Set(prev).add(scheduleFlyer.src));
-                            }
-                        }}
-                        initialImage={scheduleFlyer}
-                        initialDate={scheduleDate}
-                        initialTime={getInitialTimeForPeriod(period)}
-                    />
-                )}
             </div>
+
+            {/* Modals - Renderizados fora da div principal para evitar problema de overflow */}
+            {editingFlyer && (
+                <ImagePreviewModal
+                    image={editingFlyer}
+                    onClose={() => setEditingFlyer(null)}
+                    onImageUpdate={(src) => {
+                        onUpdateGalleryImage(editingFlyer.id, src);
+                        setGeneratedFlyers((prev) =>
+                            prev.map((f) =>
+                                f !== "loading" && f.id === editingFlyer.id ? { ...f, src } : f,
+                            ),
+                        );
+                    }}
+                    onSetChatReference={onSetChatReference}
+                    onQuickPost={setQuickPostFlyer}
+                    onPublish={(f) =>
+                        onPublishToCampaign(`Campanha para grade ${label}`, f)
+                    }
+                    onCloneStyle={onCloneStyle}
+                    downloadFilename={`period-${period}.png`}
+                />
+            )}
+            {quickPostFlyer && (
+                <QuickPostModal
+                    isOpen={!!quickPostFlyer}
+                    onClose={() => setQuickPostFlyer(null)}
+                    image={quickPostFlyer}
+                    brandProfile={brandProfile}
+                    context={`Sessão: ${label}. Grade:\n${events.map((e) => e.name).join(", ")}`}
+                    instagramContext={instagramContext}
+                />
+            )}
+            {scheduleFlyer && onSchedulePost && (
+                <SchedulePostModal
+                    isOpen={!!scheduleFlyer}
+                    onClose={() => setScheduleFlyer(null)}
+                    galleryImages={galleryImages}
+                    onSchedule={(post) => {
+                        onSchedulePost(post);
+                        // Mark as scheduled
+                        if (scheduleFlyer?.src) {
+                            setScheduledUrls((prev) => new Set(prev).add(scheduleFlyer.src));
+                        }
+                    }}
+                    initialImage={scheduleFlyer}
+                    initialDate={scheduleDate}
+                    initialTime={getInitialTimeForPeriod(period)}
+                />
+            )}
+        </>
         );
     };

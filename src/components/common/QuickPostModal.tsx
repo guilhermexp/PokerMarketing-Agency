@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { GalleryImage, BrandProfile, Post } from '../../types';
 import { generateQuickPostText } from '../../services/geminiService';
 import { publishToInstagram, type InstagramContentType, type PublishProgress, type InstagramContext } from '../../services/rubeService';
@@ -193,7 +194,7 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
         image.src?.includes('video') ||
         image.source?.startsWith('Video-');
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl z-[300] flex items-center justify-center p-3 sm:p-4 md:p-6">
             <Card className="w-full max-w-[95vw] md:max-w-4xl lg:max-w-5xl border-white/10 bg-[#080808] overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
                 {/* Header */}
@@ -415,6 +416,7 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                     </div>
                 </div>
             </Card>
-        </div>
+        </div>,
+        document.body
     );
 };

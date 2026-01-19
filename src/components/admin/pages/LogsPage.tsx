@@ -8,6 +8,8 @@ import { useAuth } from '@clerk/clerk-react';
 import { DataTable, Column } from '../common/DataTable';
 import { Pagination } from '../common/Pagination';
 import { SearchInput } from '../common/SearchInput';
+import { LogDetailModal } from '../modals/LogDetailModal';
+import { useAiSuggestions } from '../../../hooks/useAiSuggestions';
 
 interface ActivityLog {
   id: string;
@@ -42,6 +44,29 @@ interface PaginationInfo {
   totalPages: number;
 }
 
+interface LogDetail {
+  id: string;
+  request_id: string | null;
+  user_id: string | null;
+  organization_id: string | null;
+  endpoint: string | null;
+  operation: string | null;
+  provider: string | null;
+  model_id: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  image_count: number | null;
+  image_size: string | null;
+  video_duration_seconds: number | null;
+  estimated_cost_cents: number | null;
+  latency_ms: number | null;
+  status: string;
+  error_message: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const severityColors = {
@@ -69,6 +94,22 @@ export function LogsPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Modal states
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const [selectedLog, setSelectedLog] = useState<LogDetail | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+  // AI Suggestions hook
+  const {
+    suggestions,
+    isLoading: isLoadingSuggestions,
+    error: suggestionsError,
+    isCached,
+    fetchSuggestions,
+    reset: resetSuggestions,
+  } = useAiSuggestions(selectedLogId);
 
   const fetchLogs = useCallback(async (page: number, currentFilters: typeof filters) => {
     try {
@@ -107,6 +148,43 @@ export function LogsPage() {
   useEffect(() => {
     fetchLogs(pagination.page, filters);
   }, [fetchLogs, pagination.page, filters]);
+
+  // Fetch log details
+  const fetchLogDetails = useCallback(async (logId: string) => {
+    try {
+      setIsLoadingDetails(true);
+      const token = await getToken();
+
+      const res = await fetch(`${API_BASE}/api/admin/logs/${logId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) throw new Error('Falha ao carregar detalhes do log');
+
+      const data = await res.json();
+      setSelectedLog(data);
+      setIsModalOpen(true);
+    } catch (err) {
+      console.error('Error fetching log details:', err);
+      setError(err instanceof Error ? err.message : 'Falha ao carregar detalhes do log');
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  }, [getToken]);
+
+  // Handle row click
+  const handleRowClick = useCallback((log: ActivityLog) => {
+    setSelectedLogId(log.id);
+    fetchLogDetails(log.id);
+  }, [fetchLogDetails]);
+
+  // Handle modal close
+  const handleCloseModal = useCallback(() => {
+    setIsModalOpen(false);
+    setSelectedLog(null);
+    setSelectedLogId(null);
+    resetSuggestions();
+  }, [resetSuggestions]);
 
   const handleSearch = useCallback((value: string) => {
     setFilters((prev) => ({ ...prev, action: value }));
@@ -325,6 +403,7 @@ export function LogsPage() {
         data={logs}
         isLoading={isLoading}
         emptyMessage="Nenhum log encontrado"
+        onRowClick={handleRowClick}
       />
 
       {/* Pagination */}
@@ -339,6 +418,26 @@ export function LogsPage() {
           />
         </div>
       )}
+
+      {/* Loading Details Indicator */}
+      {isLoadingDetails && (
+        <div className="fixed bottom-4 right-4 bg-white/[0.05] border border-white/[0.1] rounded-lg px-4 py-3 flex items-center gap-3 shadow-xl backdrop-blur-sm z-50">
+          <div className="w-4 h-4 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+          <span className="text-[12px] text-white/70">Carregando detalhes...</span>
+        </div>
+      )}
+
+      {/* Log Detail Modal */}
+      <LogDetailModal
+        log={selectedLog}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onGenerateSuggestions={fetchSuggestions}
+        suggestions={suggestions}
+        isLoadingSuggestions={isLoadingSuggestions}
+        suggestionsError={suggestionsError}
+        isCached={isCached}
+      />
     </div>
   );
 }
