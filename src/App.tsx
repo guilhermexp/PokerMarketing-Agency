@@ -913,6 +913,18 @@ function AppContent() {
       return;
     }
 
+    // Validate required fields before attempting to create
+    if (!post.imageUrl || !post.scheduledDate || !post.scheduledTime || !post.platforms) {
+      console.error("Cannot schedule post: missing required fields", {
+        hasImageUrl: !!post.imageUrl,
+        hasScheduledDate: !!post.scheduledDate,
+        hasScheduledTime: !!post.scheduledTime,
+        hasPlatforms: !!post.platforms,
+      });
+      alert("Erro ao agendar: campos obrigatórios ausentes. Por favor, tente novamente.");
+      return;
+    }
+
     // Check if this is "publish now" (scheduled within 1 minute of now)
     const isPublishNow = post.scheduledTimestamp <= Date.now() + 60000;
 

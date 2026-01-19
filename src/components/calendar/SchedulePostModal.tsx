@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { ScheduledPost, GalleryImage, SchedulingPlatform, InstagramContentType } from '../../types';
 import { Icon } from '../common/Icon';
 import { CampaignAccordion, type CampaignWithImages } from './CampaignAccordion';
@@ -260,7 +261,16 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   };
 
   const handleSubmit = () => {
-    if (selectedImages.length === 0) return;
+    if (selectedImages.length === 0) {
+      alert('Por favor, selecione pelo menos uma imagem antes de agendar.');
+      return;
+    }
+
+    // Validate that we have a valid image URL
+    if (!selectedImage?.src) {
+      alert('Erro: imagem selecionada inválida. Por favor, selecione outra imagem.');
+      return;
+    }
 
     const hashtagsArray = hashtags
       .split(/[\s,]+/)
@@ -272,7 +282,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
     const scheduledTimestamp = publishNow ? Date.now() : new Date(`${finalDate}T${finalTime}`).getTime();
 
     // Don't send temporary IDs (they start with "temp-") - send empty string instead
-    const imageId = selectedImage?.id || '';
+    const imageId = selectedImage.id || '';
     const validContentId = imageId.startsWith('temp-') ? '' : imageId;
 
     // Collect all carousel image URLs in order
@@ -281,10 +291,10 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       : undefined;
 
     onSchedule({
-      type: selectedImage?.source === 'Post' ? 'campaign_post' :
-            selectedImage?.source === 'Anúncio' ? 'ad_creative' : 'flyer',
+      type: selectedImage.source === 'Post' ? 'campaign_post' :
+            selectedImage.source === 'Anúncio' ? 'ad_creative' : 'flyer',
       contentId: validContentId,
-      imageUrl: selectedImage?.src || '',
+      imageUrl: selectedImage.src,
       carouselImageUrls: carouselUrls,
       caption,
       hashtags: hashtagsArray,
@@ -310,7 +320,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
     return 'aspect-square';
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-4 md:p-8"
       onClick={onClose}
@@ -971,6 +981,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
