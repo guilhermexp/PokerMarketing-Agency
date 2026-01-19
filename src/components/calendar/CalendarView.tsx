@@ -515,50 +515,45 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {/* Day View Dialog - Shows all posts for a specific day */}
       {dayViewDialogOpen && selectedDayDate && (
         <div
-          className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4"
           onClick={() => setDayViewDialogOpen(false)}
         >
           <div
-            className="bg-gradient-to-b from-black/80 to-black/60 backdrop-blur-3xl border border-white/20 rounded-3xl w-full max-w-3xl max-h-[88vh] overflow-hidden shadow-[0_40px_120px_rgba(0,0,0,0.9)]"
+            className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header - Enhanced */}
-            <div className="relative px-6 py-5 border-b border-white/10 bg-gradient-to-r from-primary/5 to-transparent">
+            {/* Modal Header - Minimalist */}
+            <div className="px-6 py-4 border-b border-white/10">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex flex-col items-center justify-center shadow-lg shadow-primary/10">
-                    <span className="text-2xl font-light text-white">
+                  <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 flex flex-col items-center justify-center">
+                    <span className="text-xl font-light text-white">
                       {new Date(selectedDayDate).getDate()}
                     </span>
-                    <span className="text-[8px] font-bold uppercase tracking-wider text-primary/80">
+                    <span className="text-[9px] text-white/40 uppercase">
                       {new Date(selectedDayDate).toLocaleDateString("pt-BR", { month: "short" })}
                     </span>
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white capitalize">
+                    <h3 className="text-base font-semibold text-white capitalize">
                       {new Date(selectedDayDate).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
                     </h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                        <span className="text-xs font-medium text-white/70">
-                          {scheduledPosts.filter((p) => p.scheduledDate === selectedDayDate).length} posts
-                        </span>
-                      </div>
-                    </div>
+                    <p className="text-xs text-white/50 mt-0.5">
+                      {scheduledPosts.filter((p) => p.scheduledDate === selectedDayDate).length} posts agendados
+                    </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setDayViewDialogOpen(false)}
-                  className="p-2.5 text-white/40 hover:text-white/90 transition-all rounded-xl hover:bg-white/10 hover:scale-110"
+                  className="p-2 text-white/40 hover:text-white transition-colors rounded-lg hover:bg-white/10"
                 >
-                  <Icon name="x" className="w-5 h-5" />
+                  <Icon name="x" className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* Modal Content - List of all posts with enhanced design */}
-            <div className="px-6 py-5 overflow-y-auto max-h-[60vh] scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+            {/* Modal Content - List of all posts - Minimalist */}
+            <div className="px-5 py-4 overflow-y-auto max-h-[65vh]">
               <div className="space-y-3">
                 {scheduledPosts
                   .filter((post) => post.scheduledDate === selectedDayDate)
@@ -577,88 +572,65 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     return (
                       <div
                         key={post.id}
-                        className="group relative flex items-start gap-5 p-4 rounded-2xl bg-gradient-to-br from-white/[0.03] to-black/40 border border-white/10 hover:border-white/20 hover:from-white/[0.05] hover:to-black/30 transition-all duration-300 hover:shadow-xl hover:shadow-black/50"
+                        className="group flex items-center gap-4 p-3 rounded-xl bg-black/20 border border-white/10 hover:bg-black/30 hover:border-white/20 transition-all"
                       >
-                        {/* Thumbnail - Larger and more prominent */}
+                        {/* Thumbnail */}
                         <div
                           onClick={() => {
                             setDayViewDialogOpen(false);
                             handlePostClick(post);
                           }}
-                          className="cursor-pointer group/thumb relative"
+                          className="cursor-pointer"
                         >
                           {post.imageUrl ? (
-                            <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-black/60 border-2 border-white/10 group-hover/thumb:border-primary/40 transition-all duration-300 group-hover/thumb:scale-105 group-hover/thumb:shadow-lg group-hover/thumb:shadow-primary/20">
+                            <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-black/40 border border-white/10 hover:border-white/30 transition-colors">
                               <img
                                 src={post.imageUrl}
                                 alt=""
-                                className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-500"
+                                className="w-full h-full object-cover"
                               />
-                              {/* Overlay on hover */}
-                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
-                                <Icon name="maximize-2" className="w-5 h-5 text-white" />
-                              </div>
                             </div>
                           ) : (
-                            <div className="w-24 h-24 rounded-xl bg-black/60 flex items-center justify-center flex-shrink-0 border-2 border-white/10 group-hover/thumb:border-white/30 transition-colors">
-                              <Icon name="image" className="w-8 h-8 text-white/20" />
+                            <div className="w-20 h-20 rounded-lg bg-black/40 flex items-center justify-center flex-shrink-0 border border-white/10 hover:border-white/30 transition-colors">
+                              <Icon name="image" className="w-6 h-6 text-white/20" />
                             </div>
                           )}
                         </div>
 
-                        {/* Content */}
-                        <div className="flex-1 min-w-0 space-y-2.5">
-                          {/* Time - More prominent */}
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-lg">
-                              <Icon name="clock" className="w-3.5 h-3.5 text-primary" />
-                              <span className="text-base font-bold text-white">
-                                {post.scheduledTime}
-                              </span>
-                            </div>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-sm font-semibold text-white">
+                              {post.scheduledTime}
+                            </span>
                             {typeLabel && (
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-white/60 px-2.5 py-1 bg-white/5 border border-white/10 rounded-md">
+                              <span className="text-[9px] font-medium text-white/50 px-2 py-0.5 bg-black/40 border border-white/10 rounded-full">
                                 {typeLabel}
                               </span>
                             )}
-                          </div>
-
-                          {/* Status badges - Enhanced */}
-                          <div className="flex items-center gap-2">
                             {post.status === "published" && (
-                              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/15 border border-emerald-500/30 rounded-lg">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-400">
-                                  Publicado
-                                </span>
-                              </div>
+                              <span className="text-[9px] font-medium text-white/60 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
+                                Publicado
+                              </span>
                             )}
                             {post.status === "failed" && (
-                              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-500/15 border border-red-500/30 rounded-lg">
-                                <Icon name="alert-circle" className="w-3 h-3 text-red-400" />
-                                <span className="text-[10px] font-bold uppercase tracking-wide text-red-400">
-                                  Falhou
-                                </span>
-                              </div>
+                              <span className="text-[9px] font-medium text-white/60 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
+                                Falhou
+                              </span>
                             )}
                             {post.status === "scheduled" && (
-                              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/15 border border-amber-500/30 rounded-lg">
-                                <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-400">
-                                  Agendado
-                                </span>
-                              </div>
+                              <span className="text-[9px] font-medium text-white/60 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
+                                Agendado
+                              </span>
                             )}
                           </div>
-
-                          {/* Caption - Better readability */}
-                          <p className="text-sm text-white/70 line-clamp-1 leading-relaxed">
-                            {post.caption || <span className="italic text-white/40">Sem legenda</span>}
+                          <p className="text-xs text-white/50 line-clamp-2">
+                            {post.caption || "Sem legenda"}
                           </p>
                         </div>
 
-                        {/* Actions - More visible and organized */}
-                        <div className="flex flex-col gap-1.5">
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {post.status === "scheduled" && (
                             <>
                               {onPublishToInstagram && (
@@ -667,7 +639,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     onPublishToInstagram(post);
                                     setDayViewDialogOpen(false);
                                   }}
-                                  className="group/btn p-2.5 text-white/50 hover:text-white bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/40 rounded-xl transition-all duration-200 hover:scale-110 hover:shadow-lg hover:shadow-primary/20"
+                                  className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                                   title="Publicar agora"
                                 >
                                   <Icon name="send" className="w-4 h-4" />
@@ -681,7 +653,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                   setDayViewDialogOpen(false);
                                   setIsScheduleModalOpen(true);
                                 }}
-                                className="group/btn p-2.5 text-white/50 hover:text-white bg-white/5 hover:bg-blue-500/20 border border-white/10 hover:border-blue-500/40 rounded-xl transition-all duration-200 hover:scale-110"
+                                className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                                 title="Editar"
                               >
                                 <Icon name="edit" className="w-4 h-4" />
@@ -693,7 +665,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     publishedAt: Date.now(),
                                   });
                                 }}
-                                className="group/btn p-2.5 text-white/50 hover:text-emerald-400 bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/40 rounded-xl transition-all duration-200 hover:scale-110"
+                                className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                                 title="Marcar como publicado"
                               >
                                 <Icon name="check" className="w-4 h-4" />
@@ -702,7 +674,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           )}
                           <button
                             onClick={() => onDeleteScheduledPost(post.id)}
-                            className="group/btn p-2.5 text-white/50 hover:text-red-400 bg-white/5 hover:bg-red-500/20 border border-white/10 hover:border-red-500/40 rounded-xl transition-all duration-200 hover:scale-110"
+                            className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                             title="Excluir"
                           >
                             <Icon name="trash" className="w-4 h-4" />
@@ -714,17 +686,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </div>
             </div>
 
-            {/* Modal Footer - Enhanced */}
-            <div className="px-6 py-5 border-t border-white/10 bg-gradient-to-t from-black/60 to-transparent">
+            {/* Modal Footer */}
+            <div className="px-5 pb-4 pt-3 border-t border-white/10">
               <button
                 onClick={() => {
                   setDayViewDialogOpen(false);
                   handleDayClick(selectedDayDate);
                 }}
-                className="group w-full flex items-center justify-center gap-2.5 py-3.5 text-sm font-bold text-white bg-gradient-to-r from-primary/20 to-primary/10 hover:from-primary/30 hover:to-primary/20 border-2 border-primary/30 hover:border-primary/50 rounded-2xl transition-all duration-300 shadow-lg shadow-primary/10 hover:shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white/90 bg-black/40 backdrop-blur-2xl border border-white/10 hover:border-white/30 rounded-full transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
               >
-                <Icon name="plus" className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-                <span className="uppercase tracking-wide">Novo Agendamento</span>
+                <Icon name="plus" className="w-4 h-4" />
+                Novo Agendamento
               </button>
             </div>
           </div>
