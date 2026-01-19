@@ -852,15 +852,17 @@ app.post("/api/admin/logs/:id/ai-suggestions", requireSuperAdmin, async (req, re
 
 Formate em markdown claro com seções.`;
 
-    // Call Gemini API
+    // Call Gemini API with retry logic
     const gemini = getGeminiAi();
-    const result = await gemini.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: [{
-        role: 'user',
-        parts: [{ text: prompt }]
-      }]
-    });
+    const result = await withRetry(() =>
+      gemini.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: [{
+          role: 'user',
+          parts: [{ text: prompt }]
+        }]
+      })
+    );
 
     const suggestions = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || 'Não foi possível gerar sugestões.';
 
@@ -3044,6 +3046,46 @@ app.get("/api/generate/status", async (req, res) => {
   }
 });
 
+// Cancel all pending/queued jobs for a user
+app.post("/api/generate/cancel-all", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
+    const resolvedUserId = await resolveUserId(sql, userId);
+    if (!resolvedUserId) {
+      return res.status(400).json({ error: "User not found" });
+    }
+
+    // Update all pending and queued jobs to cancelled status
+    const result = await sql`
+      UPDATE generation_jobs
+      SET
+        status = 'cancelled',
+        completed_at = NOW()
+      WHERE user_id = ${resolvedUserId}
+        AND status IN ('pending', 'queued')
+      RETURNING id
+    `;
+
+    const cancelledCount = result.length;
+
+    res.json({
+      success: true,
+      cancelledCount,
+      message: `${cancelledCount} job(s) cancelled`
+    });
+  } catch (error) {
+    logError("Cancel All Jobs API", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================================
 // ORGANIZATIONS API - Managed by Clerk
 // Organization CRUD, members, roles, and invites are now handled by Clerk
@@ -3332,15 +3374,17 @@ const generateStructuredContent = async (
 ) => {
   const ai = getGeminiAi();
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: { parts },
-    config: {
-      responseMimeType: "application/json",
-      responseSchema,
-      temperature,
-    },
-  });
+  const response = await withRetry(() =>
+    ai.models.generateContent({
+      model,
+      contents: { parts },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature,
+      },
+    })
+  );
 
   return response.text.trim();
 };
@@ -3508,19 +3552,21 @@ const convertImagePromptToJson = async (
     const ai = getGeminiAi();
     const systemPrompt = getImagePromptSystemPrompt(aspectRatio);
 
-    const response = await ai.models.generateContent({
-      model: DEFAULT_FAST_TEXT_MODEL,
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: `${systemPrompt}\n\nPROMPT: ${prompt}` }],
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: DEFAULT_FAST_TEXT_MODEL,
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `${systemPrompt}\n\nPROMPT: ${prompt}` }],
+          },
+        ],
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.2,
         },
-      ],
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.2,
-      },
-    });
+      })
+    );
 
     const text = response.text?.trim() || "";
     let parsed = null;
@@ -4163,16 +4209,18 @@ app.post("/api/ai/flyer", async (req, res) => {
       });
     }
 
-    const response = await ai.models.generateContent({
-      model: DEFAULT_IMAGE_MODEL,
-      contents: { parts },
-      config: {
-        imageConfig: {
-          aspectRatio: mapAspectRatio(aspectRatio),
-          imageSize,
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: DEFAULT_IMAGE_MODEL,
+        contents: { parts },
+        config: {
+          imageConfig: {
+            aspectRatio: mapAspectRatio(aspectRatio),
+            imageSize,
+          },
         },
-      },
-    });
+      })
+    );
 
     let imageDataUrl = null;
     for (const part of response.candidates[0].content.parts) {
@@ -4361,19 +4409,21 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
     const ai = getGeminiAi();
     const systemPrompt = getVideoPromptSystemPrompt(duration, aspectRatio);
 
-    const response = await ai.models.generateContent({
-      model: DEFAULT_FAST_TEXT_MODEL,
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: systemPrompt + "\n\nPrompt: " + prompt }],
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: DEFAULT_FAST_TEXT_MODEL,
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: systemPrompt + "\n\nPrompt: " + prompt }],
+          },
+        ],
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.7,
         },
-      ],
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.7,
-      },
-    });
+      })
+    );
 
     const text = response.text?.trim() || "";
 
@@ -4870,12 +4920,13 @@ app.post("/api/ai/extract-colors", async (req, res) => {
       required: ["primaryColor"],
     };
 
-    const response = await ai.models.generateContent({
-      model: DEFAULT_TEXT_MODEL,
-      contents: {
-        parts: [
-          {
-            text: `Analise este logo e extraia APENAS as cores que REALMENTE existem na imagem visível.
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: DEFAULT_TEXT_MODEL,
+        contents: {
+          parts: [
+            {
+              text: `Analise este logo e extraia APENAS as cores que REALMENTE existem na imagem visível.
 
 REGRAS IMPORTANTES:
 - Extraia somente cores que você pode ver nos pixels da imagem
@@ -4890,15 +4941,16 @@ PRIORIDADE DAS CORES:
 - tertiaryColor: Uma terceira cor de destaque/acento (se existir), ou null
 
 Retorne as cores em formato hexadecimal (#RRGGBB).`,
-          },
-          { inlineData: { mimeType: logo.mimeType, data: logo.base64 } },
-        ],
-      },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: colorSchema,
-      },
-    });
+            },
+            { inlineData: { mimeType: logo.mimeType, data: logo.base64 } },
+          ],
+        },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: colorSchema,
+        },
+      })
+    );
 
     const colors = JSON.parse(response.text.trim());
 
@@ -4953,16 +5005,18 @@ app.post("/api/ai/speech", async (req, res) => {
 
     const ai = getGeminiAi();
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: script }] }],
-      config: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName } },
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text: script }] }],
+        config: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName } },
+          },
         },
-      },
-    });
+      })
+    );
 
     const audioBase64 =
       response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
