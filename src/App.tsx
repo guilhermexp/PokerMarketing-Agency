@@ -283,7 +283,9 @@ function AppContent() {
   const contextRef = useRef({ userId, organizationId });
   const hasInitialDataLoadedOnce = useRef(false);
 
-  const initialDataUserId = dbUser?.id || null;
+  // Use clerkUserId as fallback to start loading data in parallel with DB sync
+  // This prevents infinite loading when dbUser is still being synced
+  const initialDataUserId = dbUser?.id || clerkUserId || null;
 
   // === OPTIMIZED: Single request to load ALL initial data ===
   const { data: initialData, isLoading: isInitialLoading } = useInitialData(
@@ -2012,7 +2014,6 @@ function AppContent() {
 
   if (
     authLoading ||
-    isDbSyncing ||
     isInitialLoading ||
     !orgLoaded ||
     isBrandProfilePending ||

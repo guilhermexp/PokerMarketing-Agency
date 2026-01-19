@@ -3,6 +3,8 @@
  * Provides typed methods for all database entities
  */
 
+import { getAuthToken } from "./authService";
+
 const API_BASE = "/api/db";
 
 // ============================================================================
@@ -32,9 +34,12 @@ export interface InitialData {
 export async function getInitialData(
   userId: string,
   organizationId?: string | null,
+  clerkUserId?: string,
 ): Promise<InitialData> {
   const params = new URLSearchParams({ user_id: userId });
   if (organizationId) params.append("organization_id", organizationId);
+  // clerkUserId is used for parallel data loading during DB sync but not needed in API call
+  // since authentication is handled via Clerk token in headers
 
   console.debug("[API] Loading all initial data in single request...");
   const start = Date.now();
@@ -68,12 +73,16 @@ async function fetchApi<T>(
   const maxAttempts = canRetry ? 2 : 1;
   let lastError: unknown = null;
 
+  // Get Clerk authentication token
+  const token = await getAuthToken();
+
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
         headers: {
           "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
           ...options.headers,
         },
       });
