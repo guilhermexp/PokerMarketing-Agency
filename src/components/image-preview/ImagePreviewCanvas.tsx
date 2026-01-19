@@ -37,7 +37,7 @@ export const ImagePreviewCanvas: React.FC<ImagePreviewCanvasProps> = ({
   resizeProgress,
   filterStyle,
 }) => (
-  <div className="relative flex-1 flex flex-col items-center justify-center p-6 lg:p-10 overflow-hidden bg-[#080808] min-h-0 min-w-0">
+  <div className="relative flex-1 flex flex-col items-center justify-center p-6 lg:p-10 overflow-hidden min-h-0 min-w-0">
     <div
       className={`relative flex-1 w-full flex items-center justify-center min-h-0 min-w-0 ${isVerticalVideo ? 'max-w-[400px] mx-auto' : ''}`}
     >

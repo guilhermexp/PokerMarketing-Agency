@@ -742,7 +742,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           campaigns={campaigns}
           initialDate={selectedDate}
           initialTime={selectedTime}
-          initialCaption={selectedPostForEdit?.caption}
+          initialCaption={
+            // Only pass caption if it doesn't look like a technical AI prompt
+            selectedPostForEdit?.caption &&
+            !selectedPostForEdit.caption.includes('TIPO:') &&
+            !selectedPostForEdit.caption.includes('TORNEIO PRINCIPAL') &&
+            !selectedPostForEdit.caption.includes('ESTRUTURA') &&
+            !selectedPostForEdit.caption.includes('REGRA') &&
+            !selectedPostForEdit.caption.includes('SEÇÃO')
+              ? selectedPostForEdit.caption
+              : undefined
+          }
         />
       )}
     </div>

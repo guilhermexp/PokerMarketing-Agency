@@ -868,15 +868,19 @@ function AppContent() {
   const handleAddStyleReference = (
     ref: Omit<StyleReference, "id" | "createdAt">,
   ) => {
+    console.log("[App] handleAddStyleReference called", ref);
     const newRef: StyleReference = {
       ...ref,
       id: Date.now().toString(),
       createdAt: Date.now(),
     };
+    console.log("[App] Created newRef:", newRef);
     setStyleReferences((prev) => {
       const updated = [newRef, ...prev];
+      console.log("[App] Updated styleReferences:", updated);
       try {
         localStorage.setItem(styleRefsKey, JSON.stringify(updated));
+        console.log("[App] Saved to localStorage");
       } catch (e) {
         console.warn(
           "Não foi possível salvar no localStorage (limite excedido)",
@@ -887,10 +891,13 @@ function AppContent() {
   };
 
   const handleRemoveStyleReference = (id: string) => {
+    console.log("[App] handleRemoveStyleReference called", id);
     setStyleReferences((prev) => {
       const updated = prev.filter((r) => r.id !== id);
+      console.log("[App] Updated styleReferences:", updated);
       try {
         localStorage.setItem(styleRefsKey, JSON.stringify(updated));
+        console.log("[App] Saved to localStorage");
       } catch (e) {
         console.warn("Não foi possível salvar no localStorage");
       }

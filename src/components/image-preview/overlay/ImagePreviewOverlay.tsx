@@ -293,53 +293,43 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
 
         {/* Conteúdo principal (viewer + painel) */}
         <div className={`preview-content ${activePanel ? 'panel-open' : ''}`}>
-          {/* Canvas de imagem com edição */}
-          <ImagePreviewCanvas
-            image={props.image}
-            isVideo={props.image.src?.endsWith('.mp4') || props.image.src?.includes('video') || props.image.source?.startsWith('Video-') || false}
-            videoRef={props.videoRef || { current: null } as React.RefObject<HTMLVideoElement>}
-            isVerticalVideo={props.isVerticalVideo || false}
-            handleLoadedMetadata={props.handleLoadedMetadata || (() => {})}
-            resizedPreview={props.resizedPreview || null}
-            editPreview={props.editPreview || null}
-            originalDimensions={props.originalDimensions || { width: 0, height: 0 }}
-            isLoadingImage={props.isLoadingImage || false}
-            imageLoadError={props.imageLoadError || null}
-            imageCanvasRef={props.imageCanvasRef || { current: null } as React.RefObject<HTMLCanvasElement>}
-            maskCanvasRef={props.maskCanvasRef || { current: null } as React.RefObject<HTMLCanvasElement>}
-            protectionCanvasRef={props.protectionCanvasRef || { current: null } as React.RefObject<HTMLCanvasElement>}
-            useProtectionMask={props.useProtectionMask || false}
-            drawMode={props.drawMode || 'brush'}
-            startDrawing={props.startDrawing || (() => {})}
-            draw={props.draw || (() => {})}
-            stopDrawing={props.stopDrawing || (() => {})}
-            startProtectionDrawing={props.startProtectionDrawing || (() => {})}
-            drawProtection={props.drawProtection || (() => {})}
-            stopProtectionDrawing={props.stopProtectionDrawing || (() => {})}
-            isActionRunning={props.isActionRunning || false}
-            isResizing={props.isResizing || false}
-            resizeProgress={props.resizeProgress || 0}
-            filterStyle={props.filterStyle}
-          />
-
-          {/* Toolbar flutuante na parte inferior */}
-          <div className="preview-toolbar-bottom">
-            <ImagePreviewToolbar
-              zoom={zoom}
-              onZoomIn={handleZoomIn}
-              onZoomOut={handleZoomOut}
-              onRotateLeft={handleRotateLeft}
-              onRotateRight={handleRotateRight}
-              onDownload={handleDownload}
-              onToggleEditPanel={() => setActivePanel(activePanel === 'edit' ? null : 'edit')}
-              onToggleCrop={handleToggleCrop}
-              onSendToChat={props.onSetChatReference ? handleSendToChat : undefined}
-              editPanelOpen={editPanelOpen}
-              cropActive={cropActive}
-              imageDimensions={imageDimensions}
-              onFitToScreen={handleFitToScreen}
-              onOriginalSize={handleOriginalSize}
-              onReset={handleReset}
+          {/* Wrapper com zoom e rotação aplicados */}
+          <div
+            className="relative flex-1 flex items-center justify-center overflow-hidden"
+            style={{
+              transform: `scale(${zoom}) rotate(${rotation}deg)`,
+              transformOrigin: 'center center',
+              transition: 'transform 0.2s ease-out',
+              zIndex: 1, // Atrás do painel lateral
+            }}
+          >
+            {/* Canvas de imagem com edição */}
+            <ImagePreviewCanvas
+              image={props.image}
+              isVideo={props.image.src?.endsWith('.mp4') || props.image.src?.includes('video') || props.image.source?.startsWith('Video-') || false}
+              videoRef={props.videoRef || { current: null } as React.RefObject<HTMLVideoElement>}
+              isVerticalVideo={props.isVerticalVideo || false}
+              handleLoadedMetadata={props.handleLoadedMetadata || (() => {})}
+              resizedPreview={props.resizedPreview || null}
+              editPreview={props.editPreview || null}
+              originalDimensions={props.originalDimensions || { width: 0, height: 0 }}
+              isLoadingImage={props.isLoadingImage || false}
+              imageLoadError={props.imageLoadError || null}
+              imageCanvasRef={props.imageCanvasRef || { current: null } as React.RefObject<HTMLCanvasElement>}
+              maskCanvasRef={props.maskCanvasRef || { current: null } as React.RefObject<HTMLCanvasElement>}
+              protectionCanvasRef={props.protectionCanvasRef || { current: null } as React.RefObject<HTMLCanvasElement>}
+              useProtectionMask={props.useProtectionMask || false}
+              drawMode={props.drawMode || 'brush'}
+              startDrawing={props.startDrawing || (() => {})}
+              draw={props.draw || (() => {})}
+              stopDrawing={props.stopDrawing || (() => {})}
+              startProtectionDrawing={props.startProtectionDrawing || (() => {})}
+              drawProtection={props.drawProtection || (() => {})}
+              stopProtectionDrawing={props.stopProtectionDrawing || (() => {})}
+              isActionRunning={props.isActionRunning || false}
+              isResizing={props.isResizing || false}
+              resizeProgress={props.resizeProgress || 0}
+              filterStyle={props.filterStyle}
             />
           </div>
 
@@ -359,6 +349,27 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
               chatComponent={props.chatComponent}
             />
           )}
+        </div>
+
+        {/* Toolbar flutuante na parte inferior - FORA do preview-content */}
+        <div className="preview-toolbar-bottom">
+          <ImagePreviewToolbar
+            zoom={zoom}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onRotateLeft={handleRotateLeft}
+            onRotateRight={handleRotateRight}
+            onDownload={handleDownload}
+            onToggleEditPanel={() => setActivePanel(activePanel === 'edit' ? null : 'edit')}
+            onToggleCrop={handleToggleCrop}
+            onSendToChat={props.onSetChatReference ? handleSendToChat : undefined}
+            editPanelOpen={editPanelOpen}
+            cropActive={cropActive}
+            imageDimensions={imageDimensions}
+            onFitToScreen={handleFitToScreen}
+            onOriginalSize={handleOriginalSize}
+            onReset={handleReset}
+          />
         </div>
       </div>
 

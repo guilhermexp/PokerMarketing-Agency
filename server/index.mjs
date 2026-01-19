@@ -3062,14 +3062,11 @@ app.post("/api/generate/cancel-all", async (req, res) => {
       return res.status(400).json({ error: "User not found" });
     }
 
-    // Update all pending and queued jobs to cancelled status
+    // Delete all queued jobs (not started yet)
     const result = await sql`
-      UPDATE generation_jobs
-      SET
-        status = 'cancelled',
-        completed_at = NOW()
+      DELETE FROM generation_jobs
       WHERE user_id = ${resolvedUserId}
-        AND status IN ('pending', 'queued')
+        AND status = 'queued'
       RETURNING id
     `;
 

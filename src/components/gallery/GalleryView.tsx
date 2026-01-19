@@ -330,18 +330,24 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   };
 
   const handleToggleFavorite = (image: GalleryImage) => {
+    console.log("[GalleryView] handleToggleFavorite called", { image, styleReferences });
     const existingRef = getFavoriteRef(image);
+    console.log("[GalleryView] existingRef:", existingRef);
+
     if (existingRef) {
       // Remove from favorites
+      console.log("[GalleryView] Removing from favorites:", existingRef.id);
       onRemoveStyleReference(existingRef.id);
     } else {
       // Add to favorites
-      onAddStyleReference({
+      const newRef = {
         src: image.src,
         name:
           image.prompt.substring(0, 50) ||
           `Favorito ${new Date().toLocaleDateString("pt-BR")}`,
-      });
+      };
+      console.log("[GalleryView] Adding to favorites:", newRef);
+      onAddStyleReference(newRef);
     }
   };
 

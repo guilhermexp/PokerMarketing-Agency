@@ -107,7 +107,7 @@ export default defineConfig(({ mode }) => {
           // Add cache busting - use revision based on build time
           additionalManifestEntries: [],
           // Allow larger files to be cached (default is 2MB)
-          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+          maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10MB
           // Don't restrict navigation fallback - allow all routes
           runtimeCaching: [],
         },
