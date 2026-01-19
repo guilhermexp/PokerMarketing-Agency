@@ -457,6 +457,7 @@ export interface DbCampaign {
   clip_preview_url?: string | null;
   post_preview_url?: string | null;
   ad_preview_url?: string | null;
+  carousel_preview_url?: string | null;
   posts_breakdown?: Record<string, number>;
   ads_breakdown?: Record<string, number>;
 }

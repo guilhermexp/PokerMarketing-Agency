@@ -229,11 +229,16 @@ const CampaignCard: React.FC<{
                         className="absolute inset-0 w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                        <Icon name={item.icon} className="w-3.5 h-3.5 text-white/10" />
-                        <span className="text-[8px] text-white/30 uppercase tracking-wide">
-                          {item.label}
-                        </span>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-2">
+                        <Icon name={item.icon} className="w-4 h-4 text-white/15" />
+                        <div className="text-center">
+                          <span className="text-[8px] text-white/20 uppercase tracking-wide block">
+                            {item.label}
+                          </span>
+                          <span className="text-[7px] text-white/15 block mt-1 leading-tight">
+                            Conteúdo ainda não gerado
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>
