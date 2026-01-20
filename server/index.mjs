@@ -5,6 +5,8 @@
 
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import { neon } from "@neondatabase/serverless";
 import { put, del } from "@vercel/blob";
 import { config } from "dotenv";
@@ -33,6 +35,9 @@ import { urlToBase64 } from "./helpers/image-helpers.mjs";
 import { chatHandler } from "./api/chat/route.mjs";
 
 config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -371,6 +376,14 @@ app.use("/api/db", (req, res, next) => {
 
   next();
 });
+
+// ============================================================================
+// SERVE STATIC FILES (PRODUCTION)
+// ============================================================================
+// Serve built frontend files in production
+const distPath = path.join(__dirname, "../dist");
+console.log(`[Static] Serving static files from: ${distPath}`);
+app.use(express.static(distPath));
 
 // Health check
 
@@ -6106,6 +6119,14 @@ app.post("/api/rube", async (req, res) => {
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
+});
+
+// ============================================================================
+// SPA CATCH-ALL ROUTE (must be last!)
+// ============================================================================
+// Serve index.html for all non-API routes (SPA routing)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(distPath, "index.html"));
 });
 
 const startup = async () => {
