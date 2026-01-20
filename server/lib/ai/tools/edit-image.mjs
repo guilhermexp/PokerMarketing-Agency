@@ -27,6 +27,9 @@ const getInternalHeaders = (userId, orgId) => {
     'Content-Type': 'application/json',
   };
   const internalToken = process.env.INTERNAL_API_TOKEN;
+  if (!internalToken && process.env.NODE_ENV === 'production') {
+    throw new Error('INTERNAL_API_TOKEN não configurada para chamadas internas em produção');
+  }
   if (internalToken) {
     headers['X-Internal-Token'] = internalToken;
     headers['X-Internal-User-Id'] = userId;

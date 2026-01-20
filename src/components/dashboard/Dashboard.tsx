@@ -354,54 +354,35 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
             {/* Recent Campaigns Preview - shown below upload form */}
             {showUploadForm && campaigns.length > 0 && (
-              <div className="mt-8 sm:mt-12 flex flex-col items-center px-3 sm:px-0">
+              <div className="mt-1 sm:mt-2 flex flex-col items-center px-3 sm:px-0">
                 {/* Header with Tabs */}
-                <div className="w-full max-w-6xl mb-8">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-8">
-                      <button className="text-[15px] font-semibold text-white pb-2 border-b-2 border-white/90">
+                <div className="w-full max-w-6xl mb-0.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <button className="text-[10px] font-semibold text-white border-b border-white/90">
                         Todas
                       </button>
-                      <button className="text-[15px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors pb-2">
+                      <button className="text-[10px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors">
                         Vídeos
                       </button>
-                      <button className="text-[15px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors pb-2">
+                      <button className="text-[10px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors">
                         Posts
                       </button>
-                      <button className="text-[15px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors pb-2">
+                      <button className="text-[10px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors">
                         Ads
                       </button>
                     </div>
                     <button
                       onClick={() => onViewChange("campaigns")}
-                      className="text-sm text-zinc-400 hover:text-white transition-colors flex items-center gap-1.5 font-medium"
+                      className="text-[9px] text-zinc-400 hover:text-white transition-colors flex items-center gap-0.5 font-medium"
                     >
                       Ver todas
-                      <Icon name="arrow-right" className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Filter Tags */}
-                  <div className="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-hide">
-                    <button className="px-4 py-2 rounded-full text-sm font-medium bg-black/40 backdrop-blur-2xl border border-white/10 text-white/90 whitespace-nowrap shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-                      Todas templates
-                    </button>
-                    <button className="px-4 py-2 rounded-full text-sm font-medium bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all whitespace-nowrap shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-                      Populares
-                    </button>
-                    <button className="px-4 py-2 rounded-full text-sm font-medium bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all whitespace-nowrap shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-                      Marketing
-                    </button>
-                    <button className="px-4 py-2 rounded-full text-sm font-medium bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all whitespace-nowrap shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-                      Social Media
-                    </button>
-                    <button className="px-4 py-2 rounded-full text-sm font-medium bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all whitespace-nowrap shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-                      Promoções
+                      <Icon name="arrow-right" className="w-1.5 h-1.5" />
                     </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-6xl">
-                  {campaigns.slice(0, 3).map((camp) => {
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-6xl">
+                  {campaigns.slice(0, 6).map((camp) => {
                     const previewItems = [
                       camp.clip_preview_url ? { url: camp.clip_preview_url, type: 'clip' } : null,
                       camp.post_preview_url ? { url: camp.post_preview_url, type: 'post' } : null,

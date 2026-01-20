@@ -280,14 +280,15 @@ export const PeriodCard: React.FC<{
                         imageSize,
                         assetsToUse,
                     );
-                    const newImage = onAddImageToGallery({
+                    const newImage: GalleryImage = {
+                        id: `flyer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                         src: imageUrl,
                         prompt,
                         source: "Flyer Diário",
                         model,
                         aspectRatio,
                         imageSize,
-                    });
+                    };
                     setGeneratedFlyers((prev) =>
                         prev.map((f) => (f === "loading" ? newImage : f)),
                     );
@@ -307,7 +308,6 @@ export const PeriodCard: React.FC<{
                 aspectRatio,
                 currency,
                 styleReference,
-                onAddImageToGallery,
                 setGeneratedFlyers,
                 label,
                 collabLogo,

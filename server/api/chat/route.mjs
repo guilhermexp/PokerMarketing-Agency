@@ -26,12 +26,15 @@ const openrouter = createOpenRouter({
  */
 export async function chatHandler(req, res) {
   try {
+    const isDev = process.env.NODE_ENV !== 'production';
     // =========================================================================
     // 1. VALIDAÇÃO DO REQUEST
     // =========================================================================
 
     // DEBUG: Log do body recebido
-    console.log('[Chat API] Request body:', JSON.stringify(req.body, null, 2));
+    if (isDev) {
+      console.log('[Chat API] Request keys:', Object.keys(req.body || {}));
+    }
 
     const validation = validateChatRequest(req.body);
     if (!validation.success) {
@@ -89,13 +92,21 @@ export async function chatHandler(req, res) {
     }
 
     // =========================================================================
-    // 5. EXTRAIR REFERÊNCIA DE IMAGEM DOS PARTS (se houver)
+    // 5. SANITIZAR MENSAGENS E EXTRAIR REFERÊNCIA DE IMAGEM (se houver)
     // =========================================================================
+    const sanitizeMessage = (msg) => {
+      if (!msg?.parts) return msg;
+      const cleanedParts = msg.parts.filter((part) => part?.type !== 'tool-result');
+      return cleanedParts.length === msg.parts.length ? msg : { ...msg, parts: cleanedParts };
+    };
+
+    const sanitizedMessages = messagesToProcess.map(sanitizeMessage);
+
     let chatReferenceImage = req.body.chatReferenceImage || null;
 
     // PROCURAR IMAGEM EM TODAS AS MENSAGENS (da mais recente para a mais antiga)
     if (!chatReferenceImage) {
-      const allMessages = [...messagesToProcess].reverse(); // Mais recente primeiro
+      const allMessages = [...sanitizedMessages].reverse(); // Mais recente primeiro
       for (const msg of allMessages) {
         if (msg.role === 'user' && msg.parts) {
           const filePart = msg.parts.find(p => p.type === 'file');
@@ -174,7 +185,7 @@ export async function chatHandler(req, res) {
     // =========================================================================
 
     // Converter mensagens (é assíncrono no SDK v6)
-    const convertedMessages = await convertToModelMessages(messagesToProcess);
+    const convertedMessages = await convertToModelMessages(sanitizedMessages);
 
     const result = streamText({
       model: openrouter.chat(selectedChatModel),

@@ -33,6 +33,15 @@ import {
 } from "./helpers/usage-tracking.mjs";
 import { urlToBase64 } from "./helpers/image-helpers.mjs";
 import { chatHandler } from "./api/chat/route.mjs";
+import {
+  initializeScheduledPostsChecker,
+  schedulePostForPublishing,
+  cancelScheduledPost,
+} from "./helpers/job-queue.mjs";
+import {
+  checkAndPublishScheduledPosts,
+  publishScheduledPostById,
+} from "./helpers/scheduled-publisher.mjs";
 
 config();
 
@@ -1807,7 +1816,18 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
       RETURNING *
     `;
 
-    res.status(201).json(result[0]);
+    const newPost = result[0];
+
+    // Schedule job in BullMQ for exact-time publishing
+    try {
+      await schedulePostForPublishing(newPost.id, resolvedUserId, timestampMs);
+      console.log(`[API] Scheduled job for post ${newPost.id} at ${new Date(timestampMs).toISOString()}`);
+    } catch (error) {
+      console.error(`[API] Failed to schedule job for post ${newPost.id}:`, error.message);
+      // Don't fail the request if job scheduling fails - fallback checker will catch it
+    }
+
+    res.status(201).json(newPost);
   } catch (error) {
     if (
       error instanceof OrganizationAccessError ||
@@ -1866,7 +1886,19 @@ app.put("/api/db/scheduled-posts", async (req, res) => {
       RETURNING *
     `;
 
-    res.json(result[0]);
+    const updatedPost = result[0];
+
+    // If status changed to 'cancelled', cancel the scheduled job
+    if (updates.status === 'cancelled') {
+      try {
+        await cancelScheduledPost(id);
+        console.log(`[API] Cancelled scheduled job for post ${id} (status changed to cancelled)`);
+      } catch (error) {
+        console.error(`[API] Failed to cancel job for post ${id}:`, error.message);
+      }
+    }
+
+    res.json(updatedPost);
   } catch (error) {
     if (
       error instanceof OrganizationAccessError ||
@@ -1912,6 +1944,16 @@ app.delete("/api/db/scheduled-posts", async (req, res) => {
     }
 
     await sql`DELETE FROM scheduled_posts WHERE id = ${id}`;
+
+    // Cancel scheduled job in BullMQ
+    try {
+      await cancelScheduledPost(id);
+      console.log(`[API] Cancelled scheduled job for deleted post ${id}`);
+    } catch (error) {
+      console.error(`[API] Failed to cancel job for post ${id}:`, error.message);
+      // Don't fail the request if job cancellation fails
+    }
+
     res.status(204).end();
   } catch (error) {
     if (
@@ -6142,6 +6184,17 @@ const startup = async () => {
     } catch (error) {
       console.error(`${colors.red}✗ Startup check failed${colors.reset}`);
     }
+  }
+
+  // Initialize scheduled posts worker
+  try {
+    await initializeScheduledPostsChecker(
+      checkAndPublishScheduledPosts,
+      publishScheduledPostById
+    );
+    console.log(`${colors.green}✓ Scheduled posts worker initialized${colors.reset}`);
+  } catch (error) {
+    console.error(`${colors.red}✗ Failed to initialize scheduled posts worker:${colors.reset}`, error.message);
   }
 
   app.listen(PORT, () => {

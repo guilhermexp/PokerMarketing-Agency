@@ -33,6 +33,7 @@ import { ManualEventModal } from "./ManualEventModal";
 import { fileToBase64, formatCurrencyValue, DAY_TRANSLATIONS, PERIOD_LABELS } from "./utils";
 import { TournamentEventCard } from "./TournamentEventCard";
 import { useFlyerGenerator } from "./useFlyerGenerator";
+import { FlyerGallery } from "./FlyerGallery";
 
 interface FlyerGeneratorProps {
   brandProfile: BrandProfile;
@@ -1077,23 +1078,52 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
         </div>
       </div>
 
-      {/* Painel Lateral Integrado de Favoritos */}
+      {/* Painel Lateral Integrado */}
       <div className="w-80 bg-black/60 backdrop-blur-2xl border-l border-white/10 flex flex-col flex-shrink-0">
-        <>
-          {/* Header */}
-          <div className="px-6 py-5 border-b border-white/10 bg-black/40">
-            <div>
-              <h3 className="text-sm font-semibold text-white">
-                Favoritos
-              </h3>
-              <p className="text-xs text-white/40 mt-0.5">
-                {styleReferences.length} Estilos
+        {/* Tab Switcher */}
+        <div className="px-6 py-3 border-b border-white/10 bg-black/40">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsStylePanelOpen(true)}
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                isStylePanelOpen
+                  ? "bg-white/10 text-white/90"
+                  : "text-white/40 hover:text-white/60 hover:bg-white/5"
+              }`}
+            >
+              <Icon name="heart" className="w-3.5 h-3.5" />
+              Favoritos
+            </button>
+            <button
+              onClick={() => setIsStylePanelOpen(false)}
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                !isStylePanelOpen
+                  ? "bg-white/10 text-white/90"
+                  : "text-white/40 hover:text-white/60 hover:bg-white/5"
+              }`}
+            >
+              <Icon name="image" className="w-3.5 h-3.5" />
+              Galeria
+            </button>
+          </div>
+        </div>
+
+        {isStylePanelOpen ? (
+          <>
+            {/* Favoritos Header */}
+            <div className="px-6 py-4 border-b border-white/10 bg-black/40">
+              <div>
+                <h3 className="text-sm font-semibold text-white">
+                  Favoritos
+                </h3>
+                <p className="text-xs text-white/40 mt-0.5">
+                  {styleReferences.length} Estilos
+                </p>
+              </div>
+              <p className="text-[10px] text-white/50 mt-3 leading-relaxed">
+                Para garantir melhor qualidade e padrão use sempre um favorito como referência
               </p>
             </div>
-            <p className="text-[10px] text-white/50 mt-3 leading-relaxed">
-              Para garantir melhor qualidade e padrão use sempre um favorito como referência
-            </p>
-          </div>
 
             {/* Info Banner */}
             {selectedStyleReference && (
@@ -1184,7 +1214,15 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 />
               )}
             </div>
-        </>
+          </>
+        ) : (
+          <FlyerGallery
+            flyerState={flyerState}
+            dailyFlyerState={dailyFlyerState}
+            onUpdateGalleryImage={onUpdateGalleryImage}
+            onSetChatReference={onSetChatReference}
+          />
+        )}
       </div>
     </div>
   );

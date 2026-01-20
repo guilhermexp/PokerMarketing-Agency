@@ -220,14 +220,15 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
         imageSize,
         assetsToUse,
       );
-      const newImage = onAddImageToGallery({
+      const newImage: GalleryImage = {
+        id: `flyer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         src: imageUrl,
         prompt: '',
         source: 'Flyer',
         model,
         aspectRatio,
         imageSize,
-      });
+      };
       setGeneratedFlyers((prev) =>
         prev.map((f) => (f === 'loading' ? newImage : f))
       );
@@ -237,7 +238,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [event, brandProfile, currency, model, aspectRatio, imageSize, collabLogo, styleReference, compositionAssets, userId, jobContext, onAddImageToGallery, setGeneratedFlyers, queueJob]);
+  }, [event, brandProfile, currency, model, aspectRatio, imageSize, collabLogo, styleReference, compositionAssets, userId, jobContext, setGeneratedFlyers, queueJob]);
 
   const handleQuickPost = (flyer: GalleryImage) => {
     setQuickPostFlyer(flyer);

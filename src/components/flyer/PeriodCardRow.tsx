@@ -291,7 +291,8 @@ export const PeriodCardRow: React.FC<{
                         imageSize,
                         assetsToUse,
                     );
-                    const newImage = onAddImageToGallery({
+                    const newImage: GalleryImage = {
+                        id: `flyer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                         src: imageUrl,
                         prompt,
                         source: "Flyer Diário",
@@ -300,7 +301,7 @@ export const PeriodCardRow: React.FC<{
                         imageSize,
                         week_schedule_id: scheduleId, // Link to schedule for persistence
                         daily_flyer_period: period, // Track which period this flyer is for
-                    });
+                    };
                     setGeneratedFlyers((prev) =>
                         prev.map((f) => (f === "loading" ? newImage : f)),
                     );
@@ -335,7 +336,6 @@ export const PeriodCardRow: React.FC<{
                 scheduleId,
                 period,
                 styleReference,
-                onAddImageToGallery,
                 setGeneratedFlyers,
                 label,
                 collabLogo,

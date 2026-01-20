@@ -32,7 +32,7 @@ const isValidUrl = (value) => {
  */
 const filePartSchema = z.object({
   type: z.literal('file'),
-  mediaType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  mediaType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']),
   name: z.string().optional(),
   filename: z.string().optional(),
   url: z.string().refine(
