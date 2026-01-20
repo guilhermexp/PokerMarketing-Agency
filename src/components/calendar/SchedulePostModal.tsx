@@ -638,12 +638,12 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-5xl bg-[#1a1a1a] rounded-3xl border border-white/10 shadow-2xl flex overflow-hidden backdrop-blur-xl"
+        className="w-full max-w-5xl bg-[#0a0a0a]/95 rounded-3xl border border-white/[0.08] shadow-2xl flex overflow-hidden backdrop-blur-xl"
         style={{ height: '600px' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left Column - Image Preview & Info */}
-        <div className="w-80 bg-[#0a0a0a] border-r border-white/10 flex flex-col">
+        <div className="w-80 bg-[#070707] border-r border-white/[0.08] flex flex-col">
           {/* Image Preview */}
           <div className="h-64 bg-black flex items-center justify-center relative shrink-0">
             {selectedImage ? (
@@ -666,7 +666,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 {/* Change Image Button */}
                 <button
                   onClick={() => setShowImageSelector(true)}
-                  className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg text-xs font-medium text-white hover:bg-black/90 transition-all"
+                  className="absolute bottom-3 right-3 px-3 py-1.5 bg-[#0a0a0a]/90 backdrop-blur-xl border border-white/[0.08] rounded-lg text-xs font-medium text-white hover:bg-white/5 hover:border-white/20 transition-all"
                 >
                   Trocar Imagem
                 </button>
@@ -694,7 +694,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 onChange={(e) => setCaption(e.target.value)}
                 placeholder="Escreva a legenda..."
                 rows={2}
-                className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30 resize-none transition-all"
+                className="w-full bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30 resize-none transition-all"
               />
             </div>
 
@@ -708,7 +708,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 value={hashtags}
                 onChange={(e) => setHashtags(e.target.value)}
                 placeholder="#poker #torneio"
-                className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30 transition-all"
+                className="w-full bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30 transition-all"
               />
             </div>
 
@@ -729,8 +729,8 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                     onClick={() => handleContentTypeChange(t.id as InstagramContentType)}
                     className={`px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2 ${
                       contentType === t.id
-                        ? 'bg-white text-black'
-                        : 'text-white/60 bg-[#1a1a1a] border border-white/10 hover:border-white/20'
+                        ? 'bg-white text-black shadow-lg'
+                        : 'text-white/60 bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] hover:bg-white/5 hover:text-white hover:border-white/20'
                     }`}
                   >
                     <Icon name={t.icon as IconName} className="w-3.5 h-3.5" />
@@ -752,13 +752,13 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             <div className="flex gap-2">
               <button
                 onClick={handlePreviousMonth}
-                className="w-9 h-9 rounded-lg bg-[#0a0a0a] border border-white/10 text-white/70 hover:text-white hover:border-white/20 transition-all flex items-center justify-center"
+                className="w-9 h-9 rounded-lg bg-[#070707] backdrop-blur-xl border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/5 hover:border-white/20 transition-all flex items-center justify-center"
               >
                 <Icon name="chevron-left" className="w-4 h-4" />
               </button>
               <button
                 onClick={handleNextMonth}
-                className="w-9 h-9 rounded-lg bg-[#0a0a0a] border border-white/10 text-white/70 hover:text-white hover:border-white/20 transition-all flex items-center justify-center"
+                className="w-9 h-9 rounded-lg bg-[#070707] backdrop-blur-xl border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/5 hover:border-white/20 transition-all flex items-center justify-center"
               >
                 <Icon name="chevron-right" className="w-4 h-4" />
               </button>
@@ -826,19 +826,19 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
         </div>
 
         {/* Right Column - Time Slots */}
-        <div className="w-72 bg-[#0a0a0a] border-l border-white/10 flex flex-col">
+        <div className="w-72 bg-[#070707] border-l border-white/[0.08] flex flex-col">
           {/* Header */}
-          <div className="p-4 border-b border-white/10">
+          <div className="p-4 border-b border-white/[0.08]">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-white">Horário</h3>
               <div className="flex gap-1">
                 <button
-                  className="px-2 py-1 bg-[#1a1a1a] border border-white/10 rounded text-[10px] font-medium text-white"
+                  className="px-2 py-1 bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] rounded text-[10px] font-medium text-white"
                 >
                   12h
                 </button>
                 <button
-                  className="px-2 py-1 text-[10px] font-medium text-white/40"
+                  className="px-2 py-1 text-[10px] font-medium text-white/40 hover:text-white/60 transition-colors"
                 >
                   24h
                 </button>
@@ -868,8 +868,8 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                     isSelected
                       ? 'bg-white text-black shadow-lg'
                       : isPast
-                        ? 'bg-[#1a1a1a]/50 text-white/20 cursor-not-allowed'
-                        : 'bg-[#1a1a1a] text-white/70 hover:bg-[#1a1a1a]/80 hover:text-white border border-white/5 hover:border-white/10'
+                        ? 'bg-[#0a0a0a]/30 text-white/20 cursor-not-allowed border border-white/[0.03]'
+                        : 'bg-[#0a0a0a]/60 backdrop-blur-xl text-white/70 hover:bg-white/5 hover:text-white border border-white/[0.08] hover:border-white/20'
                   }`}
                 >
                   {new Date(`2000-01-01T${time}`).toLocaleTimeString('pt-BR', {
@@ -883,11 +883,11 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           </div>
 
           {/* Continue Button */}
-          <div className="p-4 border-t border-white/10">
+          <div className="p-4 border-t border-white/[0.08]">
             <button
               onClick={handleSubmit}
               disabled={selectedImages.length === 0 || isTimeInPast}
-              className="w-full py-3 bg-white text-black text-sm font-semibold rounded-xl hover:bg-white/90 active:scale-[0.99] transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
+              className="w-full py-3 bg-white text-black text-sm font-semibold rounded-xl hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-white/20"
             >
               Agendar Publicação
             </button>
