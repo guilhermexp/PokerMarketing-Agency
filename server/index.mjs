@@ -6125,7 +6125,11 @@ app.post("/api/rube", async (req, res) => {
 // SPA CATCH-ALL ROUTE (must be last!)
 // ============================================================================
 // Serve index.html for all non-API routes (SPA routing)
-app.get("*", (req, res) => {
+app.get("/*", (req, res) => {
+  // Skip API routes (they're already handled above)
+  if (req.path.startsWith("/api/")) {
+    return res.status(404).json({ error: "Not found" });
+  }
   res.sendFile(path.join(distPath, "index.html"));
 });
 
