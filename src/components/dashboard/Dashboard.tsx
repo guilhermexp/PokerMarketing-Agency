@@ -41,6 +41,7 @@ import { Zap, Layers, Image, Calendar, LayoutGrid, Video } from "lucide-react";
 import type { ScheduledPost } from "../../types";
 import { PlaygroundView } from "../playground";
 import { GeneratingLoader } from "../ui/quantum-pulse-loade";
+import { PublishedStoriesWidget } from "../ui/published-stories-widget";
 
 type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar" | "playground";
 
@@ -877,6 +878,12 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           instagramContext={instagramContext}
         />
       )}
+
+      {/* Published Stories Widget - Floating bottom left */}
+      <PublishedStoriesWidget
+        scheduledPosts={scheduledPosts}
+        brandProfile={brandProfile}
+      />
 
       {/* Footer - Desktop only */}
       <footer className="fixed bottom-4 left-4 z-[10000] pointer-events-auto hidden lg:flex flex-col items-center gap-2 rounded-2xl bg-black/40 backdrop-blur-2xl border border-white/10 p-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
