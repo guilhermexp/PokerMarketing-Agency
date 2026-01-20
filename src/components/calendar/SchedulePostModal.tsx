@@ -645,7 +645,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
         {/* Left Column - Image Preview & Info */}
         <div className="w-80 bg-[#0a0a0a] border-r border-white/10 flex flex-col">
           {/* Image Preview */}
-          <div className="aspect-square bg-black flex items-center justify-center relative">
+          <div className="h-64 bg-black flex items-center justify-center relative shrink-0">
             {selectedImage ? (
               <>
                 {selectedIsVideo ? (
@@ -683,24 +683,24 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           </div>
 
           {/* Post Details */}
-          <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+          <div className="flex-1 p-4 space-y-3 overflow-y-auto">
             {/* Caption */}
             <div>
-              <label className="text-xs font-semibold text-white/70 mb-2 block">
+              <label className="text-xs font-semibold text-white/70 mb-1.5 block">
                 Legenda
               </label>
               <textarea
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
                 placeholder="Escreva a legenda..."
-                rows={3}
+                rows={2}
                 className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30 resize-none transition-all"
               />
             </div>
 
             {/* Hashtags */}
             <div>
-              <label className="text-xs font-semibold text-white/70 mb-2 block">
+              <label className="text-xs font-semibold text-white/70 mb-1.5 block">
                 Hashtags
               </label>
               <input
@@ -714,7 +714,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
             {/* Content Type */}
             <div>
-              <label className="text-xs font-semibold text-white/70 mb-2 block">
+              <label className="text-xs font-semibold text-white/70 mb-1.5 block">
                 Tipo de Conteúdo
               </label>
               <div className="grid grid-cols-2 gap-2">
