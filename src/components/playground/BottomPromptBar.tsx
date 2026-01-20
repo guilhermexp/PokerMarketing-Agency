@@ -400,7 +400,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
 
       <motion.div
         ref={barRef}
-        className="w-full max-w-2xl mx-4 bg-[#0c0c0c]/95 border border-white/10 backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.7)] overflow-hidden pointer-events-auto relative group rounded-[32px]"
+        className="w-full max-w-2xl mx-4 bg-[#000000]/95 border border-white/10 backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.7)] overflow-hidden pointer-events-auto relative group rounded-[32px]"
         initial={false}
         animate={{
           height: 'auto',
@@ -416,7 +416,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
               transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
               className="px-3 pt-3"
             >
-              <div className="bg-[#0c0c0c]/60 rounded-2xl p-2 border border-white/10 shadow-inner">
+              <div className="bg-[#000000]/60 rounded-2xl p-2 border border-white/10 shadow-inner">
                 <div className="flex items-center gap-2 mb-1 px-2 text-white/70 pt-1">
                   <User className="w-3.5 h-3.5" />
                   <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">Selecionar Rosto</p>
@@ -463,7 +463,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
               transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
               className="px-3 pt-3"
             >
-              <div className="bg-[#0c0c0c]/60 rounded-2xl p-3 border border-white/10 shadow-inner">
+              <div className="bg-[#000000]/60 rounded-2xl p-3 border border-white/10 shadow-inner">
                 <div className="flex items-center gap-2 mb-2 px-1 text-white/70">
                   <Sparkles className="w-3.5 h-3.5" />
                   <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">Opcoes de Imagem</p>
@@ -505,7 +505,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                     <select
                       value={imageSize}
                       onChange={(e) => setImageSize(e.target.value as PlaygroundImageSize)}
-                      className="bg-[#0c0c0c]/80 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/80 appearance-none cursor-pointer hover:border-white/20 focus:outline-none focus:border-white/30 backdrop-blur-2xl"
+                      className="bg-[#000000]/80 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/80 appearance-none cursor-pointer hover:border-white/20 focus:outline-none focus:border-white/30 backdrop-blur-2xl"
                     >
                       <option value={PlaygroundImageSize.K1}>1K</option>
                       <option value={PlaygroundImageSize.K2}>2K</option>
@@ -531,7 +531,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                         </button>
                       </div>
                     ) : (
-                      <label className="bg-[#0c0c0c]/80 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 flex items-center gap-1.5 cursor-pointer hover:border-white/20 hover:bg-[#0c0c0c] transition-colors backdrop-blur-2xl">
+                      <label className="bg-[#000000]/80 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 flex items-center gap-1.5 cursor-pointer hover:border-white/20 hover:bg-[#000000] transition-colors backdrop-blur-2xl">
                         <Upload className="w-3 h-3" />
                         <span>Add</span>
                         <input
@@ -565,7 +565,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                         </div>
                       ))}
                       {productImages.length < 14 && (
-                        <label className="w-8 h-8 bg-[#0c0c0c]/80 border border-white/10 rounded-lg flex items-center justify-center cursor-pointer hover:border-white/20 hover:bg-[#0c0c0c] transition-colors backdrop-blur-2xl">
+                        <label className="w-8 h-8 bg-[#000000]/80 border border-white/10 rounded-lg flex items-center justify-center cursor-pointer hover:border-white/20 hover:bg-[#000000] transition-colors backdrop-blur-2xl">
                           <Plus className="w-4 h-4 text-white/40" />
                           <input
                             type="file"
@@ -603,7 +603,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
             onClick={() => setUseBrandProfile(!useBrandProfile)}
             className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 shrink-0 backdrop-blur-2xl ${useBrandProfile
                 ? 'bg-white text-black shadow-md'
-                : 'bg-[#0c0c0c]/60 text-white/60 border border-white/10 hover:text-white hover:border-white/20'
+                : 'bg-[#000000]/60 text-white/60 border border-white/10 hover:text-white hover:border-white/20'
               }`}
             title={useBrandProfile ? "Usando cores e tom da marca" : "Sem personalização de marca"}
           >
@@ -663,7 +663,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                   exit={{ width: 0, opacity: 0, scale: 0.9 }}
                   className="overflow-hidden flex items-center justify-center h-11 px-1.5 bg-white/10 border border-white/10 backdrop-blur-2xl text-white rounded-xl"
                 >
-                  <img src={selectedProfile.imageUrl} alt={selectedProfile.name} className="w-8 h-8 rounded-lg object-cover bg-[#0c0c0c]/60" />
+                  <img src={selectedProfile.imageUrl} alt={selectedProfile.name} className="w-8 h-8 rounded-lg object-cover bg-[#000000]/60" />
                 </motion.div>
               )}
             </AnimatePresence>

@@ -326,7 +326,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                         <input {...getInputProps()} />
                         {isAnalyzingLogo && (
                           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#0a0a0a]/95 rounded-xl backdrop-blur-xl">
-                            <Loader className="w-6 h-6 mb-3 text-white" />
+                            <Loader size={24} className="mb-3 text-white/60" />
                             <span className="text-xs font-medium text-white/60 animate-pulse">
                               Analisando...
                             </span>
@@ -534,7 +534,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                   {/* Connected Accounts */}
                   {loadingAccounts ? (
                     <div className="flex items-center justify-center py-8">
-                      <Loader className="w-5 h-5 text-white/40" />
+                      <Loader size={20} className="text-white/60" />
                     </div>
                   ) : instagramAccounts.length > 0 ? (
                     <div className="space-y-2">

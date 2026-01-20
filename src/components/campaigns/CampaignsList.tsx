@@ -143,7 +143,7 @@ const CampaignCard: React.FC<{
               title="Excluir"
             >
               {isDeleting ? (
-                <Loader className="w-3 h-3" />
+                <Loader size={12} className="text-white/60" />
               ) : (
                 <Icon name="trash-2" className="w-3 h-3" />
               )}

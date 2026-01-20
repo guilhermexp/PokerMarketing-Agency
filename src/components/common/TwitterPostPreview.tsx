@@ -70,7 +70,7 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
         >
           {isGenerating ? (
             <div className="w-full h-full flex items-center justify-center">
-              <Loader />
+              <Loader className="text-white/60" />
             </div>
           ) : image ? (
             <div className="relative w-full h-full">

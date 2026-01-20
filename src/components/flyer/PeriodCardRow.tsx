@@ -364,7 +364,7 @@ export const PeriodCardRow: React.FC<{
                 >
                     <div className="flex-1 grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-6 items-center text-left">
                         <div className="flex items-center gap-3">
-                            {isGenerating && <Loader className="w-4 h-4 flex-shrink-0" />}
+                            {isGenerating && <Loader size={16} className="flex-shrink-0 text-white/60" />}
                             <div>
                                 <h3 className="text-sm font-bold text-white tracking-wide">
                                     {label}

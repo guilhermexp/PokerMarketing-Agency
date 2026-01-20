@@ -274,7 +274,7 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
                     >
                       {isGeneratingCaption ? (
                         <>
-                        <Loader className="h-2.5 w-2.5" />
+                        <Loader size={10} className="text-white/60" />
                           Gerando...
                         </>
                       ) : (
@@ -395,7 +395,7 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               >
                 <div className="w-full h-full bg-gradient-to-b from-white/5 to-white/0 flex items-center justify-center">
                   <div className="text-center">
-                    <Loader className="h-5 w-5 mx-auto mb-2" />
+                    <Loader size={20} className="mx-auto mb-2 text-white/60" />
                     <span className="text-[10px] text-white/50">Gerando...</span>
                   </div>
                 </div>

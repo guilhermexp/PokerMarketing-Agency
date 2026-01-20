@@ -988,11 +988,11 @@ app.get("/api/db/init", async (req, res) => {
         ? sql`SELECT * FROM brand_profiles WHERE organization_id = ${organization_id} AND deleted_at IS NULL LIMIT 1`
         : sql`SELECT * FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`,
 
-      // 2. Gallery Images (limited to 20 most recent for faster initial load)
+      // 2. Gallery Images (limited to 100 most recent for pagination support)
       // OPTIMIZATION: Exclude 'src' column (base64 image data) to reduce egress
       isOrgContext
-        ? sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20`
-        : sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20`,
+        ? sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`
+        : sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`,
 
       // 3. Scheduled Posts (SMART LOADING: last 7 days + next 60 days)
       // Shows recent activity + upcoming schedule without arbitrary limits
@@ -1363,7 +1363,7 @@ app.get("/api/db/gallery", async (req, res) => {
     // This dramatically reduces egress data transfer (50-250MB → 50KB per request)
     const selectColumns = include_src === 'true'
       ? '*'
-      : 'id, user_id, organization_id, source, thumbnail_url, created_at, updated_at, deleted_at';
+      : 'id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name';
 
     if (organization_id) {
       // Organization context - verify membership
@@ -1485,28 +1485,34 @@ app.post("/api/db/gallery", async (req, res) => {
   }
 });
 
-// Gallery PATCH - Update gallery image (e.g., mark as published)
+// Gallery PATCH - Update gallery image (e.g., mark as published, toggle favorite)
 app.patch("/api/db/gallery", async (req, res) => {
   try {
     const sql = getSql();
     const { id } = req.query;
-    const { published_at } = req.body;
+    const { published_at, is_style_reference, style_reference_name, src_url } = req.body;
 
     if (!id) {
       return res.status(400).json({ error: "id is required" });
     }
 
+    // Get current image to preserve unmodified fields
+    const current = await sql`SELECT * FROM gallery_images WHERE id = ${id}`;
+    if (current.length === 0) {
+      return res.status(404).json({ error: "Gallery image not found" });
+    }
+
     const result = await sql`
       UPDATE gallery_images
-      SET published_at = ${published_at || null},
-          updated_at = NOW()
+      SET
+        published_at = ${published_at !== undefined ? (published_at || null) : current[0].published_at},
+        is_style_reference = ${is_style_reference !== undefined ? is_style_reference : current[0].is_style_reference},
+        style_reference_name = ${style_reference_name !== undefined ? (style_reference_name || null) : current[0].style_reference_name},
+        src_url = ${src_url !== undefined ? src_url : current[0].src_url},
+        updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
     `;
-
-    if (result.length === 0) {
-      return res.status(404).json({ error: "Gallery image not found" });
-    }
 
     return res.status(200).json(result[0]);
   } catch (error) {

@@ -18,7 +18,10 @@ function AdminAccessCheck({ children }: AdminProtectedRouteProps) {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[var(--color-bg-primary)] flex items-center justify-center">
-        <Loader label="Verifying admin access..." />
+        <div className="flex flex-col items-center gap-3">
+          <Loader size={20} className="text-white/60" />
+          <span className="text-sm text-white/60">Verifying admin access...</span>
+        </div>
       </div>
     );
   }

@@ -230,7 +230,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                   <p className="text-xs text-white/40">{isAnalyzingLogo ? 'Analisando...' : 'Pronto'}</p>
                 </div>
               </div>
-              {isAnalyzingLogo && <Loader className="w-4 h-4 text-white" />}
+              {isAnalyzingLogo && <Loader size={16} className="text-white/60" />}
             </div>
           </div>
         </div>
@@ -283,7 +283,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                       <input {...getInputProps()} />
                       {isAnalyzingLogo && (
                         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#0a0a0a]/95 rounded-2xl backdrop-blur-xl">
-                          <Loader className="w-8 h-8 mb-4 text-white" />
+                          <Loader size={32} className="mb-4 text-white/60" />
                           <span className="text-xs font-medium text-white/60 animate-pulse">Analisando...</span>
                         </div>
                       )}

@@ -662,7 +662,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = ({
                   title={(isLoading || isSending) ? 'Aguardando resposta...' : 'Enviar mensagem'}
                 >
                   {(isLoading || isSending) ? (
-                    <Loader className="w-4 h-4" />
+                    <Loader size={16} className="text-white/60" />
                   ) : (
                     <Icon name="arrow-up" className="w-4 h-4" />
                   )}

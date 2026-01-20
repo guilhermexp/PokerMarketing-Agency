@@ -343,7 +343,7 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
   };
 
   return (
-    <div className="h-full w-full bg-[#0c0c0c] text-white flex flex-col font-sans selection:bg-white/20 selection:text-white">
+    <div className="h-full w-full bg-[#000000] text-white flex flex-col font-sans selection:bg-white/20 selection:text-white">
       {showApiKeyDialog && (
         <ApiKeyDialog onContinue={handleApiKeyDialogContinue} />
       )}
@@ -356,7 +356,7 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
             animate={{ opacity: 1, y: 24, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed top-0 left-1/2 -translate-x-1/2 z-[60] bg-[#0c0c0c]/95 border border-white/10 text-white px-5 py-3 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] backdrop-blur-2xl max-w-md text-center text-sm font-medium flex items-center gap-3"
+            className="fixed top-0 left-1/2 -translate-x-1/2 z-[60] bg-[#000000]/95 border border-white/10 text-white px-5 py-3 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] backdrop-blur-2xl max-w-md text-center text-sm font-medium flex items-center gap-3"
           >
             <div className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse"></div>
             {errorToast}
@@ -364,10 +364,10 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
         )}
       </AnimatePresence>
 
-      <main className="flex-1 relative overflow-y-auto overflow-x-hidden no-scrollbar bg-[#0c0c0c]">
+      <main className="flex-1 relative overflow-y-auto overflow-x-hidden no-scrollbar bg-[#000000]">
         {/* Top Bar */}
         <header className="sticky top-0 z-30 w-full px-6 py-4 pointer-events-none">
-          <div className="absolute inset-0 bg-[#0c0c0c]/80 backdrop-blur-2xl border-b border-white/10" style={{ maskImage: 'linear-gradient(to bottom, black, transparent)' }} />
+          <div className="absolute inset-0 bg-[#000000]/80 backdrop-blur-2xl border-b border-white/10" style={{ maskImage: 'linear-gradient(to bottom, black, transparent)' }} />
 
           <div className="relative flex items-center justify-between text-white pointer-events-auto max-w-[1600px] mx-auto w-full">
             <h1 className="text-3xl font-semibold text-white tracking-tight">Playground</h1>

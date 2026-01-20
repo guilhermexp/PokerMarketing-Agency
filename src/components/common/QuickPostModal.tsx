@@ -327,7 +327,7 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                             {isGenerating ? (
                                 <div className="flex-1 flex flex-col items-center justify-center py-8 space-y-4 bg-white/[0.02] rounded-xl border border-white/5">
                                     <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                                        <Loader className="w-6 h-6" />
+                                        <Loader size={24} className="text-white/60" />
                                     </div>
                                     <div className="text-center">
                                         <p className="text-xs font-bold text-white/50 uppercase tracking-wide">Gerando Copy</p>

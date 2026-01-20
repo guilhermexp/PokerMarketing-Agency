@@ -29,7 +29,7 @@ export function AdminHeader() {
   };
 
   return (
-    <header className="h-14 bg-[#0c0c0c] border-b border-white/[0.06] fixed top-0 left-56 right-0 z-10">
+    <header className="h-14 bg-[#000000] border-b border-white/[0.06] fixed top-0 left-56 right-0 z-10">
       <div className="h-full px-6 flex items-center justify-between">
         {/* Page Title */}
         <div className="flex items-center gap-3">

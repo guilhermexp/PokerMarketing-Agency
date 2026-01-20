@@ -300,7 +300,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
               className="flex items-center gap-2 px-4 py-2 bg-white/[0.08] backdrop-blur-2xl border border-white/20 rounded-full text-sm font-medium text-white hover:bg-white/[0.12] hover:border-white/30 transition-all active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isGenerating ? (
-                <Loader className="w-4 h-4" />
+                <Loader size={16} className="text-white/60" />
               ) : (
                 <Icon name="sparkles" className="w-4 h-4" />
               )}

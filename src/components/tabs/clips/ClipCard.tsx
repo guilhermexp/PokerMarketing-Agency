@@ -3619,7 +3619,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             )}
             {audioState.isLoading && (
               <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-white/[0.06]">
-                <Loader />
+                <Loader className="text-white/60" />
                 <span className="text-[9px] text-white/40">Áudio...</span>
               </div>
             )}
@@ -3763,7 +3763,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             <div className="flex-1 flex items-center justify-center p-6 bg-black/50 relative">
               {isMerging ? (
                 <div className="flex flex-col items-center justify-center">
-                  <Loader />
+                  <Loader className="text-white/60" />
                   <p className="text-sm text-white/70 mt-4">
                     {exportProgress?.message || "Processando..."}
                   </p>
@@ -4502,7 +4502,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                     {isMerging ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
                         <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-3">
-                          <Loader />
+                          <Loader className="text-white/60" />
                         </div>
                         <p className="text-[10px] text-white/70 text-center mb-3">
                           {exportProgress?.message || "Processando..."}
@@ -4560,7 +4560,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                   <>
                     {isGeneratingThumbnail ? (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <Loader />
+                        <Loader className="text-white/60" />
                       </div>
                     ) : thumbnail ? (
                       <>
@@ -4793,14 +4793,14 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                         {/* Loading States */}
                         {isLoadingVideo ? (
                           <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <Loader />
+                            <Loader className="text-white/60" />
                             <p className="text-[7px] text-white/40 mt-2">
                               Gerando vídeo...
                             </p>
                           </div>
                         ) : isLoadingImage ? (
                           <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <Loader />
+                            <Loader className="text-white/60" />
                             <p className="text-[7px] text-white/40 mt-2">
                               Gerando imagem...
                             </p>

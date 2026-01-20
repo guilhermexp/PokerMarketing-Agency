@@ -40,6 +40,7 @@ import { ImagePreviewModal } from "../image-preview/ImagePreviewModal";
 import { Zap, Layers, Image, Calendar, LayoutGrid, Video } from "lucide-react";
 import type { ScheduledPost } from "../../types";
 import { PlaygroundView } from "../playground";
+import { GeneratingLoader } from "../ui/quantum-pulse-loade";
 
 type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar" | "playground";
 
@@ -461,52 +462,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 </div>
               </div>
             )}
-            {isGenerating && (
-              <>
-                <style>{`
-                  @keyframes shimmerText {
-                    0% {
-                      background-position: -200% 0;
-                    }
-                    100% {
-                      background-position: 200% 0;
-                    }
-                  }
-
-                  .shimmer-text {
-                    background: linear-gradient(
-                      90deg,
-                      rgba(255, 255, 255, 0.85) 0%,
-                      rgba(255, 255, 255, 0.25) 40%,
-                      rgba(255, 255, 255, 0.95) 50%,
-                      rgba(255, 255, 255, 0.25) 60%,
-                      rgba(255, 255, 255, 0.85) 100%
-                    );
-                    background-size: 200% 100%;
-                    -webkit-background-clip: text;
-                    background-clip: text;
-                    color: transparent;
-                    animation: shimmerText 2.4s ease-in-out infinite;
-                  }
-                `}</style>
-                <div className="flex flex-col items-center justify-center text-center p-32 aura-card border-white/5 bg-white/[0.01]">
-                  <h2 className="text-4xl font-black tracking-[-0.05em] uppercase shimmer-text">
-                    Gerando sua campanha
-                  </h2>
-                  <p className="text-white/40 mt-4 max-w-xs text-xs font-medium tracking-wide">
-                    Agentes autônomos estão configurando seu ecossistema de marketing.
-                  </p>
-                </div>
-                <div className="flex justify-center mt-20">
-                  <img
-                    src="/logo-socialab.png"
-                    alt="Socialab"
-                    className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 animate-spin"
-                    style={{ animationDuration: "8s" }}
-                  />
-                </div>
-              </>
-            )}
+            {isGenerating && <GeneratingLoader />}
             {campaign && (
               <div className="animate-fade-in-up space-y-8">
                 {/* Header Section */}

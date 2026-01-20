@@ -98,7 +98,7 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
             <div className="aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border border-white/5 relative">
               {flyer === 'loading' ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
-                  <Loader className="w-6 h-6 mb-2 text-primary" />
+                  <Loader size={24} className="mb-2 text-white/60" />
                   <p className="text-[8px] font-black text-white/40 uppercase tracking-widest animate-pulse">
                     Gerando...
                   </p>

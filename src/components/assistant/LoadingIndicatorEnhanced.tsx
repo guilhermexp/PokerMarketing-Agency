@@ -80,7 +80,7 @@ export function LoadingIndicatorEnhanced({
         {/* Stage indicator com Loader oficial */}
         <div className="flex items-center gap-2 mb-3">
           {/* Loader oficial do ai-elements */}
-          <Loader size={16} className="text-primary/60" />
+          <Loader size={16} className="text-white/60" />
 
           {/* Mensagem do stage */}
           <span className="text-xs text-white/40">{stageMessage}</span>
@@ -121,7 +121,7 @@ export function LoadingIndicatorEnhanced({
 export function LoadingDots({ message = 'Carregando...' }: { message?: string }) {
   return (
     <div className="flex items-center gap-3">
-      <Loader size={16} className="text-primary/60" />
+      <Loader size={16} className="text-white/60" />
       <span className="text-xs text-white/40">{message}</span>
     </div>
   );

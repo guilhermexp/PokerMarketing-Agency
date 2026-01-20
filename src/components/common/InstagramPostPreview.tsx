@@ -65,7 +65,7 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
           >
             {isGenerating ? (
               <div className="w-full h-full flex items-center justify-center">
-                <Loader />
+                <Loader className="text-white/60" />
               </div>
             ) : image ? (
               <>

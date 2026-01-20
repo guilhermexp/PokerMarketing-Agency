@@ -142,7 +142,7 @@ const AdCard: React.FC<{
             {/* Image */}
             <div className="aspect-[1.91/1] bg-black/30 rounded-lg flex items-center justify-center relative overflow-hidden">
               {isGenerating ? (
-                <Loader />
+                <Loader className="text-white/60" />
               ) : image ? (
                 <>
                   <img

@@ -149,6 +149,21 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     }
   };
 
+  // Sync selectedStyleReference to globalStyleReference
+  React.useEffect(() => {
+    if (selectedStyleReference) {
+      setGlobalStyleReference({
+        id: selectedStyleReference.id,
+        src: selectedStyleReference.src,
+        prompt: selectedStyleReference.prompt || selectedStyleReference.name,
+        source: selectedStyleReference.source || "Favorito",
+        model: (selectedStyleReference.model as ImageModel) || selectedImageModel,
+        aspectRatio: selectedStyleReference.aspectRatio,
+        imageSize: selectedStyleReference.imageSize,
+      });
+    }
+  }, [selectedStyleReference, selectedImageModel, setGlobalStyleReference]);
+
   // Download all images as a ZIP file
   const handleDownloadAllImages = async (images: GalleryImage[], title: string) => {
     if (images.length === 0) return;

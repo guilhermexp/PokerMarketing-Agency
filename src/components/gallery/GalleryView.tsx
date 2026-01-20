@@ -147,9 +147,9 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
 
       {/* Overlay */}
       {!isAudio(image) && (
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3 pointer-events-none">
           <p className="text-white text-[10px] font-bold leading-snug line-clamp-2 mb-2">
-            {image.prompt}
+            {image.prompt || 'Sem descrição'}
           </p>
           <div className="flex flex-wrap gap-1.5">
             <span className="text-[8px] text-white/80 font-bold bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
@@ -343,7 +343,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       const newRef = {
         src: image.src,
         name:
-          image.prompt.substring(0, 50) ||
+          image.prompt?.substring(0, 50) ||
           `Favorito ${new Date().toLocaleDateString("pt-BR")}`,
       };
       console.log("[GalleryView] Adding to favorites:", newRef);

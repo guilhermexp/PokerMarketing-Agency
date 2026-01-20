@@ -521,7 +521,6 @@ function AppContent() {
   });
 
   const [theme, setTheme] = useState<Theme>("dark");
-  const [styleReferences, setStyleReferences] = useState<StyleReference[]>([]);
   const [selectedStyleReference, setSelectedStyleReference] =
     useState<StyleReference | null>(null);
   const [publishingStates, setPublishingStates] = useState<
@@ -578,18 +577,18 @@ function AppContent() {
     }
   }, [initialData, brandProfile, userId, organizationId]);
 
-  // Load style references from localStorage (local only, not from DB)
-  // Key by organization or user to prevent mixing between brands
-  const styleRefsKey = `styleReferences_${organizationId || userId || "default"}`;
-  useEffect(() => {
-    if (!userId) return;
-    const savedRefs = localStorage.getItem(styleRefsKey);
-    if (savedRefs) {
-      setStyleReferences(JSON.parse(savedRefs));
-    } else {
-      setStyleReferences([]);
-    }
-  }, [styleRefsKey, userId]);
+  // Load style references from gallery images with is_style_reference=true
+  // This replaces the old localStorage-based approach for organization-wide sharing
+  const styleReferences = React.useMemo(() => {
+    return (swrGalleryImages || [])
+      .filter((img) => img.is_style_reference)
+      .map((img) => ({
+        id: img.id,
+        src: img.src_url,
+        name: img.style_reference_name || img.prompt || 'Favorito sem nome',
+        createdAt: new Date(img.created_at).getTime(),
+      }));
+  }, [swrGalleryImages]);
 
   // Load daily flyer state from localStorage and match with gallery images
   const hasRestoredDailyFlyersRef = useRef(false);
@@ -865,45 +864,60 @@ function AppContent() {
     } as Partial<GalleryImage>);
   };
 
-  const handleAddStyleReference = (
+  const handleAddStyleReference = async (
     ref: Omit<StyleReference, "id" | "createdAt">,
   ) => {
     console.log("[App] handleAddStyleReference called", ref);
-    const newRef: StyleReference = {
-      ...ref,
-      id: Date.now().toString(),
-      createdAt: Date.now(),
-    };
-    console.log("[App] Created newRef:", newRef);
-    setStyleReferences((prev) => {
-      const updated = [newRef, ...prev];
-      console.log("[App] Updated styleReferences:", updated);
-      try {
-        localStorage.setItem(styleRefsKey, JSON.stringify(updated));
-        console.log("[App] Saved to localStorage");
-      } catch (e) {
-        console.warn(
-          "Não foi possível salvar no localStorage (limite excedido)",
-        );
-      }
-      return updated;
-    });
+
+    // Find the gallery image by src
+    const galleryImage = swrGalleryImages?.find((img) => img.src_url === ref.src);
+
+    if (!galleryImage) {
+      console.error("[App] Could not find gallery image with src:", ref.src);
+      return;
+    }
+
+    try {
+      // Update image to mark as style reference
+      await updateGalleryImage(galleryImage.id, {
+        is_style_reference: true,
+        style_reference_name: ref.name,
+      });
+
+      // Update local SWR cache
+      swrUpdateGalleryImage(galleryImage.id, {
+        is_style_reference: true,
+        style_reference_name: ref.name,
+      });
+
+      console.log("[App] Successfully added to favorites:", galleryImage.id);
+    } catch (error) {
+      console.error("[App] Failed to add style reference:", error);
+    }
   };
 
-  const handleRemoveStyleReference = (id: string) => {
+  const handleRemoveStyleReference = async (id: string) => {
     console.log("[App] handleRemoveStyleReference called", id);
-    setStyleReferences((prev) => {
-      const updated = prev.filter((r) => r.id !== id);
-      console.log("[App] Updated styleReferences:", updated);
-      try {
-        localStorage.setItem(styleRefsKey, JSON.stringify(updated));
-        console.log("[App] Saved to localStorage");
-      } catch (e) {
-        console.warn("Não foi possível salvar no localStorage");
-      }
-      return updated;
-    });
-    if (selectedStyleReference?.id === id) setSelectedStyleReference(null);
+
+    try {
+      // Update image to unmark as style reference
+      await updateGalleryImage(id, {
+        is_style_reference: false,
+        style_reference_name: null,
+      });
+
+      // Update local SWR cache
+      swrUpdateGalleryImage(id, {
+        is_style_reference: false,
+        style_reference_name: null,
+      });
+
+      console.log("[App] Successfully removed from favorites:", id);
+
+      if (selectedStyleReference?.id === id) setSelectedStyleReference(null);
+    } catch (error) {
+      console.error("[App] Failed to remove style reference:", error);
+    }
   };
 
   const handleSelectStyleReference = (ref: StyleReference) => {
@@ -2041,7 +2055,7 @@ function AppContent() {
   )
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader className="h-16 w-16" />
+        <Loader size={64} className="text-white/60" />
       </div>
     );
 

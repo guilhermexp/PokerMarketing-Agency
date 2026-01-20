@@ -145,7 +145,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
           >
             {publishing ? (
               <>
-                <Loader className="h-3 w-3" />
+                <Loader size={12} className="text-white/60" />
                 Publicando...
               </>
             ) : (

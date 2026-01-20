@@ -169,7 +169,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
             !history[history.length - 1].parts[0].text) && (
             <div className="flex justify-start">
               <div className="rounded-2xl px-6 py-4 bg-[#121212] border border-white/5">
-                <Loader className="w-5 h-5 text-primary" />
+                <Loader size={20} className="text-white/60" />
               </div>
             </div>
           )}

@@ -44,7 +44,7 @@ export const ImagePreviewFooter: React.FC<ImagePreviewFooterProps> = ({
           >
             {isEditing ? (
               <>
-                <Loader className="w-3.5 h-3.5" />
+                <Loader size={14} className="text-white/60" />
                 Salvando...
               </>
             ) : (
@@ -72,7 +72,7 @@ export const ImagePreviewFooter: React.FC<ImagePreviewFooterProps> = ({
           >
             {isEditing ? (
               <>
-                <Loader className="w-3.5 h-3.5" />
+                <Loader size={14} className="text-white/60" />
                 Salvando...
               </>
             ) : (
@@ -100,7 +100,7 @@ export const ImagePreviewFooter: React.FC<ImagePreviewFooterProps> = ({
               className="flex-1 h-8 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
             >
               {isRemovingBackground ? (
-                <Loader className="w-3 h-3" />
+                <Loader size={12} className="text-white/60" />
               ) : (
                 <Icon name="scissors" className="w-3 h-3" />
               )}
@@ -115,7 +115,7 @@ export const ImagePreviewFooter: React.FC<ImagePreviewFooterProps> = ({
           >
             {isEditing ? (
               <>
-                <Loader className="w-3.5 h-3.5" />
+                <Loader size={14} className="text-white/60" />
                 Processando...
               </>
             ) : (

@@ -207,7 +207,7 @@ export function ConnectInstagramModal({
           >
             {isConnecting ? (
               <>
-                <Loader className="w-3 h-3 mr-1.5" />
+                <Loader size={12} className="mr-1.5 text-white/60" />
                 Conectando...
               </>
             ) : (

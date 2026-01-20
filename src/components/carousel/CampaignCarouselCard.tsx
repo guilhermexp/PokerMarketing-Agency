@@ -105,7 +105,7 @@ export const CampaignCarouselCard: React.FC<CampaignCarouselCardProps> = ({
           >
             {isGeneratingAny ? (
               <>
-                <Loader className="h-3 w-3" />
+                <Loader size={12} className="text-white/60" />
                 Gerando...
               </>
             ) : allGenerated ? (
@@ -157,7 +157,7 @@ export const CampaignCarouselCard: React.FC<CampaignCarouselCardProps> = ({
             >
               {publishing ? (
                 <>
-                  <Loader className="h-3 w-3" />
+                  <Loader size={12} className="text-white/60" />
                   Publicando...
                 </>
               ) : (
@@ -222,7 +222,7 @@ export const CampaignCarouselCard: React.FC<CampaignCarouselCardProps> = ({
                     </div>
                     <div className="aspect-[4/5] bg-gradient-to-b from-white/5 to-white/0 flex items-center justify-center">
                       <div className="text-center">
-                        <Loader className="h-8 w-8 mx-auto mb-3" />
+                        <Loader size={32} className="mx-auto mb-3 text-white/60" />
                         <p className="text-sm text-white/70">
                           Gerando capa...
                         </p>
@@ -246,7 +246,7 @@ export const CampaignCarouselCard: React.FC<CampaignCarouselCardProps> = ({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-4">
-                  <Loader className="h-3.5 w-3.5" />
+                  <Loader size={14} className="text-white/60" />
                   <span className="text-xs text-white/50">
                     Gerando imagens do carrossel...
                   </span>
@@ -265,7 +265,7 @@ export const CampaignCarouselCard: React.FC<CampaignCarouselCardProps> = ({
                         <div className="w-full h-full bg-gradient-to-b from-white/5 to-white/0 flex items-center justify-center">
                           {idx === 0 && (
                             <div className="text-center">
-                              <Loader className="h-4 w-4 mx-auto mb-1" />
+                              <Loader size={16} className="mx-auto mb-1 text-white/60" />
                               <span className="text-[9px] text-white/50">
                                 Capa
                               </span>

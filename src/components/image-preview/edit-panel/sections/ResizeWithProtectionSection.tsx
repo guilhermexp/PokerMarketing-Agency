@@ -161,7 +161,7 @@ export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = 
               }`}
           >
             {isDetectingText ? (
-              <Loader className="w-3 h-3" />
+              <Loader size={12} className="text-white/60" />
             ) : (
               <Icon name="eye" className="w-3 h-3" />
             )}

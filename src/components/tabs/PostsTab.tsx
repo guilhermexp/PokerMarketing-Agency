@@ -148,7 +148,7 @@ const PostCard: React.FC<{
             {/* Image */}
             <div className="aspect-square bg-black/30 rounded-lg flex items-center justify-center relative overflow-hidden">
               {isGenerating ? (
-                <Loader />
+                <Loader className="text-white/60" />
               ) : image ? (
                 <>
                   <img
