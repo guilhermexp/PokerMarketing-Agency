@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { ScheduledPost, GalleryImage, SchedulingPlatform, InstagramContentType } from '../../types';
-import { Icon } from '../common/Icon';
+import { Icon, type IconName } from '../common/Icon';
 import { CampaignAccordion, type CampaignWithImages } from './CampaignAccordion';
 import type { DbCampaign } from '../../services/apiClient';
 
@@ -40,6 +40,20 @@ const isAudioItem = (image: GalleryImage) => {
   );
 };
 
+// Generate time slots from 6:00 to 23:45 in 15-minute intervals
+const generateTimeSlots = () => {
+  const slots: string[] = [];
+  for (let hour = 6; hour < 24; hour++) {
+    for (let minute = 0; minute < 60; minute += 15) {
+      const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+      slots.push(timeStr);
+    }
+  }
+  return slots;
+};
+
+const TIME_SLOTS = generateTimeSlots();
+
 export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   isOpen,
   onClose,
@@ -57,15 +71,14 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
   const getDefaultTime = () => {
     const now = new Date();
-    const minutes = Math.ceil(now.getMinutes() / 5) * 5 + 5;
+    const minutes = Math.ceil(now.getMinutes() / 15) * 15 + 15;
     now.setMinutes(minutes);
     now.setSeconds(0);
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes() % 60).padStart(2, '0')}`;
   };
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const timeListRef = useRef<HTMLDivElement>(null);
   const [selectedImages, setSelectedImages] = useState<GalleryImage[]>([]);
-  const [carouselIndex, setCarouselIndex] = useState(0);
   const [caption, setCaption] = useState('');
   const [hashtags, setHashtags] = useState('');
 
@@ -73,10 +86,13 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   const [scheduledTime, setScheduledTime] = useState(initialTime || getDefaultTime());
   const [platforms] = useState<SchedulingPlatform>('instagram');
   const [contentType, setContentType] = useState<InstagramContentType>('photo');
-  const [publishNow, setPublishNow] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [publishNow] = useState(false);
   const [galleryFilter, setGalleryFilter] = useState<'all' | 'flyers' | 'posts' | 'videos'>('all');
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
+  const [showImageSelector, setShowImageSelector] = useState(false);
+
+  // Calendar state
+  const [calendarDate, setCalendarDate] = useState(new Date(initialDate || todayStr));
 
   // Set initial image when modal opens with a pre-selected image
   useEffect(() => {
@@ -94,26 +110,44 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       if (initialCaption && !initialCarouselImages) {
         setCaption(initialCaption);
       }
+
+      // Show image selector if no initial image
+      setShowImageSelector(!initialImage && !initialCarouselImages);
     } else {
       // Reset when modal closes
       setSelectedImages([]);
       setCaption('');
       setHashtags('');
       setContentType('photo');
+      setShowImageSelector(false);
     }
   }, [isOpen, initialImage, initialCarouselImages, initialCaption]);
 
   // Update date/time when modal opens with initial values
   useEffect(() => {
     if (isOpen) {
-      if (initialDate) setScheduledDate(initialDate);
+      if (initialDate) {
+        setScheduledDate(initialDate);
+        setCalendarDate(new Date(initialDate));
+      }
       if (initialTime) setScheduledTime(initialTime);
     }
   }, [isOpen, initialDate, initialTime]);
 
+  // Scroll to selected time when time changes
+  useEffect(() => {
+    if (isOpen && timeListRef.current && scheduledTime) {
+      const selectedIndex = TIME_SLOTS.indexOf(scheduledTime);
+      if (selectedIndex !== -1) {
+        const itemHeight = 48; // height of each time slot item
+        const scrollPosition = selectedIndex * itemHeight - 100; // Center it roughly
+        timeListRef.current.scrollTo({ top: scrollPosition, behavior: 'smooth' });
+      }
+    }
+  }, [isOpen, scheduledTime]);
+
   const isCarousel = contentType === 'carousel';
   const isReel = contentType === 'reel';
-  const isStory = contentType === 'story';
   const selectedImage = selectedImages[0] || null;
   const selectedIsVideo = selectedImage && isVideoItem(selectedImage);
 
@@ -216,12 +250,6 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   }, [deduplicatedImages, galleryFilter, campaigns]);
 
   const handleSelectImage = (image: GalleryImage) => {
-    // Pause video when changing selection
-    if (videoRef.current) {
-      videoRef.current.pause();
-      setIsPlaying(false);
-    }
-
     if (isCarousel) {
       // Toggle selection for carousel
       const isSelected = selectedImages.some(img => img.id === image.id);
@@ -233,6 +261,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
     } else {
       // Single selection
       setSelectedImages([image]);
+      setShowImageSelector(false);
     }
   };
 
@@ -242,22 +271,10 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       // Keep only first image when switching from carousel
       setSelectedImages(selectedImages.slice(0, 1));
     }
-    setCarouselIndex(0);
   };
 
   const getSelectionIndex = (image: GalleryImage) => {
     return selectedImages.findIndex(img => img.id === image.id);
-  };
-
-  const togglePlayPause = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
   };
 
   const handleSubmit = () => {
@@ -312,48 +329,75 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
     onClose();
   };
 
-  if (!isOpen) return null;
+  // Calendar functions
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
 
-  // Get aspect ratio class based on content type
-  const getAspectRatio = () => {
-    if (isReel || isStory) return 'aspect-[9/16]';
-    return 'aspect-square';
+    return { daysInMonth, startingDayOfWeek };
   };
 
-  return createPortal(
-    <div
-      className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-4 md:p-8"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-6xl max-h-[90vh] bg-[#0a0a0a]/95 rounded-2xl border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-white/[0.08] flex justify-between items-center shrink-0">
-          <div>
-            <h2 className="text-lg font-semibold text-white">
-              Agendar Publicação
-            </h2>
-            <p className="text-xs text-white/60 mt-1">
-              {isCarousel
-                ? `Selecione até 10 imagens (${selectedImages.length}/10)`
-                : 'Selecione uma imagem da galeria'
-              }
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-white/60 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
-          >
-            <Icon name="x" className="w-5 h-5" />
-          </button>
-        </div>
+  const handlePreviousMonth = () => {
+    setCalendarDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
 
-        {/* Content - Two columns on large screens */}
-        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-          {/* Gallery Grid */}
-          <div className="flex-1 overflow-y-auto border-b lg:border-b-0 lg:border-r border-white/[0.05] flex flex-col">
+  const handleNextMonth = () => {
+    setCalendarDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const handleSelectDate = (day: number) => {
+    const selected = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day);
+    const dateStr = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`;
+
+    // Don't allow past dates
+    if (dateStr < todayStr) return;
+
+    setScheduledDate(dateStr);
+  };
+
+  const { daysInMonth, startingDayOfWeek } = getDaysInMonth(calendarDate);
+  const monthName = calendarDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+  if (!isOpen) return null;
+
+  // Image selector modal
+  if (showImageSelector) {
+    return createPortal(
+      <div
+        className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-4 md:p-8"
+        onClick={onClose}
+      >
+        <div
+          className="w-full max-w-5xl max-h-[90vh] bg-[#0a0a0a]/95 rounded-2xl border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-white/[0.08] flex justify-between items-center shrink-0">
+            <div>
+              <h2 className="text-lg font-semibold text-white">
+                Selecionar Imagem
+              </h2>
+              <p className="text-xs text-white/60 mt-1">
+                {isCarousel
+                  ? `Selecione até 10 imagens (${selectedImages.length}/10)`
+                  : 'Selecione uma imagem da galeria'
+                }
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-white/60 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+            >
+              <Icon name="x" className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Gallery */}
+          <div className="flex-1 overflow-y-auto flex flex-col">
             {/* Gallery Filter */}
             <div className="px-4 pt-3 pb-2 flex gap-2 shrink-0">
               {[
@@ -443,11 +487,11 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                             )}
 
                             {/* Overlay */}
-                            <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent transition-all duration-300 flex flex-col justify-end p-2 ${
+                            <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent transition-all duration-300 flex flex-col justify-end p-2 pointer-events-none ${
                               isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                             }`}>
                               <p className="text-white text-[9px] font-bold leading-snug line-clamp-2 mb-1">
-                                {image.prompt}
+                                {image.prompt || 'Sem descrição'}
                               </p>
                               <span className="text-[7px] text-white/80 font-bold bg-white/10 backdrop-blur-sm px-1.5 py-0.5 rounded-full uppercase tracking-wide self-start">
                                 {image.source}
@@ -492,7 +536,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
                 {/* Older Images Section */}
                 {olderEligibleImages.length > 0 && (
-                  <div className="columns-2 sm:columns-3 lg:columns-3 gap-3">
+                  <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
                     {olderEligibleImages.map((image) => {
                       const selectionIndex = getSelectionIndex(image);
                       const isSelected = selectionIndex !== -1;
@@ -524,11 +568,11 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                           )}
 
                           {/* Overlay */}
-                          <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent transition-all duration-300 flex flex-col justify-end p-3 ${
+                          <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent transition-all duration-300 flex flex-col justify-end p-3 pointer-events-none ${
                             isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                           }`}>
                             <p className="text-white text-[10px] font-bold leading-snug line-clamp-2 mb-2">
-                              {image.prompt}
+                              {image.prompt || 'Sem descrição'}
                             </p>
                             <div className="flex flex-wrap gap-1.5">
                               <span className="text-[8px] text-white/80 font-bold bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wide">
@@ -565,420 +609,289 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             </div>
           </div>
 
-          {/* Instagram Preview Panel */}
-          <div className="w-full lg:w-96 shrink-0 overflow-y-auto bg-black flex flex-col">
-            {/* Preview based on content type */}
-            <div className="bg-black border-b border-white/10 flex-1 flex flex-col">
+          {/* Footer */}
+          <div className="px-4 py-3 border-t border-white/[0.08] flex gap-2 shrink-0">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 text-xs font-medium text-white/60 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => setShowImageSelector(false)}
+              disabled={selectedImages.length === 0}
+              className="flex-1 py-2.5 bg-white text-black text-xs font-semibold rounded-lg hover:bg-white/90 active:scale-[0.99] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
 
-              {/* Story Preview */}
-              {isStory && (
-                <div className="flex-1 flex items-center justify-center p-4">
-                  <div className="relative w-full max-w-[280px] aspect-[9/16] bg-[#111] rounded-2xl overflow-hidden">
-                    {selectedImages.length > 0 ? (
-                      <>
-                        <img
-                          src={selectedImages[0]?.src}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                        {/* Story Header */}
-                        <div className="absolute top-0 left-0 right-0 p-3">
-                          <div className="h-0.5 bg-white/30 rounded-full mb-3">
-                            <div className="h-full w-1/3 bg-white rounded-full" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 p-[2px]">
-                              <div className="w-full h-full rounded-full bg-black" />
-                            </div>
-                            <span className="text-xs font-semibold text-white">seu_perfil</span>
-                            <span className="text-[10px] text-white/50">2h</span>
-                          </div>
-                        </div>
-                        {/* Story Footer */}
-                        <div className="absolute bottom-0 left-0 right-0 p-3">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 px-4 py-2 border border-white/30 rounded-full">
-                              <span className="text-xs text-white/50">Enviar mensagem</span>
-                            </div>
-                            <Icon name="heart" className="w-6 h-6 text-white" />
-                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                              <line x1="22" y1="2" x2="11" y2="13" />
-                              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                            </svg>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="text-center">
-                          <Icon name="image" className="w-12 h-12 text-white/20 mx-auto mb-2" />
-                          <p className="text-xs text-white/30">Selecione uma imagem</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Reel Preview */}
-              {isReel && (
-                <div className="flex-1 flex items-center justify-center p-4">
-                  <div className="relative w-full max-w-[280px] aspect-[9/16] bg-[#111] rounded-2xl overflow-hidden">
-                    {selectedImages.length > 0 ? (
-                      <>
-                        {selectedIsVideo ? (
-                          <video
-                            ref={videoRef}
-                            src={selectedImages[0]?.src}
-                            className="w-full h-full object-cover"
-                            loop
-                            playsInline
-                            onClick={togglePlayPause}
-                            onEnded={() => setIsPlaying(false)}
-                          />
-                        ) : (
-                          <img
-                            src={selectedImages[0]?.src}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        )}
-                        {/* Reel UI */}
-                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
-                          <div className="flex items-end gap-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 p-[2px]">
-                                  <div className="w-full h-full rounded-full bg-black" />
-                                </div>
-                                <span className="text-xs font-semibold text-white">seu_perfil</span>
-                                <button className="px-3 py-1 border border-white rounded text-[10px] font-semibold text-white">
-                                  Seguir
-                                </button>
-                              </div>
-                              <p className="text-xs text-white line-clamp-2">
-                                {caption || 'Sua legenda aqui...'}
-                              </p>
-                              {hashtags && (
-                                <p className="text-xs text-white/70 mt-1">
-                                  {hashtags.split(/[\s,]+/).slice(0, 3).map(tag => tag.startsWith('#') ? tag : `#${tag}`).join(' ')}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex flex-col items-center gap-4">
-                              <div className="text-center">
-                                <Icon name="heart" className="w-7 h-7 text-white" />
-                                <span className="text-[10px] text-white">1.2k</span>
-                              </div>
-                              <div className="text-center">
-                                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                  <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-                                </svg>
-                                <span className="text-[10px] text-white">234</span>
-                              </div>
-                              <div className="text-center">
-                                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                  <line x1="22" y1="2" x2="11" y2="13" />
-                                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                                </svg>
-                              </div>
-                              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                <circle cx="5" cy="12" r="2" />
-                                <circle cx="12" cy="12" r="2" />
-                                <circle cx="19" cy="12" r="2" />
-                              </svg>
-                            </div>
-                          </div>
-                        </div>
-                        {/* Play/Pause button */}
-                        {selectedIsVideo ? (
-                          <button
-                            onClick={togglePlayPause}
-                            className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
-                              isPlaying ? 'opacity-0 hover:opacity-100' : 'opacity-100'
-                            }`}
-                          >
-                            <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                              {isPlaying ? (
-                                <Icon name="pause" className="w-8 h-8 text-white" />
-                              ) : (
-                                <Icon name="play" className="w-8 h-8 text-white ml-1" />
-                              )}
-                            </div>
-                          </button>
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                              <Icon name="play" className="w-8 h-8 text-white ml-1" />
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="text-center">
-                          <Icon name="video" className="w-12 h-12 text-white/20 mx-auto mb-2" />
-                          <p className="text-xs text-white/30">Selecione um vídeo ou imagem</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Feed / Carousel Preview */}
-              {(contentType === 'photo' || isCarousel) && (
-                <>
-                  {/* Post Header */}
-                  <div className="flex items-center gap-3 p-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 p-[2px]">
-                      <div className="w-full h-full rounded-full bg-black flex items-center justify-center">
-                        <span className="text-[10px] font-bold text-white">IG</span>
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs font-semibold text-white">seu_perfil</p>
-                      <p className="text-[10px] text-white/50">Local</p>
-                    </div>
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <circle cx="5" cy="12" r="2" />
-                      <circle cx="12" cy="12" r="2" />
-                      <circle cx="19" cy="12" r="2" />
-                    </svg>
-                  </div>
-
-                  {/* Post Image / Carousel */}
-                  <div className={`${getAspectRatio()} bg-[#111] flex items-center justify-center relative`}>
-                    {selectedImages.length > 0 ? (
-                      <>
-                        <img
-                          src={selectedImages[carouselIndex]?.src}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-
-                        {/* Carousel Navigation */}
-                        {isCarousel && selectedImages.length > 1 && (
-                          <>
-                            {carouselIndex > 0 && (
-                              <button
-                                onClick={() => setCarouselIndex(prev => prev - 1)}
-                                className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg"
-                              >
-                                <Icon name="chevron-left" className="w-5 h-5 text-black" />
-                              </button>
-                            )}
-                            {carouselIndex < selectedImages.length - 1 && (
-                              <button
-                                onClick={() => setCarouselIndex(prev => prev + 1)}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg"
-                              >
-                                <Icon name="chevron-right" className="w-5 h-5 text-black" />
-                              </button>
-                            )}
-                            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
-                              {selectedImages.map((_, idx) => (
-                                <button
-                                  key={idx}
-                                  onClick={() => setCarouselIndex(idx)}
-                                  className={`w-1.5 h-1.5 rounded-full transition-all ${
-                                    idx === carouselIndex ? 'bg-[#0095f6] w-2' : 'bg-white/50'
-                                  }`}
-                                />
-                              ))}
-                            </div>
-                            <div className="absolute top-3 right-3 px-2 py-1 bg-black/60 rounded-full">
-                              <span className="text-[10px] font-semibold text-white">
-                                {carouselIndex + 1}/{selectedImages.length}
-                              </span>
-                            </div>
-                          </>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-center">
-                        <Icon name="image" className="w-12 h-12 text-white/20 mx-auto mb-2" />
-                        <p className="text-xs text-white/30">
-                          {isCarousel ? 'Selecione as imagens' : 'Selecione uma imagem'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Post Actions */}
-                  <div className="p-3">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-4">
-                        <Icon name="heart" className="w-6 h-6 text-white" />
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-                        </svg>
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <line x1="22" y1="2" x2="11" y2="13" />
-                          <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                        </svg>
-                      </div>
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                      </svg>
-                    </div>
-
-                    {isCarousel && selectedImages.length > 1 && (
-                      <div className="flex justify-center gap-1 mb-3">
-                        {selectedImages.map((_, idx) => (
-                          <div
-                            key={idx}
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              idx === carouselIndex ? 'bg-[#0095f6]' : 'bg-white/30'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    )}
-
-                    <p className="text-xs font-semibold text-white mb-1">1.234 curtidas</p>
-
-                    <div className="text-xs text-white">
-                      <span className="font-semibold">seu_perfil</span>{' '}
-                      <span className="text-white/80">
-                        {caption || <span className="text-white/30 italic">Sua legenda aparecerá aqui...</span>}
-                      </span>
-                    </div>
-
-                    {hashtags && (
-                      <p className="text-xs text-[#00a3ff] mt-1">
-                        {hashtags.split(/[\s,]+/).map(tag => tag.startsWith('#') ? tag : `#${tag}`).filter(t => t.length > 1).join(' ')}
-                      </p>
-                    )}
-
-                    <p className="text-[10px] text-white/40 mt-2">
-                      {publishNow ? 'Agora' : new Date(`${scheduledDate}T${scheduledTime}`).toLocaleDateString('pt-BR', {
-                        day: 'numeric',
-                        month: 'long',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Content Type - Right below preview */}
-            <div className="px-3 py-2 flex gap-1.5 justify-center border-t border-white/[0.05]">
-              {[
-                { id: 'photo', label: 'Feed' },
-                { id: 'carousel', label: 'Carousel' },
-                { id: 'reel', label: 'Reel' },
-                { id: 'story', label: 'Story' },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => handleContentTypeChange(t.id as InstagramContentType)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    contentType === t.id
-                      ? 'bg-white text-black'
-                      : 'text-white/60 hover:text-white bg-[#0a0a0a]/60 border border-white/[0.08] hover:bg-white/10 backdrop-blur-xl'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Form Fields */}
-            <div className="p-3 space-y-3 border-t border-white/[0.05]">
-              {/* Caption Input */}
-              <div>
-                <label className="text-xs font-medium text-white/60 mb-2 block">
-                  Legenda
-                </label>
-                <textarea
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Escreva a legenda..."
-                  rows={2}
-                  className="w-full bg-transparent border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 outline-none focus:border-white/20 resize-none transition-all"
-                />
-              </div>
-
-              {/* Hashtags Input */}
-              <div>
-                <label className="text-xs font-medium text-white/60 mb-2 block">
-                  Hashtags
-                </label>
-                <input
-                  type="text"
-                  value={hashtags}
-                  onChange={(e) => setHashtags(e.target.value)}
-                  placeholder="#poker #torneio"
-                  className="w-full bg-transparent border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 outline-none focus:border-white/20 transition-all"
-                />
-              </div>
-
-              {/* Schedule Options */}
-              <div className="flex gap-1.5">
-                <button
-                  onClick={() => setPublishNow(true)}
-                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
-                    publishNow
-                      ? 'bg-white text-black'
-                      : 'text-white/60 hover:text-white bg-[#0a0a0a]/60 border border-white/[0.08] hover:bg-white/10 backdrop-blur-xl'
-                  }`}
-                >
-                  Agora
-                </button>
-                <button
-                  onClick={() => setPublishNow(false)}
-                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
-                    !publishNow
-                      ? 'bg-white text-black'
-                      : 'text-white/60 hover:text-white bg-[#0a0a0a]/60 border border-white/[0.08] hover:bg-white/10 backdrop-blur-xl'
-                  }`}
-                >
-                  Agendar
-                </button>
-              </div>
-
-              {/* Date & Time */}
-              {!publishNow && (
-                <div className="flex gap-1.5">
-                  <input
-                    type="date"
-                    value={scheduledDate}
-                    onChange={(e) => setScheduledDate(e.target.value)}
-                    min={todayStr}
-                    className="flex-1 bg-transparent border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-white/20 transition-all"
+  // Main scheduling modal with 3-column layout
+  return createPortal(
+    <div
+      className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-5xl bg-[#1a1a1a] rounded-3xl border border-white/10 shadow-2xl flex overflow-hidden backdrop-blur-xl"
+        style={{ height: '600px' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Left Column - Image Preview & Info */}
+        <div className="w-80 bg-[#0a0a0a] border-r border-white/10 flex flex-col">
+          {/* Image Preview */}
+          <div className="aspect-square bg-black flex items-center justify-center relative">
+            {selectedImage ? (
+              <>
+                {selectedIsVideo ? (
+                  <video
+                    src={selectedImage.src}
+                    className="w-full h-full object-cover"
+                    muted
+                    loop
+                    playsInline
                   />
-                  <input
-                    type="time"
-                    value={scheduledTime}
-                    onChange={(e) => setScheduledTime(e.target.value)}
-                    className={`flex-1 bg-transparent border rounded-lg px-3 py-2 text-xs text-white outline-none transition-all ${
-                      isTimeInPast ? 'border-red-500/30 focus:border-red-500/50' : 'border-white/[0.08] focus:border-white/20'
+                ) : (
+                  <img
+                    src={selectedImage.src}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                )}
+                {/* Change Image Button */}
+                <button
+                  onClick={() => setShowImageSelector(true)}
+                  className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg text-xs font-medium text-white hover:bg-black/90 transition-all"
+                >
+                  Trocar Imagem
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setShowImageSelector(true)}
+                className="flex flex-col items-center gap-3 text-white/40 hover:text-white/60 transition-colors"
+              >
+                <Icon name="image" className="w-12 h-12" />
+                <span className="text-sm font-medium">Selecionar Imagem</span>
+              </button>
+            )}
+          </div>
+
+          {/* Post Details */}
+          <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+            {/* Caption */}
+            <div>
+              <label className="text-xs font-semibold text-white/70 mb-2 block">
+                Legenda
+              </label>
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder="Escreva a legenda..."
+                rows={3}
+                className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30 resize-none transition-all"
+              />
+            </div>
+
+            {/* Hashtags */}
+            <div>
+              <label className="text-xs font-semibold text-white/70 mb-2 block">
+                Hashtags
+              </label>
+              <input
+                type="text"
+                value={hashtags}
+                onChange={(e) => setHashtags(e.target.value)}
+                placeholder="#poker #torneio"
+                className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30 transition-all"
+              />
+            </div>
+
+            {/* Content Type */}
+            <div>
+              <label className="text-xs font-semibold text-white/70 mb-2 block">
+                Tipo de Conteúdo
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'photo', label: 'Feed', icon: 'image' },
+                  { id: 'carousel', label: 'Carrossel', icon: 'layout' },
+                  { id: 'reel', label: 'Reel', icon: 'video' },
+                  { id: 'story', label: 'Story', icon: 'circle' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => handleContentTypeChange(t.id as InstagramContentType)}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2 ${
+                      contentType === t.id
+                        ? 'bg-white text-black'
+                        : 'text-white/60 bg-[#1a1a1a] border border-white/10 hover:border-white/20'
                     }`}
-                  />
-                </div>
-              )}
+                  >
+                    <Icon name={t.icon as IconName} className="w-3.5 h-3.5" />
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-white/[0.08] flex gap-2 shrink-0">
+        {/* Middle Column - Calendar */}
+        <div className="flex-1 flex flex-col p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-white capitalize">
+              {monthName}
+            </h2>
+            <div className="flex gap-2">
+              <button
+                onClick={handlePreviousMonth}
+                className="w-9 h-9 rounded-lg bg-[#0a0a0a] border border-white/10 text-white/70 hover:text-white hover:border-white/20 transition-all flex items-center justify-center"
+              >
+                <Icon name="chevron-left" className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleNextMonth}
+                className="w-9 h-9 rounded-lg bg-[#0a0a0a] border border-white/10 text-white/70 hover:text-white hover:border-white/20 transition-all flex items-center justify-center"
+              >
+                <Icon name="chevron-right" className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Calendar Grid */}
+          <div className="flex-1 flex flex-col">
+            {/* Weekday Headers */}
+            <div className="grid grid-cols-7 gap-2 mb-3">
+              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
+                <div
+                  key={day}
+                  className="text-center text-xs font-semibold text-white/40 py-2"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Days Grid */}
+            <div className="grid grid-cols-7 gap-2 flex-1">
+              {/* Empty cells for days before month starts */}
+              {Array.from({ length: startingDayOfWeek }).map((_, i) => (
+                <div key={`empty-${i}`} />
+              ))}
+
+              {/* Actual days */}
+              {Array.from({ length: daysInMonth }).map((_, i) => {
+                const day = i + 1;
+                const dateStr = `${calendarDate.getFullYear()}-${String(calendarDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const isSelected = dateStr === scheduledDate;
+                const isPast = dateStr < todayStr;
+                const isCurrentDay = dateStr === todayStr;
+
+                return (
+                  <button
+                    key={day}
+                    onClick={() => !isPast && handleSelectDate(day)}
+                    disabled={isPast}
+                    className={`aspect-square rounded-xl text-sm font-medium transition-all flex items-center justify-center ${
+                      isSelected
+                        ? 'bg-white text-black shadow-lg'
+                        : isPast
+                          ? 'text-white/20 cursor-not-allowed'
+                          : isCurrentDay
+                            ? 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
+                            : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Close Button at bottom */}
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 text-xs font-medium text-white/60 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+            className="mt-6 w-full py-3 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/5 transition-all"
           >
             Cancelar
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={selectedImages.length === 0 || isTimeInPast}
-            className="flex-1 py-2.5 bg-white text-black text-xs font-semibold rounded-lg hover:bg-white/90 active:scale-[0.99] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            {publishNow ? 'Publicar' : 'Agendar'}
-          </button>
+        </div>
+
+        {/* Right Column - Time Slots */}
+        <div className="w-72 bg-[#0a0a0a] border-l border-white/10 flex flex-col">
+          {/* Header */}
+          <div className="p-4 border-b border-white/10">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-white">Horário</h3>
+              <div className="flex gap-1">
+                <button
+                  className="px-2 py-1 bg-[#1a1a1a] border border-white/10 rounded text-[10px] font-medium text-white"
+                >
+                  12h
+                </button>
+                <button
+                  className="px-2 py-1 text-[10px] font-medium text-white/40"
+                >
+                  24h
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-white/50">
+              {new Date(`${scheduledDate}T${scheduledTime}`).toLocaleDateString('pt-BR', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric'
+              })}
+            </p>
+          </div>
+
+          {/* Time Slots List */}
+          <div ref={timeListRef} className="flex-1 overflow-y-auto p-3 space-y-2">
+            {TIME_SLOTS.map((time) => {
+              const isSelected = time === scheduledTime;
+              const isPast = scheduledDate === todayStr && time <= new Date().toTimeString().slice(0, 5);
+
+              return (
+                <button
+                  key={time}
+                  onClick={() => !isPast && setScheduledTime(time)}
+                  disabled={isPast}
+                  className={`w-full py-3 rounded-xl text-sm font-medium transition-all ${
+                    isSelected
+                      ? 'bg-white text-black shadow-lg'
+                      : isPast
+                        ? 'bg-[#1a1a1a]/50 text-white/20 cursor-not-allowed'
+                        : 'bg-[#1a1a1a] text-white/70 hover:bg-[#1a1a1a]/80 hover:text-white border border-white/5 hover:border-white/10'
+                  }`}
+                >
+                  {new Date(`2000-01-01T${time}`).toLocaleTimeString('pt-BR', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Continue Button */}
+          <div className="p-4 border-t border-white/10">
+            <button
+              onClick={handleSubmit}
+              disabled={selectedImages.length === 0 || isTimeInPast}
+              className="w-full py-3 bg-white text-black text-sm font-semibold rounded-xl hover:bg-white/90 active:scale-[0.99] transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
+            >
+              Agendar Publicação
+            </button>
+          </div>
         </div>
       </div>
     </div>,
