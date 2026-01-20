@@ -104,16 +104,13 @@ export const useFlyerGenerator = (
         return localStorage.getItem("flyer_manualStyleRef") || null;
     });
 
-    const [isStylePanelOpen, setIsStylePanelOpen] = useState(() => {
-        if (typeof window === 'undefined') return false;
-        return localStorage.getItem("stylePanel_isOpen") === "true";
-    });
+    const [isStylePanelOpen, setIsStylePanelOpen] = useState(true);
+    const [isSchedulesPanelOpen, setIsSchedulesPanelOpen] = useState(false);
 
     const [batchTrigger, setBatchTrigger] = useState(false);
     const [isBatchGenerating, setIsBatchGenerating] = useState(false);
     const [globalStyleReference, setGlobalStyleReference] = useState<GalleryImage | null>(null);
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
-    const [isSchedulesPanelOpen, setIsSchedulesPanelOpen] = useState(false);
     const [compositionAssets, setCompositionAssets] = useState<import("@/types").ImageFile[]>([]);
 
     // Persistence Effects
@@ -126,7 +123,6 @@ export const useFlyerGenerator = (
     useEffect(() => { localStorage.setItem("flyer_showOnlyWithGtd", String(showOnlyWithGtd)); }, [showOnlyWithGtd]);
     useEffect(() => { localStorage.setItem("flyer_sortBy", sortBy); }, [sortBy]);
     useEffect(() => { localStorage.setItem("flyer_enabledPeriods", JSON.stringify(enabledPeriods)); }, [enabledPeriods]);
-    useEffect(() => { localStorage.setItem("stylePanel_isOpen", String(isStylePanelOpen)); }, [isStylePanelOpen]);
 
     useEffect(() => {
         try {

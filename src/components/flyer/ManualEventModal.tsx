@@ -47,7 +47,7 @@ export const ManualEventModal: React.FC<{
     if (!isOpen) return null;
 
     const inputClass =
-        "w-full bg-transparent border border-white/[0.06] rounded-md px-3 py-2 text-xs text-white outline-none focus:border-primary/30 placeholder:text-white/20";
+        "w-full bg-transparent border border-white/[0.06] rounded-md px-3 py-2 text-xs text-white outline-none focus:border-white/20 placeholder:text-white/20";
     const labelClass = "text-[9px] text-white/30";
 
     return (

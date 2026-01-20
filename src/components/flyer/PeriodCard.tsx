@@ -328,12 +328,12 @@ export const PeriodCard: React.FC<{
         return (
             <>
                 <div
-                    className={`bg-[#0a0a0a] border rounded-xl overflow-hidden flex flex-col h-full transition-all ${styleReference ? "border-primary/20" : "border-white/[0.05]"}`}
+                    className={`bg-[#0a0a0a] border rounded-xl overflow-hidden flex flex-col h-full transition-all ${styleReference ? "border-white/10" : "border-white/[0.05]"}`}
                 >
                 <div className="px-4 py-2.5 flex justify-between items-center">
                     <div className="text-left flex items-center gap-2">
                         {styleReference && (
-                            <div className="w-6 h-6 rounded overflow-hidden border border-primary/20 flex-shrink-0">
+                            <div className="w-6 h-6 rounded overflow-hidden border border-white/10 flex-shrink-0">
                                 <img
                                     src={styleReference.src}
                                     className="w-full h-full object-cover"

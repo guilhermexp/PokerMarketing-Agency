@@ -356,7 +356,7 @@ export const PeriodCardRow: React.FC<{
 
         return (
             <div
-                className={`bg-black/40 backdrop-blur-2xl border rounded-2xl overflow-hidden transition-all mb-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isGenerating ? "border-primary/30 animate-pulse" : "border-white/10 hover:border-white/20"}`}
+                className={`bg-black/40 backdrop-blur-2xl border rounded-2xl overflow-hidden transition-all mb-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isGenerating ? "border-white/20 animate-pulse" : "border-white/10 hover:border-white/20"}`}
             >
                 <div
                     className="px-5 py-4 flex items-center justify-between cursor-pointer"
@@ -396,7 +396,7 @@ export const PeriodCardRow: React.FC<{
                             <span className="text-[9px] font-semibold text-white/40 uppercase tracking-wider block mb-1">
                                 GTD Total
                             </span>
-                            <span className="text-sm font-bold text-primary/90">
+                            <span className="text-sm font-bold text-white/90/90">
                                 {formatCurrencyValue(String(totalGtd), currency)}
                             </span>
                         </div>

@@ -343,12 +343,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               {events.length > 0 && weekScheduleInfo && (
                 <div className="hidden md:flex items-center gap-2">
                   {/* Week stats card */}
-                  <button
-                    onClick={() =>
-                      setIsSchedulesPanelOpen(!isSchedulesPanelOpen)
-                    }
-                    className="flex items-center gap-2 px-3 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
-                  >
+                  <div className="flex items-center gap-2 px-3 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
                     <Icon
                       name="calendar"
                       className="w-3.5 h-3.5 text-white/30"
@@ -361,19 +356,13 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     <span className="text-[9px] font-medium text-white/60">
                       {weekStats.totalTournaments} torneios
                     </span>
-                    <span className="text-[9px] font-medium text-primary/70">
+                    <span className="text-[9px] font-medium text-white/70">
                       {formatCurrencyValue(
                         String(weekStats.totalGtd),
                         selectedCurrency,
                       )}
                     </span>
-                    <Icon
-                      name={
-                        isSchedulesPanelOpen ? "chevron-up" : "chevron-down"
-                      }
-                      className="w-3 h-3 text-white/30"
-                    />
-                  </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -444,131 +433,6 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   />
                 </label>
               )}
-              {/* Logo Colab button */}
-              <label className="relative cursor-pointer group" title="Logo Colaborador">
-                <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-                  {collabLogo ? (
-                    <img src={collabLogo} className="w-5 h-5 object-contain rounded" />
-                  ) : (
-                    <Icon name="briefcase" className="w-4 h-4" />
-                  )}
-                </div>
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      const { dataUrl } = await fileToBase64(f);
-                      setCollabLogo(dataUrl);
-                    }
-                  }}
-                />
-                {collabLogo && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setCollabLogo(null);
-                    }}
-                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    ×
-                  </button>
-                )}
-              </label>
-
-              {/* Referência button */}
-              <label className="relative cursor-pointer group" title="Referência de Estilo">
-                <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-                  {manualStyleRef ? (
-                    <img src={manualStyleRef} className="w-5 h-5 object-cover rounded" />
-                  ) : (
-                    <Icon name="image" className="w-4 h-4" />
-                  )}
-                </div>
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      const { dataUrl } = await fileToBase64(f);
-                      setManualStyleRef(dataUrl);
-                      setGlobalStyleReference({
-                        id: "manual-ref",
-                        src: dataUrl,
-                        prompt: "Estilo Manual",
-                        source: "Edição",
-                        model: selectedImageModel,
-                      });
-                    }
-                  }}
-                />
-                {manualStyleRef && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setManualStyleRef(null);
-                      setGlobalStyleReference(null);
-                    }}
-                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    ×
-                  </button>
-                )}
-              </label>
-
-              {/* Ativos button */}
-              <label className="relative cursor-pointer group" title="Ativos de Composição">
-                <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-                  {compositionAssets.length > 0 ? (
-                    <span className="text-[10px] font-bold text-primary">{compositionAssets.length}</span>
-                  ) : (
-                    <Icon name="layers" className="w-4 h-4" />
-                  )}
-                </div>
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      const { base64, mimeType, dataUrl } = await fileToBase64(f);
-                      setCompositionAssets((prev) => [
-                        ...prev,
-                        { base64, mimeType, preview: dataUrl } as unknown as import("@/types").ImageFile,
-                      ]);
-                    }
-                  }}
-                />
-                {compositionAssets.length > 0 && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setCompositionAssets([]);
-                    }}
-                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    ×
-                  </button>
-                )}
-              </label>
-
-              {/* Favoritos button */}
-              <button
-                onClick={() => setIsStylePanelOpen(!isStylePanelOpen)}
-                className={`w-10 h-10 rounded-full backdrop-blur-2xl border flex items-center justify-center transition-all active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${
-                  isStylePanelOpen
-                    ? "bg-primary/10 border-primary/30 text-primary"
-                    : "bg-black/40 border-white/10 text-white/60 hover:border-white/30 hover:text-white/90"
-                }`}
-                title={`Favoritos (${styleReferences.length})`}
-              >
-                <Icon name="heart" className="w-4 h-4" />
-              </button>
 
               {/* Settings button */}
               <button
@@ -583,16 +447,16 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
 
           {/* Indicador de referência selecionada */}
           {selectedStyleReference && (
-            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-primary/10 border border-primary/30 rounded-xl">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-white/5 border border-white/20 rounded-xl">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg overflow-hidden border border-primary/30 flex-shrink-0">
+                <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/20 flex-shrink-0">
                   <img
                     src={selectedStyleReference.src}
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-primary uppercase tracking-wide">
+                  <p className="text-[10px] font-black text-white/90 uppercase tracking-wide">
                     Referência Ativa
                   </p>
                   <p className="text-[9px] text-white/50">
@@ -646,7 +510,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                       key={schedule.id}
                       onClick={() => onSelectSchedule?.(schedule)}
                       className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border transition-all text-left ${isSelected
-                        ? "bg-primary/10 border-primary/30"
+                        ? "bg-white/5 border-white/20"
                         : isCurrentWeek
                           ? "bg-green-500/10 border-green-500/20 hover:border-green-500/40"
                           : isExpired
@@ -672,7 +536,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         <div className="min-w-0">
                           <p
                             className={`text-[10px] font-bold truncate ${isSelected
-                              ? "text-primary"
+                              ? "text-white/90"
                               : isCurrentWeek
                                 ? "text-green-400"
                                 : "text-white/70"
@@ -698,7 +562,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                           </span>
                         )}
                         {isSelected && (
-                          <Icon name="check" className="w-3 h-3 text-primary" />
+                          <Icon name="check" className="w-3 h-3 text-white/90" />
                         )}
                       </div>
                     </button>
@@ -728,32 +592,148 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   ))}
                 </select>
               </div>
-              <button
-                onClick={() => {
-                  setIsBatchGenerating(true);
-                  // Clear only the current day's flyers
-                  setDailyFlyerState((prev) => ({
-                    ...prev,
-                    [selectedDay]: {
-                      ALL: [],
-                      MORNING: [],
-                      AFTERNOON: [],
-                      NIGHT: [],
-                      HIGHLIGHTS: [],
-                    },
-                  }));
-                  setBatchTrigger(true);
-                  setTimeout(() => {
-                    setBatchTrigger(false);
-                    setIsBatchGenerating(false);
-                  }, 1500);
-                }}
-                disabled={isBatchGenerating}
-                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Icon name="zap" className="w-4 h-4" />
-                {isBatchGenerating ? "Gerando..." : "Gerar Grade"}
-              </button>
+
+              <div className="flex items-center gap-2">
+                {/* Logo Colab button */}
+                <label className="relative cursor-pointer group" title="Logo Colaborador">
+                  <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                    {collabLogo ? (
+                      <img src={collabLogo} className="w-5 h-5 object-contain rounded" />
+                    ) : (
+                      <Icon name="briefcase" className="w-4 h-4" />
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        const { dataUrl } = await fileToBase64(f);
+                        setCollabLogo(dataUrl);
+                      }
+                    }}
+                  />
+                  {collabLogo && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCollabLogo(null);
+                      }}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ×
+                    </button>
+                  )}
+                </label>
+
+                {/* Referência button */}
+                <label className="relative cursor-pointer group" title="Referência de Estilo">
+                  <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                    {manualStyleRef ? (
+                      <img src={manualStyleRef} className="w-5 h-5 object-cover rounded" />
+                    ) : (
+                      <Icon name="image" className="w-4 h-4" />
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        const { dataUrl } = await fileToBase64(f);
+                        setManualStyleRef(dataUrl);
+                        setGlobalStyleReference({
+                          id: "manual-ref",
+                          src: dataUrl,
+                          prompt: "Estilo Manual",
+                          source: "Edição",
+                          model: selectedImageModel,
+                        });
+                      }
+                    }}
+                  />
+                  {manualStyleRef && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setManualStyleRef(null);
+                        setGlobalStyleReference(null);
+                      }}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ×
+                    </button>
+                  )}
+                </label>
+
+                {/* Ativos button */}
+                <label className="relative cursor-pointer group" title="Ativos de Composição">
+                  <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                    {compositionAssets.length > 0 ? (
+                      <span className="text-[10px] font-bold text-white/90">{compositionAssets.length}</span>
+                    ) : (
+                      <Icon name="layers" className="w-4 h-4" />
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        const { base64, mimeType, dataUrl } = await fileToBase64(f);
+                        setCompositionAssets((prev) => [
+                          ...prev,
+                          { base64, mimeType, preview: dataUrl } as unknown as import("@/types").ImageFile,
+                        ]);
+                      }
+                    }}
+                  />
+                  {compositionAssets.length > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCompositionAssets([]);
+                      }}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ×
+                    </button>
+                  )}
+                </label>
+
+                <button
+                  onClick={() => {
+                    setIsBatchGenerating(true);
+                    // Clear only the current day's flyers
+                    setDailyFlyerState((prev) => ({
+                      ...prev,
+                      [selectedDay]: {
+                        ALL: [],
+                        MORNING: [],
+                        AFTERNOON: [],
+                        NIGHT: [],
+                        HIGHLIGHTS: [],
+                      },
+                    }));
+                    setBatchTrigger(true);
+                    setTimeout(() => {
+                      setBatchTrigger(false);
+                      setIsBatchGenerating(false);
+                    }, 1500);
+                  }}
+                  disabled={isBatchGenerating}
+                  className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Icon name="zap" className="w-4 h-4" />
+                  {isBatchGenerating ? "Gerando..." : "Gerar Grade"}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1098,46 +1078,31 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
       </div>
 
       {/* Painel Lateral Integrado de Favoritos */}
-      <div
-        className={`bg-black/60 backdrop-blur-2xl border-l border-white/10 flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out ${isStylePanelOpen ? "w-80" : "w-0 opacity-0 pointer-events-none"
-          }`}
-      >
-        {isStylePanelOpen && (
-          <>
-            {/* Header */}
-            <div className="px-6 py-5 border-b border-white/10 flex justify-between items-center bg-black/40">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
-                  <Icon name="layout" className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white">
-                    Favoritos
-                  </h3>
-                  <p className="text-xs text-white/40 mt-0.5">
-                    {styleReferences.length} Estilos
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsStylePanelOpen(false)}
-                className="w-8 h-8 rounded-lg bg-black/40 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all group"
-              >
-                <Icon
-                  name="chevron-up"
-                  className="w-4 h-4 rotate-90 group-hover:translate-x-0.5 transition-transform"
-                />
-              </button>
+      <div className="w-80 bg-black/60 backdrop-blur-2xl border-l border-white/10 flex flex-col flex-shrink-0">
+        <>
+          {/* Header */}
+          <div className="px-6 py-5 border-b border-white/10 bg-black/40">
+            <div>
+              <h3 className="text-sm font-semibold text-white">
+                Favoritos
+              </h3>
+              <p className="text-xs text-white/40 mt-0.5">
+                {styleReferences.length} Estilos
+              </p>
             </div>
+            <p className="text-[10px] text-white/50 mt-3 leading-relaxed">
+              Para garantir melhor qualidade e padrão use sempre um favorito como referência
+            </p>
+          </div>
 
             {/* Info Banner */}
             {selectedStyleReference && (
-              <div className="px-6 py-3 bg-primary/10 border-b border-primary/20 flex items-center gap-3">
-                <div className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center flex-shrink-0">
-                  <Icon name="check" className="w-3 h-3 text-primary" />
+              <div className="px-6 py-3 bg-white/5 border-b border-white/10 flex items-center gap-3">
+                <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center flex-shrink-0">
+                  <Icon name="check" className="w-3 h-3 text-white/90" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">
+                  <p className="text-[10px] font-semibold text-white/90 uppercase tracking-wider">
                     Estilo Ativo
                   </p>
                   <p className="text-xs text-white/70 truncate font-medium">
@@ -1149,7 +1114,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     if (onClearSelectedStyleReference)
                       onClearSelectedStyleReference();
                   }}
-                  className="text-primary/50 hover:text-primary transition-colors"
+                  className="text-white/50 hover:text-white/90 transition-colors"
                 >
                   <Icon name="x" className="w-3.5 h-3.5" />
                 </button>
@@ -1171,8 +1136,8 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                           }
                         }}
                         className={`group relative w-full aspect-[4/3] rounded-xl overflow-hidden transition-all cursor-pointer ${isSelected
-                          ? "ring-2 ring-primary ring-offset-2 ring-offset-[#070707] scale-[1.02]"
-                          : "border border-white/[0.06] hover:border-primary/20 hover:scale-[1.01]"
+                          ? "ring-2 ring-white/30 ring-offset-2 ring-offset-[#070707] scale-[1.02]"
+                          : "border border-white/[0.06] hover:border-white/10 hover:scale-[1.01]"
                           }`}
                       >
                         <img
@@ -1199,13 +1164,13 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
 
                         {/* Selected Badge */}
                         {isSelected && (
-                          <div className="absolute top-3 right-3 w-7 h-7 rounded-lg bg-primary shadow-lg shadow-primary/50 flex items-center justify-center">
+                          <div className="absolute top-3 right-3 w-7 h-7 rounded-lg bg-white/10 shadow-lg shadow-white/50 flex items-center justify-center">
                             <Icon name="check" className="w-4 h-4 text-black" />
                           </div>
                         )}
 
                         {/* Hover Overlay */}
-                        <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </button>
                     );
                   })}
@@ -1219,8 +1184,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 />
               )}
             </div>
-          </>
-        )}
+        </>
       </div>
     </div>
   );

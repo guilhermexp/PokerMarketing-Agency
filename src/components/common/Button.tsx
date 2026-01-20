@@ -26,7 +26,7 @@ export const Button: React.FC<ButtonProps> = ({
     "font-black rounded-xl transition-all focus:outline-none flex items-center justify-center space-x-2 disabled:opacity-30 disabled:cursor-not-allowed uppercase tracking-wide antialiased";
 
   const variantClasses = {
-    primary: "bg-primary text-black hover:bg-primary/90 active:scale-95",
+    primary: "bg-white/10 text-white hover:bg-white/20 active:scale-95 border border-white/20",
     secondary: "bg-white text-black hover:bg-white/90 active:scale-95",
     ghost: "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white active:scale-95 border border-white/10",
     outline: "bg-transparent text-white border border-white/20 hover:bg-white/5 hover:border-white/30 active:scale-95",

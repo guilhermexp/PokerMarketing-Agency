@@ -267,7 +267,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
           <div className="flex flex-col">
             <span className="text-sm font-bold text-white line-clamp-1">{event.name}</span>
             <div className="flex items-center gap-2 text-xs text-white/60">
-              <span className="text-primary font-mono">{biVal}</span>
+              <span className="text-white/90 font-mono">{biVal}</span>
               <span>|</span>
               <span className="font-mono">{event.structure}</span>
               <span>|</span>
@@ -279,7 +279,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
           {gtdVal !== '---' && (
             <div className="flex flex-col items-end">
               <span className="text-[10px] text-white/40 uppercase tracking-wider">GTD</span>
-              <span className="text-base font-black text-primary font-mono">{gtdVal}</span>
+              <span className="text-base font-black text-white/90 font-mono">{gtdVal}</span>
             </div>
           )}
           <Icon

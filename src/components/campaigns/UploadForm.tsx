@@ -534,16 +534,6 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                       )}
                     </div>
 
-                    {/* Favorites Button */}
-                    {styleReferences.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setIsFavoritesOpen(!isFavoritesOpen)}
-                        className="flex items-center justify-center size-9 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white/90 transition-all shrink-0"
-                      >
-                        <Icon name="star" className="size-[18px]" />
-                      </button>
-                    )}
                   </div>
 
                   {/* Right side - Actions */}

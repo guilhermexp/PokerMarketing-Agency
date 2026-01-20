@@ -69,7 +69,7 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
           <button
             type="button"
             onClick={() => scrollStrip('prev')}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/[0.06] flex items-center justify-center text-white hover:bg-primary hover:text-black transition-all"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/[0.06] flex items-center justify-center text-white hover:bg-white/20 hover:text-white transition-all"
             aria-label="Anterior"
           >
             <Icon name="chevron-up" className="w-3.5 h-3.5 -rotate-90" />
@@ -77,7 +77,7 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
           <button
             type="button"
             onClick={() => scrollStrip('next')}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/[0.06] flex items-center justify-center text-white hover:bg-primary hover:text-black transition-all"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/[0.06] flex items-center justify-center text-white hover:bg-white/20 hover:text-white transition-all"
             aria-label="Próximo"
           >
             <Icon name="chevron-up" className="w-3.5 h-3.5 rotate-90" />
@@ -114,7 +114,7 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
                     {/* Primary action */}
                     <button
                       onClick={() => onQuickPost(flyer)}
-                      className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-primary hover:bg-primary/90 rounded-lg text-black font-bold text-[8px] uppercase tracking-wide transition-all"
+                      className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-black font-bold text-[8px] uppercase tracking-wide transition-all"
                     >
                       <Icon name="zap" className="w-2.5 h-2.5" />
                       Publicar
