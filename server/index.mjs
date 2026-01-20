@@ -3262,6 +3262,9 @@ const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
   let lastError = null;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
+      if (attempt > 1) {
+        console.log(`[withRetry] Tentativa ${attempt}/${maxRetries}...`);
+      }
       return await fn();
     } catch (error) {
       lastError = error;
@@ -3271,13 +3274,20 @@ const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
         error?.message?.includes("UNAVAILABLE") ||
         error?.status === 503;
 
+      console.error(`[withRetry] Erro na tentativa ${attempt}/${maxRetries}:`);
+      console.error(`[withRetry]   Tipo: ${error.constructor.name}`);
+      console.error(`[withRetry]   Mensagem: ${error.message}`);
+      console.error(`[withRetry]   Status: ${error.status || 'N/A'}`);
+      console.error(`[withRetry]   Retryable: ${isRetryable}`);
+
       if (isRetryable && attempt < maxRetries) {
-        console.log(
-          `[Gemini] Retry ${attempt}/${maxRetries} after ${delayMs}ms...`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+        const waitTime = delayMs * attempt;
+        console.log(`[withRetry] ⏳ Aguardando ${waitTime}ms antes de tentar novamente...`);
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
         continue;
       }
+
+      console.error(`[withRetry] ❌ Todas as tentativas falharam ou erro não é retryable`);
       throw error;
     }
   }
@@ -3310,11 +3320,18 @@ const generateGeminiImage = async (
   styleReferenceImage,
   personReferenceImage,
 ) => {
+  console.log(`[generateGeminiImage] ========================================`);
+  console.log(`[generateGeminiImage] Iniciando geração`);
+  console.log(`[generateGeminiImage]   model: ${model}`);
+  console.log(`[generateGeminiImage]   aspectRatio: ${aspectRatio} -> ${mapAspectRatio(aspectRatio)}`);
+  console.log(`[generateGeminiImage]   imageSize: ${imageSize}`);
+
   const ai = getGeminiAi();
   const parts = [{ text: prompt }];
 
   // Add person/face reference image first (highest priority for face consistency)
   if (personReferenceImage) {
+    console.log(`[generateGeminiImage]   Adicionando personReferenceImage (${personReferenceImage.mimeType})`);
     parts.push({
       inlineData: {
         data: personReferenceImage.base64,
@@ -3324,6 +3341,7 @@ const generateGeminiImage = async (
   }
 
   if (styleReferenceImage) {
+    console.log(`[generateGeminiImage]   Adicionando styleReferenceImage (${styleReferenceImage.mimeType})`);
     parts.push({
       inlineData: {
         data: styleReferenceImage.base64,
@@ -3333,12 +3351,17 @@ const generateGeminiImage = async (
   }
 
   if (productImages) {
-    productImages.forEach((img) => {
+    console.log(`[generateGeminiImage]   Adicionando ${productImages.length} productImages`);
+    productImages.forEach((img, idx) => {
+      console.log(`[generateGeminiImage]     ${idx + 1}. ${img.mimeType}`);
       parts.push({
         inlineData: { data: img.base64, mimeType: img.mimeType },
       });
     });
   }
+
+  console.log(`[generateGeminiImage]   Total de parts: ${parts.length}`);
+  console.log(`[generateGeminiImage] Chamando API do Gemini...`);
 
   const response = await withRetry(() =>
     ai.models.generateContent({
@@ -3353,19 +3376,36 @@ const generateGeminiImage = async (
     }),
   );
 
+  console.log(`[generateGeminiImage] ✅ Resposta recebida do Gemini`);
+
   const responseParts = response?.candidates?.[0]?.content?.parts;
+  console.log(`[generateGeminiImage] Processando resposta...`);
+  console.log(`[generateGeminiImage]   response.candidates?.length: ${response?.candidates?.length || 0}`);
+  console.log(`[generateGeminiImage]   responseParts é array: ${Array.isArray(responseParts)}`);
+  console.log(`[generateGeminiImage]   responseParts?.length: ${responseParts?.length || 0}`);
+
   if (!Array.isArray(responseParts)) {
-    console.error("[Image API] Unexpected response:", JSON.stringify(response, null, 2));
+    console.error(`[generateGeminiImage] ❌ Estrutura de resposta inválida!`);
+    console.error(`[generateGeminiImage] Resposta completa:`, JSON.stringify(response, null, 2));
     throw new Error("Failed to generate image - invalid response structure");
   }
 
   for (const part of responseParts) {
     if (part.inlineData) {
-      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      const mimeType = part.inlineData.mimeType;
+      const dataLength = part.inlineData.data?.length || 0;
+      console.log(`[generateGeminiImage] ✅ Imagem encontrada na resposta!`);
+      console.log(`[generateGeminiImage]   mimeType: ${mimeType}`);
+      console.log(`[generateGeminiImage]   base64 data length: ${dataLength} chars`);
+      console.log(`[generateGeminiImage] ========================================`);
+      return `data:${mimeType};base64,${part.inlineData.data}`;
     }
   }
 
-  throw new Error("Failed to generate image");
+  console.error(`[generateGeminiImage] ❌ Nenhuma imagem encontrada nos parts da resposta`);
+  console.error(`[generateGeminiImage] Parts recebidos:`, JSON.stringify(responseParts, null, 2));
+  console.error(`[generateGeminiImage] ========================================`);
+  throw new Error("Failed to generate image - no image data in response");
 };
 
 // Generate structured content with Gemini
@@ -4277,8 +4317,14 @@ app.post("/api/ai/flyer", async (req, res) => {
 app.post("/api/ai/image", async (req, res) => {
   const timer = createTimer();
   const auth = getAuth(req);
+  const userId = auth?.userId;
   const organizationId = auth?.orgId || null;
   const sql = getSql();
+
+  console.log(`[Image API] ========================================`);
+  console.log(`[Image API] Nova requisição de geração de imagem`);
+  console.log(`[Image API] userId: ${userId}`);
+  console.log(`[Image API] orgId: ${organizationId || 'null (personal)'}`);
 
   try {
     const {
@@ -4292,15 +4338,29 @@ app.post("/api/ai/image", async (req, res) => {
     } = req.body;
     const model = DEFAULT_IMAGE_MODEL;
 
+    console.log(`[Image API] Parâmetros recebidos:`);
+    console.log(`[Image API]   prompt: "${prompt?.substring(0, 100)}${prompt?.length > 100 ? '...' : ''}"`);
+    console.log(`[Image API]   aspectRatio: ${aspectRatio}`);
+    console.log(`[Image API]   imageSize: ${imageSize}`);
+    console.log(`[Image API]   model: ${model}`);
+    console.log(`[Image API]   brandProfile presente: ${!!brandProfile}`);
+
+    if (brandProfile) {
+      console.log(`[Image API]   brandProfile.name: ${brandProfile.name || 'undefined'}`);
+      console.log(`[Image API]   brandProfile.logo: ${brandProfile.logo ? 'presente' : 'ausente'}`);
+      console.log(`[Image API]   brandProfile.colors: ${brandProfile.colors ? JSON.stringify(brandProfile.colors) : 'ausente'}`);
+    }
+
+    console.log(`[Image API]   productImages: ${productImages?.length || 0}`);
+    console.log(`[Image API]   styleReferenceImage: ${styleReferenceImage ? 'presente' : 'ausente'}`);
+    console.log(`[Image API]   personReferenceImage: ${personReferenceImage ? 'presente' : 'ausente'}`);
+
     if (!prompt || !brandProfile) {
+      console.error(`[Image API] ❌ Validação falhou: prompt ou brandProfile ausente`);
       return res
         .status(400)
         .json({ error: "prompt and brandProfile are required" });
     }
-
-    console.log(
-      `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}${personReferenceImage ? ', with person reference' : ''} | productImages: ${productImages?.length || 0}`,
-    );
 
     // Prepare product images array, including brand logo if available
     let allProductImages = productImages ? [...productImages] : [];
@@ -4341,8 +4401,16 @@ app.post("/api/ai/image", async (req, res) => {
       jsonPrompt,
     );
 
-    console.log("[Image API] Prompt:");
+    console.log("[Image API] ========================================");
+    console.log("[Image API] Prompt completo:");
     console.log(fullPrompt);
+    console.log("[Image API] ========================================");
+
+    console.log(`[Image API] Chamando generateGeminiImage...`);
+    console.log(`[Image API]   model: ${model}`);
+    console.log(`[Image API]   aspectRatio: ${aspectRatio}`);
+    console.log(`[Image API]   imageSize: ${imageSize}`);
+    console.log(`[Image API]   allProductImages.length: ${allProductImages.length}`);
 
     const imageDataUrl = await generateGeminiImage(
       fullPrompt,
@@ -4354,7 +4422,8 @@ app.post("/api/ai/image", async (req, res) => {
       personReferenceImage,
     );
 
-    console.log("[Image API] Image generated successfully");
+    console.log(`[Image API] ✅ Imagem gerada com sucesso!`);
+    console.log(`[Image API]   imageDataUrl length: ${imageDataUrl?.length || 0} chars`);
 
     // Log AI usage
     await logAiUsage(sql, {
@@ -4369,22 +4438,37 @@ app.post("/api/ai/image", async (req, res) => {
       metadata: { aspectRatio, hasProductImages: !!productImages?.length, hasStyleRef: !!styleReferenceImage }
     });
 
+    const elapsedTime = timer();
+    console.log(`[Image API] ✅ SUCESSO | Tempo total: ${elapsedTime}ms`);
+    console.log(`[Image API] ========================================`);
+
     res.json({
       success: true,
       imageUrl: imageDataUrl,
       model,
     });
   } catch (error) {
-    console.error("[Image API] Error:", error);
+    const elapsedTime = timer();
+    console.error(`[Image API] ========================================`);
+    console.error(`[Image API] ❌ ERRO após ${elapsedTime}ms`);
+    console.error(`[Image API] Tipo de erro: ${error.constructor.name}`);
+    console.error(`[Image API] Mensagem: ${error.message}`);
+    console.error(`[Image API] Stack:`);
+    console.error(error.stack);
+    console.error(`[Image API] ========================================`);
+
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/image',
       operation: 'image',
       model: DEFAULT_IMAGE_MODEL,
-      latencyMs: timer(),
+      latencyMs: elapsedTime,
       status: 'failed',
       error: error.message,
-    }).catch(() => {});
+    }).catch((logError) => {
+      console.error(`[Image API] Falha ao logar erro no DB:`, logError);
+    });
+
     return res
       .status(500)
       .json({ error: error.message || "Failed to generate image" });

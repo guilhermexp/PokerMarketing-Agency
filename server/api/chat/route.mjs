@@ -112,7 +112,26 @@ export async function chatHandler(req, res) {
     }
 
     // =========================================================================
-    // 6. CONFIGURAR TOOLS E STREAMING
+    // 6. VALIDAR BRANDPROFILE ANTES DE CONFIGURAR TOOLS
+    // =========================================================================
+    console.log(`[Chat API] Validando brandProfile...`);
+    console.log(`[Chat API] brandProfile recebido:`, brandProfile ? {
+      hasName: !!brandProfile.name,
+      hasLogo: !!brandProfile.logo,
+      hasColors: !!brandProfile.colors,
+      hasDescription: !!brandProfile.description,
+      hasPrimaryColor: !!brandProfile.colors?.primary,
+      keys: Object.keys(brandProfile)
+    } : 'null/undefined');
+
+    // Validar que brandProfile tem os campos mínimos necessários
+    if (!brandProfile || !brandProfile.name) {
+      console.warn(`[Chat API] ⚠️ brandProfile inválido ou incompleto!`);
+      console.warn(`[Chat API] brandProfile:`, JSON.stringify(brandProfile, null, 2));
+    }
+
+    // =========================================================================
+    // 7. CONFIGURAR TOOLS E STREAMING
     // =========================================================================
 
     // Nota: Para Express, não podemos usar dataStream.write() diretamente
@@ -151,7 +170,7 @@ export async function chatHandler(req, res) {
     console.log(`[Chat API] System prompt length: ${systemMessage.length} chars`);
 
     // =========================================================================
-    // 6. STREAM DE TEXTO COM VERCEL AI SDK
+    // 8. STREAM DE TEXTO COM VERCEL AI SDK
     // =========================================================================
 
     // Converter mensagens (é assíncrono no SDK v6)
@@ -169,31 +188,67 @@ export async function chatHandler(req, res) {
       temperature: 0.7,
       maxSteps: 5, // Permitir até 5 steps de tool calling
       onStepFinish: ({ text, toolCalls, toolResults, finishReason, usage }) => {
-        console.log('[Chat API] Step finished:', {
-          text: text?.substring(0, 100) + '...',
-          toolCallsCount: toolCalls?.length || 0,
-          toolCalls: toolCalls?.map(tc => ({ name: tc.toolName, state: tc.type })),
-          toolResultsCount: toolResults?.length || 0,
-          toolResults: toolResults?.map(tr => {
-            let resultPreview = 'undefined';
-            try {
-              if (typeof tr.result === 'string') {
-                resultPreview = tr.result.substring(0, 200);
-              } else if (tr.result) {
-                resultPreview = JSON.stringify(tr.result).substring(0, 200);
+        console.log('[Chat API] ================================================');
+        console.log('[Chat API] STEP FINISHED');
+        console.log('[Chat API] finishReason:', finishReason);
+        console.log('[Chat API] usage:', usage);
+
+        if (text) {
+          console.log('[Chat API] text preview:', text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+        }
+
+        // Log detalhado de tool calls
+        if (toolCalls && toolCalls.length > 0) {
+          console.log(`[Chat API] Tool Calls (${toolCalls.length}):`);
+          toolCalls.forEach((tc, idx) => {
+            console.log(`[Chat API]   ${idx + 1}. ${tc.toolName} (${tc.type})`);
+            console.log(`[Chat API]      toolCallId: ${tc.toolCallId}`);
+
+            // Log dos argumentos da tool
+            if (tc.args) {
+              try {
+                const argsStr = JSON.stringify(tc.args, null, 2).split('\n').map(l => `[Chat API]         ${l}`).join('\n');
+                console.log(`[Chat API]      args:`);
+                console.log(argsStr);
+              } catch (e) {
+                console.log(`[Chat API]      args: <error serializing>`);
               }
-            } catch (e) {
-              resultPreview = 'error serializing result';
             }
-            return {
-              toolCallId: tr.toolCallId,
-              toolName: tr.toolName,
-              result: resultPreview
-            };
-          }),
-          finishReason,
-          usage
-        });
+          });
+        }
+
+        // Log detalhado de tool results
+        if (toolResults && toolResults.length > 0) {
+          console.log(`[Chat API] Tool Results (${toolResults.length}):`);
+          toolResults.forEach((tr, idx) => {
+            console.log(`[Chat API]   ${idx + 1}. ${tr.toolName}`);
+            console.log(`[Chat API]      toolCallId: ${tr.toolCallId}`);
+
+            // Log do resultado da tool
+            try {
+              let resultLog = '';
+              if (typeof tr.result === 'string') {
+                resultLog = tr.result.substring(0, 300);
+              } else if (tr.result) {
+                const resultStr = JSON.stringify(tr.result, null, 2);
+                resultLog = resultStr.substring(0, 500);
+                if (resultStr.length > 500) resultLog += '... (truncated)';
+              } else {
+                resultLog = 'undefined';
+              }
+              console.log(`[Chat API]      result: ${resultLog}`);
+            } catch (e) {
+              console.log(`[Chat API]      result: <error serializing: ${e.message}>`);
+            }
+
+            // Log de erros se houver
+            if (tr.error) {
+              console.error(`[Chat API]      ❌ ERROR: ${tr.error}`);
+            }
+          });
+        }
+
+        console.log('[Chat API] ================================================');
       }
     });
 

@@ -70,6 +70,21 @@ export const createImageTool = ({ userId, orgId, dataStream, brandProfile }) =>
     },
 
     execute: async ({ description, aspectRatio }) => {
+      const startTime = Date.now();
+      console.log(`[Tool:createImage] ========================================`);
+      console.log(`[Tool:createImage] INÍCIO DA EXECUÇÃO`);
+      console.log(`[Tool:createImage] userId: ${userId}`);
+      console.log(`[Tool:createImage] orgId: ${orgId || 'null (personal)'}`);
+      console.log(`[Tool:createImage] description: "${description}"`);
+      console.log(`[Tool:createImage] aspectRatio: ${aspectRatio}`);
+      console.log(`[Tool:createImage] brandProfile presente: ${!!brandProfile}`);
+
+      if (brandProfile) {
+        console.log(`[Tool:createImage] brandProfile.name: ${brandProfile.name || 'undefined'}`);
+        console.log(`[Tool:createImage] brandProfile.logo: ${brandProfile.logo ? 'presente' : 'ausente'}`);
+        console.log(`[Tool:createImage] brandProfile.colors: ${brandProfile.colors ? JSON.stringify(brandProfile.colors) : 'ausente'}`);
+      }
+
       try {
         // 1. Enviar evento de início (se dataStream disponível)
         if (dataStream) {
@@ -83,30 +98,50 @@ export const createImageTool = ({ userId, orgId, dataStream, brandProfile }) =>
           });
         }
 
-        console.log(`[Tool:createImage] Gerando imagem | orgId: ${orgId} | aspectRatio: ${aspectRatio}`);
-
         // 2. Chamar API de geração de imagem existente
         // Nota: Fazemos uma requisição interna ao endpoint existente
         const baseUrl = getInternalBaseUrl();
-        const response = await fetch(`${baseUrl}/api/ai/image`, {
+        const requestUrl = `${baseUrl}/api/ai/image`;
+        const requestBody = {
+          prompt: description,
+          brandProfile,
+          aspectRatio,
+          imageSize: '1K'
+        };
+
+        console.log(`[Tool:createImage] Fazendo requisição para: ${requestUrl}`);
+        console.log(`[Tool:createImage] Request body:`, JSON.stringify(requestBody, null, 2));
+
+        const response = await fetch(requestUrl, {
           method: 'POST',
           headers: getInternalHeaders(userId, orgId),
-          body: JSON.stringify({
-            prompt: description,
-            brandProfile,
-            aspectRatio,
-            imageSize: '1K'
-          })
+          body: JSON.stringify(requestBody)
         });
 
+        console.log(`[Tool:createImage] Response status: ${response.status} ${response.statusText}`);
+
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Falha ao gerar imagem');
+          let errorData;
+          try {
+            errorData = await response.json();
+            console.error(`[Tool:createImage] Erro da API (JSON):`, errorData);
+          } catch (jsonError) {
+            const errorText = await response.text();
+            console.error(`[Tool:createImage] Erro da API (text):`, errorText);
+            throw new Error(`Falha ao gerar imagem (${response.status}): ${errorText}`);
+          }
+          throw new Error(errorData.error || `Falha ao gerar imagem (${response.status})`);
         }
 
         const data = await response.json();
+        console.log(`[Tool:createImage] Resposta da API recebida:`, {
+          success: data.success,
+          hasImageUrl: !!data.imageUrl,
+          model: data.model
+        });
 
         // 3. Salvar na gallery (via API interna)
+        console.log(`[Tool:createImage] Salvando imagem na galeria...`);
         const galleryResponse = await fetch(`${baseUrl}/api/db/gallery`, {
           method: 'POST',
           headers: getInternalHeaders(userId, orgId),
@@ -122,9 +157,15 @@ export const createImageTool = ({ userId, orgId, dataStream, brandProfile }) =>
           })
         });
 
+        console.log(`[Tool:createImage] Gallery response status: ${galleryResponse.status}`);
+
         let savedImage = null;
         if (galleryResponse.ok) {
           savedImage = await galleryResponse.json();
+          console.log(`[Tool:createImage] Imagem salva na galeria com id: ${savedImage?.id}`);
+        } else {
+          const galleryError = await galleryResponse.text();
+          console.warn(`[Tool:createImage] Falha ao salvar na galeria: ${galleryError}`);
         }
 
         // 4. Enviar evento de conclusão (se dataStream disponível)
@@ -140,7 +181,9 @@ export const createImageTool = ({ userId, orgId, dataStream, brandProfile }) =>
           });
         }
 
-        console.log(`[Tool:createImage] ✓ Imagem criada | id: ${savedImage?.id}`);
+        const elapsedTime = Date.now() - startTime;
+        console.log(`[Tool:createImage] ✓ SUCESSO | Tempo total: ${elapsedTime}ms | id: ${savedImage?.id}`);
+        console.log(`[Tool:createImage] ========================================`);
 
         return {
           success: true,
@@ -149,7 +192,13 @@ export const createImageTool = ({ userId, orgId, dataStream, brandProfile }) =>
           message: `Imagem criada com sucesso! ${aspectRatio}`
         };
       } catch (error) {
-        console.error('[Tool:createImage] Erro:', error);
+        const elapsedTime = Date.now() - startTime;
+        console.error(`[Tool:createImage] ========================================`);
+        console.error(`[Tool:createImage] ✗ ERRO após ${elapsedTime}ms`);
+        console.error(`[Tool:createImage] Tipo de erro: ${error.constructor.name}`);
+        console.error(`[Tool:createImage] Mensagem: ${error.message}`);
+        console.error(`[Tool:createImage] Stack:`, error.stack);
+        console.error(`[Tool:createImage] ========================================`);
 
         // Enviar evento de erro (se dataStream disponível)
         if (dataStream) {
