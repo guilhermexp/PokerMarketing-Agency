@@ -14,6 +14,7 @@ interface ChatContextValue {
   onSetChatReference: (image: GalleryImage) => void;
   isAssistantOpen: boolean;
   setIsAssistantOpen: (open: boolean) => void;
+  renderPreviewChatPanel?: () => React.ReactNode;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);

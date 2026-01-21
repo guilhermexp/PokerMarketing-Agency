@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import type { ImagePreviewModalProps } from './types';
 import type { ImageFile } from './types.ts';
 import { ImagePreviewOverlay } from './overlay/ImagePreviewOverlay';
+import { useChatContext } from '../../contexts/ChatContext';
 import { useAiEdit } from './hooks/useAiEdit';
 import { useImageCanvas } from './hooks/useImageCanvas';
 import { useImageResize } from './hooks/useImageResize';
@@ -39,6 +40,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   initialEditPreview,
   chatComponent,
 }) => {
+  const chatContext = useChatContext();
+  const resolvedChatComponent = chatComponent ?? chatContext?.renderPreviewChatPanel?.();
+
   const [error, setError] = useState<string | null>(null);
   // Editor state - controlled by this component
   const [editPrompt, setEditPrompt] = useState('');
@@ -271,7 +275,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       // Error
       error={error}
       // Chat
-      chatComponent={chatComponent}
+      chatComponent={resolvedChatComponent}
     />
   );
 };

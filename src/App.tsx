@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import * as XLSX from "xlsx";
 import { BrandProfileSetup } from "./components/brand/BrandProfileSetup";
 import { Dashboard } from "./components/dashboard/Dashboard";
+import { AssistantPanel } from "./components/assistant/AssistantPanel";
+import { AssistantPanelNew } from "./components/assistant/AssistantPanelNew";
 import { SettingsModal } from "./components/settings/SettingsModal";
 import { useInstagramAccounts } from "./components/settings/ConnectInstagramModal";
 import { Loader } from "./components/common/Loader";
@@ -2146,8 +2148,50 @@ function AppContent() {
   const chatContextValue = useMemo(() => ({
     onSetChatReference: handleSetChatReference,
     isAssistantOpen,
-    setIsAssistantOpen
-  }), [handleSetChatReference, isAssistantOpen]);
+    setIsAssistantOpen,
+    renderPreviewChatPanel: () =>
+      import.meta.env.VITE_USE_VERCEL_AI_SDK === 'true' ? (
+        <AssistantPanelNew
+          isOpen={true}
+          onClose={() => {}}
+          referenceImage={chatReferenceImage}
+          onClearReference={() => handleSetChatReferenceSilent(null)}
+          onUpdateReference={(ref) => handleSetChatReferenceSilent({ id: ref.id, src: ref.src } as any)}
+          galleryImages={galleryImages}
+          brandProfile={brandProfile}
+          pendingToolEdit={pendingToolEdit}
+          onRequestImageEdit={handleRequestImageEdit}
+          onToolEditApproved={handleToolEditApproved}
+          onToolEditRejected={handleToolEditRejected}
+          onShowToolEditPreview={handleShowToolEditPreview}
+        />
+      ) : (
+        <AssistantPanel
+          isOpen={true}
+          onClose={() => {}}
+          history={chatHistory}
+          isLoading={isAssistantLoading}
+          onSendMessage={handleAssistantSendMessage}
+          referenceImage={chatReferenceImage}
+          onClearReference={() => handleSetChatReferenceSilent(null)}
+        />
+      )
+  }), [
+    handleSetChatReference,
+    isAssistantOpen,
+    chatReferenceImage,
+    galleryImages,
+    brandProfile,
+    pendingToolEdit,
+    handleRequestImageEdit,
+    handleToolEditApproved,
+    handleToolEditRejected,
+    handleShowToolEditPreview,
+    chatHistory,
+    isAssistantLoading,
+    handleAssistantSendMessage,
+    handleSetChatReferenceSilent
+  ]);
 
   // Show loader while:
   // 1. Authentication is loading
