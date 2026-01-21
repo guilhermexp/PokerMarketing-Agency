@@ -103,7 +103,7 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
             >
               <div className={`aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border-2 transition-all relative ${
                 isSelected
-                  ? 'border-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.5)]'
+                  ? 'border-white/60 shadow-[0_0_15px_rgba(255,255,255,0.3)]'
                   : 'border-white/5 hover:border-white/20'
               }`}>
                 {flyer === 'loading' ? (
@@ -126,8 +126,8 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
                       title="Clique para selecionar"
                     />
                     {isSelected && (
-                      <div className="absolute top-2 right-2 bg-purple-500 rounded-full p-1">
-                        <Icon name="check" className="w-3 h-3 text-white" />
+                      <div className="absolute top-2 right-2 bg-white/90 rounded-full p-1">
+                        <Icon name="check" className="w-3 h-3 text-black" />
                       </div>
                     )}
                   </>

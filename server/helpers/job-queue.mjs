@@ -7,31 +7,68 @@ import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 
 // Redis connection - Railway provides REDIS_URL
-const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || 'redis://localhost:6380';
+// In development without Redis, scheduled posts will use fallback polling
+const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || null;
 
 let connection = null;
 let imageQueue = null;
 let scheduledPostsQueue = null;
 let worker = null;
 let scheduledPostsWorker = null;
+let redisAvailable = false;
+
+/**
+ * Check if Redis is available
+ */
+export function isRedisAvailable() {
+  return redisAvailable;
+}
 
 /**
  * Get or create Redis connection
+ * Returns null if Redis is not configured or unavailable
  */
 export function getRedisConnection() {
+  if (!REDIS_URL) {
+    return null;
+  }
+
   if (!connection) {
     console.log('[JobQueue] Connecting to Redis:', REDIS_URL.replace(/\/\/.*@/, '//***@'));
     connection = new IORedis(REDIS_URL, {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
+      lazyConnect: true,
+      retryStrategy: (times) => {
+        if (times > 3) {
+          console.log('[JobQueue] Redis connection failed after 3 attempts, giving up');
+          redisAvailable = false;
+          return null; // Stop retrying
+        }
+        return Math.min(times * 100, 2000);
+      },
     });
 
     connection.on('error', (err) => {
-      console.error('[JobQueue] Redis error:', err.message);
+      if (!err.message.includes('ECONNREFUSED')) {
+        console.error('[JobQueue] Redis error:', err.message);
+      }
+      redisAvailable = false;
     });
 
     connection.on('connect', () => {
       console.log('[JobQueue] Redis connected');
+      redisAvailable = true;
+    });
+
+    connection.on('close', () => {
+      redisAvailable = false;
+    });
+
+    // Try to connect
+    connection.connect().catch((err) => {
+      console.log('[JobQueue] Redis not available (development mode OK, will use fallback)');
+      redisAvailable = false;
     });
   }
   return connection;
@@ -43,6 +80,9 @@ export function getRedisConnection() {
 export function getImageQueue() {
   if (!imageQueue) {
     const conn = getRedisConnection();
+    if (!conn) {
+      return null;
+    }
     imageQueue = new Queue('image-generation', {
       connection: conn,
       defaultJobOptions: {
@@ -144,6 +184,9 @@ export function initializeWorker(processorFn) {
 export function getScheduledPostsQueue() {
   if (!scheduledPostsQueue) {
     const conn = getRedisConnection();
+    if (!conn || !redisAvailable) {
+      return null;
+    }
     scheduledPostsQueue = new Queue('scheduled-posts', {
       connection: conn,
       defaultJobOptions: {
@@ -173,6 +216,11 @@ export function getScheduledPostsQueue() {
  */
 export async function schedulePostForPublishing(postId, userId, scheduledTime) {
   const queue = getScheduledPostsQueue();
+
+  if (!queue) {
+    console.log(`[JobQueue] Redis not available, post ${postId} will be handled by fallback checker`);
+    return { jobId: null, fallback: true };
+  }
 
   // Calculate delay in milliseconds
   const targetTime = new Date(scheduledTime).getTime();
@@ -217,6 +265,12 @@ export async function schedulePostForPublishing(postId, userId, scheduledTime) {
  */
 export async function cancelScheduledPost(postId) {
   const queue = getScheduledPostsQueue();
+
+  if (!queue) {
+    console.log(`[JobQueue] Redis not available, skipping job cancellation for post ${postId}`);
+    return false;
+  }
+
   const jobId = `publish-${postId}`;
 
   try {
@@ -241,6 +295,11 @@ export async function cancelScheduledPost(postId) {
 export async function initializeScheduledPostsChecker(publishFn, publishSingleFn) {
   const queue = getScheduledPostsQueue();
   const conn = getRedisConnection();
+
+  if (!queue || !conn || !redisAvailable) {
+    console.log('[ScheduledPosts] Redis not available, using fallback-only mode (checks every 5min via database polling)');
+    return null;
+  }
 
   // Create worker for scheduled posts
   scheduledPostsWorker = new Worker('scheduled-posts', async (job) => {

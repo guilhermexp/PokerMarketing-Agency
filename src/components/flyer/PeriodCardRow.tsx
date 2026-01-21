@@ -461,7 +461,7 @@ export const PeriodCardRow: React.FC<{
                             })()}
                         {/* Show reference badge if this period's image is being used as reference */}
                         {isUsingAsReference && (
-                            <span className="px-2 py-1 text-[9px] font-bold text-purple-400 bg-purple-500/10 rounded-lg flex items-center gap-1">
+                            <span className="px-2 py-1 text-[9px] font-bold text-white/60 bg-white/10 rounded-lg flex items-center gap-1">
                                 <Icon name="heart" className="w-3 h-3" />
                                 Referência
                             </span>

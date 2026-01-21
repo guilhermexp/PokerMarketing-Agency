@@ -6190,11 +6190,15 @@ const startup = async () => {
 
   // Initialize scheduled posts worker
   try {
-    await initializeScheduledPostsChecker(
+    const worker = await initializeScheduledPostsChecker(
       checkAndPublishScheduledPosts,
       publishScheduledPostById
     );
-    console.log(`${colors.green}✓ Scheduled posts worker initialized${colors.reset}`);
+    if (worker) {
+      console.log(`${colors.green}✓ Scheduled posts worker initialized (Redis)${colors.reset}`);
+    } else {
+      console.log(`${colors.yellow}⚠ Scheduled posts using fallback mode (no Redis)${colors.reset}`);
+    }
   } catch (error) {
     console.error(`${colors.red}✗ Failed to initialize scheduled posts worker:${colors.reset}`, error.message);
   }
