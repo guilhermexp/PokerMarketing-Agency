@@ -179,6 +179,11 @@ export function useAiEdit({
   }, [resetEditorState]);
 
   useEffect(() => {
+    setEditPreview(null);
+    initialPreviewAppliedRef.current = false;
+  }, [imageSrc]);
+
+  useEffect(() => {
     initialPreviewAppliedRef.current = false;
   }, [initialEditPreview?.dataUrl]);
 
@@ -191,6 +196,7 @@ export function useAiEdit({
 
   // Auto-execute edit for tool approval mode
   useEffect(() => {
+    if (initialEditPreview) return;
     if (pendingToolEdit && !editPreview && !isEditing && pendingToolEdit.prompt) {
       console.debug('[useAiEdit] Auto-executing edit for tool approval:', pendingToolEdit);
 

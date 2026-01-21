@@ -3,13 +3,17 @@
  * Runs alongside Vite to handle API routes during development
  */
 
+import { config } from "dotenv";
+
+// CRITICAL: Load environment variables BEFORE importing modules that need them
+config();
+
 import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import { neon } from "@neondatabase/serverless";
 import { put, del } from "@vercel/blob";
-import { config } from "dotenv";
 import { fal } from "@fal-ai/client";
 import { clerkMiddleware, getAuth } from "@clerk/express";
 import { GoogleGenAI } from "@google/genai";
@@ -42,8 +46,6 @@ import {
   checkAndPublishScheduledPosts,
   publishScheduledPostById,
 } from "./helpers/scheduled-publisher.mjs";
-
-config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

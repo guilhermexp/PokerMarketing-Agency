@@ -43,6 +43,12 @@ export function useImageResize({
 
   const resizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    setWidthPercent(100);
+    setHeightPercent(100);
+    setResizedPreview(null);
+  }, [imageSrc]);
+
   useEffect(() => () => {
     if (resizeTimeoutRef.current) {
       clearTimeout(resizeTimeoutRef.current);
