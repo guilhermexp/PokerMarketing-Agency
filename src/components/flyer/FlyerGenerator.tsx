@@ -162,6 +162,9 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
         aspectRatio: selectedStyleReference.aspectRatio,
         imageSize: selectedStyleReference.imageSize,
       });
+    } else {
+      // Clear globalStyleReference when selectedStyleReference is removed
+      setGlobalStyleReference(null);
     }
   }, [selectedStyleReference, selectedImageModel, setGlobalStyleReference]);
 
