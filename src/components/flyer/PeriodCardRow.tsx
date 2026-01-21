@@ -112,6 +112,8 @@ export const PeriodCardRow: React.FC<{
         );
         const [scheduleFlyer, setScheduleFlyer] = useState<GalleryImage | null>(null);
         const [scheduledUrls, setScheduledUrls] = useState<Set<string>>(new Set());
+        // Track selected flyer for actions (defaults to first non-loading flyer)
+        const [selectedFlyerId, setSelectedFlyerId] = useState<string | null>(null);
 
         const { queueJob, onJobComplete, onJobFailed, getJobByContext } =
             useBackgroundJobs();
@@ -181,6 +183,16 @@ export const PeriodCardRow: React.FC<{
                 setIsExpanded(true);
             }
         }, [hasExistingFlyers, isExpanded]);
+
+        // Auto-select first flyer when flyers change
+        useEffect(() => {
+            const firstFlyer = generatedFlyers.find((f) => f !== "loading") as GalleryImage | undefined;
+            if (firstFlyer && (!selectedFlyerId || !generatedFlyers.some(f => f !== "loading" && f.id === selectedFlyerId))) {
+                setSelectedFlyerId(firstFlyer.id);
+            } else if (!firstFlyer) {
+                setSelectedFlyerId(null);
+            }
+        }, [generatedFlyers, selectedFlyerId]);
 
         const handleGenerate = useCallback(
             async (forced: boolean = false) => {
@@ -368,6 +380,11 @@ export const PeriodCardRow: React.FC<{
             (f) => f !== "loading" && f.id === styleReference.id
         );
 
+        // Get selected flyer (or first flyer as fallback)
+        const selectedFlyer = (generatedFlyers.find(
+            (f) => f !== "loading" && f.id === selectedFlyerId
+        ) || generatedFlyers.find((f) => f !== "loading")) as GalleryImage | undefined;
+
         return (
             <div
                 className={`bg-black/40 backdrop-blur-2xl border rounded-2xl overflow-hidden transition-all mb-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isGenerating ? "border-white/20 animate-pulse" : "border-white/10 hover:border-white/20"}`}
@@ -449,6 +466,53 @@ export const PeriodCardRow: React.FC<{
                                 Referência
                             </span>
                         )}
+                        {/* Action buttons for selected flyer */}
+                        {selectedFlyer && (
+                            <>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingFlyer(selectedFlyer);
+                                    }}
+                                    className="p-2 bg-black/40 backdrop-blur-sm hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20"
+                                    title="Visualizar"
+                                >
+                                    <Icon name="eye" className="w-4 h-4 text-white/60" />
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setQuickPostFlyer(selectedFlyer);
+                                    }}
+                                    className="p-2 bg-black/40 backdrop-blur-sm hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20"
+                                    title="Publicar agora"
+                                >
+                                    <Icon name="zap" className="w-4 h-4 text-white/60" />
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onPublishToCampaign(`Campanha para grade ${label}`, selectedFlyer);
+                                    }}
+                                    className="p-2 bg-black/40 backdrop-blur-sm hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20"
+                                    title="Adicionar à campanha"
+                                >
+                                    <Icon name="users" className="w-4 h-4 text-white/60" />
+                                </button>
+                                {onCloneStyle && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onCloneStyle(selectedFlyer);
+                                        }}
+                                        className="p-2 bg-black/40 backdrop-blur-sm hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20"
+                                        title="Usar como referência de estilo"
+                                    >
+                                        <Icon name="copy" className="w-4 h-4 text-white/60" />
+                                    </button>
+                                )}
+                            </>
+                        )}
                         <Button
                             size="small"
                             variant={events.length > 0 ? "primary" : "secondary"}
@@ -504,6 +568,8 @@ export const PeriodCardRow: React.FC<{
                             onCloneStyle={onCloneStyle}
                             emptyTitle="Nenhum flyer gerado"
                             emptyDescription='Clique em "Gerar" para criar um flyer.'
+                            selectedFlyerId={selectedFlyerId}
+                            onSelectFlyer={setSelectedFlyerId}
                         />
                     </div>
                 )}

@@ -22,6 +22,8 @@ interface FlyerThumbStripProps {
   showPublish?: boolean;
   emptyTitle: string;
   emptyDescription: string;
+  selectedFlyerId?: string | null;
+  onSelectFlyer?: (id: string) => void;
 }
 
 export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
@@ -35,6 +37,8 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
   showPublish = true,
   emptyTitle,
   emptyDescription,
+  selectedFlyerId,
+  onSelectFlyer,
 }) => {
   const stripRef = useRef<HTMLDivElement>(null);
 
@@ -89,86 +93,49 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
         className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent scroll-smooth px-4"
         style={{ scrollSnapType: 'x mandatory' }}
       >
-        {images.map((flyer, index) => (
-          <div
-            key={flyer === 'loading' ? `loading-${index}` : flyer.id}
-            className="flex-shrink-0 w-[140px] group"
-            style={{ scrollSnapAlign: 'start' }}
-          >
-            <div className="aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border border-white/5 relative">
-              {flyer === 'loading' ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
-                  <Loader size={24} className="mb-2 text-white/60" />
-                  <p className="text-[8px] font-black text-white/40 uppercase tracking-widest animate-pulse">
-                    Gerando...
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <img
-                    src={flyer.src}
-                    className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
-                    onClick={() => onEdit(flyer)}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-2 gap-1">
-                    {/* Primary action */}
-                    <button
-                      onClick={() => onQuickPost(flyer)}
-                      className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-black font-bold text-[8px] uppercase tracking-wide transition-all"
-                    >
-                      <Icon name="zap" className="w-2.5 h-2.5" />
-                      Publicar
-                    </button>
-                    {/* Secondary actions - compact icons */}
-                    <div className="flex gap-1 justify-center">
-                      {onSchedule && (
-                        <button
-                          onClick={() => onSchedule(flyer)}
-                          className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
-                          title="Agendar"
-                        >
-                          <Icon name="calendar" className="w-3 h-3" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => onEdit(flyer)}
-                        className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
-                        title="Visualizar"
-                      >
-                        <Icon name="eye" className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => onDownload(flyer, index)}
-                        className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
-                        title="Download"
-                      >
-                        <Icon name="download" className="w-3 h-3" />
-                      </button>
-                      {showPublish && (
-                        <button
-                          onClick={() => onPublish(flyer)}
-                          className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
-                          title="Campanha"
-                        >
-                          <Icon name="users" className="w-3 h-3" />
-                        </button>
-                      )}
-                      {onCloneStyle && (
-                        <button
-                          onClick={() => onCloneStyle(flyer)}
-                          className="w-7 h-7 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-lg text-white transition-all"
-                          title="Usar como modelo"
-                        >
-                          <Icon name="copy" className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
+        {images.map((flyer, index) => {
+          const isSelected = flyer !== 'loading' && flyer.id === selectedFlyerId;
+          return (
+            <div
+              key={flyer === 'loading' ? `loading-${index}` : flyer.id}
+              className="flex-shrink-0 w-[140px] group"
+              style={{ scrollSnapAlign: 'start' }}
+            >
+              <div className={`aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border-2 transition-all relative ${
+                isSelected
+                  ? 'border-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.5)]'
+                  : 'border-white/5 hover:border-white/20'
+              }`}>
+                {flyer === 'loading' ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
+                    <Loader size={24} className="mb-2 text-white/60" />
+                    <p className="text-[8px] font-black text-white/40 uppercase tracking-widest animate-pulse">
+                      Gerando...
+                    </p>
                   </div>
-                </>
-              )}
+                ) : (
+                  <>
+                    <img
+                      src={flyer.src}
+                      className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
+                      onClick={() => {
+                        if (onSelectFlyer) {
+                          onSelectFlyer(flyer.id);
+                        }
+                      }}
+                      title="Clique para selecionar"
+                    />
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 bg-purple-500 rounded-full p-1">
+                        <Icon name="check" className="w-3 h-3 text-white" />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
