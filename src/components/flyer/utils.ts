@@ -30,14 +30,14 @@ export const formatCurrencyValue = (val: string, currency: Currency): string => 
 export const DAY_TRANSLATIONS: Record<string, string> = {
   MONDAY: 'Segunda',
   TUESDAY: 'Terça',
-  WEDNESSDAY: 'Quarta',
+  WEDNESDAY: 'Quarta',
   THURSDAY: 'Quinta',
   FRIDAY: 'Sexta',
   SATURDAY: 'Sábado',
   SUNDAY: 'Domingo',
 };
 
-export const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESSDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+export const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
 export const PERIOD_LABELS: Record<"pt" | "en", Record<TimePeriod, string>> = {
   pt: {
