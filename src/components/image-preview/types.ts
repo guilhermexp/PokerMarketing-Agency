@@ -16,6 +16,7 @@ export interface ImagePreviewModalProps {
   onClose: () => void;
   onImageUpdate: (newImageUrl: string) => void;
   onSetChatReference?: (image: GalleryImage) => void;
+  onSetChatReferenceSilent?: (image: GalleryImage | null) => void;
   downloadFilename?: string;
   // Action props
   onQuickPost?: (image: GalleryImage) => void;

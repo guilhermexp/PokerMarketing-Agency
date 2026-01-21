@@ -23,6 +23,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   onClose,
   onImageUpdate,
   onSetChatReference,
+  onSetChatReferenceSilent,
   downloadFilename,
   onQuickPost,
   onPublish,
@@ -191,6 +192,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       onClose={onClose}
       onImageUpdate={onImageUpdate}
       onSetChatReference={onSetChatReference}
+      onSetChatReferenceSilent={onSetChatReferenceSilent}
       downloadFilename={downloadFilename}
       onQuickPost={onQuickPost}
       onPublish={onPublish}

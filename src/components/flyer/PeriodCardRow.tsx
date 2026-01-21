@@ -38,6 +38,7 @@ export const PeriodCardRow: React.FC<{
     period: TimePeriod;
     label: string;
     dayInfo: string;
+    selectedDay?: string; // Day of week: 'MONDAY', 'TUESDAY', etc. For database persistence
     scheduleDate?: string; // YYYY-MM-DD format for scheduling
     events: TournamentEvent[];
     brandProfile: BrandProfile;
@@ -76,6 +77,7 @@ export const PeriodCardRow: React.FC<{
     period,
     label,
     dayInfo,
+    selectedDay,
     scheduleDate,
     events,
     brandProfile,
@@ -312,8 +314,9 @@ export const PeriodCardRow: React.FC<{
                         imageSize,
                         assetsToUse,
                     );
-                    const newImage: GalleryImage = {
-                        id: `flyer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+
+                    // CRITICAL: Save to gallery (images table) first to enable persistence across devices
+                    const galleryImage = onAddImageToGallery({
                         src: imageUrl,
                         prompt,
                         source: "Flyer Diário",
@@ -322,19 +325,27 @@ export const PeriodCardRow: React.FC<{
                         imageSize,
                         week_schedule_id: scheduleId, // Link to schedule for persistence
                         daily_flyer_period: period, // Track which period this flyer is for
-                    };
+                    });
+
+                    console.debug(
+                        `[FlyerGenerator] Added flyer to gallery with ID: ${galleryImage.id}`,
+                    );
+
                     setGeneratedFlyers((prev) =>
-                        prev.map((f) => (f === "loading" ? newImage : f)),
+                        prev.map((f) => (f === "loading" ? galleryImage : f)),
                     );
                     setIsExpanded(true); // Auto-expand when generation completes
 
-                    // Save daily flyer URL to database for persistence
+                    // Save daily flyer URL reference to week_schedules.daily_flyer_urls
                     if (scheduleId && imageUrl) {
                         try {
-                            await addDailyFlyer(scheduleId, period, imageUrl);
+                            await addDailyFlyer(scheduleId, period, imageUrl, selectedDay);
+                            console.debug(
+                                `[FlyerGenerator] Saved daily flyer URL to database: day=${selectedDay}, period=${period}`,
+                            );
                         } catch (err) {
                             console.error(
-                                "[FlyerGenerator] Failed to save daily flyer to database:",
+                                "[FlyerGenerator] Failed to save daily flyer URL to database:",
                                 err,
                             );
                         }

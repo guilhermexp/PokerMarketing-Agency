@@ -138,7 +138,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   if (!isOpen) return null;
 
   return (
-    <aside className="w-full sm:w-[380px] h-full bg-[#080808] border-l border-white/10 flex flex-col flex-shrink-0">
+    <aside className="assistant-panel w-full sm:w-[380px] h-full bg-[#080808] border-l border-white/10 flex flex-col flex-shrink-0">
       {/* Header minimalista */}
       <div className="flex-shrink-0 h-14 flex items-center justify-between px-4">
         <img src="/icon.png" alt="Socialab" className="w-9 h-9 rounded-xl" />

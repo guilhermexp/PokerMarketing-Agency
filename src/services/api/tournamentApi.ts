@@ -177,26 +177,31 @@ export async function addDailyFlyer(
   scheduleId: string,
   period: string,
   flyerUrl: string,
+  day?: string, // Optional: 'MONDAY', 'TUESDAY', etc. If provided, uses new day-based structure
 ): Promise<unknown> {
-  return fetchApi(
-    `/tournaments/daily-flyer?schedule_id=${scheduleId}&period=${period}`,
-    {
-      method: 'PATCH',
-      body: JSON.stringify({ flyer_url: flyerUrl, action: 'add' }),
-    },
-  );
+  const url = day
+    ? `/tournaments/daily-flyer?schedule_id=${scheduleId}&period=${period}&day=${day}`
+    : `/tournaments/daily-flyer?schedule_id=${scheduleId}&period=${period}`;
+
+  return fetchApi(url, {
+    method: 'PATCH',
+    body: JSON.stringify({ flyer_url: flyerUrl, action: 'add' }),
+  });
 }
 
 export async function removeDailyFlyer(
   scheduleId: string,
   period: string,
   flyerUrl: string,
+  day?: string, // Optional: 'MONDAY', 'TUESDAY', etc. If provided, uses new day-based structure
 ): Promise<unknown> {
-  return fetchApi(
-    `/tournaments/daily-flyer?schedule_id=${scheduleId}&period=${period}`,
-    {
-      method: 'PATCH',
-      body: JSON.stringify({ flyer_url: flyerUrl, action: 'remove' }),
-    },
+  const url = day
+    ? `/tournaments/daily-flyer?schedule_id=${scheduleId}&period=${period}&day=${day}`
+    : `/tournaments/daily-flyer?schedule_id=${scheduleId}&period=${period}`;
+
+  return fetchApi(url, {
+    method: 'PATCH',
+    body: JSON.stringify({ flyer_url: flyerUrl, action: 'remove' }),
+  },
   );
 }

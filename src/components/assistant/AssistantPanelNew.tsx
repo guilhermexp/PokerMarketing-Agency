@@ -466,7 +466,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     <DataStreamProvider dataStream={dataStream} setDataStream={setDataStream}>
       <DataStreamHandler />
 
-      <aside className="w-full sm:w-[380px] h-full bg-[#0a0a0a]/95 backdrop-blur-xl border-l border-white/[0.08] flex flex-col flex-shrink-0">
+      <aside className="assistant-panel w-full sm:w-[380px] h-full bg-[#0a0a0a]/95 backdrop-blur-xl border-l border-white/[0.08] flex flex-col flex-shrink-0">
         {/* Header minimalista */}
         <div className="flex-shrink-0 h-14 flex items-center justify-between px-4">
           <img src="/icon.png" alt="Socialab" className="w-9 h-9 rounded-xl" />

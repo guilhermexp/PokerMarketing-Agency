@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useResponsive } from 'antd-style';
 import { X } from 'lucide-react';
@@ -18,6 +18,7 @@ interface ImagePreviewOverlayProps {
   onClose: () => void;
   onImageUpdate: (newImageUrl: string) => void;
   onSetChatReference?: (image: GalleryImage) => void;
+  onSetChatReferenceSilent?: (image: GalleryImage | null) => void;
   pendingToolEdit?: PendingToolEdit | null;
   onToolEditApproved?: (toolCallId: string, imageUrl: string) => void;
   onToolEditRejected?: (toolCallId: string, reason?: string) => void;
@@ -130,12 +131,19 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
   const editPanelOpen = activePanel === 'edit';
   const chatPanelOpen = activePanel === 'chat';
 
-  // Abre painel automaticamente quando há pendingToolEdit
+  const pendingToolEditRef = useRef(pendingToolEdit);
+
+  // Abre painel automaticamente quando há pendingToolEdit (apenas na transição)
   useEffect(() => {
-    if (pendingToolEdit) {
+    const hadPending = Boolean(pendingToolEditRef.current);
+    const hasPending = Boolean(pendingToolEdit);
+
+    if (!hadPending && hasPending && !activePanel) {
       setActivePanel('edit');
     }
-  }, [pendingToolEdit]);
+
+    pendingToolEditRef.current = pendingToolEdit;
+  }, [pendingToolEdit, activePanel]);
 
   // Carregar dimensões da imagem
   useEffect(() => {
@@ -220,7 +228,9 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
 
   // Handler de enviar para o chat
   const handleSendToChat = () => {
-    if (props.onSetChatReference) {
+    if (props.chatComponent) {
+      props.onSetChatReferenceSilent?.(image);
+    } else if (props.onSetChatReference) {
       props.onSetChatReference(image);
     }
     // Abre o painel do chat
@@ -265,6 +275,7 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
   }, [visible, activePanel, cropActive, onClose]);
+
 
   if (!visible) return null;
 
@@ -362,7 +373,7 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
             onDownload={handleDownload}
             onToggleEditPanel={() => setActivePanel(activePanel === 'edit' ? null : 'edit')}
             onToggleCrop={handleToggleCrop}
-            onSendToChat={props.onSetChatReference ? handleSendToChat : undefined}
+            onSendToChat={(props.onSetChatReference || props.onSetChatReferenceSilent) ? handleSendToChat : undefined}
             editPanelOpen={editPanelOpen}
             cropActive={cropActive}
             imageDimensions={imageDimensions}

@@ -64,6 +64,7 @@ interface DashboardProps {
   ) => void;
   chatReferenceImage: ChatReferenceImage | null;
   onSetChatReference: (image: GalleryImage | null) => void;
+  onSetChatReferenceSilent?: (image: GalleryImage | null) => void;
   theme: Theme;
   onThemeToggle: () => void;
   galleryImages: GalleryImage[];
@@ -183,6 +184,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     setDailyFlyerState,
     chatReferenceImage,
     onSetChatReference,
+    onSetChatReferenceSilent,
     activeView,
     onViewChange,
     onPublishToCampaign,
@@ -822,6 +824,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             onUpdateGalleryImage?.(editingImage.id, newSrc);
           }}
           onSetChatReference={onSetChatReference}
+          onSetChatReferenceSilent={onSetChatReferenceSilent ? (image) => onSetChatReferenceSilent(image) : undefined}
           pendingToolEdit={pendingToolEdit}
           onToolEditApproved={onToolEditApproved}
           onToolEditRejected={onToolEditRejected}
@@ -842,7 +845,17 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 onToolEditRejected={props.onToolEditRejected}
                 onShowToolEditPreview={props.onShowToolEditPreview}
               />
-            ) : null
+            ) : (
+              <AssistantPanel
+                isOpen={true}
+                onClose={() => {}}
+                history={assistantHistory}
+                isLoading={isAssistantLoading}
+                onSendMessage={onAssistantSendMessage}
+                referenceImage={chatReferenceImage}
+                onClearReference={() => onSetChatReference(null)}
+              />
+            )
           }
         />
       )}

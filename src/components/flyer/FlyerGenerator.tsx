@@ -759,6 +759,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     period={p}
                     label={PERIOD_LABELS[selectedLanguage][p]}
                     dayInfo={`${DAY_TRANSLATIONS[selectedDay]} ${getDayDate(selectedDay)}`}
+                    selectedDay={selectedDay}
                     scheduleDate={getScheduleDate(selectedDay)}
                     events={getEventsForPeriod(p)}
                     brandProfile={brandProfile}

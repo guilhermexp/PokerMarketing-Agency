@@ -18,7 +18,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
   onSetChatReference,
 }) => {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
-  const [filter, setFilter] = useState<"all" | "daily" | "individual">("all");
+  const [filter, setFilter] = useState<"all" | "today" | "daily" | "individual">("all");
 
   // Collect all flyers from both states
   const allFlyers = useMemo(() => {
@@ -67,8 +67,32 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
     return allFlyers.filter(f => f.source === "Flyer");
   }, [allFlyers]);
 
+  const todayFlyers = useMemo(() => {
+    // Get today's date at midnight
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTimestamp = today.getTime();
+
+    // Get tomorrow's date at midnight
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowTimestamp = tomorrow.getTime();
+
+    return allFlyers.filter(f => {
+      // Extract timestamp from ID (format: flyer-{timestamp}-{random})
+      const match = f.id.match(/flyer-(\d+)-/);
+      if (!match) return false;
+
+      const flyerTimestamp = parseInt(match[1]);
+      // Check if flyer was created today
+      return flyerTimestamp >= todayTimestamp && flyerTimestamp < tomorrowTimestamp;
+    });
+  }, [allFlyers]);
+
   const displayedFlyers = useMemo(() => {
     switch (filter) {
+      case "today":
+        return todayFlyers;
       case "daily":
         return dailyFlyers;
       case "individual":
@@ -76,7 +100,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
       default:
         return allFlyers;
     }
-  }, [filter, allFlyers, dailyFlyers, individualFlyers]);
+  }, [filter, allFlyers, todayFlyers, dailyFlyers, individualFlyers]);
 
   const handleDownloadAll = async () => {
     for (let i = 0; i < displayedFlyers.length; i++) {
@@ -144,6 +168,16 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
             }`}
           >
             Todos ({allFlyers.length})
+          </button>
+          <button
+            onClick={() => setFilter("today")}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all backdrop-blur-2xl border ${
+              filter === "today"
+                ? "bg-black/40 border-white/10 text-white/90"
+                : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+            }`}
+          >
+            Hoje ({todayFlyers.length})
           </button>
           <button
             onClick={() => setFilter("daily")}

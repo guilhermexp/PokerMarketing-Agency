@@ -1785,13 +1785,18 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
         ? new Date(scheduled_timestamp).getTime()
         : scheduled_timestamp;
 
+    // Validate content_id: only use if it's a valid UUID, otherwise set to null
+    // Flyer IDs like "flyer-123-abc" are not valid UUIDs
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const validContentId = content_id && uuidRegex.test(content_id) ? content_id : null;
+
     const result = await sql`
       INSERT INTO scheduled_posts (
         user_id, organization_id, content_type, content_id, image_url, caption, hashtags,
         scheduled_date, scheduled_time, scheduled_timestamp, timezone,
         platforms, instagram_content_type, instagram_account_id, created_from
       ) VALUES (
-        ${resolvedUserId}, ${organization_id || null}, ${content_type || "flyer"}, ${content_id || null}, ${image_url}, ${caption || ""},
+        ${resolvedUserId}, ${organization_id || null}, ${content_type || "flyer"}, ${validContentId}, ${image_url}, ${caption || ""},
         ${hashtags || []}, ${scheduled_date}, ${scheduled_time}, ${timestampMs},
         ${timezone || "America/Sao_Paulo"}, ${platforms || "instagram"},
         ${instagram_content_type || "photo"}, ${instagram_account_id || null}, ${created_from || null}

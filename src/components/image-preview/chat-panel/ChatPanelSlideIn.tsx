@@ -1,7 +1,6 @@
 import { Drawer } from 'antd';
 import { useResponsive } from 'antd-style';
 import { X } from 'lucide-react';
-import { createPortal } from 'react-dom';
 import type { GalleryImage } from '../types';
 
 interface ChatPanelSlideInProps {
@@ -45,14 +44,13 @@ export const ChatPanelSlideIn = ({
     );
   }
 
-  // Desktop: Slide-in lateral (portal para ficar acima do overlay)
-  return createPortal(
-    <div className={`chat-panel-slide ${open ? 'open' : 'closed'}`}>
+  // Desktop: Slide-in lateral (mesmo slot do painel de edição)
+  return (
+    <div className={`edit-panel-slide ${open ? 'open' : 'closed'}`}>
       {/* Wrapper flex para garantir expansão completa */}
       <div className="flex flex-col w-full h-full">
         {chatComponent}
       </div>
-    </div>,
-    document.body
+    </div>
   );
 };

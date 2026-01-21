@@ -709,6 +709,115 @@ function AppContent() {
     }
   }, [dailyFlyerState]);
 
+  // Track if we've already restored from database to avoid re-running
+  const hasRestoredRef = useRef(false);
+
+  // Restore daily flyers from database (week_schedules.daily_flyer_urls)
+  useEffect(() => {
+    if (!swrTournamentSchedule?.daily_flyer_urls || !galleryImages.length) {
+      return;
+    }
+
+    // Only restore once per schedule load
+    if (hasRestoredRef.current) {
+      return;
+    }
+
+    const dailyFlyerUrls = swrTournamentSchedule.daily_flyer_urls;
+    console.debug('[App] Restoring daily flyers from database:', dailyFlyerUrls);
+    console.debug('[App] Available gallery images:', galleryImages.length);
+
+    // Convert URLs to GalleryImage objects
+    const restoredState: Record<string, Record<TimePeriod, GalleryImage[]>> = {};
+
+    // Detect structure: NEW (day-based) vs OLD (period-only)
+    // NEW structure: { "MONDAY": { "MORNING": [...], ... }, "TUESDAY": {...}, ... }
+    // OLD structure: { "MORNING": [...], "AFTERNOON": [...], ... }
+    const firstKey = Object.keys(dailyFlyerUrls)[0];
+    const isNewStructure = firstKey && typeof dailyFlyerUrls[firstKey] === 'object' && !Array.isArray(dailyFlyerUrls[firstKey]);
+
+    if (isNewStructure) {
+      // NEW STRUCTURE: Iterate through days, then periods
+      Object.entries(dailyFlyerUrls).forEach(([day, periods]) => {
+        if (!periods || typeof periods !== 'object') return;
+
+        // Initialize day in restoredState
+        if (!restoredState[day]) {
+          restoredState[day] = {
+            ALL: [],
+            MORNING: [],
+            AFTERNOON: [],
+            NIGHT: [],
+            HIGHLIGHTS: [],
+          };
+        }
+
+        // Iterate through periods for this day
+        Object.entries(periods).forEach(([period, urls]) => {
+          if (!Array.isArray(urls) || urls.length === 0) return;
+
+          // Find gallery images matching these URLs
+          const periodImages = urls
+            .map(url => galleryImages.find(img => img.src === url))
+            .filter((img): img is GalleryImage => img !== undefined);
+
+          if (periodImages.length > 0) {
+            restoredState[day][period as TimePeriod] = periodImages;
+          }
+        });
+      });
+    } else {
+      // OLD STRUCTURE (backward compatibility): Iterate through periods only
+      Object.entries(dailyFlyerUrls).forEach(([period, urls]) => {
+        if (!Array.isArray(urls) || urls.length === 0) return;
+
+        // Find gallery images matching these URLs
+        const periodImages = urls
+          .map(url => galleryImages.find(img => img.src === url))
+          .filter((img): img is GalleryImage => img !== undefined);
+
+        if (periodImages.length === 0) return;
+
+        // Use a default day key for old structure
+        const defaultDay = 'DAILY';
+
+        if (!restoredState[defaultDay]) {
+          restoredState[defaultDay] = {
+            ALL: [],
+            MORNING: [],
+            AFTERNOON: [],
+            NIGHT: [],
+            HIGHLIGHTS: [],
+          };
+        }
+
+        restoredState[defaultDay][period as TimePeriod] = periodImages;
+      });
+    }
+
+    if (Object.keys(restoredState).length > 0) {
+      setDailyFlyerState(prev => {
+        // Merge with existing state (preserve any data from other days)
+        const merged = { ...prev };
+        Object.entries(restoredState).forEach(([day, periods]) => {
+          merged[day] = { ...merged[day], ...periods };
+        });
+        return merged;
+      });
+      console.debug('[App] Restored daily flyer state from database:', restoredState);
+      hasRestoredRef.current = true; // Mark as restored
+    } else {
+      console.warn('[App] No flyers could be restored. URLs in database but images not found in gallery.');
+      console.warn('[App] daily_flyer_urls:', dailyFlyerUrls);
+      console.warn('[App] Gallery image URLs:', galleryImages.map(img => img.src));
+    }
+  }, [swrTournamentSchedule?.daily_flyer_urls, swrTournamentSchedule?.id, galleryImages.length]);
+
+  // Reset restoration flag when schedule changes
+  useEffect(() => {
+    hasRestoredRef.current = false;
+  }, [swrTournamentSchedule?.id]);
+
   // Process tournament schedule info when SWR data loads
   useEffect(() => {
     if (swrTournamentSchedule) {
@@ -1924,6 +2033,10 @@ function AppContent() {
     if (img && !isAssistantOpen) setIsAssistantOpen(true);
   }, [isAssistantOpen]);
 
+  const handleSetChatReferenceSilent = useCallback((img: GalleryImage | null) => {
+    setChatReferenceImage(img ? { id: img.id, src: img.src } : null);
+  }, []);
+
   // Tool edit approval handlers
   const handleRequestImageEdit = useCallback((request: {
     toolCallId: string;
@@ -2176,6 +2289,7 @@ function AppContent() {
             onAssistantSendMessage={handleAssistantSendMessage}
             chatReferenceImage={chatReferenceImage}
             onSetChatReference={handleSetChatReference}
+            onSetChatReferenceSilent={handleSetChatReferenceSilent}
             theme={theme}
             onThemeToggle={() =>
               setTheme((t) => (t === "light" ? "dark" : "light"))

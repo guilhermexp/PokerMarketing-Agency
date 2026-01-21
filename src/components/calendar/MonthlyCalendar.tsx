@@ -23,7 +23,7 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
   onPublishToInstagram,
   publishingStates
 }) => {
-  const calendarDays = useMemo(() => {
+  const { calendarDays, visibleWeeks } = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
 
@@ -87,12 +87,51 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
       });
     }
 
-    return days;
+    // Agrupar dias em semanas
+    const weeks: Array<typeof days> = [];
+    for (let i = 0; i < days.length; i += 7) {
+      weeks.push(days.slice(i, i + 7));
+    }
+
+    // Determinar quais semanas devem ser visíveis
+    // Uma semana é visível se contém o dia de hoje ou dias futuros
+    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const visibleWeekIndices: boolean[] = weeks.map((week, idx) => {
+      const hasCurrentOrFuture = week.some(day => {
+        const dayDate = new Date(day.date);
+        return dayDate >= todayDate;
+      });
+      console.log(`Semana ${idx}:`, week.map(d => d.dayNumber).join(', '), '-> visível:', hasCurrentOrFuture);
+      return hasCurrentOrFuture;
+    });
+
+    console.log('Hoje:', todayStr);
+    console.log('Semanas visíveis:', visibleWeekIndices);
+
+    return {
+      calendarDays: days,
+      visibleWeeks: visibleWeekIndices
+    };
   }, [currentDate]);
 
   const getPostsForDate = (date: string): ScheduledPost[] => {
     return scheduledPosts.filter(post => post.scheduledDate === date);
   };
+
+  // Filtrar apenas dias de semanas visíveis
+  const visibleDays = useMemo(() => {
+    const result: typeof calendarDays = [];
+    for (let i = 0; i < calendarDays.length; i++) {
+      const weekIndex = Math.floor(i / 7);
+      if (visibleWeeks[weekIndex]) {
+        result.push(calendarDays[i]);
+      }
+    }
+    return result;
+  }, [calendarDays, visibleWeeks]);
+
+  // Calcular o número de linhas necessárias
+  const numberOfRows = Math.ceil(visibleDays.length / 7);
 
   return (
     <div className="h-full flex flex-col">
@@ -109,8 +148,11 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
       </div>
 
       {/* Calendar Grid */}
-      <div className="flex-1 grid grid-cols-7 grid-rows-6">
-        {calendarDays.map((day, index) => {
+      <div
+        className="flex-1 grid grid-cols-7"
+        style={{ gridTemplateRows: `repeat(${numberOfRows}, minmax(120px, 1fr))` }}
+      >
+        {visibleDays.map((day, index) => {
           const posts = getPostsForDate(day.date);
           const hasScheduled = posts.some(p => p.status === 'scheduled');
           const hasPublished = posts.some(p => p.status === 'published');

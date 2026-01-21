@@ -1084,13 +1084,14 @@ app.get("/api/db/init", async (req, res) => {
             ws.original_filename as name,
             ws.start_date,
             ws.end_date,
+            ws.daily_flyer_urls,
             ws.created_at,
             ws.updated_at,
             COUNT(te.id)::int as event_count
           FROM week_schedules ws
           LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id
           WHERE ws.organization_id = ${organization_id}
-          GROUP BY ws.id, ws.original_filename
+          GROUP BY ws.id, ws.original_filename, ws.daily_flyer_urls
           ORDER BY ws.created_at DESC
         `
         : sql`
@@ -1101,13 +1102,14 @@ app.get("/api/db/init", async (req, res) => {
             ws.original_filename as name,
             ws.start_date,
             ws.end_date,
+            ws.daily_flyer_urls,
             ws.created_at,
             ws.updated_at,
             COUNT(te.id)::int as event_count
           FROM week_schedules ws
           LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id
           WHERE ws.user_id = ${resolvedUserId} AND ws.organization_id IS NULL
-          GROUP BY ws.id, ws.original_filename
+          GROUP BY ws.id, ws.original_filename, ws.daily_flyer_urls
           ORDER BY ws.created_at DESC
         `,
     ]);
@@ -1804,13 +1806,18 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
         ? new Date(scheduled_timestamp).getTime()
         : scheduled_timestamp;
 
+    // Validate content_id: only use if it's a valid UUID, otherwise set to null
+    // Flyer IDs like "flyer-123-abc" are not valid UUIDs
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const validContentId = content_id && uuidRegex.test(content_id) ? content_id : null;
+
     const result = await sql`
       INSERT INTO scheduled_posts (
         user_id, organization_id, content_type, content_id, image_url, caption, hashtags,
         scheduled_date, scheduled_time, scheduled_timestamp, timezone,
         platforms, instagram_content_type, instagram_account_id, created_from
       ) VALUES (
-        ${resolvedUserId}, ${organization_id || null}, ${content_type || "flyer"}, ${content_id || null}, ${image_url}, ${caption || ""},
+        ${resolvedUserId}, ${organization_id || null}, ${content_type || "flyer"}, ${validContentId}, ${image_url}, ${caption || ""},
         ${hashtags || []}, ${scheduled_date}, ${scheduled_time}, ${timestampMs},
         ${timezone || "America/Sao_Paulo"}, ${platforms || "instagram"},
         ${instagram_content_type || "photo"}, ${instagram_account_id || null}, ${created_from || null}
@@ -2904,7 +2911,7 @@ app.patch("/api/db/tournaments/event-flyer", async (req, res) => {
 app.patch("/api/db/tournaments/daily-flyer", async (req, res) => {
   try {
     const sql = getSql();
-    const { schedule_id, period } = req.query; // period: 'MORNING', 'AFTERNOON', 'NIGHT', 'HIGHLIGHTS'
+    const { schedule_id, period, day } = req.query; // period: 'MORNING', 'AFTERNOON', 'NIGHT', 'HIGHLIGHTS'; day: 'MONDAY', 'TUESDAY', etc.
     const { flyer_url, action } = req.body; // action: 'add' or 'remove'
 
     if (!schedule_id || !period) {
@@ -2923,22 +2930,50 @@ app.patch("/api/db/tournaments/daily-flyer", async (req, res) => {
     }
 
     let daily_flyer_urls = schedule.daily_flyer_urls || {};
-    let periodUrls = daily_flyer_urls[period] || [];
 
-    if (action === "add" && flyer_url) {
-      // Add new flyer URL if not already present
-      if (!periodUrls.includes(flyer_url)) {
-        periodUrls = [...periodUrls, flyer_url];
+    // NEW STRUCTURE: Support day-based organization
+    // Structure: { "MONDAY": { "MORNING": [...], "AFTERNOON": [...] }, "TUESDAY": {...}, ... }
+    if (day) {
+      // Ensure day object exists
+      if (!daily_flyer_urls[day]) {
+        daily_flyer_urls[day] = {};
       }
-    } else if (action === "remove" && flyer_url) {
-      // Remove flyer URL
-      periodUrls = periodUrls.filter((url) => url !== flyer_url);
-    } else if (action === "set" && Array.isArray(req.body.flyer_urls)) {
-      // Replace all flyer URLs for this period
-      periodUrls = req.body.flyer_urls;
-    }
 
-    daily_flyer_urls[period] = periodUrls;
+      let periodUrls = daily_flyer_urls[day][period] || [];
+
+      if (action === "add" && flyer_url) {
+        // Add new flyer URL if not already present
+        if (!periodUrls.includes(flyer_url)) {
+          periodUrls = [...periodUrls, flyer_url];
+        }
+      } else if (action === "remove" && flyer_url) {
+        // Remove flyer URL
+        periodUrls = periodUrls.filter((url) => url !== flyer_url);
+      } else if (action === "set" && Array.isArray(req.body.flyer_urls)) {
+        // Replace all flyer URLs for this period
+        periodUrls = req.body.flyer_urls;
+      }
+
+      daily_flyer_urls[day][period] = periodUrls;
+    } else {
+      // OLD STRUCTURE (backward compatibility): { "MORNING": [...], "AFTERNOON": [...] }
+      let periodUrls = daily_flyer_urls[period] || [];
+
+      if (action === "add" && flyer_url) {
+        // Add new flyer URL if not already present
+        if (!periodUrls.includes(flyer_url)) {
+          periodUrls = [...periodUrls, flyer_url];
+        }
+      } else if (action === "remove" && flyer_url) {
+        // Remove flyer URL
+        periodUrls = periodUrls.filter((url) => url !== flyer_url);
+      } else if (action === "set" && Array.isArray(req.body.flyer_urls)) {
+        // Replace all flyer URLs for this period
+        periodUrls = req.body.flyer_urls;
+      }
+
+      daily_flyer_urls[period] = periodUrls;
+    }
 
     // Update database
     const result = await sql`
