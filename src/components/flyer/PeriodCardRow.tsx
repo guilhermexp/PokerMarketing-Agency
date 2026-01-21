@@ -187,6 +187,15 @@ export const PeriodCardRow: React.FC<{
                 if (isGenerating || events.length === 0) return;
                 if (triggerBatch && !forced && generatedFlyers.length > 0) return;
 
+                // Prevent regeneration if this period's image is being used as style reference
+                const isReferenceImage = styleReference && generatedFlyers.some(
+                    (f) => f !== "loading" && f.id === styleReference.id
+                );
+                if (isReferenceImage && !forced) {
+                    console.log(`[PeriodCardRow] Skipping generation for ${period} - image is being used as reference`);
+                    return;
+                }
+
                 const sortedByGtd = [...events].sort(
                     (a, b) => parseGtd(b.gtd) - parseGtd(a.gtd),
                 );
@@ -354,6 +363,11 @@ export const PeriodCardRow: React.FC<{
 
         const totalGtd = events.reduce((sum, e) => sum + parseGtd(e.gtd), 0);
 
+        // Check if any generated flyer is being used as style reference
+        const isUsingAsReference = styleReference && generatedFlyers.some(
+            (f) => f !== "loading" && f.id === styleReference.id
+        );
+
         return (
             <div
                 className={`bg-black/40 backdrop-blur-2xl border rounded-2xl overflow-hidden transition-all mb-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isGenerating ? "border-white/20 animate-pulse" : "border-white/10 hover:border-white/20"}`}
@@ -428,6 +442,13 @@ export const PeriodCardRow: React.FC<{
                                     </button>
                                 );
                             })()}
+                        {/* Show reference badge if this period's image is being used as reference */}
+                        {isUsingAsReference && (
+                            <span className="px-2 py-1 text-[9px] font-bold text-purple-400 bg-purple-500/10 rounded-lg flex items-center gap-1">
+                                <Icon name="heart" className="w-3 h-3" />
+                                Referência
+                            </span>
+                        )}
                         <Button
                             size="small"
                             variant={events.length > 0 ? "primary" : "secondary"}
@@ -436,7 +457,8 @@ export const PeriodCardRow: React.FC<{
                                 handleGenerate(true);
                             }}
                             isLoading={isGenerating}
-                            disabled={events.length === 0}
+                            disabled={events.length === 0 || isUsingAsReference}
+                            title={isUsingAsReference ? "Esta imagem está sendo usada como referência e não pode ser regenerada" : undefined}
                         >
                             Gerar
                         </Button>
