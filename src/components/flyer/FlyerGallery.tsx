@@ -7,6 +7,7 @@ import { downloadImage } from "../../utils/imageHelpers";
 interface FlyerGalleryProps {
   flyerState: Record<string, (GalleryImage | "loading")[]>;
   dailyFlyerState: Record<string, Record<string, (GalleryImage | "loading")[]>>;
+  galleryImages?: GalleryImage[];
   onUpdateGalleryImage?: (imageId: string, newImageSrc: string) => void;
   onSetChatReference?: (image: GalleryImage | null) => void;
 }
@@ -14,6 +15,7 @@ interface FlyerGalleryProps {
 export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
   flyerState,
   dailyFlyerState,
+  galleryImages = [],
   onUpdateGalleryImage,
   onSetChatReference,
 }) => {
@@ -23,6 +25,13 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
   // Collect all flyers from both states
   const allFlyers = useMemo(() => {
     const flyers: GalleryImage[] = [];
+
+    // From gallery (persisted flyers)
+    galleryImages.forEach((flyer) => {
+      if (flyer.source?.startsWith("Flyer")) {
+        flyers.push(flyer);
+      }
+    });
 
     // From flyerState (individual tournament flyers)
     Object.values(flyerState).forEach((flyerArray) => {
@@ -44,20 +53,24 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
       });
     });
 
-    // Remove duplicates by ID and sort by newest first
+    // Remove duplicates by src (fallback to id) and sort by newest first
     const uniqueFlyers = Array.from(
-      new Map(flyers.map(f => [f.id, f])).values()
+      new Map(flyers.map(f => [f.src || f.id, f])).values()
     );
 
     return uniqueFlyers.sort((a, b) => {
-      // Extract timestamp from ID (format: flyer-{timestamp}-{random})
+      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (aTime !== bTime) return bTime - aTime;
+
+      // Fallback: Extract timestamp from ID (format: flyer-{timestamp}-{random})
       const getTimestamp = (id: string) => {
         const match = id.match(/flyer-(\d+)-/);
-        return match ? parseInt(match[1]) : 0;
+        return match ? parseInt(match[1], 10) : 0;
       };
       return getTimestamp(b.id) - getTimestamp(a.id);
     });
-  }, [flyerState, dailyFlyerState]);
+  }, [flyerState, dailyFlyerState, galleryImages]);
 
   const dailyFlyers = useMemo(() => {
     return allFlyers.filter(f => f.source === "Flyer Diário");

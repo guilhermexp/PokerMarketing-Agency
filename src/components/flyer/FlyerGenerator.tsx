@@ -1223,6 +1223,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
           <FlyerGallery
             flyerState={flyerState}
             dailyFlyerState={dailyFlyerState}
+            galleryImages={galleryImages}
             onUpdateGalleryImage={onUpdateGalleryImage}
             onSetChatReference={onSetChatReference}
           />
