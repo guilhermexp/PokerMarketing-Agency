@@ -19,6 +19,7 @@ import React from "react";
 import useSWR, { SWRConfiguration, mutate as globalMutate } from "swr";
 import {
   getInitialData,
+  getCampaigns,
   type DbBrandProfile,
   type DbGalleryImage,
   type DbScheduledPost,
@@ -327,11 +328,37 @@ export function useCampaigns(
     },
   );
 
+  const [isLoadingAll, setIsLoadingAll] = React.useState(false);
+  const [hasLoadedAll, setHasLoadedAll] = React.useState(false);
+
+  React.useEffect(() => {
+    setHasLoadedAll(false);
+    setIsLoadingAll(false);
+  }, [userId, organizationId]);
+
+  const loadAll = React.useCallback(async () => {
+    if (!userId || isLoadingAll || hasLoadedAll) return;
+
+    setIsLoadingAll(true);
+    try {
+      const campaigns = await getCampaigns(userId, organizationId);
+      mutate(campaigns, false);
+      setHasLoadedAll(true);
+    } catch (err) {
+      console.error("[useCampaigns] Failed to load all campaigns:", err);
+    } finally {
+      setIsLoadingAll(false);
+    }
+  }, [userId, organizationId, isLoadingAll, hasLoadedAll, mutate]);
+
   return {
     campaigns: data ?? EMPTY_CAMPAIGNS,
     isLoading,
     error,
     refresh: () => mutate(),
+    loadAll,
+    isLoadingAll,
+    hasLoadedAll,
     // Optimistic updates
     addCampaign: (campaign: DbCampaign) => {
       mutate(

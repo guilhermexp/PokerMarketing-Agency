@@ -58,6 +58,14 @@
   transform: translateX(-50%);
   z-index: 100;
   pointer-events: auto;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Actions bar acompanha a imagem quando painel abre */
+@media (min-width: 768px) {
+  .preview-container:has(.panel-open) .preview-actions-bar {
+    left: calc(50% - 210px); /* Centro do espaço disponível */
+  }
 }
 
 .actions-toolbar {
@@ -73,6 +81,7 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   min-height: 48px;
   pointer-events: auto;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Garantir alinhamento vertical e clicabilidade */
@@ -123,6 +132,14 @@
   transform: translateX(-50%);
   z-index: 9999;
   pointer-events: auto;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Toolbar acompanha a imagem quando painel abre */
+@media (min-width: 768px) {
+  .preview-container:has(.panel-open) .preview-toolbar-bottom {
+    left: calc(50% - 210px); /* Centro do espaço disponível (420px / 2) */
+  }
 }
 
 .preview-toolbar {
@@ -221,17 +238,15 @@
   pointer-events: auto;
 }
 
-/* Quando painel aberto: viewer reduz no desktop mantendo centralização */
+/* Quando painel aberto: área da imagem reduz para dar espaço ao painel */
 @media (min-width: 768px) {
-  .preview-content.panel-open .image-viewer-canvas {
-    width: calc(100% - 420px); /* Largura disponível menos o painel */
-    margin-right: 0;
+  .preview-content.panel-open {
+    padding-right: 420px; /* Reserva espaço para o painel fixo */
+    transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .preview-content.panel-open > div[class*="relative flex-1"] {
-    width: calc(100% - 420px); /* Largura disponível menos o painel */
-    margin-right: 0;
-    flex: none; /* Desabilita flex-grow para respeitar a largura fixa */
+  .preview-content {
+    transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
@@ -240,7 +255,7 @@
    ======================================== */
 
 .edit-panel-slide {
-  position: absolute;
+  position: fixed;
   right: 0;
   top: 0;
   height: 100%;
@@ -249,11 +264,12 @@
   transform: translateX(100%);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
-  z-index: 100 !important; /* Sobrescrever regra genérica e ficar acima do canvas */
+  z-index: 10000; /* Acima do overlay (9999) */
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  pointer-events: auto;
 }
 
 .edit-panel-slide.open {

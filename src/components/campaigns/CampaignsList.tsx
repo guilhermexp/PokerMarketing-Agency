@@ -326,6 +326,7 @@ export function CampaignsList({
     campaigns: dbCampaigns,
     isLoading,
     removeCampaign,
+    loadAll,
   } = useCampaigns(userId, organizationId);
 
   const [loadingCampaignId, setLoadingCampaignId] = useState<string | null>(
@@ -334,6 +335,10 @@ export function CampaignsList({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 6;
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   // Transform DB campaigns to display format (memoized to avoid recalc)
   const allCampaigns = useMemo<CampaignWithCounts[]>(() => {
