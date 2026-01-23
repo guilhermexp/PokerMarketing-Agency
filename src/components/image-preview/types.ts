@@ -7,6 +7,9 @@
 import type { RefObject, MouseEvent, TouchEvent, SyntheticEvent } from 'react';
 import type { GalleryImage, PendingToolEdit } from '../../types';
 
+// Re-export types from parent module
+export type { GalleryImage, PendingToolEdit };
+
 // =============================================================================
 // Props Types
 // =============================================================================
@@ -32,6 +35,7 @@ export interface ImagePreviewModalProps {
   onToolEditApproved?: (toolCallId: string, imageUrl: string) => void;
   onToolEditRejected?: (toolCallId: string, reason?: string) => void;
   initialEditPreview?: EditPreview | null;
+  chatComponent?: React.ReactNode;
 }
 
 // =============================================================================

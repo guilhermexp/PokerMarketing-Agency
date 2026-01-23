@@ -764,7 +764,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           onClose={onToggleAssistant}
           referenceImage={chatReferenceImage}
           onClearReference={() => onSetChatReference(null)}
-          onUpdateReference={(ref) => onSetChatReference({ id: ref.id, src: ref.src })}
+          onUpdateReference={(ref) => onSetChatReference({ id: ref.id, src: ref.src, source: '', model: '' } as unknown as GalleryImage)}
           galleryImages={galleryImages}
           brandProfile={brandProfile}
           pendingToolEdit={props.pendingToolEdit}
@@ -836,7 +836,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 onClose={() => {}}
                 referenceImage={chatReferenceImage}
                 onClearReference={() => onSetChatReference(null)}
-                onUpdateReference={(ref) => onSetChatReference({ id: ref.id, src: ref.src })}
+                onUpdateReference={(ref) => onSetChatReference({ id: ref.id, src: ref.src, source: '', model: '' } as unknown as GalleryImage)}
                 galleryImages={galleryImages}
                 brandProfile={brandProfile}
                 pendingToolEdit={props.pendingToolEdit}

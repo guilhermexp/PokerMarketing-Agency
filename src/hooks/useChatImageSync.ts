@@ -12,21 +12,21 @@
  */
 
 import { useEffect, useRef } from 'react';
-import type { Message } from '@ai-sdk/react';
+import type { UIMessage } from '@ai-sdk/react';
 import type { GalleryImage, ChatReferenceImage } from '../types';
 
 interface UseChatImageSyncProps {
   galleryImages: GalleryImage[];
   chatReferenceImage: ChatReferenceImage | null;
   setChatReferenceImage: (ref: ChatReferenceImage | null) => void;
-  messages: Message[];
-  setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
+  messages: UIMessage[];
+  setMessages: (messages: UIMessage[] | ((prev: UIMessage[]) => UIMessage[])) => void;
 }
 
 /**
  * Deep equality check para arrays de mensagens
  */
-function deepEqual(a: Message[], b: Message[]): boolean {
+function deepEqual(a: UIMessage[], b: UIMessage[]): boolean {
   if (a.length !== b.length) return false;
 
   for (let i = 0; i < a.length; i++) {

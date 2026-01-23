@@ -1,0 +1,39 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/worktrees/tasks/001-add-consistent-focus-ring-styling-across-all-inter/**)",
+      "Write(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/worktrees/tasks/001-add-consistent-focus-ring-styling-across-all-inter/**)",
+      "Edit(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/worktrees/tasks/001-add-consistent-focus-ring-styling-across-all-inter/**)",
+      "Glob(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/worktrees/tasks/001-add-consistent-focus-ring-styling-across-all-inter/**)",
+      "Grep(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/worktrees/tasks/001-add-consistent-focus-ring-styling-across-all-inter/**)",
+      "Read(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/worktrees/tasks/001-add-consistent-focus-ring-styling-across-all-inter/.auto-claude/specs/001-add-consistent-focus-ring-styling-across-all-inter/**)",
+      "Write(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/worktrees/tasks/001-add-consistent-focus-ring-styling-across-all-inter/.auto-claude/specs/001-add-consistent-focus-ring-styling-across-all-inter/**)",
+      "Edit(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/worktrees/tasks/001-add-consistent-focus-ring-styling-across-all-inter/.auto-claude/specs/001-add-consistent-focus-ring-styling-across-all-inter/**)",
+      "Read(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/**)",
+      "Write(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/**)",
+      "Edit(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/**)",
+      "Glob(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/**)",
+      "Grep(/Users/guilhermevarela/Documents/Projetos/PokerMarketing-Agency/.auto-claude/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)",
+      "mcp__graphiti-memory__search_nodes(*)",
+      "mcp__graphiti-memory__search_facts(*)",
+      "mcp__graphiti-memory__add_episode(*)",
+      "mcp__graphiti-memory__get_episodes(*)",
+      "mcp__graphiti-memory__get_entity_edge(*)"
+    ]
+  }
+}

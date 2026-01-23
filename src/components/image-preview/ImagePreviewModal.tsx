@@ -198,9 +198,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       onSetChatReference={onSetChatReference}
       onSetChatReferenceSilent={onSetChatReferenceSilent}
       downloadFilename={downloadFilename}
-      onQuickPost={onQuickPost}
-      onPublish={onPublish}
-      onSchedulePost={onSchedulePost}
+      onQuickPost={onQuickPost ? () => onQuickPost(image) : undefined}
+      onPublish={onPublish ? () => onPublish(image) : undefined}
+      onSchedulePost={onSchedulePost ? () => onSchedulePost(image) : undefined}
       pendingToolEdit={pendingToolEdit}
       onToolEditApproved={onToolEditApproved}
       onToolEditRejected={onToolEditRejected}

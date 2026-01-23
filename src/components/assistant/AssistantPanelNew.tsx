@@ -194,13 +194,12 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
 
   // useChat hook do Vercel AI SDK
   const { messages, sendMessage, status, addToolApprovalResponse, setMessages } = useChat({
-    api: '/api/chat',
     id: chatId,
-    body: {
+    ...({ body: {
       brandProfile: brandProfile,
       chatReferenceImage: referenceImage,
-      selectedChatModel: brandProfile?.preferredAIModel || 'x-ai/grok-4.1-fast'
-    },
+      selectedChatModel: brandProfile?.creativeModel || 'x-ai/grok-4.1-fast'
+    }} as any),
     sendAutomaticallyWhen: ({ messages }) =>
       lastAssistantMessageIsCompleteWithToolCalls({ messages }) ||
       lastAssistantMessageIsCompleteWithApprovalResponses({ messages }),
@@ -213,7 +212,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       // Auto-limpar erro após 5 segundos
       setTimeout(() => setErrorMessage(null), 5000);
     },
-    onFinish: (message) => {
+    onFinish: (message: any) => {
       console.log('[AssistantPanel] Message finished:', {
         role: message.role,
         partsCount: message.parts?.length || 0
@@ -268,15 +267,15 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     if (!onShowToolEditPreview) return;
 
     for (const msg of messages) {
-      const toolParts = msg.parts?.filter((part: any) => part.type === 'tool-editImage') || [];
+      const toolParts = (msg as any).parts?.filter((part: any) => part.type === 'tool-editImage') || [];
       for (const part of toolParts) {
-        if (part.state !== 'output-available' || !part.toolCallId) continue;
-        if (handledEditResultsRef.current.has(part.toolCallId)) continue;
-        const output = part.output;
+        if ((part as any).state !== 'output-available' || !(part as any).toolCallId) continue;
+        if (handledEditResultsRef.current.has((part as any).toolCallId)) continue;
+        const output = (part as any).output;
         if (!output?.imageUrl) continue;
-        handledEditResultsRef.current.add(part.toolCallId);
+        handledEditResultsRef.current.add((part as any).toolCallId);
         onShowToolEditPreview({
-          toolCallId: part.toolCallId,
+          toolCallId: (part as any).toolCallId,
           imageUrl: output.imageUrl,
           prompt: output.prompt,
           referenceImageId: output.referenceImageId,
@@ -581,7 +580,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
                   }
                 }}
                 placeholder="Pergunte, pesquise ou converse..."
-                className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-white placeholder:text-white/30 outline-none resize-none min-h-[80px] max-h-[200px]"
+                className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-white placeholder:text-white/30 outline-none resize-none min-h-[80px] max-h-[200px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 disabled={isLoading || isSending}
                 rows={2}
               />
