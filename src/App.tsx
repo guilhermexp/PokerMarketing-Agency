@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import * as XLSX from "xlsx";
 import { BrandProfileSetup } from "./components/brand/BrandProfileSetup";
 import { Dashboard } from "./components/dashboard/Dashboard";
 import { AssistantPanel } from "./components/assistant/AssistantPanel";
@@ -1869,6 +1868,23 @@ function AppContent() {
       reader.onload = async (e) => {
         try {
           console.debug("[Upload] File read complete, parsing...");
+
+          // Dynamically load XLSX library
+          const loadXLSX = async () => {
+            try {
+              const XLSX = await import('xlsx');
+              return XLSX;
+            } catch {
+              return null;
+            }
+          };
+
+          const XLSX = await loadXLSX();
+
+          if (!XLSX) {
+            throw new Error("Failed to load XLSX library");
+          }
+
           const data = new Uint8Array(e.target!.result as ArrayBuffer);
           const wb = XLSX.read(data, { type: "array" });
           const sheet = wb.Sheets[wb.SheetNames[0]];
