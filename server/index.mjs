@@ -62,7 +62,18 @@ process.on("unhandledRejection", (error) => {
   console.error("[Dev API] unhandledRejection:", error);
 });
 
-app.use(cors());
+// CORS configuration
+const CORS_ORIGIN = process.env.CORS_ORIGIN;
+if (!CORS_ORIGIN) {
+  console.warn("[SECURITY WARNING] CORS_ORIGIN not configured - allowing all origins. Set CORS_ORIGIN environment variable in production.");
+  app.use(cors());
+} else {
+  const allowedOrigins = CORS_ORIGIN.split(',').map(origin => origin.trim());
+  app.use(cors({
+    origin: allowedOrigins,
+    credentials: true,
+  }));
+}
 app.use(express.json({ limit: "50mb" }));
 
 // Clerk authentication middleware
