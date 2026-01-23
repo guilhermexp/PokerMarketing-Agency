@@ -456,6 +456,39 @@ async function requireSuperAdmin(req, res, next) {
   }
 }
 
+// Check if current user is a super admin
+app.get("/api/auth/check-super-admin", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+
+    // Not authenticated = not a super admin
+    if (!auth?.userId) {
+      return res.json({ isSuperAdmin: false });
+    }
+
+    // Get user email from Clerk
+    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+    const userResponse = await fetch(`https://api.clerk.com/v1/users/${auth.userId}`, {
+      headers: { Authorization: `Bearer ${clerkSecretKey}` }
+    });
+
+    if (!userResponse.ok) {
+      return res.json({ isSuperAdmin: false });
+    }
+
+    const userData = await userResponse.json();
+    const userEmail = userData.email_addresses?.[0]?.email_address?.toLowerCase();
+
+    // Check if user email is in super admin list
+    const isSuperAdmin = userEmail && SUPER_ADMIN_EMAILS.includes(userEmail);
+
+    res.json({ isSuperAdmin });
+  } catch (error) {
+    console.error('[Auth] Check super admin error:', error);
+    res.json({ isSuperAdmin: false });
+  }
+});
+
 // Admin: Get overview stats
 app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
   try {
