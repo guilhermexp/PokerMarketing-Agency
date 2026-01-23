@@ -81,7 +81,7 @@ export const PeriodCard: React.FC<{
     imageSize,
     compositionAssets,
     language: _language,
-    onAddImageToGallery,
+    onAddImageToGallery: _onAddImageToGallery,
     onUpdateGalleryImage,
     onSetChatReference,
     generatedFlyers,

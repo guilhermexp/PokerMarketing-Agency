@@ -14,6 +14,7 @@ import { Loader } from "../common/Loader";
 import { generateImage } from "../../services/geminiService";
 import { uploadImageToBlob } from "../../services/blobService";
 import { urlToBase64 } from "../../utils/imageHelpers";
+import { getErrorMessage } from "../../utils/errorMessages";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import { FacebookAdPreview } from "../common/FacebookAdPreview";
 import { GoogleAdPreview } from "../common/GoogleAdPreview";
@@ -429,7 +430,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
           setGenerationState((prev) => {
             const newErrors = [...prev.errors];
             const newGenerating = [...prev.isGenerating];
-            newErrors[index] = job.error_message || "Falha ao gerar imagem.";
+            newErrors[index] = getErrorMessage(job.error_message) || "Falha ao gerar imagem.";
             newGenerating[index] = false;
             return { isGenerating: newGenerating, errors: newErrors };
           });

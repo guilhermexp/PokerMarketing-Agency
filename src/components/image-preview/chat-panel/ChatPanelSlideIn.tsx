@@ -1,6 +1,5 @@
 import { Drawer } from 'antd';
 import { useResponsive } from 'antd-style';
-import { X } from 'lucide-react';
 import type { GalleryImage } from '../types';
 
 interface ChatPanelSlideInProps {
@@ -19,7 +18,7 @@ export const ChatPanelSlideIn = ({
   const { mobile } = useResponsive();
 
   // Debug: Log rendering state
-  console.log('[ChatPanel] Rendering:', {
+  console.debug('[ChatPanel] Rendering:', {
     open,
     chatComponent: !!chatComponent,
     mobile,

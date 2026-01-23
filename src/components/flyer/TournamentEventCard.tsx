@@ -7,7 +7,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/common/Card';
-import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import { Loader } from '@/components/common/Loader';
 import { FlyerThumbStrip } from './FlyerThumbStrip';
@@ -71,7 +70,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
   styleReference,
   generatedFlyers,
   setGeneratedFlyers,
-  onAddImageToGallery,
+  onAddImageToGallery: _onAddImageToGallery,
   onUpdateGalleryImage,
   onSetChatReference,
   onPublishToCampaign,

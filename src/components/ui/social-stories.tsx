@@ -162,7 +162,11 @@ export function SocialStories({
   const handleTap = (e: React.MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest("button, a")) return
     const { width } = e.currentTarget.getBoundingClientRect()
-    e.nativeEvent.offsetX < width / 3 ? goPrev() : goNext()
+    if (e.nativeEvent.offsetX < width / 3) {
+      goPrev()
+    } else {
+      goNext()
+    }
   }
 
   // Prevent SSR issues

@@ -28,11 +28,11 @@ export function DataStreamHandler() {
         // IMAGE GENERATION EVENTS
         // =====================================================================
         case 'data-imageGenerating':
-          console.log('[DataStream] Gerando imagem:', delta.data.description);
+          console.debug('[DataStream] Gerando imagem:', delta.data.description);
           break;
 
         case 'data-imageCreated':
-          console.log('[DataStream] Imagem criada:', delta.data.url);
+          console.debug('[DataStream] Imagem criada:', delta.data.url);
           // TODO: Adicionar notificação quando sistema de notificação existir
           // TODO: Recarregar galeria
           break;
@@ -41,11 +41,11 @@ export function DataStreamHandler() {
         // IMAGE EDITING EVENTS
         // =====================================================================
         case 'data-imageEditing':
-          console.log('[DataStream] Editando imagem:', delta.data.prompt);
+          console.debug('[DataStream] Editando imagem:', delta.data.prompt);
           break;
 
         case 'data-imageEdited':
-          console.log('[DataStream] Imagem editada:', delta.data.url);
+          console.debug('[DataStream] Imagem editada:', delta.data.url);
           // TODO: Adicionar notificação e recarregar galeria
           break;
 
@@ -53,11 +53,11 @@ export function DataStreamHandler() {
         // LOGO GENERATION EVENTS
         // =====================================================================
         case 'data-logoGenerating':
-          console.log('[DataStream] Gerando logo:', delta.data.prompt);
+          console.debug('[DataStream] Gerando logo:', delta.data.prompt);
           break;
 
         case 'data-logoCreated':
-          console.log('[DataStream] Logo criado:', delta.data.url);
+          console.debug('[DataStream] Logo criado:', delta.data.url);
           // TODO: Adicionar notificação e recarregar galeria
           break;
 

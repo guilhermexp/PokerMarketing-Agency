@@ -36,6 +36,7 @@ import { uploadImageToBlob } from "../../../services/blobService";
 import { ImagePreviewModal } from "../../common/ImagePreviewModal";
 import { ExportVideoModal } from "../../common/ExportVideoModal";
 import { urlToBase64 } from "../../../utils/imageHelpers";
+import { getErrorMessage } from "../../../utils/errorMessages";
 import {
   downloadBlob,
   extractLastFrameFromVideo,
@@ -425,7 +426,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
           [sceneNumber]: [
             {
               isLoading: false,
-              error: job.error_message || "Falha na geração do vídeo",
+              error: getErrorMessage(job.error_message) || "Falha na geração do vídeo",
             },
             ...existing,
           ],
@@ -436,7 +437,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
       const jobContext = job.context;
       if (jobContext && jobCompletionResolvers.current.has(jobContext)) {
         const resolver = jobCompletionResolvers.current.get(jobContext);
-        resolver?.reject(job.error_message || "Falha na geração do vídeo");
+        resolver?.reject(getErrorMessage(job.error_message) || "Falha na geração do vídeo");
         jobCompletionResolvers.current.delete(jobContext);
       }
     });

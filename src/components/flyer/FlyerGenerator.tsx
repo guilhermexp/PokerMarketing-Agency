@@ -114,7 +114,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   const {
     selectedDay, selectedAspectRatio, selectedImageSize, selectedCurrency,
     selectedLanguage, selectedImageModel, showIndividualTournaments,
-    showPastTournaments, enabledPeriods, isSettingsModalOpen, activeHelpTooltip,
+    showPastTournaments, enabledPeriods, isSettingsModalOpen,
     showOnlyWithGtd, sortBy, collabLogo, manualStyleRef, isStylePanelOpen,
     batchTrigger, isBatchGenerating, globalStyleReference, isManualModalOpen,
     isSchedulesPanelOpen, compositionAssets
@@ -124,7 +124,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     setSelectedDay, setSelectedAspectRatio, setSelectedImageSize,
     setSelectedCurrency, setSelectedLanguage, setSelectedImageModel,
     setShowIndividualTournaments, setShowPastTournaments, setEnabledPeriods,
-    setIsSettingsModalOpen, setActiveHelpTooltip, setShowOnlyWithGtd, setSortBy,
+    setIsSettingsModalOpen, setShowOnlyWithGtd, setSortBy,
     setCollabLogo, setManualStyleRef, setIsStylePanelOpen, setIsManualModalOpen,
     setIsSchedulesPanelOpen, setCompositionAssets, setBatchTrigger, setIsBatchGenerating,
     setGlobalStyleReference
@@ -259,7 +259,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
             className="w-full"
           >
             <label className="cursor-pointer group inline-block">
-              <div className="bg-black/40 backdrop-blur-2xl border border-white/10 text-white/90 font-medium px-6 py-3 rounded-full flex items-center justify-center gap-3 transition-all hover:border-white/30 hover:text-white active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+              <div className="bg-black/40 backdrop-blur-2xl border border-white/10 text-white/90 font-medium px-6 py-3 rounded-full flex items-center justify-center gap-3 transition-all hover:border-white/30 hover:text-white active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]">
                 <Icon name="upload" className="w-4 h-4" />
                 <span className="text-sm">
                   Carregar Nova Planilha
@@ -267,7 +267,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               </div>
               <input
                 type="file"
-                className="hidden"
+                className="hidden outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 accept=".xlsx,.xls"
                 onChange={(e) =>
                   e.target.files?.[0] && onFileUpload(e.target.files[0])
@@ -277,7 +277,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
             {onClearExpiredSchedule && (
               <button
                 onClick={onClearExpiredSchedule}
-                className="bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 font-medium px-6 py-3 rounded-full transition-all hover:border-white/30 hover:text-white/90 active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                className="bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 font-medium px-6 py-3 rounded-full transition-all hover:border-white/30 hover:text-white/90 active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               >
                 Limpar dados antigos
               </button>
@@ -293,7 +293,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
             className="w-full"
           >
             <label className="cursor-pointer group inline-block">
-              <div className="bg-black/40 backdrop-blur-2xl border border-white/10 text-white/90 font-medium px-6 py-3 rounded-full flex items-center justify-center gap-3 transition-all hover:border-white/30 hover:text-white active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+              <div className="bg-black/40 backdrop-blur-2xl border border-white/10 text-white/90 font-medium px-6 py-3 rounded-full flex items-center justify-center gap-3 transition-all hover:border-white/30 hover:text-white active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]">
                 <Icon name="upload" className="w-4 h-4" />
                 <span className="text-sm">
                   Carregar Planilha Excel
@@ -301,7 +301,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               </div>
               <input
                 type="file"
-                className="hidden"
+                className="hidden outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 accept=".xlsx,.xls"
                 onChange={(e) =>
                   e.target.files?.[0] && onFileUpload(e.target.files[0])
@@ -310,7 +310,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
             </label>
             <button
               onClick={() => setIsManualModalOpen(true)}
-              className="flex items-center gap-2 bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 font-medium px-6 py-3 rounded-full transition-all hover:border-white/30 hover:text-white/90 active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              className="flex items-center gap-2 bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 font-medium px-6 py-3 rounded-full transition-all hover:border-white/30 hover:text-white/90 active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
             >
               <Icon name="edit" className="w-4 h-4" />
               Adicionar Torneio Manual
@@ -375,7 +375,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 onClick={() =>
                   setShowIndividualTournaments(!showIndividualTournaments)
                 }
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all backdrop-blur-2xl border shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${showIndividualTournaments
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all backdrop-blur-2xl border shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] ${showIndividualTournaments
                   ? "bg-black/40 border-white/10 text-white/90"
                   : "bg-black/40 border-white/10 text-white/60 hover:text-white/90 hover:border-white/30"
                   }`}
@@ -392,7 +392,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 <>
                   <button
                     onClick={() => setShowOnlyWithGtd(!showOnlyWithGtd)}
-                    className={`px-3 py-2 rounded-full text-xs font-medium transition-all backdrop-blur-2xl border shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${showOnlyWithGtd
+                    className={`px-3 py-2 rounded-full text-xs font-medium transition-all backdrop-blur-2xl border shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] ${showOnlyWithGtd
                       ? "bg-black/40 border-white/10 text-white/90"
                       : "bg-black/40 border-white/10 text-white/60 hover:text-white/90 hover:border-white/30"
                       }`}
@@ -406,7 +406,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     onChange={(e) =>
                       setSortBy(e.target.value as "time" | "gtd")
                     }
-                    className="px-3 py-2 rounded-full text-xs bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 outline-none cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                    className="px-3 py-2 rounded-full text-xs bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 outline-none cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.5)] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                   >
                     <option value="time">Por Horário</option>
                     <option value="gtd">Por GTD ↓</option>
@@ -415,7 +415,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               )}
               <button
                 onClick={() => setIsManualModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               >
                 <Icon name="edit" className="w-4 h-4" />
                 Add Manual
@@ -423,13 +423,13 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               {/* Upload Spreadsheet - only show when no schedule is loaded */}
               {!weekScheduleInfo && (
                 <label className="cursor-pointer group">
-                  <div className="bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 font-medium px-4 py-2 rounded-full flex items-center gap-2 transition-all active:scale-95 text-sm shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                  <div className="bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 font-medium px-4 py-2 rounded-full flex items-center gap-2 transition-all active:scale-95 text-sm shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]">
                     <Icon name="upload" className="w-4 h-4" />
                     <span>Nova Planilha</span>
                   </div>
                   <input
                     type="file"
-                    className="hidden"
+                    className="hidden outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                     accept=".xlsx,.xls"
                     onChange={(e) =>
                       e.target.files?.[0] && onFileUpload(e.target.files[0])
@@ -441,7 +441,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               {/* Settings button */}
               <button
                 onClick={() => setIsSettingsModalOpen(true)}
-                className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 title="Configurações"
               >
                 <Icon name="settings" className="w-4 h-4" />
@@ -488,7 +488,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 </h4>
                 <button
                   onClick={() => setIsSchedulesPanelOpen(false)}
-                  className="text-white/30 hover:text-white/50"
+                  className="text-white/30 hover:text-white/50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] rounded"
                 >
                   <Icon name="x" className="w-3 h-3" />
                 </button>
@@ -513,7 +513,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     <button
                       key={schedule.id}
                       onClick={() => onSelectSchedule?.(schedule)}
-                      className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border transition-all text-left ${isSelected
+                      className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border transition-all text-left outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] ${isSelected
                         ? "bg-white/5 border-white/20"
                         : isCurrentWeek
                           ? "bg-green-500/10 border-green-500/20 hover:border-green-500/40"
@@ -586,7 +586,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 <select
                   value={selectedDay}
                   onChange={(e) => setSelectedDay(e.target.value)}
-                  className="w-full bg-black/40 backdrop-blur-2xl border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-white/30 appearance-none cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                  className="w-full bg-black/40 backdrop-blur-2xl border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none appearance-none cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.5)] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 >
                   {Object.keys(DAY_TRANSLATIONS).map((d) => (
                     <option key={d} value={d}>
@@ -600,7 +600,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
               <div className="flex items-center gap-2">
                 {/* Logo Colab button */}
                 <label className="relative cursor-pointer group" title="Logo Colaborador">
-                  <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                  <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]">
                     {collabLogo ? (
                       <img src={collabLogo} className="w-5 h-5 object-contain rounded" />
                     ) : (
@@ -609,7 +609,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   </div>
                   <input
                     type="file"
-                    className="hidden"
+                    className="hidden outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                     accept="image/*"
                     onChange={async (e) => {
                       const f = e.target.files?.[0];
@@ -625,7 +625,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         e.preventDefault();
                         setCollabLogo(null);
                       }}
-                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                     >
                       ×
                     </button>
@@ -634,7 +634,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
 
                 {/* Referência button */}
                 <label className="relative cursor-pointer group" title="Referência de Estilo">
-                  <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                  <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]">
                     {manualStyleRef ? (
                       <img src={manualStyleRef} className="w-5 h-5 object-cover rounded" />
                     ) : (
@@ -643,7 +643,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   </div>
                   <input
                     type="file"
-                    className="hidden"
+                    className="hidden outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                     accept="image/*"
                     onChange={async (e) => {
                       const f = e.target.files?.[0];
@@ -667,7 +667,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         setManualStyleRef(null);
                         setGlobalStyleReference(null);
                       }}
-                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                     >
                       ×
                     </button>
@@ -676,7 +676,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
 
                 {/* Ativos button */}
                 <label className="relative cursor-pointer group" title="Ativos de Composição">
-                  <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                  <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]">
                     {compositionAssets.length > 0 ? (
                       <span className="text-[10px] font-bold text-white/90">{compositionAssets.length}</span>
                     ) : (
@@ -685,7 +685,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   </div>
                   <input
                     type="file"
-                    className="hidden"
+                    className="hidden outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                     accept="image/*"
                     onChange={async (e) => {
                       const f = e.target.files?.[0];
@@ -704,7 +704,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         e.preventDefault();
                         setCompositionAssets([]);
                       }}
-                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                     >
                       ×
                     </button>
@@ -732,7 +732,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     }, 1500);
                   }}
                   disabled={isBatchGenerating}
-                  className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 >
                   <Icon name="zap" className="w-4 h-4" />
                   {isBatchGenerating ? "Gerando..." : "Gerar Grade"}
@@ -813,7 +813,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                         onClick={() =>
                           setShowPastTournaments(!showPastTournaments)
                         }
-                        className="w-full flex items-center justify-between px-4 py-3 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-2xl hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                        className="w-full flex items-center justify-between px-4 py-3 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-2xl hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                       >
                         <div className="flex items-center gap-2">
                           <Icon
@@ -931,7 +931,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   </h3>
                   <button
                     onClick={() => setIsSettingsModalOpen(false)}
-                    className="text-white/40 hover:text-white/80 transition-colors"
+                    className="text-white/40 hover:text-white/80 transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] rounded"
                   >
                     <Icon name="x" className="w-5 h-5" />
                   </button>
@@ -968,7 +968,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                                 [period]: e.target.checked,
                               }))
                             }
-                            className="w-4 h-4 rounded border-white/30 bg-transparent text-white focus:ring-white/30 focus:ring-offset-0"
+                            className="w-4 h-4 rounded border-white/30 bg-transparent text-white outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                           />
                           <span className="text-sm font-semibold">
                             {PERIOD_LABELS[selectedLanguage][period]}
@@ -993,7 +993,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                           onChange={(e) =>
                             setSelectedAspectRatio(e.target.value)
                           }
-                          className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/90 outline-none appearance-none cursor-pointer hover:border-white/20 hover:bg-white/[0.05] transition-all focus:border-white/30"
+                          className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/90 outline-none appearance-none cursor-pointer hover:border-white/20 hover:bg-white/[0.05] transition-all focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                         >
                           <option value="9:16">Vertical (9:16)</option>
                           <option value="1:1">Quadrado (1:1)</option>
@@ -1010,7 +1010,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                             setSelectedImageSize(e.target.value as ImageSize)
                           }
                           disabled={false}
-                          className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/90 outline-none appearance-none cursor-pointer hover:border-white/20 hover:bg-white/[0.05] transition-all disabled:opacity-20 focus:border-white/30"
+                          className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/90 outline-none appearance-none cursor-pointer hover:border-white/20 hover:bg-white/[0.05] transition-all disabled:opacity-20 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                         >
                           <option value="1K">HD (1K)</option>
                           <option value="2K">QuadHD (2K)</option>
@@ -1026,7 +1026,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                           onChange={(e) =>
                             setSelectedImageModel(e.target.value as ImageModel)
                           }
-                          className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/90 outline-none appearance-none cursor-pointer hover:border-white/20 hover:bg-white/[0.05] transition-all focus:border-white/30"
+                          className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/90 outline-none appearance-none cursor-pointer hover:border-white/20 hover:bg-white/[0.05] transition-all focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                         >
                           <option value="gemini-3-pro-image-preview">
                             Gemini 3 Pro
@@ -1042,7 +1042,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                           onChange={(e) =>
                             setSelectedCurrency(e.target.value as Currency)
                           }
-                          className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/90 outline-none appearance-none cursor-pointer hover:border-white/20 hover:bg-white/[0.05] transition-all focus:border-white/30"
+                          className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/90 outline-none appearance-none cursor-pointer hover:border-white/20 hover:bg-white/[0.05] transition-all focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                         >
                           <option value="BRL">Real (R$)</option>
                           <option value="USD">Dólar ($)</option>
@@ -1061,7 +1061,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                       onChange={(e) =>
                         setSelectedLanguage(e.target.value as "pt" | "en")
                       }
-                      className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/90 outline-none appearance-none cursor-pointer hover:border-white/20 hover:bg-white/[0.05] transition-all focus:border-white/30"
+                      className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/90 outline-none appearance-none cursor-pointer hover:border-white/20 hover:bg-white/[0.05] transition-all focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                     >
                       <option value="pt">Português (BR)</option>
                       <option value="en">English (US)</option>
@@ -1071,7 +1071,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   {/* Fechar */}
                   <button
                     onClick={() => setIsSettingsModalOpen(false)}
-                    className="w-full bg-white/[0.08] hover:bg-white/[0.12] border border-white/20 text-white font-bold text-sm py-3 rounded-xl transition-all active:scale-[0.98] hover:border-white/30"
+                    className="w-full bg-white/[0.08] hover:bg-white/[0.12] border border-white/20 text-white font-bold text-sm py-3 rounded-xl transition-all active:scale-[0.98] hover:border-white/30 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                   >
                     Salvar Configurações
                   </button>
@@ -1089,7 +1089,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsStylePanelOpen(true)}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
                 isStylePanelOpen
                   ? "bg-white/10 text-white/90"
                   : "text-white/40 hover:text-white/60 hover:bg-white/5"
@@ -1100,7 +1100,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
             </button>
             <button
               onClick={() => setIsStylePanelOpen(false)}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
                 !isStylePanelOpen
                   ? "bg-white/10 text-white/90"
                   : "text-white/40 hover:text-white/60 hover:bg-white/5"
@@ -1148,7 +1148,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     if (onClearSelectedStyleReference)
                       onClearSelectedStyleReference();
                   }}
-                  className="text-white/50 hover:text-white/90 transition-colors"
+                  className="text-white/50 hover:text-white/90 transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] rounded"
                 >
                   <Icon name="x" className="w-3.5 h-3.5" />
                 </button>
@@ -1169,7 +1169,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                             onSelectStyleReference(ref);
                           }
                         }}
-                        className={`group relative w-full aspect-[4/3] rounded-xl overflow-hidden transition-all cursor-pointer ${isSelected
+                        className={`group relative w-full aspect-[4/3] rounded-xl overflow-hidden transition-all cursor-pointer outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] ${isSelected
                           ? "ring-2 ring-white/30 ring-offset-2 ring-offset-[#070707] scale-[1.02]"
                           : "border border-white/[0.06] hover:border-white/10 hover:scale-[1.01]"
                           }`}

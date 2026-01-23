@@ -213,7 +213,7 @@ function AppContent() {
     userId,
     clerkUserId,
     isLoading: authLoading,
-    isDbSyncing,
+    isDbSyncing: _isDbSyncing,
     dbUser,
   } = useAuth();
   const { organization, isLoaded: orgLoaded } = useOrganization();
@@ -813,7 +813,7 @@ function AppContent() {
       console.warn('[App] daily_flyer_urls:', dailyFlyerUrls);
       console.warn('[App] Gallery image URLs:', galleryImages.map(img => img.src));
     }
-  }, [swrTournamentSchedule?.daily_flyer_urls, swrTournamentSchedule?.id, galleryImages.length]);
+  }, [swrTournamentSchedule?.daily_flyer_urls, swrTournamentSchedule?.id, galleryImages]);
 
   // Reset restoration flag when schedule changes
   useEffect(() => {
@@ -865,7 +865,7 @@ function AppContent() {
     }
   }, [brandProfile, chatHistory.length]);
 
-  const handleAddImageToGallery = (
+  const handleAddImageToGallery = useCallback((
     image: Omit<GalleryImage, "id">,
   ): GalleryImage => {
     // Create image with temporary ID immediately for UI responsiveness
@@ -922,9 +922,16 @@ function AppContent() {
     }
 
     return newImage;
-  };
+  }, [
+    organizationId,
+    setToolImageReference,
+    swrAddGalleryImage,
+    swrRemoveGalleryImage,
+    toolImageReference?.id,
+    userId,
+  ]);
 
-  const handleUpdateGalleryImage = (imageId: string, newImageSrc: string) => {
+  const handleUpdateGalleryImage = useCallback((imageId: string, newImageSrc: string) => {
     // Update SWR cache immediately (optimistic update)
     swrUpdateGalleryImage(imageId, { src_url: newImageSrc });
     if (toolImageReference?.id === imageId)
@@ -952,7 +959,11 @@ function AppContent() {
         console.error("Failed to update image in database:", e);
       }
     })();
-  };
+  }, [
+    setToolImageReference,
+    swrUpdateGalleryImage,
+    toolImageReference?.id,
+  ]);
 
   const handleDeleteGalleryImage = async (imageId: string) => {
     // Remove from SWR cache immediately (optimistic update)
@@ -978,7 +989,7 @@ function AppContent() {
   const handleAddStyleReference = async (
     ref: Omit<StyleReference, "id" | "createdAt">,
   ) => {
-    console.log("[App] handleAddStyleReference called", ref);
+    console.info("[App] handleAddStyleReference called", ref);
 
     // Find the gallery image by src
     const galleryImage = swrGalleryImages?.find((img) => img.src_url === ref.src);
@@ -1001,14 +1012,14 @@ function AppContent() {
         style_reference_name: ref.name,
       });
 
-      console.log("[App] Successfully added to favorites:", galleryImage.id);
+      console.info("[App] Successfully added to favorites:", galleryImage.id);
     } catch (error) {
       console.error("[App] Failed to add style reference:", error);
     }
   };
 
   const handleRemoveStyleReference = async (id: string) => {
-    console.log("[App] handleRemoveStyleReference called", id);
+    console.info("[App] handleRemoveStyleReference called", id);
 
     try {
       // Update image to unmark as style reference
@@ -1023,7 +1034,7 @@ function AppContent() {
         style_reference_name: null,
       });
 
-      console.log("[App] Successfully removed from favorites:", id);
+      console.info("[App] Successfully removed from favorites:", id);
 
       if (selectedStyleReference?.id === id) setSelectedStyleReference(null);
     } catch (error) {
@@ -1613,7 +1624,7 @@ function AppContent() {
     }
   };
 
-  const executeTool = async (
+  const executeTool = useCallback(async (
     toolCall: { name: string; args: Record<string, unknown> },
   ): Promise<
     | { success: true; image_data: string; message: string }
@@ -1719,9 +1730,16 @@ function AppContent() {
       }
     }
     return { error: `Comando não reconhecido: ${name}` };
-  };
+  }, [
+    brandProfile,
+    handleAddImageToGallery,
+    handleUpdateGalleryImage,
+    lastUploadedImage,
+    setToolImageReference,
+    toolImageReference
+  ]);
 
-  const handleAssistantSendMessage = async (
+  const handleAssistantSendMessage = useCallback(async (
     message: string,
     image: ChatReferenceImage | null,
   ) => {
@@ -1843,7 +1861,16 @@ function AppContent() {
     } finally {
       setIsAssistantLoading(false);
     }
-  };
+  }, [
+    brandProfile,
+    chatHistory,
+    executeTool,
+    setChatHistory,
+    setChatReferenceImage,
+    setIsAssistantLoading,
+    setLastUploadedImage,
+    setToolImageReference
+  ]);
 
   const parseWeekFromFilename = (filename: string): WeekScheduleInfo | null => {
     // Padrão: "PPST 16 18 al 21 18" ou "PPST_16_18_al_21_18" ou "PPST 22-12 al 28-12"
@@ -2030,12 +2057,12 @@ function AppContent() {
   // CHAT CONTEXT - Callbacks otimizados
   // ========================================================================
 
-  const handleSetChatReference = useCallback((img: GalleryImage | null) => {
+  const handleSetChatReference = useCallback((img: GalleryImage | ChatReferenceImage | null) => {
     setChatReferenceImage(img ? { id: img.id, src: img.src } : null);
     if (img && !isAssistantOpen) setIsAssistantOpen(true);
   }, [isAssistantOpen]);
 
-  const handleSetChatReferenceSilent = useCallback((img: GalleryImage | null) => {
+  const handleSetChatReferenceSilent = useCallback((img: GalleryImage | ChatReferenceImage | null) => {
     setChatReferenceImage(img ? { id: img.id, src: img.src } : null);
   }, []);
 
@@ -2058,7 +2085,7 @@ function AppContent() {
         ...request,
         result: 'rejected',
         error: 'Imagem não encontrada na galeria'
-      } as any);
+      });
       return;
     }
 
@@ -2075,7 +2102,7 @@ function AppContent() {
       ...prev,
       result: 'approved',
       imageUrl
-    } as any : null);
+    } : null);
 
     // Clear states (will be handled by AssistantPanelNew after it gets the result)
     setTimeout(() => {
@@ -2092,7 +2119,7 @@ function AppContent() {
       ...prev,
       result: 'rejected',
       error: reason || 'Edição rejeitada pelo usuário'
-    } as any : null);
+    } : null);
 
     // Clear states (will be handled by AssistantPanelNew after it gets the result)
     setTimeout(() => {
@@ -2156,7 +2183,7 @@ function AppContent() {
           onClose={() => {}}
           referenceImage={chatReferenceImage}
           onClearReference={() => handleSetChatReferenceSilent(null)}
-          onUpdateReference={(ref) => handleSetChatReferenceSilent({ id: ref.id, src: ref.src } as any)}
+          onUpdateReference={(ref) => handleSetChatReferenceSilent(ref)}
           galleryImages={galleryImages}
           brandProfile={brandProfile}
           pendingToolEdit={pendingToolEdit}

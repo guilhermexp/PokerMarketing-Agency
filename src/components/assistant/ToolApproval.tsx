@@ -14,8 +14,10 @@ import {
   ConfirmationActions,
   ConfirmationAction,
   ConfirmationAccepted,
-  ConfirmationRejected
+  ConfirmationRejected,
+  type ConfirmationProps
 } from '@/components/ai-elements/confirmation';
+import type { ToolUIPart } from 'ai';
 
 export interface ToolApprovalProps {
   approvalId: string;
@@ -51,14 +53,17 @@ export function ToolApproval({
   onAlwaysAllow
 }: ToolApprovalProps) {
   // Criar objeto approval compatível com Confirmation
-  const approval = {
-    id: approvalId,
-    approved: state === 'approved' ? true : state === 'denied' ? false : undefined,
-    reason: state === 'denied' ? 'Rejeitado pelo usuário' : undefined
-  };
+  let approval: ConfirmationProps['approval'];
+  if (state === 'approved') {
+    approval = { id: approvalId, approved: true };
+  } else if (state === 'denied') {
+    approval = { id: approvalId, approved: false, reason: 'Rejeitado pelo usuário' };
+  } else {
+    approval = { id: approvalId };
+  }
 
   // Mapear state para ai-elements state
-  const aiElementsState = state === 'approval-requested'
+  const aiElementsState: ToolUIPart['state'] = state === 'approval-requested'
     ? 'approval-requested'
     : state === 'approved'
     ? 'approval-responded'
@@ -68,8 +73,8 @@ export function ToolApproval({
 
   return (
     <Confirmation
-      approval={approval as any}
-      state={aiElementsState as any}
+      approval={approval}
+      state={aiElementsState}
       className="bg-black/40 border-white/10 mt-2"
     >
       {/* Solicitação de aprovação */}

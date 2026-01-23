@@ -72,6 +72,7 @@
     "react-dropzone": "^14.3.8",
     "react-image-crop": "^11.0.10",
     "react-router-dom": "^7.11.0",
+    "replicate": "^1.0.1",
     "recharts": "^3.6.0",
     "resumable-stream": "^2.2.10",
     "shiki": "^3.21.0",

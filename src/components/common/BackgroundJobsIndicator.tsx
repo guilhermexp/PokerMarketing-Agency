@@ -32,7 +32,6 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
   const [recentlyCompleted, setRecentlyCompleted] = useState<ActiveJob[]>([]);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
-  const [notificationType, setNotificationType] = useState<"success" | "error">("success");
   const [cancellingJob, setCancellingJob] = useState<string | null>(null);
   const [cancellingAll, setCancellingAll] = useState(false);
   const dismissedCompletedRef = useRef<Set<string>>(new Set());
@@ -86,7 +85,6 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
       if (dismissedCompletedRef.current.has(job.id)) return;
       setRecentlyCompleted((prev) => [job, ...prev].slice(0, 5));
       setNotificationMessage("✓ Geração concluída!");
-      setNotificationType("success");
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
     });

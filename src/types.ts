@@ -220,6 +220,9 @@ export interface PendingToolEdit {
   toolName: string;
   prompt: string;
   imageId: string;
+  result?: 'approved' | 'rejected';
+  imageUrl?: string;
+  error?: string;
 }
 
 export interface ChatPart {

@@ -30,10 +30,10 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   onPublish,
   onCloneStyle: _onCloneStyle,
   onSchedulePost,
-  onNavigatePrev,
-  onNavigateNext,
-  hasPrev,
-  hasNext,
+  onNavigatePrev: _onNavigatePrev,
+  onNavigateNext: _onNavigateNext,
+  hasPrev: _hasPrev,
+  hasNext: _hasNext,
   pendingToolEdit,
   onToolEditApproved,
   onToolEditRejected,
@@ -54,7 +54,6 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   const {
     imageCanvasRef,
     maskCanvasRef,
-    containerRef,
     originalDimensions,
     isLoadingImage,
     imageLoadError,
@@ -184,11 +183,6 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   const isActionRunning =
     isEditing || isRemovingBackground || isResizing || isCropping || isApplyingFilter;
 
-  const isVideo =
-    image.src?.endsWith('.mp4') ||
-    image.src?.includes('video') ||
-    image.source?.startsWith('Video-');
-
   return (
     <ImagePreviewOverlay
       visible={true}
@@ -198,9 +192,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       onSetChatReference={onSetChatReference}
       onSetChatReferenceSilent={onSetChatReferenceSilent}
       downloadFilename={downloadFilename}
-      onQuickPost={onQuickPost}
-      onPublish={onPublish}
-      onSchedulePost={onSchedulePost}
+      onQuickPost={onQuickPost ? () => onQuickPost(image) : undefined}
+      onPublish={onPublish ? () => onPublish(image) : undefined}
+      onSchedulePost={onSchedulePost ? () => onSchedulePost(image) : undefined}
       pendingToolEdit={pendingToolEdit}
       onToolEditApproved={onToolEditApproved}
       onToolEditRejected={onToolEditRejected}

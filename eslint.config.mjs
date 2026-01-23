@@ -62,6 +62,9 @@ export default [
                 HTMLCanvasElement: 'readonly',
                 HTMLButtonElement: 'readonly',
                 HTMLAudioElement: 'readonly',
+                HTMLSpanElement: 'readonly',
+                HTMLHeadingElement: 'readonly',
+                HTMLParagraphElement: 'readonly',
 
                 // SVG
                 SVGSVGElement: 'readonly',
@@ -80,6 +83,8 @@ export default [
                 MouseEvent: 'readonly',
                 KeyboardEvent: 'readonly',
                 TouchEvent: 'readonly',
+                DragEvent: 'readonly',
+                EventTarget: 'readonly',
 
                 // DOM APIs
                 Node: 'readonly',
@@ -120,11 +125,14 @@ export default [
                 alert: 'readonly',
                 confirm: 'readonly',
                 prompt: 'readonly',
+                performance: 'readonly',
+                crypto: 'readonly',
 
                 // Node.js globals (for test files and server-side code)
                 process: 'readonly',
                 global: 'readonly',
                 Buffer: 'readonly',
+                NodeJS: 'readonly',
 
                 // React (for files that use JSX.Element without importing React)
                 React: 'readonly',

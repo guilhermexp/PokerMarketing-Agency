@@ -5,7 +5,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Clapperboard, Video, ImageIcon } from 'lucide-react';
+import { Video, ImageIcon } from 'lucide-react';
 import { ApiKeyDialog } from './ApiKeyDialog';
 import { BottomPromptBar } from './BottomPromptBar';
 import { VideoCard } from './VideoCard';
@@ -20,6 +20,7 @@ import {
 import { queueVideoJob, queueImageJob, type ApiVideoModel, type VideoJobConfig, type ImageJobConfig } from '../../services/apiClient';
 import { generateImage } from '../../services/geminiService';
 import { urlToBase64 } from '../../utils/imageHelpers';
+import { getErrorMessage } from '../../utils/errorMessages';
 import { useBackgroundJobs } from '../../hooks/useBackgroundJobs';
 import type { ActiveJob } from '../../hooks/useBackgroundJobs';
 import type { BrandProfile } from '../../types';
@@ -136,7 +137,7 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
       const jobContext = job.context;
       if (!jobContext) return;
 
-      const errorMessage = job.error_message || "Erro na geracao";
+      const errorMessage = getErrorMessage(job.error_message) || "Erro na geração";
 
       // Check for video jobs
       const videoPostId = pendingVideoJobs.current.get(jobContext);

@@ -1,6 +1,5 @@
 import React from "react";
 import { Icon } from "../common/Icon";
-import { Button } from "../common/Button";
 import { ManualEventModal } from "../common/ManualEventModal";
 import type { WeekScheduleWithCount } from "../../services/apiClient";
 import type { TournamentEvent } from "../../types";

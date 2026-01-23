@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { ResizeWithProtectionSection } from './edit-panel/sections/ResizeWithProtectionSection';
-import { CropAndFilterSection } from './edit-panel/sections/CropAndFilterSection';
+import { FilterSection } from './edit-panel/sections/CropAndFilterSection';
 import { AiEditSection } from './edit-panel/sections/AiEditSection';
 import { ErrorBanner } from './ErrorBanner';
 import { VideoMetaSection } from './edit-panel/sections/VideoMetaSection';
@@ -60,11 +60,11 @@ export const ImagePreviewSidebar: React.FC<ImagePreviewSidebarProps> = React.mem
   setBrushSize,
   editPreview,
   error,
-  cropAspect,
-  setCropAspect,
-  isCropping,
-  handleApplyCrop,
-  handleResetCrop,
+  cropAspect: _cropAspect,
+  setCropAspect: _setCropAspect,
+  isCropping: _isCropping,
+  handleApplyCrop: _handleApplyCrop,
+  handleResetCrop: _handleResetCrop,
   filterPreset,
   setFilterPreset,
   isApplyingFilter,
@@ -108,12 +108,7 @@ export const ImagePreviewSidebar: React.FC<ImagePreviewSidebarProps> = React.mem
             </SidebarSection>
 
             <SidebarSection title="Ajustes" hint="Recorte e filtros">
-              <CropAndFilterSection
-                cropAspect={cropAspect}
-                setCropAspect={setCropAspect}
-                isCropping={isCropping}
-                handleApplyCrop={handleApplyCrop}
-                handleResetCrop={handleResetCrop}
+              <FilterSection
                 filterPreset={filterPreset}
                 setFilterPreset={setFilterPreset}
                 isApplyingFilter={isApplyingFilter}

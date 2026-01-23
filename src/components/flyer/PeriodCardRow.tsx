@@ -206,7 +206,7 @@ export const PeriodCardRow: React.FC<{
                     (f) => f !== "loading" && f.id === styleReference.id
                 );
                 if (isReferenceImage && !forced) {
-                    console.log(`[PeriodCardRow] Skipping generation for ${period} - image is being used as reference`);
+                    console.debug(`[PeriodCardRow] Skipping generation for ${period} - image is being used as reference`);
                     return;
                 }
 
@@ -360,7 +360,7 @@ export const PeriodCardRow: React.FC<{
                 isGenerating,
                 events,
                 triggerBatch,
-                generatedFlyers.length,
+                generatedFlyers,
                 model,
                 brandProfile,
                 aspectRatio,
@@ -377,6 +377,8 @@ export const PeriodCardRow: React.FC<{
                 queueJob,
                 jobContext,
                 dayInfo,
+                selectedDay,
+                onAddImageToGallery,
             ],
         );
 

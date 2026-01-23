@@ -15,7 +15,7 @@ import { Icon } from '../common/Icon';
 export interface ToolWithApprovalProps {
   toolCallId: string;
   toolName: string;
-  args: Record<string, any>;
+  args: Record<string, unknown>;
   metadata?: ToolDisplayMetadata;
   state?: 'approval-requested' | 'approved' | 'denied' | 'executing' | 'complete';
   approvalId?: string;
@@ -47,7 +47,7 @@ export interface ToolWithApprovalProps {
  * ```
  */
 export function ToolWithApproval({
-  toolCallId,
+  toolCallId: _toolCallId,
   toolName,
   args,
   metadata,

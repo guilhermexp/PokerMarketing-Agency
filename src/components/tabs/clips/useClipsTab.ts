@@ -13,6 +13,7 @@ import {
 } from "../../../services/apiClient";
 import { uploadImageToBlob } from "../../../services/blobService";
 import { urlToBase64 } from "../../../utils/imageHelpers";
+import { getErrorMessage } from "../../../utils/errorMessages";
 import { buildThumbnailPrompt } from "@/ai-prompts";
 
 const CLIP_ASPECT_RATIO = "9:16" as const;
@@ -224,7 +225,7 @@ export const useClipsTab = ({
                     setGenerationState((prev) => {
                         const newErrors = [...prev.errors];
                         const newGenerating = [...prev.isGenerating];
-                        newErrors[index] = job.error_message || "Falha ao gerar imagem.";
+                        newErrors[index] = getErrorMessage(job.error_message) || "Falha ao gerar imagem.";
                         newGenerating[index] = false;
                         return { isGenerating: newGenerating, errors: newErrors };
                     });

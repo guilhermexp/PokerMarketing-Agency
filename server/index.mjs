@@ -18,6 +18,7 @@ import { fal } from "@fal-ai/client";
 import { clerkMiddleware, getAuth } from "@clerk/express";
 import { GoogleGenAI } from "@google/genai";
 import { OpenRouter } from "@openrouter/sdk";
+import Replicate from "replicate";
 import {
   hasPermission,
   PERMISSIONS,
@@ -3343,6 +3344,154 @@ const getOpenRouter = () => {
   return new OpenRouter({ apiKey });
 };
 
+const getReplicate = () => {
+  const apiToken = process.env.REPLICATE_API_TOKEN;
+  if (!apiToken) {
+    throw new Error("REPLICATE_API_TOKEN not configured");
+  }
+  return new Replicate({ auth: apiToken });
+};
+
+// Check if an error is a quota/rate limit error that warrants fallback
+const isQuotaOrRateLimitError = (error) => {
+  const errorString = String(error?.message || error || '').toLowerCase();
+  return (
+    errorString.includes('resource_exhausted') ||
+    errorString.includes('quota') ||
+    errorString.includes('429') ||
+    errorString.includes('rate') ||
+    errorString.includes('limit') ||
+    errorString.includes('exceeded')
+  );
+};
+
+const REPLICATE_IMAGE_MODEL = "google/nano-banana-pro";
+
+const toDataUrl = (img) => `data:${img.mimeType};base64,${img.base64}`;
+
+const normalizeReplicateOutputUrl = (output) => {
+  if (typeof output === "string") return output;
+  if (Array.isArray(output)) {
+    const first = output[0];
+    if (typeof first === "string") return first;
+    if (first && typeof first.url === "function") return first.url();
+    if (first && typeof first.url === "string") return first.url;
+  }
+  if (output && typeof output.url === "function") return output.url();
+  if (output && typeof output.url === "string") return output.url;
+  return null;
+};
+
+const generateImageWithReplicate = async (
+  prompt,
+  aspectRatio,
+  imageSize = "1K",
+  productImages,
+  styleReferenceImage,
+  personReferenceImage,
+) => {
+  const replicate = getReplicate();
+
+  const imageInputs = [];
+  if (personReferenceImage) imageInputs.push(personReferenceImage);
+  if (styleReferenceImage) imageInputs.push(styleReferenceImage);
+  if (productImages && productImages.length > 0) imageInputs.push(...productImages);
+
+  const input = {
+    prompt,
+    output_format: "png",
+  };
+
+  if (aspectRatio) {
+    input.aspect_ratio = aspectRatio;
+  }
+
+  if (["1K", "2K", "4K"].includes(imageSize)) {
+    input.resolution = imageSize;
+  }
+
+  if (imageInputs.length > 0) {
+    input.image_input = imageInputs.slice(0, 14).map(toDataUrl);
+  }
+
+  const output = await replicate.run(REPLICATE_IMAGE_MODEL, { input });
+  const outputUrl = normalizeReplicateOutputUrl(output);
+  if (!outputUrl) {
+    throw new Error("[Replicate] No image URL in output");
+  }
+  return outputUrl;
+};
+
+// Generate image with OpenRouter as fallback
+const generateImageWithOpenRouter = async (prompt, productImages) => {
+  console.log(`[OpenRouter Fallback] ========================================`);
+  console.log(`[OpenRouter Fallback] Tentando gerar imagem via OpenRouter`);
+
+  const openrouter = getOpenRouter();
+
+  // Build content parts with optional images
+  const contentParts = [];
+
+  // Add images first if provided
+  if (productImages && productImages.length > 0) {
+    console.log(`[OpenRouter Fallback] Adicionando ${productImages.length} imagens de referência`);
+    for (const img of productImages) {
+      contentParts.push({
+        type: "image_url",
+        image_url: {
+          url: `data:${img.mimeType};base64,${img.base64}`,
+        },
+      });
+    }
+  }
+
+  // Add text prompt
+  contentParts.push({
+    type: "text",
+    text: prompt,
+  });
+
+  const response = await openrouter.chat.send({
+    model: "google/gemini-3-pro-image-preview",
+    messages: [
+      {
+        role: "user",
+        content: contentParts,
+      },
+    ],
+    modalities: ["image", "text"],
+  });
+
+  const message = response?.choices?.[0]?.message;
+  if (!message) {
+    throw new Error("[OpenRouter] No message in response");
+  }
+
+  // Check for image in response
+  if (message.images && message.images.length > 0) {
+    const imageUrl = message.images[0].image_url?.url;
+    if (imageUrl) {
+      console.log(`[OpenRouter Fallback] ✅ Imagem gerada com sucesso!`);
+      console.log(`[OpenRouter Fallback] ========================================`);
+      return imageUrl;
+    }
+  }
+
+  // Check for base64 image in content
+  if (message.content) {
+    const base64Match = message.content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
+    if (base64Match) {
+      console.log(`[OpenRouter Fallback] ✅ Imagem encontrada no content!`);
+      console.log(`[OpenRouter Fallback] ========================================`);
+      return base64Match[0];
+    }
+  }
+
+  console.error(`[OpenRouter Fallback] ❌ Nenhuma imagem encontrada na resposta`);
+  console.error(`[OpenRouter Fallback] Response:`, JSON.stringify(response, null, 2));
+  throw new Error("[OpenRouter] No image data in response");
+};
+
 // Model defaults
 const DEFAULT_TEXT_MODEL = "gemini-3-flash-preview";
 const DEFAULT_FAST_TEXT_MODEL = "gemini-3-flash-preview";
@@ -3498,6 +3647,62 @@ const generateGeminiImage = async (
   console.error(`[generateGeminiImage] Parts recebidos:`, JSON.stringify(responseParts, null, 2));
   console.error(`[generateGeminiImage] ========================================`);
   throw new Error("Failed to generate image - no image data in response");
+};
+
+// Generate image with Gemini + Replicate fallback
+const generateImageWithFallback = async (
+  prompt,
+  aspectRatio,
+  model = DEFAULT_IMAGE_MODEL,
+  imageSize = "1K",
+  productImages,
+  styleReferenceImage,
+  personReferenceImage,
+) => {
+  try {
+    // Try Gemini first
+    const imageUrl = await generateGeminiImage(
+      prompt,
+      aspectRatio,
+      model,
+      imageSize,
+      productImages,
+      styleReferenceImage,
+      personReferenceImage,
+    );
+    return { imageUrl, usedModel: model, usedProvider: "google", usedFallback: false };
+  } catch (error) {
+    // Check if this is a quota/rate limit error that warrants fallback
+    if (isQuotaOrRateLimitError(error)) {
+      console.log(`[generateImageWithFallback] ========================================`);
+      console.log(`[generateImageWithFallback] ⚠️ Gemini falhou com erro de quota/rate limit`);
+      console.log(`[generateImageWithFallback] Erro original: ${error.message}`);
+      console.log(`[generateImageWithFallback] Tentando fallback para Replicate...`);
+
+      try {
+        const result = await generateImageWithReplicate(
+          prompt,
+          aspectRatio,
+          imageSize,
+          productImages,
+          styleReferenceImage,
+          personReferenceImage,
+        );
+        console.log(`[generateImageWithFallback] ✅ Replicate fallback bem sucedido!`);
+        console.log(`[generateImageWithFallback] ========================================`);
+        return { imageUrl: result, usedModel: REPLICATE_IMAGE_MODEL, usedProvider: "replicate", usedFallback: true };
+      } catch (fallbackError) {
+        console.error(`[generateImageWithFallback] ❌ Replicate fallback também falhou`);
+        console.error(`[generateImageWithFallback] Erro do fallback: ${fallbackError.message}`);
+        console.error(`[generateImageWithFallback] ========================================`);
+        // Throw the original error if fallback also fails
+        throw error;
+      }
+    }
+
+    // For other errors, just re-throw
+    throw error;
+  }
 };
 
 // Generate structured content with Gemini
@@ -4498,13 +4703,13 @@ app.post("/api/ai/image", async (req, res) => {
     console.log(fullPrompt);
     console.log("[Image API] ========================================");
 
-    console.log(`[Image API] Chamando generateGeminiImage...`);
+    console.log(`[Image API] Chamando generateImageWithFallback...`);
     console.log(`[Image API]   model: ${model}`);
     console.log(`[Image API]   aspectRatio: ${aspectRatio}`);
     console.log(`[Image API]   imageSize: ${imageSize}`);
     console.log(`[Image API]   allProductImages.length: ${allProductImages.length}`);
 
-    const imageDataUrl = await generateGeminiImage(
+    const result = await generateImageWithFallback(
       fullPrompt,
       aspectRatio,
       model,
@@ -4515,19 +4720,25 @@ app.post("/api/ai/image", async (req, res) => {
     );
 
     console.log(`[Image API] ✅ Imagem gerada com sucesso!`);
-    console.log(`[Image API]   imageDataUrl length: ${imageDataUrl?.length || 0} chars`);
+    console.log(`[Image API]   imageDataUrl length: ${result.imageUrl?.length || 0} chars`);
 
     // Log AI usage
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/image',
       operation: 'image',
-      model,
+      model: result.usedModel,
+      provider: result.usedProvider,
       imageCount: 1,
       imageSize: imageSize || '1K',
       latencyMs: timer(),
       status: 'success',
-      metadata: { aspectRatio, hasProductImages: !!productImages?.length, hasStyleRef: !!styleReferenceImage }
+      metadata: {
+        aspectRatio,
+        hasProductImages: !!productImages?.length,
+        hasStyleRef: !!styleReferenceImage,
+        fallbackUsed: result.usedFallback,
+      }
     });
 
     const elapsedTime = timer();
@@ -4536,7 +4747,7 @@ app.post("/api/ai/image", async (req, res) => {
 
     res.json({
       success: true,
-      imageUrl: imageDataUrl,
+      imageUrl: result.imageUrl,
       model,
     });
   } catch (error) {

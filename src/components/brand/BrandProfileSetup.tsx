@@ -53,7 +53,7 @@ const CustomSelect: React.FC<{
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-lg p-2.5 flex items-center justify-between text-left transition-all hover:border-white/20 active:scale-[0.98] outline-none backdrop-blur-xl"
+        className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-lg p-2.5 flex items-center justify-between text-left transition-all hover:border-white/20 active:scale-[0.98] backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-white/20 focus-visible:ring-[3px]"
       >
         <span className="text-xs font-medium text-white truncate">{value}</span>
         <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} className="w-3 h-3 text-white/40 flex-shrink-0 ml-1.5" />
@@ -66,7 +66,7 @@ const CustomSelect: React.FC<{
               key={opt}
               type="button"
               onClick={() => { onChange(opt); setIsOpen(false); }}
-              className={`w-full px-3 py-2 text-left text-xs font-medium transition-colors ${value === opt
+              className={`w-full px-3 py-2 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-white/20 focus-visible:ring-[3px] focus-visible:ring-inset ${value === opt
                 ? 'bg-white text-black'
                 : 'text-white/60 hover:bg-white/5 hover:text-white'
                 }`}
@@ -88,7 +88,7 @@ const ColorWidget: React.FC<{
   name: string;
   isAnalyzing: boolean;
 }> = ({ label, color, onChange, name, isAnalyzing }) => (
-  <div className="bg-[#0a0a0a]/60 border border-white/[0.08] p-2.5 rounded-lg flex items-center justify-between group transition-all hover:border-white/20 w-full overflow-hidden backdrop-blur-xl">
+  <div className="bg-[#0a0a0a]/60 border border-white/[0.08] p-2.5 rounded-lg flex items-center justify-between group transition-all hover:border-white/20 w-full overflow-hidden backdrop-blur-xl focus-within:border-white/30 focus-within:ring-white/20 focus-within:ring-[3px]">
     <div className="flex flex-col min-w-0 flex-1 pr-1.5">
       <label className="text-[10px] font-medium text-white/60 mb-0.5 truncate">{label}</label>
       <span className={`text-[10px] font-mono text-white/40 group-hover:text-white transition-colors truncate ${isAnalyzing ? 'animate-pulse' : ''}`}>
@@ -101,7 +101,7 @@ const ColorWidget: React.FC<{
         name={name}
         value={color}
         onChange={onChange}
-        className="w-full h-full rounded-md cursor-pointer bg-transparent border-none p-0 overflow-hidden relative z-10 opacity-0"
+        className="w-full h-full rounded-md cursor-pointer bg-transparent border-none p-0 overflow-hidden relative z-10 opacity-0 focus-visible:outline-none"
       />
 
       <div
@@ -129,17 +129,17 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       const file = acceptedFiles[0];
-      console.log('[BrandProfile] Logo dropped:', { name: file.name, type: file.type, size: file.size });
+      console.debug('[BrandProfile] Logo dropped:', { name: file.name, type: file.type, size: file.size });
       setProfile(prev => ({ ...prev, logo: file }));
       setIsAnalyzingLogo(true);
       try {
         const { base64, mimeType, dataUrl } = await fileToBase64(file);
-        console.log('[BrandProfile] Logo converted to base64:', { mimeType, base64Length: base64.length });
+        console.debug('[BrandProfile] Logo converted to base64:', { mimeType, base64Length: base64.length });
         setLogoPreview(dataUrl);
 
-        console.log('[BrandProfile] Calling extractColorsFromLogo...');
+        console.debug('[BrandProfile] Calling extractColorsFromLogo...');
         const colors = await extractColorsFromLogo({ base64, mimeType });
-        console.log('[BrandProfile] Colors extracted:', colors);
+        console.debug('[BrandProfile] Colors extracted:', colors);
 
         setProfile(prev => ({
           ...prev,
@@ -148,7 +148,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
           secondaryColor: colors.secondaryColor ?? prev.secondaryColor,
           tertiaryColor: colors.tertiaryColor ?? '',
         }));
-        console.log('[BrandProfile] Profile updated with colors');
+        console.debug('[BrandProfile] Profile updated with colors');
       } catch (error) {
         console.error("[BrandProfile] Failed to extract colors:", error);
         alert(`Erro ao extrair cores: ${error.message}`);
@@ -203,7 +203,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
             <button
               type="button"
               onClick={() => signOut()}
-              className="flex items-center space-x-2 px-3 py-2 bg-white/5 border border-white/[0.08] rounded-lg text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all text-xs font-medium backdrop-blur-xl"
+              className="flex items-center space-x-2 px-3 py-2 bg-white/5 border border-white/[0.08] rounded-lg text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all text-xs font-medium backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-white/20 focus-visible:ring-[3px]"
             >
               <Icon name="log-out" className="w-3.5 h-3.5" />
               <span>Sair</span>
@@ -255,7 +255,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                       onChange={handleChange}
                       required
                       placeholder="CPC POKER"
-                      className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-xl p-3 text-white text-sm font-medium focus:outline-none focus:border-white/30 transition-all placeholder:text-white/20 backdrop-blur-xl"
+                      className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-xl p-3 text-white text-sm font-medium transition-all placeholder:text-white/20 backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-white/20 focus-visible:ring-[3px]"
                     />
                   </div>
                   <div className="group">
@@ -267,7 +267,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                       required
                       rows={4}
                       placeholder="Clube de Poker"
-                      className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-xl p-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all resize-none placeholder:text-white/20 backdrop-blur-xl"
+                      className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-xl p-3 text-white text-sm transition-all resize-none placeholder:text-white/20 backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-white/20 focus-visible:ring-[3px]"
                     />
                   </div>
                 </div>

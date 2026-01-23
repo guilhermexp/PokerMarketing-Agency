@@ -865,7 +865,8 @@ ORDER BY week DESC;
 CREATE TYPE ai_provider AS ENUM (
     'google',      -- Gemini and Imagen
     'openrouter',  -- GPT-5.2, Grok 4.1, Claude
-    'fal'          -- Sora 2, Veo 3.1
+    'fal',         -- Sora 2, Veo 3.1
+    'replicate'    -- Replicate (Gemini Image 3 Pro fallback)
 );
 
 CREATE TYPE ai_operation AS ENUM (

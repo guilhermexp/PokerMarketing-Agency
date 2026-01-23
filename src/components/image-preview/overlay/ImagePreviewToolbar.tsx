@@ -5,7 +5,6 @@ import {
   RotateCw,
   RotateCcw,
   Download,
-  X,
   Edit3,
   Maximize2,
   Scan,
@@ -14,7 +13,7 @@ import {
 } from 'lucide-react';
 
 interface ToolbarButtonProps {
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
   onClick: () => void;
   title?: string;
   disabled?: boolean;

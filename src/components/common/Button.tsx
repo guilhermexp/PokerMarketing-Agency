@@ -23,7 +23,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseClasses =
-    "font-black rounded-xl transition-all focus:outline-none flex items-center justify-center space-x-2 disabled:opacity-30 disabled:cursor-not-allowed uppercase tracking-wide antialiased";
+    "font-black rounded-xl transition-all outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex items-center justify-center space-x-2 disabled:opacity-30 disabled:cursor-not-allowed uppercase tracking-wide antialiased";
 
   const variantClasses = {
     primary: "bg-white/10 text-white hover:bg-white/20 active:scale-95 border border-white/20",

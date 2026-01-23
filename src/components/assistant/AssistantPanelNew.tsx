@@ -7,13 +7,23 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
+import {
+  isFileUIPart,
+  isTextUIPart,
+  isToolUIPart,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  lastAssistantMessageIsCompleteWithToolCalls,
+  type CreateUIMessage,
+  type ToolUIPart,
+  type UIMessage,
+} from 'ai';
 import type { ChatReferenceImage, BrandProfile, GalleryImage, PendingToolEdit } from '../../types';
 import { useChatImageSync } from '../../hooks/useChatImageSync';
 import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 import { DataStreamProvider } from './DataStreamProvider';
 import { DataStreamHandler } from './DataStreamHandler';
+import type { DataUIPart } from './DataStreamProvider';
 import { MessageResponse } from './MessageResponse';
 import { MessageActionsEnhanced } from './MessageActionsEnhanced';
 import { ToolWithApproval } from './ToolWithApproval';
@@ -74,27 +84,39 @@ const getImageMediaType = (url: string): 'image/jpeg' | 'image/png' | 'image/web
 };
 
 // ChatBubble component
-const ChatBubble: React.FC<{ message: any; onApprove?: (id: string) => void; onDeny?: (id: string) => void }> = ({
+const ChatBubble: React.FC<{ message: UIMessage; onApprove?: (id: string) => void; onDeny?: (id: string) => void }> = ({
   message,
   onApprove,
   onDeny
 }) => {
   const isAssistant = message.role === 'assistant';
 
-  // Renderizar conteúdo usando message.parts (v5)
   const textParts = message.parts
-    ?.filter((part: any) => part.type === 'text')
-    .map((part: any) => part.text)
-    .join(' ') || '';
+    .filter(isTextUIPart)
+    .map((part) => part.text)
+    .join(' ');
 
   // Extrair imagens/arquivos
-  const fileParts = message.parts
-    ?.filter((part: any) => part.type === 'file') || [];
+  const fileParts = message.parts.filter(isFileUIPart);
 
   // Tool approvals (AI SDK v6)
   const toolApprovals = message.parts
-    ?.filter((part: any) => typeof part.type === 'string' && part.type.startsWith('tool-'))
-    ?.filter((part: any) => part.state === 'approval-requested' && part.approval?.id) || [];
+    .filter(isToolUIPart)
+    .filter((part) => part.state === 'approval-requested' && part.approval?.id);
+
+  const mapToolState = (state: ToolUIPart['state']): 'approval-requested' | 'approved' | 'denied' | 'executing' | 'complete' => {
+    switch (state) {
+      case 'approval-requested':
+        return 'approval-requested';
+      case 'output-denied':
+        return 'denied';
+      case 'output-available':
+      case 'approval-responded':
+        return 'complete';
+      default:
+        return 'executing';
+    }
+  };
 
   return (
     <div className={`flex flex-col ${isAssistant ? 'items-start' : 'items-end'} space-y-2 animate-fade-in-up`}>
@@ -102,18 +124,18 @@ const ChatBubble: React.FC<{ message: any; onApprove?: (id: string) => void; onD
       {fileParts.length > 0 && (
         <div className={`max-w-[90%] ${isAssistant ? '' : 'flex justify-end'}`}>
           <div className="space-y-2">
-            {fileParts.map((file: any, idx: number) => (
+            {fileParts.map((file, idx) => (
               <div
                 key={idx}
                 className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/20 animate-fade-in-up"
               >
                 <img
                   src={file.url}
-                  alt={file.filename || file.name}
+                  alt={file.filename || 'Arquivo'}
                   className="max-w-full max-h-[300px] object-contain"
                 />
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                  <p className="text-[10px] text-white/70 truncate">{file.filename || file.name}</p>
+                  <p className="text-[10px] text-white/70 truncate">{file.filename || 'Arquivo'}</p>
                 </div>
               </div>
             ))}
@@ -129,8 +151,8 @@ const ChatBubble: React.FC<{ message: any; onApprove?: (id: string) => void; onD
             <MessageActionsEnhanced
               messageId={message.id}
               content={textParts}
-              onPin={() => console.log('Pin message:', message.id)}
-              onFork={() => console.log('Fork from:', message.id)}
+              onPin={() => console.info('Pin message:', message.id)}
+              onFork={() => console.info('Fork from:', message.id)}
             />
           </div>
 
@@ -150,19 +172,32 @@ const ChatBubble: React.FC<{ message: any; onApprove?: (id: string) => void; onD
       )}
 
       {/* Tool Approval UI com ToolWithApproval */}
-      {toolApprovals.map((toolPart: any) => (
+      {toolApprovals.map((toolPart) => (
         <div key={toolPart.toolCallId} className="max-w-[90%]">
+          {(() => {
+            const toolArgs = (
+              ('rawInput' in toolPart
+                ? (toolPart as { rawInput?: unknown }).rawInput
+                : toolPart.input) || {}
+            ) as Record<string, unknown>;
+            return (
           <ToolWithApproval
             toolCallId={toolPart.toolCallId}
             toolName={toolPart.type.replace('tool-', '')}
-            args={toolPart.input || toolPart.rawInput || {}}
-            metadata={toolPart.metadata?.preview}
-            state={toolPart.state}
+            args={toolArgs}
+            metadata={
+              'metadata' in toolPart
+                ? (toolPart as { metadata?: { preview?: unknown } }).metadata?.preview
+                : undefined
+            }
+            state={mapToolState(toolPart.state)}
             approvalId={toolPart.approval?.id}
             onApprove={onApprove!}
             onDeny={onDeny!}
-            onAlwaysAllow={(toolName) => console.log('Always allow:', toolName)}
+            onAlwaysAllow={(toolName) => console.info('Always allow:', toolName)}
           />
+            );
+          })()}
         </div>
       ))}
     </div>
@@ -181,7 +216,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     onShowToolEditPreview
   } = props;
   const [input, setInput] = useState('');
-  const [dataStream, setDataStream] = useState<any[]>([]);
+  const [dataStream, setDataStream] = useState<DataUIPart[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [chatId] = useState(() => crypto.randomUUID());
@@ -193,19 +228,18 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // useChat hook do Vercel AI SDK
-  const { messages, sendMessage, status, addToolApprovalResponse, setMessages } = useChat({
-    api: '/api/chat',
+  const chatOptions = {
     id: chatId,
     body: {
       brandProfile: brandProfile,
       chatReferenceImage: referenceImage,
-      selectedChatModel: brandProfile?.preferredAIModel || 'x-ai/grok-4.1-fast'
+      selectedChatModel: brandProfile?.creativeModel || 'x-ai/grok-4.1-fast'
     },
     sendAutomaticallyWhen: ({ messages }) =>
       lastAssistantMessageIsCompleteWithToolCalls({ messages }) ||
       lastAssistantMessageIsCompleteWithApprovalResponses({ messages }),
     onResponse: (response) => {
-      console.log('[AssistantPanel] Response received', response.status);
+      console.info('[AssistantPanel] Response received', response.status);
     },
     onError: (error) => {
       console.error('[AssistantPanel] Error:', error);
@@ -213,13 +247,15 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       // Auto-limpar erro após 5 segundos
       setTimeout(() => setErrorMessage(null), 5000);
     },
-    onFinish: (message) => {
-      console.log('[AssistantPanel] Message finished:', {
+    onFinish: (message: UIMessage) => {
+      console.info('[AssistantPanel] Message finished:', {
         role: message.role,
         partsCount: message.parts?.length || 0
       });
     }
-  });
+  } as unknown as Parameters<typeof useChat>[0];
+
+  const { messages, sendMessage, status, addToolApprovalResponse, setMessages } = useChat<UIMessage>(chatOptions);
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const lastMessage = messages[messages.length - 1];
@@ -253,10 +289,10 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
   // Debug: monitorar tool parts
   useEffect(() => {
     messages.forEach((msg, idx) => {
-      const toolParts = msg.parts?.filter((part: any) => typeof part.type === 'string' && part.type.startsWith('tool-')) || [];
+      const toolParts = msg.parts.filter(isToolUIPart);
       if (toolParts.length > 0) {
-        console.log(`[Chat] Message ${idx} has tool parts:`, toolParts.map((part: any) => ({
-          toolName: part.type?.replace('tool-', ''),
+        console.debug(`[Chat] Message ${idx} has tool parts:`, toolParts.map((part) => ({
+          toolName: part.type.replace('tool-', ''),
           state: part.state,
           toolCallId: part.toolCallId
         })));
@@ -268,11 +304,18 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     if (!onShowToolEditPreview) return;
 
     for (const msg of messages) {
-      const toolParts = msg.parts?.filter((part: any) => part.type === 'tool-editImage') || [];
+      const toolParts = msg.parts
+        .filter(isToolUIPart)
+        .filter((part) => part.type === 'tool-editImage');
       for (const part of toolParts) {
         if (part.state !== 'output-available' || !part.toolCallId) continue;
         if (handledEditResultsRef.current.has(part.toolCallId)) continue;
-        const output = part.output;
+        const output = part.output as {
+          imageUrl?: string;
+          prompt?: string;
+          referenceImageId?: string;
+          referenceImageUrl?: string;
+        } | undefined;
         if (!output?.imageUrl) continue;
         handledEditResultsRef.current.add(part.toolCallId);
         onShowToolEditPreview({
@@ -311,7 +354,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
 
     try {
       // Construir mensagem com parts
-      const messageParts: any[] = [];
+      const messageParts: UIMessage['parts'] = [];
 
       // Adicionar texto (se houver)
       if (messageText.trim()) {
@@ -332,10 +375,11 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       }
 
       // Enviar mensagem com parts
-      await sendMessage({
+      const message: CreateUIMessage<UIMessage> = {
         role: 'user',
         parts: messageParts
-      } as any);
+      };
+      await sendMessage(message);
 
       // Limpar referência de imagem após enviar (agora está no chat)
       if (referenceImage) {
@@ -360,7 +404,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
         setInput('');
 
         // Enviar mensagem com a imagem nos parts
-        await sendMessage({
+        const message: CreateUIMessage<UIMessage> = {
           role: 'user',
           parts: [
             {
@@ -369,14 +413,16 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
             },
             {
               type: 'file',
-              mediaType: (file.type || 'image/png') as any,
+              mediaType: file.type || 'image/png',
               filename: file.name,
               url: uploadedUrl
             }
           ]
-        } as any);
-      } catch (error: any) {
-        setErrorMessage(error?.message || 'Falha ao enviar a imagem. Tente novamente.');
+        };
+        await sendMessage(message);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Falha ao enviar a imagem. Tente novamente.';
+        setErrorMessage(errorMessage);
         setTimeout(() => setErrorMessage(null), 5000);
       }
 
@@ -422,7 +468,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       setInput('');
 
       // Enviar mensagem com a imagem nos parts
-      await sendMessage({
+      const message: CreateUIMessage<UIMessage> = {
         role: 'user',
         parts: [
           {
@@ -431,14 +477,16 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
           },
           {
             type: 'file',
-            mediaType: (file.type || 'image/png') as any,
+            mediaType: file.type || 'image/png',
             filename: file.name,
             url: uploadedUrl
           }
         ]
-      } as any);
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Falha ao enviar a imagem. Tente novamente.');
+      };
+      await sendMessage(message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Falha ao enviar a imagem. Tente novamente.';
+      setErrorMessage(errorMessage);
       setTimeout(() => setErrorMessage(null), 5000);
     }
   };
@@ -581,7 +629,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
                   }
                 }}
                 placeholder="Pergunte, pesquise ou converse..."
-                className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-white placeholder:text-white/30 outline-none resize-none min-h-[80px] max-h-[200px]"
+                className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-white placeholder:text-white/30 outline-none resize-none min-h-[80px] max-h-[200px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 disabled={isLoading || isSending}
                 rows={2}
               />

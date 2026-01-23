@@ -28,6 +28,15 @@ const MODEL_PRICING = {
       '4K': 24      // $0.24/image = 24 cents
     }
   },
+  // Replicate (Gemini Image 3 Pro via Replicate)
+  'google/nano-banana-pro': {
+    provider: 'replicate',
+    costPerImage: {
+      '1K': 15,   // $0.15/image = 15 cents
+      '2K': 15,
+      '4K': 30    // $0.30/image = 30 cents
+    }
+  },
   // Google TTS Models
   'gemini-2.5-flash-preview-tts': {
     provider: 'google',
@@ -143,6 +152,7 @@ function getProvider(model) {
 
   // Fallback detection
   if (model.includes('gemini') || model.includes('imagen')) return 'google';
+  if (model.includes('nano-banana') || model.includes('replicate')) return 'replicate';
   if (model.includes('gpt') || model.includes('grok') || model.includes('claude')) return 'openrouter';
   if (model.includes('veo') || model.includes('sora') || model.includes('fal')) return 'fal';
 

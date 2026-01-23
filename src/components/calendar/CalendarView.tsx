@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import type {
   ScheduledPost,
-  CalendarViewType,
   GalleryImage,
   InstagramPublishState,
 } from "../../types";
@@ -51,7 +50,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   galleryImages,
   campaigns = [],
   onPublishToInstagram,
-  publishingStates,
+  publishingStates: _publishingStates,
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -148,7 +147,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }
 
     return calendar;
-  }, [currentDate, scheduledPosts]);
+  }, [currentMonth, currentYear, scheduledPosts]);
 
   const isToday = (date: number | null) => {
     if (!date) return false;

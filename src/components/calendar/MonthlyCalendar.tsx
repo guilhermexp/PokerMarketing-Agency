@@ -101,12 +101,12 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
         const dayDate = new Date(day.date);
         return dayDate >= todayDate;
       });
-      console.log(`Semana ${idx}:`, week.map(d => d.dayNumber).join(', '), '-> visível:', hasCurrentOrFuture);
+      console.debug(`Semana ${idx}:`, week.map(d => d.dayNumber).join(', '), '-> visível:', hasCurrentOrFuture);
       return hasCurrentOrFuture;
     });
 
-    console.log('Hoje:', todayStr);
-    console.log('Semanas visíveis:', visibleWeekIndices);
+    console.debug('Hoje:', todayStr);
+    console.debug('Semanas visíveis:', visibleWeekIndices);
 
     return {
       calendarDays: days,

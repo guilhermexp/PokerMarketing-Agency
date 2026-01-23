@@ -9,6 +9,7 @@
  */
 
 import React from 'react';
+import type { ToolUIPart } from 'ai';
 import { Tool, ToolHeader, ToolContent, ToolInput } from '@/components/ai-elements/tool';
 import { Icon } from '../common/Icon';
 
@@ -23,7 +24,7 @@ export interface ToolDisplayMetadata {
 
 export interface ToolDisplayProps {
   toolName: string;
-  args: Record<string, any>;
+  args: Record<string, unknown>;
   metadata?: ToolDisplayMetadata;
   state?: 'approval-requested' | 'approved' | 'denied' | 'executing' | 'complete';
 }
@@ -54,17 +55,17 @@ export function ToolDisplay({
 }: ToolDisplayProps) {
   const title = metadata?.title || toolName;
   const description = metadata?.description;
-  const icon = metadata?.icon || 'zap';
 
   // Mapear state interno para state do ai-elements
-  const aiElementsState = state === 'approval-requested' ? 'input-available' : 'output-available';
+  const aiElementsState: ToolUIPart['state'] =
+    state === 'approval-requested' ? 'input-available' : 'output-available';
 
   return (
     <Tool className="bg-black/70 border-white/10">
       <ToolHeader
         title={title}
         type={`tool-${toolName}`}
-        state={aiElementsState as any}
+        state={aiElementsState}
         className="p-3"
       />
 

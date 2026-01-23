@@ -208,7 +208,7 @@ export function useAiEdit({
         handleEdit();
       }, 100);
     }
-  }, [pendingToolEdit, editPreview, isEditing, handleEdit, setEditPrompt]);
+  }, [pendingToolEdit, editPreview, isEditing, handleEdit, setEditPrompt, initialEditPreview]);
 
   return {
     editPrompt,

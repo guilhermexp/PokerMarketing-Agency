@@ -5,7 +5,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useRef, useState, useEffect } from 'react';
-import { ArrowUp, Plus, User, Video, ImageIcon, Palette, Upload, X, Sparkles, Image as _ImageLucide, Edit3 } from 'lucide-react';
+import { ArrowUp, Plus, User, Palette, Upload, X, Sparkles, Image as _ImageLucide, Edit3 } from 'lucide-react';
 import {
   CameoProfile,
   FeedPost,
@@ -123,7 +123,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
       setIsExpanded(true);
       setMediaType(MediaType.IMAGE);
     }
-  }, [editingImage]);
+  }, [editingImage, setMediaType]);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -505,7 +505,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                     <select
                       value={imageSize}
                       onChange={(e) => setImageSize(e.target.value as PlaygroundImageSize)}
-                      className="bg-[#000000]/80 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/80 appearance-none cursor-pointer hover:border-white/20 focus:outline-none focus:border-white/30 backdrop-blur-2xl"
+                      className="bg-[#000000]/80 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/80 appearance-none cursor-pointer hover:border-white/20 outline-none backdrop-blur-2xl focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                     >
                       <option value={PlaygroundImageSize.K1}>1K</option>
                       <option value={PlaygroundImageSize.K2}>2K</option>
@@ -648,7 +648,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
               onKeyDown={handleKeyDown}
               rows={1}
               placeholder={!isExpanded ? "Descreva a cena..." : ""}
-              className={`w-full bg-transparent text-white outline-none resize-none overflow-hidden py-0.5 leading-relaxed text-lg font-light tracking-wide relative z-10 placeholder:text-white/40 ${prompt === '' && isExpanded ? 'opacity-0 focus:opacity-100' : ''}`}
+              className={`w-full bg-transparent text-white outline-none resize-none overflow-hidden py-0.5 leading-relaxed text-lg font-light tracking-wide relative z-10 placeholder:text-white/40 focus-visible:ring-ring/50 focus-visible:ring-[3px] rounded-md ${prompt === '' && isExpanded ? 'opacity-0 focus:opacity-100' : ''}`}
               style={{ height: '28px' }}
             />
           </div>

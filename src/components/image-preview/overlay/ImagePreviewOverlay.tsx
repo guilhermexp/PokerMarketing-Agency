@@ -1,10 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useResponsive } from 'antd-style';
 import { X } from 'lucide-react';
 import { ImagePreviewToolbar } from './ImagePreviewToolbar';
 import { ImagePreviewActionsBar } from './ImagePreviewActionsBar';
-import { ImageViewerCanvas } from './ImageViewerCanvas';
 import { ImagePreviewCanvas } from '../ImagePreviewCanvas';
 import { EditPanelSlideIn } from '../edit-panel/EditPanelSlideIn';
 import { ChatPanelSlideIn } from '../chat-panel/ChatPanelSlideIn';
@@ -117,8 +115,6 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
     downloadFilename,
     pendingToolEdit,
   } = props;
-  const { mobile } = useResponsive();
-
   // Estado do preview
   const [activePanel, setActivePanel] = useState<'edit' | 'chat' | null>(
     pendingToolEdit ? 'edit' : null
@@ -158,23 +154,21 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
   }, [image.src]);
 
   // Handlers de zoom e rotação
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 3));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.5));
-  const handleRotateLeft = () => setRotation(prev => prev - 90);
-  const handleRotateRight = () => setRotation(prev => prev + 90);
-
-  // Handler de wheel zoom
-  const handleWheel = (e: React.WheelEvent) => {
-    // Apenas zoom com Ctrl/Cmd pressionado
-    if (!e.ctrlKey && !e.metaKey) return;
-
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setZoom(prev => Math.max(0.5, Math.min(3.0, prev + delta)));
-  };
+  const handleZoomIn = useCallback(() => {
+    setZoom(prev => Math.min(prev + 0.1, 3));
+  }, []);
+  const handleZoomOut = useCallback(() => {
+    setZoom(prev => Math.max(prev - 0.1, 0.5));
+  }, []);
+  const handleRotateLeft = useCallback(() => {
+    setRotation(prev => prev - 90);
+  }, []);
+  const handleRotateRight = useCallback(() => {
+    setRotation(prev => prev + 90);
+  }, []);
 
   // Handler de fit to screen
-  const handleFitToScreen = () => {
+  const handleFitToScreen = useCallback(() => {
     if (!imageDimensions) return;
 
     // Dimensões do viewport (aproximadas)
@@ -188,20 +182,20 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
 
     setZoom(fitZoom);
     setRotation(0); // Reset rotação para fit consistente
-  };
+  }, [imageDimensions]);
 
   // Handler de tamanho original
-  const handleOriginalSize = () => {
+  const handleOriginalSize = useCallback(() => {
     setZoom(1);
     setRotation(0);
-  };
+  }, []);
 
   // Handler de reset
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setZoom(1);
     setRotation(0);
     // Offset será resetado automaticamente pelo effect no canvas
-  };
+  }, []);
 
   // Handler de download
   const handleDownload = async () => {
@@ -212,9 +206,9 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
   };
 
   // Handler de crop
-  const handleToggleCrop = () => {
-    setCropActive(!cropActive);
-  };
+  const handleToggleCrop = useCallback(() => {
+    setCropActive(prev => !prev);
+  }, []);
 
   const handleCropComplete = (croppedImageUrl: string) => {
     // Atualiza a imagem com o crop
@@ -274,7 +268,19 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [visible, activePanel, cropActive, onClose]);
+  }, [
+    visible,
+    activePanel,
+    cropActive,
+    onClose,
+    handleFitToScreen,
+    handleOriginalSize,
+    handleReset,
+    handleRotateRight,
+    handleToggleCrop,
+    handleZoomIn,
+    handleZoomOut,
+  ]);
 
 
   if (!visible) return null;

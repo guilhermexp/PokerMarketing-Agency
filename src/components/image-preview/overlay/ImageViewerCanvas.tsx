@@ -14,9 +14,6 @@ interface ImageViewerCanvasProps {
   onWheel?: (e: React.WheelEvent) => void;
 }
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, value));
-
 export const ImageViewerCanvas: React.FC<ImageViewerCanvasProps> = ({
   image,
   zoom,

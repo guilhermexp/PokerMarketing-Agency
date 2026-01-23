@@ -34,7 +34,7 @@ export interface InitialData {
 export async function getInitialData(
   userId: string,
   organizationId?: string | null,
-  clerkUserId?: string,
+  _clerkUserId?: string,
 ): Promise<InitialData> {
   const params = new URLSearchParams({ user_id: userId });
   if (organizationId) params.append("organization_id", organizationId);
@@ -212,6 +212,8 @@ export interface DbGalleryImage {
   post_id?: string | null;
   ad_creative_id?: string | null;
   video_script_id?: string | null;
+  is_style_reference?: boolean | null;
+  style_reference_name?: string | null;
 }
 
 export async function getGalleryImages(
@@ -265,7 +267,7 @@ export async function deleteGalleryImage(id: string): Promise<void> {
 
 export async function updateGalleryImage(
   id: string,
-  data: { src_url?: string; published_at?: string },
+  data: Partial<DbGalleryImage>,
 ): Promise<DbGalleryImage | null> {
   // Skip if it's a temporary ID (not yet saved to database)
   if (id.startsWith("temp-")) {

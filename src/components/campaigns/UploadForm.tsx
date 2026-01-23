@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import type {
   ContentInput,
   GenerationOptions,
@@ -17,7 +17,6 @@ import { urlToBase64 } from "../../utils/imageHelpers";
 import { enhancePrompt } from "../../services/geminiService";
 
 // Models from centralized config
-const creativeModelOptions = CREATIVE_MODELS_FOR_UI.map((m) => m.id);
 const creativeModelLabels = Object.fromEntries(
   CREATIVE_MODELS_FOR_UI.map((m) => [
     m.id,
@@ -122,7 +121,6 @@ export const UploadForm: React.FC<UploadFormProps> = ({
   });
   const [compositionAssets, setCompositionAssets] = useState<ImageFile[]>([]);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
   const [isToneSelectorOpen, setIsToneSelectorOpen] = useState(false);
   const [toneOverride, setToneOverride] = useState<ToneOfVoice | null>(null);
@@ -201,20 +199,6 @@ export const UploadForm: React.FC<UploadFormProps> = ({
   }, [isFavoritesOpen]);
 
   const [isEnhancing, setIsEnhancing] = useState(false);
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
-
-  // Simple markdown parser
-  const parseMarkdown = (text: string) => {
-    return text
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold mt-3 mb-1">$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2 class="text-lg font-bold mt-4 mb-2">$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1 class="text-xl font-bold mt-4 mb-2">$1</h1>')
-      .replace(/^\* (.*$)/gim, '<li class="ml-4">• $1</li>')
-      .replace(/^- (.*$)/gim, '<li class="ml-4">• $1</li>')
-      .replace(/\n/g, "<br />");
-  };
 
   // Note: textarea now has fixed height in the new design
   // Auto-resize disabled for compact inline layout
@@ -273,15 +257,12 @@ export const UploadForm: React.FC<UploadFormProps> = ({
     if (!transcript.trim() || isEnhancing) return;
 
     setIsEnhancing(true);
-    setError(null);
 
     try {
       const enhanced = await enhancePrompt(transcript, brandProfile);
       setTranscript(enhanced);
-      setIsPreviewMode(true);
     } catch (err) {
       console.error("[UploadForm] Failed to enhance prompt:", err);
-      setError("Erro ao aprimorar o prompt. Tente novamente.");
     } finally {
       setIsEnhancing(false);
     }
@@ -344,10 +325,8 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
   const handleGenerateClick = () => {
     if (!transcript.trim()) {
-      setError("Cole um conteúdo para gerar a campanha.");
       return;
     }
-    setError(null);
     const contentInput: ContentInput = {
       transcript,
       productImages:
@@ -398,33 +377,6 @@ export const UploadForm: React.FC<UploadFormProps> = ({
     inspirationImages.length > 0 ||
     !!collabLogo ||
     compositionAssets.length > 0;
-
-  // Generate summary of selected options
-  const getOptionsSummary = () => {
-    const items: string[] = [];
-
-    if (generationOptions.videoClipScripts.generate) {
-      items.push(`${generationOptions.videoClipScripts.count} Clips`);
-    }
-
-    if (generationOptions.posts.instagram?.generate)
-      items.push(`${generationOptions.posts.instagram.count} Instagram`);
-    if (generationOptions.posts.facebook?.generate)
-      items.push(`${generationOptions.posts.facebook.count} Facebook`);
-    if (generationOptions.posts.twitter?.generate)
-      items.push(`${generationOptions.posts.twitter.count} Twitter`);
-    if (generationOptions.posts.linkedin?.generate)
-      items.push(`${generationOptions.posts.linkedin.count} LinkedIn`);
-
-    if (generationOptions.adCreatives.facebook?.generate)
-      items.push(
-        `${generationOptions.adCreatives.facebook.count} Facebook Ads`,
-      );
-    if (generationOptions.adCreatives.google?.generate)
-      items.push(`${generationOptions.adCreatives.google.count} Google Ads`);
-
-    return items.length > 0 ? items.join(" • ") : "Nenhuma opção selecionada";
-  };
 
   return (
     <>
