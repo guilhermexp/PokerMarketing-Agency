@@ -326,7 +326,9 @@ export function CampaignsList({
     campaigns: dbCampaigns,
     isLoading,
     removeCampaign,
-    loadAll,
+    loadMore,
+    isLoadingMore,
+    hasMore,
   } = useCampaigns(userId, organizationId);
 
   const [loadingCampaignId, setLoadingCampaignId] = useState<string | null>(
@@ -335,10 +337,6 @@ export function CampaignsList({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 6;
-
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
 
   // Transform DB campaigns to display format (memoized to avoid recalc)
   const allCampaigns = useMemo<CampaignWithCounts[]>(() => {
@@ -377,6 +375,18 @@ export function CampaignsList({
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const campaigns = allCampaigns.slice(startIndex, endIndex);
+  const totalPagesLabel = hasMore ? `${totalPages}+` : `${totalPages}`;
+  const canGoNext = currentPage < totalPages || hasMore;
+
+  const handleNextPage = async () => {
+    if (currentPage < totalPages) {
+      setCurrentPage((prev) => prev + 1);
+      return;
+    }
+    if (!hasMore || isLoadingMore) return;
+    await loadMore();
+    setCurrentPage((prev) => prev + 1);
+  };
 
   // Reset to page 1 when campaigns change
   useEffect(() => {
@@ -443,7 +453,10 @@ export function CampaignsList({
               {allCampaigns.length} campanha{allCampaigns.length !== 1 ? "s" : ""}{" "}
               salva{allCampaigns.length !== 1 ? "s" : ""}
               {totalPages > 1 && (
-                <span className="text-white/20"> • Página {currentPage} de {totalPages}</span>
+                <span className="text-white/20">
+                  {" "}
+                  • Página {currentPage} de {totalPagesLabel}
+                </span>
               )}
             </p>
           )}
@@ -492,14 +505,14 @@ export function CampaignsList({
                 Anterior
               </button>
               <span className="text-sm text-white/50 font-medium px-4">
-                Página {currentPage} de {totalPages}
+                Página {currentPage} de {totalPagesLabel}
               </span>
               <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
+                onClick={handleNextPage}
+                disabled={!canGoNext}
                 className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
               >
-                Próxima
+                {isLoadingMore ? "Carregando..." : "Próxima"}
                 <Icon name="chevron-right" className="w-4 h-4" />
               </button>
             </div>

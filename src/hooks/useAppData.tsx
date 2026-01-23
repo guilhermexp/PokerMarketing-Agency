@@ -328,37 +328,47 @@ export function useCampaigns(
     },
   );
 
-  const [isLoadingAll, setIsLoadingAll] = React.useState(false);
-  const [hasLoadedAll, setHasLoadedAll] = React.useState(false);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(true);
 
   React.useEffect(() => {
-    setHasLoadedAll(false);
-    setIsLoadingAll(false);
+    setHasMore(true);
+    setIsLoadingMore(false);
   }, [userId, organizationId]);
 
-  const loadAll = React.useCallback(async () => {
-    if (!userId || isLoadingAll || hasLoadedAll) return;
+  const loadMore = React.useCallback(async () => {
+    if (!userId || isLoadingMore || !hasMore) return;
 
-    setIsLoadingAll(true);
+    setIsLoadingMore(true);
     try {
-      const campaigns = await getCampaigns(userId, organizationId);
-      mutate(campaigns, false);
-      setHasLoadedAll(true);
+      const currentCount = data?.length || 0;
+      const moreCampaigns = await getCampaigns(userId, organizationId, {
+        limit: 50,
+        offset: currentCount,
+      });
+
+      if (moreCampaigns.length < 50) {
+        setHasMore(false);
+      }
+
+      if (moreCampaigns.length > 0) {
+        mutate((current) => [...(current || []), ...moreCampaigns], false);
+      }
     } catch (err) {
-      console.error("[useCampaigns] Failed to load all campaigns:", err);
+      console.error("[useCampaigns] Failed to load more campaigns:", err);
     } finally {
-      setIsLoadingAll(false);
+      setIsLoadingMore(false);
     }
-  }, [userId, organizationId, isLoadingAll, hasLoadedAll, mutate]);
+  }, [userId, organizationId, isLoadingMore, hasMore, data?.length, mutate]);
 
   return {
     campaigns: data ?? EMPTY_CAMPAIGNS,
     isLoading,
     error,
     refresh: () => mutate(),
-    loadAll,
-    isLoadingAll,
-    hasLoadedAll,
+    loadMore,
+    isLoadingMore,
+    hasMore,
     // Optimistic updates
     addCampaign: (campaign: DbCampaign) => {
       mutate(

@@ -1962,7 +1962,7 @@ app.delete("/api/db/scheduled-posts", async (req, res) => {
 app.get("/api/db/campaigns", async (req, res) => {
   try {
     const sql = getSql();
-    const { user_id, organization_id, id, include_content } = req.query;
+    const { user_id, organization_id, id, include_content, limit, offset } = req.query;
 
     // Get single campaign by ID
     if (id) {
@@ -2027,12 +2027,42 @@ app.get("/api/db/campaigns", async (req, res) => {
 
     // OPTIMIZED: Single query with all counts and previews using subqueries
     // This replaces the N+1 problem (was doing 6 queries PER campaign!)
+    const parsedLimit = Number.parseInt(limit, 10);
+    const parsedOffset = Number.parseInt(offset, 10);
+    const hasLimit = Number.isFinite(parsedLimit) && parsedLimit > 0;
+    const safeOffset = Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
+
     let result;
     if (organization_id) {
       // Organization context - verify membership
       await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
-      result = await sql`
+      result = hasLimit
+        ? await sql`
+        SELECT
+          c.id,
+          c.user_id,
+          c.organization_id,
+          c.name,
+          c.description,
+          c.input_transcript,
+          c.status,
+          c.created_at,
+          c.updated_at,
+          COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
+          COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
+          COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
+          COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count,
+          (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
+          (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
+          (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url,
+          (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url
+        FROM campaigns c
+        WHERE c.organization_id = ${organization_id} AND c.deleted_at IS NULL
+        ORDER BY c.created_at DESC
+        LIMIT ${parsedLimit} OFFSET ${safeOffset}
+      `
+        : await sql`
         SELECT
           c.id,
           c.user_id,
@@ -2057,7 +2087,32 @@ app.get("/api/db/campaigns", async (req, res) => {
       `;
     } else {
       // Personal context
-      result = await sql`
+      result = hasLimit
+        ? await sql`
+        SELECT
+          c.id,
+          c.user_id,
+          c.organization_id,
+          c.name,
+          c.description,
+          c.input_transcript,
+          c.status,
+          c.created_at,
+          c.updated_at,
+          COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
+          COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
+          COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
+          COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count,
+          (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
+          (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
+          (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url,
+          (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url
+        FROM campaigns c
+        WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL
+        ORDER BY c.created_at DESC
+        LIMIT ${parsedLimit} OFFSET ${safeOffset}
+      `
+        : await sql`
         SELECT
           c.id,
           c.user_id,

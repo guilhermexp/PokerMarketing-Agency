@@ -474,9 +474,12 @@ export interface DbCampaignFull extends DbCampaign {
 export async function getCampaigns(
   userId: string,
   organizationId?: string | null,
+  options?: { limit?: number; offset?: number },
 ): Promise<DbCampaign[]> {
   const params = new URLSearchParams({ user_id: userId });
   if (organizationId) params.append("organization_id", organizationId);
+  if (options?.limit != null) params.append("limit", String(options.limit));
+  if (options?.offset != null) params.append("offset", String(options.offset));
   return fetchApi<DbCampaign[]>(`/campaigns?${params}`);
 }
 
