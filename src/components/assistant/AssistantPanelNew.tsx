@@ -230,18 +230,18 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
   // useChat hook do Vercel AI SDK
   const chatOptions = {
     id: chatId,
-    body: {
+    ...({ body: {
       brandProfile: brandProfile,
       chatReferenceImage: referenceImage,
       selectedChatModel: brandProfile?.creativeModel || 'x-ai/grok-4.1-fast'
     },
-    sendAutomaticallyWhen: ({ messages }) =>
+    sendAutomaticallyWhen: ({ messages }: { messages: UIMessage[] }) =>
       lastAssistantMessageIsCompleteWithToolCalls({ messages }) ||
       lastAssistantMessageIsCompleteWithApprovalResponses({ messages }),
-    onResponse: (response) => {
+    onResponse: (response: Response) => {
       console.info('[AssistantPanel] Response received', response.status);
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('[AssistantPanel] Error:', error);
       setErrorMessage(error.message || 'Erro ao processar mensagem. Tente novamente.');
       // Auto-limpar erro após 5 segundos
@@ -253,7 +253,8 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
         partsCount: message.parts?.length || 0
       });
     }
-  } as unknown as Parameters<typeof useChat>[0];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any) as Parameters<typeof useChat>[0]};
 
   const { messages, sendMessage, status, addToolApprovalResponse, setMessages } = useChat<UIMessage>(chatOptions);
 
