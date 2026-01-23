@@ -223,7 +223,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
                 }
               }}
               placeholder="Pergunte, pesquise ou converse..."
-              className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-white placeholder:text-white/30 outline-none resize-none min-h-[80px] max-h-[200px]"
+              className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-white placeholder:text-white/30 outline-none resize-none min-h-[80px] max-h-[200px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               disabled={isLoading}
               rows={2}
             />
