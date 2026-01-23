@@ -46,8 +46,8 @@ interface TournamentEventCardProps {
   onSchedulePost?: (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => void;
 }
 
-// Check if we're in development mode (QStash won't work locally)
-const isDevMode = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+// Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
+const isDevMode = false;
 
 const formatCurrencyValue = (val: string, currency: Currency): string => {
   if (!val || val === '0' || val === '') return '---';

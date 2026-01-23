@@ -25,9 +25,8 @@ import {
 import type { GenerationJobConfig } from "../../services/apiClient";
 import { updateAdCreativeImage } from "../../services/apiClient";
 
-// Check if we're in development mode (QStash won't work locally)
-const isDevMode =
-  typeof window !== "undefined" && window.location.hostname === "localhost";
+// Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
+const isDevMode = false;
 
 interface AdCreativesTabProps {
   adCreatives: AdCreative[];

@@ -247,10 +247,8 @@ export const useClipsTab = ({
 
     const handleGenerateThumbnail = useCallback(
         async (index: number, extraInstruction?: string) => {
-            const isDevMode =
-                import.meta.env.DEV ||
-                (typeof window !== "undefined" &&
-                    window.location.hostname === "localhost");
+            // Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
+            const isDevMode = false;
 
             if (selectedImageModel === "gemini-3-pro-image-preview") {
                 if (

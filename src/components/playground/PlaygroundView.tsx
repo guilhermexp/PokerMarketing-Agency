@@ -25,8 +25,8 @@ import { useBackgroundJobs } from '../../hooks/useBackgroundJobs';
 import type { ActiveJob } from '../../hooks/useBackgroundJobs';
 import type { BrandProfile } from '../../types';
 
-// Check if we're in development mode
-const isDevMode = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname === 'localhost');
+// Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
+const isDevMode = false;
 
 // Sample video URLs for the feed
 const sampleVideos: FeedPost[] = [

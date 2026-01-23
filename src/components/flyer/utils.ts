@@ -7,9 +7,8 @@
 import type { Currency } from '@/types/flyer.types';
 import type { TimePeriod } from '@/types/flyer.types';
 
-// Check if we're in development mode (QStash won't work locally)
-export const isDevMode =
-  typeof window !== "undefined" && window.location.hostname === "localhost";
+// Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
+export const isDevMode = false;
 
 // ============================================
 // Currency Formatting

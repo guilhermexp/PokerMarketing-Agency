@@ -51,10 +51,8 @@ import {
   useBackgroundJobs,
 } from "../../../hooks/useBackgroundJobs";
 
-// Check if we're in development mode (QStash won't work locally)
-const isDevMode =
-  import.meta.env.DEV ||
-  (typeof window !== "undefined" && window.location.hostname === "localhost");
+// Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
+const isDevMode = false;
 
 const CLIP_ASPECT_RATIO = "9:16" as const;
 
