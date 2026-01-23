@@ -399,7 +399,7 @@ app.get("/api/db/health", async (req, res) => {
 // ============================================================================
 
 // Super admin emails from environment
-const SUPER_ADMIN_EMAILS = (process.env.VITE_SUPER_ADMIN_EMAILS || '')
+const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS || '')
   .split(',')
   .map(email => email.trim().toLowerCase())
   .filter(Boolean);
