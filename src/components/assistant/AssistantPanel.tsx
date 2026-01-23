@@ -22,11 +22,22 @@ const fileToDataUrl = (file: File): Promise<string> =>
   });
 
 const parseMarkdown = (text: string) => {
-  const toHtml = text
+  // Escape HTML entities to prevent XSS attacks
+  const escapeHtml = (str: string) =>
+    str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  const escapedText = escapeHtml(text);
+
+  const toHtml = escapedText
     .replace(
       /`{3}([\s\S]*?)`{3}/g,
       (match, p1) =>
-        `<pre class="bg-black/50 p-2 rounded my-2 overflow-x-auto"><code>${p1.trim().replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>`,
+        `<pre class="bg-black/50 p-2 rounded my-2 overflow-x-auto"><code>${p1.trim()}</code></pre>`,
     )
     .replace(/`([^`]+)`/g, '<code class="bg-black/30 px-1 rounded">$1</code>')
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
