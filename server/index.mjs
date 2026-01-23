@@ -40,6 +40,10 @@ import { urlToBase64 } from "./helpers/image-helpers.mjs";
 import { chatHandler } from "./api/chat/route.mjs";
 import {
   initializeScheduledPostsChecker,
+  initializeImageWorker,
+  addImageJob,
+  isRedisAvailable,
+  waitForRedis,
   schedulePostForPublishing,
   cancelScheduledPost,
 } from "./helpers/job-queue.mjs";
@@ -2993,9 +2997,8 @@ app.patch("/api/db/tournaments/daily-flyer", async (req, res) => {
 });
 
 // ============================================================================
-// Generation Jobs API (Background Processing)
-// Note: In dev mode, QStash callback won't work (needs public URL)
-// Jobs are created but will remain in 'queued' status until deployed
+// Generation Jobs API (Background Processing with BullMQ)
+// Uses Redis + BullMQ for reliable job processing
 // ============================================================================
 
 app.post("/api/generate/queue", async (req, res) => {
@@ -3025,19 +3028,39 @@ app.post("/api/generate/queue", async (req, res) => {
     `;
 
     const job = result[0];
-    console.log(`[Generate Queue] Created job ${job.id} for user ${userId}`);
+    console.log(`[Generate Queue] Created job ${job.id} for user ${userId}, type: ${jobType}`);
 
-    // In dev mode, we just return the job ID
-    // QStash won't work locally, so jobs will stay in 'queued' status
-    // For full testing, deploy to Vercel or use ngrok
-
-    res.json({
-      success: true,
-      jobId: job.id,
-      messageId: "dev-mode-no-qstash",
-      status: "queued",
-      note: "Dev mode: QStash disabled. Job created but won't process automatically. Deploy to Vercel for full functionality.",
+    // Try to add to BullMQ queue if Redis is available
+    const bullJob = await addImageJob(job.id, {
+      userId,
+      organizationId,
+      jobType,
+      prompt,
+      config,
     });
+
+    if (bullJob) {
+      console.log(`[Generate Queue] Job ${job.id} added to BullMQ queue`);
+      res.json({
+        success: true,
+        jobId: job.id,
+        status: "queued",
+        queued: true,
+      });
+    } else {
+      // Redis not available - mark as failed immediately
+      console.warn(`[Generate Queue] Redis not available, job ${job.id} cannot be processed`);
+      await sql`
+        UPDATE generation_jobs
+        SET status = 'failed', error_message = 'Job queue unavailable. Please try again later.', completed_at = NOW()
+        WHERE id = ${job.id}
+      `;
+      res.status(503).json({
+        success: false,
+        error: "Job queue temporarily unavailable. Please try again.",
+        jobId: job.id,
+      });
+    }
   } catch (error) {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
@@ -6434,19 +6457,146 @@ const startup = async () => {
     }
   }
 
-  // Initialize scheduled posts worker
-  try {
-    const worker = await initializeScheduledPostsChecker(
-      checkAndPublishScheduledPosts,
-      publishScheduledPostById
-    );
-    if (worker) {
-      console.log(`${colors.green}✓ Scheduled posts worker initialized (Redis)${colors.reset}`);
-    } else {
-      console.log(`${colors.yellow}⚠ Scheduled posts using fallback mode (no Redis)${colors.reset}`);
+  // Wait for Redis to connect before initializing workers
+  console.log(`${colors.cyan}⏳ Waiting for Redis...${colors.reset}`);
+  const redisConnected = await waitForRedis(5000);
+
+  if (redisConnected) {
+    console.log(`${colors.green}✓ Redis connected${colors.reset}`);
+
+    // Define image job processor (needs access to functions defined above)
+    const processImageJob = async (job) => {
+      const { jobId, userId, jobType, prompt, config } = job.data;
+      const sql = getSql();
+
+      console.log(`[ImageWorker] Processing job ${jobId} (${jobType})`);
+
+      try {
+        // Update status to processing
+        await sql`
+          UPDATE generation_jobs
+          SET status = 'processing', started_at = NOW(), attempts = attempts + 1
+          WHERE id = ${jobId}
+        `;
+        await job.updateProgress(10);
+
+        // Parse config
+        const {
+          aspectRatio = '1:1',
+          imageSize = '1K',
+          productImages = [],
+          styleReferenceImage,
+          personReferenceImage,
+          brandProfile,
+        } = config;
+
+        // Build full prompt with brand context
+        const hasStyleReference = !!styleReferenceImage;
+        const hasPersonReference = !!personReferenceImage;
+        const hasProducts = productImages?.length > 0;
+        const hasLogo = !!brandProfile?.logo;
+
+        const fullPrompt = buildImagePrompt(
+          prompt,
+          brandProfile,
+          hasStyleReference,
+          hasLogo,
+          hasPersonReference,
+          hasProducts,
+          prompt, // jsonPrompt same as prompt for now
+        );
+
+        await job.updateProgress(20);
+
+        console.log(`[ImageWorker] Job ${jobId}: Generating image...`);
+
+        // Generate image
+        const result = await generateImageWithFallback(
+          fullPrompt,
+          aspectRatio,
+          DEFAULT_IMAGE_MODEL,
+          imageSize,
+          productImages?.length > 0 ? productImages : undefined,
+          styleReferenceImage,
+          personReferenceImage,
+        );
+
+        await job.updateProgress(80);
+
+        console.log(`[ImageWorker] Job ${jobId}: Image generated, saving to gallery...`);
+
+        // Save to gallery
+        let galleryId = null;
+        try {
+          const galleryResult = await sql`
+            INSERT INTO gallery (user_id, organization_id, src, prompt, aspect_ratio, source)
+            VALUES (${userId}, ${config.organizationId || null}, ${result.imageUrl}, ${prompt}, ${aspectRatio}, 'generation')
+            RETURNING id
+          `;
+          galleryId = galleryResult[0]?.id;
+        } catch (galleryError) {
+          console.error(`[ImageWorker] Failed to save to gallery:`, galleryError.message);
+        }
+
+        // Update job as completed
+        await sql`
+          UPDATE generation_jobs
+          SET
+            status = 'completed',
+            progress = 100,
+            result_url = ${result.imageUrl},
+            result_gallery_id = ${galleryId},
+            completed_at = NOW()
+          WHERE id = ${jobId}
+        `;
+
+        await job.updateProgress(100);
+        console.log(`[ImageWorker] Job ${jobId}: Completed successfully`);
+
+        return { success: true, imageUrl: result.imageUrl, galleryId };
+
+      } catch (error) {
+        console.error(`[ImageWorker] Job ${jobId} failed:`, error.message);
+
+        // Update job as failed
+        await sql`
+          UPDATE generation_jobs
+          SET
+            status = 'failed',
+            error_message = ${error.message || 'Unknown error'},
+            completed_at = NOW()
+          WHERE id = ${jobId}
+        `;
+
+        throw error; // Let BullMQ handle retries
+      }
+    };
+
+    // Initialize image generation worker
+    try {
+      const imageWorker = initializeImageWorker(processImageJob);
+      if (imageWorker) {
+        console.log(`${colors.green}✓ Image generation worker initialized${colors.reset}`);
+      }
+    } catch (error) {
+      console.error(`${colors.red}✗ Failed to initialize image worker:${colors.reset}`, error.message);
     }
-  } catch (error) {
-    console.error(`${colors.red}✗ Failed to initialize scheduled posts worker:${colors.reset}`, error.message);
+
+    // Initialize scheduled posts worker
+    try {
+      const worker = await initializeScheduledPostsChecker(
+        checkAndPublishScheduledPosts,
+        publishScheduledPostById
+      );
+      if (worker) {
+        console.log(`${colors.green}✓ Scheduled posts worker initialized${colors.reset}`);
+      }
+    } catch (error) {
+      console.error(`${colors.red}✗ Failed to initialize scheduled posts worker:${colors.reset}`, error.message);
+    }
+  } else {
+    console.log(`${colors.yellow}⚠ Redis not available - job processing disabled${colors.reset}`);
+    console.log(`${colors.yellow}⚠ Scheduled posts using fallback mode (database polling)${colors.reset}`);
   }
 
   app.listen(PORT, () => {

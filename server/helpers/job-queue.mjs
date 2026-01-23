@@ -13,15 +13,43 @@ const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || null
 let connection = null;
 let imageQueue = null;
 let scheduledPostsQueue = null;
-let worker = null;
+let imageWorker = null;
 let scheduledPostsWorker = null;
 let redisAvailable = false;
+let redisConnectPromise = null;
 
 /**
  * Check if Redis is available
  */
 export function isRedisAvailable() {
   return redisAvailable;
+}
+
+/**
+ * Wait for Redis to connect (with timeout)
+ * Returns true if connected, false if timeout/failed
+ */
+export async function waitForRedis(timeoutMs = 5000) {
+  if (redisAvailable) return true;
+  if (!REDIS_URL) return false;
+
+  // Ensure connection is initiated
+  getRedisConnection();
+
+  // Wait for connection or timeout
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+    const checkInterval = setInterval(() => {
+      if (redisAvailable) {
+        clearInterval(checkInterval);
+        resolve(true);
+      } else if (Date.now() - startTime > timeoutMs) {
+        clearInterval(checkInterval);
+        console.log('[JobQueue] Redis connection timeout after', timeoutMs, 'ms');
+        resolve(false);
+      }
+    }, 100);
+  });
 }
 
 /**
@@ -143,39 +171,70 @@ export async function getQueueJobStatus(jobId) {
 }
 
 /**
- * Initialize the worker with a processor function
+ * Add an image generation job to the queue
+ * Returns null if Redis not available (caller should use fallback)
  */
-export function initializeWorker(processorFn) {
-  if (worker) {
-    console.log('[JobQueue] Worker already initialized');
-    return worker;
+export async function addImageJob(jobId, data) {
+  const queue = getImageQueue();
+  if (!queue) {
+    console.log(`[JobQueue] Redis not available, job ${jobId} will use sync processing`);
+    return null;
+  }
+
+  const job = await queue.add('generate', {
+    jobId,
+    ...data,
+  }, {
+    jobId: jobId,
+    attempts: 2,
+    backoff: {
+      type: 'fixed',
+      delay: 3000,
+    },
+  });
+
+  console.log(`[JobQueue] Added image job ${jobId} to queue`);
+  return job;
+}
+
+/**
+ * Initialize the image generation worker with a processor function
+ */
+export function initializeImageWorker(processorFn) {
+  if (imageWorker) {
+    console.log('[JobQueue] Image worker already initialized');
+    return imageWorker;
   }
 
   const conn = getRedisConnection();
+  if (!conn || !redisAvailable) {
+    console.log('[JobQueue] Cannot initialize image worker - Redis not available');
+    return null;
+  }
 
-  worker = new Worker('image-generation', processorFn, {
+  imageWorker = new Worker('image-generation', processorFn, {
     connection: conn,
-    concurrency: 1, // Process 1 job at a time to avoid race conditions
+    concurrency: 2, // Process 2 jobs at a time
   });
 
-  worker.on('completed', (job, result) => {
-    console.log(`[JobQueue] Job ${job.id} completed`);
+  imageWorker.on('completed', (job, result) => {
+    console.log(`[JobQueue] Image job ${job.id} completed`);
   });
 
-  worker.on('failed', (job, err) => {
-    console.error(`[JobQueue] Job ${job?.id} failed:`, err.message);
+  imageWorker.on('failed', (job, err) => {
+    console.error(`[JobQueue] Image job ${job?.id} failed:`, err.message);
   });
 
-  worker.on('progress', (job, progress) => {
-    console.log(`[JobQueue] Job ${job.id} progress: ${progress}%`);
+  imageWorker.on('progress', (job, progress) => {
+    console.log(`[JobQueue] Image job ${job.id} progress: ${progress}%`);
   });
 
-  worker.on('error', (err) => {
-    console.error('[JobQueue] Worker error:', err.message);
+  imageWorker.on('error', (err) => {
+    console.error('[JobQueue] Image worker error:', err.message);
   });
 
-  console.log('[JobQueue] Worker initialized with concurrency 1');
-  return worker;
+  console.log('[JobQueue] Image worker initialized with concurrency 2');
+  return imageWorker;
 }
 
 /**
@@ -362,9 +421,9 @@ export async function initializeScheduledPostsChecker(publishFn, publishSingleFn
  * Graceful shutdown
  */
 export async function closeQueue() {
-  if (worker) {
-    await worker.close();
-    worker = null;
+  if (imageWorker) {
+    await imageWorker.close();
+    imageWorker = null;
   }
   if (scheduledPostsWorker) {
     await scheduledPostsWorker.close();
