@@ -21,6 +21,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
 }) => {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [filter, setFilter] = useState<"all" | "today" | "daily" | "individual">("all");
+  const [isSharing, setIsSharing] = useState(false);
 
   // Collect all flyers from both states
   const allFlyers = useMemo(() => {
@@ -130,6 +131,45 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
     }
   };
 
+  const handleShareTodayWhatsApp = async () => {
+    if (todayFlyers.length === 0) return;
+
+    try {
+      setIsSharing(true);
+
+      const files: File[] = [];
+      for (let i = 0; i < todayFlyers.length; i++) {
+        const flyer = todayFlyers[i];
+        const response = await fetch(flyer.src);
+        const blob = await response.blob();
+        const extension = blob.type.includes("png") ? "png" : "jpg";
+        files.push(new File([blob], `flyer-${i + 1}.${extension}`, { type: blob.type }));
+      }
+
+      const canShareFiles =
+        typeof navigator !== "undefined" &&
+        typeof navigator.share === "function" &&
+        (!navigator.canShare || navigator.canShare({ files }));
+
+      if (canShareFiles) {
+        await navigator.share({
+          title: "Flyers do dia",
+          text: "Flyers gerados hoje",
+          files,
+        });
+        return;
+      }
+
+      const links = todayFlyers.map((flyer) => flyer.src).join("\n");
+      const message = `Flyers gerados hoje:\n${links}`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+    } catch (err) {
+      console.error("Failed to share flyers on WhatsApp:", err);
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   if (allFlyers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-6">
@@ -160,13 +200,23 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
             </p>
           </div>
           {displayedFlyers.length > 0 && (
-            <button
-              onClick={handleDownloadAll}
-              className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
-            >
-              <Icon name="download" className="w-3 h-3" />
-              Baixar Todos
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleShareTodayWhatsApp}
+                disabled={todayFlyers.length === 0 || isSharing}
+                className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+              >
+                <Icon name="send" className="w-3 h-3" />
+                {isSharing ? "Enviando..." : "WhatsApp (Hoje)"}
+              </button>
+              <button
+                onClick={handleDownloadAll}
+                className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              >
+                <Icon name="download" className="w-3 h-3" />
+                Baixar Todos
+              </button>
+            </div>
           )}
         </div>
 
