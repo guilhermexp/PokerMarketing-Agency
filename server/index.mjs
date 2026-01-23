@@ -3826,6 +3826,7 @@ const Type = {
 
 // Prompt builders
 const shouldUseTone = (brandProfile, target) => {
+  if (!brandProfile) return false;
   const targets = brandProfile.toneTargets || [
     "campaigns",
     "posts",
@@ -3836,7 +3837,8 @@ const shouldUseTone = (brandProfile, target) => {
 };
 
 const getToneText = (brandProfile, target) => {
-  return shouldUseTone(brandProfile, target) ? brandProfile.toneOfVoice : "";
+  if (!brandProfile) return "";
+  return shouldUseTone(brandProfile, target) ? (brandProfile.toneOfVoice || "") : "";
 };
 
 const buildImagePrompt = (
@@ -3849,8 +3851,10 @@ const buildImagePrompt = (
   jsonPrompt = null,
 ) => {
   const toneText = getToneText(brandProfile, "images");
+  const primaryColor = brandProfile?.primaryColor || "#000000";
+  const secondaryColor = brandProfile?.secondaryColor || "#FFFFFF";
   let fullPrompt = `PROMPT TÉCNICO: ${prompt}
-ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
+ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${primaryColor}, ${secondaryColor}. Cinematográfico e Luxuoso.`;
 
   if (jsonPrompt) {
     fullPrompt += `
