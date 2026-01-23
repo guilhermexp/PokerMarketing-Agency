@@ -6527,14 +6527,48 @@ const startup = async () => {
 
         await job.updateProgress(80);
 
-        console.log(`[ImageWorker] Job ${jobId}: Image generated, saving to gallery...`);
+        console.log(`[ImageWorker] Job ${jobId}: Image generated via ${result.usedProvider}`);
+
+        // If image came from Replicate, upload to Vercel Blob (Replicate URLs are temporary)
+        let finalImageUrl = result.imageUrl;
+        if (result.usedProvider === 'replicate' && result.imageUrl && !result.imageUrl.startsWith('data:')) {
+          console.log(`[ImageWorker] Job ${jobId}: Uploading Replicate image to Vercel Blob...`);
+          try {
+            // Fetch image from Replicate's temporary URL
+            const imageResponse = await fetch(result.imageUrl);
+            if (!imageResponse.ok) {
+              throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+            }
+            const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+            const contentType = imageResponse.headers.get('content-type') || 'image/png';
+
+            // Generate unique filename
+            const ext = contentType.includes('png') ? 'png' : 'jpg';
+            const filename = `generated-${jobId}-${Date.now()}.${ext}`;
+
+            // Upload to Vercel Blob
+            const blob = await put(filename, imageBuffer, {
+              access: 'public',
+              contentType,
+            });
+
+            finalImageUrl = blob.url;
+            console.log(`[ImageWorker] Job ${jobId}: Uploaded to Vercel Blob: ${blob.url}`);
+          } catch (uploadError) {
+            console.error(`[ImageWorker] Job ${jobId}: Failed to upload to Vercel Blob:`, uploadError.message);
+            // Keep using the Replicate URL as fallback (will work temporarily)
+          }
+        }
+
+        await job.updateProgress(90);
+        console.log(`[ImageWorker] Job ${jobId}: Saving to gallery...`);
 
         // Save to gallery
         let galleryId = null;
         try {
           const galleryResult = await sql`
-            INSERT INTO gallery (user_id, organization_id, src, prompt, aspect_ratio, source)
-            VALUES (${userId}, ${config.organizationId || null}, ${result.imageUrl}, ${prompt}, ${aspectRatio}, 'generation')
+            INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, aspect_ratio, source)
+            VALUES (${userId}, ${config.organizationId || null}, ${finalImageUrl}, ${prompt}, ${aspectRatio}, 'generation')
             RETURNING id
           `;
           galleryId = galleryResult[0]?.id;
@@ -6548,7 +6582,7 @@ const startup = async () => {
           SET
             status = 'completed',
             progress = 100,
-            result_url = ${result.imageUrl},
+            result_url = ${finalImageUrl},
             result_gallery_id = ${galleryId},
             completed_at = NOW()
           WHERE id = ${jobId}
@@ -6557,7 +6591,7 @@ const startup = async () => {
         await job.updateProgress(100);
         console.log(`[ImageWorker] Job ${jobId}: Completed successfully`);
 
-        return { success: true, imageUrl: result.imageUrl, galleryId };
+        return { success: true, imageUrl: finalImageUrl, galleryId };
 
       } catch (error) {
         console.error(`[ImageWorker] Job ${jobId} failed:`, error.message);
