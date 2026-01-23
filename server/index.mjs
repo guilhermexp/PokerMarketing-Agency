@@ -3,10 +3,8 @@
  * Runs alongside Vite to handle API routes during development
  */
 
-import { config } from "dotenv";
-
-// CRITICAL: Load environment variables BEFORE importing modules that need them
-config();
+// CRITICAL: This import auto-loads .env BEFORE other imports are evaluated
+import "dotenv/config";
 
 import express from "express";
 import cors from "cors";
@@ -4576,44 +4574,107 @@ app.post("/api/ai/flyer", async (req, res) => {
       });
     }
 
-    const response = await withRetry(() =>
-      ai.models.generateContent({
-        model: DEFAULT_IMAGE_MODEL,
-        contents: { parts },
-        config: {
-          imageConfig: {
-            aspectRatio: mapAspectRatio(aspectRatio),
-            imageSize,
-          },
-        },
-      })
-    );
-
     let imageDataUrl = null;
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        break;
+    let usedProvider = 'google';
+    let usedModel = DEFAULT_IMAGE_MODEL;
+
+    try {
+      // Try Gemini first
+      const response = await withRetry(() =>
+        ai.models.generateContent({
+          model: DEFAULT_IMAGE_MODEL,
+          contents: { parts },
+          config: {
+            imageConfig: {
+              aspectRatio: mapAspectRatio(aspectRatio),
+              imageSize,
+            },
+          },
+        })
+      );
+
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+          imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          break;
+        }
+      }
+
+      if (!imageDataUrl) {
+        throw new Error("A IA falhou em produzir o Flyer.");
+      }
+    } catch (geminiError) {
+      // Check if quota/rate limit error - fallback to Replicate
+      if (isQuotaOrRateLimitError(geminiError)) {
+        console.log("[Flyer API] Gemini quota exceeded, trying Replicate fallback...");
+
+        // Build text prompt for Replicate (combine all text parts)
+        const textPrompt = parts
+          .filter(p => p.text)
+          .map(p => p.text)
+          .join('\n\n');
+
+        // Collect image inputs for Replicate
+        const imageInputs = parts
+          .filter(p => p.inlineData)
+          .map(p => ({ base64: p.inlineData.data, mimeType: p.inlineData.mimeType }));
+
+        const replicateUrl = await generateImageWithReplicate(
+          textPrompt,
+          aspectRatio,
+          imageSize,
+          imageInputs.length > 0 ? imageInputs : undefined,
+          undefined,
+          undefined,
+        );
+
+        console.log("[Flyer API] Replicate fallback successful!");
+
+        // Upload to Vercel Blob (Replicate URLs are temporary)
+        console.log("[Flyer API] Uploading Replicate image to Vercel Blob...");
+        try {
+          const imageResponse = await fetch(replicateUrl);
+          if (!imageResponse.ok) {
+            throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+          }
+          const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+          const contentType = imageResponse.headers.get('content-type') || 'image/png';
+          const ext = contentType.includes('png') ? 'png' : 'jpg';
+          const filename = `flyer-${Date.now()}.${ext}`;
+
+          const blob = await put(filename, imageBuffer, {
+            access: 'public',
+            contentType,
+          });
+
+          imageDataUrl = blob.url;
+          console.log("[Flyer API] Uploaded to Vercel Blob:", blob.url);
+        } catch (uploadError) {
+          console.error("[Flyer API] Failed to upload to Vercel Blob:", uploadError.message);
+          imageDataUrl = replicateUrl; // Use temporary URL as fallback
+        }
+
+        usedProvider = 'replicate';
+        usedModel = REPLICATE_IMAGE_MODEL;
+      } else {
+        throw geminiError;
       }
     }
 
-    if (!imageDataUrl) {
-      throw new Error("A IA falhou em produzir o Flyer.");
-    }
-
-    console.log("[Flyer API] Flyer generated successfully");
+    console.log(`[Flyer API] Flyer generated successfully via ${usedProvider}`);
 
     // Log AI usage
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/flyer',
       operation: 'flyer',
-      model: DEFAULT_IMAGE_MODEL,
+      model: usedModel,
+      provider: usedProvider,
       imageCount: 1,
       imageSize: imageSize || '1K',
       latencyMs: timer(),
       status: 'success',
-      metadata: { aspectRatio, hasLogo: !!logo, hasReference: !!referenceImage }
+      metadata: { aspectRatio, hasLogo: !!logo, hasReference: !!referenceImage, fallbackUsed: usedProvider === 'replicate' }
     });
 
     res.json({
@@ -4746,8 +4807,34 @@ app.post("/api/ai/image", async (req, res) => {
       personReferenceImage,
     );
 
-    console.log(`[Image API] ✅ Imagem gerada com sucesso!`);
+    console.log(`[Image API] ✅ Imagem gerada com sucesso via ${result.usedProvider}!`);
     console.log(`[Image API]   imageDataUrl length: ${result.imageUrl?.length || 0} chars`);
+
+    // If image came from Replicate, upload to Vercel Blob (Replicate URLs are temporary)
+    let finalImageUrl = result.imageUrl;
+    if (result.usedProvider === 'replicate' && result.imageUrl && !result.imageUrl.startsWith('data:')) {
+      console.log("[Image API] Uploading Replicate image to Vercel Blob...");
+      try {
+        const imageResponse = await fetch(result.imageUrl);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+        }
+        const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+        const contentType = imageResponse.headers.get('content-type') || 'image/png';
+        const ext = contentType.includes('png') ? 'png' : 'jpg';
+        const filename = `generated-${Date.now()}.${ext}`;
+
+        const blob = await put(filename, imageBuffer, {
+          access: 'public',
+          contentType,
+        });
+
+        finalImageUrl = blob.url;
+        console.log("[Image API] Uploaded to Vercel Blob:", blob.url);
+      } catch (uploadError) {
+        console.error("[Image API] Failed to upload to Vercel Blob:", uploadError.message);
+      }
+    }
 
     // Log AI usage
     await logAiUsage(sql, {
@@ -4774,7 +4861,7 @@ app.post("/api/ai/image", async (req, res) => {
 
     res.json({
       success: true,
-      imageUrl: result.imageUrl,
+      imageUrl: finalImageUrl,
       model,
     });
   } catch (error) {

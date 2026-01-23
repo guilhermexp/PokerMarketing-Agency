@@ -3,10 +3,8 @@
  * Runs alongside Vite to handle API routes during development
  */
 
-import { config } from "dotenv";
-
-// CRITICAL: Load environment variables BEFORE importing modules that need them
-config();
+// CRITICAL: This import auto-loads .env BEFORE other imports are evaluated
+import "dotenv/config";
 
 import express from "express";
 import cors from "cors";
@@ -38,6 +36,10 @@ import { urlToBase64 } from "./helpers/image-helpers.mjs";
 import { chatHandler } from "./api/chat/route.mjs";
 import {
   initializeScheduledPostsChecker,
+  initializeImageWorker,
+  addImageJob,
+  isRedisAvailable,
+  waitForRedis,
   schedulePostForPublishing,
   cancelScheduledPost,
 } from "./helpers/job-queue.mjs";
@@ -2978,17 +2980,34 @@ app.post("/api/generate/queue", async (req, res) => {
     const job = result[0];
     console.log(`[Generate Queue] Created job ${job.id} for user ${userId}`);
 
-    // In dev mode, we just return the job ID
-    // QStash won't work locally, so jobs will stay in 'queued' status
-    // For full testing, deploy to Vercel or use ngrok
-
-    res.json({
-      success: true,
-      jobId: job.id,
-      messageId: "dev-mode-no-qstash",
-      status: "queued",
-      note: "Dev mode: QStash disabled. Job created but won't process automatically. Deploy to Vercel for full functionality.",
+    // Try to add to BullMQ queue (if Redis available)
+    const bullJob = await addImageJob(job.id, {
+      userId,
+      organizationId,
+      jobType,
+      prompt,
+      config,
     });
+
+    if (bullJob) {
+      console.log(`[Generate Queue] Job ${job.id} added to BullMQ queue`);
+      res.json({
+        success: true,
+        jobId: job.id,
+        messageId: bullJob.id,
+        status: "queued",
+      });
+    } else {
+      // Redis not available - job will stay in queued status
+      console.log(`[Generate Queue] Redis not available, job ${job.id} in fallback mode`);
+      res.json({
+        success: true,
+        jobId: job.id,
+        messageId: "no-redis",
+        status: "queued",
+        note: "Redis not available. Job created but waiting for worker.",
+      });
+    }
   } catch (error) {
     if (error instanceof OrganizationAccessError) {
       return res.status(403).json({ error: error.message });
@@ -4460,44 +4479,107 @@ app.post("/api/ai/flyer", async (req, res) => {
       });
     }
 
-    const response = await withRetry(() =>
-      ai.models.generateContent({
-        model: DEFAULT_IMAGE_MODEL,
-        contents: { parts },
-        config: {
-          imageConfig: {
-            aspectRatio: mapAspectRatio(aspectRatio),
-            imageSize,
-          },
-        },
-      })
-    );
-
     let imageDataUrl = null;
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        break;
+    let usedProvider = 'google';
+    let usedModel = DEFAULT_IMAGE_MODEL;
+
+    try {
+      // Try Gemini first
+      const response = await withRetry(() =>
+        ai.models.generateContent({
+          model: DEFAULT_IMAGE_MODEL,
+          contents: { parts },
+          config: {
+            imageConfig: {
+              aspectRatio: mapAspectRatio(aspectRatio),
+              imageSize,
+            },
+          },
+        })
+      );
+
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+          imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          break;
+        }
+      }
+
+      if (!imageDataUrl) {
+        throw new Error("A IA falhou em produzir o Flyer.");
+      }
+    } catch (geminiError) {
+      // Check if quota/rate limit error - fallback to Replicate
+      if (isQuotaOrRateLimitError(geminiError)) {
+        console.log("[Flyer API] Gemini quota exceeded, trying Replicate fallback...");
+
+        // Build text prompt for Replicate (combine all text parts)
+        const textPrompt = parts
+          .filter(p => p.text)
+          .map(p => p.text)
+          .join('\n\n');
+
+        // Collect image inputs for Replicate
+        const imageInputs = parts
+          .filter(p => p.inlineData)
+          .map(p => ({ base64: p.inlineData.data, mimeType: p.inlineData.mimeType }));
+
+        const replicateUrl = await generateImageWithReplicate(
+          textPrompt,
+          aspectRatio,
+          imageSize,
+          imageInputs.length > 0 ? imageInputs : undefined,
+          undefined,
+          undefined,
+        );
+
+        console.log("[Flyer API] Replicate fallback successful!");
+
+        // Upload to Vercel Blob (Replicate URLs are temporary)
+        console.log("[Flyer API] Uploading Replicate image to Vercel Blob...");
+        try {
+          const imageResponse = await fetch(replicateUrl);
+          if (!imageResponse.ok) {
+            throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+          }
+          const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+          const contentType = imageResponse.headers.get('content-type') || 'image/png';
+          const ext = contentType.includes('png') ? 'png' : 'jpg';
+          const filename = `flyer-${Date.now()}.${ext}`;
+
+          const blob = await put(filename, imageBuffer, {
+            access: 'public',
+            contentType,
+          });
+
+          imageDataUrl = blob.url;
+          console.log("[Flyer API] Uploaded to Vercel Blob:", blob.url);
+        } catch (uploadError) {
+          console.error("[Flyer API] Failed to upload to Vercel Blob:", uploadError.message);
+          imageDataUrl = replicateUrl; // Use temporary URL as fallback
+        }
+
+        usedProvider = 'replicate';
+        usedModel = 'google/nano-banana-pro';
+      } else {
+        throw geminiError;
       }
     }
 
-    if (!imageDataUrl) {
-      throw new Error("A IA falhou em produzir o Flyer.");
-    }
-
-    console.log("[Flyer API] Flyer generated successfully");
+    console.log(`[Flyer API] Flyer generated successfully via ${usedProvider}`);
 
     // Log AI usage
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/flyer',
       operation: 'flyer',
-      model: DEFAULT_IMAGE_MODEL,
+      model: usedModel,
+      provider: usedProvider,
       imageCount: 1,
       imageSize: imageSize || '1K',
       latencyMs: timer(),
       status: 'success',
-      metadata: { aspectRatio, hasLogo: !!logo, hasReference: !!referenceImage }
+      metadata: { aspectRatio, hasLogo: !!logo, hasReference: !!referenceImage, fallbackUsed: usedProvider === 'replicate' }
     });
 
     res.json({
@@ -4602,7 +4684,34 @@ app.post("/api/ai/image", async (req, res) => {
       personReferenceImage,
     );
 
-    console.log("[Image API] Image generated successfully");
+    console.log("[Image API] Image generated successfully via", result.usedProvider);
+
+    // If image came from Replicate, upload to Vercel Blob (Replicate URLs are temporary)
+    let finalImageUrl = result.imageUrl;
+    if (result.usedProvider === 'replicate' && result.imageUrl && !result.imageUrl.startsWith('data:')) {
+      console.log("[Image API] Uploading Replicate image to Vercel Blob...");
+      try {
+        const imageResponse = await fetch(result.imageUrl);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+        }
+        const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+        const contentType = imageResponse.headers.get('content-type') || 'image/png';
+        const ext = contentType.includes('png') ? 'png' : 'jpg';
+        const filename = `generated-${Date.now()}.${ext}`;
+
+        const blob = await put(filename, imageBuffer, {
+          access: 'public',
+          contentType,
+        });
+
+        finalImageUrl = blob.url;
+        console.log("[Image API] Uploaded to Vercel Blob:", blob.url);
+      } catch (uploadError) {
+        console.error("[Image API] Failed to upload to Vercel Blob:", uploadError.message);
+        // Keep using the Replicate URL as fallback (will work temporarily)
+      }
+    }
 
     // Log AI usage
     await logAiUsage(sql, {
@@ -4625,7 +4734,7 @@ app.post("/api/ai/image", async (req, res) => {
 
     res.json({
       success: true,
-      imageUrl: result.imageUrl,
+      imageUrl: finalImageUrl,
       model,
     });
   } catch (error) {
@@ -6288,19 +6397,172 @@ const startup = async () => {
     }
   }
 
-  // Initialize scheduled posts worker
-  try {
-    const worker = await initializeScheduledPostsChecker(
-      checkAndPublishScheduledPosts,
-      publishScheduledPostById
-    );
-    if (worker) {
-      console.log(`${colors.green}✓ Scheduled posts worker initialized (Redis)${colors.reset}`);
-    } else {
-      console.log(`${colors.yellow}⚠ Scheduled posts using fallback mode (no Redis)${colors.reset}`);
+  // Wait for Redis to connect before initializing workers
+  const redisConnected = await waitForRedis(5000);
+
+  if (redisConnected) {
+    console.log(`${colors.green}✓ Redis connected${colors.reset}`);
+
+    // Define image job processor
+    const processImageJob = async (job) => {
+      const { jobId, userId, jobType, prompt, config } = job.data;
+      const sql = getSql();
+
+      console.log(`[ImageWorker] Processing job ${jobId} (${jobType})`);
+
+      try {
+        // Update status to processing
+        await sql`
+          UPDATE generation_jobs
+          SET status = 'processing', started_at = NOW(), attempts = attempts + 1
+          WHERE id = ${jobId}
+        `;
+        await job.updateProgress(10);
+
+        // Parse config
+        const {
+          aspectRatio = '1:1',
+          imageSize = '1K',
+          productImages = [],
+          styleReferenceImage,
+          personReferenceImage,
+          brandProfile,
+        } = config;
+
+        // Build full prompt with brand context
+        const hasStyleReference = !!styleReferenceImage;
+        const hasPersonReference = !!personReferenceImage;
+        const hasProducts = productImages?.length > 0;
+        const hasLogo = !!brandProfile?.logo;
+
+        const fullPrompt = buildImagePrompt(
+          prompt,
+          brandProfile,
+          hasStyleReference,
+          hasLogo,
+          hasPersonReference,
+          hasProducts,
+          prompt,
+        );
+
+        await job.updateProgress(20);
+
+        console.log(`[ImageWorker] Job ${jobId}: Generating image...`);
+
+        // Generate image
+        const result = await generateImageWithFallback(
+          fullPrompt,
+          aspectRatio,
+          DEFAULT_IMAGE_MODEL,
+          imageSize,
+          productImages?.length > 0 ? productImages : undefined,
+          styleReferenceImage,
+          personReferenceImage,
+        );
+
+        await job.updateProgress(80);
+
+        console.log(`[ImageWorker] Job ${jobId}: Image generated via ${result.usedProvider}`);
+
+        // If image came from Replicate, upload to Vercel Blob (Replicate URLs are temporary)
+        let finalImageUrl = result.imageUrl;
+        if (result.usedProvider === 'replicate' && result.imageUrl && !result.imageUrl.startsWith('data:')) {
+          console.log(`[ImageWorker] Job ${jobId}: Uploading Replicate image to Vercel Blob...`);
+          try {
+            const imageResponse = await fetch(result.imageUrl);
+            if (!imageResponse.ok) {
+              throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+            }
+            const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+            const contentType = imageResponse.headers.get('content-type') || 'image/png';
+            const ext = contentType.includes('png') ? 'png' : 'jpg';
+            const filename = `generated-${jobId}-${Date.now()}.${ext}`;
+
+            const blob = await put(filename, imageBuffer, {
+              access: 'public',
+              contentType,
+            });
+
+            finalImageUrl = blob.url;
+            console.log(`[ImageWorker] Job ${jobId}: Uploaded to Vercel Blob: ${blob.url}`);
+          } catch (uploadError) {
+            console.error(`[ImageWorker] Job ${jobId}: Failed to upload to Vercel Blob:`, uploadError.message);
+          }
+        }
+
+        await job.updateProgress(90);
+        console.log(`[ImageWorker] Job ${jobId}: Saving to gallery...`);
+
+        // Save to gallery
+        let galleryId = null;
+        try {
+          const galleryResult = await sql`
+            INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, aspect_ratio, source)
+            VALUES (${userId}, ${config.organizationId || null}, ${finalImageUrl}, ${prompt}, ${aspectRatio}, 'generation')
+            RETURNING id
+          `;
+          galleryId = galleryResult[0]?.id;
+        } catch (galleryError) {
+          console.error(`[ImageWorker] Failed to save to gallery:`, galleryError.message);
+        }
+
+        // Update job as completed
+        await sql`
+          UPDATE generation_jobs
+          SET
+            status = 'completed',
+            progress = 100,
+            result_url = ${finalImageUrl},
+            result_gallery_id = ${galleryId},
+            completed_at = NOW()
+          WHERE id = ${jobId}
+        `;
+
+        await job.updateProgress(100);
+        console.log(`[ImageWorker] Job ${jobId}: Completed successfully`);
+
+        return { success: true, imageUrl: finalImageUrl, galleryId };
+
+      } catch (error) {
+        console.error(`[ImageWorker] Job ${jobId} failed:`, error.message);
+
+        await sql`
+          UPDATE generation_jobs
+          SET
+            status = 'failed',
+            error_message = ${error.message || 'Unknown error'},
+            completed_at = NOW()
+          WHERE id = ${jobId}
+        `;
+
+        throw error;
+      }
+    };
+
+    // Initialize image generation worker
+    try {
+      const imageWorker = initializeImageWorker(processImageJob);
+      if (imageWorker) {
+        console.log(`${colors.green}✓ Image generation worker initialized${colors.reset}`);
+      }
+    } catch (error) {
+      console.error(`${colors.red}✗ Failed to initialize image worker:${colors.reset}`, error.message);
     }
-  } catch (error) {
-    console.error(`${colors.red}✗ Failed to initialize scheduled posts worker:${colors.reset}`, error.message);
+
+    // Initialize scheduled posts worker
+    try {
+      const worker = await initializeScheduledPostsChecker(
+        checkAndPublishScheduledPosts,
+        publishScheduledPostById
+      );
+      if (worker) {
+        console.log(`${colors.green}✓ Scheduled posts worker initialized${colors.reset}`);
+      }
+    } catch (error) {
+      console.error(`${colors.red}✗ Failed to initialize scheduled posts worker:${colors.reset}`, error.message);
+    }
+  } else {
+    console.log(`${colors.yellow}⚠ Redis not available, workers disabled${colors.reset}`);
   }
 
   app.listen(PORT, () => {
