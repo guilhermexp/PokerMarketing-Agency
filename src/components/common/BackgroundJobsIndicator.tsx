@@ -23,18 +23,21 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
   const {
     pendingJobs,
     completedJobs,
-    failedJobs: _failedJobs,
+    failedJobs,
     onJobComplete,
-    onJobFailed: _onJobFailed,
+    onJobFailed,
     refreshJobs,
   } = useBackgroundJobs();
   const [isExpanded, setIsExpanded] = useState(false);
   const [recentlyCompleted, setRecentlyCompleted] = useState<ActiveJob[]>([]);
+  const [recentlyFailed, setRecentlyFailed] = useState<ActiveJob[]>([]);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationType, setNotificationType] = useState<"success" | "error">("success");
   const [cancellingJob, setCancellingJob] = useState<string | null>(null);
   const [cancellingAll, setCancellingAll] = useState(false);
   const dismissedCompletedRef = useRef<Set<string>>(new Set());
+  const dismissedFailedRef = useRef<Set<string>>(new Set());
   const dismissedStorageKey = "backgroundJobsDismissed";
 
   useEffect(() => {
@@ -43,6 +46,13 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
       const stored = localStorage.getItem(dismissedStorageKey);
       if (!stored) return;
       const parsed = JSON.parse(stored);
+      if (parsed.completed && Array.isArray(parsed.completed)) {
+        dismissedCompletedRef.current = new Set(parsed.completed);
+      }
+      if (parsed.failed && Array.isArray(parsed.failed)) {
+        dismissedFailedRef.current = new Set(parsed.failed);
+      }
+      // Legacy format (array only)
       if (Array.isArray(parsed)) {
         dismissedCompletedRef.current = new Set(parsed);
       }
@@ -85,6 +95,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
       if (dismissedCompletedRef.current.has(job.id)) return;
       setRecentlyCompleted((prev) => [job, ...prev].slice(0, 5));
       setNotificationMessage("✓ Geração concluída!");
+      setNotificationType("success");
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
     });
@@ -92,8 +103,35 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
     return unsubComplete;
   }, [onJobComplete]);
 
+  // Listen for failed jobs to show error notification
+  useEffect(() => {
+    const unsubFailed = onJobFailed((job) => {
+      if (dismissedFailedRef.current.has(job.id)) return;
+      setRecentlyFailed((prev) => [job, ...prev].slice(0, 5));
+      // Extract a user-friendly error message
+      let errorMsg = "Erro na geração";
+      if (job.error_message) {
+        if (job.error_message.includes("quota") || job.error_message.includes("429")) {
+          errorMsg = "Limite de API excedido. Tente mais tarde.";
+        } else if (job.error_message.includes("not configured")) {
+          errorMsg = "Serviço de geração indisponível.";
+        } else if (job.error_message.length < 50) {
+          errorMsg = job.error_message;
+        }
+      }
+      setNotificationMessage(`✗ ${errorMsg}`);
+      setNotificationType("error");
+      setShowNotification(true);
+      setIsExpanded(true); // Auto-expand to show error details
+      setTimeout(() => setShowNotification(false), 5000);
+    });
+
+    return unsubFailed;
+  }, [onJobFailed]);
+
   // Don't render if nothing to show
-  const hasContent = pendingJobs.length > 0 || recentlyCompleted.length > 0;
+  const hasContent = pendingJobs.length > 0 || recentlyCompleted.length > 0 || recentlyFailed.length > 0;
+  const hasErrors = recentlyFailed.length > 0;
 
   if (!hasContent) {
     return null;
@@ -132,8 +170,14 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
     <div className={`fixed bottom-4 sm:bottom-6 z-40 transition-all duration-300 ${isAssistantOpen ? "right-[400px] sm:right-[420px]" : "right-16 sm:right-20"}`}>
       {/* Notification Toast */}
       {showNotification && (
-        <div className="absolute bottom-full right-0 mb-2 px-4 py-2 bg-black/90 backdrop-blur-md rounded-lg border border-white/10 shadow-xl animate-fade-in-up">
-          <p className="text-xs font-bold text-white whitespace-nowrap">
+        <div className={`absolute bottom-full right-0 mb-2 px-4 py-2 backdrop-blur-md rounded-lg border shadow-xl animate-fade-in-up ${
+          notificationType === "error"
+            ? "bg-red-900/90 border-red-500/30"
+            : "bg-black/90 border-white/10"
+        }`}>
+          <p className={`text-xs font-bold whitespace-nowrap ${
+            notificationType === "error" ? "text-red-200" : "text-white"
+          }`}>
             {notificationMessage}
           </p>
         </div>
@@ -227,6 +271,69 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
                 </div>
               )}
 
+              {/* Recently Failed */}
+              {recentlyFailed.length > 0 && (
+                <div className="p-2 border-t border-red-500/20 bg-red-950/20">
+                  <div className="flex items-center justify-between px-2 mb-1.5">
+                    <p className="text-[9px] font-medium text-red-400">
+                      Falhas ({recentlyFailed.length})
+                    </p>
+                    <button
+                      onClick={() => {
+                        const ids = new Set(dismissedFailedRef.current);
+                        recentlyFailed.forEach((job) => ids.add(job.id));
+                        failedJobs.forEach((job) => ids.add(job.id));
+                        dismissedFailedRef.current = ids;
+                        if (typeof window !== "undefined") {
+                          try {
+                            localStorage.setItem(
+                              dismissedStorageKey,
+                              JSON.stringify({
+                                completed: Array.from(dismissedCompletedRef.current),
+                                failed: Array.from(ids),
+                              }),
+                            );
+                          } catch (error) {
+                            console.warn(
+                              "[BackgroundJobs] Failed to persist dismissed jobs:",
+                              error,
+                            );
+                          }
+                        }
+                        setRecentlyFailed([]);
+                      }}
+                      className="text-[9px] font-medium text-red-400/60 hover:text-red-300 transition-colors"
+                    >
+                      Limpar
+                    </button>
+                  </div>
+                  {recentlyFailed.map((job) => (
+                    <div
+                      key={job.id}
+                      className="px-2.5 py-2 rounded-lg bg-red-950/30 border border-red-500/20 mb-1.5"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Icon name="alert-circle" className="w-3 h-3 text-red-400 flex-shrink-0" />
+                        <span className="text-[10px] text-red-300 flex-1 truncate">
+                          {getJobTypeLabel(job.job_type)}
+                        </span>
+                      </div>
+                      {job.error_message && (
+                        <p className="mt-1 text-[9px] text-red-400/80 line-clamp-2">
+                          {job.error_message.includes("quota") || job.error_message.includes("429")
+                            ? "Limite de API excedido. Tente novamente mais tarde."
+                            : job.error_message.includes("not configured")
+                            ? "Serviço de geração indisponível. Verifique as configurações."
+                            : job.error_message.length > 80
+                            ? job.error_message.substring(0, 80) + "..."
+                            : job.error_message}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Recently Completed */}
               {recentlyCompleted.length > 0 && (
                 <div className="p-2 border-t border-white/[0.08]">
@@ -244,7 +351,10 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
                           try {
                             localStorage.setItem(
                               dismissedStorageKey,
-                              JSON.stringify(Array.from(ids)),
+                              JSON.stringify({
+                                completed: Array.from(ids),
+                                failed: Array.from(dismissedFailedRef.current),
+                              }),
                             );
                           } catch (error) {
                             console.warn(
@@ -284,7 +394,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
                 </div>
               )}
 
-              {pendingJobs.length === 0 && recentlyCompleted.length === 0 && (
+              {pendingJobs.length === 0 && recentlyCompleted.length === 0 && recentlyFailed.length === 0 && (
                 <p className="px-4 py-6 text-center text-[10px] text-white/30">
                   Nenhum job ativo
                 </p>
@@ -296,15 +406,25 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
         {/* Floating Button */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/90 backdrop-blur-sm border border-white/20 shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-105 hover:bg-white active:scale-95"
+          className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full backdrop-blur-sm border shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 ${
+            hasErrors
+              ? "bg-red-500/90 border-red-400/50 hover:bg-red-500"
+              : "bg-white/90 border-white/20 hover:bg-white"
+          }`}
         >
           {pendingJobs.length > 0 ? (
             <div className="relative">
-              <div className="w-2 h-2 border-2 border-black border-t-transparent rounded-full animate-spin" />
-              <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 bg-black text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+              <div className={`w-2 h-2 border-2 border-t-transparent rounded-full animate-spin ${
+                hasErrors ? "border-white" : "border-black"
+              }`} />
+              <span className={`absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 text-[9px] font-bold rounded-full flex items-center justify-center ${
+                hasErrors ? "bg-white text-red-600" : "bg-black text-white"
+              }`}>
                 {pendingJobs.length}
               </span>
             </div>
+          ) : hasErrors ? (
+            <Icon name="alert-circle" className="w-5 h-5 text-white" />
           ) : (
             <Icon name="check" className="w-5 h-5 text-black" />
           )}
