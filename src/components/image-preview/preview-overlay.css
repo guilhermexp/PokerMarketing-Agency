@@ -221,14 +221,17 @@
   pointer-events: auto;
 }
 
-/* Quando painel aberto: viewer reduz no desktop */
+/* Quando painel aberto: viewer reduz no desktop mantendo centralização */
 @media (min-width: 768px) {
   .preview-content.panel-open .image-viewer-canvas {
-    margin-right: 420px; /* Largura do painel */
+    width: calc(100% - 420px); /* Largura disponível menos o painel */
+    margin-right: 0;
   }
 
   .preview-content.panel-open > div[class*="relative flex-1"] {
-    margin-right: 420px; /* Largura do painel */
+    width: calc(100% - 420px); /* Largura disponível menos o painel */
+    margin-right: 0;
+    flex: none; /* Desabilita flex-grow para respeitar a largura fixa */
   }
 }
 

@@ -259,16 +259,6 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Stats
-  const stats = React.useMemo(() => {
-    const total = images.length;
-    const favorites = styleReferences.length;
-    const videos = images.filter(img =>
-      img.mediaType === "video" || img.src?.endsWith(".mp4") || img.source?.startsWith("Video-") || img.source === "Video Final"
-    ).length;
-    return { total, favorites, videos };
-  }, [images, styleReferences]);
-
   const handleImageUpdate = (newSrc: string) => {
     if (selectedImage) {
       onUpdateImage(selectedImage.id, newSrc);
@@ -298,6 +288,11 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   // Get the favorite reference for an image
   const getFavoriteRef = (image: GalleryImage) => {
     return styleReferences.find((ref) => ref.src === image.src);
+  };
+
+  // Check if gallery item is a flyer
+  const isFlyer = (image: GalleryImage) => {
+    return image.source?.startsWith("Flyer");
   };
 
   // Check if gallery item is a video
@@ -354,7 +349,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   // Deduplicate images by src URL (keep the first/newest occurrence)
   const deduplicatedImages = React.useMemo(() => {
     const seen = new Set<string>();
-    return images.filter((img) => {
+    return images.filter((img) => !isFlyer(img)).filter((img) => {
       // Use src as the dedup key
       const key = img.src;
       if (seen.has(key)) {
@@ -364,6 +359,19 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       return true;
     });
   }, [images]);
+
+  // Stats
+  const stats = React.useMemo(() => {
+    const total = deduplicatedImages.length;
+    const favorites = styleReferences.length;
+    const videos = deduplicatedImages.filter((img) =>
+      img.mediaType === "video" ||
+      img.src?.endsWith(".mp4") ||
+      img.source?.startsWith("Video-") ||
+      img.source === "Video Final"
+    ).length;
+    return { total, favorites, videos };
+  }, [deduplicatedImages, styleReferences]);
 
   // Apply source filter
   const filteredImages = React.useMemo(() => {
@@ -478,11 +486,6 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                   <h1 className="text-3xl font-semibold text-white tracking-tight">
                     {viewMode === "gallery" ? "Galeria" : "Favoritos"}
                   </h1>
-                  <p className="text-sm text-white/50 mt-1">
-                    {viewMode === "gallery"
-                      ? "Todas as suas imagens e vídeos gerados"
-                      : "Imagens salvas como referência de estilo"}
-                  </p>
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
