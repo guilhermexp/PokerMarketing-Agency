@@ -26,3 +26,6 @@ dev-dist
 *.sw?
 .env
 .vercel
+
+# Auto Claude data directory
+.auto-claude/

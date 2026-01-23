@@ -1,0 +1,25 @@
+{
+  "active": true,
+  "spec": "004-super-admin-emails-exposed-to-client-side-code",
+  "state": "building",
+  "subtasks": {
+    "completed": 5,
+    "total": 7,
+    "in_progress": 1,
+    "failed": 0
+  },
+  "phase": {
+    "current": "Configuration Cleanup",
+    "id": null,
+    "total": 2
+  },
+  "workers": {
+    "active": 0,
+    "max": 1
+  },
+  "session": {
+    "number": 7,
+    "started_at": "2026-01-23T01:08:48.244227"
+  },
+  "last_update": "2026-01-23T01:21:55.198566"
+}
