@@ -6654,7 +6654,38 @@ const startup = async () => {
         const hasStyleReference = !!styleReferenceImage;
         const hasPersonReference = !!personReferenceImage;
         const hasProducts = productImages?.length > 0;
-        const hasLogo = !!brandProfile?.logo;
+
+        // Process logo from brandProfile (same as normal endpoint)
+        let allProductImages = [...(productImages || [])];
+        if (brandProfile?.logo && brandProfile.logo.startsWith('http')) {
+          try {
+            const logoBase64 = await urlToBase64(brandProfile.logo);
+            if (logoBase64) {
+              const mimeType = brandProfile.logo.includes('.svg') ? 'image/svg+xml'
+                : brandProfile.logo.includes('.jpg') || brandProfile.logo.includes('.jpeg') ? 'image/jpeg'
+                : 'image/png';
+              allProductImages.unshift({ base64: logoBase64, mimeType });
+              console.log(`[ImageWorker] Job ${jobId}: Logo converted to base64`);
+            }
+          } catch (logoError) {
+            console.error(`[ImageWorker] Job ${jobId}: Failed to convert logo:`, logoError.message);
+          }
+        }
+        const hasLogo = !!brandProfile?.logo && allProductImages.length > 0;
+
+        // Convert prompt to structured JSON (same as normal endpoint)
+        let jsonPrompt = null;
+        try {
+          jsonPrompt = await convertImagePromptToJson(
+            prompt,
+            aspectRatio,
+            config.organizationId,
+            sql,
+          );
+          console.log(`[ImageWorker] Job ${jobId}: Prompt converted to JSON`);
+        } catch (jsonError) {
+          console.warn(`[ImageWorker] Job ${jobId}: Failed to convert prompt to JSON:`, jsonError.message);
+        }
 
         const fullPrompt = buildImagePrompt(
           prompt,
@@ -6663,7 +6694,7 @@ const startup = async () => {
           hasLogo,
           hasPersonReference,
           hasProducts,
-          prompt, // jsonPrompt same as prompt for now
+          jsonPrompt,
         );
 
         await job.updateProgress(20);
@@ -6676,7 +6707,7 @@ const startup = async () => {
           aspectRatio,
           DEFAULT_IMAGE_MODEL,
           imageSize,
-          productImages?.length > 0 ? productImages : undefined,
+          allProductImages.length > 0 ? allProductImages : undefined,
           styleReferenceImage,
           personReferenceImage,
         );
