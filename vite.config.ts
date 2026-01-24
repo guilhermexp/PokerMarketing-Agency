@@ -104,12 +104,70 @@ export default defineConfig(({ mode }) => {
           clientsClaim: true,
           // Clean old caches on update
           cleanupOutdatedCaches: true,
-          // Add cache busting - use revision based on build time
-          additionalManifestEntries: [],
           // Allow larger files to be cached (default is 2MB)
           maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10MB
-          // Don't restrict navigation fallback - allow all routes
-          runtimeCaching: [],
+          // Runtime caching strategies for better cache invalidation
+          runtimeCaching: [
+            {
+              // Network-first for HTML - always try to get fresh version
+              urlPattern: /^https:\/\/.*\/$/,
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "html-cache",
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60, // 1 hour
+                },
+                networkTimeoutSeconds: 3,
+              },
+            },
+            {
+              // Network-first for index.html specifically
+              urlPattern: /\/index\.html$/,
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "html-cache",
+                networkTimeoutSeconds: 3,
+              },
+            },
+            {
+              // Stale-while-revalidate for JS/CSS assets
+              urlPattern: /\.(?:js|css)$/,
+              handler: "StaleWhileRevalidate",
+              options: {
+                cacheName: "assets-cache",
+                expiration: {
+                  maxEntries: 100,
+                  maxAgeSeconds: 60 * 60 * 24 * 7, // 1 week
+                },
+              },
+            },
+            {
+              // Cache-first for images (they rarely change)
+              urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/,
+              handler: "CacheFirst",
+              options: {
+                cacheName: "images-cache",
+                expiration: {
+                  maxEntries: 100,
+                  maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                },
+              },
+            },
+            {
+              // Network-first for API calls
+              urlPattern: /\/api\//,
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "api-cache",
+                expiration: {
+                  maxEntries: 50,
+                  maxAgeSeconds: 60 * 5, // 5 minutes
+                },
+                networkTimeoutSeconds: 5,
+              },
+            },
+          ],
         },
         devOptions: {
           enabled: false, // Disable service worker in dev to avoid caching issues

@@ -25,24 +25,50 @@ root.render(
   </React.StrictMode>,
 );
 
+// Clear old caches on startup to prevent stale versions
+async function clearOldCaches() {
+  if ('caches' in window) {
+    const cacheNames = await caches.keys();
+    const oldCaches = cacheNames.filter(name =>
+      name.startsWith('workbox-') ||
+      name.includes('precache')
+    );
+    await Promise.all(oldCaches.map(name => caches.delete(name)));
+    if (oldCaches.length > 0) {
+      console.debug('[PWA] Caches antigos removidos:', oldCaches);
+    }
+  }
+}
+
 // Register service worker with auto-update
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    // Auto-reload when new version is available
     console.debug('[PWA] Nova versão disponível, recarregando...');
-    updateSW(true);
+    // Clear caches before updating
+    clearOldCaches().then(() => {
+      updateSW(true);
+      // Force hard reload to bypass any remaining cache
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+    });
   },
   onOfflineReady() {
     console.debug('[PWA] App pronto para uso offline');
   },
   onRegistered(registration) {
     console.debug('[PWA] Service Worker registrado');
-    // Check for updates every 5 minutes
+    // Check for updates every 1 minute for faster detection
     if (registration) {
       setInterval(() => {
         registration.update();
-      }, 5 * 60 * 1000);
+      }, 60 * 1000); // 1 minute
     }
+  },
+  onRegisterError(error) {
+    console.error('[PWA] Erro ao registrar Service Worker:', error);
+    // Clear caches on error to prevent stuck state
+    clearOldCaches();
   },
 });
