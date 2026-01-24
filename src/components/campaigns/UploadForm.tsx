@@ -517,7 +517,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                       {isGenerating ? (
                         <div className="w-4 sm:w-5 h-4 sm:h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <Icon name="arrow-up" className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <Icon name="send" className="w-4 h-4 sm:w-5 sm:h-5" />
                       )}
                     </button>
                   </div>
