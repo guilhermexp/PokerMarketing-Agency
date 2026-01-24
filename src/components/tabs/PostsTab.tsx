@@ -500,6 +500,28 @@ export const PostsTab: React.FC<PostsTabProps> = ({
     // Use background job if userId is available AND we're not in dev mode
     if (userId && !isDevMode) {
       try {
+        // Build product images array for the job
+        const jobProductImages: string[] = [];
+
+        // Add chat reference image (priority) or reference image
+        if (chatReferenceImage?.src) {
+          jobProductImages.push(chatReferenceImage.src);
+        } else if (referenceImage) {
+          jobProductImages.push(`data:${referenceImage.mimeType};base64,${referenceImage.base64}`);
+        }
+
+        // Add style reference if selected
+        if (selectedStyleReference?.src) {
+          jobProductImages.push(selectedStyleReference.src);
+        }
+
+        // Add composition assets
+        if (compositionAssets?.length) {
+          compositionAssets.forEach(asset => {
+            jobProductImages.push(`data:${asset.mimeType};base64,${asset.base64}`);
+          });
+        }
+
         const config: GenerationJobConfig = {
           brandName: brandProfile.name,
           brandDescription: brandProfile.description,
@@ -510,6 +532,8 @@ export const PostsTab: React.FC<PostsTabProps> = ({
           model: selectedImageModel,
           logo: brandProfile.logo || undefined,
           source: "Post",
+          productImages: jobProductImages.length > 0 ? jobProductImages : undefined,
+          styleReference: selectedStyleReference?.src || undefined,
         };
 
         await queueJob(

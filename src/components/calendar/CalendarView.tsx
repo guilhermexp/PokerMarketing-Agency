@@ -40,7 +40,8 @@ const monthNames = [
   "Dezembro",
 ];
 
-const dayNames = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const dayNames = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
+const dayNamesShort = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
   scheduledPosts,
@@ -63,6 +64,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [pendingPosts, setPendingPosts] = useState<ScheduledPost[]>([]);
   const [dayViewDialogOpen, setDayViewDialogOpen] = useState(false);
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
+  const [showTodayView, setShowTodayView] = useState(false);
 
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
@@ -116,7 +118,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return { scheduled, published, failed, total: scheduledPosts.length };
   }, [scheduledPosts]);
 
-  // Generate month calendar
+  // Generate month calendar (filtered to show only current week and forward)
   const monthCalendar = useMemo(() => {
     const year = currentYear;
     const month = currentMonth;
@@ -124,29 +126,54 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
 
-    let startDay = firstDay.getDay();
+    // Adjust for Monday as first day of week (getDay: 0=Sun, 1=Mon... → we want: 0=Mon, 6=Sun)
+    const startDay = (firstDay.getDay() + 6) % 7;
 
-    const calendar: { date: number | null; dateStr: string | null; posts: ScheduledPost[] }[] = [];
+    const fullCalendar: { date: number | null; dateStr: string | null; posts: ScheduledPost[] }[] = [];
 
     // Empty cells before first day
     for (let i = 0; i < startDay; i++) {
-      calendar.push({ date: null, dateStr: null, posts: [] });
+      fullCalendar.push({ date: null, dateStr: null, posts: [] });
     }
 
     // Days of month
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const dayPosts = scheduledPosts.filter((post) => post.scheduledDate === dateStr);
-      calendar.push({ date: day, dateStr, posts: dayPosts });
+      fullCalendar.push({ date: day, dateStr, posts: dayPosts });
     }
 
     // Fill remaining cells
-    const remainingCells = (7 - (calendar.length % 7)) % 7;
+    const remainingCells = (7 - (fullCalendar.length % 7)) % 7;
     for (let i = 0; i < remainingCells; i++) {
-      calendar.push({ date: null, dateStr: null, posts: [] });
+      fullCalendar.push({ date: null, dateStr: null, posts: [] });
     }
 
-    return calendar;
+    // Calculate start of current week (Monday)
+    const today = new Date();
+    const todayDayOfWeek = (today.getDay() + 6) % 7; // Monday = 0, Sunday = 6
+    const currentWeekMonday = new Date(today);
+    currentWeekMonday.setDate(today.getDate() - todayDayOfWeek);
+    currentWeekMonday.setHours(0, 0, 0, 0);
+
+    // Split calendar into weeks and filter out past weeks
+    const weeks: typeof fullCalendar[] = [];
+    for (let i = 0; i < fullCalendar.length; i += 7) {
+      weeks.push(fullCalendar.slice(i, i + 7));
+    }
+
+    // Filter weeks: keep only weeks that contain today or future dates
+    const filteredWeeks = weeks.filter((week) => {
+      // Check if any day in this week is today or in the future
+      return week.some((day) => {
+        if (!day.date) return false;
+        const dayDate = new Date(year, month, day.date);
+        dayDate.setHours(0, 0, 0, 0);
+        return dayDate >= currentWeekMonday;
+      });
+    });
+
+    return filteredWeeks.flat();
   }, [currentMonth, currentYear, scheduledPosts]);
 
   const isToday = (date: number | null) => {
@@ -158,6 +185,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       currentYear === today.getFullYear()
     );
   };
+
 
   // Notification system
   useEffect(() => {
@@ -221,81 +249,82 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     <div className="min-h-screen flex flex-col">
       {/* Sticky Header */}
       <header className="sticky top-0 bg-black border-b border-white/10 z-50">
-        <div className="px-6 py-4">
-          <div className="flex flex-col gap-4">
-            {/* Row 1: Title */}
-            <div className="flex items-start justify-between">
+        <div className="px-4 md:px-6 py-3 md:py-4">
+          <div className="flex flex-col gap-3 md:gap-4">
+            {/* Row 1: Title + Add Button (mobile) */}
+            <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-semibold text-white tracking-tight">Agenda de Publicações</h1>
-                <p className="text-sm text-white/50 mt-1">Gerencie seus posts agendados</p>
+                <h1 className="text-xl md:text-3xl font-semibold text-white tracking-tight">Agenda</h1>
+                <p className="text-xs md:text-sm text-white/50 mt-0.5 md:mt-1 hidden md:block">Gerencie seus posts agendados</p>
               </div>
+              {/* Add button - always visible */}
+              <button
+                onClick={() => {
+                  setSelectedDate(null);
+                  setIsScheduleModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-3 md:px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs md:text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              >
+                <Icon name="plus" className="w-4 h-4" />
+                <span className="hidden sm:inline">Agendar Post</span>
+              </button>
             </div>
 
-            {/* Row 2: Controls */}
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-4">
+            {/* Row 2: Month Navigation + Stats */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1 md:gap-2">
                 <button
                   onClick={goToPreviousMonth}
-                  className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  className="p-1.5 md:p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                 >
                   <Icon name="chevron-left" className="w-4 h-4" />
                 </button>
                 <button
                   onClick={goToNextMonth}
-                  className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  className="p-1.5 md:p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                 >
                   <Icon name="chevron-right" className="w-4 h-4" />
                 </button>
-                <h3 className="text-sm font-medium text-white/70">
+                <h3 className="text-xs md:text-sm font-medium text-white/70 ml-1">
                   {monthNames[currentMonth]} {currentYear}
                 </h3>
-
                 <button
-                  onClick={goToToday}
-                  className="px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-lg text-xs font-medium text-white/60 hover:text-white hover:border-white/30 transition-all"
+                  onClick={() => {
+                    goToToday();
+                    setShowTodayView(true);
+                  }}
+                  className="px-2 md:px-3 py-1 md:py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-lg text-[10px] md:text-xs font-medium text-white/60 hover:text-white hover:border-white/30 transition-all ml-1"
                 >
                   Hoje
                 </button>
               </div>
 
-              <div className="flex items-center gap-4">
-                {/* Stats */}
-                <div className="flex items-center gap-3 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-amber-500" />
-                    <span className="text-[10px] font-medium text-white/60">
-                      {stats.scheduled} agendados
-                    </span>
-                  </div>
-                  <div className="h-3 w-px bg-white/10" />
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    <span className="text-[10px] font-medium text-white/60">
-                      {stats.published} publicados
-                    </span>
-                  </div>
+              {/* Stats - hidden on small mobile */}
+              <div className="hidden sm:flex items-center gap-2 md:gap-3 px-2 md:px-4 py-1.5 md:py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                <div className="flex items-center gap-1 md:gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span className="text-[9px] md:text-[10px] font-medium text-white/60">
+                    {stats.scheduled}
+                  </span>
                 </div>
-
-                <button
-                  onClick={() => {
-                    setSelectedDate(null);
-                    setIsScheduleModalOpen(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
-                >
-                  <Icon name="plus" className="w-4 h-4" />
-                  Agendar Post
-                </button>
+                <div className="h-3 w-px bg-white/10" />
+                <div className="flex items-center gap-1 md:gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-[9px] md:text-[10px] font-medium text-white/60">
+                    {stats.published}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Day headers */}
-          <div className="flex mt-4">
+          <div className="flex mt-3 md:mt-4">
             <div className="flex-1 grid grid-cols-7">
-              {dayNames.map((day) => (
-                <div key={day} className="p-2 text-center font-medium text-sm text-white/40">
-                  {day}
+              {dayNamesShort.map((day, idx) => (
+                <div key={day} className="p-1 md:p-2 text-center font-medium text-[10px] md:text-sm text-white/40">
+                  <span className="md:hidden">{day}</span>
+                  <span className="hidden md:inline">{dayNames[idx]}</span>
                 </div>
               ))}
             </div>
@@ -305,22 +334,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
       {/* Notification Banner */}
       {showNotificationBanner && pendingPosts.length > 0 && (
-        <div className="px-6 py-3 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Icon name="bell" className="w-4 h-4 text-amber-400" />
-            <p className="text-xs font-semibold text-amber-400">
-              {pendingPosts.length} post{pendingPosts.length > 1 ? "s" : ""} pendente
-              {pendingPosts.length > 1 ? "s" : ""}
+        <div className="px-3 md:px-6 py-2 md:py-3 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0">
+            <Icon name="bell" className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <p className="text-[10px] md:text-xs font-semibold text-amber-400 truncate">
+              {pendingPosts.length} pendente{pendingPosts.length > 1 ? "s" : ""}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {isRubeConfigured() && (
               <button
                 onClick={handlePublishAll}
-                className="flex items-center gap-2 px-3 py-1.5 bg-black/40 border border-white/10 rounded-full text-xs font-medium text-white/90 hover:border-white/30 transition-all"
+                className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 bg-black/40 border border-white/10 rounded-full text-[10px] md:text-xs font-medium text-white/90 hover:border-white/30 transition-all"
               >
                 <Icon name="send" className="w-3 h-3" />
-                Publicar Todos
+                <span className="hidden sm:inline">Publicar</span>
               </button>
             )}
             <button
@@ -334,15 +362,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       )}
 
       {/* Calendar Grid */}
-      <main className="flex-1 px-6 py-6">
-        <div className="grid grid-cols-7 gap-px bg-white/5 border border-white/10 rounded-lg overflow-hidden">
+      <main className="flex-1 px-2 md:px-6 py-3 md:py-6 flex flex-col">
+        <div className="grid grid-cols-7 gap-px bg-white/5 border border-white/10 rounded-lg overflow-hidden flex-1">
           {monthCalendar.map((day, index) => (
             <div
               key={index}
-              onClick={() => day.dateStr && day.posts.length === 0 && handleDayClick(day.dateStr)}
-              className={`bg-black min-h-[140px] p-3 transition-all hover:bg-black/80 ${
-                day.date && day.posts.length === 0 ? "cursor-pointer" : ""
-              } ${isToday(day.date) ? "ring-2 ring-inset ring-primary" : ""}`}
+              onClick={() => day.dateStr && handleDayClick(day.dateStr)}
+              className={`bg-black min-h-[80px] sm:min-h-[100px] md:min-h-[140px] p-1.5 sm:p-2 md:p-3 transition-all flex flex-col ${
+                day.date ? "cursor-pointer hover:bg-black/80" : ""
+              }`}
             >
               {day.date && (
                 <>
@@ -353,13 +381,33 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         handleDayViewClick(day.dateStr);
                       }
                     }}
-                    className={`mb-3 font-light text-7xl ${
-                      isToday(day.date) ? "text-primary" : "text-white/80"
-                    } ${day.posts.length > 0 ? "cursor-pointer hover:text-white transition-colors" : ""}`}
+                    className={`mb-1 md:mb-3 font-light text-xl sm:text-3xl md:text-7xl text-white/80 ${
+                      day.posts.length > 0 ? "cursor-pointer hover:text-white transition-colors" : ""
+                    }`}
                   >
                     {day.date}
                   </h3>
-                  <div className="space-y-2">
+                  {/* Mobile: show dots for posts */}
+                  <div className="md:hidden flex flex-wrap gap-1">
+                    {day.posts.slice(0, 4).map((post) => (
+                      <div
+                        key={post.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePostClick(post);
+                        }}
+                        className={`w-2.5 h-2.5 sm:w-2 sm:h-2 rounded-full cursor-pointer ${
+                          post.status === "published" ? "bg-green-500" :
+                          post.status === "failed" ? "bg-red-500" : "bg-primary"
+                        }`}
+                      />
+                    ))}
+                    {day.posts.length > 4 && (
+                      <span className="text-[8px] text-white/40">+{day.posts.length - 4}</span>
+                    )}
+                  </div>
+                  {/* Desktop: show post cards */}
+                  <div className="hidden md:block space-y-2">
                     {day.posts.slice(0, 3).map((post) => (
                       <div
                         key={post.id}
@@ -720,6 +768,212 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Today View Modal - Shows all posts for today */}
+      {showTodayView && (() => {
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        const todayPosts = scheduledPosts.filter((post) => post.scheduledDate === todayStr);
+
+        return (
+          <div
+            className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+            onClick={() => setShowTodayView(false)}
+          >
+            <div
+              className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-white/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 flex flex-col items-center justify-center">
+                      <span className="text-xl font-light text-white">
+                        {today.getDate()}
+                      </span>
+                      <span className="text-[9px] text-white/40 uppercase">
+                        {today.toLocaleDateString("pt-BR", { month: "short" })}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-white capitalize">
+                        Hoje - {today.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
+                      </h3>
+                      <p className="text-xs text-white/50 mt-0.5">
+                        {todayPosts.length} posts agendados
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowTodayView(false)}
+                    className="p-2 text-white/40 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+                  >
+                    <Icon name="x" className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Content */}
+              <div className="px-5 py-4 overflow-y-auto max-h-[65vh]">
+                {todayPosts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
+                      <Icon name="calendar" className="w-6 h-6 text-white/20" />
+                    </div>
+                    <p className="text-sm font-medium text-white/40">Nenhum agendamento para hoje</p>
+                    <p className="text-xs text-white/20 mt-1">Agende novos posts usando o botão abaixo</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {todayPosts
+                      .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime))
+                      .map((post) => {
+                        const contentType = post.instagramContentType;
+                        const typeLabel =
+                          contentType === "story"
+                            ? "Story"
+                            : contentType === "carousel"
+                              ? "Carousel"
+                              : contentType === "reel"
+                                ? "Reel"
+                                : null;
+
+                        return (
+                          <div
+                            key={post.id}
+                            className="group flex items-center gap-4 p-3 rounded-xl bg-black/20 border border-white/10 hover:bg-black/30 hover:border-white/20 transition-all"
+                          >
+                            {/* Thumbnail */}
+                            <div
+                              onClick={() => {
+                                setShowTodayView(false);
+                                handlePostClick(post);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              {post.imageUrl ? (
+                                <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-black/40 border border-white/10 hover:border-white/30 transition-colors">
+                                  <img
+                                    src={post.imageUrl}
+                                    alt=""
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-20 h-20 rounded-lg bg-black/40 flex items-center justify-center flex-shrink-0 border border-white/10 hover:border-white/30 transition-colors">
+                                  <Icon name="image" className="w-6 h-6 text-white/20" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className="text-sm font-semibold text-white">
+                                  {post.scheduledTime}
+                                </span>
+                                {typeLabel && (
+                                  <span className="text-[9px] font-medium text-white/50 px-2 py-0.5 bg-black/40 border border-white/10 rounded-full">
+                                    {typeLabel}
+                                  </span>
+                                )}
+                                {post.status === "published" && (
+                                  <span className="text-[9px] font-medium text-white/60 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
+                                    Publicado
+                                  </span>
+                                )}
+                                {post.status === "failed" && (
+                                  <span className="text-[9px] font-medium text-white/60 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
+                                    Falhou
+                                  </span>
+                                )}
+                                {post.status === "scheduled" && (
+                                  <span className="text-[9px] font-medium text-white/60 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
+                                    Agendado
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-white/50 line-clamp-2">
+                                {post.caption || "Sem legenda"}
+                              </p>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {post.status === "scheduled" && (
+                                <>
+                                  {onPublishToInstagram && (
+                                    <button
+                                      onClick={() => {
+                                        onPublishToInstagram(post);
+                                        setShowTodayView(false);
+                                      }}
+                                      className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                      title="Publicar agora"
+                                    >
+                                      <Icon name="send" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      setSelectedPostForEdit(post);
+                                      setSelectedDate(post.scheduledDate);
+                                      setSelectedTime(post.scheduledTime);
+                                      setShowTodayView(false);
+                                      setIsScheduleModalOpen(true);
+                                    }}
+                                    className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                    title="Editar"
+                                  >
+                                    <Icon name="edit" className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      onUpdateScheduledPost(post.id, {
+                                        status: "published",
+                                        publishedAt: Date.now(),
+                                      });
+                                    }}
+                                    className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                    title="Marcar como publicado"
+                                  >
+                                    <Icon name="check" className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                onClick={() => onDeleteScheduledPost(post.id)}
+                                className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                title="Excluir"
+                              >
+                                <Icon name="trash" className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-5 pb-4 pt-3 border-t border-white/10">
+                <button
+                  onClick={() => {
+                    setShowTodayView(false);
+                    handleDayClick(todayStr);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white/90 bg-black/40 backdrop-blur-2xl border border-white/10 hover:border-white/30 rounded-full transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                >
+                  <Icon name="plus" className="w-4 h-4" />
+                  Novo Agendamento
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Schedule Modal */}
       {isScheduleModalOpen && (

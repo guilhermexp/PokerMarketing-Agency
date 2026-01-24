@@ -491,19 +491,25 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 <div className="flex flex-col items-end gap-2">
                   {/* Stats */}
                   <div className="flex items-center gap-3 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-                    <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setViewMode("gallery")}
+                      className="flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors"
+                    >
                       <div className="w-2 h-2 rounded-full bg-white/40" />
                       <span className="text-[10px] font-medium text-white/60">
                         {stats.total} itens
                       </span>
-                    </div>
+                    </button>
                     <div className="h-3 w-px bg-white/10" />
-                    <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setViewMode("references")}
+                      className="flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors"
+                    >
                       <div className="w-2 h-2 rounded-full bg-primary" />
                       <span className="text-[10px] font-medium text-white/60">
                         {stats.favorites} favoritos
                       </span>
-                    </div>
+                    </button>
                     {stats.videos > 0 && (
                       <>
                         <div className="h-3 w-px bg-white/10" />
@@ -517,51 +523,31 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     )}
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2">
-                    {viewMode === "references" && (
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
-                      >
-                        <Icon name="upload" className="w-4 h-4" />
-                        Adicionar
-                      </button>
-                    )}
+                  {/* Add button - only show in references mode */}
+                  {viewMode === "references" && (
                     <button
-                      onClick={() =>
-                        setViewMode(viewMode === "gallery" ? "references" : "gallery")
-                      }
-                      className={`flex items-center gap-2 px-4 py-2 backdrop-blur-2xl border rounded-full text-sm font-medium transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${
-                        viewMode === "references"
-                          ? "bg-primary/10 text-primary border-primary/30"
-                          : "bg-black/40 text-white/90 border-white/10 hover:border-white/30"
-                      }`}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
                     >
-                      <Icon
-                        name={viewMode === "gallery" ? "heart" : "layout"}
-                        className="w-4 h-4"
-                      />
-                      {viewMode === "gallery" ? "Favoritos" : "Galeria"}
+                      <Icon name="upload" className="w-4 h-4" />
+                      Adicionar
                     </button>
-                  </div>
+                  )}
                 </div>
               </div>
 
               {/* Source Filter Tabs - only show in gallery mode */}
               {viewMode === "gallery" && deduplicatedImages.length > 0 && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                  {SOURCE_FILTERS.map((filter) => {
+                  {SOURCE_FILTERS.filter((f) => f.value !== "all").map((filter) => {
                     const count =
-                      filter.value === "all"
-                        ? deduplicatedImages.length
-                        : filter.value === "video"
-                          ? deduplicatedImages.filter((img) => isVideo(img)).length
-                          : deduplicatedImages.filter((img) =>
-                            filter.sources.some((source) => img.source === source),
-                          ).length;
+                      filter.value === "video"
+                        ? deduplicatedImages.filter((img) => isVideo(img)).length
+                        : deduplicatedImages.filter((img) =>
+                          filter.sources.some((source) => img.source === source),
+                        ).length;
 
-                    if (filter.value !== "all" && count === 0) return null;
+                    if (count === 0) return null;
 
                     return (
                       <button

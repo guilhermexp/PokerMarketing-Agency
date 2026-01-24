@@ -99,7 +99,7 @@ export const LimelightNav = ({
 
       <div
         ref={limelightRef}
-        className={`absolute top-0 z-10 w-10 h-[4px] rounded-full bg-primary ${
+        className={`absolute bottom-0 z-10 w-10 h-[4px] rounded-full bg-white/40 ${
           isReady ? 'transition-[left] duration-300 ease-out' : ''
         } ${limelightClassName || ''}`}
         style={{ left: '-999px' }}

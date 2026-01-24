@@ -72,18 +72,20 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
 
   if (schedules.length === 0) {
     return (
-      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 animate-fade-in-up">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
-          <div>
-            <h1 className="text-3xl font-semibold text-white tracking-tight">
-              Lista de Torneios
-            </h1>
-            <p className="text-sm text-white/50 mt-2">
-              0 semanas salvas
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+      <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col animate-fade-in-up">
+        {/* Header - Top */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-semibold text-white tracking-tight">
+            Lista de Torneios
+          </h1>
+          <p className="text-sm text-white/50 mt-2">
+            0 semanas salvas
+          </p>
+        </div>
+
+        {/* Action Buttons - Centered at bottom */}
+        <div className="flex-1 flex items-end justify-center pb-32">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             {onAddEvent && (
               <button
                 onClick={() => setIsManualModalOpen(true)}
@@ -109,13 +111,6 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
               />
             </label>
           </div>
-        </div>
-
-        {/* Empty State */}
-        <div className="flex items-center justify-center w-full min-h-[60vh]">
-          <p className="text-white/30 text-sm">
-            Nenhuma planilha ainda
-          </p>
         </div>
 
         {/* Manual Event Modal */}

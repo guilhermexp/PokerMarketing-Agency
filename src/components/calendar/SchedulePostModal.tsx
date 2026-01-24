@@ -221,9 +221,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
     // Build campaign list from campaigns data (which has counts and previews)
     // and associate images that have campaign_id
-    const campaignImages = deduplicatedImages.filter(img =>
-      img.campaign_id && (img.source === 'Post' || img.source === 'Anúncio')
-    );
+    const campaignImages = deduplicatedImages.filter(img => img.campaign_id);
 
     // Group images by campaign_id
     const imagesByCampaign = new Map<string, GalleryImage[]>();
@@ -364,24 +362,27 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Image selector modal
-  if (showImageSelector) {
-    return createPortal(
+  // Image selector modal - kept mounted but hidden to preserve image cache
+  const imageSelectorModal = createPortal(
+    <div
+      className={`fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-4 md:p-8 transition-opacity duration-200 ${
+        showImageSelector ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      }`}
+      onClick={() => setShowImageSelector(false)}
+    >
       <div
-        className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-4 md:p-8"
-        onClick={onClose}
+        className={`w-full max-w-5xl max-h-[90vh] bg-[#0a0a0a]/95 rounded-2xl border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl transition-transform duration-200 ${
+          showImageSelector ? 'scale-100' : 'scale-95'
+        }`}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="w-full max-w-5xl max-h-[90vh] bg-[#0a0a0a]/95 rounded-2xl border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl"
-          onClick={(e) => e.stopPropagation()}
-        >
           {/* Header */}
-          <div className="px-6 py-4 border-b border-white/[0.08] flex justify-between items-center shrink-0">
+          <div className="px-6 pt-5 pb-3 flex justify-between items-start shrink-0">
             <div>
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-base font-medium text-white/90">
                 Selecionar Imagem
               </h2>
-              <p className="text-xs text-white/60 mt-1">
+              <p className="text-[11px] text-white/40 mt-0.5">
                 {isCarousel
                   ? `Selecione até 10 imagens (${selectedImages.length}/10)`
                   : 'Selecione uma imagem da galeria'
@@ -390,36 +391,14 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-white/60 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              className="p-1.5 text-white/40 hover:text-white rounded-full hover:bg-white/5 transition-colors"
             >
-              <Icon name="x" className="w-5 h-5" />
+              <Icon name="x" className="w-4 h-4" />
             </button>
           </div>
 
           {/* Gallery */}
           <div className="flex-1 overflow-y-auto flex flex-col">
-            {/* Gallery Filter */}
-            <div className="px-4 pt-3 pb-2 flex gap-2 shrink-0">
-              {[
-                { id: 'all', label: 'Todos' },
-                { id: 'flyers', label: 'Flyers' },
-                { id: 'posts', label: 'Campanhas' },
-                ...(isReel ? [{ id: 'videos', label: 'Vídeos' }] : []),
-              ].map((filter) => (
-                <button
-                  key={filter.id}
-                  onClick={() => setGalleryFilter(filter.id as typeof galleryFilter)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    galleryFilter === filter.id
-                      ? 'bg-white text-black'
-                      : 'text-white/60 hover:text-white bg-[#0a0a0a]/60 border border-white/[0.08] hover:bg-white/10 backdrop-blur-xl'
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-
             <div className="flex-1 overflow-y-auto px-4 pb-4">
             {/* Campaigns Accordion View */}
             {galleryFilter === 'posts' ? (
@@ -443,83 +422,62 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Today's Images Section */}
+                {/* Today's Images Section - Horizontal Carousel */}
                 {todayEligibleImages.length > 0 && (
-                  <div className="bg-primary/[0.03] rounded-lg p-3 border border-primary/10">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
-                      <h3 className="text-[9px] font-bold text-primary/70 uppercase tracking-wide">
-                        Gerados Hoje
-                      </h3>
-                      <span className="text-[8px] text-white/30">
-                        {todayEligibleImages.length} {todayEligibleImages.length === 1 ? 'item' : 'itens'}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {todayEligibleImages.map((image) => {
-                        const selectionIndex = getSelectionIndex(image);
-                        const isSelected = selectionIndex !== -1;
-                        const itemIsVideo = isVideoItem(image);
-                        return (
-                          <div
-                            key={image.id}
-                            onClick={() => handleSelectImage(image)}
-                            className={`group relative overflow-hidden rounded-xl border-2 bg-[#111111] transition-all cursor-pointer ${
-                              isSelected
-                                ? 'border-primary shadow-lg shadow-primary/20'
-                                : 'border-white/5 hover:border-white/20'
-                            }`}
-                          >
-                            {itemIsVideo ? (
-                              <video
-                                src={image.src}
-                                className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                                muted
-                                playsInline
-                                preload="metadata"
-                              />
-                            ) : (
-                              <img
-                                src={image.src}
-                                alt={image.prompt}
-                                className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                              />
-                            )}
+                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                    {todayEligibleImages.map((image) => {
+                      const selectionIndex = getSelectionIndex(image);
+                      const isSelected = selectionIndex !== -1;
+                      const itemIsVideo = isVideoItem(image);
+                      return (
+                        <div
+                          key={image.id}
+                          onClick={() => handleSelectImage(image)}
+                          className={`group relative overflow-hidden rounded-xl border-2 bg-[#111111] transition-all cursor-pointer flex-shrink-0 w-28 h-28 sm:w-36 sm:h-36 ${
+                            isSelected
+                              ? 'border-primary shadow-lg shadow-primary/20'
+                              : 'border-white/5 hover:border-white/20'
+                          }`}
+                        >
+                          {itemIsVideo ? (
+                            <video
+                              src={image.src}
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                              muted
+                              playsInline
+                              preload="metadata"
+                            />
+                          ) : (
+                            <img
+                              src={image.src}
+                              alt={image.prompt}
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                              loading="eager"
+                              decoding="async"
+                            />
+                          )}
 
-                            {/* Overlay */}
-                            <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent transition-all duration-300 flex flex-col justify-end p-2 pointer-events-none ${
-                              isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                            }`}>
-                              <p className="text-white text-[9px] font-bold leading-snug line-clamp-2 mb-1">
-                                {image.prompt || 'Sem descrição'}
-                              </p>
-                              <span className="text-[7px] text-white/80 font-bold bg-white/10 backdrop-blur-sm px-1.5 py-0.5 rounded-full uppercase tracking-wide self-start">
-                                {image.source}
-                              </span>
+                          {/* Video indicator */}
+                          {itemIsVideo && (
+                            <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                              <Icon name="video" className="w-3 h-3 text-white" />
+                              <span className="text-[8px] font-bold text-white uppercase">Vídeo</span>
                             </div>
+                          )}
 
-                            {/* Video indicator */}
-                            {itemIsVideo && (
-                              <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
-                                <Icon name="video" className="w-3 h-3 text-white" />
-                                <span className="text-[8px] font-bold text-white uppercase">Vídeo</span>
-                              </div>
-                            )}
-
-                            {/* Selected indicator */}
-                            {isSelected && (
-                              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                                {isCarousel ? (
-                                  <span className="text-[9px] font-black text-black">{selectionIndex + 1}</span>
-                                ) : (
-                                  <Icon name="check" className="w-3 h-3 text-black" />
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                          {/* Selected indicator */}
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                              {isCarousel ? (
+                                <span className="text-[9px] font-black text-black">{selectionIndex + 1}</span>
+                              ) : (
+                                <Icon name="check" className="w-3 h-3 text-black" />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -564,6 +522,8 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                               src={image.src}
                               alt={image.prompt}
                               className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                              loading="lazy"
+                              decoding="async"
                             />
                           )}
 
@@ -629,10 +589,12 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       </div>,
       document.body
     );
-  }
 
   // Main scheduling modal with 3-column layout
-  return createPortal(
+  return (
+    <>
+      {imageSelectorModal}
+      {createPortal(
     <div
       className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-4"
       onClick={onClose}
@@ -896,5 +858,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       </div>
     </div>,
     document.body
+      )}
+    </>
   );
 };
