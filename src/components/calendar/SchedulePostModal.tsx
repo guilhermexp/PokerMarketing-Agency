@@ -90,6 +90,8 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   const [galleryFilter, setGalleryFilter] = useState<'all' | 'flyers' | 'posts' | 'videos'>('all');
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
   const [showImageSelector, setShowImageSelector] = useState(false);
+  const [olderImagesLimit, setOlderImagesLimit] = useState(12);
+  const [timeFormat, setTimeFormat] = useState<'12h' | '24h'>('24h');
 
   // Calendar state
   const [calendarDate, setCalendarDate] = useState(new Date(initialDate || todayStr));
@@ -112,7 +114,8 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       }
 
       // Show image selector if no initial image
-      setShowImageSelector(!initialImage && !initialCarouselImages);
+      const hasInitialImages = initialImage || (initialCarouselImages && initialCarouselImages.length > 0);
+      setShowImageSelector(!hasInitialImages);
     } else {
       // Reset when modal closes
       setSelectedImages([]);
@@ -120,6 +123,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       setHashtags('');
       setContentType('photo');
       setShowImageSelector(false);
+      setOlderImagesLimit(12);
     }
   }, [isOpen, initialImage, initialCarouselImages, initialCaption]);
 
@@ -198,6 +202,15 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       return true;
     });
   }, [deduplicatedImages, isReel, galleryFilter]);
+
+  // Convert 24h time format to 12h
+  const formatTime12h = (time24h: string) => {
+    const [hours, minutes] = time24h.split(':');
+    const hour = parseInt(hours);
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${String(hour12).padStart(2, '0')}:${minutes}${period}`;
+  };
 
   // Check if image was created today
   const isToday = (dateString?: string) => {
@@ -365,7 +378,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   // Image selector modal - kept mounted but hidden to preserve image cache
   const imageSelectorModal = createPortal(
     <div
-      className={`fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-4 md:p-8 transition-opacity duration-200 ${
+      className={`fixed inset-0 bg-black/90 backdrop-blur-md z-[400] flex items-center justify-center p-4 md:p-8 transition-opacity duration-200 ${
         showImageSelector ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}
       onClick={() => setShowImageSelector(false)}
@@ -424,7 +437,15 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
               <div className="space-y-4">
                 {/* Today's Images Section - Horizontal Carousel */}
                 {todayEligibleImages.length > 0 && (
-                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                  <div>
+                    <div className="flex items-center gap-3 py-1 mb-3">
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                      <span className="text-[8px] text-white/30 font-bold uppercase tracking-wider">
+                        Gerados Hoje
+                      </span>
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                    </div>
+                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                     {todayEligibleImages.map((image) => {
                       const selectionIndex = getSelectionIndex(image);
                       const isSelected = selectionIndex !== -1;
@@ -478,6 +499,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                         </div>
                       );
                     })}
+                    </div>
                   </div>
                 )}
 
@@ -494,8 +516,8 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
                 {/* Older Images Section */}
                 {olderEligibleImages.length > 0 && (
-                  <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
-                    {olderEligibleImages.map((image) => {
+                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+                    {olderEligibleImages.slice(0, olderImagesLimit).map((image) => {
                       const selectionIndex = getSelectionIndex(image);
                       const isSelected = selectionIndex !== -1;
                       const itemIsVideo = isVideoItem(image);
@@ -503,7 +525,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                         <div
                           key={image.id}
                           onClick={() => handleSelectImage(image)}
-                          className={`group relative overflow-hidden rounded-xl border-2 bg-[#111111] transition-all break-inside-avoid mb-3 cursor-pointer ${
+                          className={`group relative overflow-hidden rounded-xl border-2 bg-[#111111] transition-all cursor-pointer aspect-square ${
                             isSelected
                               ? 'border-primary shadow-lg shadow-primary/20'
                               : 'border-white/5 hover:border-white/20'
@@ -512,7 +534,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                           {itemIsVideo ? (
                             <video
                               src={image.src}
-                              className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
                               muted
                               playsInline
                               preload="metadata"
@@ -521,7 +543,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                             <img
                               src={image.src}
                               alt={image.prompt}
-                              className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
                               loading="lazy"
                               decoding="async"
                             />
@@ -562,6 +584,17 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                         </div>
                       );
                     })}
+                  </div>
+                )}
+                {/* Load more button - outside columns for proper centering */}
+                {olderEligibleImages.length > 0 && olderImagesLimit < olderEligibleImages.length && (
+                  <div className="flex items-center justify-center py-6">
+                    <button
+                      onClick={() => setOlderImagesLimit((prev) => prev + 12)}
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-full text-xs font-medium text-white/60 hover:text-white/90 transition-all"
+                    >
+                      Carregar mais ({olderEligibleImages.length - olderImagesLimit} restantes)
+                    </button>
                   </div>
                 )}
               </div>
@@ -636,10 +669,15 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             ) : (
               <button
                 onClick={() => setShowImageSelector(true)}
-                className="flex flex-col items-center gap-3 text-white/40 hover:text-white/60 transition-colors"
+                className="w-full h-full flex flex-col items-center justify-center gap-3 text-white/40 hover:text-white/60 hover:bg-white/5 transition-all cursor-pointer border-2 border-dashed border-white/10 hover:border-white/20"
               >
-                <Icon name="image" className="w-12 h-12" />
-                <span className="text-sm font-medium">Selecionar Imagem</span>
+                <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                  <Icon name="image" className="w-7 h-7" />
+                </div>
+                <div className="text-center">
+                  <span className="text-sm font-medium block">Selecionar Imagem</span>
+                  <span className="text-[10px] text-white/30">Clique para abrir a galeria</span>
+                </div>
               </button>
             )}
           </div>
@@ -795,12 +833,22 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
               <h3 className="text-sm font-semibold text-white">Horário</h3>
               <div className="flex gap-1">
                 <button
-                  className="px-2 py-1 bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] rounded text-[10px] font-medium text-white"
+                  onClick={() => setTimeFormat('12h')}
+                  className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                    timeFormat === '12h'
+                      ? 'bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] text-white'
+                      : 'text-white/40 hover:text-white/60 border border-transparent'
+                  }`}
                 >
                   12h
                 </button>
                 <button
-                  className="px-2 py-1 text-[10px] font-medium text-white/40 hover:text-white/60 transition-colors"
+                  onClick={() => setTimeFormat('24h')}
+                  className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                    timeFormat === '24h'
+                      ? 'bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] text-white'
+                      : 'text-white/40 hover:text-white/60 border border-transparent'
+                  }`}
                 >
                   24h
                 </button>
@@ -834,11 +882,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                         : 'bg-[#0a0a0a]/60 backdrop-blur-xl text-white/70 hover:bg-white/5 hover:text-white border border-white/[0.08] hover:border-white/20'
                   }`}
                 >
-                  {new Date(`2000-01-01T${time}`).toLocaleTimeString('pt-BR', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true
-                  })}
+                  {timeFormat === '12h' ? formatTime12h(time) : time}
                 </button>
               );
             })}
