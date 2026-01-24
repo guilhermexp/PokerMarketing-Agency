@@ -424,7 +424,7 @@ export function CampaignsList({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col min-h-screen">
       {/* CSS Keyframes */}
       <style>{`
         @keyframes fadeSlideIn {
@@ -441,7 +441,7 @@ export function CampaignsList({
 
       {/* Header */}
       <div
-        className="flex justify-between items-start gap-3 mb-2"
+        className="flex justify-between items-start gap-3 mb-6"
         style={{ animation: "fadeSlideIn 0.4s ease-out" }}
       >
         <div>
@@ -471,13 +471,13 @@ export function CampaignsList({
         </button>
       </div>
 
-      {/* Content */}
-      {isLoading ? (
-        <LoadingSkeleton />
-      ) : allCampaigns.length === 0 ? (
-        <CampaignsEmptyState />
-      ) : (
-        <>
+      {/* Content - Flex 1 to push pagination down */}
+      <div className="flex-1">
+        {isLoading ? (
+          <LoadingSkeleton />
+        ) : allCampaigns.length === 0 ? (
+          <CampaignsEmptyState />
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {campaigns.map((campaign, index) => (
               <CampaignCard
@@ -492,32 +492,32 @@ export function CampaignsList({
               />
             ))}
           </div>
+        )}
+      </div>
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 mt-8">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
-              >
-                <Icon name="chevron-left" className="w-4 h-4" />
-                Anterior
-              </button>
-              <span className="text-sm text-white/50 font-medium px-4">
-                Página {currentPage} de {totalPagesLabel}
-              </span>
-              <button
-                onClick={handleNextPage}
-                disabled={!canGoNext}
-                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
-              >
-                {isLoadingMore ? "Carregando..." : "Próxima"}
-                <Icon name="chevron-right" className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </>
+      {/* Pagination Controls - Fixed at bottom */}
+      {totalPages > 1 && !isLoading && allCampaigns.length > 0 && (
+        <div className="flex items-center justify-center gap-3 mt-12 pt-6 border-t border-white/5">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+          >
+            <Icon name="chevron-left" className="w-4 h-4" />
+            Anterior
+          </button>
+          <span className="text-sm text-white/50 font-medium px-4">
+            Página {currentPage} de {totalPagesLabel}
+          </span>
+          <button
+            onClick={handleNextPage}
+            disabled={!canGoNext}
+            className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+          >
+            {isLoadingMore ? "Carregando..." : "Próxima"}
+            <Icon name="chevron-right" className="w-4 h-4" />
+          </button>
+        </div>
       )}
     </div>
   );
