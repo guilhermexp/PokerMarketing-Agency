@@ -432,6 +432,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                       >
                         <span className="hidden sm:inline">{creativeModelLabels[selectedModel].label}</span>
                         <span className="sm:hidden text-[9px]">AI</span>
+                        <Icon name="chevron-down" className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-transform ${isModelSelectorOpen ? 'rotate-180' : ''}`} />
                       </button>
 
                       {isModelSelectorOpen && (
@@ -461,6 +462,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                       >
                         <span className="hidden sm:inline">{toneOverride || brandProfile.toneOfVoice}</span>
                         <span className="sm:hidden text-[9px] truncate max-w-[50px]">{(toneOverride || brandProfile.toneOfVoice).substring(0, 3)}</span>
+                        <Icon name="chevron-down" className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-transform ${isToneSelectorOpen ? 'rotate-180' : ''}`} />
                       </button>
 
                       {isToneSelectorOpen && (
