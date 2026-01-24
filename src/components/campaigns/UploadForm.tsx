@@ -612,7 +612,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               onClick={() => inspirationInputRef.current?.click()}
               className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
-              <Icon name="copy" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
+              <Icon name="star" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
               <span className="hidden sm:inline font-medium">Referência</span>
               <span className="sm:hidden font-medium text-[10px]">Ref</span>
             </button>
