@@ -3796,6 +3796,7 @@ const Type = {
 
 // Prompt builders
 const shouldUseTone = (brandProfile, target) => {
+  if (!brandProfile) return false;
   const targets = brandProfile.toneTargets || [
     "campaigns",
     "posts",
@@ -3806,7 +3807,8 @@ const shouldUseTone = (brandProfile, target) => {
 };
 
 const getToneText = (brandProfile, target) => {
-  return shouldUseTone(brandProfile, target) ? brandProfile.toneOfVoice : "";
+  if (!brandProfile) return "";
+  return shouldUseTone(brandProfile, target) ? (brandProfile.toneOfVoice || "") : "";
 };
 
 const buildImagePrompt = (
@@ -3819,8 +3821,10 @@ const buildImagePrompt = (
   jsonPrompt = null,
 ) => {
   const toneText = getToneText(brandProfile, "images");
+  const primaryColor = brandProfile?.primaryColor || "cores vibrantes";
+  const secondaryColor = brandProfile?.secondaryColor || "tons complementares";
   let fullPrompt = `PROMPT TÉCNICO: ${prompt}
-ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${brandProfile.primaryColor}, ${brandProfile.secondaryColor}. Cinematográfico e Luxuoso.`;
+ESTILO VISUAL: ${toneText ? `${toneText}, ` : ""}Cores: ${primaryColor}, ${secondaryColor}. Cinematográfico e Luxuoso.`;
 
   if (jsonPrompt) {
     fullPrompt += `
@@ -3962,6 +3966,10 @@ const convertImagePromptToJson = async (
 
 const buildFlyerPrompt = (brandProfile) => {
   const toneText = getToneText(brandProfile, "flyers");
+  const brandName = brandProfile?.name || "a marca";
+  const brandDescription = brandProfile?.description || "";
+  const primaryColor = brandProfile?.primaryColor || "cores vibrantes";
+  const secondaryColor = brandProfile?.secondaryColor || "tons complementares";
 
   return `
 **PERSONA:** Você é Diretor de Arte Sênior de uma agência de publicidade internacional de elite.
@@ -3972,19 +3980,19 @@ Se houver valores ou informações importantes no conteúdo, destaque-os visualm
 
 **REGRAS DE CONTEÚDO:**
 1. Destaque informações importantes (valores, datas, horários) de forma clara e legível.
-2. Use a marca ${brandProfile.name}.
+2. Use a marca ${brandName}.
 3. Siga a identidade visual da marca em todos os elementos.
 
-**IDENTIDADE DA MARCA - ${brandProfile.name}:**
-${brandProfile.description ? `- Descrição: ${brandProfile.description}` : ""}
+**IDENTIDADE DA MARCA - ${brandName}:**
+${brandDescription ? `- Descrição: ${brandDescription}` : ""}
 ${toneText ? `- Tom de Comunicação: ${toneText}` : ""}
-- Cor Primária (dominante): ${brandProfile.primaryColor}
-- Cor de Acento (destaques, CTAs): ${brandProfile.secondaryColor}
+- Cor Primária (dominante): ${primaryColor}
+- Cor de Acento (destaques, CTAs): ${secondaryColor}
 
 **PRINCÍPIOS DE DESIGN PROFISSIONAL:**
 
 1. HARMONIA CROMÁTICA:
-   - Use APENAS as cores da marca: ${brandProfile.primaryColor} (primária) e ${brandProfile.secondaryColor} (acento)
+   - Use APENAS as cores da marca: ${primaryColor} (primária) e ${secondaryColor} (acento)
    - Crie variações tonais dessas cores para profundidade
    - Evite introduzir cores aleatórias
 
@@ -4010,6 +4018,8 @@ ${toneText ? `- Tom de Comunicação: ${toneText}` : ""}
 
 const buildQuickPostPrompt = (brandProfile, context) => {
   const toneText = getToneText(brandProfile, "posts");
+  const brandName = brandProfile?.name || "a marca";
+  const brandDescription = brandProfile?.description || "";
 
   return `
 Você é Social Media Manager de elite. Crie um post de INSTAGRAM de alta performance.
@@ -4017,7 +4027,7 @@ Você é Social Media Manager de elite. Crie um post de INSTAGRAM de alta perfor
 **CONTEXTO:**
 ${context}
 
-**MARCA:** ${brandProfile.name}${brandProfile.description ? ` - ${brandProfile.description}` : ""}${toneText ? ` | **TOM:** ${toneText}` : ""}
+**MARCA:** ${brandName}${brandDescription ? ` - ${brandDescription}` : ""}${toneText ? ` | **TOM:** ${toneText}` : ""}
 
 **REGRAS DE OURO:**
 1. GANCHO EXPLOSIVO com emojis relevantes ao tema.
