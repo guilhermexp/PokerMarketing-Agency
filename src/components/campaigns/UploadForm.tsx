@@ -517,7 +517,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                       {isGenerating ? (
                         <div className="w-4 sm:w-5 h-4 sm:h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <Icon name="arrow-up" className="size-4 sm:size-5" />
+                        <Icon name="arrow-up" className="w-4 h-4 sm:w-5 sm:h-5" />
                       )}
                     </button>
                   </div>
@@ -601,7 +601,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               onClick={() => productInputRef.current?.click()}
               className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
-              <Icon name="image" className="size-3.5 sm:size-4 text-white/80" />
+              <Icon name="image" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
               <span className="hidden sm:inline font-medium">Imagem Produto</span>
               <span className="sm:hidden font-medium text-[10px]">Prod</span>
             </button>
@@ -611,7 +611,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               onClick={() => inspirationInputRef.current?.click()}
               className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
-              <Icon name="copy" className="size-3.5 sm:size-4 text-white/80" />
+              <Icon name="copy" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
               <span className="hidden sm:inline font-medium">Referência</span>
               <span className="sm:hidden font-medium text-[10px]">Ref</span>
             </button>
@@ -621,7 +621,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               onClick={() => collabLogoInputRef.current?.click()}
               className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
-              <Icon name="users" className="size-3.5 sm:size-4 text-white/80" />
+              <Icon name="users" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
               <span className="hidden sm:inline font-medium">Logo</span>
               <span className="sm:hidden font-medium text-[10px]">Logo</span>
             </button>
@@ -631,7 +631,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               onClick={() => assetsInputRef.current?.click()}
               className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
-              <Icon name="layers" className="size-3.5 sm:size-4 text-white/80" />
+              <Icon name="layers" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
               <span className="hidden sm:inline font-medium">Ativos</span>
               <span className="sm:hidden font-medium text-[10px]">Ativ</span>
             </button>
@@ -641,7 +641,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               onClick={() => setIsOptionsModalOpen(true)}
               className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
-              <Icon name="settings" className="size-3.5 sm:size-4 text-white/80" />
+              <Icon name="settings" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
               <span className="hidden sm:inline font-medium">Configurar</span>
               <span className="sm:hidden font-medium text-[10px]">Config</span>
             </button>
