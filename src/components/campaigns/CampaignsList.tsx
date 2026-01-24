@@ -497,25 +497,25 @@ export function CampaignsList({
 
       {/* Pagination Controls - Fixed at bottom */}
       {totalPages > 1 && !isLoading && allCampaigns.length > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 mt-8 sm:mt-12 px-2 sm:px-0 pt-4 sm:pt-6 pb-2 border-t border-white/5">
+        <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3 mt-6 sm:mt-12 px-2 sm:px-0 pt-3 sm:pt-6 pb-2 border-t border-white/5">
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="flex items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs sm:text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10 w-full sm:w-auto"
+            className="flex items-center justify-center gap-1 px-2 sm:px-4 py-1 sm:py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-[10px] sm:text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
           >
-            <Icon name="chevron-left" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="sm:inline">Anterior</span>
+            <Icon name="chevron-left" className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Anterior</span>
           </button>
-          <span className="text-xs sm:text-sm text-white/50 font-medium px-2 sm:px-4 whitespace-nowrap">
-            Página {currentPage} de {totalPagesLabel}
+          <span className="text-[10px] sm:text-sm text-white/50 font-medium px-1 sm:px-4 whitespace-nowrap">
+            {currentPage} de {totalPagesLabel}
           </span>
           <button
             onClick={handleNextPage}
             disabled={!canGoNext}
-            className="flex items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs sm:text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10 w-full sm:w-auto"
+            className="flex items-center justify-center gap-1 px-2 sm:px-4 py-1 sm:py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-[10px] sm:text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
           >
-            <span className="sm:inline">{isLoadingMore ? "Carregando..." : "Próxima"}</span>
-            <Icon name="chevron-right" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">{isLoadingMore ? "Carregando..." : "Próxima"}</span>
+            <Icon name="chevron-right" className="w-3 h-3 sm:w-4 sm:h-4" />
           </button>
         </div>
       )}
