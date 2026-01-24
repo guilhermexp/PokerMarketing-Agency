@@ -225,7 +225,7 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
-        <div className="bg-[#0a0a0a] rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-white/10"
+        <div className="bg-[#0a0a0a] rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-white/10"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="p-4 border-b border-white/10">
