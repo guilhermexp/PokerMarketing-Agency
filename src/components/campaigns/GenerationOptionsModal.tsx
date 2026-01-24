@@ -27,7 +27,7 @@ const CountSelector: React.FC<{
         className={`
           w-7 h-7 rounded-md text-xs font-semibold transition-all
           ${count === num
-            ? 'bg-primary/20 text-primary border border-primary/30'
+            ? 'bg-white/15 text-white border border-white/20'
             : 'bg-white/5 text-white/40 hover:text-white/70 hover:bg-white/10'
           }
         `}
@@ -61,7 +61,7 @@ const SectionCard: React.FC<{
     onClick={onToggle}
     className={`rounded-lg border p-3 transition-all cursor-pointer ${
       enabled
-        ? 'border-primary/30 bg-primary/5'
+        ? 'border-white/20 bg-white/[0.04]'
         : 'border-white/10 bg-white/[0.02] hover:border-white/15'
     }`}
   >
@@ -69,7 +69,7 @@ const SectionCard: React.FC<{
       <div className="flex items-center gap-3 flex-1">
         <div
           className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-            enabled ? 'bg-primary/15 text-primary' : 'bg-white/5 text-white/40'
+            enabled ? 'bg-white/10 text-white' : 'bg-white/5 text-white/40'
           }`}
         >
           <Icon name={icon} className="w-4 h-4" />
@@ -85,7 +85,7 @@ const SectionCard: React.FC<{
       <div
         className={`px-2.5 py-1 rounded-md text-[10px] font-medium uppercase ${
           enabled
-            ? 'bg-primary/20 text-primary'
+            ? 'bg-white/10 text-white'
             : 'bg-white/5 text-white/30'
         }`}
       >
@@ -114,17 +114,17 @@ const SubOption: React.FC<{
     className={`
       px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2
       ${enabled
-        ? 'bg-primary/10 text-white border border-primary/30'
+        ? 'bg-white/10 text-white border border-white/20'
         : 'text-white/40 hover:text-white/60 border border-white/10 hover:border-white/15 bg-white/5'
       }
     `}
   >
     <span
       className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${
-        enabled ? 'border-primary bg-primary' : 'border-white/30 bg-transparent'
+        enabled ? 'border-white bg-white' : 'border-white/30 bg-transparent'
       }`}
     >
-      {enabled && <Icon name="check" className="w-2 h-2 text-white" />}
+      {enabled && <Icon name="check" className="w-2 h-2 text-black" />}
     </span>
     {label}
   </button>
