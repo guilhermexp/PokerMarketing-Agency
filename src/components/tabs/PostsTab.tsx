@@ -11,6 +11,7 @@ import type {
 import { Button } from "../common/Button";
 import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
+import { ImageGenerationLoader } from "../ui/ai-chat-image-generation-1";
 import { generateImage } from "../../services/geminiService";
 import { uploadImageToBlob } from "../../services/blobService";
 import { urlToBase64 } from "../../utils/imageHelpers";
@@ -148,7 +149,7 @@ const PostCard: React.FC<{
             {/* Image */}
             <div className="aspect-square bg-black/30 rounded-lg flex items-center justify-center relative overflow-hidden">
               {isGenerating ? (
-                <Loader className="text-white/60" />
+                <ImageGenerationLoader prompt={post.image_prompt} showLabel={true} />
               ) : image ? (
                 <>
                   <img

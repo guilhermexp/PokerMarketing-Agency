@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Icon } from "./Icon";
 import { SendToChatButton } from "./SendToChatButton";
-import { Loader } from "./Loader";
+import { ImageGenerationLoader } from "../ui/ai-chat-image-generation-1";
 import type { GalleryImage } from "../../types";
 
 interface InstagramPostPreviewProps {
@@ -63,21 +63,16 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
             className={`relative aspect-square bg-black overflow-hidden ${onImageClick ? "cursor-pointer" : ""}`}
             onClick={onImageClick}
           >
-            {isGenerating ? (
-              <div className="w-full h-full flex items-center justify-center">
-                <Loader className="text-white/60" />
-              </div>
-            ) : image ? (
+            {isGenerating || image ? (
               <>
-                <img
-                  src={image}
-                  alt="Post preview"
-                  className="w-full h-full object-cover"
-                  draggable={false}
+                <ImageGenerationLoader
+                  imageSrc={image}
+                  prompt={imagePrompt}
+                  isGenerating={isGenerating}
                 />
-                {/* Hover overlay for editing and chat */}
-                {(onImageClick || galleryImage) && (
-                  <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                {/* Hover overlay for editing and chat - only when image is ready and not generating */}
+                {image && !isGenerating && (onImageClick || galleryImage) && (
+                  <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2 z-30">
                     {galleryImage && (
                       <SendToChatButton image={galleryImage} />
                     )}

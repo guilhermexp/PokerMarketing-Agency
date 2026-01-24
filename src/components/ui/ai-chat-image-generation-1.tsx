@@ -1,0 +1,163 @@
+import * as React from "react"
+import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+
+export interface ImageGenerationLoaderProps {
+  /** Image URL - when provided, shows the reveal effect */
+  imageSrc?: string | null;
+  /** Image prompt to show as placeholder when no image */
+  prompt?: string;
+  /** Optional className for the container */
+  className?: string;
+  /** Whether currently generating */
+  isGenerating?: boolean;
+  /** Callback when reveal animation completes */
+  onRevealComplete?: () => void;
+}
+
+export const ImageGenerationLoader = ({
+  imageSrc,
+  prompt,
+  className,
+  isGenerating = true,
+  onRevealComplete,
+}: ImageGenerationLoaderProps) => {
+  const [progress, setProgress] = React.useState(0);
+  const [loadingState, setLoadingState] = React.useState<
+    "waiting" | "generating" | "revealing" | "completed"
+  >("waiting");
+  const revealDuration = 3000; // 3 seconds to reveal
+
+  // Handle state transitions
+  React.useEffect(() => {
+    if (imageSrc && loadingState !== "revealing" && loadingState !== "completed") {
+      // Image arrived - start reveal
+      setLoadingState("revealing");
+      setProgress(0);
+
+      const startTime = Date.now();
+      const interval = setInterval(() => {
+        const elapsedTime = Date.now() - startTime;
+        const progressPercentage = Math.min(100, (elapsedTime / revealDuration) * 100);
+        setProgress(progressPercentage);
+
+        if (progressPercentage >= 100) {
+          clearInterval(interval);
+          setLoadingState("completed");
+          onRevealComplete?.();
+        }
+      }, 16);
+
+      return () => clearInterval(interval);
+    } else if (!imageSrc && isGenerating) {
+      // No image yet, start generating state after delay
+      const timeout = setTimeout(() => {
+        setLoadingState("generating");
+      }, 1000);
+      return () => clearTimeout(timeout);
+    }
+  }, [imageSrc, isGenerating, loadingState, onRevealComplete]);
+
+  // Reset when starting new generation
+  React.useEffect(() => {
+    if (isGenerating && !imageSrc) {
+      setLoadingState("waiting");
+      setProgress(0);
+    }
+  }, [isGenerating, imageSrc]);
+
+  const isRevealing = loadingState === "revealing";
+  const isCompleted = loadingState === "completed";
+  const showLoader = !imageSrc && isGenerating;
+
+  return (
+    <div className={cn("relative w-full h-full overflow-hidden", className)}>
+      {/* Image (when available) */}
+      {imageSrc && (
+        <img
+          src={imageSrc}
+          alt="Generated"
+          className="w-full h-full object-cover"
+        />
+      )}
+
+      {/* Placeholder when no image */}
+      {!imageSrc && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-black/30">
+          <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center mb-3">
+            <svg className="w-5 h-5 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          {prompt && (
+            <p className="text-[8px] text-white/30 italic line-clamp-3 max-w-[80%]">
+              "{prompt}"
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Blur overlay that reveals from top to bottom */}
+      <AnimatePresence>
+        {(isRevealing || showLoader) && !isCompleted && (
+          <motion.div
+            className="absolute inset-0 pointer-events-none backdrop-blur-2xl bg-black/40"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            style={isRevealing ? {
+              clipPath: `polygon(0 ${progress}%, 100% ${progress}%, 100% 100%, 0 100%)`,
+              maskImage: `linear-gradient(to bottom, transparent ${Math.max(0, progress - 15)}%, black ${progress + 5}%)`,
+              WebkitMaskImage: `linear-gradient(to bottom, transparent ${Math.max(0, progress - 15)}%, black ${progress + 5}%)`,
+            } : undefined}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Loading text */}
+      <AnimatePresence>
+        {(showLoader || isRevealing) && !isCompleted && (
+          <motion.div
+            className="absolute bottom-3 left-0 right-0 flex justify-center z-20"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <motion.span
+              className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm
+                bg-[linear-gradient(110deg,rgba(255,255,255,0.4),35%,rgba(255,255,255,0.8),50%,rgba(255,255,255,0.4),75%,rgba(255,255,255,0.4))]
+                bg-[length:200%_100%] bg-clip-text text-transparent"
+              animate={{ backgroundPosition: ["-200% 0", "200% 0"] }}
+              transition={{
+                repeat: Infinity,
+                duration: 2,
+                ease: "linear",
+              }}
+            >
+              {isRevealing ? "Criando imagem..." : loadingState === "waiting" ? "Iniciando..." : "Gerando imagem..."}
+            </motion.span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Progress bar */}
+      {(showLoader || isRevealing) && !isCompleted && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10 z-20">
+          <motion.div
+            className="h-full bg-gradient-to-r from-primary/80 to-primary"
+            initial={{ width: "0%" }}
+            animate={{ width: isRevealing ? `${progress}%` : "30%" }}
+            transition={isRevealing ? { ease: "linear" } : {
+              repeat: Infinity,
+              repeatType: "reverse",
+              duration: 1.5,
+              ease: "easeInOut"
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+ImageGenerationLoader.displayName = "ImageGenerationLoader";
