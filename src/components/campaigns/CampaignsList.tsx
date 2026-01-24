@@ -424,7 +424,7 @@ export function CampaignsList({
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen px-4 sm:px-6 lg:px-8 lg:max-w-7xl lg:mx-auto w-full">
       {/* CSS Keyframes */}
       <style>{`
         @keyframes fadeSlideIn {
@@ -497,7 +497,7 @@ export function CampaignsList({
 
       {/* Pagination Controls - Fixed at bottom */}
       {totalPages > 1 && !isLoading && allCampaigns.length > 0 && (
-        <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3 mt-6 sm:mt-12 px-2 sm:px-0 pt-3 sm:pt-6 pb-2 border-t border-white/5">
+        <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3 mt-6 sm:mt-12 pt-3 sm:pt-6 pb-2 border-t border-white/5">
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
