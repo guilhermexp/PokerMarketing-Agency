@@ -447,18 +447,18 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       `}</style>
       <div className="relative py-6 sm:py-8 md:py-10 flex flex-col items-center w-full px-2 sm:px-4">
         <div className="w-full max-w-sm sm:max-w-2xl py-3 sm:py-4 md:py-6 px-2 sm:px-0">
-          <div className="relative z-10 flex flex-col gap-4 sm:gap-6 items-center w-full">
+          <div className="relative z-10 flex flex-col gap-3 sm:gap-4 items-center w-full">
             {/* Title */}
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-medium text-white mb-1 sm:mb-2 px-2 text-center tracking-tight">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-medium text-white mb-0.5 sm:mb-1 px-2 text-center tracking-tight">
               O que vamos criar hoje?
             </h2>
 
             {/* Main Input Box */}
             <form className="w-full max-w-sm sm:max-w-2xl relative">
               {/* Blur layer behind */}
-              <div className="absolute -inset-1 rounded-[26px] bg-white/5 blur-3xl pointer-events-none z-[5]" />
+              <div className="absolute -inset-1 rounded-[18px] sm:rounded-[22px] bg-white/5 blur-3xl pointer-events-none z-[5]" />
 
-              <div className="relative z-10 rounded-[26px] border border-white/10 bg-black/40 backdrop-blur-2xl text-white/90 focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
+              <div className="relative z-10 rounded-[18px] sm:rounded-[22px] border border-white/10 bg-black/40 backdrop-blur-2xl text-white/90 focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
                 {/* Textarea */}
                 <textarea
                   ref={textareaRef}
@@ -466,7 +466,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                   onChange={(e) => setTranscript(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Descreva sua ideia..."
-                  className="hide-scrollbar w-full rounded-[26px] rounded-b-none text-sm sm:text-base leading-relaxed text-white/90 placeholder:text-white/50 !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-3 sm:!px-6 !py-3 sm:!py-5 touch-manipulation resize-none outline-none overflow-hidden min-h-[60px] max-h-[200px]"
+                  className="hide-scrollbar w-full rounded-[18px] sm:rounded-[22px] rounded-b-none text-xs sm:text-sm leading-relaxed text-white/90 placeholder:text-white/50 !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-3 sm:!px-4 !py-2 sm:!py-2.5 touch-manipulation resize-none outline-none overflow-hidden min-h-[36px] sm:min-h-[42px] max-h-[80px] sm:max-h-[120px]"
                   style={{
                     WebkitUserSelect: 'text',
                     WebkitTouchCallout: 'none',
@@ -474,7 +474,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                 />
 
                 {/* Toolbar */}
-                <div className="flex justify-between items-center rounded-t-none rounded-b-[26px] bg-black/30 backdrop-blur-xl px-2 sm:px-3 py-2 sm:py-2.5 md:px-4 md:py-3 gap-1 sm:gap-2 text-white/80 overflow-x-auto flex-wrap">
+                <div className="flex justify-between items-center rounded-t-none rounded-b-[18px] sm:rounded-b-[22px] bg-black/30 backdrop-blur-xl px-2 sm:px-3 py-1.5 sm:py-2 gap-1 sm:gap-2 text-white/80 overflow-x-auto flex-wrap">
                   {/* Left side - Actions */}
                   <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                     {/* Model Selector */}
@@ -483,10 +483,10 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                         ref={modelButtonRef}
                         type="button"
                         onClick={handleOpenModelSelector}
-                        className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:text-white/90 transition-all text-xs sm:text-sm whitespace-nowrap font-medium"
+                        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:text-white/90 transition-all text-[10px] sm:text-xs whitespace-nowrap font-medium"
                       >
                         <span>{creativeModelLabels[selectedModel].label}</span>
-                        <Icon name="chevron-down" className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-transform ${isModelSelectorOpen ? 'rotate-180' : ''}`} />
+                        <Icon name="chevron-down" className={`w-2.5 h-2.5 sm:w-3 sm:h-3 transition-transform ${isModelSelectorOpen ? 'rotate-180' : ''}`} />
                       </button>
                     </div>
 
@@ -496,7 +496,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                         ref={toneButtonRef}
                         type="button"
                         onClick={handleOpenToneSelector}
-                        className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:text-white/90 transition-all text-xs sm:text-sm whitespace-nowrap font-medium"
+                        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:text-white/90 transition-all text-[10px] sm:text-xs whitespace-nowrap font-medium"
                       >
                         <span>{toneOverride || brandProfile.toneOfVoice}</span>
                         <Icon name="chevron-down" className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-transform ${isToneSelectorOpen ? 'rotate-180' : ''}`} />
@@ -506,33 +506,33 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                   </div>
 
                   {/* Right side - Actions */}
-                  <div className="flex items-center gap-1 sm:gap-2 ml-auto">
+                  <div className="flex items-center gap-0.5 sm:gap-1 ml-auto">
                     <button
                       type="button"
                       onClick={handleEnhancePrompt}
                       disabled={!transcript.trim() || isEnhancing}
-                      className="flex items-center justify-center size-8 sm:size-9 rounded-lg sm:rounded-xl text-white/60 hover:text-white/90 hover:bg-white/5 transition-all disabled:opacity-30"
+                      className="flex items-center justify-center size-6 sm:size-7 rounded-md text-white/60 hover:text-white/90 hover:bg-white/5 transition-all disabled:opacity-30"
                     >
                       {isEnhancing ? (
-                        <div className="w-4 h-4 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <Icon name="wand-2" className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                        <Icon name="wand-2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       )}
                     </button>
                     <button
                       onClick={handleGenerateClick}
                       disabled={!canGenerate}
                       type="button"
-                      className={`rounded-lg sm:rounded-xl size-8 sm:size-10 p-1.5 sm:p-2.5 flex items-center justify-center transition-all ${
+                      className={`size-6 sm:size-7 flex items-center justify-center transition-all ${
                         canGenerate
-                          ? 'bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:scale-105 shadow-lg'
-                          : 'bg-white/5 border border-white/10 text-white/30 cursor-not-allowed'
+                          ? 'text-white hover:text-white/80 hover:scale-105'
+                          : 'text-white/30 cursor-not-allowed'
                       }`}
                     >
                       {isGenerating ? (
-                        <div className="w-4 sm:w-5 h-4 sm:h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        <div className="w-3 sm:w-3.5 h-3 sm:h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <Icon name="send" className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <Icon name="send" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       )}
                     </button>
                   </div>

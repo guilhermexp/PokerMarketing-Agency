@@ -146,7 +146,7 @@ export const LinkedInPostPreview: React.FC<LinkedInPostPreviewProps> = ({
                 </button>
               )}
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Regenerate button - integrated in mockup when image exists */}

@@ -146,7 +146,7 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
                 </button>
               )}
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Regenerate button - integrated in mockup when image exists */}
