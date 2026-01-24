@@ -3009,7 +3009,7 @@ app.patch("/api/db/tournaments/daily-flyer", async (req, res) => {
 app.post("/api/generate/queue", async (req, res) => {
   try {
     const sql = getSql();
-    const { userId, organizationId, jobType, prompt, config } = req.body;
+    const { userId, organizationId, jobType, prompt, config, context } = req.body;
 
     if (!userId || !jobType || !prompt || !config) {
       return res.status(400).json({
@@ -3025,10 +3025,13 @@ app.post("/api/generate/queue", async (req, res) => {
       }
     }
 
+    // Store context inside config for persistence (no schema change needed)
+    const configWithContext = context ? { ...config, _context: context } : config;
+
     // Create job in database
     const result = await sql`
       INSERT INTO generation_jobs (user_id, organization_id, job_type, prompt, config, status)
-      VALUES (${userId}, ${organizationId || null}, ${jobType}, ${prompt}, ${JSON.stringify(config)}, 'queued')
+      VALUES (${userId}, ${organizationId || null}, ${jobType}, ${prompt}, ${JSON.stringify(configWithContext)}, 'queued')
       RETURNING id, created_at
     `;
 
@@ -3089,7 +3092,8 @@ app.get("/api/generate/status", async (req, res) => {
         SELECT
           id, user_id, organization_id, job_type, status, progress,
           result_url, result_gallery_id, error_message,
-          created_at, started_at, completed_at, attempts
+          created_at, started_at, completed_at, attempts,
+          config->>'_context' as context
         FROM generation_jobs
         WHERE id = ${jobId}
         LIMIT 1
@@ -3115,7 +3119,8 @@ app.get("/api/generate/status", async (req, res) => {
             SELECT
               id, user_id, organization_id, job_type, status, progress,
               result_url, result_gallery_id, error_message,
-              created_at, started_at, completed_at
+              created_at, started_at, completed_at,
+              config->>'_context' as context
             FROM generation_jobs
             WHERE organization_id = ${organizationId} AND status = ${filterStatus}
             ORDER BY created_at DESC
@@ -3126,7 +3131,8 @@ app.get("/api/generate/status", async (req, res) => {
             SELECT
               id, user_id, organization_id, job_type, status, progress,
               result_url, result_gallery_id, error_message,
-              created_at, started_at, completed_at
+              created_at, started_at, completed_at,
+              config->>'_context' as context
             FROM generation_jobs
             WHERE organization_id = ${organizationId}
             ORDER BY created_at DESC
@@ -3140,7 +3146,8 @@ app.get("/api/generate/status", async (req, res) => {
             SELECT
               id, user_id, organization_id, job_type, status, progress,
               result_url, result_gallery_id, error_message,
-              created_at, started_at, completed_at
+              created_at, started_at, completed_at,
+              config->>'_context' as context
             FROM generation_jobs
             WHERE user_id = ${userId} AND organization_id IS NULL AND status = ${filterStatus}
             ORDER BY created_at DESC
@@ -3151,7 +3158,8 @@ app.get("/api/generate/status", async (req, res) => {
             SELECT
               id, user_id, organization_id, job_type, status, progress,
               result_url, result_gallery_id, error_message,
-              created_at, started_at, completed_at
+              created_at, started_at, completed_at,
+              config->>'_context' as context
             FROM generation_jobs
             WHERE user_id = ${userId} AND organization_id IS NULL
             ORDER BY created_at DESC
