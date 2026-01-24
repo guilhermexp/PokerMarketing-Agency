@@ -133,8 +133,12 @@ export const UploadForm: React.FC<UploadFormProps> = ({
   const modelSelectorRef = useRef<HTMLDivElement>(null);
   const toneSelectorRef = useRef<HTMLDivElement>(null);
   const favoritesPanelRef = useRef<HTMLDivElement>(null);
+  const modelButtonRef = useRef<HTMLButtonElement>(null);
+  const toneButtonRef = useRef<HTMLButtonElement>(null);
+  const [modelDropdownPosition, setModelDropdownPosition] = useState({ top: 0, left: 0 });
+  const [toneDropdownPosition, setToneDropdownPosition] = useState({ top: 0, left: 0 });
 
-  // Close selectors when clicking outside
+  // Close selectors when clicking outside or scrolling
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -152,11 +156,25 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       }
     };
 
+    const handleScroll = () => {
+      if (isModelSelectorOpen) {
+        setIsModelSelectorOpen(false);
+      }
+      if (isToneSelectorOpen) {
+        setIsToneSelectorOpen(false);
+      }
+    };
+
     document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleScroll);
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleScroll);
     };
-  }, []);
+  }, [isModelSelectorOpen, isToneSelectorOpen]);
 
   useEffect(() => {
     if (!toneToast) return;
@@ -290,6 +308,28 @@ export const UploadForm: React.FC<UploadFormProps> = ({
     setSelectedModel(model);
     onUpdateCreativeModel(model);
     setIsModelSelectorOpen(false);
+  };
+
+  const handleOpenModelSelector = () => {
+    if (modelButtonRef.current) {
+      const rect = modelButtonRef.current.getBoundingClientRect();
+      setModelDropdownPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+      });
+    }
+    setIsModelSelectorOpen(!isModelSelectorOpen);
+  };
+
+  const handleOpenToneSelector = () => {
+    if (toneButtonRef.current) {
+      const rect = toneButtonRef.current.getBoundingClientRect();
+      setToneDropdownPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+      });
+    }
+    setIsToneSelectorOpen(!isToneSelectorOpen);
   };
 
   const handleRemoveImage = (
@@ -426,66 +466,27 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                     {/* Model Selector */}
                     <div className="relative" ref={modelSelectorRef}>
                       <button
+                        ref={modelButtonRef}
                         type="button"
-                        onClick={() => setIsModelSelectorOpen(!isModelSelectorOpen)}
+                        onClick={handleOpenModelSelector}
                         className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:text-white/90 transition-all text-xs sm:text-sm whitespace-nowrap font-medium"
                       >
                         <span>{creativeModelLabels[selectedModel].label}</span>
                         <Icon name="chevron-down" className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-transform ${isModelSelectorOpen ? 'rotate-180' : ''}`} />
                       </button>
-
-                      {isModelSelectorOpen && (
-                        <div className="absolute top-full left-0 mt-2 w-56 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 z-[200]">
-                          {CREATIVE_MODELS_FOR_UI.map((model) => (
-                            <button
-                              key={model.id}
-                              onClick={() => handleModelSelect(model.id)}
-                              className={`w-full px-3 py-2 text-left transition-colors ${
-                                selectedModel === model.id ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
-                              }`}
-                            >
-                              <div className="text-xs font-medium">{model.label}</div>
-                              <div className="text-[10px] text-white/40">{model.provider}</div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
                     </div>
 
                     {/* Tone Selector */}
                     <div className="relative" ref={toneSelectorRef}>
                       <button
+                        ref={toneButtonRef}
                         type="button"
-                        onClick={() => setIsToneSelectorOpen(!isToneSelectorOpen)}
+                        onClick={handleOpenToneSelector}
                         className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:text-white/90 transition-all text-xs sm:text-sm whitespace-nowrap font-medium"
                       >
                         <span>{toneOverride || brandProfile.toneOfVoice}</span>
                         <Icon name="chevron-down" className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-transform ${isToneSelectorOpen ? 'rotate-180' : ''}`} />
                       </button>
-
-                      {isToneSelectorOpen && (
-                        <div className="absolute top-full left-0 mt-2 w-48 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 z-[200]">
-                          <button
-                            onClick={() => handleToneSelect(null)}
-                            className={`w-full px-3 py-2 text-left text-xs transition-colors ${
-                              !toneOverride ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
-                            }`}
-                          >
-                            Padrão ({brandProfile.toneOfVoice})
-                          </button>
-                          {TONE_OPTIONS.map((tone) => (
-                            <button
-                              key={tone}
-                              onClick={() => handleToneSelect(tone)}
-                              className={`w-full px-3 py-2 text-left text-xs transition-colors ${
-                                toneOverride === tone ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
-                              }`}
-                            >
-                              {tone}
-                            </button>
-                          ))}
-                        </div>
-                      )}
                     </div>
 
                   </div>
@@ -780,6 +781,55 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
         </div>
       </div>
+
+      {/* Model Selector Dropdown - Fixed Position */}
+      {isModelSelectorOpen && (
+        <div
+          className="fixed w-56 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 z-[300]"
+          style={{ top: `${modelDropdownPosition.top}px`, left: `${modelDropdownPosition.left}px` }}
+        >
+          {CREATIVE_MODELS_FOR_UI.map((model) => (
+            <button
+              key={model.id}
+              onClick={() => handleModelSelect(model.id)}
+              className={`w-full px-3 py-2 text-left transition-colors ${
+                selectedModel === model.id ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <div className="text-xs font-medium">{model.label}</div>
+              <div className="text-[10px] text-white/40">{model.provider}</div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Tone Selector Dropdown - Fixed Position */}
+      {isToneSelectorOpen && (
+        <div
+          className="fixed w-48 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 z-[300]"
+          style={{ top: `${toneDropdownPosition.top}px`, left: `${toneDropdownPosition.left}px` }}
+        >
+          <button
+            onClick={() => handleToneSelect(null)}
+            className={`w-full px-3 py-2 text-left text-xs transition-colors ${
+              !toneOverride ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            Padrão ({brandProfile.toneOfVoice})
+          </button>
+          {TONE_OPTIONS.map((tone) => (
+            <button
+              key={tone}
+              onClick={() => handleToneSelect(tone)}
+              className={`w-full px-3 py-2 text-left text-xs transition-colors ${
+                toneOverride === tone ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              {tone}
+            </button>
+          ))}
+        </div>
+      )}
 
       {toneToast && (
         <div className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-[400] animate-in slide-in-from-bottom-4 fade-in duration-300 px-2 sm:px-0">
