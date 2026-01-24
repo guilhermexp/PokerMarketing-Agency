@@ -389,16 +389,16 @@ export const UploadForm: React.FC<UploadFormProps> = ({
           display: none;
         }
       `}</style>
-      <div className="relative pt-[4dvh] pb-[8dvh] flex flex-col items-center w-full px-4">
-        <div className="w-full max-w-[720px] pt-[2dvh] md:pt-[2dvh] px-4 md:px-0">
-          <div className="relative z-10 flex flex-col gap-6 items-center w-full">
+      <div className="relative py-6 sm:py-8 md:py-10 flex flex-col items-center w-full px-2 sm:px-4">
+        <div className="w-full max-w-sm sm:max-w-2xl py-3 sm:py-4 md:py-6 px-2 sm:px-0">
+          <div className="relative z-10 flex flex-col gap-4 sm:gap-6 items-center w-full">
             {/* Title */}
-            <h2 className="text-2xl md:text-3xl font-medium text-white mb-2 px-4 text-center tracking-tight">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-medium text-white mb-1 sm:mb-2 px-2 text-center tracking-tight">
               O que vamos criar hoje?
             </h2>
 
             {/* Main Input Box */}
-            <form className="w-full max-w-2xl relative">
+            <form className="w-full max-w-sm sm:max-w-2xl relative">
               {/* Blur layer behind */}
               <div className="absolute -inset-1 rounded-[26px] bg-white/5 blur-3xl pointer-events-none z-[5]" />
 
@@ -410,7 +410,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                   onChange={(e) => setTranscript(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Descreva sua ideia..."
-                  className="hide-scrollbar w-full rounded-[26px] rounded-b-none text-base leading-relaxed md:text-base text-white/90 placeholder:text-white/50 !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-6 !py-5 touch-manipulation transition-all duration-200 resize-none outline-none overflow-hidden"
+                  className="hide-scrollbar w-full rounded-[26px] rounded-b-none text-sm sm:text-base leading-relaxed text-white/90 placeholder:text-white/50 !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-3 sm:!px-6 !py-3 sm:!py-5 touch-manipulation transition-all duration-200 resize-none outline-none overflow-hidden"
                   style={{
                     height: '60px',
                     WebkitUserSelect: 'text',
@@ -420,17 +420,18 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                 />
 
                 {/* Toolbar */}
-                <div className="flex justify-between items-center rounded-t-none rounded-b-[26px] bg-black/30 backdrop-blur-xl px-3 py-2.5 md:px-4 md:py-3 gap-2 text-white/80">
+                <div className="flex justify-between items-center rounded-t-none rounded-b-[26px] bg-black/30 backdrop-blur-xl px-2 sm:px-3 py-2 sm:py-2.5 md:px-4 md:py-3 gap-1 sm:gap-2 text-white/80 overflow-x-auto flex-wrap">
                   {/* Left side - Actions */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                     {/* Model Selector */}
                     <div className="relative" ref={modelSelectorRef}>
                       <button
                         type="button"
                         onClick={() => setIsModelSelectorOpen(!isModelSelectorOpen)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white/90 transition-all text-xs whitespace-nowrap"
+                        className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white/90 transition-all text-[10px] sm:text-xs whitespace-nowrap"
                       >
-                        <span>{creativeModelLabels[selectedModel].label}</span>
+                        <span className="hidden sm:inline">{creativeModelLabels[selectedModel].label}</span>
+                        <span className="sm:hidden text-[9px]">AI</span>
                       </button>
 
                       {isModelSelectorOpen && (
@@ -456,9 +457,10 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                       <button
                         type="button"
                         onClick={() => setIsToneSelectorOpen(!isToneSelectorOpen)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white/90 transition-all text-xs whitespace-nowrap"
+                        className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white/90 transition-all text-[10px] sm:text-xs whitespace-nowrap"
                       >
-                        <span>{toneOverride || brandProfile.toneOfVoice}</span>
+                        <span className="hidden sm:inline">{toneOverride || brandProfile.toneOfVoice}</span>
+                        <span className="sm:hidden text-[9px] truncate max-w-[50px]">{(toneOverride || brandProfile.toneOfVoice).substring(0, 3)}</span>
                       </button>
 
                       {isToneSelectorOpen && (
@@ -489,33 +491,33 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                   </div>
 
                   {/* Right side - Actions */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2 ml-auto">
                     <button
                       type="button"
                       onClick={handleEnhancePrompt}
                       disabled={!transcript.trim() || isEnhancing}
-                      className="flex items-center justify-center size-9 rounded-xl text-white/60 hover:text-white/90 hover:bg-white/5 transition-all disabled:opacity-30"
+                      className="flex items-center justify-center size-8 sm:size-9 rounded-lg sm:rounded-xl text-white/60 hover:text-white/90 hover:bg-white/5 transition-all disabled:opacity-30"
                     >
                       {isEnhancing ? (
-                        <div className="w-[18px] h-[18px] border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <Icon name="wand-2" className="size-[18px]" />
+                        <Icon name="wand-2" className="size-4 sm:size-[18px]" />
                       )}
                     </button>
                     <button
                       onClick={handleGenerateClick}
                       disabled={!canGenerate}
                       type="button"
-                      className={`rounded-xl size-10 p-2.5 flex items-center justify-center transition-all ${
+                      className={`rounded-lg sm:rounded-xl size-8 sm:size-10 p-1.5 sm:p-2.5 flex items-center justify-center transition-all ${
                         canGenerate
                           ? 'bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:scale-105 shadow-lg'
                           : 'bg-white/5 border border-white/10 text-white/30 cursor-not-allowed'
                       }`}
                     >
                       {isGenerating ? (
-                        <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        <div className="w-4 sm:w-5 h-4 sm:h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <Icon name="arrow-up" className="size-5" />
+                        <Icon name="arrow-up" className="size-4 sm:size-5" />
                       )}
                     </button>
                   </div>
@@ -559,8 +561,8 @@ export const UploadForm: React.FC<UploadFormProps> = ({
         </div>
 
         {/* Type Buttons */}
-        <div className="relative w-full max-w-[720px] mt-12 px-4 md:px-0">
-          <div className="flex flex-wrap md:flex-nowrap items-center gap-2.5 justify-center">
+        <div className="relative w-full max-w-sm sm:max-w-2xl mt-6 sm:mt-8 md:mt-12 px-2 sm:px-0">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 md:gap-2.5 justify-center">
             {/* Hidden file inputs */}
             <input
               ref={productInputRef}
@@ -597,58 +599,63 @@ export const UploadForm: React.FC<UploadFormProps> = ({
             <button
               type="button"
               onClick={() => productInputRef.current?.click()}
-              className="flex items-center gap-2 h-9 px-3.5 rounded-[26px] text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
-              <Icon name="image" className="size-4 text-white/80" />
-              <span className="font-medium">Imagem Produto</span>
+              <Icon name="image" className="size-3.5 sm:size-4 text-white/80" />
+              <span className="hidden sm:inline font-medium">Imagem Produto</span>
+              <span className="sm:hidden font-medium text-[10px]">Prod</span>
             </button>
 
             <button
               type="button"
               onClick={() => inspirationInputRef.current?.click()}
-              className="flex items-center gap-2 h-9 px-3.5 rounded-[26px] text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
-              <Icon name="copy" className="size-4 text-white/80" />
-              <span className="font-medium">Referência</span>
+              <Icon name="copy" className="size-3.5 sm:size-4 text-white/80" />
+              <span className="hidden sm:inline font-medium">Referência</span>
+              <span className="sm:hidden font-medium text-[10px]">Ref</span>
             </button>
 
             <button
               type="button"
               onClick={() => collabLogoInputRef.current?.click()}
-              className="flex items-center gap-2 h-9 px-3.5 rounded-[26px] text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
-              <Icon name="users" className="size-4 text-white/80" />
-              <span className="font-medium">Logo</span>
+              <Icon name="users" className="size-3.5 sm:size-4 text-white/80" />
+              <span className="hidden sm:inline font-medium">Logo</span>
+              <span className="sm:hidden font-medium text-[10px]">Logo</span>
             </button>
 
             <button
               type="button"
               onClick={() => assetsInputRef.current?.click()}
-              className="flex items-center gap-2 h-9 px-3.5 rounded-[26px] text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
-              <Icon name="layers" className="size-4 text-white/80" />
-              <span className="font-medium">Ativos</span>
+              <Icon name="layers" className="size-3.5 sm:size-4 text-white/80" />
+              <span className="hidden sm:inline font-medium">Ativos</span>
+              <span className="sm:hidden font-medium text-[10px]">Ativ</span>
             </button>
 
             <button
               type="button"
               onClick={() => setIsOptionsModalOpen(true)}
-              className="flex items-center gap-2 h-9 px-3.5 rounded-[26px] text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
-              <Icon name="settings" className="size-4 text-white/80" />
-              <span className="font-medium">Configurar</span>
+              <Icon name="settings" className="size-3.5 sm:size-4 text-white/80" />
+              <span className="hidden sm:inline font-medium">Configurar</span>
+              <span className="sm:hidden font-medium text-[10px]">Config</span>
             </button>
           </div>
 
           {/* Attachments Panel */}
           {hasAttachments && (
-            <div className="mt-4 bg-[#0a0a0a] border border-white/10 rounded-xl p-4 max-w-2xl mx-auto">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-bold text-white/70">
+            <div className="mt-4 bg-[#0a0a0a] border border-white/10 rounded-xl p-3 sm:p-4 max-w-sm sm:max-w-2xl mx-auto">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <h4 className="text-[10px] sm:text-xs font-bold text-white/70">
                   Anexos
                 </h4>
               </div>
-              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 sm:gap-2">
                 {productImages.map((img, i) => (
                   <button
                     key={`product-${i}`}
@@ -732,20 +739,20 @@ export const UploadForm: React.FC<UploadFormProps> = ({
           {isFavoritesOpen && styleReferences.length > 0 && (
             <div
               ref={favoritesPanelRef}
-              className="mt-4 bg-[#0a0a0a] border border-white/10 rounded-xl p-4 max-w-2xl mx-auto"
+              className="mt-4 bg-[#0a0a0a] border border-white/10 rounded-xl p-3 sm:p-4 max-w-sm sm:max-w-2xl mx-auto"
             >
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-bold text-white/70">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <h4 className="text-[10px] sm:text-xs font-bold text-white/70">
                   Estilos Favoritos
                 </h4>
                 <button
                   onClick={() => setIsFavoritesOpen(false)}
                   className="text-white/30 hover:text-white/50"
                 >
-                  <Icon name="x" className="w-4 h-4" />
+                  <Icon name="x" className="w-3 sm:w-4 h-3 sm:h-4" />
                 </button>
               </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 sm:gap-2">
                 {styleReferences.map((ref) => (
                   <button
                     key={ref.id}
@@ -775,20 +782,20 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       </div>
 
       {toneToast && (
-        <div className="fixed bottom-6 right-6 z-[400] animate-in slide-in-from-bottom-4 fade-in duration-300">
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border border-white/10 bg-[#0b1220]/90 backdrop-blur-sm">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white/10">
-              <Icon name="check" className="w-4 h-4 text-white/70" />
+        <div className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-[400] animate-in slide-in-from-bottom-4 fade-in duration-300 px-2 sm:px-0">
+          <div className="flex items-start sm:items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl shadow-2xl border border-white/10 bg-[#0b1220]/90 backdrop-blur-sm max-w-xs sm:max-w-sm">
+            <div className="w-6 sm:w-8 h-6 sm:h-8 rounded-full flex items-center justify-center bg-white/10 flex-shrink-0">
+              <Icon name="check" className="w-3 sm:w-4 h-3 sm:h-4 text-white/70" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-white/90">{toneToast.title}</p>
-              <p className="text-xs text-white/50">{toneToast.description}</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-white/90">{toneToast.title}</p>
+              <p className="text-[10px] sm:text-xs text-white/50 line-clamp-2">{toneToast.description}</p>
             </div>
             <button
               onClick={() => setToneToast(null)}
-              className="p-1 rounded-full hover:bg-white/10 transition-colors ml-2"
+              className="p-1 rounded-full hover:bg-white/10 transition-colors ml-1 flex-shrink-0"
             >
-              <Icon name="x" className="w-3.5 h-3.5 text-white/50" />
+              <Icon name="x" className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-white/50" />
             </button>
           </div>
         </div>
