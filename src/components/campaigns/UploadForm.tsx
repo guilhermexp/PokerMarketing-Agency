@@ -182,6 +182,15 @@ export const UploadForm: React.FC<UploadFormProps> = ({
     return () => clearTimeout(timer);
   }, [toneToast]);
 
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '60px';
+      const scrollHeight = textareaRef.current.scrollHeight;
+      textareaRef.current.style.height = Math.max(60, Math.min(scrollHeight, 200)) + 'px';
+    }
+  }, [transcript]);
+
 
   // Persist collabLogo to localStorage
   useEffect(() => {
@@ -450,12 +459,13 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                   onChange={(e) => setTranscript(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Descreva sua ideia..."
-                  className="hide-scrollbar w-full rounded-[26px] rounded-b-none text-sm sm:text-base leading-relaxed text-white/90 placeholder:text-white/50 !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-3 sm:!px-6 !py-3 sm:!py-5 touch-manipulation transition-all duration-200 resize-none outline-none overflow-hidden"
+                  className="hide-scrollbar w-full rounded-[26px] rounded-b-none text-sm sm:text-base leading-relaxed text-white/90 placeholder:text-white/50 !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-3 sm:!px-6 !py-3 sm:!py-5 touch-manipulation transition-all duration-200 resize-none outline-none overflow-y-auto"
                   style={{
                     height: '60px',
+                    maxHeight: '200px',
                     WebkitUserSelect: 'text',
                     WebkitTouchCallout: 'none',
-                    minHeight: undefined,
+                    minHeight: '60px',
                   }}
                 />
 
