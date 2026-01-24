@@ -50,10 +50,6 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
             </div>
             <div className="flex items-center gap-1 text-[9px] text-white/50">
               <span>Patrocinado</span>
-              <span>·</span>
-              <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM1.5 8a6.5 6.5 0 1 1 13 0 6.5 6.5 0 0 1-13 0z"/>
-              </svg>
             </div>
           </div>
           <Icon name="more-horizontal" className="w-5 h-5 text-white/40 flex-shrink-0" />
@@ -68,7 +64,7 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
 
         {/* Image - fills remaining space */}
         <div
-          className={`flex-1 bg-white/5 overflow-hidden min-h-[100px] ${onImageClick ? "cursor-pointer" : ""}`}
+          className={`flex-1 bg-white/5 overflow-y-auto min-h-[150px] ${onImageClick ? "cursor-pointer" : ""}`}
           onClick={onImageClick}
         >
           {isGenerating ? (
@@ -76,68 +72,75 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
               <Loader className="text-white/60" />
             </div>
           ) : image ? (
-            <div className="relative w-full h-full">
-              <img
-                src={image}
-                alt="Facebook ad"
-                className="w-full h-full object-cover"
-                draggable={false}
-              />
-              {(onImageClick || galleryImage) && (
-                <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2">
-                  {galleryImage && (
-                    <SendToChatButton image={galleryImage} />
-                  )}
-                  {onImageClick && (
-                    <div className="px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur-sm text-xs text-white font-medium cursor-pointer">
-                      Editar
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <img
+              src={image}
+              alt="Facebook ad"
+              className="w-full h-full object-cover"
+              draggable={false}
+            />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center p-3">
+            <div className="w-full flex flex-col items-center justify-center p-3">
               <Icon name="image" className="w-8 h-8 text-white/10 mb-2" />
               {imagePrompt && (
-                <p className="text-[8px] text-white/20 italic text-center line-clamp-2">
+                <p className="text-[8px] text-white/20 italic text-center leading-relaxed">
                   "{imagePrompt}"
                 </p>
-              )}
-              {onGenerate && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onGenerate();
-                  }}
-                  className="mt-2 px-3 py-1 text-[9px] font-medium rounded-md bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors flex items-center gap-1"
-                >
-                  <Icon name="zap" className="w-3 h-3" />
-                  Gerar
-                </button>
               )}
             </div>
           )}
         </div>
 
         {/* Ad Info */}
-        <div className="px-3 py-2 bg-white/5 border-t border-white/10">
+        <div className="px-3 py-2 bg-white/5 border-t border-white/10 flex-1 overflow-y-auto">
           <p className="text-[9px] text-white/50 uppercase tracking-wide mb-1">
             {username.toLowerCase().replace(/\s+/g, '')}.com
           </p>
-          <p className="text-[11px] font-semibold text-white line-clamp-1">
+          <p className="text-[11px] font-semibold text-white">
             {headline}
           </p>
-          <p className="text-[9px] text-white/50 line-clamp-1 mt-0.5">
-            {body.substring(0, 60)}...
+          <p className="text-[9px] text-white/50 mt-0.5 leading-relaxed">
+            {body}
           </p>
         </div>
 
         {/* CTA Button */}
-        <div className="px-3 py-2 border-t border-white/10 flex items-center justify-between">
-          <button className="flex-1 py-2 bg-white/10 hover:bg-white/15 rounded text-[11px] font-semibold text-white/90 transition-colors">
+        <div className="px-3 py-2 border-t border-white/10">
+          <button className="w-full py-2 bg-white/10 hover:bg-white/15 rounded text-[11px] font-semibold text-white/90 transition-colors mb-2">
             {cta}
           </button>
+
+          {/* Action buttons - integrated */}
+          {(onGenerate || (image && (onImageClick || galleryImage))) && (
+            <div className="space-y-1.5">
+              {!image && onGenerate && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onGenerate();
+                  }}
+                  className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors flex items-center justify-center gap-1.5 border border-white/5"
+                >
+                  <Icon name="zap" className="w-3 h-3" />
+                  Gerar
+                </button>
+              )}
+              {image && onImageClick && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onImageClick();
+                  }}
+                  className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors flex items-center justify-center gap-1.5 border border-white/5"
+                >
+                  <Icon name="edit" className="w-3 h-3" />
+                  Editar
+                </button>
+              )}
+              {image && galleryImage && (
+                <SendToChatButton image={galleryImage} />
+              )}
+            </div>
+          )}
         </div>
       </div>
       {error && (

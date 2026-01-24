@@ -244,61 +244,14 @@ export const CampaignCarouselCard: React.FC<CampaignCarouselCardProps> = ({
                   </div>
                 </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-4">
-                  <Loader size={14} className="text-white/60" />
-                  <span className="text-xs text-white/50">
-                    Gerando imagens do carrossel...
-                  </span>
-                </div>
-                <div className="flex items-center justify-start gap-1 pb-2">
-                  {Array.from({ length: Math.min(totalSlides + 1, 6) }).map(
-                    (_, idx) => (
-                      <div
-                        key={`skeleton-${idx}`}
-                        className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-lg"
-                        style={{
-                          width: idx === 0 ? '10rem' : '5rem',
-                          height: '20rem',
-                        }}
-                      >
-                        <div className="w-full h-full bg-gradient-to-b from-white/5 to-white/0 flex items-center justify-center">
-                          {idx === 0 && (
-                            <div className="text-center">
-                              <Loader size={16} className="mx-auto mb-1 text-white/60" />
-                              <span className="text-[9px] text-white/50">
-                                Capa
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/50 text-xs text-white/40 font-medium">
-                          {idx === 0 ? 'C' : idx}
-                        </div>
-                      </div>
-                    ),
-                  )}
-                </div>
+              <div className="flex items-center gap-2">
+                <Loader size={14} className="text-white/60" />
+                <span className="text-xs text-white/50">
+                  Gerando imagens do carrossel...
+                </span>
               </div>
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <Icon
-                name="image"
-                className="w-10 h-10 text-white/20 mx-auto mb-3"
-              />
-              <p className="text-sm text-white/50 mb-4">
-                Clique em "Gerar Tudo" para criar o carrossel completo
-              </p>
-              <button
-                onClick={onGenerateAll}
-                disabled={isGeneratingAny}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500 transition-colors disabled:opacity-50"
-              >
-                {isGeneratingAny ? 'Gerando...' : 'Gerar Tudo'}
-              </button>
-            </div>
-          )}
+          ) : null}
         </div>
       )}
 

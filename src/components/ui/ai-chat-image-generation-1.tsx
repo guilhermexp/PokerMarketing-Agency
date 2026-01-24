@@ -31,6 +31,13 @@ export const ImageGenerationLoader = ({
   // Handle state transitions
   React.useEffect(() => {
     if (imageSrc && loadingState !== "revealing" && loadingState !== "completed") {
+      // If not generating (image already exists), skip animation
+      if (!isGenerating) {
+        setLoadingState("completed");
+        setProgress(100);
+        return;
+      }
+
       // Image arrived - start reveal
       setLoadingState("revealing");
       setProgress(0);

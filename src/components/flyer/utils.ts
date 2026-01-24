@@ -7,7 +7,7 @@
 import type { Currency } from '@/types/flyer.types';
 import type { TimePeriod } from '@/types/flyer.types';
 
-// Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
+// Dev mode flag - set to false to use BullMQ queue (Redis configured)
 export const isDevMode = false;
 
 // ============================================

@@ -6645,30 +6645,94 @@ const startup = async () => {
           aspectRatio = '1:1',
           imageSize = '1K',
           productImages = [],
-          styleReferenceImage,
+          // Style reference can have different field names depending on the source
+          styleReferenceImage,    // From post/ad jobs
+          styleReference,         // From GenerationJobConfig (clip/flyer)
+          referenceImage,         // From ImageJobConfig
           personReferenceImage,
-          brandProfile,
+          // brandProfile can be an object (from post/ad jobs) or individual fields (from clip/flyer jobs)
+          brandProfile: configBrandProfile,
+          // Individual brand fields (from GenerationJobConfig used by clip/flyer jobs)
+          brandName,
+          brandDescription,
+          brandToneOfVoice,
+          brandPrimaryColor,
+          brandSecondaryColor,
+          logo,
         } = config;
 
+        // Use whichever style reference field is provided
+        const rawStyleRef = styleReferenceImage || styleReference || referenceImage;
+
+        // Reconstruct brandProfile from individual fields if not provided as object
+        const brandProfile = configBrandProfile || (brandName ? {
+          name: brandName,
+          description: brandDescription || '',
+          toneOfVoice: brandToneOfVoice || 'Profissional',
+          primaryColor: brandPrimaryColor || '#000000',
+          secondaryColor: brandSecondaryColor || '#ffffff',
+          logo: logo || null,
+        } : null);
+
+        // Helper to normalize image entries (data URL strings or {base64, mimeType} objects)
+        const normalizeImageEntry = (entry) => {
+          if (!entry) return null;
+          // Already an object with base64 and mimeType
+          if (typeof entry === 'object' && entry.base64) {
+            return entry;
+          }
+          // Data URL string: "data:image/png;base64,..."
+          if (typeof entry === 'string' && entry.startsWith('data:')) {
+            const match = entry.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) {
+              return { base64: match[2], mimeType: match[1] };
+            }
+          }
+          // HTTP URL - skip (will be handled separately)
+          if (typeof entry === 'string' && entry.startsWith('http')) {
+            return null;
+          }
+          return null;
+        };
+
+        // Normalize productImages (may come as data URL strings from clip/flyer jobs)
+        const normalizedProductImages = (productImages || [])
+          .map(normalizeImageEntry)
+          .filter(Boolean);
+
+        // Normalize styleReferenceImage and personReferenceImage
+        const normalizedStyleRef = normalizeImageEntry(rawStyleRef);
+        const normalizedPersonRef = normalizeImageEntry(personReferenceImage);
+
         // Build full prompt with brand context
-        const hasStyleReference = !!styleReferenceImage;
-        const hasPersonReference = !!personReferenceImage;
-        const hasProducts = productImages?.length > 0;
+        const hasStyleReference = !!normalizedStyleRef;
+        const hasPersonReference = !!normalizedPersonRef;
+        const hasProducts = normalizedProductImages.length > 0;
 
         // Process logo from brandProfile (same as normal endpoint)
-        let allProductImages = [...(productImages || [])];
-        if (brandProfile?.logo && brandProfile.logo.startsWith('http')) {
-          try {
-            const logoBase64 = await urlToBase64(brandProfile.logo);
-            if (logoBase64) {
-              const mimeType = brandProfile.logo.includes('.svg') ? 'image/svg+xml'
-                : brandProfile.logo.includes('.jpg') || brandProfile.logo.includes('.jpeg') ? 'image/jpeg'
-                : 'image/png';
-              allProductImages.unshift({ base64: logoBase64, mimeType });
-              console.log(`[ImageWorker] Job ${jobId}: Logo converted to base64`);
+        let allProductImages = [...normalizedProductImages];
+        if (brandProfile?.logo) {
+          if (brandProfile.logo.startsWith('http')) {
+            // HTTP URL - convert to base64
+            try {
+              const logoBase64 = await urlToBase64(brandProfile.logo);
+              if (logoBase64) {
+                const mimeType = brandProfile.logo.includes('.svg') ? 'image/svg+xml'
+                  : brandProfile.logo.includes('.jpg') || brandProfile.logo.includes('.jpeg') ? 'image/jpeg'
+                  : 'image/png';
+                allProductImages.unshift({ base64: logoBase64, mimeType });
+                console.log(`[ImageWorker] Job ${jobId}: Logo HTTP URL converted to base64`);
+              }
+            } catch (logoError) {
+              console.error(`[ImageWorker] Job ${jobId}: Failed to convert logo:`, logoError.message);
             }
-          } catch (logoError) {
-            console.error(`[ImageWorker] Job ${jobId}: Failed to convert logo:`, logoError.message);
+          } else if (brandProfile.logo.startsWith('data:')) {
+            // Data URL - normalize it
+            const normalizedLogo = normalizeImageEntry(brandProfile.logo);
+            if (normalizedLogo) {
+              allProductImages.unshift(normalizedLogo);
+              console.log(`[ImageWorker] Job ${jobId}: Logo data URL normalized`);
+            }
           }
         }
         const hasLogo = !!brandProfile?.logo && allProductImages.length > 0;
@@ -6708,8 +6772,8 @@ const startup = async () => {
           DEFAULT_IMAGE_MODEL,
           imageSize,
           allProductImages.length > 0 ? allProductImages : undefined,
-          styleReferenceImage,
-          personReferenceImage,
+          normalizedStyleRef,
+          normalizedPersonRef,
         );
 
         await job.updateProgress(80);

@@ -25,7 +25,7 @@ import { useBackgroundJobs } from '../../hooks/useBackgroundJobs';
 import type { ActiveJob } from '../../hooks/useBackgroundJobs';
 import type { BrandProfile } from '../../types';
 
-// Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
+// Dev mode flag - set to false to use BullMQ queue (Redis configured)
 const isDevMode = false;
 
 // Sample video URLs for the feed

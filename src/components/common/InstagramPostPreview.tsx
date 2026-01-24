@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Icon } from "./Icon";
-import { SendToChatButton } from "./SendToChatButton";
 import { ImageGenerationLoader } from "../ui/ai-chat-image-generation-1";
 import type { GalleryImage } from "../../types";
 
@@ -11,6 +10,7 @@ interface InstagramPostPreviewProps {
   username?: string;
   isGenerating?: boolean;
   onGenerate?: () => void;
+  onRegenerate?: () => void;
   onImageClick?: () => void;
   imagePrompt?: string;
   error?: string | null;
@@ -24,16 +24,14 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
   username = "marca",
   isGenerating = false,
   onGenerate,
+  onRegenerate,
   onImageClick,
   imagePrompt,
   error,
   galleryImage,
 }) => {
-  const [showFullCaption, setShowFullCaption] = useState(false);
-
-  // Truncate caption for preview - show more by default
-  const truncatedCaption = caption.length > 250 ? caption.slice(0, 250) + "..." : caption;
-  const displayCaption = showFullCaption ? caption : truncatedCaption;
+  // Display full caption always
+  const displayCaption = caption;
 
   return (
     <div className="flex flex-col h-full">
@@ -64,26 +62,11 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
             onClick={onImageClick}
           >
             {isGenerating || image ? (
-              <>
-                <ImageGenerationLoader
-                  imageSrc={image}
-                  prompt={imagePrompt}
-                  isGenerating={isGenerating}
-                />
-                {/* Hover overlay for editing and chat - only when image is ready and not generating */}
-                {image && !isGenerating && (onImageClick || galleryImage) && (
-                  <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2 z-30">
-                    {galleryImage && (
-                      <SendToChatButton image={galleryImage} />
-                    )}
-                    {onImageClick && (
-                      <div className="px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur-sm text-xs text-white font-medium cursor-pointer">
-                        Editar
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
+              <ImageGenerationLoader
+                imageSrc={image}
+                prompt={imagePrompt}
+                isGenerating={isGenerating}
+              />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center p-3">
                 <Icon name="image" className="w-8 h-8 text-white/10 mb-2" />
@@ -98,7 +81,7 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
                       e.stopPropagation();
                       onGenerate();
                     }}
-                    className="mt-2 px-3 py-1 text-[9px] font-medium rounded-md bg-primary/20 text-primary hover:bg-primary/30 transition-colors flex items-center gap-1"
+                    className="mt-2 px-3 py-1.5 text-[9px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors flex items-center gap-1 border border-white/5"
                   >
                     <Icon name="zap" className="w-3 h-3" />
                     Gerar
@@ -118,19 +101,11 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
           </div>
 
           {/* Caption */}
-          <div className="px-2.5 pb-3 flex-1 overflow-y-auto max-h-[120px]">
+          <div className="px-2.5 pb-2 flex-1 overflow-y-auto">
             <p className="text-[9px] text-white/90 leading-relaxed">
               <span className="font-semibold">{username}</span>{" "}
               {displayCaption}
             </p>
-            {caption.length > 250 && (
-              <button
-                onClick={() => setShowFullCaption(!showFullCaption)}
-                className="text-[8px] text-white/40 hover:text-white/60 transition-colors mt-1"
-              >
-                {showFullCaption ? "menos" : "mais"}
-              </button>
-            )}
             {/* Hashtags */}
             {hashtags.length > 0 && (
               <p className="text-[8px] text-blue-400/70 mt-1.5">
@@ -138,6 +113,37 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
               </p>
             )}
           </div>
+
+          {/* Action buttons - integrated in mockup when image exists */}
+          {image && !isGenerating && (onRegenerate || onImageClick || galleryImage) && (
+            <div className="px-2.5 pb-2 space-y-2">
+              {onRegenerate && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRegenerate();
+                  }}
+                  disabled={isGenerating}
+                  className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 border border-white/5"
+                >
+                  <Icon name="refresh" className="w-3 h-3" />
+                  Regenerar imagem
+                </button>
+              )}
+              {onImageClick && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onImageClick();
+                  }}
+                  className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors flex items-center justify-center gap-1.5 border border-white/5"
+                >
+                  <Icon name="edit" className="w-3 h-3" />
+                  Editar
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
       {error && (

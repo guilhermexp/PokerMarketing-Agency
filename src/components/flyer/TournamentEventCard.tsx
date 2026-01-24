@@ -46,7 +46,7 @@ interface TournamentEventCardProps {
   onSchedulePost?: (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => void;
 }
 
-// Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
+// Dev mode flag - set to false to use BullMQ queue (Redis configured)
 const isDevMode = false;
 
 const formatCurrencyValue = (val: string, currency: Currency): string => {

@@ -1,8 +1,8 @@
 # Arquitetura de Geração de Imagens
 ## Análise Completa dos Parâmetros e Prompts
 
-**Versão:** 1.0
-**Data:** 2026-01-15
+**Versão:** 1.1
+**Data:** 2026-01-24
 **Status:** Documentação Oficial
 
 ---
@@ -17,6 +17,7 @@
 6. [Casos de Uso](#casos-de-uso)
 7. [Esquemas de Dados](#esquemas-de-dados)
 8. [Boas Práticas](#boas-práticas)
+9. [ImageWorker - Processamento em Background](#-imageworker---processamento-em-background)
 
 ---
 
@@ -1252,7 +1253,194 @@ POST /api/ai/extract-colors     - Extrair cores de logo
 
 ---
 
+## 🔧 ImageWorker - Processamento em Background
+
+### Visão Geral
+
+O **ImageWorker** é responsável pelo processamento assíncrono de geração de imagens via **BullMQ/Redis**. É utilizado principalmente na geração de campanhas, onde múltiplas imagens precisam ser criadas em background.
+
+**Localização:**
+- `server/dev-api.mjs` (desenvolvimento) - linha ~6480
+- `server/index.mjs` (produção) - linha ~6630
+
+### Fluxo de Processamento
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│            CAMPANHA SOLICITA GERAÇÃO DE IMAGEM              │
+│  POST /api/campaigns → addJob('image-generation', {...})    │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    REDIS/BULLMQ QUEUE                       │
+│  Job: { jobId, userId, jobType, prompt, config }            │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     IMAGE WORKER                            │
+│  1. Converte logo HTTP → base64 (urlToBase64)               │
+│  2. Converte prompt → JSON (convertImagePromptToJson)       │
+│  3. Constrói prompt completo (buildImagePrompt)             │
+│  4. Gera imagem (generateImageWithFallback)                 │
+│  5. Upload para Vercel Blob                                 │
+│  6. Salva na gallery_images                                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Paridade com Endpoint Normal
+
+O ImageWorker foi projetado para ter **paridade total** com o endpoint `/api/ai/image`. A tabela abaixo demonstra a equivalência:
+
+| Aspecto | Endpoint Normal (`/api/ai/image`) | ImageWorker |
+|---------|-----------------------------------|-------------|
+| **Inicialização de productImages** | `productImages ? [...productImages] : []` | `[...(productImages \|\| [])]` |
+| **Conversão de Logo HTTP** | ✅ `urlToBase64(brandProfile.logo)` | ✅ `urlToBase64(brandProfile.logo)` |
+| **MIME Type do Logo** | ✅ Detecta SVG/JPG/PNG | ✅ Detecta SVG/JPG/PNG |
+| **JSON Prompt** | ✅ `convertImagePromptToJson()` | ✅ `convertImagePromptToJson()` |
+| **hasLogo calculation** | `!!brandProfile.logo && allProductImages.length > 0` | `!!brandProfile?.logo && allProductImages.length > 0` |
+| **buildImagePrompt** | ✅ Passa `jsonPrompt` | ✅ Passa `jsonPrompt` |
+| **generateImageWithFallback** | ✅ Usa `allProductImages` | ✅ Usa `allProductImages` |
+| **Upload Vercel Blob** | ✅ (se Replicate) | ✅ (se Replicate) |
+
+### Código do ImageWorker
+
+```javascript
+// server/dev-api.mjs ~linha 6480
+const processImageJob = async (job) => {
+  const { jobId, userId, jobType, prompt, config } = job.data;
+  const sql = getSql();
+
+  // Parse config
+  const {
+    aspectRatio = '1:1',
+    imageSize = '1K',
+    productImages = [],
+    styleReferenceImage,
+    personReferenceImage,
+    brandProfile,
+  } = config;
+
+  // Build full prompt with brand context
+  const hasStyleReference = !!styleReferenceImage;
+  const hasPersonReference = !!personReferenceImage;
+  const hasProducts = productImages?.length > 0;
+
+  // 1. PROCESSO DO LOGO (igual ao endpoint normal)
+  let allProductImages = [...(productImages || [])];
+  if (brandProfile?.logo && brandProfile.logo.startsWith('http')) {
+    try {
+      const logoBase64 = await urlToBase64(brandProfile.logo);
+      if (logoBase64) {
+        const mimeType = brandProfile.logo.includes('.svg') ? 'image/svg+xml'
+          : brandProfile.logo.includes('.jpg') || brandProfile.logo.includes('.jpeg') ? 'image/jpeg'
+          : 'image/png';
+        allProductImages.unshift({ base64: logoBase64, mimeType });
+      }
+    } catch (logoError) {
+      console.error(`[ImageWorker] Failed to convert logo:`, logoError.message);
+    }
+  }
+  const hasLogo = !!brandProfile?.logo && allProductImages.length > 0;
+
+  // 2. CONVERSÃO PARA JSON (igual ao endpoint normal)
+  let jsonPrompt = null;
+  try {
+    jsonPrompt = await convertImagePromptToJson(
+      prompt,
+      aspectRatio,
+      config.organizationId,
+      sql,
+    );
+  } catch (jsonError) {
+    console.warn(`[ImageWorker] Failed to convert prompt to JSON:`, jsonError.message);
+  }
+
+  // 3. BUILD DO PROMPT COMPLETO
+  const fullPrompt = buildImagePrompt(
+    prompt,
+    brandProfile,
+    hasStyleReference,
+    hasLogo,
+    hasPersonReference,
+    hasProducts,
+    jsonPrompt,  // ← JSON estruturado (não raw prompt)
+  );
+
+  // 4. GERAÇÃO DA IMAGEM
+  const result = await generateImageWithFallback(
+    fullPrompt,
+    aspectRatio,
+    DEFAULT_IMAGE_MODEL,
+    imageSize,
+    allProductImages.length > 0 ? allProductImages : undefined,  // ← Inclui logo
+    styleReferenceImage,
+    personReferenceImage,
+  );
+
+  // 5. Upload e salvamento...
+};
+```
+
+### Diferenças Técnicas (Não-Funcionais)
+
+| Aspecto | Endpoint Normal | ImageWorker | Impacto |
+|---------|-----------------|-------------|---------|
+| **Error handling JSON** | Sem try-catch (propaga erro) | Com try-catch (resiliente) | Worker não falha se JSON der erro |
+| **Null safety** | `brandProfile.logo` | `brandProfile?.logo` | Worker mais seguro |
+| **organizationId** | `organizationId` (da auth) | `config.organizationId` | Mesma origem, diferente acesso |
+| **Variáveis intermediárias** | Inline expressions | `hasProducts`, `hasStyleReference` | Apenas legibilidade |
+
+### Logs de Debugging
+
+O ImageWorker inclui logs detalhados para troubleshooting:
+
+```
+[ImageWorker] Processing job abc123 (image)
+[ImageWorker] Job abc123: Logo converted to base64
+[ImageWorker] Job abc123: Prompt converted to JSON
+[ImageWorker] Job abc123: Generating image...
+[ImageWorker] Job abc123: Image generated via gemini
+[ImageWorker] Job abc123: Uploading Replicate image to Vercel Blob...
+[ImageWorker] Job abc123: Uploaded to Vercel Blob: https://...
+[ImageWorker] Job abc123: Saving to gallery...
+[ImageWorker] Job abc123: Completed successfully
+```
+
+### Verificação de Qualidade
+
+Para garantir que as imagens geradas via campanha têm a mesma qualidade do endpoint direto:
+
+1. **Verificar nos logs:**
+   - `Logo converted to base64` → Logo está sendo processado
+   - `Prompt converted to JSON` → Prompt está sendo estruturado
+
+2. **Verificar na imagem gerada:**
+   - Cores da marca presentes
+   - Logo visível (se aplicável)
+   - Estilo visual consistente com brand profile
+
+3. **Comparação A/B:**
+   ```bash
+   # Gerar via endpoint direto
+   curl -X POST /api/ai/image -d '{"prompt": "...", "brandProfile": {...}}'
+
+   # Gerar via campanha (ImageWorker)
+   # → Verificar se resultado é equivalente
+   ```
+
+---
+
 ## 📝 Changelog
+
+**v1.1 (2026-01-24)**
+- Adicionada documentação do ImageWorker
+- Corrigido ImageWorker para ter paridade com endpoint normal
+- Adicionada conversão de logo HTTP para base64 no worker
+- Adicionada chamada de `convertImagePromptToJson()` no worker
+- Corrigido parâmetro `jsonPrompt` em `buildImagePrompt()`
+- Corrigido uso de `allProductImages` em `generateImageWithFallback()`
 
 **v1.0 (2026-01-15)**
 - Documentação inicial completa
@@ -1263,5 +1451,5 @@ POST /api/ai/extract-colors     - Extrair cores de logo
 ---
 
 **Autor:** Claude Code (Senior Architect)
-**Última Atualização:** 2026-01-15
+**Última Atualização:** 2026-01-24
 **Status:** Documentação de Produção

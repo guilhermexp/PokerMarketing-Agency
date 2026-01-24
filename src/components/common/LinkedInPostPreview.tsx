@@ -12,6 +12,7 @@ interface LinkedInPostPreviewProps {
   headline?: string;
   isGenerating?: boolean;
   onGenerate?: () => void;
+  onRegenerate?: () => void;
   onImageClick?: () => void;
   imagePrompt?: string;
   error?: string | null;
@@ -26,6 +27,7 @@ export const LinkedInPostPreview: React.FC<LinkedInPostPreviewProps> = ({
   headline = "Empresa",
   isGenerating = false,
   onGenerate,
+  onRegenerate,
   onImageClick,
   imagePrompt,
   error,
@@ -127,6 +129,23 @@ export const LinkedInPostPreview: React.FC<LinkedInPostPreviewProps> = ({
             </div>
           )}
         </div>
+
+        {/* Regenerate button - integrated in mockup when image exists */}
+        {image && !isGenerating && onRegenerate && (
+          <div className="px-3 py-2 border-t border-white/5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRegenerate();
+              }}
+              disabled={isGenerating}
+              className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 border border-white/5"
+            >
+              <Icon name="refresh" className="w-3 h-3" />
+              Regenerar imagem
+            </button>
+          </div>
+        )}
 
         {/* Engagement stats */}
         <div className="px-3 py-1.5 flex items-center justify-between text-[9px] text-white/40 border-b border-white/5">

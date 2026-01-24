@@ -28,7 +28,7 @@ import {
 import type { GenerationJobConfig } from "../../services/apiClient";
 import { updatePostImage } from "../../services/apiClient";
 
-// Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
+// Dev mode flag - set to false to use BullMQ queue (Redis configured)
 const isDevMode = false;
 
 interface PostsTabProps {
@@ -703,19 +703,17 @@ export const PostsTab: React.FC<PostsTabProps> = ({
   return (
     <div className="space-y-6">
       {/* Controls Bar - Minimal */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 px-4 py-3 bg-[#0a0a0a] rounded-xl border border-white/[0.05]">
-        <Button
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <button
           onClick={handleGenerateAll}
-          isLoading={isGeneratingAll}
           disabled={
             isGeneratingAll || generationState.isGenerating.some(Boolean)
           }
-          icon="zap"
-          size="small"
-          className="!rounded-md !px-3 !py-1.5 !text-[10px] !bg-primary/10 !text-primary/80 !border !border-primary/20 hover:!bg-primary/20"
+          className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-30 disabled:cursor-not-allowed"
         >
+          <Icon name="zap" className="w-4 h-4" />
           Gerar Todas
-        </Button>
+        </button>
         <div className="flex items-center gap-2">
           <span className="text-[9px] text-white/30">Modelo:</span>
           <select
@@ -744,6 +742,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
                 username={brandProfile.name}
                 isGenerating={generationState.isGenerating[index]}
                 onGenerate={() => handleGenerate(index)}
+                onRegenerate={() => handleGenerate(index)}
                 onImageClick={image ? () => setEditingInstagramImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
                 error={generationState.errors[index]}
@@ -764,6 +763,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
                 username={brandProfile.name}
                 isGenerating={generationState.isGenerating[index]}
                 onGenerate={() => handleGenerate(index)}
+                onRegenerate={() => handleGenerate(index)}
                 onImageClick={image ? () => setEditingFacebookImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
                 error={generationState.errors[index]}
@@ -784,6 +784,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
                 username={brandProfile.name}
                 isGenerating={generationState.isGenerating[index]}
                 onGenerate={() => handleGenerate(index)}
+                onRegenerate={() => handleGenerate(index)}
                 onImageClick={image ? () => setEditingTwitterImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
                 error={generationState.errors[index]}
@@ -805,6 +806,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
                 headline={brandProfile.industry || "Empresa"}
                 isGenerating={generationState.isGenerating[index]}
                 onGenerate={() => handleGenerate(index)}
+                onRegenerate={() => handleGenerate(index)}
                 onImageClick={image ? () => setEditingLinkedInImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
                 error={generationState.errors[index]}

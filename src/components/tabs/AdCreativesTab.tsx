@@ -25,7 +25,7 @@ import {
 import type { GenerationJobConfig } from "../../services/apiClient";
 import { updateAdCreativeImage } from "../../services/apiClient";
 
-// Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
+// Dev mode flag - set to false to use BullMQ queue (Redis configured)
 const isDevMode = false;
 
 interface AdCreativesTabProps {
@@ -156,7 +156,7 @@ const AdCard: React.FC<{
                         e.stopPropagation();
                         handleToggleFavorite(image);
                       }}
-                      className={`w - 8 h - 8 rounded - lg flex items - center justify - center transition - colors ${isFavorite(image) ? "bg-primary text-black" : "bg-white/10 text-white/70 hover:text-primary"} `}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isFavorite(image) ? "bg-primary text-black" : "bg-white/10 text-white/70 hover:text-primary"}`}
                       title={
                         isFavorite(image)
                           ? "Remover dos favoritos"
@@ -233,7 +233,7 @@ const AdCard: React.FC<{
             onClose={() => setEditingImage(null)}
             onImageUpdate={handleModalUpdate}
             onSetChatReference={onSetChatReference}
-            downloadFilename={`ad - ${ad.platform.toLowerCase().replace(/\s+/g, "_")}.png`}
+            downloadFilename={`ad-${ad.platform.toLowerCase().replace(/\s+/g, "_")}.png`}
           />
         )}
       </>
@@ -288,12 +288,12 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
   // Helper to generate unique source for an ad
   // Includes campaignId to ensure uniqueness across campaigns
   const getAdSource = useCallback((index: number, platform: string) => {
-    return campaignId ? `Ad ${index + 1} (${platform}) - ${campaignId} ` : `Ad ${index + 1} (${platform})`;
+    return campaignId ? `Ad ${index + 1} (${platform}) - ${campaignId}` : `Ad ${index + 1} (${platform})`;
   }, [campaignId]);
 
   // Legacy source format (for backward compatibility)
   const getLegacyAdSource = (index: number, platform: string) =>
-    `Ad - ${platform} -${index} `;
+    `Ad - ${platform} -${index}`;
 
   // ============================================================================
   // IMAGE RECOVERY LOGIC - DO NOT REMOVE THIS FALLBACK!
@@ -322,7 +322,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
       // Priority 1: Use saved image_url from database (most reliable)
       if (ad.image_url) {
         return {
-          id: `saved - ${ad.id || Date.now()} `,
+          id: `saved-${ad.id || Date.now()}`,
           src: ad.image_url,
           prompt: ad.image_prompt || "",
           source: getAdSource(index, ad.platform) as string,
@@ -488,7 +488,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
           source: "Anúncio",
         };
 
-        await queueJob(userId, "ad", ad.image_prompt, config, `ad - ${index} `);
+        await queueJob(userId, "ad", ad.image_prompt, config, `ad-${index}`);
         // Job will complete via onJobComplete callback
         return;
       } catch (err) {
@@ -671,19 +671,17 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
   return (
     <div className="space-y-6">
       {/* Controls Bar - Minimal */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 px-4 py-3 bg-[#0a0a0a] rounded-xl border border-white/[0.05]">
-        <Button
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <button
           onClick={handleGenerateAll}
-          isLoading={isGeneratingAll}
           disabled={
             isGeneratingAll || generationState.isGenerating.some(Boolean)
           }
-          icon="zap"
-          size="small"
-          className="!rounded-md !px-3 !py-1.5 !text-[10px] !bg-primary/10 !text-primary/80 !border !border-primary/20 hover:!bg-primary/20"
+          className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-30 disabled:cursor-not-allowed"
         >
+          <Icon name="zap" className="w-4 h-4" />
           Gerar Todos
-        </Button>
+        </button>
         <div className="flex items-center gap-2">
           <span className="text-[9px] text-white/30">Modelo:</span>
           <select
@@ -773,7 +771,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
             );
           }}
           onSetChatReference={onSetChatReference}
-          downloadFilename={`ad - ${editingAdImage.platform.toLowerCase()}.png`}
+          downloadFilename={`ad-${editingAdImage.platform.toLowerCase()}.png`}
           onQuickPost={onQuickPost}
           onSchedulePost={onSchedulePost}
         />

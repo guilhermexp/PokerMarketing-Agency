@@ -345,6 +345,7 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
                 ${idx === currentIndex ? "border-white/30 ring-2 ring-white/10" : "border-white/10"}
                 ${dragOverIndex === idx ? "scale-105 border-blue-500" : ""}
                 ${draggedIndex === idx ? "opacity-50 scale-95" : ""}
+                ${isGenerating ? "border-white/30" : ""}
                 hover:border-white/30
               `}
               style={{
@@ -361,6 +362,14 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/70 text-sm text-white font-medium">
                 {idx + 1}
               </div>
+              {isGenerating && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-xl">
+                  <div className="text-center">
+                    <Loader size={16} className="mx-auto mb-1 text-white/60" />
+                    <span className="text-[9px] text-white/50">Gerando...</span>
+                  </div>
+                </div>
+              )}
               {/* Action buttons - appear on hover */}
               {!isGenerating && (
                 <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
@@ -384,26 +393,24 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
           })}
           {/* Skeleton placeholders for slides being generated */}
           {totalExpectedSlides > images.length && Object.values(generatingSlides).some(v => v) && (
-            Array.from({ length: Math.min(totalExpectedSlides - images.length, 5) }).map((_, idx) => (
-              <div
-                key={`skeleton-${idx}`}
-                className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-lg"
-                style={{
-                  width: "7rem",
-                  height: "28rem",
-                }}
-              >
-                <div className="w-full h-full bg-gradient-to-b from-white/5 to-white/0 flex items-center justify-center">
-                  <div className="text-center">
-                    <Loader size={20} className="mx-auto mb-2 text-white/60" />
-                    <span className="text-[10px] text-white/50">Gerando...</span>
-                  </div>
-                </div>
-                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/50 text-sm text-white/40 font-medium">
-                  {images.length + idx + 1}
+            <div
+              key="skeleton-loading"
+              className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-lg"
+              style={{
+                width: "20rem",
+                height: "28rem",
+              }}
+            >
+              <div className="w-full h-full bg-gradient-to-b from-white/5 to-white/0 flex items-center justify-center">
+                <div className="text-center">
+                  <Loader size={20} className="mx-auto mb-2 text-white/60" />
+                  <span className="text-[10px] text-white/50">Gerando...</span>
                 </div>
               </div>
-            ))
+              <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/50 text-sm text-white/40 font-medium">
+                {images.length + 1}
+              </div>
+            </div>
           )}
         </div>
       </div>
