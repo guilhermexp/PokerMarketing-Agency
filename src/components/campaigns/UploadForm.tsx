@@ -501,7 +501,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                       {isEnhancing ? (
                         <div className="w-4 h-4 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <Icon name="wand-2" className="size-4 sm:size-[18px]" />
+                        <Icon name="wand-2" className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                       )}
                     </button>
                     <button
