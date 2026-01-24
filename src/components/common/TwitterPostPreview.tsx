@@ -1,7 +1,7 @@
 import React from "react";
 import { Icon } from "./Icon";
 import { SendToChatButton } from "./SendToChatButton";
-import { Loader } from "./Loader";
+import { ImageGenerationLoader } from "../ui/ai-chat-image-generation-1";
 import type { GalleryImage } from "../../types";
 
 interface TwitterPostPreviewProps {
@@ -33,8 +33,24 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
   error,
   galleryImage,
 }) => {
+  const [isImageLoading, setIsImageLoading] = React.useState(false);
+  const [loadedImage, setLoadedImage] = React.useState<string | null>(null);
   const displayHandle = handle || `@${username.toLowerCase().replace(/\s+/g, "_")}`;
   const cleanHashtags = hashtags.map(h => h.startsWith('#') ? h : `#${h}`);
+
+  // Track when image URL changes to show loading
+  React.useEffect(() => {
+    if (image && image !== loadedImage) {
+      setIsImageLoading(true);
+    }
+  }, [image, loadedImage]);
+
+  const handleImageLoad = () => {
+    setIsImageLoading(false);
+    setLoadedImage(image);
+  };
+
+  const showLoader = isGenerating || isImageLoading;
 
   return (
     <div className="h-full flex flex-col">
@@ -67,22 +83,25 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
 
         {/* Image - fills remaining space */}
         <div
-          className={`flex-1 bg-white/5 overflow-hidden mx-3 mb-2 rounded-xl min-h-[120px] ${onImageClick ? "cursor-pointer" : ""}`}
+          className={`flex-1 bg-white/5 overflow-hidden mx-3 mb-2 rounded-xl min-h-[120px] relative ${onImageClick ? "cursor-pointer" : ""}`}
           onClick={onImageClick}
         >
-          {isGenerating ? (
-            <div className="w-full h-full flex items-center justify-center">
-              <Loader className="text-white/60" />
+          {showLoader && (
+            <div className="absolute inset-0 z-10">
+              <ImageGenerationLoader prompt={imagePrompt || ""} showLabel={true} />
             </div>
-          ) : image ? (
+          )}
+          {image ? (
             <div className="relative w-full h-full">
               <img
                 src={image}
                 alt="Tweet media"
                 className="w-full h-full object-cover"
                 draggable={false}
+                onLoad={handleImageLoad}
+                style={{ opacity: isImageLoading ? 0 : 1 }}
               />
-              {(onImageClick || galleryImage) && (
+              {!isImageLoading && (onImageClick || galleryImage) && (
                 <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2">
                   {galleryImage && (
                     <SendToChatButton image={galleryImage} />
@@ -95,7 +114,7 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
                 </div>
               )}
             </div>
-          ) : (
+          ) : !isGenerating ? (
             <div className="w-full h-full flex flex-col items-center justify-center p-3">
               <Icon name="image" className="w-8 h-8 text-white/10 mb-2" />
               {imagePrompt && (
@@ -116,7 +135,7 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
                 </button>
               )}
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Regenerate button - integrated in mockup when image exists */}

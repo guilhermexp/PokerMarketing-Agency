@@ -1,7 +1,7 @@
 import React from "react";
 import { Icon } from "./Icon";
 import { SendToChatButton } from "./SendToChatButton";
-import { Loader } from "./Loader";
+import { ImageGenerationLoader } from "../ui/ai-chat-image-generation-1";
 import type { GalleryImage } from "../../types";
 
 interface FacebookAdPreviewProps {
@@ -31,6 +31,23 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
   error,
   galleryImage,
 }) => {
+  const [isImageLoading, setIsImageLoading] = React.useState(false);
+  const [loadedImage, setLoadedImage] = React.useState<string | null>(null);
+
+  // Track when image URL changes to show loading
+  React.useEffect(() => {
+    if (image && image !== loadedImage) {
+      setIsImageLoading(true);
+    }
+  }, [image, loadedImage]);
+
+  const handleImageLoad = () => {
+    setIsImageLoading(false);
+    setLoadedImage(image);
+  };
+
+  const showLoader = isGenerating || isImageLoading;
+
   return (
     <div className="h-full flex flex-col">
       {/* Facebook Ad Card */}
@@ -64,21 +81,24 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
 
         {/* Image - fills remaining space */}
         <div
-          className={`flex-1 bg-white/5 overflow-y-auto min-h-[150px] ${onImageClick ? "cursor-pointer" : ""}`}
+          className={`flex-1 bg-white/5 overflow-y-auto min-h-[150px] relative ${onImageClick ? "cursor-pointer" : ""}`}
           onClick={onImageClick}
         >
-          {isGenerating ? (
-            <div className="w-full h-full flex items-center justify-center">
-              <Loader className="text-white/60" />
+          {showLoader && (
+            <div className="absolute inset-0 z-10">
+              <ImageGenerationLoader prompt={imagePrompt || ""} showLabel={true} />
             </div>
-          ) : image ? (
+          )}
+          {image ? (
             <img
               src={image}
               alt="Facebook ad"
               className="w-full h-full object-cover"
               draggable={false}
+              onLoad={handleImageLoad}
+              style={{ opacity: isImageLoading ? 0 : 1 }}
             />
-          ) : (
+          ) : !isGenerating ? (
             <div className="w-full flex flex-col items-center justify-center p-3">
               <Icon name="image" className="w-8 h-8 text-white/10 mb-2" />
               {imagePrompt && (
@@ -87,7 +107,7 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
                 </p>
               )}
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Ad Info */}

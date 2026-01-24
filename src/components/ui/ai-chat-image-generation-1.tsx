@@ -26,11 +26,21 @@ export const ImageGenerationLoader = ({
   const [loadingState, setLoadingState] = React.useState<
     "waiting" | "generating" | "revealing" | "completed"
   >("waiting");
+  const [isImageLoaded, setIsImageLoaded] = React.useState(false);
+  const [currentImageSrc, setCurrentImageSrc] = React.useState<string | null>(null);
   const revealDuration = 3000; // 3 seconds to reveal
 
-  // Handle state transitions
+  // Track when image URL changes to reset loaded state
   React.useEffect(() => {
-    if (imageSrc && loadingState !== "revealing" && loadingState !== "completed") {
+    if (imageSrc !== currentImageSrc) {
+      setIsImageLoaded(false);
+      setCurrentImageSrc(imageSrc);
+    }
+  }, [imageSrc, currentImageSrc]);
+
+  // Handle state transitions - only start reveal when image is fully loaded
+  React.useEffect(() => {
+    if (imageSrc && isImageLoaded && loadingState !== "revealing" && loadingState !== "completed") {
       // If not generating (image already exists), skip animation
       if (!isGenerating) {
         setLoadingState("completed");
@@ -38,7 +48,7 @@ export const ImageGenerationLoader = ({
         return;
       }
 
-      // Image arrived - start reveal
+      // Image arrived and loaded - start reveal
       setLoadingState("revealing");
       setProgress(0);
 
@@ -63,7 +73,7 @@ export const ImageGenerationLoader = ({
       }, 1000);
       return () => clearTimeout(timeout);
     }
-  }, [imageSrc, isGenerating, loadingState, onRevealComplete]);
+  }, [imageSrc, isImageLoaded, isGenerating, loadingState, onRevealComplete]);
 
   // Reset when starting new generation
   React.useEffect(() => {
@@ -72,6 +82,10 @@ export const ImageGenerationLoader = ({
       setProgress(0);
     }
   }, [isGenerating, imageSrc]);
+
+  const handleImageLoad = () => {
+    setIsImageLoaded(true);
+  };
 
   const isRevealing = loadingState === "revealing";
   const isCompleted = loadingState === "completed";
@@ -85,6 +99,8 @@ export const ImageGenerationLoader = ({
           src={imageSrc}
           alt="Generated"
           className="w-full h-full object-cover"
+          onLoad={handleImageLoad}
+          style={{ opacity: isImageLoaded || !isGenerating ? 1 : 0 }}
         />
       )}
 
@@ -121,14 +137,14 @@ export const ImageGenerationLoader = ({
         )}
       </AnimatePresence>
 
-      {/* Loading text */}
+      {/* Loading text - Centralized */}
       <AnimatePresence>
         {(showLoader || isRevealing) && !isCompleted && (
           <motion.div
-            className="absolute bottom-3 left-0 right-0 flex justify-center z-20"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            className="absolute inset-0 flex items-center justify-center z-20"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
           >
             <motion.span
               className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm
