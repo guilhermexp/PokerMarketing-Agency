@@ -18,17 +18,17 @@ const CountSelector: React.FC<{
   disabled?: boolean;
   onChange: (count: number) => void;
 }> = ({ count, disabled, onChange }) => (
-  <div className={`flex items-center gap-1 ${disabled ? 'opacity-40' : ''}`}>
+  <div className={`flex items-center gap-2 ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
     {[1, 2, 3].map((num) => (
       <button
         key={num}
         onClick={() => onChange(num)}
         disabled={disabled}
         className={`
-          w-8 h-8 rounded-lg text-xs font-semibold transition-all
+          w-10 h-10 rounded-xl text-sm font-bold transition-all
           ${count === num
-            ? 'bg-white/15 text-white'
-            : 'text-white/40 hover:text-white/70 hover:bg-white/[0.06]'
+            ? 'bg-primary text-white shadow-lg shadow-primary/30'
+            : 'bg-white/5 text-white/50 hover:text-white hover:bg-white/10 border border-white/10'
           }
         `}
       >
@@ -58,49 +58,51 @@ const SectionCard: React.FC<{
   children,
 }) => (
   <div
-    className={`rounded-xl border p-3 sm:p-4 transition-all ${
+    onClick={onToggle}
+    className={`rounded-2xl border-2 p-5 transition-all cursor-pointer group ${
       enabled
-        ? 'border-white/10 bg-white/[0.03]'
-        : 'border-white/[0.06] bg-[#0e0e0e]'
+        ? 'border-primary/50 bg-primary/5 shadow-lg shadow-primary/10'
+        : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
     }`}
   >
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex items-start gap-3">
+    <div className="flex items-start justify-between gap-4 mb-4">
+      <div className="flex items-start gap-4 flex-1">
         <div
-          className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-            enabled ? 'bg-white/10 text-white' : 'bg-white/[0.03] text-white/40'
+          className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all ${
+            enabled ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/40 group-hover:bg-white/10'
           }`}
         >
-          <Icon name={icon} className="w-4 h-4" />
+          <Icon name={icon} className="w-7 h-7" />
         </div>
-        <div>
-          <p className={`text-sm font-semibold ${enabled ? 'text-white' : 'text-white/60'}`}>
+        <div className="flex-1">
+          <h3 className={`text-lg font-bold mb-1 ${enabled ? 'text-white' : 'text-white/70'}`}>
             {title}
-          </p>
-          <p className="text-[11px] text-white/40 mt-0.5">{description}</p>
+          </h3>
+          <p className="text-sm text-white/50 leading-relaxed">{description}</p>
         </div>
       </div>
-      <div className="flex flex-col items-end gap-1">
-        <button
-          onClick={onToggle}
-          className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide transition-all ${
+
+      <div className="flex flex-col items-end gap-2">
+        <div
+          className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
             enabled
-              ? 'bg-emerald-500/20 text-emerald-300'
-              : 'bg-white/[0.06] text-white/40 hover:text-white/60'
+              ? 'bg-primary/30 text-primary border-2 border-primary/50'
+              : 'bg-white/5 text-white/40 border-2 border-white/10'
           }`}
         >
-          {enabled ? 'Ativo' : 'Desativado'}
-        </button>
-        <span className="text-[10px] text-white/30">Clique para ativar/desativar</span>
+          {enabled ? '✓ Ativo' : 'Desativado'}
+        </div>
       </div>
     </div>
 
-    <div className="mt-4 flex items-center justify-between">
-      <span className="text-[11px] text-white/40">Quantidade</span>
-      <CountSelector count={count} disabled={!enabled} onChange={onCountChange} />
+    <div className="flex items-center justify-between pt-4 border-t border-white/10">
+      <span className="text-sm font-medium text-white/60">Quantidade a gerar:</span>
+      <div onClick={(e) => e.stopPropagation()}>
+        <CountSelector count={count} disabled={!enabled} onChange={onCountChange} />
+      </div>
     </div>
 
-    {enabled && children && <div className="mt-3">{children}</div>}
+    {enabled && children && <div className="mt-4" onClick={(e) => e.stopPropagation()}>{children}</div>}
   </div>
 );
 
@@ -112,19 +114,19 @@ const SubOption: React.FC<{
   <button
     onClick={onToggle}
     className={`
-      px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5
+      px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2.5
       ${enabled
-        ? 'bg-white/12 text-white border border-white/20'
-        : 'text-white/35 hover:text-white/60 border border-white/10 hover:border-white/20'
+        ? 'bg-primary/20 text-white border-2 border-primary/50 shadow-md'
+        : 'text-white/50 hover:text-white/80 border-2 border-white/10 hover:border-white/20 bg-white/5'
       }
     `}
   >
     <span
-      className={`w-3 h-3 rounded-sm border flex items-center justify-center ${
-        enabled ? 'border-white bg-white' : 'border-white/30'
+      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+        enabled ? 'border-primary bg-primary' : 'border-white/30 bg-transparent'
       }`}
     >
-      {enabled && <Icon name="check" className="w-2 h-2 text-black" />}
+      {enabled && <Icon name="check" className="w-3 h-3 text-white" />}
     </span>
     {label}
   </button>
@@ -222,24 +224,24 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
-        <div className="bg-black rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-white/[0.08]"
+        <div className="bg-[#0a0a0a] rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-white/10 shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="p-4 border-b border-white/[0.06]">
-            <h2 className="text-sm font-medium text-white">Gerar conteúdo</h2>
-            <p className="text-[11px] text-white/40 mt-1">
-              Escolha o que será criado e a quantidade por formato.
+          <div className="p-6 border-b border-white/10">
+            <h2 className="text-2xl font-bold text-white mb-2">O que você quer criar?</h2>
+            <p className="text-sm text-white/60">
+              Escolha os tipos de conteúdo e quantos você quer gerar
             </p>
           </div>
 
-          <div className="px-4 py-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="p-6 space-y-5">
             <SectionCard
               icon="film"
-              title="Roteiros de vídeo | Carrosséis"
-              description="Clips com cenas e narração prontas; além de carrosséis que saem das capas dos clips."
+              title="Roteiros de Vídeo & Carrosséis"
+              description="Scripts completos com cenas, narração e carrosséis prontos para usar"
               enabled={options.videoClipScripts.generate}
               count={options.videoClipScripts.count}
               onToggle={() => setOptions(prev => ({
@@ -254,18 +256,18 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
 
             <SectionCard
               icon="image"
-              title="Posts"
-              description="Textos e imagens prontos para redes sociais."
+              title="Posts para Redes Sociais"
+              description="Textos e imagens otimizadas para cada plataforma"
               enabled={postsEnabled}
               count={getPostsCount()}
               onToggle={togglePosts}
               onCountChange={setPostsCount}
             >
-              <div className="bg-black/30 border border-white/10 rounded-lg p-2">
-                <p className="text-[10px] text-white/40 mb-2">
-                  Selecione as redes em que deseja publicar.
+              <div className="bg-black/40 border border-white/10 rounded-xl p-4">
+                <p className="text-sm font-medium text-white/70 mb-3">
+                  Escolha as plataformas:
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   <SubOption
                     label="Instagram"
                     enabled={options.posts.instagram.generate}
@@ -290,23 +292,22 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
               </div>
             </SectionCard>
 
-            <div className="lg:col-span-2">
-              <SectionCard
-                icon="megaphone"
-                title="Anúncios"
-                description="Criativos completos para campanhas pagas."
-                enabled={adsEnabled}
-                count={getAdsCount()}
-                onToggle={toggleAds}
-                onCountChange={setAdsCount}
-              >
-              <div className="bg-black/30 border border-white/10 rounded-lg p-2">
-                <p className="text-[10px] text-white/40 mb-2">
-                  Selecione os canais de anúncios desejados.
+            <SectionCard
+              icon="zap"
+              title="Anúncios Pagos"
+              description="Criativos profissionais otimizados para conversão"
+              enabled={adsEnabled}
+              count={getAdsCount()}
+              onToggle={toggleAds}
+              onCountChange={setAdsCount}
+            >
+              <div className="bg-black/40 border border-white/10 rounded-xl p-4">
+                <p className="text-sm font-medium text-white/70 mb-3">
+                  Escolha os canais de anúncios:
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   <SubOption
-                    label="Meta Ads"
+                    label="Meta Ads (FB/IG)"
                     enabled={options.adCreatives.facebook.generate}
                     onToggle={() => toggleAdPlatform('facebook')}
                   />
@@ -317,26 +318,36 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
                   />
                 </div>
               </div>
-              </SectionCard>
-            </div>
+            </SectionCard>
           </div>
 
 
-        <div className="p-4 flex items-center justify-between border-t border-white/[0.06]">
-          <span className="text-xs text-white/30">
-            {totalCount > 0 && `${totalCount} ${totalCount === 1 ? 'item' : 'itens'}`}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose} disabled={isGenerating} size="small">
+        <div className="p-6 flex items-center justify-between border-t border-white/10 bg-black/20">
+          <div className="flex items-center gap-3">
+            {totalCount > 0 ? (
+              <>
+                <div className="w-12 h-12 rounded-xl bg-primary/20 border-2 border-primary/50 flex items-center justify-center">
+                  <span className="text-xl font-bold text-primary">{totalCount}</span>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">{totalCount} {totalCount === 1 ? 'item' : 'itens'}</p>
+                  <p className="text-xs text-white/50">serão gerados</p>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-white/40">Selecione pelo menos uma opção</p>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={onClose} disabled={isGenerating}>
               Cancelar
             </Button>
             <Button
               onClick={mode === 'edit' ? onClose : onConfirm}
               isLoading={isGenerating}
               disabled={isGenerating || nothingSelected}
-              size="small"
             >
-              {mode === 'edit' ? 'Salvar' : 'Gerar'}
+              {mode === 'edit' ? 'Salvar Configurações' : 'Gerar Conteúdo'}
             </Button>
           </div>
         </div>
