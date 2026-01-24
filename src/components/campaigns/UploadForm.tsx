@@ -184,11 +184,18 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
   // Auto-resize textarea
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = '60px';
-      const scrollHeight = textareaRef.current.scrollHeight;
-      textareaRef.current.style.height = Math.max(60, Math.min(scrollHeight, 200)) + 'px';
-    }
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Reset height to auto to shrink if needed
+    textarea.style.height = 'auto';
+
+    // Get the scroll height (content height)
+    const scrollHeight = textarea.scrollHeight;
+
+    // Set new height between min (60px) and max (200px)
+    const newHeight = Math.max(60, Math.min(scrollHeight, 200));
+    textarea.style.height = `${newHeight}px`;
   }, [transcript]);
 
 
@@ -451,7 +458,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               {/* Blur layer behind */}
               <div className="absolute -inset-1 rounded-[26px] bg-white/5 blur-3xl pointer-events-none z-[5]" />
 
-              <div className="relative z-10 rounded-[26px] border border-white/10 bg-black/40 backdrop-blur-2xl text-white/90 transition-all duration-200 focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
+              <div className="relative z-10 rounded-[26px] border border-white/10 bg-black/40 backdrop-blur-2xl text-white/90 focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
                 {/* Textarea */}
                 <textarea
                   ref={textareaRef}
@@ -459,13 +466,10 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                   onChange={(e) => setTranscript(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Descreva sua ideia..."
-                  className="hide-scrollbar w-full rounded-[26px] rounded-b-none text-sm sm:text-base leading-relaxed text-white/90 placeholder:text-white/50 !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-3 sm:!px-6 !py-3 sm:!py-5 touch-manipulation transition-all duration-200 resize-none outline-none overflow-y-auto"
+                  className="hide-scrollbar w-full rounded-[26px] rounded-b-none text-sm sm:text-base leading-relaxed text-white/90 placeholder:text-white/50 !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-3 sm:!px-6 !py-3 sm:!py-5 touch-manipulation resize-none outline-none overflow-hidden min-h-[60px] max-h-[200px]"
                   style={{
-                    height: '60px',
-                    maxHeight: '200px',
                     WebkitUserSelect: 'text',
                     WebkitTouchCallout: 'none',
-                    minHeight: '60px',
                   }}
                 />
 
