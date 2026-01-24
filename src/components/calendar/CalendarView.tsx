@@ -293,9 +293,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     goToToday();
                     setShowTodayView(true);
                   }}
-                  className="px-2 md:px-3 py-1 md:py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-lg text-[10px] md:text-xs font-medium text-white/60 hover:text-white hover:border-white/30 transition-all ml-1"
+                  className="flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 bg-primary/10 backdrop-blur-2xl border border-primary/30 rounded-lg text-[10px] md:text-xs font-medium text-primary hover:text-primary/90 hover:border-primary/60 transition-all ml-1"
                 >
-                  Hoje
+                  <Icon name="calendar" className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                  <span className="hidden sm:inline">Hoje</span>
                 </button>
               </div>
 
