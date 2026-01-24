@@ -6709,8 +6709,8 @@ const startup = async () => {
         let galleryId = null;
         try {
           const galleryResult = await sql`
-            INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, aspect_ratio, source)
-            VALUES (${userId}, ${config.organizationId || null}, ${finalImageUrl}, ${prompt}, ${aspectRatio}, 'generation')
+            INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, aspect_ratio, source, model, image_size)
+            VALUES (${userId}, ${config.organizationId || null}, ${finalImageUrl}, ${prompt}, ${aspectRatio}, 'generation', ${result.usedModel}, ${imageSize})
             RETURNING id
           `;
           galleryId = galleryResult[0]?.id;
