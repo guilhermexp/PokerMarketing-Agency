@@ -13,6 +13,8 @@ interface FlyerGalleryProps {
   onSetChatReference?: (image: GalleryImage | null) => void;
   selectedDay?: string;
   weekScheduleInfo?: WeekScheduleInfo | null;
+  // Selected flyer ID per day/period - only these are shown in the day filter
+  selectedDailyFlyerIds?: Record<string, Record<string, string | null>>;
 }
 
 export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
@@ -23,6 +25,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
   onSetChatReference,
   selectedDay = "MONDAY",
   weekScheduleInfo,
+  selectedDailyFlyerIds,
 }) => {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [filter, setFilter] = useState<"all" | "selectedDay" | "daily" | "individual">("all");
@@ -91,11 +94,24 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
 
     // Get flyers from the selected day in dailyFlyerState
     const dayData = dailyFlyerState[selectedDay];
+    const daySelectedIds = selectedDailyFlyerIds?.[selectedDay];
+
     if (dayData) {
-      Object.values(dayData).forEach((periodArray) => {
+      Object.entries(dayData).forEach(([period, periodArray]) => {
+        // If we have selected IDs, only include the selected flyer from this period
+        const selectedIdForPeriod = daySelectedIds?.[period];
+
         periodArray.forEach((flyer) => {
           if (flyer !== "loading") {
-            flyers.push(flyer);
+            // If selectedDailyFlyerIds is provided, only include the selected flyer
+            if (selectedDailyFlyerIds) {
+              if (selectedIdForPeriod && flyer.id === selectedIdForPeriod) {
+                flyers.push(flyer);
+              }
+            } else {
+              // Fallback: include all flyers when no selection state is provided
+              flyers.push(flyer);
+            }
           }
         });
       });
@@ -105,7 +121,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
     return Array.from(
       new Map(flyers.map(f => [f.src || f.id, f])).values()
     );
-  }, [dailyFlyerState, selectedDay]);
+  }, [dailyFlyerState, selectedDay, selectedDailyFlyerIds]);
 
   const displayedFlyers = useMemo(() => {
     switch (filter) {
