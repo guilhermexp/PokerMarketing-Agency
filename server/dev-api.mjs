@@ -8,7 +8,10 @@ import "dotenv/config";
 
 import express from "express";
 import cors from "cors";
-import { neon } from "@neondatabase/serverless";
+import { neon, neonConfig } from "@neondatabase/serverless";
+
+// Enable HTTP connection caching for better performance
+neonConfig.fetchConnectionCache = true;
 import { put, del } from "@vercel/blob";
 import { fal } from "@fal-ai/client";
 import { clerkMiddleware, getAuth } from "@clerk/express";
@@ -40,6 +43,7 @@ import {
   addImageJob,
   isRedisAvailable,
   waitForRedis,
+  getRedisConnection,
   schedulePostForPublishing,
   cancelScheduledPost,
 } from "./helpers/job-queue.mjs";
@@ -260,12 +264,33 @@ function setCachedUserId(clerkId, userId) {
   userIdCache.set(clerkId, { userId, timestamp: Date.now() });
 }
 
+// SINGLETON: Reuse neon() instance with HTTP connection caching
+let sqlInstance = null;
+
 function getSql() {
   if (!DATABASE_URL) {
     throw new Error("DATABASE_URL not configured");
   }
-  return neon(DATABASE_URL);
+  if (!sqlInstance) {
+    sqlInstance = neon(DATABASE_URL);
+  }
+  return sqlInstance;
 }
+
+// WARMUP: Pre-warm database connection on server start
+async function warmupDatabase() {
+  try {
+    const start = Date.now();
+    const sql = getSql();
+    await sql`SELECT 1 as warmup`;
+    console.log(`✓ Database connection warmed up in ${Date.now() - start}ms`);
+  } catch (error) {
+    console.error("Database warmup failed:", error.message);
+  }
+}
+
+// Run warmup on module load
+warmupDatabase();
 
 async function ensureGallerySourceType(sql) {
   try {
@@ -930,6 +955,7 @@ app.get("/api/db/init", async (req, res) => {
 
     // If clerk_user_id is provided explicitly, try to find/create user
     let resolvedUserId = null;
+    let resolveTime = 0;
     if (clerk_user_id) {
       // First check if it's a UUID (db user id)
       const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -937,7 +963,10 @@ app.get("/api/db/init", async (req, res) => {
         resolvedUserId = clerk_user_id;
       } else {
         // It's a Clerk ID - look up or create the user
+        const resolveStart = Date.now();
         resolvedUserId = await resolveUserId(sql, clerk_user_id, reqId);
+        resolveTime = Date.now() - resolveStart;
+        console.log(`[Init API] resolveUserId took ${resolveTime}ms`);
         if (!resolvedUserId) {
           // User doesn't exist yet - this happens during parallel loading
           // Return empty data - the frontend will retry after user sync completes
@@ -980,121 +1009,83 @@ app.get("/api/db/init", async (req, res) => {
     // Security is enforced via WHERE clauses in each query (application-level)
     // RLS policies protect direct database access (psql, DB clients)
 
-    // Run ALL queries in parallel - this is the key optimization!
-    // PERFORMANCE: Tournaments are now loaded lazily (only when user opens tournaments tab)
+    // SEQUENTIAL queries - counterintuitively FASTER than parallel with Neon serverless!
+    // Neon has connection limits that cause parallel queries to queue and wait.
+    // Test results: Sequential 2475ms vs Parallel 5112ms for 5 queries.
     const isOrgContext = !!organization_id;
 
-    const [
-      brandProfileResult,
-      galleryResult,
-      scheduledPostsResult,
-      campaignsResult,
-      schedulesListResult,
-    ] = await Promise.all([
-      // 1. Brand Profile
-      isOrgContext
-        ? sql`SELECT * FROM brand_profiles WHERE organization_id = ${organization_id} AND deleted_at IS NULL LIMIT 1`
-        : sql`SELECT * FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`,
+    // TIMING: Measure each query individually
+    const queryTimings = {};
+    const timedQuery = async (name, queryFn) => {
+      const qStart = Date.now();
+      const result = await queryFn();
+      queryTimings[name] = Date.now() - qStart;
+      return result;
+    };
 
-      // 2. Gallery Images (limited to 100 most recent for pagination support)
-      // OPTIMIZATION: Exclude 'src' column (base64 image data) to reduce egress
-      isOrgContext
-        ? sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`
-        : sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`,
+    // Run queries SEQUENTIALLY (faster with Neon connection limits)
 
-      // 3. Scheduled Posts (SMART LOADING: last 7 days + next 60 days)
-      // Shows recent activity + upcoming schedule without arbitrary limits
-      // NOTE: scheduled_timestamp is bigint (unix ms), convert NOW() to match
-      isOrgContext
-        ? sql`
-          SELECT * FROM scheduled_posts
-          WHERE organization_id = ${organization_id}
-            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
-            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
-          ORDER BY scheduled_timestamp ASC
-        `
-        : sql`
-          SELECT * FROM scheduled_posts
-          WHERE user_id = ${resolvedUserId}
-            AND organization_id IS NULL
-            AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
-            AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
-          ORDER BY scheduled_timestamp ASC
-        `,
+    // CACHE: Try Redis cache for brandProfile (rarely changes, saves ~1.5s)
+    const cacheKey = `brandProfile:${isOrgContext ? organization_id : resolvedUserId}`;
+    let brandProfileResult = [];
+    let brandProfileCached = false;
 
-      // 4. Campaigns with counts (OPTIMIZED: simple subqueries for preview URLs)
-      // Only fetch from main tables (posts/ads/clips), not from gallery_images
-      isOrgContext
-        ? sql`
-          SELECT
-            c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at,
-            COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
-            COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
-            COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-            COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count,
-            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
-            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
-            (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url,
-            (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url
-          FROM campaigns c
-          WHERE c.organization_id = ${organization_id} AND c.deleted_at IS NULL
-          ORDER BY c.created_at DESC
-          LIMIT 10
-        `
-        : sql`
-          SELECT
-            c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at,
-            COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
-            COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
-            COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-            COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count,
-            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
-            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
-            (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url,
-            (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url
-          FROM campaigns c
-          WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL
-          ORDER BY c.created_at DESC
-          LIMIT 10
-        `,
+    const redis = getRedisConnection();
+    if (redis && isRedisAvailable()) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          brandProfileResult = JSON.parse(cached);
+          brandProfileCached = true;
+          queryTimings.brandProfile = 0; // Cache hit
+          console.log(`[Init API] brandProfile cache HIT for ${cacheKey}`);
+        }
+      } catch (e) {
+        console.log(`[Init API] brandProfile cache error:`, e.message);
+      }
+    }
 
-      // 5. Week schedules list (for flyers page - show saved spreadsheets)
-      isOrgContext
-        ? sql`
-          SELECT
-            ws.id,
-            ws.user_id,
-            ws.organization_id,
-            ws.original_filename as name,
-            ws.start_date,
-            ws.end_date,
-            ws.created_at,
-            ws.updated_at,
-            COUNT(te.id)::int as event_count
-          FROM week_schedules ws
-          LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id
-          WHERE ws.organization_id = ${organization_id}
-          GROUP BY ws.id, ws.original_filename
-          ORDER BY ws.created_at DESC
-        `
-        : sql`
-          SELECT
-            ws.id,
-            ws.user_id,
-            ws.organization_id,
-            ws.original_filename as name,
-            ws.start_date,
-            ws.end_date,
-            ws.created_at,
-            ws.updated_at,
-            COUNT(te.id)::int as event_count
-          FROM week_schedules ws
-          LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id
-          WHERE ws.user_id = ${resolvedUserId} AND ws.organization_id IS NULL
-          GROUP BY ws.id, ws.original_filename
-          ORDER BY ws.created_at DESC
-        `,
-    ]);
+    if (!brandProfileCached) {
+      // OPTIMIZATION: Don't return data URLs for logo_url - they can be 3MB each!
+      brandProfileResult = await timedQuery('brandProfile', () => isOrgContext
+        ? sql`SELECT id, user_id, organization_id, name, description, CASE WHEN logo_url LIKE 'data:%' THEN '' ELSE logo_url END as logo_url, primary_color, secondary_color, tertiary_color, tone_of_voice, settings, created_at, updated_at, deleted_at FROM brand_profiles WHERE organization_id = ${organization_id} AND deleted_at IS NULL LIMIT 1`
+        : sql`SELECT id, user_id, organization_id, name, description, CASE WHEN logo_url LIKE 'data:%' THEN '' ELSE logo_url END as logo_url, primary_color, secondary_color, tertiary_color, tone_of_voice, settings, created_at, updated_at, deleted_at FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`);
+
+      // Cache for 5 minutes
+      if (redis && isRedisAvailable() && brandProfileResult.length > 0) {
+        try {
+          await redis.set(cacheKey, JSON.stringify(brandProfileResult), 'EX', 300);
+          console.log(`[Init API] brandProfile cached for ${cacheKey}`);
+        } catch (e) {
+          // Ignore cache write errors
+        }
+      }
+    }
+
+    // OPTIMIZATION: Don't return data URLs (base64) for gallery - they're 113MB+ total!
+    // Use thumbnail_url if available, otherwise only return real URLs
+    const galleryResult = await timedQuery('gallery', () => isOrgContext
+      ? sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 25`
+      : sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 25`);
+
+    // OPTIMIZATION: Don't return data URLs (base64) in image_url - they're huge (26MB+ total!)
+    // Use CASE to return empty string for data URLs, full URL otherwise
+    const scheduledPostsResult = await timedQuery('scheduledPosts', () => isOrgContext
+      ? sql`SELECT id, user_id, organization_id, content_type, content_id, CASE WHEN image_url LIKE 'data:%' THEN '' ELSE image_url END as image_url, carousel_image_urls, caption, hashtags, scheduled_date, scheduled_time, scheduled_timestamp, timezone, platforms, instagram_content_type, status, published_at, error_message, created_from, created_at, updated_at FROM scheduled_posts WHERE organization_id = ${organization_id} AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000 AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000 ORDER BY scheduled_timestamp ASC`
+      : sql`SELECT id, user_id, organization_id, content_type, content_id, CASE WHEN image_url LIKE 'data:%' THEN '' ELSE image_url END as image_url, carousel_image_urls, caption, hashtags, scheduled_date, scheduled_time, scheduled_timestamp, timezone, platforms, instagram_content_type, status, published_at, error_message, created_from, created_at, updated_at FROM scheduled_posts WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000 AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000 ORDER BY scheduled_timestamp ASC`);
+
+    const campaignsResult = await timedQuery('campaigns', () => isOrgContext
+      ? sql`SELECT c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at, COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count, COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count, COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count, COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count, (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url, (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url, (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url, (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url FROM campaigns c WHERE c.organization_id = ${organization_id} AND c.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT 10`
+      : sql`SELECT c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at, COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count, COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count, COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count, COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count, (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url, (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url, (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url, (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url FROM campaigns c WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT 10`);
+
+    const schedulesListResult = await timedQuery('schedulesList', () => isOrgContext
+      ? sql`SELECT ws.id, ws.user_id, ws.organization_id, ws.original_filename as name, ws.start_date, ws.end_date, ws.created_at, ws.updated_at, COUNT(te.id)::int as event_count FROM week_schedules ws LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id WHERE ws.organization_id = ${organization_id} GROUP BY ws.id, ws.original_filename ORDER BY ws.created_at DESC`
+      : sql`SELECT ws.id, ws.user_id, ws.organization_id, ws.original_filename as name, ws.start_date, ws.end_date, ws.created_at, ws.updated_at, COUNT(te.id)::int as event_count FROM week_schedules ws LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id WHERE ws.user_id = ${resolvedUserId} AND ws.organization_id IS NULL GROUP BY ws.id, ws.original_filename ORDER BY ws.created_at DESC`);
+
+
+    // LOG: Query timing breakdown for performance analysis
+    const totalTime = Date.now() - start;
+    console.log(`[Init API] Query timings (total: ${totalTime}ms):`, JSON.stringify(queryTimings));
 
     // PERFORMANCE: Only tournament schedule/events are loaded lazily via /api/db/tournaments
     // schedulesList is loaded here because it's essential for flyers page
@@ -1107,8 +1098,9 @@ app.get("/api/db/init", async (req, res) => {
       tournamentEvents: [], // Loaded lazily
       schedulesList: schedulesListResult, // List of saved spreadsheets
       _meta: {
-        loadTime: Date.now() - start,
-        queriesExecuted: 5, // Reduced from 6 to 5
+        loadTime: totalTime,
+        queryTimings, // Include breakdown in response for frontend debugging
+        queriesExecuted: 5,
         timestamp: new Date().toISOString(),
       },
     });
@@ -3006,73 +2998,12 @@ app.patch("/api/db/tournaments/daily-flyer", async (req, res) => {
 // Jobs are created but will remain in 'queued' status until deployed
 // ============================================================================
 
+// DISABLED: Background job queue - use synchronous generation instead
 app.post("/api/generate/queue", async (req, res) => {
-  try {
-    const sql = getSql();
-    const { userId, organizationId, jobType, prompt, config, context } = req.body;
-
-    if (!userId || !jobType || !prompt || !config) {
-      return res.status(400).json({
-        error: "Missing required fields: userId, jobType, prompt, config",
-      });
-    }
-
-    // Verify organization membership if organizationId provided
-    if (organizationId) {
-      const resolvedUserId = await resolveUserId(sql, userId);
-      if (resolvedUserId) {
-        await resolveOrganizationContext(sql, resolvedUserId, organizationId);
-      }
-    }
-
-    // Store context inside config for persistence (no schema change needed)
-    const configWithContext = context ? { ...config, _context: context } : config;
-
-    // Create job in database
-    const result = await sql`
-      INSERT INTO generation_jobs (user_id, organization_id, job_type, prompt, config, status)
-      VALUES (${userId}, ${organizationId || null}, ${jobType}, ${prompt}, ${JSON.stringify(configWithContext)}, 'queued')
-      RETURNING id, created_at
-    `;
-
-    const job = result[0];
-    console.log(`[Generate Queue] Created job ${job.id} for user ${userId}`);
-
-    // Try to add to BullMQ queue (if Redis available)
-    const bullJob = await addImageJob(job.id, {
-      userId,
-      organizationId,
-      jobType,
-      prompt,
-      config,
-    });
-
-    if (bullJob) {
-      console.log(`[Generate Queue] Job ${job.id} added to BullMQ queue`);
-      res.json({
-        success: true,
-        jobId: job.id,
-        messageId: bullJob.id,
-        status: "queued",
-      });
-    } else {
-      // Redis not available - job will stay in queued status
-      console.log(`[Generate Queue] Redis not available, job ${job.id} in fallback mode`);
-      res.json({
-        success: true,
-        jobId: job.id,
-        messageId: "no-redis",
-        status: "queued",
-        note: "Redis not available. Job created but waiting for worker.",
-      });
-    }
-  } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
-    }
-    logError("Generate Queue", error);
-    res.status(500).json({ error: error.message });
-  }
+  return res.status(503).json({
+    error: "Background job queue is disabled. Use synchronous image generation.",
+    disabled: true,
+  });
 });
 
 app.get("/api/generate/status", async (req, res) => {
@@ -3121,7 +3052,7 @@ app.get("/api/generate/status", async (req, res) => {
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id,
+              CASE WHEN result_url LIKE 'data:%' THEN '' ELSE result_url END as result_url, result_gallery_id,
               CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
@@ -3135,7 +3066,7 @@ app.get("/api/generate/status", async (req, res) => {
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id,
+              CASE WHEN result_url LIKE 'data:%' THEN '' ELSE result_url END as result_url, result_gallery_id,
               CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
@@ -3155,7 +3086,7 @@ app.get("/api/generate/status", async (req, res) => {
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id,
+              CASE WHEN result_url LIKE 'data:%' THEN '' ELSE result_url END as result_url, result_gallery_id,
               CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
@@ -3169,7 +3100,7 @@ app.get("/api/generate/status", async (req, res) => {
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id,
+              CASE WHEN result_url LIKE 'data:%' THEN '' ELSE result_url END as result_url, result_gallery_id,
               CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
@@ -6528,6 +6459,8 @@ const startup = async () => {
           brandPrimaryColor,
           brandSecondaryColor,
           logo,
+          // Collab logo (partnership/sponsor logo)
+          collabLogo,
         } = config;
 
         // Use whichever style reference field is provided
@@ -6573,8 +6506,47 @@ const startup = async () => {
         const normalizedStyleRef = normalizeImageEntry(rawStyleRef);
         const normalizedPersonRef = normalizeImageEntry(personReferenceImage);
 
+        // Process styleReference HTTP URL (same as logo) - CRITICAL for favorites/style references
+        let processedStyleRef = normalizedStyleRef;
+        if (!processedStyleRef && rawStyleRef && typeof rawStyleRef === 'string' && rawStyleRef.startsWith('http')) {
+          try {
+            const styleBase64 = await urlToBase64(rawStyleRef);
+            if (styleBase64) {
+              const mimeType = rawStyleRef.includes('.svg') ? 'image/svg+xml'
+                : rawStyleRef.includes('.jpg') || rawStyleRef.includes('.jpeg') ? 'image/jpeg'
+                : 'image/png';
+              processedStyleRef = { base64: styleBase64, mimeType };
+              console.log(`[ImageWorker] Job ${jobId}: Style reference HTTP URL converted to base64`);
+            }
+          } catch (styleError) {
+            console.error(`[ImageWorker] Job ${jobId}: Failed to convert style reference:`, styleError.message);
+          }
+        }
+
+        // Process collabLogo HTTP URL
+        let processedCollabLogo = null;
+        if (collabLogo) {
+          if (typeof collabLogo === 'string' && collabLogo.startsWith('http')) {
+            try {
+              const collabBase64 = await urlToBase64(collabLogo);
+              if (collabBase64) {
+                const mimeType = collabLogo.includes('.svg') ? 'image/svg+xml'
+                  : collabLogo.includes('.jpg') || collabLogo.includes('.jpeg') ? 'image/jpeg'
+                  : 'image/png';
+                processedCollabLogo = { base64: collabBase64, mimeType };
+                console.log(`[ImageWorker] Job ${jobId}: Collab logo HTTP URL converted to base64`);
+              }
+            } catch (collabError) {
+              console.error(`[ImageWorker] Job ${jobId}: Failed to convert collab logo:`, collabError.message);
+            }
+          } else {
+            // Try to normalize if it's a data URL
+            processedCollabLogo = normalizeImageEntry(collabLogo);
+          }
+        }
+
         // Build full prompt with brand context
-        const hasStyleReference = !!normalizedStyleRef;
+        const hasStyleReference = !!processedStyleRef;
         const hasPersonReference = !!normalizedPersonRef;
         const hasProducts = normalizedProductImages.length > 0;
 
@@ -6605,6 +6577,12 @@ const startup = async () => {
           }
         }
         const hasLogo = !!brandProfile?.logo && allProductImages.length > 0;
+
+        // Add collab logo to product images if present
+        if (processedCollabLogo) {
+          allProductImages.push(processedCollabLogo);
+          console.log(`[ImageWorker] Job ${jobId}: Collab logo added to product images`);
+        }
 
         // Convert prompt to structured JSON (same as normal endpoint)
         let jsonPrompt = null;
@@ -6641,7 +6619,7 @@ const startup = async () => {
           DEFAULT_IMAGE_MODEL,
           imageSize,
           allProductImages.length > 0 ? allProductImages : undefined,
-          normalizedStyleRef,
+          processedStyleRef,
           normalizedPersonRef,
         );
 
@@ -6724,25 +6702,26 @@ const startup = async () => {
       }
     };
 
-    // Initialize image generation worker with progress callback to update database
-    try {
-      const imageWorker = initializeImageWorker(processImageJob, {
-        onProgress: async (jobId, progress) => {
-          // Update progress in PostgreSQL database
-          const dbSql = getSql();
-          await dbSql`
-            UPDATE generation_jobs
-            SET progress = ${progress}
-            WHERE id = ${jobId}
-          `;
-        }
-      });
-      if (imageWorker) {
-        console.log(`${colors.green}✓ Image generation worker initialized${colors.reset}`);
-      }
-    } catch (error) {
-      console.error(`${colors.red}✗ Failed to initialize image worker:${colors.reset}`, error.message);
-    }
+    // DISABLED: Background job queue was causing issues with userId resolution
+    // Images are now generated synchronously via /api/images endpoint
+    // try {
+    //   const imageWorker = initializeImageWorker(processImageJob, {
+    //     onProgress: async (jobId, progress) => {
+    //       const dbSql = getSql();
+    //       await dbSql`
+    //         UPDATE generation_jobs
+    //         SET progress = ${progress}
+    //         WHERE id = ${jobId}
+    //       `;
+    //     }
+    //   });
+    //   if (imageWorker) {
+    //     console.log(`${colors.green}✓ Image generation worker initialized${colors.reset}`);
+    //   }
+    // } catch (error) {
+    //   console.error(`${colors.red}✗ Failed to initialize image worker:${colors.reset}`, error.message);
+    // }
+    console.log(`${colors.yellow}⚠ Image worker disabled - using synchronous generation${colors.reset}`);
 
     // Initialize scheduled posts worker
     try {

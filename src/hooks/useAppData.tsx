@@ -2,15 +2,16 @@
  * Centralized data fetching hook with SWR caching
  *
  * PERFORMANCE OPTIMIZATIONS:
- * 1. Single /api/db/init endpoint loads core data (1 request, 4 queries in parallel)
+ * 1. Single /api/db/init endpoint loads core data (1 request, 5 queries in parallel)
  * 2. Reduced initial limits for faster load:
- *    - Gallery: 20 images (was 50) - use loadMore() for infinite scroll
- *    - Scheduled Posts: 50 posts (was 100)
- *    - Campaigns: 10 campaigns (was 20)
+ *    - Gallery: 25 images (was 100) - use loadMore() for infinite scroll
+ *    - Scheduled Posts: 7 days back + 60 days forward (smart window)
+ *    - Campaigns: 10 campaigns
  * 3. Campaigns: Preview URLs removed from initial load (loaded lazily on view)
  * 4. Tournaments: Loaded lazily via /api/db/tournaments (only when tab is opened)
  * 5. Composite database indexes for optimized WHERE + ORDER BY queries
  * 6. Removed scheduled posts polling (saved 4-6 requests/minute)
+ * 7. Gate initial fetch by orgLoaded to prevent double-fetch for org users (Jan 2025)
  *
  * This dramatically reduces initial load time from ~10-18s to ~2-3s
  */

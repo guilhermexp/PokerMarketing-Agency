@@ -106,8 +106,10 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
     dbUser,
     // isLoading is now just Clerk loading - DB sync happens in background
     isLoading: !clerkLoaded,
-    // userId uses clerkUserId as fallback for parallel data loading
-    userId: dbUser?.id || clerkUserId || null,
+    // PERF: Always use clerkUserId for consistent SWR cache keys
+    // Server resolves clerkUserId -> dbUser.id via resolveUserId() with caching
+    // This prevents double-fetch when dbUser syncs (userId changing invalidates cache)
+    userId: clerkUserId || null,
     clerkUserId: clerkUserId || null,
     isDbSyncing,
   };

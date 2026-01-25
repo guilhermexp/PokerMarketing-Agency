@@ -265,12 +265,33 @@ function setCachedUserId(clerkId, userId) {
   userIdCache.set(clerkId, { userId, timestamp: Date.now() });
 }
 
+// SINGLETON: Reuse connection to avoid cold start on every request
+let sqlInstance = null;
+
 function getSql() {
   if (!DATABASE_URL) {
     throw new Error("DATABASE_URL not configured");
   }
-  return neon(DATABASE_URL);
+  if (!sqlInstance) {
+    sqlInstance = neon(DATABASE_URL);
+  }
+  return sqlInstance;
 }
+
+// WARMUP: Pre-warm database connection on server start
+async function warmupDatabase() {
+  try {
+    const start = Date.now();
+    const sql = getSql();
+    await sql`SELECT 1 as warmup`;
+    console.log(`✓ Database connection warmed up in ${Date.now() - start}ms`);
+  } catch (error) {
+    console.error("Database warmup failed:", error.message);
+  }
+}
+
+// Run warmup on module load
+warmupDatabase();
 
 async function ensureGallerySourceType(sql) {
   try {
@@ -1011,29 +1032,42 @@ app.get("/api/db/init", async (req, res) => {
       schedulesListResult,
     ] = await Promise.all([
       // 1. Brand Profile
+      // OPTIMIZATION: Don't return data URLs for logo_url - they can be 3MB each!
       isOrgContext
-        ? sql`SELECT * FROM brand_profiles WHERE organization_id = ${organization_id} AND deleted_at IS NULL LIMIT 1`
-        : sql`SELECT * FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`,
+        ? sql`SELECT id, user_id, organization_id, name, description, CASE WHEN logo_url LIKE 'data:%' THEN '' ELSE logo_url END as logo_url, primary_color, secondary_color, tertiary_color, tone_of_voice, settings, created_at, updated_at, deleted_at FROM brand_profiles WHERE organization_id = ${organization_id} AND deleted_at IS NULL LIMIT 1`
+        : sql`SELECT id, user_id, organization_id, name, description, CASE WHEN logo_url LIKE 'data:%' THEN '' ELSE logo_url END as logo_url, primary_color, secondary_color, tertiary_color, tone_of_voice, settings, created_at, updated_at, deleted_at FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`,
 
-      // 2. Gallery Images (limited to 100 most recent for pagination support)
-      // OPTIMIZATION: Exclude 'src' column (base64 image data) to reduce egress
+      // 2. Gallery Images (limited to 25 most recent - use loadMore() for pagination)
+      // OPTIMIZATION: Reduced from 100 to 25 for faster initial load (Jan 2025)
+      // OPTIMIZATION: Don't return data URLs (base64) for gallery - they're 113MB+ total!
+      // Use thumbnail_url if available for data URLs, otherwise return empty string
       isOrgContext
-        ? sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`
-        : sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`,
+        ? sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 25`
+        : sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 25`,
 
       // 3. Scheduled Posts (SMART LOADING: last 7 days + next 60 days)
-      // Shows recent activity + upcoming schedule without arbitrary limits
-      // NOTE: scheduled_timestamp is bigint (unix ms), convert NOW() to match
+      // OPTIMIZATION: Don't return data URLs (base64) in image_url - they're huge (26MB+ total!)
+      // Use CASE to return empty string for data URLs, full URL otherwise
       isOrgContext
         ? sql`
-          SELECT * FROM scheduled_posts
+          SELECT id, user_id, organization_id, content_type, content_id,
+            CASE WHEN image_url LIKE 'data:%' THEN '' ELSE image_url END as image_url,
+            carousel_image_urls, caption, hashtags, scheduled_date, scheduled_time,
+            scheduled_timestamp, timezone, platforms, instagram_content_type, status,
+            published_at, error_message, created_from, created_at, updated_at
+          FROM scheduled_posts
           WHERE organization_id = ${organization_id}
             AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
             AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
           ORDER BY scheduled_timestamp ASC
         `
         : sql`
-          SELECT * FROM scheduled_posts
+          SELECT id, user_id, organization_id, content_type, content_id,
+            CASE WHEN image_url LIKE 'data:%' THEN '' ELSE image_url END as image_url,
+            carousel_image_urls, caption, hashtags, scheduled_date, scheduled_time,
+            scheduled_timestamp, timezone, platforms, instagram_content_type, status,
+            published_at, error_message, created_from, created_at, updated_at
+          FROM scheduled_posts
           WHERE user_id = ${resolvedUserId}
             AND organization_id IS NULL
             AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
@@ -3054,76 +3088,12 @@ app.patch("/api/db/tournaments/daily-flyer", async (req, res) => {
 // Uses Redis + BullMQ for reliable job processing
 // ============================================================================
 
+// DISABLED: Background job queue - use synchronous generation instead
 app.post("/api/generate/queue", async (req, res) => {
-  try {
-    const sql = getSql();
-    const { userId, organizationId, jobType, prompt, config, context } = req.body;
-
-    if (!userId || !jobType || !prompt || !config) {
-      return res.status(400).json({
-        error: "Missing required fields: userId, jobType, prompt, config",
-      });
-    }
-
-    // Verify organization membership if organizationId provided
-    if (organizationId) {
-      const resolvedUserId = await resolveUserId(sql, userId);
-      if (resolvedUserId) {
-        await resolveOrganizationContext(sql, resolvedUserId, organizationId);
-      }
-    }
-
-    // Store context inside config for persistence (no schema change needed)
-    const configWithContext = context ? { ...config, _context: context } : config;
-
-    // Create job in database
-    const result = await sql`
-      INSERT INTO generation_jobs (user_id, organization_id, job_type, prompt, config, status)
-      VALUES (${userId}, ${organizationId || null}, ${jobType}, ${prompt}, ${JSON.stringify(configWithContext)}, 'queued')
-      RETURNING id, created_at
-    `;
-
-    const job = result[0];
-    console.log(`[Generate Queue] Created job ${job.id} for user ${userId}, type: ${jobType}`);
-
-    // Try to add to BullMQ queue if Redis is available
-    const bullJob = await addImageJob(job.id, {
-      userId,
-      organizationId,
-      jobType,
-      prompt,
-      config,
-    });
-
-    if (bullJob) {
-      console.log(`[Generate Queue] Job ${job.id} added to BullMQ queue`);
-      res.json({
-        success: true,
-        jobId: job.id,
-        status: "queued",
-        queued: true,
-      });
-    } else {
-      // Redis not available - mark as failed immediately
-      console.warn(`[Generate Queue] Redis not available, job ${job.id} cannot be processed`);
-      await sql`
-        UPDATE generation_jobs
-        SET status = 'failed', error_message = 'Job queue unavailable. Please try again later.', completed_at = NOW()
-        WHERE id = ${job.id}
-      `;
-      res.status(503).json({
-        success: false,
-        error: "Job queue temporarily unavailable. Please try again.",
-        jobId: job.id,
-      });
-    }
-  } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
-    }
-    logError("Generate Queue", error);
-    res.status(500).json({ error: error.message });
-  }
+  return res.status(503).json({
+    error: "Background job queue is disabled. Use synchronous image generation.",
+    disabled: true,
+  });
 });
 
 app.get("/api/generate/status", async (req, res) => {
@@ -3142,7 +3112,7 @@ app.get("/api/generate/status", async (req, res) => {
       const jobs = await sql`
         SELECT
           id, user_id, organization_id, job_type, status, progress,
-          result_url, result_gallery_id, error_message,
+          CASE WHEN result_url LIKE 'data:%' THEN '' ELSE result_url END as result_url, result_gallery_id, error_message,
           created_at, started_at, completed_at, attempts,
           config->>'_context' as context
         FROM generation_jobs
@@ -3172,7 +3142,7 @@ app.get("/api/generate/status", async (req, res) => {
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id,
+              CASE WHEN result_url LIKE 'data:%' THEN '' ELSE result_url END as result_url, result_gallery_id,
               CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
@@ -3186,7 +3156,7 @@ app.get("/api/generate/status", async (req, res) => {
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id,
+              CASE WHEN result_url LIKE 'data:%' THEN '' ELSE result_url END as result_url, result_gallery_id,
               CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
@@ -3206,7 +3176,7 @@ app.get("/api/generate/status", async (req, res) => {
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id,
+              CASE WHEN result_url LIKE 'data:%' THEN '' ELSE result_url END as result_url, result_gallery_id,
               CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
@@ -3220,7 +3190,7 @@ app.get("/api/generate/status", async (req, res) => {
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id,
+              CASE WHEN result_url LIKE 'data:%' THEN '' ELSE result_url END as result_url, result_gallery_id,
               CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
@@ -6676,6 +6646,8 @@ const startup = async () => {
           brandPrimaryColor,
           brandSecondaryColor,
           logo,
+          // Collab logo (partnership/sponsor logo)
+          collabLogo,
         } = config;
 
         // Use whichever style reference field is provided
@@ -6721,8 +6693,47 @@ const startup = async () => {
         const normalizedStyleRef = normalizeImageEntry(rawStyleRef);
         const normalizedPersonRef = normalizeImageEntry(personReferenceImage);
 
+        // Process styleReference HTTP URL (same as logo) - CRITICAL for favorites/style references
+        let processedStyleRef = normalizedStyleRef;
+        if (!processedStyleRef && rawStyleRef && typeof rawStyleRef === 'string' && rawStyleRef.startsWith('http')) {
+          try {
+            const styleBase64 = await urlToBase64(rawStyleRef);
+            if (styleBase64) {
+              const mimeType = rawStyleRef.includes('.svg') ? 'image/svg+xml'
+                : rawStyleRef.includes('.jpg') || rawStyleRef.includes('.jpeg') ? 'image/jpeg'
+                : 'image/png';
+              processedStyleRef = { base64: styleBase64, mimeType };
+              console.log(`[ImageWorker] Job ${jobId}: Style reference HTTP URL converted to base64`);
+            }
+          } catch (styleError) {
+            console.error(`[ImageWorker] Job ${jobId}: Failed to convert style reference:`, styleError.message);
+          }
+        }
+
+        // Process collabLogo HTTP URL
+        let processedCollabLogo = null;
+        if (collabLogo) {
+          if (typeof collabLogo === 'string' && collabLogo.startsWith('http')) {
+            try {
+              const collabBase64 = await urlToBase64(collabLogo);
+              if (collabBase64) {
+                const mimeType = collabLogo.includes('.svg') ? 'image/svg+xml'
+                  : collabLogo.includes('.jpg') || collabLogo.includes('.jpeg') ? 'image/jpeg'
+                  : 'image/png';
+                processedCollabLogo = { base64: collabBase64, mimeType };
+                console.log(`[ImageWorker] Job ${jobId}: Collab logo HTTP URL converted to base64`);
+              }
+            } catch (collabError) {
+              console.error(`[ImageWorker] Job ${jobId}: Failed to convert collab logo:`, collabError.message);
+            }
+          } else {
+            // Try to normalize if it's a data URL
+            processedCollabLogo = normalizeImageEntry(collabLogo);
+          }
+        }
+
         // Build full prompt with brand context
-        const hasStyleReference = !!normalizedStyleRef;
+        const hasStyleReference = !!processedStyleRef;
         const hasPersonReference = !!normalizedPersonRef;
         const hasProducts = normalizedProductImages.length > 0;
 
@@ -6753,6 +6764,12 @@ const startup = async () => {
           }
         }
         const hasLogo = !!brandProfile?.logo && allProductImages.length > 0;
+
+        // Add collab logo to product images if present
+        if (processedCollabLogo) {
+          allProductImages.push(processedCollabLogo);
+          console.log(`[ImageWorker] Job ${jobId}: Collab logo added to product images`);
+        }
 
         // Convert prompt to structured JSON (same as normal endpoint)
         let jsonPrompt = null;
@@ -6789,7 +6806,7 @@ const startup = async () => {
           DEFAULT_IMAGE_MODEL,
           imageSize,
           allProductImages.length > 0 ? allProductImages : undefined,
-          normalizedStyleRef,
+          processedStyleRef,
           normalizedPersonRef,
         );
 
@@ -6878,25 +6895,26 @@ const startup = async () => {
       }
     };
 
-    // Initialize image generation worker with progress callback to update database
-    try {
-      const imageWorker = initializeImageWorker(processImageJob, {
-        onProgress: async (jobId, progress) => {
-          // Update progress in PostgreSQL database
-          const dbSql = getSql();
-          await dbSql`
-            UPDATE generation_jobs
-            SET progress = ${progress}
-            WHERE id = ${jobId}
-          `;
-        }
-      });
-      if (imageWorker) {
-        console.log(`${colors.green}✓ Image generation worker initialized${colors.reset}`);
-      }
-    } catch (error) {
-      console.error(`${colors.red}✗ Failed to initialize image worker:${colors.reset}`, error.message);
-    }
+    // DISABLED: Background job queue was causing issues with userId resolution
+    // Images are now generated synchronously via /api/images endpoint
+    // try {
+    //   const imageWorker = initializeImageWorker(processImageJob, {
+    //     onProgress: async (jobId, progress) => {
+    //       const dbSql = getSql();
+    //       await dbSql`
+    //         UPDATE generation_jobs
+    //         SET progress = ${progress}
+    //         WHERE id = ${jobId}
+    //       `;
+    //     }
+    //   });
+    //   if (imageWorker) {
+    //     console.log(`${colors.green}✓ Image generation worker initialized${colors.reset}`);
+    //   }
+    // } catch (error) {
+    //   console.error(`${colors.red}✗ Failed to initialize image worker:${colors.reset}`, error.message);
+    // }
+    console.log(`${colors.yellow}⚠ Image worker disabled - using synchronous generation${colors.reset}`);
 
     // Initialize scheduled posts worker
     try {

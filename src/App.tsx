@@ -285,13 +285,16 @@ function AppContent() {
   const contextRef = useRef({ userId, organizationId });
   const hasInitialDataLoadedOnce = useRef(false);
 
-  // Use clerkUserId as fallback to start loading data in parallel with DB sync
-  // This prevents infinite loading when dbUser is still being synced
-  const initialDataUserId = dbUser?.id || clerkUserId || null;
+  // PERF: Always use clerkUserId - server resolves to DB UUID via resolveUserId()
+  // This prevents double-fetch when dbUser.id becomes available after sync
+  // The server's resolveUserId() handles both Clerk IDs and UUIDs with caching
+  const initialDataUserId = clerkUserId || null;
 
   // === OPTIMIZED: Single request to load ALL initial data ===
+  // PERF: Only fetch after orgLoaded to avoid double-fetch when user is in an organization
+  // Without this gate, we fetch with organizationId=null first, then refetch when org loads
   const { data: initialData, isLoading: isInitialLoading } = useInitialData(
-    initialDataUserId,
+    orgLoaded ? initialDataUserId : null, // Gate by orgLoaded to prevent premature fetch
     organizationId,
     clerkUserId,
   );
