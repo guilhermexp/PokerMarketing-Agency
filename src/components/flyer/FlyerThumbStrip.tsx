@@ -19,6 +19,7 @@ interface FlyerThumbStripProps {
   onPublish: (image: GalleryImage) => void;
   onDownload: (image: GalleryImage, index: number) => void;
   onCloneStyle?: (image: GalleryImage) => void;
+  onDelete?: (image: GalleryImage) => void;
   showPublish?: boolean;
   emptyTitle: string;
   emptyDescription: string;
@@ -34,6 +35,7 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
   onPublish: _onPublish,
   onDownload: _onDownload,
   onCloneStyle: _onCloneStyle,
+  onDelete,
   showPublish: _showPublish = true,
   emptyTitle,
   emptyDescription,
@@ -129,6 +131,20 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
                       <div className="absolute top-2 right-2 bg-white/90 rounded-full p-1">
                         <Icon name="check" className="w-3 h-3 text-black" />
                       </div>
+                    )}
+                    {/* Delete button - appears on hover */}
+                    {onDelete && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(flyer);
+                        }}
+                        className="absolute top-2 left-2 w-6 h-6 rounded-full bg-red-500/80 hover:bg-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Excluir flyer"
+                      >
+                        <Icon name="x" className="w-3 h-3 text-white" />
+                      </button>
                     )}
                   </>
                 )}
