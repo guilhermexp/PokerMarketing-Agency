@@ -1474,6 +1474,81 @@ app.get("/api/db/gallery", async (req, res) => {
   }
 });
 
+// Get daily flyers for a specific week schedule
+app.get("/api/db/gallery/daily-flyers", async (req, res) => {
+  try {
+    const sql = getSql();
+    const { user_id, organization_id, week_schedule_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({ error: "user_id is required" });
+    }
+
+    if (!week_schedule_id) {
+      return res.status(400).json({ error: "week_schedule_id is required" });
+    }
+
+    // Resolve user_id (handles both Clerk IDs and UUIDs)
+    const resolvedUserId = await resolveUserId(sql, user_id);
+    if (!resolvedUserId) {
+      return res.json([]); // No user found, return empty array
+    }
+
+    // Verify organization membership if organization_id provided
+    if (organization_id) {
+      await resolveOrganizationContext(sql, resolvedUserId, organization_id);
+    }
+
+    // Select all relevant columns including daily flyer fields
+    const selectColumns = `id, user_id, organization_id, source, src_url, thumbnail_url, prompt, model,
+                          aspect_ratio, image_size, week_schedule_id, daily_flyer_day, daily_flyer_period,
+                          created_at, updated_at`;
+
+    let query;
+    if (organization_id) {
+      query = await sql`
+        SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
+        WHERE organization_id = ${organization_id}
+          AND week_schedule_id = ${week_schedule_id}
+          AND deleted_at IS NULL
+        ORDER BY daily_flyer_day, daily_flyer_period, created_at DESC
+      `;
+    } else {
+      query = await sql`
+        SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
+        WHERE user_id = ${resolvedUserId}
+          AND organization_id IS NULL
+          AND week_schedule_id = ${week_schedule_id}
+          AND deleted_at IS NULL
+        ORDER BY daily_flyer_day, daily_flyer_period, created_at DESC
+      `;
+    }
+
+    // Transform to a structured format: { DAY: { PERIOD: [images] } }
+    const structured = {};
+    for (const img of query) {
+      const day = img.daily_flyer_day || 'UNKNOWN';
+      const period = img.daily_flyer_period || 'UNKNOWN';
+
+      if (!structured[day]) {
+        structured[day] = {};
+      }
+      if (!structured[day][period]) {
+        structured[day][period] = [];
+      }
+      structured[day][period].push(img);
+    }
+
+    res.json({ images: query, structured });
+  } catch (error) {
+    if (error instanceof OrganizationAccessError) {
+      return res.status(403).json({ error: error.message });
+    }
+    logError("Gallery Daily Flyers API GET", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post("/api/db/gallery", async (req, res) => {
   try {
     const sql = getSql();
@@ -1493,6 +1568,10 @@ app.post("/api/db/gallery", async (req, res) => {
       style_reference_name,
       media_type,
       duration,
+      // Daily flyer fields
+      week_schedule_id,
+      daily_flyer_day,
+      daily_flyer_period,
     } = req.body;
 
     if (!user_id || !src_url || !source || !model) {
@@ -1524,12 +1603,13 @@ app.post("/api/db/gallery", async (req, res) => {
     const result = await sql`
       INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, source, model, aspect_ratio, image_size,
                                   post_id, ad_creative_id, video_script_id, is_style_reference, style_reference_name,
-                                  media_type, duration)
+                                  media_type, duration, week_schedule_id, daily_flyer_day, daily_flyer_period)
       VALUES (${resolvedUserId}, ${organization_id || null}, ${src_url}, ${prompt || null}, ${source}, ${model},
               ${aspect_ratio || null}, ${image_size || null},
               ${post_id || null}, ${ad_creative_id || null}, ${video_script_id || null},
               ${is_style_reference || false}, ${style_reference_name || null},
-              ${media_type || "image"}, ${duration || null})
+              ${media_type || "image"}, ${duration || null},
+              ${week_schedule_id || null}, ${daily_flyer_day || null}, ${daily_flyer_period || null})
       RETURNING *
     `;
 

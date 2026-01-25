@@ -66,6 +66,7 @@ import {
   getWeekSchedulesList,
   deleteGalleryImage,
   updateGalleryImage,
+  getDailyFlyers,
   type DbCampaign,
   type WeekScheduleWithCount,
   type DbTournamentEvent,
@@ -595,232 +596,90 @@ function AppContent() {
       }));
   }, [swrGalleryImages]);
 
-  // Load daily flyer state from localStorage and match with gallery images
+  // Track if we've already restored from database to avoid re-running
   const hasRestoredDailyFlyersRef = useRef(false);
-  // Restore daily flyer state from localStorage (new structure: { DAY: { PERIOD: [ids] } })
+  const lastLoadedScheduleIdRef = useRef<string | null>(null);
+
+  // Load daily flyers from database (gallery_images with week_schedule_id)
   useEffect(() => {
-    if (!galleryImages.length || hasRestoredDailyFlyersRef.current) return;
+    if (!userId || !swrTournamentSchedule?.id) {
+      return;
+    }
 
-    const savedDailyFlyers = localStorage.getItem("dailyFlyerMapping");
-    if (!savedDailyFlyers) return;
+    // Only load once per schedule
+    if (lastLoadedScheduleIdRef.current === swrTournamentSchedule.id && hasRestoredDailyFlyersRef.current) {
+      return;
+    }
 
-    try {
-      const mapping = JSON.parse(savedDailyFlyers);
-      const newState: Record<string, Record<TimePeriod, GalleryImage[]>> = {};
+    const loadDailyFlyers = async () => {
+      try {
+        console.debug('[App] Loading daily flyers from database for schedule:', swrTournamentSchedule.id);
+        const result = await getDailyFlyers(userId, swrTournamentSchedule.id, organizationId);
 
-      // Check if it's the new structure (by day) or old structure (by period only)
-      const firstKey = Object.keys(mapping)[0];
-      const dayOrder = [
-        "MONDAY",
-        "TUESDAY",
-        "WEDNESDAY",
-        "THURSDAY",
-        "FRIDAY",
-        "SATURDAY",
-        "SUNDAY",
-      ];
-      const isNewStructure = firstKey && dayOrder.includes(firstKey);
+        if (!result.structured || Object.keys(result.structured).length === 0) {
+          console.debug('[App] No daily flyers found in database for this schedule');
+          hasRestoredDailyFlyersRef.current = true;
+          lastLoadedScheduleIdRef.current = swrTournamentSchedule.id;
+          return;
+        }
 
-      if (isNewStructure) {
-        // New structure: { DAY: { PERIOD: [ids] } }
-        Object.entries(mapping).forEach(([day, periods]) => {
-          if (periods && typeof periods === "object") {
-            newState[day] = {
+        // Convert database images to GalleryImage format
+        const restoredState: Record<string, Record<TimePeriod, GalleryImage[]>> = {};
+
+        Object.entries(result.structured).forEach(([day, periods]) => {
+          if (!restoredState[day]) {
+            restoredState[day] = {
               ALL: [],
               MORNING: [],
               AFTERNOON: [],
               NIGHT: [],
               HIGHLIGHTS: [],
             };
-            Object.entries(periods as Record<string, string[]>).forEach(
-              ([period, ids]) => {
-                if (Array.isArray(ids)) {
-                  ids.forEach((id) => {
-                    const image = galleryImages.find((img) => img.id === id);
-                    if (image) {
-                      newState[day][period as TimePeriod].push(image);
-                    }
-                  });
-                }
-              },
-            );
           }
-        });
-      }
 
-      // Only update if we found any matches
-      const hasImages = Object.values(newState).some((dayData) =>
-        Object.values(dayData).some((arr) => arr.length > 0),
-      );
-      if (hasImages) {
+          Object.entries(periods).forEach(([period, dbImages]) => {
+            const galleryImagesForPeriod: GalleryImage[] = dbImages.map((dbImg) => ({
+              id: dbImg.id,
+              src: dbImg.src_url,
+              prompt: dbImg.prompt || undefined,
+              source: dbImg.source,
+              model: dbImg.model as GalleryImage['model'],
+              aspectRatio: dbImg.aspect_ratio || undefined,
+              imageSize: dbImg.image_size as GalleryImage['imageSize'] | undefined,
+              week_schedule_id: dbImg.week_schedule_id || undefined,
+              daily_flyer_day: dbImg.daily_flyer_day || undefined,
+              daily_flyer_period: dbImg.daily_flyer_period || undefined,
+              created_at: dbImg.created_at,
+            }));
+
+            if (galleryImagesForPeriod.length > 0) {
+              restoredState[day][period as TimePeriod] = galleryImagesForPeriod;
+            }
+          });
+        });
+
+        if (Object.keys(restoredState).length > 0) {
+          setDailyFlyerState(restoredState);
+          console.debug('[App] Restored daily flyer state from database:', restoredState);
+        }
+
         hasRestoredDailyFlyersRef.current = true;
-        setDailyFlyerState(newState);
-        console.debug("[App] Restored daily flyer state from localStorage");
+        lastLoadedScheduleIdRef.current = swrTournamentSchedule.id;
+      } catch (err) {
+        console.error('[App] Failed to load daily flyers from database:', err);
       }
-    } catch (e) {
-      console.error("[App] Failed to parse daily flyer mapping:", e);
-    }
-  }, [galleryImages]);
+    };
 
-  // Save daily flyer state to localStorage when it changes (new structure: { DAY: { PERIOD: [ids] } })
-  useEffect(() => {
-    // Don't save during initial restore
-    if (!hasRestoredDailyFlyersRef.current) {
-      // Check if there's something to save (user generated new flyers)
-      const hasRealImages = Object.values(dailyFlyerState).some(
-        (dayData) =>
-          dayData &&
-          typeof dayData === "object" &&
-          Object.values(dayData).some(
-            (arr) =>
-              Array.isArray(arr) &&
-              arr.some(
-                (item) => item !== "loading" && typeof item === "object",
-              ),
-          ),
-      );
-      if (hasRealImages) {
-        hasRestoredDailyFlyersRef.current = true; // Mark as ready to save
-      } else {
-        return;
-      }
-    }
-
-    // Extract just the IDs for each day/period
-    const mapping: Record<string, Record<string, string[]>> = {};
-    Object.entries(dailyFlyerState).forEach(([day, periods]) => {
-      if (periods && typeof periods === "object") {
-        mapping[day] = {};
-        Object.entries(periods).forEach(([period, images]) => {
-          if (Array.isArray(images)) {
-            mapping[day][period] = images
-              .filter(
-                (img): img is GalleryImage =>
-                  img !== "loading" && typeof img === "object",
-              )
-              .map((img) => img.id);
-          }
-        });
-      }
-    });
-
-    // Only save if there's at least one image
-    const hasAnyImages = Object.values(mapping).some((dayData) =>
-      Object.values(dayData).some((ids) => ids.length > 0),
-    );
-    if (hasAnyImages) {
-      localStorage.setItem("dailyFlyerMapping", JSON.stringify(mapping));
-      console.debug("[App] Saved daily flyer mapping to localStorage");
-    }
-  }, [dailyFlyerState]);
-
-  // Track if we've already restored from database to avoid re-running
-  const hasRestoredRef = useRef(false);
-
-  // Restore daily flyers from database (week_schedules.daily_flyer_urls)
-  useEffect(() => {
-    if (!swrTournamentSchedule?.daily_flyer_urls || !galleryImages.length) {
-      return;
-    }
-
-    // Only restore once per schedule load
-    if (hasRestoredRef.current) {
-      return;
-    }
-
-    const dailyFlyerUrls = swrTournamentSchedule.daily_flyer_urls;
-    console.debug('[App] Restoring daily flyers from database:', dailyFlyerUrls);
-    console.debug('[App] Available gallery images:', galleryImages.length);
-
-    // Convert URLs to GalleryImage objects
-    const restoredState: Record<string, Record<TimePeriod, GalleryImage[]>> = {};
-
-    // Detect structure: NEW (day-based) vs OLD (period-only)
-    // NEW structure: { "MONDAY": { "MORNING": [...], ... }, "TUESDAY": {...}, ... }
-    // OLD structure: { "MORNING": [...], "AFTERNOON": [...], ... }
-    const firstKey = Object.keys(dailyFlyerUrls)[0];
-    const isNewStructure = firstKey && typeof dailyFlyerUrls[firstKey] === 'object' && !Array.isArray(dailyFlyerUrls[firstKey]);
-
-    if (isNewStructure) {
-      // NEW STRUCTURE: Iterate through days, then periods
-      Object.entries(dailyFlyerUrls).forEach(([day, periods]) => {
-        if (!periods || typeof periods !== 'object') return;
-
-        // Initialize day in restoredState
-        if (!restoredState[day]) {
-          restoredState[day] = {
-            ALL: [],
-            MORNING: [],
-            AFTERNOON: [],
-            NIGHT: [],
-            HIGHLIGHTS: [],
-          };
-        }
-
-        // Iterate through periods for this day
-        Object.entries(periods).forEach(([period, urls]) => {
-          if (!Array.isArray(urls) || urls.length === 0) return;
-
-          // Find gallery images matching these URLs
-          const periodImages = urls
-            .map(url => galleryImages.find(img => img.src === url))
-            .filter((img): img is GalleryImage => img !== undefined);
-
-          if (periodImages.length > 0) {
-            restoredState[day][period as TimePeriod] = periodImages;
-          }
-        });
-      });
-    } else {
-      // OLD STRUCTURE (backward compatibility): Iterate through periods only
-      Object.entries(dailyFlyerUrls).forEach(([period, urls]) => {
-        if (!Array.isArray(urls) || urls.length === 0) return;
-
-        // Find gallery images matching these URLs
-        const periodImages = urls
-          .map(url => galleryImages.find(img => img.src === url))
-          .filter((img): img is GalleryImage => img !== undefined);
-
-        if (periodImages.length === 0) return;
-
-        // Use a default day key for old structure
-        const defaultDay = 'DAILY';
-
-        if (!restoredState[defaultDay]) {
-          restoredState[defaultDay] = {
-            ALL: [],
-            MORNING: [],
-            AFTERNOON: [],
-            NIGHT: [],
-            HIGHLIGHTS: [],
-          };
-        }
-
-        restoredState[defaultDay][period as TimePeriod] = periodImages;
-      });
-    }
-
-    if (Object.keys(restoredState).length > 0) {
-      setDailyFlyerState(prev => {
-        // Merge with existing state (preserve any data from other days)
-        const merged = { ...prev };
-        Object.entries(restoredState).forEach(([day, periods]) => {
-          merged[day] = { ...merged[day], ...periods };
-        });
-        return merged;
-      });
-      console.debug('[App] Restored daily flyer state from database:', restoredState);
-      hasRestoredRef.current = true; // Mark as restored
-    } else {
-      console.warn('[App] No flyers could be restored. URLs in database but images not found in gallery.');
-      console.warn('[App] daily_flyer_urls:', dailyFlyerUrls);
-      console.warn('[App] Gallery image URLs:', galleryImages.map(img => img.src));
-    }
-  }, [swrTournamentSchedule?.daily_flyer_urls, swrTournamentSchedule?.id, galleryImages]);
+    loadDailyFlyers();
+  }, [userId, swrTournamentSchedule?.id, organizationId]);
 
   // Reset restoration flag when schedule changes
   useEffect(() => {
-    hasRestoredRef.current = false;
+    if (swrTournamentSchedule?.id !== lastLoadedScheduleIdRef.current) {
+      hasRestoredDailyFlyersRef.current = false;
+      // Clear daily flyer state when switching schedules
+      setDailyFlyerState({});
+    }
   }, [swrTournamentSchedule?.id]);
 
   // Process tournament schedule info when SWR data loads
@@ -893,6 +752,10 @@ function AppContent() {
         video_script_id: image.video_script_id || null,
         media_type: image.mediaType || null,
         duration: image.duration || null,
+        // Daily flyer fields
+        week_schedule_id: image.week_schedule_id || null,
+        daily_flyer_day: image.daily_flyer_day || null,
+        daily_flyer_period: image.daily_flyer_period || null,
       });
 
       (async () => {
@@ -911,6 +774,10 @@ function AppContent() {
             organization_id: organizationId,
             media_type: image.mediaType,
             duration: image.duration,
+            // Daily flyer fields
+            week_schedule_id: image.week_schedule_id,
+            daily_flyer_day: image.daily_flyer_day,
+            daily_flyer_period: image.daily_flyer_period,
           });
           // Replace temp image with the real database image
           swrRemoveGalleryImage(tempId);

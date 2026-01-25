@@ -329,6 +329,7 @@ export const PeriodCardRow: React.FC<{
                         aspectRatio,
                         imageSize,
                         week_schedule_id: scheduleId, // Link to schedule for persistence
+                        daily_flyer_day: selectedDay, // Track which day of week
                         daily_flyer_period: period, // Track which period this flyer is for
                     });
 

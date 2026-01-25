@@ -191,6 +191,7 @@ export interface GalleryImage {
   // Database linking for flyers
   tournament_event_id?: string;
   week_schedule_id?: string;
+  daily_flyer_day?: string; // 'MONDAY' | 'TUESDAY' | ... for daily flyers
   daily_flyer_period?: string; // 'MORNING' | 'AFTERNOON' | 'NIGHT' | 'HIGHLIGHTS' for daily flyers
   // Publishing status
   published_at?: string; // ISO timestamp when published to Instagram

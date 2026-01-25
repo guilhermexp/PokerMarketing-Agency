@@ -325,6 +325,7 @@ CREATE TABLE gallery_images (
 
     -- Daily flyer reference
     week_schedule_id UUID,
+    daily_flyer_day VARCHAR(20),
     daily_flyer_period VARCHAR(50),
 
     -- Style reference
@@ -343,6 +344,8 @@ CREATE INDEX idx_gallery_images_user ON gallery_images(user_id) WHERE deleted_at
 CREATE INDEX idx_gallery_images_org ON gallery_images(organization_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_gallery_images_source ON gallery_images(source);
 CREATE INDEX idx_gallery_images_week_schedule ON gallery_images(week_schedule_id);
+CREATE INDEX idx_gallery_images_daily_flyers ON gallery_images(week_schedule_id, daily_flyer_day, daily_flyer_period)
+    WHERE week_schedule_id IS NOT NULL;
 CREATE INDEX idx_gallery_images_style_ref ON gallery_images(user_id, is_style_reference)
     WHERE is_style_reference = TRUE AND deleted_at IS NULL;
 CREATE INDEX idx_gallery_images_created ON gallery_images(created_at DESC);

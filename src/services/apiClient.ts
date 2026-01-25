@@ -214,6 +214,10 @@ export interface DbGalleryImage {
   video_script_id?: string | null;
   is_style_reference?: boolean | null;
   style_reference_name?: string | null;
+  // Daily flyer fields
+  week_schedule_id?: string | null;
+  daily_flyer_day?: string | null;
+  daily_flyer_period?: string | null;
 }
 
 export async function getGalleryImages(
@@ -247,12 +251,34 @@ export async function createGalleryImage(
     organization_id?: string | null;
     media_type?: string;
     duration?: number;
+    // Daily flyer fields
+    week_schedule_id?: string;
+    daily_flyer_day?: string;
+    daily_flyer_period?: string;
   },
 ): Promise<DbGalleryImage> {
   return fetchApi<DbGalleryImage>("/gallery", {
     method: "POST",
     body: JSON.stringify({ user_id: userId, ...data }),
   });
+}
+
+// Fetch daily flyers for a specific week schedule
+export async function getDailyFlyers(
+  userId: string,
+  weekScheduleId: string,
+  organizationId?: string | null,
+): Promise<{ images: DbGalleryImage[]; structured: Record<string, Record<string, DbGalleryImage[]>> }> {
+  const params = new URLSearchParams({
+    user_id: userId,
+    week_schedule_id: weekScheduleId,
+  });
+  if (organizationId) {
+    params.append("organization_id", organizationId);
+  }
+  return fetchApi<{ images: DbGalleryImage[]; structured: Record<string, Record<string, DbGalleryImage[]>> }>(
+    `/gallery/daily-flyers?${params}`
+  );
 }
 
 export async function deleteGalleryImage(id: string): Promise<void> {
