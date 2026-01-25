@@ -680,6 +680,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 selectedDailyFlyerIds={selectedDailyFlyerIds}
                 setSelectedDailyFlyerIds={setSelectedDailyFlyerIds}
                 onUpdateGalleryImage={onUpdateGalleryImage}
+                onDeleteGalleryImage={onDeleteGalleryImage}
                 onSetChatReference={onSetChatReference}
                 onPublishToCampaign={onPublishToCampaign}
                 selectedStyleReference={selectedStyleReference}
