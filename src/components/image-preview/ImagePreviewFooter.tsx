@@ -27,35 +27,9 @@ export const ImagePreviewFooter: React.FC<ImagePreviewFooterProps> = ({
 
   return (
     <div className="p-4 border-t border-white/[0.06] space-y-2">
-      {isToolApprovalMode && editPreview ? (
-        <div className="flex gap-1.5">
-          <button
-            onClick={onReject}
-            disabled={isEditing}
-            className="flex-1 h-9 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 rounded-lg text-[10px] font-medium text-red-400 hover:text-red-300 transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
-          >
-            <Icon name="x" className="w-3.5 h-3.5" />
-            Rejeitar
-          </button>
-          <button
-            onClick={onApprove}
-            disabled={isEditing}
-            className="flex-1 h-9 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 rounded-lg text-[11px] font-bold text-green-400 hover:text-green-300 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
-          >
-            {isEditing ? (
-              <>
-                <Loader size={14} className="text-white/60" />
-                Salvando...
-              </>
-            ) : (
-              <>
-                <Icon name="check" className="w-3.5 h-3.5" />
-                Aprovar Edição
-              </>
-            )}
-          </button>
-        </div>
-      ) : editPreview ? (
+      {/* Botões de aprovação agora estão no overlay, não aqui */}
+      {/* Mostrar apenas botões normais de edição quando NÃO estiver em modo de aprovação */}
+      {editPreview && !isToolApprovalMode ? (
         <div className="flex gap-1.5">
           <button
             onClick={handleDiscardEdit}

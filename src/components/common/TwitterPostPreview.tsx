@@ -1,6 +1,5 @@
 import React from "react";
 import { Icon } from "./Icon";
-import { SendToChatButton } from "./SendToChatButton";
 import { ImageGenerationLoader } from "../ui/ai-chat-image-generation-1";
 import type { GalleryImage } from "../../types";
 
@@ -101,16 +100,11 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
                 onLoad={handleImageLoad}
                 style={{ opacity: isImageLoading ? 0 : 1 }}
               />
-              {!isImageLoading && (onImageClick || galleryImage) && (
+              {!isImageLoading && onImageClick && (
                 <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-all flex items-center justify-center gap-2">
-                  {galleryImage && (
-                    <SendToChatButton image={galleryImage} />
-                  )}
-                  {onImageClick && (
-                    <div className="px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur-sm text-xs text-white font-medium cursor-pointer">
-                      Editar
-                    </div>
-                  )}
+                  <div className="px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur-sm text-xs text-white font-medium cursor-pointer">
+                    Editar
+                  </div>
                 </div>
               )}
             </div>

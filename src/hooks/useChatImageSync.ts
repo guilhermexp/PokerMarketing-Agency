@@ -86,17 +86,14 @@ export function useChatImageSync({
           img => img.id === chatReferenceImage.id
         );
 
-        // Se encontrou a imagem e a URL mudou
+        // Se encontrou a imagem e a URL mudou, atualizar a referência
         if (updatedImage && updatedImage.src !== chatReferenceImage.src) {
           setChatReferenceImage({ id: updatedImage.id, src: updatedImage.src });
           hasChanges = true;
         }
 
-        // Se a imagem foi deletada (não está mais em galleryImages)
-        if (!updatedImage) {
-          setChatReferenceImage(null);
-          hasChanges = true;
-        }
+        // NOTA: Não limpar automaticamente se a imagem não está em galleryImages
+        // Isso permite que imagens externas (ex: do preview de edição) sejam referenciadas
       }
 
       // ========================================================================

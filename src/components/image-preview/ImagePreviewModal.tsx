@@ -39,6 +39,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   onToolEditRejected,
   initialEditPreview,
   chatComponent,
+  chatReferenceImageId,
 }) => {
   const chatContext = useChatContext();
   const resolvedChatComponent = chatComponent ?? chatContext?.renderPreviewChatPanel?.();
@@ -47,6 +48,14 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   // Editor state - controlled by this component
   const [editPrompt, setEditPrompt] = useState('');
   const [referenceImage, setReferenceImage] = useState<ImageFile | null>(null);
+
+  // Log when image.src changes
+  useEffect(() => {
+    console.log('📸 [ImagePreviewModal] image.src changed:', {
+      imageId: image.id,
+      src: image.src.substring(0, 50),
+    });
+  }, [image.src, image.id]);
 
   // Tool approval mode detection
   const isToolApprovalMode = Boolean(pendingToolEdit);
@@ -115,8 +124,23 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     // Tool approval mode
     pendingToolEdit,
     onToolEditComplete: (imageUrl: string) => {
+      console.log('🔗 [ImagePreviewModal] onToolEditComplete called:', {
+        imageUrl,
+        isToolApprovalMode,
+        hasOnToolEditApproved: !!onToolEditApproved,
+        hasPendingToolEdit: !!pendingToolEdit,
+        toolCallId: pendingToolEdit?.toolCallId,
+      });
+
       if (isToolApprovalMode && onToolEditApproved && pendingToolEdit) {
+        console.log('🔗 [ImagePreviewModal] Calling onToolEditApproved');
         onToolEditApproved(pendingToolEdit.toolCallId, imageUrl);
+      } else {
+        console.warn('🔗 [ImagePreviewModal] NOT calling onToolEditApproved:', {
+          isToolApprovalMode,
+          hasOnToolEditApproved: !!onToolEditApproved,
+          hasPendingToolEdit: !!pendingToolEdit,
+        });
       }
     },
     initialEditPreview,
@@ -270,6 +294,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       error={error}
       // Chat
       chatComponent={resolvedChatComponent}
+      chatReferenceImageId={chatReferenceImageId}
     />
   );
 };

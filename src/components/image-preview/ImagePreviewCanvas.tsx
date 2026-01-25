@@ -81,7 +81,7 @@ export const ImagePreviewCanvas: React.FC<ImagePreviewCanvasProps> = ({
         />
       )}
 
-      {!isVideo && (isLoadingImage || imageLoadError) && (
+      {!isVideo && !editPreview && !resizedPreview && (isLoadingImage || imageLoadError) && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
           <div className="flex flex-col items-center gap-2 text-center px-4">
             <div className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/60 text-xs">

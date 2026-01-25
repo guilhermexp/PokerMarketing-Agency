@@ -36,6 +36,7 @@ export interface ImagePreviewModalProps {
   onToolEditRejected?: (toolCallId: string, reason?: string) => void;
   initialEditPreview?: EditPreview | null;
   chatComponent?: React.ReactNode;
+  chatReferenceImageId?: string | null;
 }
 
 // =============================================================================

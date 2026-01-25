@@ -5,7 +5,6 @@
 import React from 'react';
 import type { GalleryImage, VideoClipScript } from '../../types';
 import { Icon } from '../common/Icon';
-import { SendToChatButton } from '../common/SendToChatButton';
 import { Loader } from '../common/Loader';
 import { CarouselPreview } from './CarouselPreview';
 
@@ -228,7 +227,6 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-1.5">
-              <SendToChatButton image={img} />
               <button
                 onClick={() => onOpenEditor(img)}
                 className="w-7 h-7 rounded-lg bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/80 hover:bg-black/80 hover:text-primary transition-all"

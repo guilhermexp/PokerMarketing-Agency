@@ -75,8 +75,8 @@ export function LoadingIndicatorEnhanced({
   const stageMessage = message || getStageMessage(stage);
 
   return (
-    <div className="flex justify-start animate-fade-in px-1">
-      <div className="max-w-[90%] space-y-2">
+    <div className="flex justify-start animate-fade-in px-1 w-full">
+      <div className="w-full space-y-2">
         {/* Stage indicator com Loader oficial */}
         <div className="flex items-center gap-2 mb-3">
           {/* Loader oficial do ai-elements */}

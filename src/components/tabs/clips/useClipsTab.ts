@@ -67,15 +67,37 @@ export const useClipsTab = ({
 
         setThumbnails((prevThumbnails) => {
             return videoClipScripts.map((clip, index) => {
+                // First check if there's a gallery image for this clip
+                if (galleryImages && galleryImages.length > 0 && clip.id) {
+                    const exactMatch = galleryImages.find(
+                        (img) => img.source === "Clipe" && img.video_script_id === clip.id
+                    );
+                    if (exactMatch) {
+                        console.log('🔄 [useClipsTab] Found exact match in gallery for clip:', {
+                            clipId: clip.id,
+                            imageSrc: exactMatch.src.substring(0, 50),
+                        });
+                        return exactMatch;
+                    }
+                }
+
                 // If we already have a valid thumbnail for this index that matches this clip, keep it
                 const existingThumbnail = prevThumbnails[index];
                 if (existingThumbnail && existingThumbnail.src) {
                     if (existingThumbnail.video_script_id === clip.id) {
+                        console.log('🔄 [useClipsTab] Using existing thumbnail for clip:', {
+                            clipId: clip.id,
+                            thumbnailSrc: existingThumbnail.src.substring(0, 50),
+                        });
                         return existingThumbnail;
                     }
                 }
 
                 if (clip.thumbnail_url) {
+                    console.log('🔄 [useClipsTab] Creating thumbnail from clip.thumbnail_url:', {
+                        clipId: clip.id,
+                        thumbnailUrl: clip.thumbnail_url.substring(0, 50),
+                    });
                     return {
                         id: `thumbnail-${clip.id}`,
                         src: clip.thumbnail_url,
@@ -86,13 +108,6 @@ export const useClipsTab = ({
                     };
                 }
 
-                if (galleryImages && galleryImages.length > 0 && clip.id) {
-                    const exactMatch = galleryImages.find(
-                        (img) => img.source === "Clipe" && img.video_script_id === clip.id
-                    );
-                    if (exactMatch) return exactMatch;
-                }
-
                 if (galleryImages && galleryImages.length > 0 && clip.image_prompt) {
                     const legacyMatch = galleryImages.find(
                         (img) =>
@@ -100,9 +115,16 @@ export const useClipsTab = ({
                             !img.video_script_id &&
                             img.prompt === clip.image_prompt
                     );
-                    if (legacyMatch) return legacyMatch;
+                    if (legacyMatch) {
+                        console.log('🔄 [useClipsTab] Found legacy match for clip:', {
+                            clipId: clip.id,
+                            imageSrc: legacyMatch.src.substring(0, 50),
+                        });
+                        return legacyMatch;
+                    }
                 }
 
+                console.log('🔄 [useClipsTab] No thumbnail found for clip:', clip.id);
                 return null;
             });
         });

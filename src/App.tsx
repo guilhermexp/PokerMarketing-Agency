@@ -932,13 +932,25 @@ function AppContent() {
   ]);
 
   const handleUpdateGalleryImage = useCallback((imageId: string, newImageSrc: string) => {
+    console.log('🗃️ [App] handleUpdateGalleryImage called:', {
+      imageId,
+      newSrc: newImageSrc.substring(0, 50),
+    });
+
     // Update SWR cache immediately (optimistic update)
     swrUpdateGalleryImage(imageId, { src_url: newImageSrc });
-    if (toolImageReference?.id === imageId)
-      setToolImageReference({ id: imageId, src: newImageSrc });
+    console.log('🗃️ [App] SWR cache updated');
 
-    // Skip temp images and blob URLs (already uploaded)
-    if (imageId.startsWith("temp-")) return;
+    if (toolImageReference?.id === imageId) {
+      setToolImageReference({ id: imageId, src: newImageSrc });
+      console.log('🗃️ [App] toolImageReference updated');
+    }
+
+    // Skip temp images, synthetic IDs (like thumbnail-xxx), and other non-database IDs
+    if (imageId.startsWith("temp-") || imageId.startsWith("thumbnail-") || imageId.includes("-cover")) {
+      console.log('🗃️ [App] Skipping synthetic/temp image ID:', imageId);
+      return;
+    }
 
     // Upload to Blob and update database in background
     (async () => {
@@ -947,16 +959,23 @@ function AppContent() {
           ? await uploadDataUrlToBlob(newImageSrc)
           : newImageSrc;
 
+        console.log('🗃️ [App] Updating database with:', {
+          imageId,
+          srcUrl: srcUrl.substring(0, 50),
+        });
+
         await updateGalleryImage(imageId, { src_url: srcUrl });
+        console.log('🗃️ [App] Database updated successfully');
 
         // Update cache with final Blob URL
         if (srcUrl !== newImageSrc) {
           swrUpdateGalleryImage(imageId, { src_url: srcUrl });
           if (toolImageReference?.id === imageId)
             setToolImageReference({ id: imageId, src: srcUrl });
+          console.log('🗃️ [App] Cache updated with blob URL');
         }
       } catch (e) {
-        console.error("Failed to update image in database:", e);
+        console.error("🗃️ [App] Failed to update image in database:", e);
       }
     })();
   }, [
@@ -2095,19 +2114,31 @@ function AppContent() {
   }, [galleryImages]);
 
   const handleToolEditApproved = useCallback((toolCallId: string, imageUrl: string) => {
-    console.debug('[App] Tool edit approved:', { toolCallId, imageUrl });
+    console.log('🎯 [App] Tool edit approved:', {
+      toolCallId,
+      imageUrl,
+      imageUrlType: typeof imageUrl,
+      imageUrlLength: imageUrl?.length,
+      isHttps: imageUrl?.startsWith('https://'),
+      isBlob: imageUrl?.startsWith('blob:'),
+    });
 
     // Update pending state to mark as approved
-    setPendingToolEdit(prev => prev ? {
-      ...prev,
-      result: 'approved',
-      imageUrl
-    } : null);
+    setPendingToolEdit(prev => {
+      const updated = prev ? {
+        ...prev,
+        result: 'approved' as const,
+        imageUrl
+      } : null;
+      console.log('🎯 [App] Updated pendingToolEdit:', updated);
+      return updated;
+    });
 
     // Clear states (will be handled by AssistantPanelNew after it gets the result)
     setTimeout(() => {
       setPendingToolEdit(null);
       setEditingImage(null);
+      setToolEditPreview(null);
     }, 100);
   }, []);
 
@@ -2164,6 +2195,21 @@ function AppContent() {
       dataUrl: imageUrl,
       type: 'edit',
       prompt,
+    });
+
+    // Preserve or create pendingToolEdit for approval flow
+    setPendingToolEdit(prev => {
+      // If there's already a pending edit with the same toolCallId, keep it
+      if (prev && prev.toolCallId === toolCallId) {
+        return prev;
+      }
+      // Otherwise create a new one from the payload
+      return {
+        toolCallId,
+        toolName: 'edit_image',
+        prompt: prompt || '',
+        imageId: previewImage.id,
+      };
     });
   }, [galleryImages]);
 

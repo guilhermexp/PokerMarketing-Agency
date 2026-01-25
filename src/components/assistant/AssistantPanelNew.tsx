@@ -83,12 +83,8 @@ const getImageMediaType = (url: string): 'image/jpeg' | 'image/png' | 'image/web
   return 'image/png'; // default
 };
 
-// ChatBubble component
-const ChatBubble: React.FC<{ message: UIMessage; onApprove?: (id: string) => void; onDeny?: (id: string) => void }> = ({
-  message,
-  onApprove,
-  onDeny
-}) => {
+// ChatBubble component - Apenas renderiza mensagens (approvals são mostrados acima do input)
+const ChatBubble: React.FC<{ message: UIMessage }> = ({ message }) => {
   const isAssistant = message.role === 'assistant';
 
   const textParts = message.parts
@@ -98,25 +94,6 @@ const ChatBubble: React.FC<{ message: UIMessage; onApprove?: (id: string) => voi
 
   // Extrair imagens/arquivos
   const fileParts = message.parts.filter(isFileUIPart);
-
-  // Tool approvals (AI SDK v6)
-  const toolApprovals = message.parts
-    .filter(isToolUIPart)
-    .filter((part) => part.state === 'approval-requested' && part.approval?.id);
-
-  const mapToolState = (state: ToolUIPart['state']): 'approval-requested' | 'approved' | 'denied' | 'executing' | 'complete' => {
-    switch (state) {
-      case 'approval-requested':
-        return 'approval-requested';
-      case 'output-denied':
-        return 'denied';
-      case 'output-available':
-      case 'approval-responded':
-        return 'complete';
-      default:
-        return 'executing';
-    }
-  };
 
   return (
     <div className={`flex flex-col ${isAssistant ? 'items-start' : 'items-end'} space-y-2 animate-fade-in-up`}>
@@ -145,17 +122,7 @@ const ChatBubble: React.FC<{ message: UIMessage; onApprove?: (id: string) => voi
 
       {/* Renderizar texto (se houver) */}
       {textParts && (
-        <div className="group relative max-w-[90%]">
-          {/* Ações (aparecem no hover) */}
-          <div className="absolute top-2 right-2 z-10">
-            <MessageActionsEnhanced
-              messageId={message.id}
-              content={textParts}
-              onPin={() => console.info('Pin message:', message.id)}
-              onFork={() => console.info('Fork from:', message.id)}
-            />
-          </div>
-
+        <div className="group max-w-[90%]">
           {/* Conteúdo da mensagem */}
           <div
             className={`${
@@ -168,38 +135,18 @@ const ChatBubble: React.FC<{ message: UIMessage; onApprove?: (id: string) => voi
               {textParts}
             </MessageResponse>
           </div>
+
+          {/* Ações (aparecem no hover, embaixo do texto) */}
+          {isAssistant && (
+            <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <MessageActionsEnhanced
+                messageId={message.id}
+                content={textParts}
+              />
+            </div>
+          )}
         </div>
       )}
-
-      {/* Tool Approval UI com ToolWithApproval */}
-      {toolApprovals.map((toolPart) => (
-        <div key={toolPart.toolCallId} className="max-w-[90%]">
-          {(() => {
-            const toolArgs = (
-              ('rawInput' in toolPart
-                ? (toolPart as { rawInput?: unknown }).rawInput
-                : toolPart.input) || {}
-            ) as Record<string, unknown>;
-            return (
-          <ToolWithApproval
-            toolCallId={toolPart.toolCallId}
-            toolName={toolPart.type.replace('tool-', '')}
-            args={toolArgs}
-            metadata={
-              'metadata' in toolPart
-                ? (toolPart as { metadata?: { preview?: unknown } }).metadata?.preview
-                : undefined
-            }
-            state={mapToolState(toolPart.state)}
-            approvalId={toolPart.approval?.id}
-            onApprove={onApprove!}
-            onDeny={onDeny!}
-            onAlwaysAllow={(toolName) => console.info('Always allow:', toolName)}
-          />
-            );
-          })()}
-        </div>
-      ))}
     </div>
   );
 };
@@ -213,6 +160,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     onUpdateReference,
     galleryImages,
     brandProfile,
+    pendingToolEdit,
     onShowToolEditPreview
   } = props;
   const [input, setInput] = useState('');
@@ -259,8 +207,33 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
   const { messages, sendMessage, status, addToolApprovalResponse, setMessages } = useChat<UIMessage>(chatOptions);
 
   const isLoading = status === 'streaming' || status === 'submitted';
-  const lastMessage = messages[messages.length - 1];
-  const shouldShowLoading = isSending || (isLoading && lastMessage?.role === 'user');
+
+  // Helper para mapear estado da tool
+  const mapToolState = (state: ToolUIPart['state']): 'approval-requested' | 'approved' | 'denied' | 'executing' | 'complete' => {
+    switch (state) {
+      case 'approval-requested':
+        return 'approval-requested';
+      case 'output-denied':
+        return 'denied';
+      case 'output-available':
+      case 'approval-responded':
+        return 'complete';
+      default:
+        return 'executing';
+    }
+  };
+
+  // Extrair todos os pending approvals de todas as mensagens
+  const pendingApprovals = messages.flatMap((msg) =>
+    msg.parts
+      .filter(isToolUIPart)
+      .filter((part) => part.state === 'approval-requested' && part.approval?.id)
+  );
+
+  // Mostrar loading quando:
+  // 1. Usuário acabou de enviar mensagem (isSending)
+  // 2. Está carregando E não há approvals pendentes (processando após aprovação)
+  const shouldShowLoading = isSending || (isLoading && pendingApprovals.length === 0);
 
   useEffect(() => {
     if (!toast) return;
@@ -285,6 +258,91 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     messages,
     setMessages
   });
+
+  // ========================================================================
+  // TOOL EDIT APPROVAL FLOW
+  // ========================================================================
+  // Monitora pendingToolEdit e notifica o agente quando aprovado/rejeitado
+  useEffect(() => {
+    if (!pendingToolEdit) {
+      // Limpar cache quando pendingToolEdit for null (reset)
+      // Mas mantém por um tempo para evitar processar múltiplas vezes durante transições
+      return;
+    }
+
+    const { toolCallId, result, imageUrl, error } = pendingToolEdit;
+
+    // Evitar processar o mesmo resultado múltiplas vezes
+    if (handledEditResultsRef.current.has(toolCallId)) {
+      return;
+    }
+
+    // Verificar se a tool call existe nas mensagens antes de aprovar/rejeitar
+    const allToolCalls = messages.flatMap(msg =>
+      msg.parts.filter(isToolUIPart).map(part => ({
+        id: part.id,
+        toolName: part.type.replace('tool-', ''),
+        state: part.state
+      }))
+    );
+
+    console.log('🔍 [AssistantPanel] All tool calls in messages:', allToolCalls);
+    console.log('🔍 [AssistantPanel] Looking for toolCallId:', toolCallId);
+
+    const toolCallExists = allToolCalls.some(tc => tc.id === toolCallId);
+
+    if (!toolCallExists) {
+      console.warn('❌ [AssistantPanel] Tool call not found in messages:', {
+        toolCallId,
+        availableToolCalls: allToolCalls.map(tc => tc.id),
+        totalMessages: messages.length,
+        totalToolCalls: allToolCalls.length,
+      });
+      // Não processar - a tool call pode ter sido removida ou ainda não carregada
+      return;
+    }
+
+    console.log('✅ [AssistantPanel] Tool call found! Proceeding with approval/rejection');
+
+    if (result === 'approved' && imageUrl) {
+      console.log('✅ [AssistantPanel] Auto-approving tool edit:', {
+        toolCallId,
+        imageUrl,
+        imageUrlType: typeof imageUrl,
+        imageUrlLength: imageUrl?.length,
+      });
+
+      // Marcar como processado antes de chamar addToolApprovalResponse
+      handledEditResultsRef.current.add(toolCallId);
+
+      // Notificar o agente que a edição foi aprovada
+      console.log('✅ [AssistantPanel] Calling addToolApprovalResponse with:', {
+        id: toolCallId,
+        approved: true,
+        result: imageUrl
+      });
+
+      addToolApprovalResponse({
+        id: toolCallId,
+        approved: true,
+        result: imageUrl
+      });
+
+      console.log('✅ [AssistantPanel] addToolApprovalResponse completed');
+    } else if (result === 'rejected') {
+      console.debug('[AssistantPanel] Auto-denying tool edit:', { toolCallId, error });
+
+      // Marcar como processado antes de chamar addToolApprovalResponse
+      handledEditResultsRef.current.add(toolCallId);
+
+      // Notificar o agente que a edição foi rejeitada
+      addToolApprovalResponse({
+        id: toolCallId,
+        approved: false,
+        reason: error || 'Edição rejeitada pelo usuário'
+      });
+    }
+  }, [pendingToolEdit, addToolApprovalResponse, messages]);
 
   // ========================================================================
   // Debug: monitorar tool parts
@@ -515,7 +573,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     <DataStreamProvider dataStream={dataStream} setDataStream={setDataStream}>
       <DataStreamHandler />
 
-      <aside className="assistant-panel w-full sm:w-[380px] h-full bg-[#0a0a0a]/95 backdrop-blur-xl border-l border-white/[0.08] flex flex-col flex-shrink-0">
+      <aside className="assistant-panel w-full h-full bg-[#0a0a0a]/95 backdrop-blur-xl border-l border-white/[0.08] flex flex-col flex-shrink-0">
         {/* Header minimalista */}
         <div className="flex-shrink-0 h-14 flex items-center justify-between px-4">
           <img src="/icon.png" alt="Socialab" className="w-9 h-9 rounded-xl" />
@@ -545,7 +603,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
             </div>
           )}
           {messages.map((msg) => (
-            <ChatBubble key={msg.id} message={msg} onApprove={handleApprove} onDeny={handleDeny} />
+            <ChatBubble key={msg.id} message={msg} />
           ))}
 
           {/* Erro */}
@@ -570,6 +628,37 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
 
         {/* Input Area */}
         <div className="flex-shrink-0 p-4">
+          {/* Pending Tool Approvals - Fixo acima do input */}
+          {pendingApprovals.length > 0 && (
+            <div className="mb-3 space-y-2 animate-fade-in-up">
+              {pendingApprovals.map((toolPart) => {
+                const toolArgs = (
+                  ('rawInput' in toolPart
+                    ? (toolPart as { rawInput?: unknown }).rawInput
+                    : toolPart.input) || {}
+                ) as Record<string, unknown>;
+                return (
+                  <ToolWithApproval
+                    key={toolPart.toolCallId}
+                    toolCallId={toolPart.toolCallId}
+                    toolName={toolPart.type.replace('tool-', '')}
+                    args={toolArgs}
+                    metadata={
+                      'metadata' in toolPart
+                        ? (toolPart as { metadata?: { preview?: unknown } }).metadata?.preview
+                        : undefined
+                    }
+                    state={mapToolState(toolPart.state)}
+                    approvalId={toolPart.approval?.id}
+                    onApprove={handleApprove}
+                    onDeny={handleDeny}
+                    onAlwaysAllow={(toolName) => console.info('Always allow:', toolName)}
+                  />
+                );
+              })}
+            </div>
+          )}
+
           {referenceImage && (
             <div className="relative mb-3 p-2 bg-primary/10 border border-primary/20 rounded-lg flex items-center gap-3 animate-fade-in-up">
               <img
@@ -624,6 +713,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
+                  e.stopPropagation();
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSend(e);

@@ -216,10 +216,27 @@ export const EditPanelSlideIn = (props: EditPanelSlideInProps) => {
         onClose={onClose}
         height="60%"
         styles={{
-          body: { padding: '16px' },
+          header: {
+            background: '#000000',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+            padding: '16px 20px',
+          },
+          body: {
+            padding: '16px',
+            background: '#000000',
+          },
+          content: {
+            background: '#000000',
+            borderTopLeftRadius: '16px',
+            borderTopRightRadius: '16px',
+          },
+          mask: {
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(8px)',
+          },
         }}
-        closeIcon={<X size={20} />}
-        title="Editar Imagem"
+        closeIcon={<X size={20} className="text-white/40 hover:text-white transition-colors" />}
+        title={<span className="text-white font-semibold">Editar Imagem</span>}
       >
         <EditPanelContent {...props} />
       </Drawer>

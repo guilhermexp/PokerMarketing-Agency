@@ -251,22 +251,28 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       <header className="sticky top-0 bg-black border-b border-white/10 z-50">
         <div className="px-4 md:px-6 py-3 md:py-4">
           <div className="flex flex-col gap-3 md:gap-4">
-            {/* Row 1: Title + Add Button (mobile) */}
-            <div className="flex items-center justify-between">
+            {/* Row 1: Title + Add Button */}
+            <div
+              className="flex justify-between items-start gap-3 mb-2"
+              style={{ animation: "fadeSlideIn 0.4s ease-out" }}
+            >
               <div>
-                <h1 className="text-xl md:text-3xl font-semibold text-white tracking-tight">Agenda</h1>
-                <p className="text-xs md:text-sm text-white/50 mt-0.5 md:mt-1 hidden md:block">Gerencie seus posts agendados</p>
+                <h1 className="text-3xl font-semibold text-white tracking-tight">Agenda</h1>
+                <p className="text-[11px] text-white/30 uppercase tracking-wider mt-1">
+                  {scheduledPosts.length} post{scheduledPosts.length !== 1 ? "s" : ""} agendado{scheduledPosts.length !== 1 ? "s" : ""}
+                </p>
               </div>
-              {/* Add button - always visible */}
+              {/* Add button */}
               <button
                 onClick={() => {
                   setSelectedDate(null);
                   setIsScheduleModalOpen(true);
                 }}
-                className="flex items-center gap-2 px-3 md:px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs md:text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
               >
-                <Icon name="plus" className="w-4 h-4" />
-                <span className="hidden sm:inline">Agendar Post</span>
+                <Icon name="plus" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
+                <span className="hidden sm:inline">Agendar</span>
+                <span className="sm:hidden">+</span>
               </button>
             </div>
 

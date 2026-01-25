@@ -42,6 +42,7 @@ import type { ScheduledPost } from "../../types";
 import { PlaygroundView } from "../playground";
 import { GeneratingLoader } from "../ui/quantum-pulse-loade";
 import { PublishedStoriesWidget } from "../ui/published-stories-widget";
+import { SchedulePostModal } from "../calendar/SchedulePostModal";
 
 type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar" | "playground";
 
@@ -233,6 +234,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
   const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(
     null,
   );
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleModalImage, setScheduleModalImage] = useState<GalleryImage | null>(null);
 
   // Handler to publish carousel directly to Instagram
   const handlePublishCarousel = async (imageUrls: string[], caption: string) => {
@@ -701,26 +704,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
               onPublishToCampaign={onPublishToCampaign}
               onQuickPost={setQuickPostImage}
               onSchedulePost={(image) => {
-                // Create scheduled post for tomorrow at noon
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                tomorrow.setHours(12, 0, 0, 0);
-                const dateStr = tomorrow.toISOString().split("T")[0];
-                onSchedulePost({
-                  type: "flyer",
-                  contentId: image.id,
-                  createdFrom: "gallery",
-                  imageUrl: image.src,
-                  caption: "",
-                  hashtags: [],
-                  scheduledDate: dateStr,
-                  scheduledTime: "12:00",
-                  scheduledTimestamp: tomorrow.getTime(),
-                  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                  platforms: "instagram",
-                  status: "scheduled",
-                });
-                onViewChange("calendar");
+                // Open schedule modal with image
+                setScheduleModalImage(image);
+                setScheduleModalOpen(true);
               }}
             />
           </div>
@@ -757,33 +743,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         )}
       </main>
 
-      {/* Feature Flag: Vercel AI SDK */}
-      {import.meta.env.VITE_USE_VERCEL_AI_SDK === 'true' ? (
-        <AssistantPanelNew
-          isOpen={isAssistantOpen}
-          onClose={onToggleAssistant}
-          referenceImage={chatReferenceImage}
-          onClearReference={() => onSetChatReference(null)}
-          onUpdateReference={(ref) => onSetChatReference({ id: ref.id, src: ref.src, source: '', model: '' } as unknown as GalleryImage)}
-          galleryImages={galleryImages}
-          brandProfile={brandProfile}
-          pendingToolEdit={props.pendingToolEdit}
-          onRequestImageEdit={props.onRequestImageEdit}
-          onToolEditApproved={props.onToolEditApproved}
-          onToolEditRejected={props.onToolEditRejected}
-          onShowToolEditPreview={props.onShowToolEditPreview}
-        />
-      ) : (
-        <AssistantPanel
-          isOpen={isAssistantOpen}
-          onClose={onToggleAssistant}
-          history={assistantHistory}
-          isLoading={isAssistantLoading}
-          onSendMessage={onAssistantSendMessage}
-          referenceImage={chatReferenceImage}
-          onClearReference={() => onSetChatReference(null)}
-        />
-      )}
+      {/* Assistente removido do Dashboard - agora só existe dentro do AI Studio (ImagePreviewModal) */}
 
       {/* Mobile Bottom Navigation */}
       {(() => {
@@ -829,6 +789,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           onToolEditApproved={onToolEditApproved}
           onToolEditRejected={onToolEditRejected}
           initialEditPreview={props.toolEditPreview || null}
+          chatReferenceImageId={chatReferenceImage?.id || null}
           chatComponent={
             import.meta.env.VITE_USE_VERCEL_AI_SDK === 'true' ? (
               <AssistantPanelNew
@@ -878,6 +839,25 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         scheduledPosts={scheduledPosts}
         brandProfile={brandProfile}
       />
+
+      {/* Schedule Post Modal - from Gallery */}
+      {scheduleModalOpen && (
+        <SchedulePostModal
+          isOpen={scheduleModalOpen}
+          onClose={() => {
+            setScheduleModalOpen(false);
+            setScheduleModalImage(null);
+          }}
+          onSchedule={(post) => {
+            onSchedulePost(post);
+            setScheduleModalOpen(false);
+            setScheduleModalImage(null);
+          }}
+          galleryImages={galleryImages}
+          campaigns={campaigns}
+          initialImage={scheduleModalImage}
+        />
+      )}
 
       {/* Footer - Desktop only */}
       <footer className="fixed bottom-4 left-4 z-[10000] pointer-events-auto hidden lg:flex flex-col items-center gap-2 rounded-2xl bg-black/40 backdrop-blur-2xl border border-white/10 p-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">

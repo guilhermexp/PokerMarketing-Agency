@@ -156,16 +156,32 @@ export function useAiEdit({
         }
       }
 
+      console.log('💾 [useAiEdit] handleSaveEdit - finalImageUrl:', {
+        finalImageUrl,
+        urlType: typeof finalImageUrl,
+        urlLength: finalImageUrl?.length,
+        isHttps: finalImageUrl?.startsWith('https://'),
+      });
+
+      console.log('💾 [useAiEdit] Updating image with finalImageUrl:', finalImageUrl);
+
+      // Update the image - this will trigger imageSrc to change
       onImageUpdate(finalImageUrl);
+
+      // Reset editor state immediately
       resetEditorState();
-      setEditPreview(null);
 
       // Notify tool edit completion
       if (onToolEditComplete) {
+        console.log('💾 [useAiEdit] Calling onToolEditComplete with:', finalImageUrl);
         onToolEditComplete(finalImageUrl);
+      } else {
+        console.warn('💾 [useAiEdit] onToolEditComplete is not defined!');
       }
 
-      setTimeout(() => redrawCanvas(), 100);
+      // NOTE: editPreview will be cleared automatically by the useEffect below
+      // when imageSrc prop changes (which happens when image.src updates in parent)
+      console.log('💾 [useAiEdit] Waiting for imageSrc to update and trigger editPreview clear...');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar a edição.');
     } finally {
@@ -178,10 +194,22 @@ export function useAiEdit({
     resetEditorState();
   }, [resetEditorState]);
 
+  // Clear edit preview when image source changes (after save)
+  const prevImageSrcRef = useRef(imageSrc);
   useEffect(() => {
-    setEditPreview(null);
-    initialPreviewAppliedRef.current = false;
-  }, [imageSrc]);
+    if (prevImageSrcRef.current !== imageSrc) {
+      console.log('💾 [useAiEdit] imageSrc changed, clearing editPreview', {
+        old: prevImageSrcRef.current?.substring(0, 50),
+        new: imageSrc?.substring(0, 50),
+      });
+      setEditPreview(null);
+      initialPreviewAppliedRef.current = false;
+      prevImageSrcRef.current = imageSrc;
+
+      // Redraw canvas with new image
+      setTimeout(() => redrawCanvas(), 100);
+    }
+  }, [imageSrc, redrawCanvas]);
 
   useEffect(() => {
     initialPreviewAppliedRef.current = false;

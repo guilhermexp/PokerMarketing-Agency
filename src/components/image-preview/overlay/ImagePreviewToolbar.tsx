@@ -10,7 +10,10 @@ import {
   Scan,
   Crop,
   MessageSquare,
+  X,
+  Check,
 } from 'lucide-react';
+import type { PendingToolEdit } from '../types';
 
 interface ToolbarButtonProps {
   icon: React.ComponentType<{ size?: number; className?: string }>;
@@ -53,6 +56,12 @@ interface ImagePreviewToolbarProps {
   onFitToScreen: () => void;
   onOriginalSize: () => void;
   onReset: () => void;
+  // Tool approval mode
+  pendingToolEdit?: PendingToolEdit | null;
+  hasEditPreview?: boolean;
+  isEditing?: boolean;
+  onApproveEdit?: () => void;
+  onRejectEdit?: () => void;
 }
 
 export const ImagePreviewToolbar = ({
@@ -71,7 +80,14 @@ export const ImagePreviewToolbar = ({
   onFitToScreen,
   onOriginalSize,
   onReset,
+  pendingToolEdit,
+  hasEditPreview,
+  isEditing,
+  onApproveEdit,
+  onRejectEdit,
 }: ImagePreviewToolbarProps) => {
+  const showApprovalButtons = pendingToolEdit && hasEditPreview;
+
   return (
     <div className="preview-toolbar">
       {/* Controles em linha única */}
@@ -166,6 +182,39 @@ export const ImagePreviewToolbar = ({
         onClick={onDownload}
         title="Baixar imagem"
       />
+
+      {/* Tool Approval Buttons */}
+      {showApprovalButtons && (
+        <>
+          <div className="toolbar-separator" />
+          <button
+            onClick={onRejectEdit}
+            className="px-3 py-1.5 text-[10px] text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/50 rounded-full transition-all backdrop-blur-sm flex items-center gap-1.5"
+            title="Rejeitar edição"
+          >
+            <X size={12} />
+            <span>Rejeitar</span>
+          </button>
+          <button
+            onClick={onApproveEdit}
+            disabled={isEditing}
+            className="px-3 py-1.5 text-[10px] text-green-400 hover:text-green-300 border border-green-500/30 hover:border-green-500/50 rounded-full transition-all backdrop-blur-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Aprovar edição"
+          >
+            {isEditing ? (
+              <>
+                <span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Salvando...</span>
+              </>
+            ) : (
+              <>
+                <Check size={12} />
+                <span>Aprovar</span>
+              </>
+            )}
+          </button>
+        </>
+      )}
     </div>
   );
 };

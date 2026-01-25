@@ -23,6 +23,11 @@ export function useImageCanvas({ imageSrc }: UseImageCanvasProps): UseImageCanva
   const [isDrawing, setIsDrawing] = useState(false);
   const [brushSize, setBrushSize] = useState(60);
 
+  // Log when imageSrc changes
+  useEffect(() => {
+    console.log('🖌️ [useImageCanvas] imageSrc changed:', imageSrc.substring(0, 50));
+  }, [imageSrc]);
+
   // Calculate display dimensions based on container size and natural image size
   const calculateDisplayDimensions = useCallback((
     containerWidth: number,

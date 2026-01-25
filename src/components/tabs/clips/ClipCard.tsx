@@ -261,6 +261,24 @@ export const ClipCard: React.FC<ClipCardProps> = ({
     }
   }, [useFrameInterpolation, selectedVideoModel]);
 
+  // Debug: Log when thumbnail prop changes
+  useEffect(() => {
+    console.log('📸 [ClipCard] thumbnail prop changed:', {
+      clipId: clip.id,
+      thumbnailId: thumbnail?.id,
+      thumbnailSrc: thumbnail?.src.substring(0, 50),
+    });
+  }, [thumbnail, clip.id]);
+
+  // Debug: Log when editingThumbnail state changes
+  useEffect(() => {
+    console.log('✏️ [ClipCard] editingThumbnail state changed:', {
+      clipId: clip.id,
+      editingId: editingThumbnail?.id,
+      editingSrc: editingThumbnail?.src.substring(0, 50),
+    });
+  }, [editingThumbnail, clip.id]);
+
   const playheadDragRef = useRef<{
     startX: number;
     startTime: number;
@@ -1905,8 +1923,21 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
   const handleThumbnailUpdate = async (newSrc: string) => {
     if (thumbnail) {
+      console.log('🔄 [ClipCard] handleThumbnailUpdate called:', {
+        thumbnailId: thumbnail.id,
+        oldSrc: thumbnail.src.substring(0, 50),
+        newSrc: newSrc.substring(0, 50),
+      });
+
       onUpdateGalleryImage(thumbnail.id, newSrc);
-      setEditingThumbnail((prev) => (prev ? { ...prev, src: newSrc } : null));
+      setEditingThumbnail((prev) => {
+        const updated = prev ? { ...prev, src: newSrc } : null;
+        console.log('🔄 [ClipCard] setEditingThumbnail updated:', {
+          prevSrc: prev?.src.substring(0, 50),
+          updatedSrc: updated?.src.substring(0, 50),
+        });
+        return updated;
+      });
 
       // Also update the database so the edit persists
       if (clip.id) {

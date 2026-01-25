@@ -1,6 +1,5 @@
 import React from "react";
 import { Icon } from "./Icon";
-import { SendToChatButton } from "./SendToChatButton";
 import { ImageGenerationLoader } from "../ui/ai-chat-image-generation-1";
 import type { GalleryImage } from "../../types";
 
@@ -155,9 +154,6 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
                   <Icon name="edit" className="w-3 h-3" />
                   Editar
                 </button>
-              )}
-              {image && galleryImage && (
-                <SendToChatButton image={galleryImage} />
               )}
             </div>
           )}

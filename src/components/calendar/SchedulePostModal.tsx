@@ -378,24 +378,24 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
   // Image selector modal - kept mounted but hidden to preserve image cache
   const imageSelectorModal = createPortal(
     <div
-      className={`fixed inset-0 bg-black/90 backdrop-blur-md z-[400] flex items-center justify-center p-4 md:p-8 transition-opacity duration-200 ${
+      className={`fixed inset-0 bg-black/90 backdrop-blur-md z-[400] flex items-center justify-center p-0 sm:p-4 md:p-8 transition-opacity duration-200 ${
         showImageSelector ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}
       onClick={() => setShowImageSelector(false)}
     >
       <div
-        className={`w-full max-w-5xl max-h-[90vh] bg-[#0a0a0a]/95 rounded-2xl border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl transition-transform duration-200 ${
+        className={`w-full h-full sm:h-auto max-w-5xl sm:max-h-[90vh] bg-[#0a0a0a]/95 sm:rounded-2xl border-0 sm:border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl transition-transform duration-200 ${
           showImageSelector ? 'scale-100' : 'scale-95'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
           {/* Header */}
-          <div className="px-6 pt-5 pb-3 flex justify-between items-start shrink-0">
+          <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 flex justify-between items-start shrink-0">
             <div>
-              <h2 className="text-base font-medium text-white/90">
+              <h2 className="text-sm sm:text-base font-medium text-white/90">
                 Selecionar Imagem
               </h2>
-              <p className="text-[11px] text-white/40 mt-0.5">
+              <p className="text-[10px] sm:text-[11px] text-white/40 mt-0.5">
                 {isCarousel
                   ? `Selecione até 10 imagens (${selectedImages.length}/10)`
                   : 'Selecione uma imagem da galeria'
@@ -412,7 +412,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
 
           {/* Gallery */}
           <div className="flex-1 overflow-y-auto flex flex-col">
-            <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <div className="flex-1 overflow-y-auto px-3 sm:px-4 pb-3 sm:pb-4">
             {/* Campaigns Accordion View */}
             {galleryFilter === 'posts' ? (
               <CampaignAccordion
@@ -603,17 +603,17 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-3 border-t border-white/[0.08] flex gap-2 shrink-0">
+          <div className="px-3 sm:px-4 py-3 border-t border-white/[0.08] flex gap-2 shrink-0">
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 text-xs font-medium text-white/60 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+              className="flex-1 py-2.5 text-[11px] sm:text-xs font-medium text-white/60 hover:text-white transition-colors rounded-lg hover:bg-white/5"
             >
               Cancelar
             </button>
             <button
               onClick={() => setShowImageSelector(false)}
               disabled={selectedImages.length === 0}
-              className="flex-1 py-2.5 bg-white text-black text-xs font-semibold rounded-lg hover:bg-white/90 active:scale-[0.99] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex-1 py-2.5 bg-white text-black text-[11px] sm:text-xs font-semibold rounded-lg hover:bg-white/90 active:scale-[0.99] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Continuar
             </button>
@@ -629,18 +629,17 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       {imageSelectorModal}
       {createPortal(
     <div
-      className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-5xl bg-[#0a0a0a]/95 rounded-3xl border border-white/[0.08] shadow-2xl flex overflow-hidden backdrop-blur-xl"
-        style={{ height: '600px' }}
+        className="w-full h-screen sm:h-[600px] sm:max-w-5xl bg-[#0a0a0a]/95 sm:rounded-3xl border-0 sm:border border-white/[0.08] shadow-2xl flex flex-col sm:flex-row overflow-hidden backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left Column - Image Preview & Info */}
-        <div className="w-80 bg-[#070707] border-r border-white/[0.08] flex flex-col">
+        <div className="w-full sm:w-80 bg-[#070707] border-b sm:border-b-0 sm:border-r border-white/[0.08] flex flex-col max-h-[50vh] sm:max-h-none overflow-y-auto">
           {/* Image Preview */}
-          <div className="h-64 bg-black flex items-center justify-center relative shrink-0">
+          <div className="h-72 sm:h-96 bg-black flex items-center justify-center relative shrink-0">
             {selectedImage ? (
               <>
                 {selectedIsVideo ? (
@@ -683,7 +682,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           </div>
 
           {/* Post Details */}
-          <div className="flex-1 p-4 space-y-3 overflow-y-auto">
+          <div className="flex-1 p-3 sm:p-4 space-y-2 sm:space-y-3 overflow-y-auto">
             {/* Caption */}
             <div>
               <label className="text-xs font-semibold text-white/70 mb-1.5 block">
@@ -743,10 +742,10 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
         </div>
 
         {/* Middle Column - Calendar */}
-        <div className="flex-1 flex flex-col p-6">
+        <div className="flex-1 flex flex-col p-4 sm:p-6 overflow-y-auto">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-white capitalize">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-white capitalize">
               {monthName}
             </h2>
             <div className="flex gap-2">
@@ -768,11 +767,11 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           {/* Calendar Grid */}
           <div className="flex-1 flex flex-col">
             {/* Weekday Headers */}
-            <div className="grid grid-cols-7 gap-2 mb-3">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 sm:mb-3">
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
                 <div
                   key={day}
-                  className="text-center text-xs font-semibold text-white/40 py-2"
+                  className="text-center text-[10px] sm:text-xs font-semibold text-white/40 py-1 sm:py-2"
                 >
                   {day}
                 </div>
@@ -780,7 +779,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             </div>
 
             {/* Days Grid */}
-            <div className="grid grid-cols-7 gap-2 flex-1">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 flex-1">
               {/* Empty cells for days before month starts */}
               {Array.from({ length: startingDayOfWeek }).map((_, i) => (
                 <div key={`empty-${i}`} />
@@ -799,7 +798,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                     key={day}
                     onClick={() => !isPast && handleSelectDate(day)}
                     disabled={isPast}
-                    className={`aspect-square rounded-xl text-sm font-medium transition-all flex items-center justify-center ${
+                    className={`aspect-square rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all flex items-center justify-center ${
                       isSelected
                         ? 'bg-white text-black shadow-lg'
                         : isPast
@@ -819,18 +818,18 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           {/* Close Button at bottom */}
           <button
             onClick={onClose}
-            className="mt-6 w-full py-3 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/5 transition-all"
+            className="mt-4 sm:mt-6 w-full py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium text-white/60 hover:text-white hover:bg-white/5 transition-all"
           >
             Cancelar
           </button>
         </div>
 
         {/* Right Column - Time Slots */}
-        <div className="w-72 bg-[#070707] border-l border-white/[0.08] flex flex-col">
+        <div className="w-full sm:w-72 bg-[#070707] border-t sm:border-t-0 sm:border-l border-white/[0.08] flex flex-col overflow-y-auto">
           {/* Header */}
-          <div className="p-4 border-b border-white/[0.08]">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-white">Horário</h3>
+          <div className="p-3 sm:p-4 border-b border-white/[0.08]">
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <h3 className="text-xs sm:text-sm font-semibold text-white">Horário</h3>
               <div className="flex gap-1">
                 <button
                   onClick={() => setTimeFormat('12h')}
@@ -864,7 +863,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           </div>
 
           {/* Time Slots List */}
-          <div ref={timeListRef} className="flex-1 overflow-y-auto p-3 space-y-2">
+          <div ref={timeListRef} className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-1.5 sm:space-y-2">
             {TIME_SLOTS.map((time) => {
               const isSelected = time === scheduledTime;
               const isPast = scheduledDate === todayStr && time <= new Date().toTimeString().slice(0, 5);
@@ -874,7 +873,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   key={time}
                   onClick={() => !isPast && setScheduledTime(time)}
                   disabled={isPast}
-                  className={`w-full py-3 rounded-xl text-sm font-medium transition-all ${
+                  className={`w-full py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all ${
                     isSelected
                       ? 'bg-white text-black shadow-lg'
                       : isPast
@@ -889,11 +888,11 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           </div>
 
           {/* Continue Button */}
-          <div className="p-4 border-t border-white/[0.08]">
+          <div className="p-3 sm:p-4 border-t border-white/[0.08]">
             <button
               onClick={handleSubmit}
               disabled={selectedImages.length === 0 || isTimeInPast}
-              className="w-full py-3 bg-white text-black text-sm font-semibold rounded-xl hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-white/20"
+              className="w-full py-2.5 sm:py-3 bg-white text-black text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-white/20"
             >
               Agendar Publicação
             </button>

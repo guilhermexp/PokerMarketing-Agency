@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { GalleryImage, StyleReference } from "../../types";
 import { Icon } from "../common/Icon";
-import { SendToChatButton } from "../common/SendToChatButton";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 
 interface GalleryViewProps {
@@ -188,7 +187,6 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
             >
               <Icon name="heart" className="w-3.5 h-3.5" />
             </button>
-            <SendToChatButton image={image} />
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -261,6 +259,11 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
   const handleImageUpdate = (newSrc: string) => {
     if (selectedImage) {
+      console.log('🖼️ [GalleryView] handleImageUpdate:', {
+        imageId: selectedImage.id,
+        oldSrc: selectedImage.src.substring(0, 50),
+        newSrc: newSrc.substring(0, 50),
+      });
       onUpdateImage(selectedImage.id, newSrc);
       setSelectedImage((prev) => (prev ? { ...prev, src: newSrc } : null));
     }
@@ -479,62 +482,67 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
         {/* Sticky Header */}
         <header className="sticky top-0 bg-black border-b border-white/10 z-50 -mx-4 sm:-mx-6 px-4 sm:px-6">
           <div className="py-4">
-            <div className="flex flex-col gap-4">
-              {/* Row 1: Title and Stats/Actions */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <h1 className="text-3xl font-semibold text-white tracking-tight">
-                    {viewMode === "gallery" ? "Galeria" : "Favoritos"}
-                  </h1>
-                </div>
-
-                <div className="flex flex-col items-end gap-2">
-                  {/* Stats */}
-                  <div className="flex items-center gap-3 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-                    <button
-                      onClick={() => setViewMode("gallery")}
-                      className="flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors"
-                    >
-                      <div className="w-2 h-2 rounded-full bg-white/40" />
-                      <span className="text-[10px] font-medium text-white/60">
-                        {stats.total} itens
-                      </span>
-                    </button>
-                    <div className="h-3 w-px bg-white/10" />
-                    <button
-                      onClick={() => setViewMode("references")}
-                      className="flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors"
-                    >
-                      <div className="w-2 h-2 rounded-full bg-primary" />
-                      <span className="text-[10px] font-medium text-white/60">
-                        {stats.favorites} favoritos
-                      </span>
-                    </button>
-                    {stats.videos > 0 && (
-                      <>
-                        <div className="h-3 w-px bg-white/10" />
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-2 h-2 rounded-full bg-blue-500" />
-                          <span className="text-[10px] font-medium text-white/60">
-                            {stats.videos} vídeos
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Add button - only show in references mode */}
-                  {viewMode === "references" && (
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
-                    >
-                      <Icon name="upload" className="w-4 h-4" />
-                      Adicionar
-                    </button>
+            <div
+              className="flex justify-between items-start gap-3 mb-6"
+              style={{ animation: "fadeSlideIn 0.4s ease-out" }}
+            >
+              <div>
+                <h1 className="text-3xl font-semibold text-white tracking-tight">
+                  {viewMode === "gallery" ? "Galeria" : "Favoritos"}
+                </h1>
+                <p className="text-[11px] text-white/30 uppercase tracking-wider mt-1">
+                  {stats.total} {stats.total === 1 ? "item" : "itens"}
+                  {" • "}
+                  {stats.favorites} favorito{stats.favorites !== 1 ? "s" : ""}
+                  {stats.videos > 0 && (
+                    <>
+                      {" • "}
+                      {stats.videos} vídeo{stats.videos !== 1 ? "s" : ""}
+                    </>
                   )}
-                </div>
+                </p>
               </div>
+
+              <div className="flex items-center gap-2">
+                {/* View mode toggles */}
+                <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full">
+                  <button
+                    onClick={() => setViewMode("gallery")}
+                    className={`px-2.5 py-1 rounded-full text-[9px] font-medium uppercase tracking-wide transition-all ${
+                      viewMode === "gallery"
+                        ? "bg-white/10 text-white"
+                        : "text-white/40 hover:text-white/60"
+                    }`}
+                  >
+                    Todas
+                  </button>
+                  <button
+                    onClick={() => setViewMode("references")}
+                    className={`px-2.5 py-1 rounded-full text-[9px] font-medium uppercase tracking-wide transition-all ${
+                      viewMode === "references"
+                        ? "bg-white/10 text-white"
+                        : "text-white/40 hover:text-white/60"
+                    }`}
+                  >
+                    Favoritos
+                  </button>
+                </div>
+
+                {/* Add button - only show in references mode */}
+                {viewMode === "references" && (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
+                  >
+                    <Icon name="plus" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
+                    <span className="hidden sm:inline">Adicionar</span>
+                    <span className="sm:hidden">+</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4">
 
               {/* Source Filter Tabs - only show in gallery mode */}
               {viewMode === "gallery" && deduplicatedImages.length > 0 && (
@@ -700,7 +708,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 src: img.src,
               })
             }
-            onSchedulePost={onSchedulePost}
+            onSchedulePost={onSchedulePost ? (img) => {
+              // Fecha o preview primeiro
+              setSelectedImage(null);
+              // Depois chama a função de agendamento
+              onSchedulePost(img);
+            } : undefined}
           />
         )}
       </div>

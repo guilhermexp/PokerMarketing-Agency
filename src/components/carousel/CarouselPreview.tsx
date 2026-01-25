@@ -5,7 +5,6 @@
 import React, { useRef, useState } from 'react';
 import type { GalleryImage } from '../../types';
 import { Icon } from '../common/Icon';
-import { SendToChatButton } from '../common/SendToChatButton';
 import { ImageGenerationLoader } from '../ui/ai-chat-image-generation-1';
 
 interface CarouselPreviewProps {
@@ -359,7 +358,6 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               </div>
               {/* Action buttons - appear on hover */}
               <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
-                <SendToChatButton image={img} />
                 {onOpenEditor && (
                   <button
                     onClick={(e) => {

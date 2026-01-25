@@ -5,8 +5,6 @@
  * - Copiar texto
  * - Copiar como código
  * - Compartilhar mensagem
- * - Fixar mensagem
- * - Fork da conversa
  */
 
 import React, { useState } from 'react';
@@ -17,8 +15,6 @@ export interface MessageActionsEnhancedProps {
   messageId: string;
   content: string;
   chatId?: string;
-  onPin?: (messageId: string) => void;
-  onFork?: (messageId: string) => void;
 }
 
 /**
@@ -32,8 +28,6 @@ export interface MessageActionsEnhancedProps {
  *   messageId="msg-123"
  *   content="Texto da mensagem..."
  *   chatId="chat-456"
- *   onPin={(id) => console.log('Pin:', id)}
- *   onFork={(id) => console.log('Fork:', id)}
  * />
  * ```
  */
@@ -41,8 +35,6 @@ export function MessageActionsEnhanced({
   messageId,
   content,
   chatId,
-  onPin,
-  onFork
 }: MessageActionsEnhancedProps) {
   const [toast, setToast] = useState<{ message: string } | null>(null);
 
@@ -85,22 +77,10 @@ export function MessageActionsEnhanced({
     }
   };
 
-  // Fixar mensagem
-  const handlePin = () => {
-    onPin?.(messageId);
-    showToast('Mensagem fixada!');
-  };
-
-  // Fork da conversa
-  const handleFork = () => {
-    onFork?.(messageId);
-    showToast('Conversa bifurcada!');
-  };
-
   return (
     <>
       {/* Ações usando ai-elements oficiais */}
-      <MessageActions className="opacity-0 group-hover:opacity-100 transition-opacity">
+      <MessageActions>
         {/* Copiar texto */}
         <MessageAction
           onClick={handleCopy}
@@ -133,32 +113,6 @@ export function MessageActionsEnhanced({
         >
           <Icon name="share" className="w-4 h-4" />
         </MessageAction>
-
-        {/* Fixar (se callback fornecido) */}
-        {onPin && (
-          <MessageAction
-            onClick={handlePin}
-            tooltip="Fixar mensagem"
-            variant="ghost"
-            size="icon-sm"
-            className="hover:bg-white/5"
-          >
-            <Icon name="pin" className="w-4 h-4" />
-          </MessageAction>
-        )}
-
-        {/* Fork (se callback fornecido) */}
-        {onFork && (
-          <MessageAction
-            onClick={handleFork}
-            tooltip="Fork daqui"
-            variant="ghost"
-            size="icon-sm"
-            className="hover:bg-white/5"
-          >
-            <Icon name="git-branch" className="w-4 h-4" />
-          </MessageAction>
-        )}
       </MessageActions>
 
       {/* Toast de sucesso */}

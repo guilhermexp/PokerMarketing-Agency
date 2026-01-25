@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { ImagePreviewToolbar } from './ImagePreviewToolbar';
@@ -26,6 +26,7 @@ interface ImagePreviewOverlayProps {
   onPublish?: () => void;
   onSchedulePost?: () => void;
   chatComponent?: React.ReactNode;
+  chatReferenceImageId?: string | null;
 
   // Canvas refs and handlers (needed by ImagePreviewCanvas)
   imageCanvasRef?: React.RefObject<HTMLCanvasElement>;
@@ -115,10 +116,9 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
     downloadFilename,
     pendingToolEdit,
   } = props;
+
   // Estado do preview
-  const [activePanel, setActivePanel] = useState<'edit' | 'chat' | null>(
-    pendingToolEdit ? 'edit' : null
-  );
+  const [activePanel, setActivePanel] = useState<'edit' | 'chat' | null>(null);
   const [cropActive, setCropActive] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -127,19 +127,13 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
   const editPanelOpen = activePanel === 'edit';
   const chatPanelOpen = activePanel === 'chat';
 
-  const pendingToolEditRef = useRef(pendingToolEdit);
-
-  // Abre painel automaticamente quando há pendingToolEdit (apenas na transição)
+  // Log when image.src changes
   useEffect(() => {
-    const hadPending = Boolean(pendingToolEditRef.current);
-    const hasPending = Boolean(pendingToolEdit);
-
-    if (!hadPending && hasPending && !activePanel) {
-      setActivePanel('edit');
-    }
-
-    pendingToolEditRef.current = pendingToolEdit;
-  }, [pendingToolEdit, activePanel]);
+    console.log('🎨 [ImagePreviewOverlay] image.src changed:', {
+      imageId: image.id,
+      src: image.src.substring(0, 50),
+    });
+  }, [image.src, image.id]);
 
   // Carregar dimensões da imagem
   useEffect(() => {
@@ -222,13 +216,19 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
 
   // Handler de enviar para o chat
   const handleSendToChat = () => {
-    if (props.chatComponent) {
-      props.onSetChatReferenceSilent?.(image);
+    // Define a referência da imagem no chat
+    if (props.onSetChatReferenceSilent) {
+      props.onSetChatReferenceSilent(image);
     } else if (props.onSetChatReference) {
       props.onSetChatReference(image);
     }
-    // Abre o painel do chat
-    setActivePanel('chat');
+
+    // Aguarda múltiplos frames para garantir que o ciclo de render complete
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setActivePanel('chat');
+      });
+    });
   };
 
   // Handler de fechar com ESC
@@ -348,6 +348,7 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
               resizeProgress={props.resizeProgress || 0}
               filterStyle={props.filterStyle}
             />
+
           </div>
 
           {/* Painel de edição (slide-in lateral ou bottom sheet) */}
@@ -386,6 +387,12 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
             onFitToScreen={handleFitToScreen}
             onOriginalSize={handleOriginalSize}
             onReset={handleReset}
+            // Tool approval mode
+            pendingToolEdit={pendingToolEdit}
+            hasEditPreview={!!props.editPreview}
+            isEditing={props.isEditing}
+            onApproveEdit={props.handleSaveEdit}
+            onRejectEdit={props.onToolEditRejected ? () => props.onToolEditRejected?.(pendingToolEdit?.toolCallId || '') : undefined}
           />
         </div>
       </div>

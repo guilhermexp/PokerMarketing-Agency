@@ -73,43 +73,22 @@ export const FreeCropOverlay: React.FC<FreeCropOverlayProps> = ({
         zoom: 1,
       }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <Icon name="crop" className="w-5 h-5 text-white/60" />
-          <h3 className="text-base font-semibold text-white">Recortar Imagem</h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onCancel}
-            disabled={isProcessing}
-            className="px-4 py-2 text-sm text-white/60 hover:text-white/80 transition-colors disabled:opacity-40"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleCropConfirm}
-            disabled={!completedCrop || isProcessing}
-            className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {isProcessing ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Processando...
-              </>
-            ) : (
-              <>
-                <Icon name="check" className="w-4 h-4" />
-                Confirmar
-              </>
-            )}
-          </button>
-        </div>
+      {/* Header minimalista */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <button
+          onClick={onCancel}
+          disabled={isProcessing}
+          className="p-2 text-white/40 hover:text-white/70 transition-colors disabled:opacity-40"
+        >
+          <Icon name="x" className="w-5 h-5" />
+        </button>
+        <span className="text-xs text-white/30 uppercase tracking-wider">Recortar</span>
+        <div className="w-9" /> {/* Spacer para centralizar */}
       </div>
 
       {/* Crop Area */}
       <div
-        className="flex-1 flex items-center justify-center p-6 overflow-auto relative"
+        className="flex-1 flex flex-col items-center justify-center p-4 overflow-auto relative"
         style={{
           transform: 'none',
           zoom: 1,
@@ -129,7 +108,7 @@ export const FreeCropOverlay: React.FC<FreeCropOverlayProps> = ({
               style={{
                 display: 'block',
                 maxWidth: '90vw',
-                maxHeight: 'calc(100vh - 200px)',
+                maxHeight: 'calc(100vh - 180px)',
                 transform: 'none',
                 imageRendering: 'auto',
               }}
@@ -138,26 +117,38 @@ export const FreeCropOverlay: React.FC<FreeCropOverlayProps> = ({
           </ReactCrop>
         </div>
 
+        {/* Botão confirmar embaixo da imagem */}
+        {completedCrop && (
+          <button
+            onClick={handleCropConfirm}
+            disabled={isProcessing}
+            className="mt-4 px-3 py-1.5 text-[10px] text-white/50 hover:text-white/80 border border-white/10 hover:border-white/20 rounded-full transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 backdrop-blur-sm"
+          >
+            {isProcessing ? (
+              <>
+                <span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Aplicando...</span>
+              </>
+            ) : (
+              <>
+                <Icon name="check" className="w-3 h-3" />
+                <span>Aplicar recorte</span>
+              </>
+            )}
+          </button>
+        )}
+
         {/* Hint quando não há seleção */}
         {!crop && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="bg-black/80 backdrop-blur-sm px-6 py-4 rounded-lg border border-white/10">
-              <div className="flex items-center gap-3 text-white/80">
-                <Icon name="mouse-pointer-2" className="w-5 h-5" />
-                <span className="text-sm">Clique e arraste para selecionar a área</span>
+            <div className="bg-black/60 backdrop-blur-sm px-4 py-2.5 rounded-lg border border-white/5">
+              <div className="flex items-center gap-2 text-white/50">
+                <Icon name="mouse-pointer-2" className="w-4 h-4" />
+                <span className="text-xs">Clique e arraste para selecionar</span>
               </div>
             </div>
           </div>
         )}
-      </div>
-
-      {/* Instructions */}
-      <div className="px-6 py-3 bg-black/60 border-t border-white/10">
-        <p className="text-xs text-white/40 text-center">
-          {!crop || !completedCrop
-            ? 'Clique e arraste sobre a imagem para criar a área de recorte.'
-            : 'Arraste para ajustar a área de recorte. Use as bordas para redimensionar.'}
-        </p>
       </div>
     </div>
   );

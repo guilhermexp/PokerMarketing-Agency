@@ -34,7 +34,23 @@ export const ChatPanelSlideIn = ({
         onClose={onClose}
         height="90%"
         styles={{
-          body: { padding: 0, height: '100%', background: 'transparent' },
+          header: {
+            display: 'none',
+          },
+          body: {
+            padding: 0,
+            height: '100%',
+            background: '#000000',
+          },
+          content: {
+            background: '#000000',
+            borderTopLeftRadius: '16px',
+            borderTopRightRadius: '16px',
+          },
+          mask: {
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(8px)',
+          },
         }}
         closeIcon={null}
       >
