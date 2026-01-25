@@ -118,13 +118,24 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
   const completedJobs = jobs.filter((j) => j.status === "completed");
   const failedJobs = jobs.filter((j) => j.status === "failed");
 
+  // Debug: log when jobs change
+  useEffect(() => {
+    console.debug("[BackgroundJobs] Jobs state updated:", {
+      total: jobs.length,
+      pending: pendingJobs.length,
+      completed: completedJobs.length,
+      failed: failedJobs.length,
+      pendingJobIds: pendingJobs.map((j) => ({ id: j.id, status: j.status, context: j.context })),
+    });
+  }, [jobs, pendingJobs, completedJobs, failedJobs]);
+
   // Load jobs from server
   const refreshJobs = useCallback(async () => {
     if (!userId) return;
 
     try {
       const result = await getGenerationJobs(userId, {
-        limit: 100,
+        limit: 30, // Reduced from 100 to prevent response size issues
         organizationId: organizationId || undefined,
       });
       const serverJobs = result.jobs as ActiveJob[];

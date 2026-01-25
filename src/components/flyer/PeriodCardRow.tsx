@@ -119,12 +119,27 @@ export const PeriodCardRow: React.FC<{
 
         const { queueJob, onJobComplete, onJobFailed, getJobByContext } =
             useBackgroundJobs();
-        const jobContext = `flyer-period-${period}`;
+        // Include day in context to ensure jobs are unique per day+period
+        const jobContext = `flyer-period-${selectedDay}-${period}`;
         const pendingJob = getJobByContext(jobContext);
+
+        // Debug logging for job state issues
+        useEffect(() => {
+            if (pendingJob) {
+                console.debug(`[PeriodCardRow:${period}] Found job:`, {
+                    id: pendingJob.id,
+                    status: pendingJob.status,
+                    context: pendingJob.context,
+                    progress: pendingJob.progress,
+                    isGenerating,
+                    hasFlyers: generatedFlyers.length,
+                });
+            }
+        }, [pendingJob, period, isGenerating, generatedFlyers.length]);
 
         // Listen for job completion
         useEffect(() => {
-            const unsubComplete = onJobComplete((job: ActiveJob) => {
+            const unsubComplete = onJobComplete(async (job: ActiveJob) => {
                 if (job.context === jobContext && job.result_url) {
                     // Use the gallery ID from the job (already saved by backend) instead of creating new entry
                     const newImage: GalleryImage = {
@@ -141,6 +156,22 @@ export const PeriodCardRow: React.FC<{
                     );
                     setIsGenerating(false);
                     setIsExpanded(true); // Auto-expand when generation completes
+
+                    // Save daily flyer URL reference to week_schedules.daily_flyer_urls
+                    // This ensures the flyer is restored when the page is reloaded
+                    if (scheduleId && job.result_url && selectedDay) {
+                        try {
+                            await addDailyFlyer(scheduleId, period, job.result_url, selectedDay);
+                            console.debug(
+                                `[PeriodCardRow] Saved background job flyer to database: day=${selectedDay}, period=${period}`,
+                            );
+                        } catch (err) {
+                            console.error(
+                                "[PeriodCardRow] Failed to save daily flyer URL to database:",
+                                err,
+                            );
+                        }
+                    }
                 }
             });
 
@@ -163,21 +194,30 @@ export const PeriodCardRow: React.FC<{
             aspectRatio,
             imageSize,
             setGeneratedFlyers,
+            selectedDay,
+            scheduleId,
+            period,
         ]);
 
-        // Restore loading state from pending job
+        // Restore loading state from pending job (only on initial mount or when starting new generation)
+        // Skip if we already have generated flyers - this prevents phantom loading after completion
         useEffect(() => {
+            // Don't restore if we already have flyers (job likely already completed)
+            const hasGeneratedContent = generatedFlyers.some((f) => f !== "loading");
+
             if (
                 pendingJob &&
                 (pendingJob.status === "queued" || pendingJob.status === "processing") &&
-                !isGenerating
+                !isGenerating &&
+                !hasGeneratedContent // Only restore if we don't have any content yet
             ) {
+                console.debug(`[PeriodCardRow] Restoring loading state for ${period}:`, pendingJob.id);
                 setIsGenerating(true);
                 if (!generatedFlyers.includes("loading")) {
                     setGeneratedFlyers((prev) => ["loading", ...prev]);
                 }
             }
-        }, [pendingJob, isGenerating, generatedFlyers, setGeneratedFlyers]);
+        }, [pendingJob, isGenerating, generatedFlyers, setGeneratedFlyers, period]);
 
         // Auto-expand when flyers are loaded from storage
         useEffect(() => {
@@ -277,6 +317,10 @@ export const PeriodCardRow: React.FC<{
                                 (a) => `data:${a.mimeType};base64,${a.base64}`,
                             ),
                             source: "Flyer Diário",
+                            // Daily flyer metadata for database linking
+                            weekScheduleId: scheduleId,
+                            dailyFlyerPeriod: period,
+                            dailyFlyerDay: selectedDay,
                         };
 
                         await queueJob(userId, "flyer_daily", prompt, config, jobContext);
@@ -408,7 +452,6 @@ export const PeriodCardRow: React.FC<{
                 >
                     <div className="flex-1 grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-6 items-center text-left">
                         <div className="flex items-center gap-3">
-                            {isGenerating && <Loader size={16} className="flex-shrink-0 text-white/60" />}
                             <div>
                                 <h3 className="text-sm font-bold text-white tracking-wide">
                                     {label}
@@ -526,19 +569,27 @@ export const PeriodCardRow: React.FC<{
                                 )}
                             </>
                         )}
-                        <Button
-                            size="small"
-                            variant={events.length > 0 ? "primary" : "secondary"}
+                        <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleGenerate(true);
                             }}
-                            isLoading={isGenerating}
-                            disabled={events.length === 0 || isUsingAsReference}
+                            disabled={events.length === 0 || isUsingAsReference || isGenerating}
                             title={isUsingAsReference ? "Esta imagem está sendo usada como referência e não pode ser regenerada" : undefined}
+                            className="px-3 py-1.5 text-[10px] font-medium text-white/70 hover:text-white/90 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"
                         >
-                            Gerar
-                        </Button>
+                            {isGenerating ? (
+                                <>
+                                    <Loader size={12} />
+                                    <span>Gerando...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Icon name="zap" className="w-3 h-3" />
+                                    <span>Gerar</span>
+                                </>
+                            )}
+                        </button>
                         {/* Download all button */}
                         {onDownloadAll &&
                             generatedFlyers.some((f) => f !== "loading") &&

@@ -3109,7 +3109,10 @@ app.get("/api/generate/status", async (req, res) => {
     // List jobs for user
     if (userId) {
       let jobs;
-      const limitNum = parseInt(limit) || 50;
+      const limitNum = Math.min(parseInt(limit) || 30, 50); // Max 50, default 30
+      const cutoffDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); // 24 hours ago
+      // For active jobs, only show recent ones (1 hour) to avoid showing stale queued jobs
+      const activeCutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString(); // 1 hour ago
 
       // Filter by organization context
       if (organizationId) {
@@ -3118,7 +3121,8 @@ app.get("/api/generate/status", async (req, res) => {
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id, error_message,
+              result_url, result_gallery_id,
+              CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
             FROM generation_jobs
@@ -3127,14 +3131,20 @@ app.get("/api/generate/status", async (req, res) => {
             LIMIT ${limitNum}
           `;
         } else {
+          // Get recent active jobs + recent completed/failed jobs
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id, error_message,
+              result_url, result_gallery_id,
+              CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
             FROM generation_jobs
             WHERE organization_id = ${organizationId}
+              AND (
+                (status IN ('queued', 'processing') AND created_at > ${activeCutoff})
+                OR created_at > ${cutoffDate}
+              )
             ORDER BY created_at DESC
             LIMIT ${limitNum}
           `;
@@ -3145,7 +3155,8 @@ app.get("/api/generate/status", async (req, res) => {
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id, error_message,
+              result_url, result_gallery_id,
+              CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
             FROM generation_jobs
@@ -3154,14 +3165,20 @@ app.get("/api/generate/status", async (req, res) => {
             LIMIT ${limitNum}
           `;
         } else {
+          // Get recent active jobs + recent completed/failed jobs
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id, error_message,
+              result_url, result_gallery_id,
+              CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
             FROM generation_jobs
             WHERE user_id = ${userId} AND organization_id IS NULL
+              AND (
+                (status IN ('queued', 'processing') AND created_at > ${activeCutoff})
+                OR created_at > ${cutoffDate}
+              )
             ORDER BY created_at DESC
             LIMIT ${limitNum}
           `;
@@ -6707,9 +6724,18 @@ const startup = async () => {
       }
     };
 
-    // Initialize image generation worker
+    // Initialize image generation worker with progress callback to update database
     try {
-      const imageWorker = initializeImageWorker(processImageJob);
+      const imageWorker = initializeImageWorker(processImageJob, {
+        onProgress: async (jobId, progress) => {
+          // Update progress in PostgreSQL database
+          await sql`
+            UPDATE generation_jobs
+            SET progress = ${progress}
+            WHERE id = ${jobId}
+          `;
+        }
+      });
       if (imageWorker) {
         console.log(`${colors.green}✓ Image generation worker initialized${colors.reset}`);
       }

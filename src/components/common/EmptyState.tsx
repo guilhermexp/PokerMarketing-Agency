@@ -1,17 +1,16 @@
 import React from "react";
-import { Icon, type IconName } from "./Icon";
 import { Button } from "./Button";
 
 interface EmptyStateProps {
-  icon: IconName;
+  icon?: string;
   title: string;
   description: string;
   subtitle?: string;
   actionLabel?: string;
-  actionIcon?: IconName;
+  actionIcon?: string;
   onAction?: () => void;
   secondaryActionLabel?: string;
-  secondaryActionIcon?: IconName;
+  secondaryActionIcon?: string;
   onSecondaryAction?: () => void;
   size?: "small" | "medium" | "large";
   children?: React.ReactNode;
@@ -19,7 +18,6 @@ interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  icon,
   title,
   description,
   subtitle,
@@ -36,27 +34,18 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   const sizeClasses = {
     small: {
       container: "p-8 md:p-10",
-      iconWrapper: "w-14 h-14 rounded-xl",
-      icon: "w-6 h-6",
       title: "text-base",
       description: "text-xs",
-      blur: "w-[300px] h-[300px]",
     },
     medium: {
       container: "p-10 md:p-14",
-      iconWrapper: "w-16 h-16 rounded-2xl",
-      icon: "w-7 h-7",
       title: "text-lg",
       description: "text-sm",
-      blur: "w-[400px] h-[400px]",
     },
     large: {
       container: "p-12 md:p-16",
-      iconWrapper: "w-20 h-20 rounded-2xl",
-      icon: "w-8 h-8",
       title: "text-xl",
       description: "text-sm",
-      blur: "w-[500px] h-[500px]",
     },
   };
 
@@ -74,17 +63,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       `}
       style={{ animation: "fadeSlideIn 0.6s ease-out" }}
     >
-      {/* Icon */}
-      <div className="relative inline-flex items-center justify-center mb-6">
-        <div
-          className={`relative ${classes.iconWrapper} bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] flex items-center justify-center`}
-        >
-          <Icon name={icon} className={`${classes.icon} text-white/20`} />
-        </div>
-      </div>
-
       {/* Text */}
-      <h3 className={`relative ${classes.title} font-bold text-white mb-2`}>
+      <h3 className={`relative ${classes.title} font-bold text-white mb-2 mt-2`}>
         {title}
       </h3>
       <p

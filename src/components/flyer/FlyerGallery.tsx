@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from "react";
-import type { GalleryImage } from "../../types";
+import type { GalleryImage, WeekScheduleInfo } from "../../types";
 import { Icon } from "../common/Icon";
 import { ImagePreviewModal } from "../image-preview/ImagePreviewModal";
 import { downloadImage } from "../../utils/imageHelpers";
+import { DAY_TRANSLATIONS } from "./utils";
 
 interface FlyerGalleryProps {
   flyerState: Record<string, (GalleryImage | "loading")[]>;
@@ -10,6 +11,8 @@ interface FlyerGalleryProps {
   galleryImages?: GalleryImage[];
   onUpdateGalleryImage?: (imageId: string, newImageSrc: string) => void;
   onSetChatReference?: (image: GalleryImage | null) => void;
+  selectedDay?: string;
+  weekScheduleInfo?: WeekScheduleInfo | null;
 }
 
 export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
@@ -18,9 +21,11 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
   galleryImages = [],
   onUpdateGalleryImage,
   onSetChatReference,
+  selectedDay = "MONDAY",
+  weekScheduleInfo,
 }) => {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
-  const [filter, setFilter] = useState<"all" | "today" | "daily" | "individual">("all");
+  const [filter, setFilter] = useState<"all" | "selectedDay" | "daily" | "individual">("all");
   const [isSharing, setIsSharing] = useState(false);
 
   // Collect all flyers from both states
@@ -81,32 +86,31 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
     return allFlyers.filter(f => f.source === "Flyer");
   }, [allFlyers]);
 
-  const todayFlyers = useMemo(() => {
-    // Get today's date at midnight
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTimestamp = today.getTime();
+  const selectedDayFlyers = useMemo(() => {
+    const flyers: GalleryImage[] = [];
 
-    // Get tomorrow's date at midnight
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowTimestamp = tomorrow.getTime();
+    // Get flyers from the selected day in dailyFlyerState
+    const dayData = dailyFlyerState[selectedDay];
+    if (dayData) {
+      Object.values(dayData).forEach((periodArray) => {
+        periodArray.forEach((flyer) => {
+          if (flyer !== "loading") {
+            flyers.push(flyer);
+          }
+        });
+      });
+    }
 
-    return allFlyers.filter(f => {
-      // Extract timestamp from ID (format: flyer-{timestamp}-{random})
-      const match = f.id.match(/flyer-(\d+)-/);
-      if (!match) return false;
-
-      const flyerTimestamp = parseInt(match[1]);
-      // Check if flyer was created today
-      return flyerTimestamp >= todayTimestamp && flyerTimestamp < tomorrowTimestamp;
-    });
-  }, [allFlyers]);
+    // Remove duplicates by src
+    return Array.from(
+      new Map(flyers.map(f => [f.src || f.id, f])).values()
+    );
+  }, [dailyFlyerState, selectedDay]);
 
   const displayedFlyers = useMemo(() => {
     switch (filter) {
-      case "today":
-        return todayFlyers;
+      case "selectedDay":
+        return selectedDayFlyers;
       case "daily":
         return dailyFlyers;
       case "individual":
@@ -114,7 +118,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
       default:
         return allFlyers;
     }
-  }, [filter, allFlyers, todayFlyers, dailyFlyers, individualFlyers]);
+  }, [filter, allFlyers, selectedDayFlyers, dailyFlyers, individualFlyers]);
 
   const handleDownloadAll = async () => {
     for (let i = 0; i < displayedFlyers.length; i++) {
@@ -131,15 +135,15 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
     }
   };
 
-  const handleShareTodayWhatsApp = async () => {
-    if (todayFlyers.length === 0) return;
+  const handleShareDayWhatsApp = async () => {
+    if (selectedDayFlyers.length === 0) return;
 
     try {
       setIsSharing(true);
 
       const files: File[] = [];
-      for (let i = 0; i < todayFlyers.length; i++) {
-        const flyer = todayFlyers[i];
+      for (let i = 0; i < selectedDayFlyers.length; i++) {
+        const flyer = selectedDayFlyers[i];
         const response = await fetch(flyer.src);
         const blob = await response.blob();
         const extension = blob.type.includes("png") ? "png" : "jpg";
@@ -151,17 +155,18 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
         typeof navigator.share === "function" &&
         (!navigator.canShare || navigator.canShare({ files }));
 
+      const dayLabel = DAY_TRANSLATIONS[selectedDay] || selectedDay;
       if (canShareFiles) {
         await navigator.share({
-          title: "Flyers do dia",
-          text: "Flyers gerados hoje",
+          title: `Flyers ${dayLabel}`,
+          text: `Flyers de ${dayLabel}`,
           files,
         });
         return;
       }
 
-      const links = todayFlyers.map((flyer) => flyer.src).join("\n");
-      const message = `Flyers gerados hoje:\n${links}`;
+      const links = selectedDayFlyers.map((flyer) => flyer.src).join("\n");
+      const message = `Flyers de ${dayLabel}:\n${links}`;
       window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
     } catch (err) {
       console.error("Failed to share flyers on WhatsApp:", err);
@@ -189,8 +194,8 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-white/10 bg-black/40">
-        <div className="flex items-center justify-between mb-3">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/10 bg-black/40">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-3">
           <div>
             <h3 className="text-sm font-semibold text-white">
               Galeria de Flyers
@@ -200,31 +205,33 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
             </p>
           </div>
           {displayedFlyers.length > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
-                onClick={handleShareTodayWhatsApp}
-                disabled={todayFlyers.length === 0 || isSharing}
-                className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+                onClick={handleShareDayWhatsApp}
+                disabled={selectedDayFlyers.length === 0 || isSharing}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-[10px] sm:text-xs font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
               >
                 <Icon name="send" className="w-3 h-3" />
-                {isSharing ? "Enviando..." : "WhatsApp (Hoje)"}
+                <span className="hidden sm:inline">{isSharing ? "Enviando..." : `WhatsApp (${DAY_TRANSLATIONS[selectedDay] || selectedDay})`}</span>
+                <span className="sm:hidden">{isSharing ? "..." : DAY_TRANSLATIONS[selectedDay] || selectedDay}</span>
               </button>
               <button
                 onClick={handleDownloadAll}
-                className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-[10px] sm:text-xs font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
               >
                 <Icon name="download" className="w-3 h-3" />
-                Baixar Todos
+                <span className="hidden sm:inline">Baixar Todos</span>
+                <span className="sm:hidden">Todos</span>
               </button>
             </div>
           )}
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => setFilter("all")}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all backdrop-blur-2xl border ${
+            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all backdrop-blur-2xl border ${
               filter === "all"
                 ? "bg-black/40 border-white/10 text-white/90"
                 : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
@@ -233,18 +240,18 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
             Todos ({allFlyers.length})
           </button>
           <button
-            onClick={() => setFilter("today")}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all backdrop-blur-2xl border ${
-              filter === "today"
+            onClick={() => setFilter("selectedDay")}
+            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all backdrop-blur-2xl border ${
+              filter === "selectedDay"
                 ? "bg-black/40 border-white/10 text-white/90"
                 : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
             }`}
           >
-            Hoje ({todayFlyers.length})
+            {DAY_TRANSLATIONS[selectedDay] || selectedDay} ({selectedDayFlyers.length})
           </button>
           <button
             onClick={() => setFilter("daily")}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all backdrop-blur-2xl border ${
+            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all backdrop-blur-2xl border ${
               filter === "daily"
                 ? "bg-black/40 border-white/10 text-white/90"
                 : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
@@ -254,68 +261,72 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
           </button>
           <button
             onClick={() => setFilter("individual")}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all backdrop-blur-2xl border ${
+            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all backdrop-blur-2xl border ${
               filter === "individual"
                 ? "bg-black/40 border-white/10 text-white/90"
                 : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
             }`}
           >
-            Individuais ({individualFlyers.length})
+            <span className="hidden sm:inline">Individuais</span>
+            <span className="sm:hidden">Indiv.</span> ({individualFlyers.length})
           </button>
         </div>
       </div>
 
       {/* Gallery Grid */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        <div className="grid grid-cols-2 gap-3">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
           {displayedFlyers.map((flyer) => (
-            <button
+            <div
               key={flyer.id}
               onClick={() => setSelectedImage(flyer)}
-              className="group relative aspect-[9/16] rounded-xl overflow-hidden border border-white/[0.06] hover:border-white/10 hover:scale-[1.02] transition-all cursor-pointer"
+              className="group relative aspect-[9/16] rounded-xl border border-white/[0.06] hover:border-white/10 hover:scale-[1.02] transition-all cursor-pointer"
             >
-              <img
-                src={flyer.src}
-                className="w-full h-full object-cover"
-                alt="Flyer"
-              />
+              {/* Image container with overflow hidden */}
+              <div className="absolute inset-0 rounded-xl overflow-hidden">
+                <img
+                  src={flyer.src}
+                  className="w-full h-full object-cover"
+                  alt="Flyer"
+                />
 
-              {/* Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                {/* Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
-              {/* Hover Actions */}
-              <div className="absolute bottom-0 left-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      downloadImage(flyer.src, `flyer-${flyer.id}.png`);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-white/10 backdrop-blur-xl rounded-lg text-xs font-medium text-white hover:bg-white/20 transition-colors"
-                  >
-                    <Icon name="download" className="w-3 h-3" />
-                    Download
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedImage(flyer);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-white/10 backdrop-blur-xl rounded-lg text-xs font-medium text-white hover:bg-white/20 transition-colors"
-                  >
-                    <Icon name="eye" className="w-3 h-3" />
-                    Ver
-                  </button>
+                {/* Hover Actions */}
+                <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        downloadImage(flyer.src, `flyer-${flyer.id}.png`);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 bg-white/10 backdrop-blur-xl rounded-md text-[10px] font-medium text-white hover:bg-white/20 transition-colors"
+                    >
+                      <Icon name="download" className="w-2.5 h-2.5" />
+                      Baixar
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedImage(flyer);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 bg-white/10 backdrop-blur-xl rounded-md text-[10px] font-medium text-white hover:bg-white/20 transition-colors"
+                    >
+                      <Icon name="eye" className="w-2.5 h-2.5" />
+                      Ver
+                    </button>
+                  </div>
+                </div>
+
+                {/* Type Badge */}
+                <div className="absolute top-1.5 left-1.5">
+                  <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-black/60 backdrop-blur-xl text-white/70 uppercase tracking-wider">
+                    {flyer.source === "Flyer Diário" ? "Grade" : "Individual"}
+                  </span>
                 </div>
               </div>
-
-              {/* Type Badge */}
-              <div className="absolute top-2 left-2">
-                <span className="text-[9px] font-black px-2 py-1 rounded-full bg-black/60 backdrop-blur-xl text-white/70 uppercase tracking-wider">
-                  {flyer.source === "Flyer Diário" ? "Grade" : "Individual"}
-                </span>
-              </div>
-            </button>
+            </div>
           ))}
         </div>
       </div>

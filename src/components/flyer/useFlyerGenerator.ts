@@ -106,6 +106,7 @@ export const useFlyerGenerator = (
 
     const [isStylePanelOpen, setIsStylePanelOpen] = useState(true);
     const [isSchedulesPanelOpen, setIsSchedulesPanelOpen] = useState(false);
+    const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
 
     const [batchTrigger, setBatchTrigger] = useState(false);
     const [isBatchGenerating, setIsBatchGenerating] = useState(false);
@@ -342,7 +343,8 @@ export const useFlyerGenerator = (
             globalStyleReference,
             isManualModalOpen,
             isSchedulesPanelOpen,
-            compositionAssets
+            compositionAssets,
+            isMobilePanelOpen
         },
         setters: {
             setSelectedDay,
@@ -366,7 +368,8 @@ export const useFlyerGenerator = (
             setGlobalStyleReference,
             setIsManualModalOpen,
             setIsSchedulesPanelOpen,
-            setCompositionAssets
+            setCompositionAssets,
+            setIsMobilePanelOpen
         },
         data: {
             currentEvents,

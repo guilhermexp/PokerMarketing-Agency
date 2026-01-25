@@ -199,8 +199,11 @@ export async function addImageJob(jobId, data) {
 
 /**
  * Initialize the image generation worker with a processor function
+ * @param {Function} processorFn - The job processor function
+ * @param {Object} options - Optional configuration
+ * @param {Function} options.onProgress - Callback when job progress updates (jobId, progress) => Promise<void>
  */
-export function initializeImageWorker(processorFn) {
+export function initializeImageWorker(processorFn, options = {}) {
   if (imageWorker) {
     console.log('[JobQueue] Image worker already initialized');
     return imageWorker;
@@ -225,8 +228,18 @@ export function initializeImageWorker(processorFn) {
     console.error(`[JobQueue] Image job ${job?.id} failed:`, err.message);
   });
 
-  imageWorker.on('progress', (job, progress) => {
+  imageWorker.on('progress', async (job, progress) => {
     console.log(`[JobQueue] Image job ${job.id} progress: ${progress}%`);
+    // Update database with progress if callback provided
+    if (options.onProgress) {
+      try {
+        // Use jobId from job data (PostgreSQL job ID), fallback to BullMQ job ID
+        const dbJobId = job.data?.jobId || job.id;
+        await options.onProgress(dbJobId, progress);
+      } catch (err) {
+        console.error(`[JobQueue] Failed to update progress in DB:`, err.message);
+      }
+    }
   });
 
   imageWorker.on('error', (err) => {

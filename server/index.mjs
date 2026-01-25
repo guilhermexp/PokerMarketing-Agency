@@ -1018,8 +1018,8 @@ app.get("/api/db/init", async (req, res) => {
       // 2. Gallery Images (limited to 100 most recent for pagination support)
       // OPTIMIZATION: Exclude 'src' column (base64 image data) to reduce egress
       isOrgContext
-        ? sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`
-        : sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`,
+        ? sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`
+        : sql`SELECT id, user_id, organization_id, source, src_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`,
 
       // 3. Scheduled Posts (SMART LOADING: last 7 days + next 60 days)
       // Shows recent activity + upcoming schedule without arbitrary limits
@@ -1392,7 +1392,7 @@ app.get("/api/db/gallery", async (req, res) => {
     // This dramatically reduces egress data transfer (50-250MB → 50KB per request)
     const selectColumns = include_src === 'true'
       ? '*'
-      : 'id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name';
+      : 'id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period';
 
     if (organization_id) {
       // Organization context - verify membership
@@ -3160,7 +3160,10 @@ app.get("/api/generate/status", async (req, res) => {
     // List jobs for user
     if (userId) {
       let jobs;
-      const limitNum = parseInt(limit) || 50;
+      const limitNum = Math.min(parseInt(limit) || 30, 50); // Max 50, default 30
+      const cutoffDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); // 24 hours ago
+      // For active jobs, only show recent ones (1 hour) to avoid showing stale queued jobs
+      const activeCutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString(); // 1 hour ago
 
       // Filter by organization context
       if (organizationId) {
@@ -3169,7 +3172,8 @@ app.get("/api/generate/status", async (req, res) => {
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id, error_message,
+              result_url, result_gallery_id,
+              CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
             FROM generation_jobs
@@ -3178,14 +3182,20 @@ app.get("/api/generate/status", async (req, res) => {
             LIMIT ${limitNum}
           `;
         } else {
+          // Get recent active jobs + recent completed/failed jobs
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id, error_message,
+              result_url, result_gallery_id,
+              CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
             FROM generation_jobs
             WHERE organization_id = ${organizationId}
+              AND (
+                (status IN ('queued', 'processing') AND created_at > ${activeCutoff})
+                OR created_at > ${cutoffDate}
+              )
             ORDER BY created_at DESC
             LIMIT ${limitNum}
           `;
@@ -3196,7 +3206,8 @@ app.get("/api/generate/status", async (req, res) => {
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id, error_message,
+              result_url, result_gallery_id,
+              CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
             FROM generation_jobs
@@ -3205,14 +3216,20 @@ app.get("/api/generate/status", async (req, res) => {
             LIMIT ${limitNum}
           `;
         } else {
+          // Get recent active jobs + recent completed/failed jobs
           jobs = await sql`
             SELECT
               id, user_id, organization_id, job_type, status, progress,
-              result_url, result_gallery_id, error_message,
+              result_url, result_gallery_id,
+              CASE WHEN LENGTH(error_message) > 500 THEN LEFT(error_message, 500) || '...' ELSE error_message END as error_message,
               created_at, started_at, completed_at,
               config->>'_context' as context
             FROM generation_jobs
             WHERE user_id = ${userId} AND organization_id IS NULL
+              AND (
+                (status IN ('queued', 'processing') AND created_at > ${activeCutoff})
+                OR created_at > ${cutoffDate}
+              )
             ORDER BY created_at DESC
             LIMIT ${limitNum}
           `;
@@ -6861,9 +6878,18 @@ const startup = async () => {
       }
     };
 
-    // Initialize image generation worker
+    // Initialize image generation worker with progress callback to update database
     try {
-      const imageWorker = initializeImageWorker(processImageJob);
+      const imageWorker = initializeImageWorker(processImageJob, {
+        onProgress: async (jobId, progress) => {
+          // Update progress in PostgreSQL database
+          await sql`
+            UPDATE generation_jobs
+            SET progress = ${progress}
+            WHERE id = ${jobId}
+          `;
+        }
+      });
       if (imageWorker) {
         console.log(`${colors.green}✓ Image generation worker initialized${colors.reset}`);
       }

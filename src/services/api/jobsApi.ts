@@ -23,6 +23,10 @@ export interface GenerationJobConfig {
   styleReference?: string;
   compositionAssets?: string[];
   source: string;
+  // Daily flyer metadata for database linking
+  weekScheduleId?: string;
+  dailyFlyerPeriod?: string;
+  dailyFlyerDay?: string;
 }
 
 export interface GenerationJob {
