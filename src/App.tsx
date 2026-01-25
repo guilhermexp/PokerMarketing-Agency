@@ -659,8 +659,31 @@ function AppContent() {
         });
 
         if (Object.keys(restoredState).length > 0) {
-          setDailyFlyerState(restoredState);
-          console.debug('[App] Restored daily flyer state from database:', restoredState);
+          // IMPORTANT: Merge with existing state to preserve any flyers generated during this session
+          // that haven't been saved to the database yet
+          setDailyFlyerState((prev) => {
+            const merged = { ...prev };
+            Object.entries(restoredState).forEach(([day, periods]) => {
+              if (!merged[day]) {
+                merged[day] = periods;
+              } else {
+                // Merge periods, keeping existing flyers and adding new ones from DB
+                Object.entries(periods).forEach(([period, dbImages]) => {
+                  const existingImages = merged[day][period as TimePeriod] || [];
+                  // Only add images from DB that aren't already in state (by ID)
+                  const existingIds = new Set(
+                    existingImages
+                      .filter((img): img is GalleryImage => img !== "loading")
+                      .map((img) => img.id)
+                  );
+                  const newFromDb = dbImages.filter((img) => !existingIds.has(img.id));
+                  merged[day][period as TimePeriod] = [...existingImages, ...newFromDb];
+                });
+              }
+            });
+            return merged;
+          });
+          console.debug('[App] Merged daily flyer state from database:', restoredState);
         }
 
         hasRestoredDailyFlyersRef.current = true;
@@ -675,9 +698,15 @@ function AppContent() {
 
   // Reset restoration flag when schedule changes
   useEffect(() => {
-    if (swrTournamentSchedule?.id !== lastLoadedScheduleIdRef.current) {
+    // Only clear state when actually switching to a DIFFERENT schedule
+    // Don't clear on initial load (when lastLoadedScheduleIdRef.current is null)
+    if (
+      swrTournamentSchedule?.id &&
+      lastLoadedScheduleIdRef.current &&
+      swrTournamentSchedule.id !== lastLoadedScheduleIdRef.current
+    ) {
+      console.debug('[App] Schedule changed, clearing daily flyer state');
       hasRestoredDailyFlyersRef.current = false;
-      // Clear daily flyer state when switching schedules
       setDailyFlyerState({});
     }
   }, [swrTournamentSchedule?.id]);
