@@ -49,6 +49,7 @@ export const PeriodCardRow: React.FC<{
     scheduleId?: string; // For saving daily flyers to database
     onAddImageToGallery: (image: Omit<GalleryImage, "id">) => GalleryImage;
     onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
+    onDeleteGalleryImage?: (imageId: string) => void;
     onSetChatReference: (image: GalleryImage | null) => void;
     generatedFlyers: (GalleryImage | "loading")[];
     setGeneratedFlyers: (
@@ -91,6 +92,7 @@ export const PeriodCardRow: React.FC<{
     scheduleId,
     onAddImageToGallery,
     onUpdateGalleryImage,
+    onDeleteGalleryImage,
     onSetChatReference,
     generatedFlyers,
     setGeneratedFlyers,
@@ -606,6 +608,19 @@ export const PeriodCardRow: React.FC<{
                                 handleDownloadFlyer(f.src, `period-${period}-${index}.png`)
                             }
                             onCloneStyle={onCloneStyle}
+                            onDelete={(flyer) => {
+                                // Remove from local state
+                                setGeneratedFlyers((prev) =>
+                                    prev.filter((f) => f !== "loading" && f.id !== flyer.id)
+                                );
+                                // Delete from database if handler provided
+                                onDeleteGalleryImage?.(flyer.id);
+                                // Clear selection if this was the selected flyer
+                                if (selectedFlyerId === flyer.id) {
+                                    setSelectedFlyerId(null);
+                                    onExternalSelectFlyer?.(null);
+                                }
+                            }}
                             emptyTitle="Nenhum flyer gerado"
                             emptyDescription='Clique em "Gerar" para criar um flyer.'
                             selectedFlyerId={selectedFlyerId}
