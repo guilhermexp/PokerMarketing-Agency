@@ -18,7 +18,6 @@ import { urlToBase64 } from '@/utils/imageHelpers';
 import { generateFlyer } from '@/services/geminiService';
 import { buildSingleEventFlyerPromptExtended } from '@/ai-prompts';
 import type { BrandProfile, TournamentEvent, GalleryImage, ImageModel, ImageSize, ImageFile } from '@/types';
-import type { GenerationJobConfig } from '@/services/apiClient';
 import type { Currency } from '@/types/flyer.types';
 import type { InstagramContext } from '@/services/rubeService';
 import type { ScheduledPost } from '@/types';
@@ -45,9 +44,6 @@ interface TournamentEventCardProps {
   galleryImages?: GalleryImage[];
   onSchedulePost?: (post: Omit<ScheduledPost, 'id' | 'createdAt' | 'updatedAt'>) => void;
 }
-
-// Dev mode flag - set to false to use BullMQ queue (Redis configured)
-const isDevMode = false;
 
 const formatCurrencyValue = (val: string, currency: Currency): string => {
   if (!val || val === '0' || val === '') return '---';
@@ -88,7 +84,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
   const hasExistingFlyers = generatedFlyers.some((f) => f !== 'loading');
   const [isExpanded, setIsExpanded] = useState(hasExistingFlyers);
 
-  const { queueJob, onJobComplete, onJobFailed, getJobByContext } = useBackgroundJobs();
+  const { onJobComplete, onJobFailed, getJobByContext } = useBackgroundJobs();
   const jobContext = `flyer-event-${event.id}`;
   const pendingJob = getJobByContext(jobContext);
 
@@ -161,40 +157,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
       brandSecondaryColor: brandProfile.secondaryColor,
     });
 
-    // Use background job if userId is available AND we're not in dev mode
-    if (userId && !isDevMode) {
-      setIsGenerating(true);
-      setGeneratedFlyers((prev) => ['loading', ...prev]);
-
-      try {
-        const config: GenerationJobConfig = {
-          brandName: brandProfile.name,
-          brandDescription: brandProfile.description,
-          brandToneOfVoice: brandProfile.toneOfVoice,
-          brandPrimaryColor: brandProfile.primaryColor,
-          brandSecondaryColor: brandProfile.secondaryColor,
-          aspectRatio,
-          model,
-          imageSize,
-          logo: brandProfile.logo || undefined,
-          collabLogo: collabLogo || undefined,
-          styleReference: styleReference?.src || undefined,
-          compositionAssets: compositionAssets.map(
-            (a) => `data:${a.mimeType};base64,${a.base64}`
-          ),
-          source: 'Flyer',
-        };
-
-        await queueJob(userId, 'flyer', prompt, config, jobContext);
-      } catch (err) {
-        console.error('[TournamentEventCard] Failed to queue job:', err);
-        setGeneratedFlyers((prev) => prev.filter((f) => f !== 'loading'));
-        setIsGenerating(false);
-      }
-      return;
-    }
-
-    // Local generation (dev mode or no userId)
+    // Synchronous generation (background jobs were removed)
     setIsGenerating(true);
     setGeneratedFlyers((prev) => ['loading', ...prev]);
 
@@ -237,7 +200,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [event, brandProfile, currency, model, aspectRatio, imageSize, collabLogo, styleReference, compositionAssets, userId, jobContext, setGeneratedFlyers, queueJob]);
+  }, [event, brandProfile, currency, model, aspectRatio, imageSize, collabLogo, styleReference, compositionAssets, userId, jobContext, setGeneratedFlyers]);
 
   const handleQuickPost = (flyer: GalleryImage) => {
     setQuickPostFlyer(flyer);

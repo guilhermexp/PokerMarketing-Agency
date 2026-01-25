@@ -28,9 +28,7 @@ import {
   updateClipThumbnail,
   updateSceneImage,
   queueVideoJob,
-  queueImageJob,
   type VideoJobConfig,
-  type ImageJobConfig,
 } from "../../../services/apiClient";
 import { uploadImageToBlob } from "../../../services/blobService";
 import { ImagePreviewModal } from "../../common/ImagePreviewModal";
@@ -1731,37 +1729,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
       [sceneNumber]: { dataUrl: "", isUploading: true, error: undefined },
     }));
 
-    // Use background job if userId is available AND we're not in dev mode
-    if (userId && !isDevMode) {
-      try {
-        // Build style reference as data URL
-        const styleRefBase64 = thumbnail.src.startsWith("data:")
-          ? thumbnail.src
-          : `data:image/png;base64,${thumbnail.src}`;
-
-        const jobProductImages = [...productImageDataUrls];
-        if (brandProfile.logo?.startsWith("data:")) {
-          jobProductImages.push(brandProfile.logo);
-        }
-
-        const config: ImageJobConfig = {
-          model: "gemini-3-pro-image-preview",
-          aspectRatio: CLIP_ASPECT_RATIO,
-          referenceImage: styleRefBase64,
-          source: getSceneSource(sceneNumber),
-          productImages: jobProductImages.length > 0 ? jobProductImages : undefined,
-        };
-
-        const context = `scene-${clip.id}-${sceneNumber}`;
-        const result = await queueImageJob(userId, prompt, config, context);
-        console.debug(`[ClipsTab] Queued background job for scene ${sceneNumber}:`, result.jobId);
-        return;
-      } catch (err) {
-        console.warn("[ClipsTab] Failed to queue background job, falling back to sync:", err);
-      }
-    }
-
-    // Sync fallback
+    // Synchronous generation (background jobs were removed)
     try {
       // Extract base64 from thumbnail for style reference
       const thumbnailData = await urlToBase64(thumbnail.src);

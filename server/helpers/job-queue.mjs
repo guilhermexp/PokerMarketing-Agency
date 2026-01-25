@@ -1,6 +1,9 @@
 /**
- * BullMQ Job Queue for Background Image Generation & Scheduled Post Publishing
+ * BullMQ Job Queue for Scheduled Post Publishing
  * Uses Redis for job queue management
+ *
+ * NOTE: Image generation jobs were REMOVED (2026-01-25)
+ * Images are now generated synchronously via /api/images endpoint
  */
 
 import { Queue, Worker } from 'bullmq';
@@ -11,12 +14,9 @@ import IORedis from 'ioredis';
 const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || null;
 
 let connection = null;
-let imageQueue = null;
 let scheduledPostsQueue = null;
-let imageWorker = null;
 let scheduledPostsWorker = null;
 let redisAvailable = false;
-let redisConnectPromise = null;
 
 /**
  * Check if Redis is available
@@ -100,154 +100,6 @@ export function getRedisConnection() {
     });
   }
   return connection;
-}
-
-/**
- * Get or create the image generation queue
- */
-export function getImageQueue() {
-  if (!imageQueue) {
-    const conn = getRedisConnection();
-    if (!conn) {
-      return null;
-    }
-    imageQueue = new Queue('image-generation', {
-      connection: conn,
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
-        removeOnComplete: {
-          count: 100, // Keep last 100 completed jobs
-        },
-        removeOnFail: {
-          count: 50, // Keep last 50 failed jobs
-        },
-      },
-    });
-    console.log('[JobQueue] Image queue created');
-  }
-  return imageQueue;
-}
-
-/**
- * Add a job to the queue
- */
-export async function addJob(jobId, data) {
-  const queue = getImageQueue();
-
-  const job = await queue.add('generate', {
-    jobId,
-    ...data,
-  }, {
-    jobId: jobId, // Use DB job ID as BullMQ job ID for easy lookup
-  });
-
-  console.log(`[JobQueue] Added job ${jobId} to queue`);
-  return job;
-}
-
-/**
- * Get job status from queue
- */
-export async function getQueueJobStatus(jobId) {
-  const queue = getImageQueue();
-  const job = await queue.getJob(jobId);
-
-  if (!job) return null;
-
-  const state = await job.getState();
-  return {
-    id: job.id,
-    state,
-    progress: job.progress,
-    data: job.data,
-    failedReason: job.failedReason,
-    finishedOn: job.finishedOn,
-    processedOn: job.processedOn,
-  };
-}
-
-/**
- * Add an image generation job to the queue
- * Returns null if Redis not available (caller should use fallback)
- */
-export async function addImageJob(jobId, data) {
-  const queue = getImageQueue();
-  if (!queue) {
-    console.log(`[JobQueue] Redis not available, job ${jobId} will use sync processing`);
-    return null;
-  }
-
-  const job = await queue.add('generate', {
-    jobId,
-    ...data,
-  }, {
-    jobId: jobId,
-    attempts: 2,
-    backoff: {
-      type: 'fixed',
-      delay: 3000,
-    },
-  });
-
-  console.log(`[JobQueue] Added image job ${jobId} to queue`);
-  return job;
-}
-
-/**
- * Initialize the image generation worker with a processor function
- * @param {Function} processorFn - The job processor function
- * @param {Object} options - Optional configuration
- * @param {Function} options.onProgress - Callback when job progress updates (jobId, progress) => Promise<void>
- */
-export function initializeImageWorker(processorFn, options = {}) {
-  if (imageWorker) {
-    console.log('[JobQueue] Image worker already initialized');
-    return imageWorker;
-  }
-
-  const conn = getRedisConnection();
-  if (!conn || !redisAvailable) {
-    console.log('[JobQueue] Cannot initialize image worker - Redis not available');
-    return null;
-  }
-
-  imageWorker = new Worker('image-generation', processorFn, {
-    connection: conn,
-    concurrency: 2, // Process 2 jobs at a time
-  });
-
-  imageWorker.on('completed', (job, result) => {
-    console.log(`[JobQueue] Image job ${job.id} completed`);
-  });
-
-  imageWorker.on('failed', (job, err) => {
-    console.error(`[JobQueue] Image job ${job?.id} failed:`, err.message);
-  });
-
-  imageWorker.on('progress', async (job, progress) => {
-    console.log(`[JobQueue] Image job ${job.id} progress: ${progress}%`);
-    // Update database with progress if callback provided
-    if (options.onProgress) {
-      try {
-        // Use jobId from job data (PostgreSQL job ID), fallback to BullMQ job ID
-        const dbJobId = job.data?.jobId || job.id;
-        await options.onProgress(dbJobId, progress);
-      } catch (err) {
-        console.error(`[JobQueue] Failed to update progress in DB:`, err.message);
-      }
-    }
-  });
-
-  imageWorker.on('error', (err) => {
-    console.error('[JobQueue] Image worker error:', err.message);
-  });
-
-  console.log('[JobQueue] Image worker initialized with concurrency 2');
-  return imageWorker;
 }
 
 /**
@@ -434,17 +286,9 @@ export async function initializeScheduledPostsChecker(publishFn, publishSingleFn
  * Graceful shutdown
  */
 export async function closeQueue() {
-  if (imageWorker) {
-    await imageWorker.close();
-    imageWorker = null;
-  }
   if (scheduledPostsWorker) {
     await scheduledPostsWorker.close();
     scheduledPostsWorker = null;
-  }
-  if (imageQueue) {
-    await imageQueue.close();
-    imageQueue = null;
   }
   if (scheduledPostsQueue) {
     await scheduledPostsQueue.close();

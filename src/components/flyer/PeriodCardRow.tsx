@@ -18,14 +18,12 @@ import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import { QuickPostModal } from "../common/QuickPostModal";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";
 import { useBackgroundJobs, type ActiveJob } from "../../hooks/useBackgroundJobs";
-import type { GenerationJobConfig } from "../../services/apiClient";
 import { urlToBase64, downloadImage } from "../../utils/imageHelpers";
 import { addDailyFlyer } from "../../services/apiClient";
 import { FlyerThumbStrip } from "./FlyerThumbStrip";
 import {
     formatCurrencyValue,
     getInitialTimeForPeriod,
-    isDevMode,
     getSortValue,
     parseGtd
 } from "./utils";
@@ -117,7 +115,7 @@ export const PeriodCardRow: React.FC<{
         // Track selected flyer for actions (defaults to first non-loading flyer)
         const [selectedFlyerId, setSelectedFlyerId] = useState<string | null>(null);
 
-        const { queueJob, onJobComplete, onJobFailed, getJobByContext } =
+        const { onJobComplete, onJobFailed, getJobByContext } =
             useBackgroundJobs();
         // Include day in context to ensure jobs are unique per day+period
         const jobContext = `flyer-period-${selectedDay}-${period}`;
@@ -295,44 +293,7 @@ export const PeriodCardRow: React.FC<{
                     brandSecondaryColor: brandProfile.secondaryColor,
                 });
 
-                // Use background job if userId is available AND we're not in dev mode
-                if (userId && !isDevMode) {
-                    setIsGenerating(true);
-                    setGeneratedFlyers((prev) => ["loading", ...prev]);
-
-                    try {
-                        const config: GenerationJobConfig = {
-                            brandName: brandProfile.name,
-                            brandDescription: brandProfile.description,
-                            brandToneOfVoice: brandProfile.toneOfVoice,
-                            brandPrimaryColor: brandProfile.primaryColor,
-                            brandSecondaryColor: brandProfile.secondaryColor,
-                            aspectRatio,
-                            model,
-                            imageSize,
-                            logo: brandProfile.logo || undefined,
-                            collabLogo: collabLogo || undefined,
-                            styleReference: styleReference?.src || undefined,
-                            compositionAssets: compositionAssets.map(
-                                (a) => `data:${a.mimeType};base64,${a.base64}`,
-                            ),
-                            source: "Flyer Diário",
-                            // Daily flyer metadata for database linking
-                            weekScheduleId: scheduleId,
-                            dailyFlyerPeriod: period,
-                            dailyFlyerDay: selectedDay,
-                        };
-
-                        await queueJob(userId, "flyer_daily", prompt, config, jobContext);
-                    } catch (err) {
-                        console.error("[PeriodCardRow] Failed to queue job:", err);
-                        setGeneratedFlyers((prev) => prev.filter((f) => f !== "loading"));
-                        setIsGenerating(false);
-                    }
-                    return;
-                }
-
-                // Local generation (dev mode or no userId)
+                // Synchronous generation (background jobs were removed)
                 setIsGenerating(true);
                 setGeneratedFlyers((prev) => ["loading", ...prev]);
 
@@ -418,7 +379,6 @@ export const PeriodCardRow: React.FC<{
                 imageSize,
                 compositionAssets,
                 userId,
-                queueJob,
                 jobContext,
                 dayInfo,
                 selectedDay,

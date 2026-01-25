@@ -353,36 +353,41 @@ curl -s "http://localhost:5177/api/generate/status?userId=XXX" | wc -c
 
 ---
 
-## Sistema de Jobs em Background (DESATIVADO)
+## Sistema de Jobs de Imagem (REMOVIDO)
 
 **Data:** 25 de Janeiro de 2026
 
-O sistema de filas/jobs em background (BullMQ + Redis) foi **desativado** devido a problemas recorrentes com a resolução de `userId` (Clerk ID vs UUID do banco).
+O sistema de jobs de imagem em background (BullMQ + Redis) foi **completamente removido** do código devido a problemas recorrentes com a resolução de `userId` (Clerk ID vs UUID do banco).
 
-### Problema
+### Problema Original
 
 O worker de imagens recebia o Clerk ID (`user_xxx...`) mas tentava salvar na galeria com esse ID, causando erro:
 ```
 invalid input syntax for type uuid: "user_378fc20OZ5lfbZMSXns5m68zpB5"
 ```
 
-### Solução
+### Solução Final
 
-Em vez de corrigir a propagação de IDs pelo sistema de filas, optamos por **desativar** o sistema e usar geração síncrona.
+O sistema de jobs de **imagem** foi completamente removido. O sistema de **scheduled posts** continua funcionando normalmente.
 
-### Mudanças
+### Código Removido
+
+**`server/helpers/job-queue.mjs`:**
+- `imageQueue` - variável removida
+- `imageWorker` - variável removida
+- `getImageQueue()` - função removida
+- `addJob()` - função removida
+- `getQueueJobStatus()` - função removida
+- `addImageJob()` - função removida
+- `initializeImageWorker()` - função removida
 
 **`server/dev-api.mjs` e `server/index.mjs`:**
+- `processImageJob` - função removida (~280 linhas cada)
+- Imports de `initializeImageWorker` e `addImageJob` removidos
 
-1. **Worker de imagens comentado:**
+**Endpoint `/api/generate/queue`:**
 ```javascript
-// DISABLED: Background job queue was causing issues with userId resolution
-// const imageWorker = initializeImageWorker(processImageJob, {...});
-console.log(`⚠ Image worker disabled - using synchronous generation`);
-```
-
-2. **Endpoint `/api/generate/queue` desativado:**
-```javascript
+// Retorna erro 503 - sistema desativado
 app.post("/api/generate/queue", async (req, res) => {
   return res.status(503).json({
     error: "Background job queue is disabled. Use synchronous image generation.",
@@ -391,19 +396,19 @@ app.post("/api/generate/queue", async (req, res) => {
 });
 ```
 
-### Comportamento Atual
+### O Que Continua Funcionando
 
-- Imagens são geradas de forma **síncrona** via `/api/images`
-- O endpoint `/api/generate/queue` retorna erro 503
-- O worker de posts agendados (`ScheduledPostsChecker`) continua funcionando normalmente
-- Redis ainda é usado para posts agendados, apenas o worker de imagens foi desativado
+- **Scheduled Posts** - Redis + BullMQ continua ativo para posts agendados
+- **Geração de Imagens Síncrona** - Via `/api/images` endpoint
+- **Redis Connection** - Mantida para scheduled posts
 
-### Reativação Futura
+### Arquivos Afetados
 
-Para reativar o sistema de jobs:
-1. Descomentar a inicialização do `imageWorker` em ambos os arquivos
-2. Restaurar o endpoint `/api/generate/queue`
-3. Garantir que `resolvedUserId` (UUID) seja passado para `addImageJob()` e propagado corretamente pelo worker
+| Arquivo | Mudança |
+|---------|---------|
+| `server/helpers/job-queue.mjs` | Removido ~150 linhas de código de image jobs |
+| `server/dev-api.mjs` | Removido ~280 linhas (processImageJob + imports) |
+| `server/index.mjs` | Removido ~290 linhas (processImageJob + imports) |
 
 ---
 

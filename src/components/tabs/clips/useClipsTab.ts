@@ -7,10 +7,7 @@ import type {
     ImageFile,
 } from "../../../types";
 import { generateImage } from "../../../services/geminiService";
-import {
-    updateClipThumbnail,
-    type GenerationJobConfig,
-} from "../../../services/apiClient";
+import { updateClipThumbnail } from "../../../services/apiClient";
 import { uploadImageToBlob } from "../../../services/blobService";
 import { urlToBase64 } from "../../../utils/imageHelpers";
 import { getErrorMessage } from "../../../utils/errorMessages";
@@ -59,7 +56,7 @@ export const useClipsTab = ({
     >(null);
     const normalizedThumbsRef = useRef<Set<string>>(new Set());
 
-    const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
+    const { onJobComplete, onJobFailed } = useBackgroundJobs();
 
     // Initialize thumbnails - prioritize thumbnail_url from clip, then gallery
     useEffect(() => {
@@ -269,9 +266,6 @@ export const useClipsTab = ({
 
     const handleGenerateThumbnail = useCallback(
         async (index: number, extraInstruction?: string) => {
-            // Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
-            const isDevMode = false;
-
             if (selectedImageModel === "gemini-3-pro-image-preview") {
                 if (
                     window.aistudio &&
@@ -296,36 +290,7 @@ export const useClipsTab = ({
                 return { isGenerating: newGenerating, errors: newErrors };
             });
 
-            if (userId && !isDevMode) {
-                try {
-                    const productImageDataUrls = (productImages || []).map(
-                        (img) => `data:${img.mimeType};base64,${img.base64}`
-                    );
-
-                    if (brandProfile.logo?.startsWith("data:")) {
-                        productImageDataUrls.push(brandProfile.logo);
-                    }
-
-                    const config: GenerationJobConfig = {
-                        brandName: brandProfile.name,
-                        brandDescription: brandProfile.description,
-                        brandToneOfVoice: brandProfile.toneOfVoice,
-                        brandPrimaryColor: brandProfile.primaryColor,
-                        brandSecondaryColor: brandProfile.secondaryColor,
-                        aspectRatio: CLIP_ASPECT_RATIO,
-                        model: selectedImageModel,
-                        logo: brandProfile.logo || undefined,
-                        productImages: productImageDataUrls.length > 0 ? productImageDataUrls : undefined,
-                        source: "Clipe",
-                    };
-
-                    await queueJob(userId, "clip", prompt, config, `clip-${index}`);
-                    return;
-                } catch (err) {
-                    console.error("[useClipsTab] Failed to queue job:", err);
-                }
-            }
-
+            // Synchronous generation (background jobs were removed)
             try {
                 const productImagesToUse: ImageFile[] = [...(productImages || [])];
                 if (brandProfile.logo) {
@@ -404,7 +369,6 @@ export const useClipsTab = ({
             selectedImageModel,
             userId,
             brandProfile,
-            queueJob,
             onAddImageToGallery,
             productImages,
         ]

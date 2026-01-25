@@ -25,11 +25,7 @@ import {
   useBackgroundJobs,
   type ActiveJob,
 } from "../../hooks/useBackgroundJobs";
-import type { GenerationJobConfig } from "../../services/apiClient";
 import { updatePostImage } from "../../services/apiClient";
-
-// Dev mode flag - set to false to use BullMQ queue (Redis configured)
-const isDevMode = false;
 
 interface PostsTabProps {
   posts: Post[];
@@ -306,7 +302,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
     galleryImagesRef.current = galleryImages;
   }, [galleryImages]);
 
-  const { queueJob, onJobComplete, onJobFailed } = useBackgroundJobs();
+  const { onJobComplete, onJobFailed } = useBackgroundJobs();
 
   // Helper to generate unique source for a post
   // Includes campaignId to ensure uniqueness across campaigns
@@ -497,61 +493,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
       return { isGenerating: newGenerating, errors: newErrors };
     });
 
-    // Use background job if userId is available AND we're not in dev mode
-    if (userId && !isDevMode) {
-      try {
-        // Build product images array for the job
-        const jobProductImages: string[] = [];
-
-        // Add chat reference image (priority) or reference image
-        if (chatReferenceImage?.src) {
-          jobProductImages.push(chatReferenceImage.src);
-        } else if (referenceImage) {
-          jobProductImages.push(`data:${referenceImage.mimeType};base64,${referenceImage.base64}`);
-        }
-
-        // Add style reference if selected
-        if (selectedStyleReference?.src) {
-          jobProductImages.push(selectedStyleReference.src);
-        }
-
-        // Add composition assets
-        if (compositionAssets?.length) {
-          compositionAssets.forEach(asset => {
-            jobProductImages.push(`data:${asset.mimeType};base64,${asset.base64}`);
-          });
-        }
-
-        const config: GenerationJobConfig = {
-          brandName: brandProfile.name,
-          brandDescription: brandProfile.description,
-          brandToneOfVoice: brandProfile.toneOfVoice,
-          brandPrimaryColor: brandProfile.primaryColor,
-          brandSecondaryColor: brandProfile.secondaryColor,
-          aspectRatio: "1:1",
-          model: selectedImageModel,
-          logo: brandProfile.logo || undefined,
-          source: "Post",
-          productImages: jobProductImages.length > 0 ? jobProductImages : undefined,
-          styleReference: selectedStyleReference?.src || undefined,
-        };
-
-        await queueJob(
-          userId,
-          "post",
-          post.image_prompt,
-          config,
-          `post-${index}`,
-        );
-        // Job will complete via onJobComplete callback
-        return;
-      } catch (err) {
-        console.error("[PostsTab] Failed to queue job:", err);
-        // Fall through to local generation
-      }
-    }
-
-    // Local generation (dev mode or no userId or queue failed)
+    // Synchronous generation (background jobs were removed)
     try {
       const productImages: { base64: string; mimeType: string }[] = [];
 

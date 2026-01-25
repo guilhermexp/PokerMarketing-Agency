@@ -17,16 +17,13 @@ import {
   MediaType,
   PlaygroundAspectRatio,
 } from './types';
-import { queueVideoJob, queueImageJob, type ApiVideoModel, type VideoJobConfig, type ImageJobConfig } from '../../services/apiClient';
+import { queueVideoJob, type ApiVideoModel, type VideoJobConfig } from '../../services/apiClient';
 import { generateImage } from '../../services/geminiService';
 import { urlToBase64 } from '../../utils/imageHelpers';
 import { getErrorMessage } from '../../utils/errorMessages';
 import { useBackgroundJobs } from '../../hooks/useBackgroundJobs';
 import type { ActiveJob } from '../../hooks/useBackgroundJobs';
 import type { BrandProfile } from '../../types';
-
-// Dev mode flag - set to false to use BullMQ queue (Redis configured)
-const isDevMode = false;
 
 // Sample video URLs for the feed
 const sampleVideos: FeedPost[] = [
@@ -181,38 +178,7 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
       }
 
       if (isImageGeneration) {
-        // Use background job if userId is available AND we're not in dev mode
-        if (userId && !isDevMode) {
-          let styleRef: string | undefined;
-          if (params.styleReference) {
-            styleRef = `data:${params.styleReference.mimeType || 'image/png'};base64,${params.styleReference.base64}`;
-          }
-
-          let personReferenceImage: { base64: string; mimeType: string } | undefined;
-          if (params.referenceImages && params.referenceImages.length > 0) {
-            personReferenceImage = {
-              base64: params.referenceImages[0].base64,
-              mimeType: 'image/png',
-            };
-          }
-
-          const config: ImageJobConfig = {
-            aspectRatio: params.aspectRatio,
-            model: 'gemini-3-pro-image-preview',
-            imageSize: params.imageSize as '1K' | '2K' | '4K' | undefined,
-            style: styleRef,
-            referenceImage: personReferenceImage ? `data:image/png;base64,${personReferenceImage.base64}` : undefined,
-            source: 'playground',
-          };
-
-          const jobContext = `playground-image-${postId}`;
-          pendingImageJobs.current.set(jobContext, postId);
-          await queueImageJob(userId, params.prompt, config, jobContext);
-          console.debug(`[PlaygroundView] Image job queued for post ${postId}`);
-          return;
-        }
-
-        // Local generation fallback
+        // Synchronous generation (background jobs were removed)
         const profileToUse = params.useBrandProfile ? brandProfile : {
           name: brandProfile.name,
           description: '',
