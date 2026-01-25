@@ -61,6 +61,7 @@ interface FlyerGeneratorProps {
     React.SetStateAction<Record<string, Record<TimePeriod, string | null>>>
   >;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
+  onDeleteGalleryImage?: (imageId: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
   onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
   selectedStyleReference?: StyleReference | null;
@@ -100,6 +101,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   selectedDailyFlyerIds = {},
   setSelectedDailyFlyerIds,
   onUpdateGalleryImage,
+  onDeleteGalleryImage,
   onSetChatReference,
   onPublishToCampaign,
   selectedStyleReference,
@@ -787,6 +789,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     scheduleId={weekScheduleInfo?.id}
                     onAddImageToGallery={onAddImageToGallery}
                     onUpdateGalleryImage={onUpdateGalleryImage}
+                    onDeleteGalleryImage={onDeleteGalleryImage}
                     onSetChatReference={onSetChatReference}
                     generatedFlyers={dailyFlyerState[selectedDay]?.[p] || []}
                     setGeneratedFlyers={(u) =>
