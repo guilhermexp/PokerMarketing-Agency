@@ -55,6 +55,11 @@ interface FlyerGeneratorProps {
       Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>
     >
   >;
+  // Selected flyer per day/period
+  selectedDailyFlyerIds?: Record<string, Record<TimePeriod, string | null>>;
+  setSelectedDailyFlyerIds?: React.Dispatch<
+    React.SetStateAction<Record<string, Record<TimePeriod, string | null>>>
+  >;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
   onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
@@ -92,6 +97,8 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   setFlyerState,
   dailyFlyerState,
   setDailyFlyerState,
+  selectedDailyFlyerIds = {},
+  setSelectedDailyFlyerIds,
   onUpdateGalleryImage,
   onSetChatReference,
   onPublishToCampaign,
@@ -808,6 +815,16 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     galleryImages={galleryImages}
                     onSchedulePost={onSchedulePost}
                     onDownloadAll={handleDownloadAllImages}
+                    externalSelectedFlyerId={selectedDailyFlyerIds[selectedDay]?.[p] || null}
+                    onExternalSelectFlyer={setSelectedDailyFlyerIds ? (flyerId) => {
+                      setSelectedDailyFlyerIds(prev => ({
+                        ...prev,
+                        [selectedDay]: {
+                          ...(prev[selectedDay] || { ALL: null, MORNING: null, AFTERNOON: null, NIGHT: null, HIGHLIGHTS: null }),
+                          [p]: flyerId,
+                        },
+                      }));
+                    } : undefined}
                   />
                 ))}
             </div>
@@ -1260,6 +1277,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
             onSetChatReference={onSetChatReference}
             selectedDay={selectedDay}
             weekScheduleInfo={weekScheduleInfo}
+            selectedDailyFlyerIds={selectedDailyFlyerIds}
           />
         )}
       </div>
