@@ -71,6 +71,9 @@ export const PeriodCardRow: React.FC<{
         >,
     ) => void;
     onDownloadAll?: (images: GalleryImage[], title: string) => void;
+    // External selection state (for gallery integration)
+    externalSelectedFlyerId?: string | null;
+    onExternalSelectFlyer?: (flyerId: string | null) => void;
 }> = ({
     period,
     label,
@@ -101,6 +104,8 @@ export const PeriodCardRow: React.FC<{
     galleryImages = [],
     onSchedulePost,
     onDownloadAll,
+    externalSelectedFlyerId,
+    onExternalSelectFlyer,
 }) => {
         const [isGenerating, setIsGenerating] = useState(false);
         // Auto-expand if there are already generated flyers
@@ -224,15 +229,25 @@ export const PeriodCardRow: React.FC<{
             }
         }, [hasExistingFlyers, isExpanded]);
 
-        // Auto-select first flyer when flyers change
+        // Sync with external selection state if provided
+        useEffect(() => {
+            if (externalSelectedFlyerId !== undefined && externalSelectedFlyerId !== selectedFlyerId) {
+                setSelectedFlyerId(externalSelectedFlyerId);
+            }
+        }, [externalSelectedFlyerId]);
+
+        // Auto-select first flyer when flyers change (and notify parent)
         useEffect(() => {
             const firstFlyer = generatedFlyers.find((f) => f !== "loading") as GalleryImage | undefined;
             if (firstFlyer && (!selectedFlyerId || !generatedFlyers.some(f => f !== "loading" && f.id === selectedFlyerId))) {
                 setSelectedFlyerId(firstFlyer.id);
+                // Notify parent of selection change
+                onExternalSelectFlyer?.(firstFlyer.id);
             } else if (!firstFlyer) {
                 setSelectedFlyerId(null);
+                onExternalSelectFlyer?.(null);
             }
-        }, [generatedFlyers, selectedFlyerId]);
+        }, [generatedFlyers, selectedFlyerId, onExternalSelectFlyer]);
 
         const handleGenerate = useCallback(
             async (forced: boolean = false) => {
@@ -594,7 +609,10 @@ export const PeriodCardRow: React.FC<{
                             emptyTitle="Nenhum flyer gerado"
                             emptyDescription='Clique em "Gerar" para criar um flyer.'
                             selectedFlyerId={selectedFlyerId}
-                            onSelectFlyer={setSelectedFlyerId}
+                            onSelectFlyer={(flyerId) => {
+                                setSelectedFlyerId(flyerId);
+                                onExternalSelectFlyer?.(flyerId);
+                            }}
                         />
                     </div>
                 )}
