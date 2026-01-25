@@ -6729,7 +6729,8 @@ const startup = async () => {
       const imageWorker = initializeImageWorker(processImageJob, {
         onProgress: async (jobId, progress) => {
           // Update progress in PostgreSQL database
-          await sql`
+          const dbSql = getSql();
+          await dbSql`
             UPDATE generation_jobs
             SET progress = ${progress}
             WHERE id = ${jobId}

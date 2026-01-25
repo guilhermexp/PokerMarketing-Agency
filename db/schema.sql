@@ -311,6 +311,7 @@ CREATE TABLE gallery_images (
     organization_id VARCHAR(50),  -- Clerk organization ID
 
     src_url TEXT NOT NULL,
+    thumbnail_url TEXT,
     prompt TEXT,
     source VARCHAR(100) NOT NULL,
     model image_model NOT NULL,
@@ -321,6 +322,10 @@ CREATE TABLE gallery_images (
     post_id UUID REFERENCES posts(id) ON DELETE SET NULL,
     ad_creative_id UUID REFERENCES ad_creatives(id) ON DELETE SET NULL,
     video_script_id UUID REFERENCES video_clip_scripts(id) ON DELETE SET NULL,
+
+    -- Daily flyer reference
+    week_schedule_id UUID,
+    daily_flyer_period VARCHAR(50),
 
     -- Style reference
     is_style_reference BOOLEAN DEFAULT FALSE,
@@ -337,6 +342,7 @@ CREATE TABLE gallery_images (
 CREATE INDEX idx_gallery_images_user ON gallery_images(user_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_gallery_images_org ON gallery_images(organization_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_gallery_images_source ON gallery_images(source);
+CREATE INDEX idx_gallery_images_week_schedule ON gallery_images(week_schedule_id);
 CREATE INDEX idx_gallery_images_style_ref ON gallery_images(user_id, is_style_reference)
     WHERE is_style_reference = TRUE AND deleted_at IS NULL;
 CREATE INDEX idx_gallery_images_created ON gallery_images(created_at DESC);
