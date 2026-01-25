@@ -485,46 +485,10 @@ function AppContent() {
     Record<string, (GalleryImage | "loading")[]>
   >({});
   // Daily flyer state: { DAY: { PERIOD: [flyers] } }
-  // Persisted to localStorage per schedule
+  // Loaded from database via getDailyFlyers() when schedule is selected/auto-loaded
   const [dailyFlyerState, setDailyFlyerState] = useState<
     Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>
-  >(() => {
-    // Load from localStorage on init
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("dailyFlyerState");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          // Filter out "loading" items (they shouldn't be persisted)
-          const filtered: Record<string, Record<string, GalleryImage[]>> = {};
-          Object.entries(parsed).forEach(([day, periods]) => {
-            if (periods && typeof periods === "object") {
-              filtered[day] = {};
-              Object.entries(periods as Record<string, unknown[]>).forEach(
-                ([period, flyers]) => {
-                  if (Array.isArray(flyers)) {
-                    filtered[day][period] = flyers.filter(
-                      (f) => f !== "loading",
-                    ) as GalleryImage[];
-                  }
-                },
-              );
-            }
-          });
-          return filtered as Record<
-            string,
-            Record<TimePeriod, (GalleryImage | "loading")[]>
-          >;
-        }
-      } catch (e) {
-        console.warn(
-          "[App] Failed to load dailyFlyerState from localStorage:",
-          e,
-        );
-      }
-    }
-    return {};
-  });
+  >({});
 
   const [theme, setTheme] = useState<Theme>("dark");
   const [selectedStyleReference, setSelectedStyleReference] =
@@ -599,27 +563,60 @@ function AppContent() {
   // Track if we've already restored from database to avoid re-running
   const hasRestoredDailyFlyersRef = useRef(false);
   const lastLoadedScheduleIdRef = useRef<string | null>(null);
+  const lastLoadedOrgIdRef = useRef<string | null | undefined>(undefined);
 
   // Load daily flyers from database (gallery_images with week_schedule_id)
+  // Uses currentScheduleId which is set by handleSelectSchedule or auto-load
   useEffect(() => {
-    if (!userId || !swrTournamentSchedule?.id) {
+    console.log('🔄 [DailyFlyers] useEffect triggered:', {
+      userId: !!userId,
+      currentScheduleId,
+      organizationId,
+      hasRestored: hasRestoredDailyFlyersRef.current,
+      lastLoadedScheduleId: lastLoadedScheduleIdRef.current,
+    });
+
+    if (!userId || !currentScheduleId) {
+      console.log('⏭️ [DailyFlyers] Skipping: missing userId or currentScheduleId');
       return;
     }
 
-    // Only load once per schedule
-    if (lastLoadedScheduleIdRef.current === swrTournamentSchedule.id && hasRestoredDailyFlyersRef.current) {
+    // Only load once per schedule + organization combination
+    // Re-load if organization changed (e.g., from null to a value after org loads)
+    const orgChanged = lastLoadedOrgIdRef.current !== undefined && lastLoadedOrgIdRef.current !== organizationId;
+    if (
+      lastLoadedScheduleIdRef.current === currentScheduleId &&
+      hasRestoredDailyFlyersRef.current &&
+      !orgChanged
+    ) {
+      console.log('⏭️ [DailyFlyers] Skipping: already loaded for this schedule+org');
       return;
+    }
+
+    // If org changed, reset the restored flag to force reload
+    if (orgChanged) {
+      console.log('🔄 [DailyFlyers] Organization changed, forcing reload');
+      hasRestoredDailyFlyersRef.current = false;
     }
 
     const loadDailyFlyers = async () => {
       try {
-        console.debug('[App] Loading daily flyers from database for schedule:', swrTournamentSchedule.id);
-        const result = await getDailyFlyers(userId, swrTournamentSchedule.id, organizationId);
+        console.log('📥 [DailyFlyers] Loading from database:', {
+          currentScheduleId,
+          userId,
+          organizationId,
+        });
+        const result = await getDailyFlyers(userId, currentScheduleId, organizationId);
+        console.log('📦 [DailyFlyers] Result:', {
+          imagesCount: result.images?.length || 0,
+          structuredKeys: Object.keys(result.structured || {}),
+        });
 
         if (!result.structured || Object.keys(result.structured).length === 0) {
-          console.debug('[App] No daily flyers found in database for this schedule');
+          console.log('⚠️ [DailyFlyers] No flyers found in database');
           hasRestoredDailyFlyersRef.current = true;
-          lastLoadedScheduleIdRef.current = swrTournamentSchedule.id;
+          lastLoadedScheduleIdRef.current = currentScheduleId;
+          lastLoadedOrgIdRef.current = organizationId;
           return;
         }
 
@@ -683,33 +680,35 @@ function AppContent() {
             });
             return merged;
           });
-          console.debug('[App] Merged daily flyer state from database:', restoredState);
+          console.log('✅ [DailyFlyers] Merged state from database:', Object.keys(restoredState));
         }
 
         hasRestoredDailyFlyersRef.current = true;
-        lastLoadedScheduleIdRef.current = swrTournamentSchedule.id;
+        lastLoadedScheduleIdRef.current = currentScheduleId;
+        lastLoadedOrgIdRef.current = organizationId;
       } catch (err) {
         console.error('[App] Failed to load daily flyers from database:', err);
       }
     };
 
     loadDailyFlyers();
-  }, [userId, swrTournamentSchedule?.id, organizationId]);
+  }, [userId, currentScheduleId, organizationId]);
 
   // Reset restoration flag when schedule changes
+  // Note: handleSelectSchedule also clears state, this handles edge cases
   useEffect(() => {
     // Only clear state when actually switching to a DIFFERENT schedule
     // Don't clear on initial load (when lastLoadedScheduleIdRef.current is null)
     if (
-      swrTournamentSchedule?.id &&
+      currentScheduleId &&
       lastLoadedScheduleIdRef.current &&
-      swrTournamentSchedule.id !== lastLoadedScheduleIdRef.current
+      currentScheduleId !== lastLoadedScheduleIdRef.current
     ) {
       console.debug('[App] Schedule changed, clearing daily flyer state');
       hasRestoredDailyFlyersRef.current = false;
       setDailyFlyerState({});
     }
-  }, [swrTournamentSchedule?.id]);
+  }, [currentScheduleId]);
 
   // Process tournament schedule info when SWR data loads
   useEffect(() => {
@@ -1494,6 +1493,11 @@ function AppContent() {
 
   const handleSelectSchedule = async (schedule: WeekScheduleWithCount) => {
     if (!userId) return;
+
+    // Only clear state if actually SWITCHING to a different schedule
+    // Don't clear if reloading the same schedule (e.g., on remount)
+    const isSwitchingSchedule = currentScheduleId && currentScheduleId !== schedule.id;
+
     try {
       // Load events for selected schedule
       const eventsData = await getScheduleEvents(
@@ -1506,13 +1510,16 @@ function AppContent() {
       );
       setTournamentEvents(mappedEvents);
 
-      // Clear daily flyer state when switching schedules to avoid showing old flyers
-      setDailyFlyerState({});
-      hasRestoredDailyFlyersRef.current = false;
+      // Only clear daily flyer state when SWITCHING schedules (not on initial load or reload)
+      if (isSwitchingSchedule) {
+        console.log('🔄 [handleSelectSchedule] Switching schedules, clearing flyer state');
+        setDailyFlyerState({});
+        hasRestoredDailyFlyersRef.current = false;
 
-      // Clear schedule-specific localStorage items for a fresh start
-      localStorage.removeItem("dailyFlyerMapping");
-      localStorage.removeItem("flyer_selectedDay");
+        // Clear schedule-specific localStorage items for a fresh start
+        localStorage.removeItem("dailyFlyerMapping");
+        localStorage.removeItem("flyer_selectedDay");
+      }
 
       setCurrentScheduleId(schedule.id);
 
@@ -1541,6 +1548,26 @@ function AppContent() {
       console.error("[Tournaments] Failed to load schedule events:", error);
     }
   };
+
+  // Auto-load the most recent schedule when page loads
+  // This ensures daily flyers are shown after refresh/login
+  const hasAutoLoadedScheduleRef = useRef(false);
+  useEffect(() => {
+    // Only auto-load once per session, when we have schedules but no current selection
+    if (
+      !hasAutoLoadedScheduleRef.current &&
+      swrAllSchedules &&
+      swrAllSchedules.length > 0 &&
+      !currentScheduleId &&
+      userId
+    ) {
+      hasAutoLoadedScheduleRef.current = true;
+      console.log('🔄 [AutoLoad] Loading most recent schedule:', swrAllSchedules[0].id);
+      // Load the most recent schedule (first in list, sorted by created_at DESC)
+      handleSelectSchedule(swrAllSchedules[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swrAllSchedules, currentScheduleId, userId]);
 
   const executeTool = useCallback(async (
     toolCall: { name: string; args: Record<string, unknown> },
