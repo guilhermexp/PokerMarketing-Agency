@@ -6,7 +6,7 @@ import React, { useRef, useState } from 'react';
 import type { GalleryImage } from '../../types';
 import { Icon } from '../common/Icon';
 import { SendToChatButton } from '../common/SendToChatButton';
-import { Loader } from '../common/Loader';
+import { ImageGenerationLoader } from '../ui/ai-chat-image-generation-1';
 
 interface CarouselPreviewProps {
   images: GalleryImage[];
@@ -274,7 +274,7 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
                     >
                       {isGeneratingCaption ? (
                         <>
-                        <Loader size={10} className="text-white/60" />
+                          <Icon name="loader" className="w-3 h-3 animate-spin" />
                           Gerando...
                         </>
                       ) : (
@@ -327,25 +327,20 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
           className="flex items-center justify-start gap-1 pb-2 overflow-x-auto scrollbar-none"
         >
           {images.map((img, idx) => {
-            // Check if this specific slide is being generated
-            const isGenerating = Object.entries(generatingSlides).some(
-              ([key, val]) => val && (key.endsWith(`-${idx}`) || key.endsWith(`-${idx + 1}`) || key.endsWith('-cover'))
-            );
             return (
             <div
               key={img.id || idx}
-              draggable={!isGenerating}
+              draggable={true}
               onDragStart={(e) => handleDragStart(e, idx)}
               onDragOver={(e) => handleDragOver(e, idx)}
               onDragEnd={handleDragEnd}
-              onClick={() => !isGenerating && onOpenEditor?.(img)}
+              onClick={() => onOpenEditor?.(img)}
               className={`
                 relative flex-shrink-0 rounded-xl overflow-hidden cursor-move group
                 border-2 transition-all duration-500 ease-in-out shadow-lg
                 ${idx === currentIndex ? "border-white/30 ring-2 ring-white/10" : "border-white/10"}
                 ${dragOverIndex === idx ? "scale-105 border-blue-500" : ""}
                 ${draggedIndex === idx ? "opacity-50 scale-95" : ""}
-                ${isGenerating ? "border-white/30" : ""}
                 hover:border-white/30
               `}
               style={{
@@ -362,32 +357,22 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/70 text-sm text-white font-medium">
                 {idx + 1}
               </div>
-              {isGenerating && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-xl">
-                  <div className="text-center">
-                    <Loader size={16} className="mx-auto mb-1 text-white/60" />
-                    <span className="text-[9px] text-white/50">Gerando...</span>
-                  </div>
-                </div>
-              )}
               {/* Action buttons - appear on hover */}
-              {!isGenerating && (
-                <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
-                  <SendToChatButton image={img} />
-                  {onOpenEditor && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenEditor(img);
-                      }}
-                      className="w-8 h-8 rounded-lg bg-black/70 hover:bg-primary text-white/70 hover:text-black flex items-center justify-center transition-all"
-                      title="Editar no AI Studio"
-                    >
-                      <Icon name="edit" className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
+                <SendToChatButton image={img} />
+                {onOpenEditor && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenEditor(img);
+                    }}
+                    className="w-8 h-8 rounded-lg bg-black/70 hover:bg-primary text-white/70 hover:text-black flex items-center justify-center transition-all"
+                    title="Editar no AI Studio"
+                  >
+                    <Icon name="edit" className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
             );
           })}
@@ -395,18 +380,13 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
           {totalExpectedSlides > images.length && Object.values(generatingSlides).some(v => v) && (
             <div
               key="skeleton-loading"
-              className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-lg"
+              className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-lg bg-black"
               style={{
                 width: "20rem",
                 height: "28rem",
               }}
             >
-              <div className="w-full h-full bg-gradient-to-b from-white/5 to-white/0 flex items-center justify-center">
-                <div className="text-center">
-                  <Loader size={20} className="mx-auto mb-2 text-white/60" />
-                  <span className="text-[10px] text-white/50">Gerando...</span>
-                </div>
-              </div>
+              <ImageGenerationLoader isGenerating={true} />
               <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/50 text-sm text-white/40 font-medium">
                 {images.length + 1}
               </div>

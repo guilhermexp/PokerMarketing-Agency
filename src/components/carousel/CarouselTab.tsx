@@ -370,7 +370,7 @@ export const CarouselTab: React.FC<CarrosselTabProps> = ({
       {hasCampaignCarousels && (
         <>
           <div className="flex items-center gap-2 mb-2">
-            <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-medium">
+            <span className="px-2 py-0.5 rounded-full bg-white/10 text-white/60 text-xs font-medium">
               Carrosséis da Campanha
             </span>
           </div>
