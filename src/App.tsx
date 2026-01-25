@@ -490,6 +490,12 @@ function AppContent() {
     Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>
   >({});
 
+  // Selected flyer ID per day/period: { DAY: { PERIOD: flyerId } }
+  // Used to track which flyer is selected when multiple are generated
+  const [selectedDailyFlyerIds, setSelectedDailyFlyerIds] = useState<
+    Record<string, Record<TimePeriod, string | null>>
+  >({});
+
   const [theme, setTheme] = useState<Theme>("dark");
   const [selectedStyleReference, setSelectedStyleReference] =
     useState<StyleReference | null>(null);
@@ -2375,6 +2381,8 @@ function AppContent() {
             setFlyerState={setFlyerState}
             dailyFlyerState={dailyFlyerState}
             setDailyFlyerState={setDailyFlyerState}
+            selectedDailyFlyerIds={selectedDailyFlyerIds}
+            setSelectedDailyFlyerIds={setSelectedDailyFlyerIds}
             activeView={activeView}
             onViewChange={setActiveView}
             onPublishToCampaign={handlePublishFlyerToCampaign}
