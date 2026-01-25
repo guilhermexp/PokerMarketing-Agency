@@ -90,6 +90,11 @@ interface DashboardProps {
       Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>
     >
   >;
+  // Selected flyer per day/period (for gallery filtering)
+  selectedDailyFlyerIds: Record<string, Record<TimePeriod, string | null>>;
+  setSelectedDailyFlyerIds: React.Dispatch<
+    React.SetStateAction<Record<string, Record<TimePeriod, string | null>>>
+  >;
   // Navigation
   activeView: View;
   onViewChange: (view: View) => void;
@@ -183,6 +188,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     setFlyerState,
     dailyFlyerState,
     setDailyFlyerState,
+    selectedDailyFlyerIds,
+    setSelectedDailyFlyerIds,
     chatReferenceImage,
     onSetChatReference,
     onSetChatReferenceSilent,
@@ -670,6 +677,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 setFlyerState={setFlyerState}
                 dailyFlyerState={dailyFlyerState}
                 setDailyFlyerState={setDailyFlyerState}
+                selectedDailyFlyerIds={selectedDailyFlyerIds}
+                setSelectedDailyFlyerIds={setSelectedDailyFlyerIds}
                 onUpdateGalleryImage={onUpdateGalleryImage}
                 onSetChatReference={onSetChatReference}
                 onPublishToCampaign={onPublishToCampaign}
