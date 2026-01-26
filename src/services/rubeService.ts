@@ -33,6 +33,7 @@ const generateId = () => `rube_${Date.now()}_${Math.random().toString(36).substr
 export interface InstagramContext {
   instagramAccountId: string;  // UUID from instagram_accounts table
   userId: string;              // Clerk user ID
+  organizationId?: string;     // Clerk organization ID (for org-shared accounts)
 }
 
 // Types for Rube MCP
@@ -138,7 +139,8 @@ export const callRubeMCP = async (
   const requestBody = {
     ...request,
     instagram_account_id: context.instagramAccountId,
-    user_id: context.userId
+    user_id: context.userId,
+    organization_id: context.organizationId || undefined
   };
 
   // Uses proxy which handles token from database
