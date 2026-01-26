@@ -526,7 +526,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       {new Date(selectedDayDate).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
                     </h3>
                     <p className="text-xs text-white/50 mt-0.5">
-                      {scheduledPosts.filter((p) => p.scheduledDate === selectedDayDate).length} posts agendados
+                      {(() => {
+                        const dayPosts = scheduledPosts.filter((p) => p.scheduledDate === selectedDayDate);
+                        const published = dayPosts.filter((p) => p.status === "published").length;
+                        const scheduled = dayPosts.filter((p) => p.status === "scheduled").length;
+                        const parts = [];
+                        if (scheduled > 0) parts.push(`${scheduled} agendado${scheduled !== 1 ? "s" : ""}`);
+                        if (published > 0) parts.push(`${published} publicado${published !== 1 ? "s" : ""}`);
+                        return parts.length > 0 ? parts.join(" · ") : "Nenhum post";
+                      })()}
                     </p>
                   </div>
                 </div>
@@ -695,6 +703,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         const today = new Date();
         const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
         const todayPosts = scheduledPosts.filter((post) => post.scheduledDate === todayStr).sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+        const publishedCount = todayPosts.filter((p) => p.status === "published").length;
+        const scheduledCount = todayPosts.filter((p) => p.status === "scheduled").length;
 
         return (
           <main className="flex-1 px-2 md:px-6 py-3 md:py-6 flex flex-col">
@@ -710,7 +720,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 <h2 className="text-lg md:text-2xl font-semibold text-white">
                   {today.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }).toUpperCase()}
                 </h2>
-                <p className="text-xs md:text-sm text-white/50 mt-1">{todayPosts.length} posts agendados</p>
+                <p className="text-xs md:text-sm text-white/50 mt-1">
+                  {todayPosts.length === 0 ? "Nenhum post" : (
+                    <>
+                      {scheduledCount > 0 && <span>{scheduledCount} agendado{scheduledCount !== 1 ? "s" : ""}</span>}
+                      {scheduledCount > 0 && publishedCount > 0 && <span> · </span>}
+                      {publishedCount > 0 && <span className="text-green-400">{publishedCount} publicado{publishedCount !== 1 ? "s" : ""}</span>}
+                    </>
+                  )}
+                </p>
               </div>
               <div className="w-20" />
             </div>
@@ -721,8 +739,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
                     <Icon name="calendar" className="w-8 h-8 text-white/20" />
                   </div>
-                  <p className="text-base font-medium text-white/40">Nenhum agendamento para hoje</p>
-                  <p className="text-sm text-white/20 mt-2 text-center">Clique em "Agendar Post" para criar o primeiro</p>
+                  <p className="text-base font-medium text-white/40">Nenhum post para hoje</p>
+                  <p className="text-sm text-white/20 mt-2 text-center">Clique em "Agendar" para criar o primeiro</p>
                 </div>
               ) : (
                 todayPosts.map((post) => {
