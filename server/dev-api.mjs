@@ -6379,7 +6379,7 @@ app.delete("/api/db/instagram-accounts", async (req, res) => {
 app.post("/api/rube", async (req, res) => {
   try {
     const sql = getSql();
-    const { instagram_account_id, user_id, ...mcpRequest } = req.body;
+    const { instagram_account_id, user_id, organization_id, ...mcpRequest } = req.body;
 
     let token;
     let instagramUserId;
@@ -6389,6 +6389,8 @@ app.post("/api/rube", async (req, res) => {
       console.log(
         "[Rube Proxy] Multi-tenant mode - fetching token for account:",
         instagram_account_id,
+        "org:",
+        organization_id,
       );
 
       // Resolve user_id: can be DB UUID or Clerk ID
@@ -6408,14 +6410,25 @@ app.post("/api/rube", async (req, res) => {
       }
 
       // Fetch account token and instagram_user_id
-      const accountResult = await sql`
-        SELECT rube_token, instagram_user_id FROM instagram_accounts
-        WHERE id = ${instagram_account_id} AND user_id = ${resolvedUserId} AND is_active = TRUE
-        LIMIT 1
-      `;
+      // Check both personal accounts (user_id match) and organization accounts (org_id match)
+      const accountResult = organization_id
+        ? await sql`
+            SELECT rube_token, instagram_user_id FROM instagram_accounts
+            WHERE id = ${instagram_account_id}
+              AND (
+                (organization_id = ${organization_id} AND is_active = TRUE)
+                OR (user_id = ${resolvedUserId} AND is_active = TRUE)
+              )
+            LIMIT 1
+          `
+        : await sql`
+            SELECT rube_token, instagram_user_id FROM instagram_accounts
+            WHERE id = ${instagram_account_id} AND user_id = ${resolvedUserId} AND is_active = TRUE
+            LIMIT 1
+          `;
 
       if (accountResult.length === 0) {
-        console.log("[Rube Proxy] Instagram account not found or not active");
+        console.log("[Rube Proxy] Instagram account not found or not active for user/org");
         return res
           .status(403)
           .json({ error: "Instagram account not found or inactive" });
