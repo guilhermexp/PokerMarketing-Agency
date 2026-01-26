@@ -366,6 +366,7 @@ function AppContent() {
       return {
         instagramAccountId: activeAccount.id,
         userId: userId,
+        organizationId: organizationId || undefined,
       };
     }
     return undefined;
