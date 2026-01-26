@@ -60,6 +60,10 @@ export default defineConfig(({ mode }) => {
           target: "http://localhost:3002",
           changeOrigin: true,
         },
+        "/api/image-playground": {
+          target: "http://localhost:3002",
+          changeOrigin: true,
+        },
       },
     },
     plugins: [

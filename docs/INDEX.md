@@ -114,6 +114,31 @@ Biblioteca completa de exemplos reais de prompts e suas saídas.
 
 ---
 
+### 5. [IMAGE_PLAYGROUND.md](./IMAGE_PLAYGROUND.md)
+**Image Playground - Geração de Imagens com IA**
+
+Documentação completa da funcionalidade de Image Playground inspirada no LobeChat.
+
+**Conteúdo:**
+- ✅ Arquitetura de 3 painéis
+- ✅ Componentes React (8 arquivos)
+- ✅ Database schema (4 tabelas)
+- ✅ API endpoints (CRUD completo)
+- ✅ Zustand store structure
+- ✅ Hooks e API client
+- ✅ Backend helper (Gemini API)
+- ✅ Integração com galeria
+- ✅ Troubleshooting
+
+**Para quem:**
+- Desenvolvedores mantendo o Image Playground
+- Quem quer entender a integração com Gemini
+- Novos membros aprendendo o sistema
+
+**Leitura estimada:** 15-20 minutos
+
+---
+
 ## 🗂️ Outros Documentos Relevantes
 
 ### [MODEL_DOCUMENTATION.md](./MODEL_DOCUMENTATION.md)

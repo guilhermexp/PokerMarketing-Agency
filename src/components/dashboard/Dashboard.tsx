@@ -40,11 +40,12 @@ import { ImagePreviewModal } from "../image-preview/ImagePreviewModal";
 import { Zap, Layers, Image, Calendar, LayoutGrid, Video } from "lucide-react";
 import type { ScheduledPost } from "../../types";
 import { PlaygroundView } from "../playground";
+import { ImagePlaygroundPage } from "../image-playground";
 import { GeneratingLoader } from "../ui/quantum-pulse-loade";
 import { PublishedStoriesWidget } from "../ui/published-stories-widget";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";
 
-type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar" | "playground";
+type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar" | "playground" | "image-playground";
 
 interface DashboardProps {
   brandProfile: BrandProfile;
@@ -751,6 +752,11 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             <PlaygroundView brandProfile={brandProfile} userId={userId} />
           </div>
         )}
+        {activeView === "image-playground" && (
+          <div className="h-full">
+            <ImagePlaygroundPage userId={userId} organizationId={organizationId} />
+          </div>
+        )}
       </main>
 
       {/* Assistente removido do Dashboard - agora só existe dentro do AI Studio (ImagePreviewModal) */}
@@ -764,6 +770,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           { id: "calendar", icon: <Calendar />, label: "Agenda" },
           { id: "gallery", icon: <LayoutGrid />, label: "Galeria" },
           { id: "playground", icon: <Video />, label: "Playground" },
+          { id: "image-playground", icon: <Image />, label: "Image Studio" },
         ] as const;
         const activeNavIndex = mobileNavItems.findIndex(item => item.id === activeView);
         return (

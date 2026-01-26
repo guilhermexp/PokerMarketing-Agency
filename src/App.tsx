@@ -93,7 +93,8 @@ export type ViewType =
   | "flyer"
   | "gallery"
   | "calendar"
-  | "playground";
+  | "playground"
+  | "image-playground";
 
 const MAX_CHAT_HISTORY_MESSAGES = 10;
 
