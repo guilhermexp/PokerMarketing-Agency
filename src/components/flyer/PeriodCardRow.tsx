@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import type {
     BrandProfile,
     TournamentEvent,
@@ -236,20 +236,38 @@ export const PeriodCardRow: React.FC<{
             if (externalSelectedFlyerId !== undefined && externalSelectedFlyerId !== selectedFlyerId) {
                 setSelectedFlyerId(externalSelectedFlyerId);
             }
-        }, [externalSelectedFlyerId]);
+        }, [externalSelectedFlyerId, selectedFlyerId]);
+
+        // Ref to track the last notified flyer ID to prevent notification loops
+        const lastNotifiedFlyerIdRef = useRef<string | null | undefined>(undefined);
 
         // Auto-select first flyer when flyers change (and notify parent)
         useEffect(() => {
             const firstFlyer = generatedFlyers.find((f) => f !== "loading") as GalleryImage | undefined;
-            if (firstFlyer && (!selectedFlyerId || !generatedFlyers.some(f => f !== "loading" && f.id === selectedFlyerId))) {
-                setSelectedFlyerId(firstFlyer.id);
-                // Notify parent of selection change
-                onExternalSelectFlyer?.(firstFlyer.id);
+            const currentSelectedExists = selectedFlyerId && generatedFlyers.some(f => f !== "loading" && f.id === selectedFlyerId);
+
+            let newSelectedId: string | null = null;
+
+            if (firstFlyer && !currentSelectedExists) {
+                newSelectedId = firstFlyer.id;
             } else if (!firstFlyer) {
-                setSelectedFlyerId(null);
-                onExternalSelectFlyer?.(null);
+                newSelectedId = null;
+            } else {
+                // Keep current selection
+                return;
             }
-        }, [generatedFlyers, selectedFlyerId, onExternalSelectFlyer]);
+
+            // Only update if the selection actually changed
+            if (newSelectedId !== selectedFlyerId) {
+                setSelectedFlyerId(newSelectedId);
+            }
+
+            // Only notify parent if the value actually changed from last notification
+            if (onExternalSelectFlyer && lastNotifiedFlyerIdRef.current !== newSelectedId) {
+                lastNotifiedFlyerIdRef.current = newSelectedId;
+                onExternalSelectFlyer(newSelectedId);
+            }
+        }, [generatedFlyers, selectedFlyerId]);
 
         const handleGenerate = useCallback(
             async (forced: boolean = false) => {
