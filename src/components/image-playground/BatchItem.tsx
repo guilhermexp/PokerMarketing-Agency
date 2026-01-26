@@ -70,9 +70,9 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
   const totalCount = batch.generations.length;
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+    <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-white/5 flex items-start gap-3">
+      <div className="px-4 py-3 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 flex items-start gap-3">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="mt-0.5 p-1 -ml-1 rounded-lg hover:bg-white/10 transition-colors"
@@ -147,7 +147,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
 
       {/* Generations Grid */}
       {isExpanded && (
-        <div className="p-4">
+        <div className="p-4 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10">
           <div
             className={`grid gap-4 ${
               batch.generations.length === 1

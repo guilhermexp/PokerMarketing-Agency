@@ -156,7 +156,7 @@ export const ConfigPanel: React.FC = () => {
     <div className="h-full flex flex-col bg-black/40 backdrop-blur-xl">
       {/* Header */}
       <div className="px-4 py-5 border-b border-white/10">
-        <h1 className="text-2xl font-bold text-white">Pintura</h1>
+        <h1 className="text-2xl font-bold text-white">Image Studio</h1>
         <p className="text-xs text-white/50 mt-1">
           Descrição simples, crie imediatamente
         </p>

@@ -35,7 +35,6 @@ import { CampaignsList } from "../campaigns/CampaignsList";
 import { SchedulesListView } from "../schedules/SchedulesListView";
 import { QuickPostModal } from "../common/QuickPostModal";
 import { FloatingSidebar } from "../layout/FloatingSidebar";
-import { LimelightNav } from "../ui/limelight-nav";
 import { ImagePreviewModal } from "../image-preview/ImagePreviewModal";
 import { Zap, Layers, Image, Calendar, LayoutGrid, Video } from "lucide-react";
 import type { ScheduledPost } from "../../types";
@@ -760,36 +759,6 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
       </main>
 
       {/* Assistente removido do Dashboard - agora só existe dentro do AI Studio (ImagePreviewModal) */}
-
-      {/* Mobile Bottom Navigation */}
-      {(() => {
-        const mobileNavItems = [
-          { id: "campaign", icon: <Zap />, label: "Direct" },
-          { id: "campaigns", icon: <Layers />, label: "Campanhas" },
-          { id: "flyer", icon: <Image />, label: "Flyers" },
-          { id: "calendar", icon: <Calendar />, label: "Agenda" },
-          { id: "gallery", icon: <LayoutGrid />, label: "Galeria" },
-          { id: "playground", icon: <Video />, label: "Playground" },
-          { id: "image-playground", icon: <Image />, label: "Image Studio" },
-        ] as const;
-        const activeNavIndex = mobileNavItems.findIndex(item => item.id === activeView);
-        return (
-          <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden flex justify-center pb-[max(12px,env(safe-area-inset-bottom))] pt-3 pointer-events-none">
-            <div className="pointer-events-auto">
-              <LimelightNav
-                items={mobileNavItems.map(item => ({
-                  id: item.id,
-                  icon: item.icon,
-                  label: item.label,
-                  onClick: () => onViewChange(item.id as View),
-                }))}
-                activeIndex={activeNavIndex >= 0 ? activeNavIndex : 0}
-                onTabChange={(index) => onViewChange(mobileNavItems[index].id as View)}
-              />
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ImagePreviewModal for Tool Edit Approval */}
       {editingImage && (

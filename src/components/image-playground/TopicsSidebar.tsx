@@ -193,7 +193,7 @@ const TopicItem: React.FC<TopicItemProps> = ({
 
       {/* Hover Overlay with Actions */}
       <div
-        className={`absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent transition-opacity flex flex-col justify-end p-2 ${
+        className={`absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent transition-opacity flex flex-col justify-end p-2 pointer-events-none ${
           showMenu ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         }`}
       >
@@ -203,7 +203,7 @@ const TopicItem: React.FC<TopicItemProps> = ({
         </p>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 pointer-events-auto">
           <button
             onClick={(e) => {
               e.stopPropagation();

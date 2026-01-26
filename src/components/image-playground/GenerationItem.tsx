@@ -33,7 +33,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
   const [elapsedTime, setElapsedTime] = useState(0);
   const [previewImage, setPreviewImage] = useState<GalleryImage | null>(null);
   const { deleteGeneration } = useImagePlaygroundBatches(topicId);
-  const { reuseSeed, updateGeneration, setParam, topics, updateTopic: updateTopicStore } = useImagePlaygroundStore();
+  const { updateGeneration, setParam, topics, updateTopic: updateTopicStore } = useImagePlaygroundStore();
 
   // Get current topic to check if it needs a coverUrl
   const currentTopic = topics.find(t => t.id === topicId);
@@ -103,12 +103,6 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       window.open(generation.asset.url, '_blank');
     }
   }, [generation]);
-
-  const handleReuseSeed = useCallback(() => {
-    if (generation.seed) {
-      reuseSeed(generation.seed);
-    }
-  }, [generation.seed, reuseSeed]);
 
   const handleUseAsReference = useCallback(() => {
     if (generation.asset?.url) {
@@ -228,16 +222,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
             >
               <Download className="w-4 h-4 text-white" />
             </button>
-            {generation.seed && (
-              <button
-                onClick={handleReuseSeed}
-                className="p-2 bg-white/10 backdrop-blur-xl rounded-lg hover:bg-white/20 transition-colors"
-                title="Reusar seed"
-              >
-                <Hash className="w-4 h-4 text-white" />
-              </button>
-            )}
-            <button
+                        <button
               onClick={handleDelete}
               className="p-2 bg-white/10 backdrop-blur-xl rounded-lg hover:bg-red-500/30 transition-colors"
               title="Excluir"
