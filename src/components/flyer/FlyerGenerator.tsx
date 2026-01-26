@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import type {
   BrandProfile,
   TournamentEvent,
@@ -176,6 +176,21 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
       setGlobalStyleReference(null);
     }
   }, [selectedStyleReference, selectedImageModel, setGlobalStyleReference]);
+
+  // Memoized callback for handling flyer selection per day/period
+  const handleExternalSelectFlyer = useCallback(
+    (day: string, period: TimePeriod, flyerId: string | null) => {
+      if (!setSelectedDailyFlyerIds) return;
+      setSelectedDailyFlyerIds(prev => ({
+        ...prev,
+        [day]: {
+          ...(prev[day] || { ALL: null, MORNING: null, AFTERNOON: null, NIGHT: null, HIGHLIGHTS: null }),
+          [period]: flyerId,
+        },
+      }));
+    },
+    [setSelectedDailyFlyerIds]
+  );
 
   // Download all images as a ZIP file
   const handleDownloadAllImages = async (images: GalleryImage[], title: string) => {
@@ -819,15 +834,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     onSchedulePost={onSchedulePost}
                     onDownloadAll={handleDownloadAllImages}
                     externalSelectedFlyerId={selectedDailyFlyerIds[selectedDay]?.[p] || null}
-                    onExternalSelectFlyer={setSelectedDailyFlyerIds ? (flyerId) => {
-                      setSelectedDailyFlyerIds(prev => ({
-                        ...prev,
-                        [selectedDay]: {
-                          ...(prev[selectedDay] || { ALL: null, MORNING: null, AFTERNOON: null, NIGHT: null, HIGHLIGHTS: null }),
-                          [p]: flyerId,
-                        },
-                      }));
-                    } : undefined}
+                    onExternalSelectFlyer={setSelectedDailyFlyerIds ? (flyerId) => handleExternalSelectFlyer(selectedDay, p, flyerId) : undefined}
                   />
                 ))}
             </div>
