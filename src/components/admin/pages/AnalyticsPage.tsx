@@ -16,6 +16,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts';
+import { StatsCard } from '../common/StatsCard';
 
 interface AnalyticsData {
   total_campaigns: number;
@@ -150,31 +151,61 @@ export function AnalyticsPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
-          <div className="text-[13px] text-white/40 mb-1">Total de Campanhas</div>
-          <div className="text-2xl font-semibold text-white/90">
-            {data?.total_campaigns?.toLocaleString('pt-BR') || 0}
-          </div>
-        </div>
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
-          <div className="text-[13px] text-white/40 mb-1">Total de Imagens</div>
-          <div className="text-2xl font-semibold text-white/90">
-            {data?.total_images?.toLocaleString('pt-BR') || 0}
-          </div>
-        </div>
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
-          <div className="text-[13px] text-white/40 mb-1">Total de Flyers</div>
-          <div className="text-2xl font-semibold text-white/90">
-            {data?.total_flyers?.toLocaleString('pt-BR') || 0}
-          </div>
-        </div>
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
-          <div className="text-[13px] text-white/40 mb-1">Custo IA</div>
-          <div className="text-2xl font-semibold text-white/90">
-            ${((data?.total_ai_cost_cents || 0) / 100).toFixed(2)}
-          </div>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <StatsCard
+          title="Total de Campanhas"
+          value={data?.total_campaigns?.toLocaleString('pt-BR') || 0}
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          }
+          color="amber"
+        />
+        <StatsCard
+          title="Total de Imagens"
+          value={data?.total_images?.toLocaleString('pt-BR') || 0}
+          subtitle="Imagens geradas por IA"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          }
+          color="green"
+        />
+        <StatsCard
+          title="Total de Flyers"
+          value={data?.total_flyers?.toLocaleString('pt-BR') || 0}
+          subtitle="Flyers de torneio"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+            </svg>
+          }
+          color="default"
+        />
+        <StatsCard
+          title="Taxa de Sucesso"
+          value={`${((data?.success_rate || 0) * 100).toFixed(1)}%`}
+          subtitle="Geração de imagens"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+          color="green"
+        />
+        <StatsCard
+          title="Custo IA"
+          value={`$${((data?.total_ai_cost_cents || 0) / 100).toFixed(2)}`}
+          subtitle="Custos totais"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+          color="default"
+        />
       </div>
 
       {/* Campaigns Chart */}
