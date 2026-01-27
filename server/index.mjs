@@ -700,6 +700,104 @@ app.get("/api/admin/analytics", requireSuperAdmin, async (req, res) => {
   }
 });
 
+// Admin: Export analytics data to CSV
+app.get("/api/admin/analytics/export", requireSuperAdmin, async (req, res) => {
+  try {
+    const sql = getSql();
+    const { period = 'month', format = 'csv' } = req.query;
+
+    // Calculate date range based on period
+    let intervalDays;
+    switch (period) {
+      case 'day':
+        intervalDays = 1;
+        break;
+      case 'week':
+        intervalDays = 7;
+        break;
+      case 'month':
+        intervalDays = 30;
+        break;
+      default:
+        intervalDays = 30;
+    }
+
+    // Query data for export
+    const exportData = await sql`
+      SELECT
+        DATE(c.created_at) as date,
+        COALESCE(c.organization_id, 'personal') as organization_id,
+        COUNT(DISTINCT c.id) as campaigns,
+        COUNT(DISTINCT gi.id) as images,
+        COALESCE(SUM(aul.estimated_cost_cents), 0) as cost_cents,
+        COALESCE(SUM(aul.latency_ms), 0) as latency_ms
+      FROM campaigns c
+      LEFT JOIN gallery_images gi ON DATE(gi.created_at) = DATE(c.created_at)
+        AND (gi.organization_id = c.organization_id OR (gi.organization_id IS NULL AND c.organization_id IS NULL))
+      LEFT JOIN api_usage_logs aul ON DATE(aul.created_at) = DATE(c.created_at)
+        AND (aul.organization_id = c.organization_id OR (aul.organization_id IS NULL AND c.organization_id IS NULL))
+      WHERE c.created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}
+      GROUP BY DATE(c.created_at), c.organization_id
+      ORDER BY date DESC, organization_id ASC
+    `;
+
+    if (format === 'json') {
+      // Return JSON format
+      const jsonData = exportData.map(row => {
+        const campaigns = parseInt(row.campaigns || 0);
+        const latencyMs = parseInt(row.latency_ms || 0);
+        const aiTimeHours = latencyMs / (1000 * 60 * 60);
+        const manualTimeHours = campaigns * 2;
+        const timeSavedHours = Math.max(0, manualTimeHours - aiTimeHours);
+
+        return {
+          date: row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date),
+          organization: row.organization_id,
+          campaigns: parseInt(row.campaigns || 0),
+          images: parseInt(row.images || 0),
+          cost_usd: (parseInt(row.cost_cents || 0) / 100).toFixed(2),
+          time_saved_hours: Math.round(timeSavedHours * 100) / 100
+        };
+      });
+
+      return res.json(jsonData);
+    }
+
+    // Generate CSV format
+    const csvRows = [];
+
+    // CSV header
+    csvRows.push('Date,Organization,Campaigns,Images,Cost (USD),Time Saved (Hours)');
+
+    // CSV data rows
+    for (const row of exportData) {
+      const campaigns = parseInt(row.campaigns || 0);
+      const latencyMs = parseInt(row.latency_ms || 0);
+      const aiTimeHours = latencyMs / (1000 * 60 * 60);
+      const manualTimeHours = campaigns * 2;
+      const timeSavedHours = Math.max(0, manualTimeHours - aiTimeHours);
+
+      const date = row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date);
+      const organization = row.organization_id;
+      const images = parseInt(row.images || 0);
+      const costUsd = (parseInt(row.cost_cents || 0) / 100).toFixed(2);
+      const timeSaved = Math.round(timeSavedHours * 100) / 100;
+
+      csvRows.push(`${date},${organization},${campaigns},${images},${costUsd},${timeSaved}`);
+    }
+
+    const csv = csvRows.join('\n');
+
+    // Set CSV headers
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=analytics.csv');
+    res.send(csv);
+  } catch (error) {
+    console.error('[Admin] Analytics export error:', error);
+    res.status(500).json({ error: 'Failed to export analytics' });
+  }
+});
+
 // Admin: Get AI usage analytics
 app.get("/api/admin/usage", requireSuperAdmin, async (req, res) => {
   try {
