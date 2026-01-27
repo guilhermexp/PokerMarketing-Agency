@@ -11,6 +11,7 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { parseApiError } from '../utils/errorMessages';
 
 // =============================================================================
 // Types
@@ -199,6 +200,18 @@ export const useToast = () => {
       addToast({ type: 'warning', message, duration }),
     info: (message: string, duration?: number) =>
       addToast({ type: 'info', message, duration }),
+    /**
+     * Converts an API error into a user-friendly toast notification
+     * Uses parseApiError to extract message and suggested actions
+     */
+    errorFromApi: (error: unknown, duration?: number) => {
+      const parsed = parseApiError(error);
+      const message = parsed.action
+        ? `${parsed.message}. ${parsed.action}`
+        : parsed.message;
+
+      return addToast({ type: 'error', message, duration });
+    },
     dismiss: removeToast,
   };
 };
