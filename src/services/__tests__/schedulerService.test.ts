@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import {
   saveScheduledPost,
   updateScheduledPost,
@@ -8,6 +9,15 @@ import {
   getOverduePosts,
 } from '../schedulerService';
 import type { ScheduledPost } from '../../types';
+import type {
+  MockIDBDatabase,
+  MockIDBRequest,
+  MockIDBObjectStore,
+  MockIDBTransaction,
+} from '../../__tests__/test-utils';
+import {
+  createMockIDBRequest,
+} from '../../__tests__/test-utils';
 
 vi.mock('../storageService', () => ({
   initDB: vi.fn(),
@@ -16,19 +26,31 @@ vi.mock('../storageService', () => ({
 import { initDB } from '../storageService';
 
 describe('schedulerService', () => {
-  let mockDB: any;
+  let mockDB: MockIDBDatabase;
 
   beforeEach(() => {
-    mockDB = { transaction: vi.fn() };
-    (initDB as any).mockResolvedValue(mockDB);
+    mockDB = { transaction: vi.fn() } as MockIDBDatabase;
+    (initDB as Mock).mockResolvedValue(mockDB);
     vi.clearAllMocks();
   });
 
   describe('saveScheduledPost', () => {
     it('should save post with generated ID', async () => {
-      const mockRequest = { onsuccess: null as any, onerror: null as any };
-      const mockStore = { add: vi.fn().mockReturnValue(mockRequest) };
-      const mockTransaction = { objectStore: vi.fn().mockReturnValue(mockStore) };
+      const mockRequest: MockIDBRequest = createMockIDBRequest();
+      const mockStore: MockIDBObjectStore = {
+        add: vi.fn().mockReturnValue(mockRequest),
+        put: vi.fn(),
+        delete: vi.fn(),
+        get: vi.fn(),
+        getAll: vi.fn(),
+        clear: vi.fn(),
+        createIndex: vi.fn(),
+      };
+      const mockTransaction: MockIDBTransaction = {
+        objectStore: vi.fn().mockReturnValue(mockStore),
+        oncomplete: null,
+        onerror: null,
+      };
 
       mockDB.transaction.mockReturnValue(mockTransaction);
 
@@ -76,13 +98,22 @@ describe('schedulerService', () => {
         updatedAt: Date.now() - 1000,
       };
 
-      const mockGetRequest = { result: existingPost, onsuccess: null as any, onerror: null as any };
-      const mockPutRequest = { onsuccess: null as any, onerror: null as any };
-      const mockStore = {
-        get: vi.fn().mockReturnValue(mockGetRequest),
+      const mockGetRequest: MockIDBRequest<ScheduledPost> = createMockIDBRequest(existingPost);
+      const mockPutRequest: MockIDBRequest = createMockIDBRequest();
+      const mockStore: MockIDBObjectStore = {
+        add: vi.fn(),
         put: vi.fn().mockReturnValue(mockPutRequest),
+        delete: vi.fn(),
+        get: vi.fn().mockReturnValue(mockGetRequest),
+        getAll: vi.fn(),
+        clear: vi.fn(),
+        createIndex: vi.fn(),
       };
-      const mockTransaction = { objectStore: vi.fn().mockReturnValue(mockStore) };
+      const mockTransaction: MockIDBTransaction = {
+        objectStore: vi.fn().mockReturnValue(mockStore),
+        oncomplete: null,
+        onerror: null,
+      };
 
       mockDB.transaction.mockReturnValue(mockTransaction);
 
@@ -100,9 +131,21 @@ describe('schedulerService', () => {
 
   describe('deleteScheduledPost', () => {
     it('should delete post', async () => {
-      const mockRequest = { onsuccess: null as any, onerror: null as any };
-      const mockStore = { delete: vi.fn().mockReturnValue(mockRequest) };
-      const mockTransaction = { objectStore: vi.fn().mockReturnValue(mockStore) };
+      const mockRequest: MockIDBRequest = createMockIDBRequest();
+      const mockStore: MockIDBObjectStore = {
+        add: vi.fn(),
+        put: vi.fn(),
+        delete: vi.fn().mockReturnValue(mockRequest),
+        get: vi.fn(),
+        getAll: vi.fn(),
+        clear: vi.fn(),
+        createIndex: vi.fn(),
+      };
+      const mockTransaction: MockIDBTransaction = {
+        objectStore: vi.fn().mockReturnValue(mockStore),
+        oncomplete: null,
+        onerror: null,
+      };
 
       mockDB.transaction.mockReturnValue(mockTransaction);
 
@@ -121,9 +164,21 @@ describe('schedulerService', () => {
         { id: '2', scheduledTimestamp: 1000 } as ScheduledPost,
       ];
 
-      const mockRequest = { result: mockPosts, onsuccess: null as any, onerror: null as any };
-      const mockStore = { getAll: vi.fn().mockReturnValue(mockRequest) };
-      const mockTransaction = { objectStore: vi.fn().mockReturnValue(mockStore) };
+      const mockRequest: MockIDBRequest<ScheduledPost[]> = createMockIDBRequest(mockPosts);
+      const mockStore: MockIDBObjectStore = {
+        add: vi.fn(),
+        put: vi.fn(),
+        delete: vi.fn(),
+        get: vi.fn(),
+        getAll: vi.fn().mockReturnValue(mockRequest),
+        clear: vi.fn(),
+        createIndex: vi.fn(),
+      };
+      const mockTransaction: MockIDBTransaction = {
+        objectStore: vi.fn().mockReturnValue(mockStore),
+        oncomplete: null,
+        onerror: null,
+      };
 
       mockDB.transaction.mockReturnValue(mockTransaction);
 
@@ -146,9 +201,21 @@ describe('schedulerService', () => {
         { id: '2', status: 'scheduled', scheduledTimestamp: now + 90 * 60 * 1000 } as ScheduledPost,
       ];
 
-      const mockRequest = { result: mockPosts, onsuccess: null as any, onerror: null as any };
-      const mockStore = { getAll: vi.fn().mockReturnValue(mockRequest) };
-      const mockTransaction = { objectStore: vi.fn().mockReturnValue(mockStore) };
+      const mockRequest: MockIDBRequest<ScheduledPost[]> = createMockIDBRequest(mockPosts);
+      const mockStore: MockIDBObjectStore = {
+        add: vi.fn(),
+        put: vi.fn(),
+        delete: vi.fn(),
+        get: vi.fn(),
+        getAll: vi.fn().mockReturnValue(mockRequest),
+        clear: vi.fn(),
+        createIndex: vi.fn(),
+      };
+      const mockTransaction: MockIDBTransaction = {
+        objectStore: vi.fn().mockReturnValue(mockStore),
+        oncomplete: null,
+        onerror: null,
+      };
 
       mockDB.transaction.mockReturnValue(mockTransaction);
 
@@ -173,9 +240,21 @@ describe('schedulerService', () => {
         { id: '2', status: 'scheduled', scheduledTimestamp: now + 3600000 } as ScheduledPost,
       ];
 
-      const mockRequest = { result: mockPosts, onsuccess: null as any, onerror: null as any };
-      const mockStore = { getAll: vi.fn().mockReturnValue(mockRequest) };
-      const mockTransaction = { objectStore: vi.fn().mockReturnValue(mockStore) };
+      const mockRequest: MockIDBRequest<ScheduledPost[]> = createMockIDBRequest(mockPosts);
+      const mockStore: MockIDBObjectStore = {
+        add: vi.fn(),
+        put: vi.fn(),
+        delete: vi.fn(),
+        get: vi.fn(),
+        getAll: vi.fn().mockReturnValue(mockRequest),
+        clear: vi.fn(),
+        createIndex: vi.fn(),
+      };
+      const mockTransaction: MockIDBTransaction = {
+        objectStore: vi.fn().mockReturnValue(mockStore),
+        oncomplete: null,
+        onerror: null,
+      };
 
       mockDB.transaction.mockReturnValue(mockTransaction);
 
