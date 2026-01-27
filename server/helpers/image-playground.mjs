@@ -7,6 +7,11 @@
  */
 
 import { put } from "@vercel/blob";
+import sharp from "sharp";
+
+// Thumbnail settings
+const THUMBNAIL_WIDTH = 400;
+const THUMBNAIL_QUALITY = 80;
 
 // =============================================================================
 // Topics
@@ -550,6 +555,26 @@ async function processImageGeneration(sql, taskId, generationId, params, genai) 
       contentType: mimeType,
     });
 
+    // Generate and upload thumbnail for faster gallery loading
+    let thumbnailUrl = null;
+    try {
+      const thumbnailBuffer = await sharp(buffer)
+        .resize(THUMBNAIL_WIDTH, null, { withoutEnlargement: true })
+        .jpeg({ quality: THUMBNAIL_QUALITY })
+        .toBuffer();
+
+      const thumbnailFilename = `playground/thumb-${generationId}.jpg`;
+      const thumbnailBlob = await put(thumbnailFilename, thumbnailBuffer, {
+        access: 'public',
+        contentType: 'image/jpeg',
+      });
+      thumbnailUrl = thumbnailBlob.url;
+      console.log(`[ImagePlayground] Thumbnail generated: ${thumbnailUrl}`);
+    } catch (thumbError) {
+      console.warn(`[ImagePlayground] Failed to generate thumbnail:`, thumbError.message);
+      // Continue without thumbnail - will use full image
+    }
+
     // Get actual dimensions from aspect ratio and size
     const dimensions = getActualDimensions(params.aspectRatio || '1:1', params.imageSize || '1K');
 
@@ -609,6 +634,7 @@ async function processImageGeneration(sql, taskId, generationId, params, genai) 
           user_id,
           organization_id,
           src_url,
+          thumbnail_url,
           prompt,
           source,
           model,
@@ -620,6 +646,7 @@ async function processImageGeneration(sql, taskId, generationId, params, genai) 
           ${generationInfo.user_id},
           ${generationInfo.organization_id},
           ${blob.url},
+          ${thumbnailUrl},
           ${generationInfo.prompt},
           'playground',
           ${generationInfo.model},
