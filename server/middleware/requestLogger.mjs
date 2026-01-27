@@ -67,17 +67,22 @@ function customRequestSerializer(req) {
 /**
  * Custom response serializer
  * Includes response status and timing information
- * @param {Object} res - Express response object
+ * @param {Object} res - Express response object (or serialized version)
  * @returns {Object}
  */
 function customResponseSerializer(res) {
+  // pino-http may pass a serialized object without getHeader method
+  const hasGetHeader = typeof res.getHeader === "function";
+
   return {
     statusCode: res.statusCode,
-    // Response headers can be useful for debugging
-    headers: {
-      "content-type": res.getHeader("content-type"),
-      "content-length": res.getHeader("content-length"),
-    },
+    // Response headers can be useful for debugging (only if available)
+    headers: hasGetHeader
+      ? {
+          "content-type": res.getHeader("content-type"),
+          "content-length": res.getHeader("content-length"),
+        }
+      : undefined,
   };
 }
 
