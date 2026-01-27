@@ -404,7 +404,7 @@ async function setRLSContext(sql, userId, organizationId = null) {
   } catch (error) {
     // Don't fail the request if RLS context can't be set
     // The application-level security (WHERE clauses) will still work
-    console.warn("[RLS] Failed to set context:", error.message);
+    logger.warn({ err: error, userId, organizationId }, "Failed to set RLS context");
   }
 }
 
@@ -4769,7 +4769,7 @@ app.post("/api/ai/image", async (req, res) => {
           allProductImages.unshift({ base64: logoBase64, mimeType });
         }
       } catch (err) {
-        console.warn("[Image API] Failed to include brand logo:", err.message);
+        logger.warn({ err, brandProfileId: brandProfile.id }, "Failed to include brand logo in image generation");
       }
     }
 
@@ -6679,7 +6679,7 @@ app.post("/api/image-playground/generate", async (req, res) => {
               productImages.push({ base64: logoBase64, mimeType });
             }
           } catch (err) {
-            console.warn("[ImagePlayground] Failed to include brand logo:", err.message);
+            logger.warn({ err, brandProfileId: mappedBrandProfile.id }, "Failed to include brand logo in image playground");
           }
         }
 
