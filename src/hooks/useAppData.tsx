@@ -107,8 +107,12 @@ export function useInitialData(
   organizationId?: string | null,
   clerkUserId?: string | null,
 ) {
+  // DEBUG: Log SWR key to identify double-fetch cause
+  const swrKey = userId ? KEYS.initialData(userId, organizationId) : null;
+  console.debug("[SWR] useInitialData called with key:", swrKey);
+
   const { data, error, isLoading, mutate } = useSWR(
-    userId ? KEYS.initialData(userId, organizationId) : null,
+    swrKey,
     async () => {
       console.debug("[SWR] Fetching all initial data via /api/db/init...");
       const result = await getInitialData(userId!, organizationId, clerkUserId || undefined);
