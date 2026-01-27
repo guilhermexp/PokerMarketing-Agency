@@ -59,6 +59,9 @@ import {
   createImageBatch,
   generateTopicTitle,
 } from "./helpers/image-playground.mjs";
+import { requestLogger } from "./middleware/requestLogger.mjs";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler.mjs";
+import logger from "./lib/logger.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -68,11 +71,13 @@ const PORT = process.env.PORT || 3002;
 
 // Surface fatal errors during dev so the API doesn't silently exit.
 process.on("uncaughtException", (error) => {
-  console.error("[Dev API] uncaughtException:", error);
+  logger.fatal({ err: error }, "Uncaught exception in Production API");
+  process.exit(1); // Exit with error code
 });
 
 process.on("unhandledRejection", (error) => {
-  console.error("[Dev API] unhandledRejection:", error);
+  logger.fatal({ err: error }, "Unhandled rejection in Production API");
+  process.exit(1); // Exit with error code
 });
 
 app.use(cors());
@@ -106,6 +111,9 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// Request logging middleware - logs all HTTP requests with structured format
+app.use(requestLogger);
 
 // Helper to get Clerk org context from request
 function getClerkOrgContext(req) {
@@ -6975,6 +6983,15 @@ app.use((req, res, next) => {
   // Serve index.html for all other routes (SPA routing)
   res.sendFile(path.join(distPath, "index.html"));
 });
+
+// ============================================================================
+// ERROR HANDLING MIDDLEWARE
+// ============================================================================
+// 404 handler - catches undefined routes
+app.use(notFoundHandler);
+
+// Global error handler - catches all errors
+app.use(errorHandler);
 
 const startup = async () => {
   if (DATABASE_URL) {
