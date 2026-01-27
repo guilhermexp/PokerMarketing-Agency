@@ -393,7 +393,9 @@ async function processImageGeneration(sql, taskId, generationId, params, genai) 
       prompt: params.prompt?.substring(0, 50) + '...',
       aspectRatio: params.aspectRatio,
       imageSize: params.imageSize,
-      hasReferenceImage: !!params.imageUrl,
+      hasReferenceImages: !!params.referenceImages?.length,
+      referenceImagesCount: params.referenceImages?.length || 0,
+      hasLegacyImageUrl: !!params.imageUrl,
       hasProductImages: !!params.productImages?.length,
       hasBrandProfile: !!params.brandProfile,
     });
@@ -401,8 +403,43 @@ async function processImageGeneration(sql, taskId, generationId, params, genai) 
     // Build content parts (same structure as generateGeminiImage in dev-api.mjs)
     const parts = [{ text: params.prompt }];
 
-    // Add reference image if provided (for image-to-image editing)
-    if (params.imageUrl) {
+    // Add multiple reference images if provided (NEW - array of up to 14 images)
+    if (params.referenceImages && Array.isArray(params.referenceImages) && params.referenceImages.length > 0) {
+      for (const refImage of params.referenceImages) {
+        try {
+          let base64Data = refImage.dataUrl;
+          let mimeType = refImage.mimeType || 'image/png';
+
+          // If it's a data URL, extract base64 and mime type
+          if (refImage.dataUrl.startsWith('data:')) {
+            const matches = refImage.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (matches) {
+              mimeType = matches[1];
+              base64Data = matches[2];
+            }
+          } else if (refImage.dataUrl.startsWith('http')) {
+            // Fetch external image and convert to base64
+            const response = await fetch(refImage.dataUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            base64Data = Buffer.from(arrayBuffer).toString('base64');
+            mimeType = response.headers.get('content-type') || 'image/png';
+          }
+
+          parts.push({
+            inlineData: {
+              data: base64Data,
+              mimeType,
+            }
+          });
+        } catch (imgError) {
+          console.warn(`[ImagePlayground] Failed to process reference image ${refImage.id}:`, imgError.message);
+          // Continue with other images
+        }
+      }
+      console.log(`[ImagePlayground] Added ${params.referenceImages.length} reference images`);
+    }
+    // Fallback: Add single reference image if provided (DEPRECATED - for backwards compatibility)
+    else if (params.imageUrl) {
       try {
         let base64Data = params.imageUrl;
         let mimeType = 'image/png';
@@ -429,7 +466,7 @@ async function processImageGeneration(sql, taskId, generationId, params, genai) 
           }
         });
 
-        console.log(`[ImagePlayground] Added reference image (${mimeType})`);
+        console.log(`[ImagePlayground] Added legacy reference image (${mimeType})`);
       } catch (imgError) {
         console.warn(`[ImagePlayground] Failed to process reference image:`, imgError.message);
         // Continue without reference image

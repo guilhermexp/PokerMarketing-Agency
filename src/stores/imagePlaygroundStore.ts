@@ -11,6 +11,12 @@ import { devtools, persist } from 'zustand/middleware';
 // Types
 // =============================================================================
 
+export interface ReferenceImage {
+  id: string;        // UUID for unique identification
+  dataUrl: string;   // data:image/...;base64,...
+  mimeType: string;  // image/png, image/jpeg, etc.
+}
+
 export interface ImageGenerationTopic {
   id: string;
   userId: string;
@@ -61,7 +67,8 @@ export interface RuntimeImageGenParams {
   quality?: string;
   aspectRatio?: string;
   imageSize?: '1K' | '2K' | '4K';
-  imageUrl?: string; // Reference image URL
+  imageUrl?: string; // DEPRECATED - kept for backwards compatibility
+  referenceImages?: ReferenceImage[]; // NEW - array of up to 14 reference images
   [key: string]: unknown;
 }
 
@@ -120,6 +127,10 @@ interface GenerationConfigActions {
   reuseSettings: (model: string, provider: string, settings: Record<string, unknown>) => void;
   reuseSeed: (seed: number) => void;
   toggleBrandProfile: () => void;
+  // Reference images actions
+  addReferenceImage: (image: ReferenceImage) => void;
+  removeReferenceImage: (id: string) => void;
+  clearReferenceImages: () => void;
 }
 
 interface GenerationTopicActions {
@@ -321,6 +332,37 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
 
         toggleBrandProfile: () => {
           set({ useBrandProfile: !get().useBrandProfile });
+        },
+
+        // Reference images actions
+        addReferenceImage: (image) => {
+          const current = get().parameters.referenceImages || [];
+          if (current.length >= 14) return; // Max 14 images
+          set({
+            parameters: {
+              ...get().parameters,
+              referenceImages: [...current, image],
+            },
+          });
+        },
+
+        removeReferenceImage: (id) => {
+          const current = get().parameters.referenceImages || [];
+          set({
+            parameters: {
+              ...get().parameters,
+              referenceImages: current.filter((img) => img.id !== id),
+            },
+          });
+        },
+
+        clearReferenceImages: () => {
+          set({
+            parameters: {
+              ...get().parameters,
+              referenceImages: [],
+            },
+          });
         },
 
         // =============================================================================

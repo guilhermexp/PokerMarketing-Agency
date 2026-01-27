@@ -255,6 +255,8 @@ export function useCreateImage() {
           quality: parameters.quality,
           aspectRatio: parameters.aspectRatio,
           imageSize: parameters.imageSize,
+          // Send referenceImages array (new approach), fallback to imageUrl for compatibility
+          referenceImages: parameters.referenceImages,
           imageUrl: parameters.imageUrl,
           useBrandProfile,
         },

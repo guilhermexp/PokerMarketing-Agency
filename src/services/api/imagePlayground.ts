@@ -28,6 +28,12 @@ export interface UpdateTopicInput {
   coverUrl?: string;
 }
 
+export interface ReferenceImageInput {
+  id: string;
+  dataUrl: string;
+  mimeType: string;
+}
+
 export interface CreateImageInput {
   topicId: string;
   provider: string;
@@ -40,7 +46,8 @@ export interface CreateImageInput {
     seed?: number;
     quality?: string;
     aspectRatio?: string;
-    imageUrl?: string;
+    imageUrl?: string; // DEPRECATED - kept for backwards compatibility
+    referenceImages?: ReferenceImageInput[]; // NEW - array of up to 14 reference images
     [key: string]: unknown;
   };
 }

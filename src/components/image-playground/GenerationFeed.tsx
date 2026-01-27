@@ -1,9 +1,10 @@
 /**
  * GenerationFeed
  * Scrollable list of generation batches for the active topic
+ * Chat-like layout: newest items at bottom, auto-scroll on new content
  */
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { BatchItem } from './BatchItem';
 import { useImagePlaygroundBatches } from '../../hooks/useImagePlayground';
 import { Loader } from '../common/Loader';
@@ -14,6 +15,31 @@ interface GenerationFeedProps {
 
 export const GenerationFeed: React.FC<GenerationFeedProps> = ({ topicId }) => {
   const { batches, isLoading } = useImagePlaygroundBatches(topicId);
+  const feedEndRef = useRef<HTMLDivElement>(null);
+  const hasInitializedRef = useRef(false);
+  const prevBatchCountRef = useRef(0);
+
+  // Auto-scroll to bottom when new batches are added or on initial load
+  useEffect(() => {
+    if (batches.length > 0) {
+      if (!hasInitializedRef.current) {
+        // Initial load - instant scroll to bottom
+        feedEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        hasInitializedRef.current = true;
+        prevBatchCountRef.current = batches.length;
+      } else if (batches.length > prevBatchCountRef.current) {
+        // New batch added - smooth scroll to bottom
+        feedEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        prevBatchCountRef.current = batches.length;
+      }
+    }
+  }, [batches.length]);
+
+  // Reset when topic changes
+  useEffect(() => {
+    hasInitializedRef.current = false;
+    prevBatchCountRef.current = 0;
+  }, [topicId]);
 
   if (isLoading) {
     return (
@@ -31,11 +57,17 @@ export const GenerationFeed: React.FC<GenerationFeedProps> = ({ topicId }) => {
     return null;
   }
 
+  // Reverse the array to show oldest first (top) and newest last (bottom)
+  // This creates a chat-like experience
+  const reversedBatches = [...batches].reverse();
+
   return (
     <div className="p-6 space-y-6">
-      {batches.map((batch) => (
+      {reversedBatches.map((batch) => (
         <BatchItem key={batch.id} batch={batch} topicId={topicId} />
       ))}
+      {/* Scroll anchor at the bottom */}
+      <div ref={feedEndRef} />
     </div>
   );
 };

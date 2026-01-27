@@ -1,6 +1,6 @@
 /**
  * ConfigPanel
- * Left sidebar with model selection, reference image, resolution, proportions, and quantity
+ * Left sidebar with model selection, reference images (up to 14), resolution, proportions, and quantity
  * Design based on LobeChat reference
  */
 
@@ -13,7 +13,7 @@ import {
   X,
   Palette,
 } from 'lucide-react';
-import { useImagePlaygroundStore } from '../../stores/imagePlaygroundStore';
+import { useImagePlaygroundStore, type ReferenceImage } from '../../stores/imagePlaygroundStore';
 
 // =============================================================================
 // Model Options - Only Gemini 3 Pro Image Preview
@@ -48,6 +48,7 @@ const ASPECT_RATIOS = [
 ];
 
 const IMAGE_NUM_OPTIONS = [1, 2, 4, 8];
+const MAX_REFERENCE_IMAGES = 14;
 
 // =============================================================================
 // Component
@@ -65,13 +66,16 @@ export const ConfigPanel: React.FC = () => {
     activeImageSize,
     useBrandProfile,
     setModelAndProvider,
-    setParam,
     setImageNum,
     toggleAspectRatioLock,
     setAspectRatio,
     setImageSize,
     toggleBrandProfile,
+    addReferenceImage,
+    removeReferenceImage,
   } = useImagePlaygroundStore();
+
+  const referenceImages = parameters.referenceImages || [];
 
   const selectedModel = MODEL_OPTIONS.find((m) => m.model === model);
 
@@ -107,45 +111,75 @@ export const ConfigPanel: React.FC = () => {
   );
 
   const handleReferenceImageClick = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
+    if (referenceImages.length < MAX_REFERENCE_IMAGES) {
+      fileInputRef.current?.click();
+    }
+  }, [referenceImages.length]);
+
+  const processFile = useCallback(
+    (file: File) => {
+      if (referenceImages.length >= MAX_REFERENCE_IMAGES) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        const newImage: ReferenceImage = {
+          id: crypto.randomUUID(),
+          dataUrl,
+          mimeType: file.type || 'image/png',
+        };
+        addReferenceImage(newImage);
+      };
+      reader.readAsDataURL(file);
+    },
+    [referenceImages.length, addReferenceImage]
+  );
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const dataUrl = event.target?.result as string;
-          setParam('imageUrl', dataUrl);
-        };
-        reader.readAsDataURL(file);
+      const files = e.target.files;
+      if (!files) return;
+
+      // Process multiple files
+      const remainingSlots = MAX_REFERENCE_IMAGES - referenceImages.length;
+      const filesToProcess = Math.min(files.length, remainingSlots);
+
+      for (let i = 0; i < filesToProcess; i++) {
+        processFile(files[i]);
+      }
+
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
     },
-    [setParam]
+    [referenceImages.length, processFile]
   );
 
-  const handleRemoveReferenceImage = useCallback(() => {
-    setParam('imageUrl', undefined);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }, [setParam]);
+  const handleRemoveReferenceImage = useCallback(
+    (id: string) => {
+      removeReferenceImage(id);
+    },
+    [removeReferenceImage]
+  );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const file = e.dataTransfer.files?.[0];
-      if (file && file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const dataUrl = event.target?.result as string;
-          setParam('imageUrl', dataUrl);
-        };
-        reader.readAsDataURL(file);
+      const files = e.dataTransfer.files;
+      if (!files) return;
+
+      const remainingSlots = MAX_REFERENCE_IMAGES - referenceImages.length;
+      const filesToProcess = Math.min(files.length, remainingSlots);
+
+      for (let i = 0; i < filesToProcess; i++) {
+        const file = files[i];
+        if (file.type.startsWith('image/')) {
+          processFile(file);
+        }
       }
     },
-    [setParam]
+    [referenceImages.length, processFile]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -207,31 +241,69 @@ export const ConfigPanel: React.FC = () => {
           </button>
         </div>
 
-        {/* Reference Image */}
+        {/* Reference Images (Multiple) */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-white/80">
-            Imagem de Referência
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-white/80">
+              Imagens de Referência
+            </label>
+            <span className="text-xs text-white/50">
+              {referenceImages.length}/{MAX_REFERENCE_IMAGES}
+            </span>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            multiple
             onChange={handleFileChange}
             className="hidden"
           />
-          {parameters.imageUrl ? (
-            <div className="relative rounded-xl overflow-hidden border border-white/10">
-              <img
-                src={parameters.imageUrl}
-                alt="Reference"
-                className="w-full h-40 object-cover"
-              />
-              <button
-                onClick={handleRemoveReferenceImage}
-                className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-lg hover:bg-black/80 transition-colors"
+
+          {/* Grid of reference images */}
+          {referenceImages.length > 0 ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-4 gap-2">
+                {referenceImages.map((img) => (
+                  <div
+                    key={img.id}
+                    className="relative aspect-square rounded-lg overflow-hidden border border-white/10 group"
+                  >
+                    <img
+                      src={img.dataUrl}
+                      alt="Reference"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      onClick={() => handleRemoveReferenceImage(img.id)}
+                      className="absolute top-1 right-1 p-1 bg-black/60 rounded-md hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Add button when under limit */}
+                {referenceImages.length < MAX_REFERENCE_IMAGES && (
+                  <div
+                    onClick={handleReferenceImageClick}
+                    className="aspect-square rounded-lg border-2 border-dashed border-white/10 flex items-center justify-center cursor-pointer hover:border-white/20 hover:bg-white/5 transition-colors"
+                  >
+                    <Plus className="w-5 h-5 text-white/40" />
+                  </div>
+                )}
+              </div>
+
+              {/* Drop zone hint */}
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                className="border border-dashed border-white/10 rounded-lg p-2 text-center"
               >
-                <X className="w-4 h-4 text-white" />
-              </button>
+                <p className="text-[10px] text-white/30">
+                  Arraste mais imagens aqui
+                </p>
+              </div>
             </div>
           ) : (
             <div
@@ -245,7 +317,7 @@ export const ConfigPanel: React.FC = () => {
                 Clique ou arraste para enviar imagens
               </p>
               <p className="text-[10px] text-white/30">
-                Suporta seleção de múltiplas imagens
+                Suporta até {MAX_REFERENCE_IMAGES} imagens
               </p>
             </div>
           )}
