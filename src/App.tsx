@@ -222,6 +222,16 @@ function AppContent() {
   const { organization, isLoaded: orgLoaded } = useOrganization();
   const organizationId = organization?.id || null;
 
+  // DEBUG: Track org loading state changes to identify double-fetch cause
+  useEffect(() => {
+    console.debug("[App] Org state:", {
+      orgLoaded,
+      hasOrganization: !!organization,
+      organizationId,
+      clerkUserId,
+    });
+  }, [orgLoaded, organization, organizationId, clerkUserId]);
+
   // Track if initial data load has happened (prevents hot reload re-fetches)
   const hasInitializedRef = useRef(false);
   const initScopeRef = useRef<{
