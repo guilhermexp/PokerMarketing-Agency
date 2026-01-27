@@ -5,6 +5,17 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from 'recharts';
 
 interface AnalyticsData {
   total_campaigns: number;
@@ -87,6 +98,26 @@ export function AnalyticsPage() {
     );
   }
 
+  // Transform campaigns data for chart
+  const campaignsChartData = (data?.campaigns_per_day || []).map((item) => ({
+    date: new Date(item.date).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      ...(period === 'day' ? { hour: '2-digit' } : {})
+    }),
+    campanhas: parseInt(item.count) || 0,
+  }));
+
+  // Transform images data for chart
+  const imagesChartData = (data?.images_per_day || []).map((item) => ({
+    date: new Date(item.date).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      ...(period === 'day' ? { hour: '2-digit' } : {})
+    }),
+    imagens: parseInt(item.count) || 0,
+  }));
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -118,23 +149,134 @@ export function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Placeholder Content */}
-      <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-8 text-center">
-        <div className="text-white/40 text-[13px]">
-          <div className="mb-4">
-            <svg className="w-12 h-12 mx-auto text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-            </svg>
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
+          <div className="text-[13px] text-white/40 mb-1">Total de Campanhas</div>
+          <div className="text-2xl font-semibold text-white/90">
+            {data?.total_campaigns?.toLocaleString('pt-BR') || 0}
           </div>
-          <p className="font-medium text-white/60">Dashboard Analytics em desenvolvimento</p>
-          <p className="mt-1">Gráficos e métricas serão exibidos aqui</p>
-          {data && (
-            <p className="mt-4 text-white/30 text-[11px]">
-              Dados carregados: {data.total_campaigns} campanhas
-            </p>
-          )}
+        </div>
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
+          <div className="text-[13px] text-white/40 mb-1">Total de Imagens</div>
+          <div className="text-2xl font-semibold text-white/90">
+            {data?.total_images?.toLocaleString('pt-BR') || 0}
+          </div>
+        </div>
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
+          <div className="text-[13px] text-white/40 mb-1">Total de Flyers</div>
+          <div className="text-2xl font-semibold text-white/90">
+            {data?.total_flyers?.toLocaleString('pt-BR') || 0}
+          </div>
+        </div>
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
+          <div className="text-[13px] text-white/40 mb-1">Custo IA</div>
+          <div className="text-2xl font-semibold text-white/90">
+            ${((data?.total_ai_cost_cents || 0) / 100).toFixed(2)}
+          </div>
         </div>
       </div>
+
+      {/* Campaigns Chart */}
+      {campaignsChartData.length > 0 && (
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-5">
+          <h3 className="text-[13px] font-medium text-white/70 mb-4">
+            Campanhas Criadas (
+            {period === 'day' && 'Últimas 24 horas'}
+            {period === 'week' && 'Últimos 7 dias'}
+            {period === 'month' && 'Últimos 30 dias'}
+            )
+          </h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={campaignsChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis
+                  dataKey="date"
+                  stroke="rgba(255,255,255,0.3)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="rgba(255,255,255,0.3)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1a1a1a',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                  }}
+                  labelStyle={{ color: 'rgba(255,255,255,0.7)' }}
+                  itemStyle={{ color: 'rgba(255,255,255,0.9)' }}
+                />
+                <Bar
+                  dataKey="campanhas"
+                  name="Campanhas"
+                  fill="#f59e0b"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Images Chart */}
+      {imagesChartData.length > 0 && (
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-5">
+          <h3 className="text-[13px] font-medium text-white/70 mb-4">
+            Imagens Geradas (
+            {period === 'day' && 'Últimas 24 horas'}
+            {period === 'week' && 'Últimos 7 dias'}
+            {period === 'month' && 'Últimos 30 dias'}
+            )
+          </h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={imagesChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis
+                  dataKey="date"
+                  stroke="rgba(255,255,255,0.3)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="rgba(255,255,255,0.3)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1a1a1a',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                  }}
+                  labelStyle={{ color: 'rgba(255,255,255,0.7)' }}
+                  itemStyle={{ color: 'rgba(255,255,255,0.9)' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="imagens"
+                  name="Imagens"
+                  stroke="#10b981"
+                  fill="#10b981"
+                  fillOpacity={0.1}
+                  strokeWidth={1.5}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
