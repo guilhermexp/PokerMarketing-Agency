@@ -62,6 +62,14 @@ import {
 import { requestLogger } from "./middleware/requestLogger.mjs";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.mjs";
 import logger from "./lib/logger.mjs";
+import {
+  ValidationError,
+  AuthError,
+  NotFoundError,
+  DatabaseError,
+  ExternalServiceError,
+  RateLimitError,
+} from "./lib/errors/index.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -451,7 +459,7 @@ app.get("/api/db/health", async (req, res) => {
     await sql`SELECT 1`;
     res.json({ status: "healthy", timestamp: new Date().toISOString() });
   } catch (error) {
-    res.status(500).json({ status: "unhealthy", error: error.message });
+    throw new DatabaseError("Database health check failed", error);
   }
 });
 
@@ -1209,10 +1217,12 @@ app.get("/api/db/users", async (req, res) => {
       return res.json(result[0] || null);
     }
 
-    return res.status(400).json({ error: "email or id is required" });
+    throw new ValidationError("email or id is required");
   } catch (error) {
-    logError("Users API", error);
-    res.status(500).json({ error: error.message });
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to fetch user", error);
   }
 });
 
@@ -1223,7 +1233,7 @@ app.post("/api/db/users", async (req, res) => {
       req.body;
 
     if (!email || !name) {
-      return res.status(400).json({ error: "email and name are required" });
+      throw new ValidationError("email and name are required");
     }
 
     const existing =
@@ -1242,8 +1252,10 @@ app.post("/api/db/users", async (req, res) => {
 
     res.status(201).json(result[0]);
   } catch (error) {
-    logError("Users API", error);
-    res.status(500).json({ error: error.message });
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to create or update user", error);
   }
 });
 
@@ -1286,13 +1298,12 @@ app.get("/api/db/brand-profiles", async (req, res) => {
       return res.json(result[0] || null);
     }
 
-    return res.status(400).json({ error: "user_id or id is required" });
+    throw new ValidationError("user_id or id is required");
   } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
+    if (error instanceof OrganizationAccessError || error instanceof ValidationError) {
+      throw error;
     }
-    logError("Brand Profiles API", error);
-    res.status(500).json({ error: error.message });
+    throw new DatabaseError("Failed to fetch brand profile", error);
   }
 });
 
@@ -1311,13 +1322,13 @@ app.post("/api/db/brand-profiles", async (req, res) => {
     } = req.body;
 
     if (!user_id || !name) {
-      return res.status(400).json({ error: "user_id and name are required" });
+      throw new ValidationError("user_id and name are required");
     }
 
     // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
-      return res.status(400).json({ error: "User not found" });
+      throw new NotFoundError("User", user_id);
     }
 
     // Verify organization membership and permission if organization_id provided
@@ -1328,9 +1339,7 @@ app.post("/api/db/brand-profiles", async (req, res) => {
         organization_id,
       );
       if (!hasPermission(context.orgRole, PERMISSIONS.MANAGE_BRAND)) {
-        return res
-          .status(403)
-          .json({ error: "Permission denied: manage_brand required" });
+        throw new PermissionDeniedError("manage_brand");
       }
     }
 
@@ -1345,12 +1354,13 @@ app.post("/api/db/brand-profiles", async (req, res) => {
   } catch (error) {
     if (
       error instanceof OrganizationAccessError ||
-      error instanceof PermissionDeniedError
+      error instanceof PermissionDeniedError ||
+      error instanceof ValidationError ||
+      error instanceof NotFoundError
     ) {
-      return res.status(403).json({ error: error.message });
+      throw error;
     }
-    logError("Brand Profiles API", error);
-    res.status(500).json({ error: error.message });
+    throw new DatabaseError("Failed to create brand profile", error);
   }
 });
 
@@ -1428,7 +1438,7 @@ app.get("/api/db/gallery", async (req, res) => {
     const { user_id, organization_id, source, limit, include_src } = req.query;
 
     if (!user_id) {
-      return res.status(400).json({ error: "user_id is required" });
+      throw new ValidationError("user_id is required");
     }
 
     // Resolve user_id (handles both Clerk IDs and UUIDs)
@@ -1486,11 +1496,10 @@ app.get("/api/db/gallery", async (req, res) => {
 
     res.json(query);
   } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
+    if (error instanceof OrganizationAccessError || error instanceof ValidationError) {
+      throw error;
     }
-    logError("Gallery API GET", error);
-    res.status(500).json({ error: error.message });
+    throw new DatabaseError("Failed to fetch gallery images", error);
   }
 });
 
@@ -1814,7 +1823,7 @@ app.get("/api/db/scheduled-posts", async (req, res) => {
       req.query;
 
     if (!user_id) {
-      return res.status(400).json({ error: "user_id is required" });
+      throw new ValidationError("user_id is required");
     }
 
     // Resolve user_id (handles both Clerk IDs and UUIDs)
@@ -1875,11 +1884,10 @@ app.get("/api/db/scheduled-posts", async (req, res) => {
 
     res.json(query);
   } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
+    if (error instanceof OrganizationAccessError || error instanceof ValidationError) {
+      throw error;
     }
-    logError("Scheduled Posts API", error);
-    res.status(500).json({ error: error.message });
+    throw new DatabaseError("Failed to fetch scheduled posts", error);
   }
 });
 
@@ -2169,7 +2177,7 @@ app.get("/api/db/campaigns", async (req, res) => {
     }
 
     if (!user_id) {
-      return res.status(400).json({ error: "user_id is required" });
+      throw new ValidationError("user_id is required");
     }
 
     // Resolve user_id (handles both Clerk IDs and UUIDs)
@@ -2292,11 +2300,10 @@ app.get("/api/db/campaigns", async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
+    if (error instanceof OrganizationAccessError || error instanceof ValidationError) {
+      throw error;
     }
-    logError("Campaigns API", error);
-    res.status(500).json({ error: error.message });
+    throw new DatabaseError("Failed to fetch campaigns", error);
   }
 });
 
@@ -2318,13 +2325,13 @@ app.post("/api/db/campaigns", async (req, res) => {
     } = req.body;
 
     if (!user_id) {
-      return res.status(400).json({ error: "user_id is required" });
+      throw new ValidationError("user_id is required");
     }
 
     // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
-      return res.status(400).json({ error: "User not found" });
+      throw new NotFoundError("User", user_id);
     }
 
     // Verify organization membership and permission if organization_id provided
@@ -2335,9 +2342,7 @@ app.post("/api/db/campaigns", async (req, res) => {
         organization_id,
       );
       if (!hasPermission(context.orgRole, PERMISSIONS.CREATE_CAMPAIGN)) {
-        return res
-          .status(403)
-          .json({ error: "Permission denied: create_campaign required" });
+        throw new PermissionDeniedError("create_campaign");
       }
     }
 
@@ -2417,12 +2422,13 @@ app.post("/api/db/campaigns", async (req, res) => {
   } catch (error) {
     if (
       error instanceof OrganizationAccessError ||
-      error instanceof PermissionDeniedError
+      error instanceof PermissionDeniedError ||
+      error instanceof ValidationError ||
+      error instanceof NotFoundError
     ) {
-      return res.status(403).json({ error: error.message });
+      throw error;
     }
-    logError("Campaigns API", error);
-    res.status(500).json({ error: error.message });
+    throw new DatabaseError("Failed to create campaign", error);
   }
 });
 
@@ -2848,7 +2854,7 @@ app.get("/api/db/tournaments", async (req, res) => {
     const { user_id, organization_id, week_schedule_id } = req.query;
 
     if (!user_id) {
-      return res.status(400).json({ error: "user_id is required" });
+      throw new ValidationError("user_id is required");
     }
 
     // Resolve user_id (handles both Clerk IDs and UUIDs)
@@ -2903,11 +2909,10 @@ app.get("/api/db/tournaments", async (req, res) => {
 
     res.json({ schedule, events });
   } catch (error) {
-    if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
+    if (error instanceof OrganizationAccessError || error instanceof ValidationError) {
+      throw error;
     }
-    logError("Tournaments API", error);
-    res.status(500).json({ error: error.message });
+    throw new DatabaseError("Failed to fetch tournaments", error);
   }
 });
 
