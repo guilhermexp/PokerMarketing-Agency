@@ -563,11 +563,15 @@ app.get("/api/admin/analytics", requireSuperAdmin, async (req, res) => {
         intervalDays = 30;
     }
 
-    // Get campaigns data in parallel
+    // Get campaigns data and image generation metrics in parallel
     const [
       totalCampaignsResult,
       campaignsPerDayResult,
-      campaignsByOrgResult
+      campaignsByOrgResult,
+      totalImagesResult,
+      imagesPerDayResult,
+      totalFlyersResult,
+      imageSuccessRateResult
     ] = await Promise.all([
       // Total campaigns in period
       sql`SELECT COUNT(*) as count
@@ -590,8 +594,43 @@ app.get("/api/admin/analytics", requireSuperAdmin, async (req, res) => {
           FROM campaigns
           WHERE created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}
           GROUP BY organization_id
-          ORDER BY count DESC`
+          ORDER BY count DESC`,
+
+      // Total images in period
+      sql`SELECT COUNT(*) as count
+          FROM gallery_images
+          WHERE created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}`,
+
+      // Images per day (time series)
+      sql`SELECT
+            DATE(created_at) as date,
+            COUNT(*) as count
+          FROM gallery_images
+          WHERE created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}
+          GROUP BY DATE(created_at)
+          ORDER BY date ASC`,
+
+      // Total flyers in period (from gallery_images with source = 'flyer')
+      sql`SELECT COUNT(*) as count
+          FROM gallery_images
+          WHERE created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}
+            AND source = 'flyer'`,
+
+      // Image generation success rate (from api_usage_logs)
+      sql`SELECT
+            COUNT(*) FILTER (WHERE status = 'success') as success_count,
+            COUNT(*) as total_count
+          FROM api_usage_logs
+          WHERE created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}
+            AND operation IN ('image', 'flyer', 'edit_image')`
     ]);
+
+    // Calculate success rate
+    const successCount = parseInt(imageSuccessRateResult[0]?.success_count || 0);
+    const totalImageJobs = parseInt(imageSuccessRateResult[0]?.total_count || 0);
+    const successRate = totalImageJobs > 0
+      ? Math.round((successCount / totalImageJobs) * 100 * 100) / 100
+      : 0;
 
     res.json({
       period,
@@ -605,7 +644,16 @@ app.get("/api/admin/analytics", requireSuperAdmin, async (req, res) => {
       campaigns_by_organization: campaignsByOrgResult.map(row => ({
         organization_id: row.organization_id,
         count: parseInt(row.count)
-      }))
+      })),
+      total_images: parseInt(totalImagesResult[0]?.count || 0),
+      images_per_day: imagesPerDayResult.map(row => ({
+        date: row.date instanceof Date
+          ? row.date.toISOString().split('T')[0]
+          : String(row.date),
+        count: parseInt(row.count)
+      })),
+      total_flyers: parseInt(totalFlyersResult[0]?.count || 0),
+      success_rate: successRate
     });
   } catch (error) {
     console.error('[Admin] Analytics error:', error);
