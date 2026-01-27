@@ -541,6 +541,78 @@ app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
   }
 });
 
+// Admin: Get campaign analytics with metrics
+app.get("/api/admin/analytics", requireSuperAdmin, async (req, res) => {
+  try {
+    const sql = getSql();
+    const { period = 'month' } = req.query;
+
+    // Calculate date range based on period
+    let intervalDays;
+    switch (period) {
+      case 'day':
+        intervalDays = 1;
+        break;
+      case 'week':
+        intervalDays = 7;
+        break;
+      case 'month':
+        intervalDays = 30;
+        break;
+      default:
+        intervalDays = 30;
+    }
+
+    // Get campaigns data in parallel
+    const [
+      totalCampaignsResult,
+      campaignsPerDayResult,
+      campaignsByOrgResult
+    ] = await Promise.all([
+      // Total campaigns in period
+      sql`SELECT COUNT(*) as count
+          FROM campaigns
+          WHERE created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}`,
+
+      // Campaigns per day (time series)
+      sql`SELECT
+            DATE(created_at) as date,
+            COUNT(*) as count
+          FROM campaigns
+          WHERE created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}
+          GROUP BY DATE(created_at)
+          ORDER BY date ASC`,
+
+      // Campaigns by organization
+      sql`SELECT
+            COALESCE(organization_id, 'personal') as organization_id,
+            COUNT(*) as count
+          FROM campaigns
+          WHERE created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}
+          GROUP BY organization_id
+          ORDER BY count DESC`
+    ]);
+
+    res.json({
+      period,
+      total_campaigns: parseInt(totalCampaignsResult[0]?.count || 0),
+      campaigns_per_day: campaignsPerDayResult.map(row => ({
+        date: row.date instanceof Date
+          ? row.date.toISOString().split('T')[0]
+          : String(row.date),
+        count: parseInt(row.count)
+      })),
+      campaigns_by_organization: campaignsByOrgResult.map(row => ({
+        organization_id: row.organization_id,
+        count: parseInt(row.count)
+      }))
+    });
+  } catch (error) {
+    console.error('[Admin] Analytics error:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
 // Admin: Get AI usage analytics
 app.get("/api/admin/usage", requireSuperAdmin, async (req, res) => {
   try {
