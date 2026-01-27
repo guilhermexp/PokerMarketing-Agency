@@ -1741,21 +1741,25 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
       const productImagesToUse = await buildProductImages();
 
-      const imageDataUrl = await generateImage(prompt, brandProfile, {
+      const imageUrl = await generateImage(prompt, brandProfile, {
         aspectRatio: CLIP_ASPECT_RATIO,
         model: "gemini-3-pro-image-preview",
         styleReferenceImage: styleRef,
         productImages: productImagesToUse.length > 0 ? productImagesToUse : undefined,
       });
 
-      // Upload to Vercel Blob
-      const base64Data = imageDataUrl.indexOf(",") !== -1 ? imageDataUrl.split(",")[1] : imageDataUrl;
-      const mimeType = imageDataUrl.match(/data:(.*?);/)?.[1] || "image/png";
-      const httpUrl = await uploadImageToBlob(base64Data, mimeType);
+      // API now returns HTTP URL directly (Vercel Blob), no need to re-upload
+      let httpUrl = imageUrl;
+      if (imageUrl.startsWith("data:")) {
+        // Fallback: if still receiving data URL, upload to blob
+        const base64Data = imageUrl.split(",")[1];
+        const mimeType = imageUrl.match(/data:(.*?);/)?.[1] || "image/png";
+        httpUrl = await uploadImageToBlob(base64Data, mimeType);
+      }
 
       setSceneImages((prev) => ({
         ...prev,
-        [sceneNumber]: { dataUrl: imageDataUrl, httpUrl, isUploading: false },
+        [sceneNumber]: { dataUrl: imageUrl, httpUrl, isUploading: false },
       }));
 
       // Save to gallery

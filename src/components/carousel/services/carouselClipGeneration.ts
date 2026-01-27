@@ -128,7 +128,7 @@ export const generateCarouselSlide4x5 = async ({
       }
     }
 
-    const imageDataUrl = await generateImage(prompt, brandProfile, {
+    const imageUrl = await generateImage(prompt, brandProfile, {
       aspectRatio: '4:5',
       model: 'gemini-3-pro-image-preview',
       styleReferenceImage: styleRef,
@@ -136,9 +136,14 @@ export const generateCarouselSlide4x5 = async ({
       compositionAssets: compositionAssets?.length > 0 ? compositionAssets : undefined,
     });
 
-    const base64Data = imageDataUrl.split(',')[1];
-    const mimeType = imageDataUrl.match(/data:(.*?);/)?.[1] || 'image/png';
-    const httpUrl = await uploadImageToBlob(base64Data, mimeType);
+    // API now returns HTTP URL directly (Vercel Blob), no need to re-upload
+    let httpUrl = imageUrl;
+    if (imageUrl.startsWith('data:')) {
+      // Fallback: if still receiving data URL, upload to blob
+      const base64Data = imageUrl.split(',')[1];
+      const mimeType = imageUrl.match(/data:(.*?);/)?.[1] || 'image/png';
+      httpUrl = await uploadImageToBlob(base64Data, mimeType);
+    }
 
     if (httpUrl) {
       onAddImageToGallery({
