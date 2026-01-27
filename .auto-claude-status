@@ -3,7 +3,7 @@
   "spec": "022-typescript-strict-mode-migration",
   "state": "building",
   "subtasks": {
-    "completed": 11,
+    "completed": 13,
     "total": 14,
     "in_progress": 1,
     "failed": 0
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 13,
+    "number": 15,
     "started_at": "2026-01-26T21:19:50.220285"
   },
-  "last_update": "2026-01-26T21:44:26.613749"
+  "last_update": "2026-01-26T21:49:40.714595"
 }
