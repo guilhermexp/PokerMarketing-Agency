@@ -123,7 +123,7 @@ const PostCard: React.FC<{
         onAddStyleReference({
           src: img.src,
           name:
-            img.prompt.substring(0, 50) ||
+            (img.prompt ?? '').substring(0, 50) ||
             `Favorito ${new Date().toLocaleDateString("pt-BR")}`,
         });
       }
@@ -145,7 +145,7 @@ const PostCard: React.FC<{
             {/* Image */}
             <div className="aspect-square bg-black/30 rounded-lg flex items-center justify-center relative overflow-hidden">
               {isGenerating ? (
-                <ImageGenerationLoader prompt={post.image_prompt} showLabel={true} />
+                <ImageGenerationLoader prompt={post.image_prompt} />
               ) : image ? (
                 <>
                   <img
@@ -565,7 +565,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
           aspectRatio: "1:1",
           model: selectedImageModel,
           productImages: productImages.length > 0 ? productImages : undefined,
-          compositionAssets: compositionAssets?.length > 0 ? compositionAssets : undefined,
+          compositionAssets: compositionAssets && compositionAssets.length > 0 ? compositionAssets : undefined,
         },
       );
 

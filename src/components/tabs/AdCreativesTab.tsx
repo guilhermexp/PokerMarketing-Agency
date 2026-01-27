@@ -31,7 +31,7 @@ interface AdCreativesTabProps {
   chatReferenceImage?: ChatReferenceImage | null; // Reference from chat takes priority
   onAddImageToGallery: (image: Omit<GalleryImage, "id">) => GalleryImage;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
-  onSetChatReference: (image: GalleryImage | null) => void;
+  onSetChatReference: (image: GalleryImage | undefined) => void;
   styleReferences?: StyleReference[];
   onAddStyleReference?: (ref: Omit<StyleReference, "id" | "createdAt">) => void;
   onRemoveStyleReference?: (id: string) => void;
@@ -46,12 +46,12 @@ interface AdCreativesTabProps {
 
 const AdCard: React.FC<{
   ad: AdCreative;
-  image: GalleryImage | null;
+  image: GalleryImage | undefined;
   isGenerating: boolean;
   error: string | null;
   onGenerate: () => void;
   onImageUpdate: (newSrc: string) => void;
-  onSetChatReference: (image: GalleryImage | null) => void;
+  onSetChatReference: (image: GalleryImage | undefined) => void;
   styleReferences?: StyleReference[];
   onAddStyleReference?: (ref: Omit<StyleReference, "id" | "createdAt">) => void;
   onRemoveStyleReference?: (id: string) => void;
@@ -67,7 +67,7 @@ const AdCard: React.FC<{
   onAddStyleReference,
   onRemoveStyleReference,
 }) => {
-    const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
+    const [editingImage, setEditingImage] = useState<GalleryImage | undefined>(undefined);
     const [isCopied, setIsCopied] = useState(false);
 
     const handleEditClick = () => {
@@ -118,7 +118,7 @@ const AdCard: React.FC<{
         onAddStyleReference({
           src: img.src,
           name:
-            img.prompt.substring(0, 50) ||
+            (img.prompt ?? '').substring(0, 50) ||
             `Favorito ${new Date().toLocaleDateString("pt-BR")} `,
         });
       }
@@ -255,7 +255,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
   onQuickPost,
   onSchedulePost,
 }) => {
-  const [images, setImages] = useState<(GalleryImage | null)[]>([]);
+  const [images, setImages] = useState<(GalleryImage | undefined)[]>([]);
   const [generationState, setGenerationState] = useState<{
     isGenerating: boolean[];
     errors: (string | null)[];
@@ -541,7 +541,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
           aspectRatio: "1.91:1",
           model: selectedImageModel,
           productImages: productImages.length > 0 ? productImages : undefined,
-          compositionAssets: compositionAssets?.length > 0 ? compositionAssets : undefined,
+          compositionAssets: compositionAssets && compositionAssets.length > 0 ? compositionAssets : undefined,
         },
       );
 

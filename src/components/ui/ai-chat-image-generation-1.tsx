@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export interface ImageGenerationLoaderProps {
   /** Image URL - when provided, shows the reveal effect */
-  imageSrc?: string | null;
+  imageSrc?: string;
   /** Image prompt to show as placeholder when no image */
   prompt?: string;
   /** Optional className for the container */
@@ -27,7 +27,7 @@ export const ImageGenerationLoader = ({
     "waiting" | "generating" | "revealing" | "completed"
   >("waiting");
   const [isImageLoaded, setIsImageLoaded] = React.useState(false);
-  const [currentImageSrc, setCurrentImageSrc] = React.useState<string | null>(null);
+  const [currentImageSrc, setCurrentImageSrc] = React.useState<string | undefined>(undefined);
   const revealDuration = 3000; // 3 seconds to reveal
 
   // Track when image URL changes to reset loaded state

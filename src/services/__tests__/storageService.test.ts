@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import { initDB, saveImagesToDB, loadImagesFromDB } from '../storageService';
 import type { GalleryImage } from '../../types';
 import type {
@@ -40,7 +41,7 @@ describe('storageService', () => {
   describe('initDB', () => {
     it('should initialize database successfully', async () => {
       const request = createMockOpenRequest();
-      vi.mocked(indexedDB.open).mockReturnValue(request as unknown as IDBOpenDBRequest);
+      (indexedDB.open as Mock).mockReturnValue(request as unknown as IDBOpenDBRequest);
 
       const promise = initDB();
       setTimeout(() => request.onsuccess?.(), 0);
@@ -52,7 +53,7 @@ describe('storageService', () => {
 
     it('should reject on database open error', async () => {
       const request = createMockOpenRequest();
-      vi.mocked(indexedDB.open).mockReturnValue(request as unknown as IDBOpenDBRequest);
+      (indexedDB.open as Mock).mockReturnValue(request as unknown as IDBOpenDBRequest);
 
       const promise = initDB();
       setTimeout(() => request.onerror?.(), 0);
@@ -62,7 +63,7 @@ describe('storageService', () => {
 
     it('should create stores on upgrade', async () => {
       const request = createMockOpenRequest();
-      vi.mocked(indexedDB.open).mockReturnValue(request as unknown as IDBOpenDBRequest);
+      (indexedDB.open as Mock).mockReturnValue(request as unknown as IDBOpenDBRequest);
 
       const promise = initDB();
 
@@ -91,7 +92,7 @@ describe('storageService', () => {
       ];
 
       const request = createMockOpenRequest();
-      vi.mocked(indexedDB.open).mockReturnValue(request as unknown as IDBOpenDBRequest);
+      (indexedDB.open as Mock).mockReturnValue(request as unknown as IDBOpenDBRequest);
 
       const mockStore = createMockIDBObjectStore();
       const mockTransaction: MockIDBTransaction = {
@@ -131,7 +132,7 @@ describe('storageService', () => {
       }];
 
       const request = createMockOpenRequest();
-      vi.mocked(indexedDB.open).mockReturnValue(request as unknown as IDBOpenDBRequest);
+      (indexedDB.open as Mock).mockReturnValue(request as unknown as IDBOpenDBRequest);
 
       const mockGetAllRequest: MockIDBRequest<GalleryImage[]> = {
         result: mockImages,

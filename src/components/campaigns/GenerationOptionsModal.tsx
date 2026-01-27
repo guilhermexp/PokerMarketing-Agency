@@ -18,7 +18,7 @@ const modalVariants = {
     scale: 1,
     y: 0,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 300,
       damping: 30,
       staggerChildren: 0.08,
@@ -39,7 +39,7 @@ const itemVariants = {
     opacity: 1,
     y: 0,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 100,
       damping: 12
     }
@@ -252,31 +252,38 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
   };
 
   const togglePostPlatform = (key: string) => {
-    setOptions(prev => ({
-      ...prev,
-      posts: {
-        ...prev.posts,
-        [key]: { ...prev.posts[key], generate: !prev.posts[key].generate }
-      }
-    }));
+    setOptions(prev => {
+      const typedKey = key as keyof typeof prev.posts;
+      return {
+        ...prev,
+        posts: {
+          ...prev.posts,
+          [key]: { ...prev.posts[typedKey], generate: !prev.posts[typedKey].generate }
+        }
+      };
+    });
   };
 
   const toggleAdPlatform = (key: string) => {
-    setOptions(prev => ({
-      ...prev,
-      adCreatives: {
-        ...prev.adCreatives,
-        [key]: { ...prev.adCreatives[key], generate: !prev.adCreatives[key].generate }
-      }
-    }));
+    setOptions(prev => {
+      const typedKey = key as keyof typeof prev.adCreatives;
+      return {
+        ...prev,
+        adCreatives: {
+          ...prev.adCreatives,
+          [key]: { ...prev.adCreatives[typedKey], generate: !prev.adCreatives[typedKey].generate }
+        }
+      };
+    });
   };
 
   const setPostsCount = (count: number) => {
     setOptions(prev => {
       const newPosts = { ...prev.posts };
       for (const key in newPosts) {
-        if (newPosts[key].generate) {
-          newPosts[key] = { ...newPosts[key], count };
+        const typedKey = key as keyof typeof newPosts;
+        if (newPosts[typedKey].generate) {
+          newPosts[typedKey] = { ...newPosts[typedKey], count };
         }
       }
       return { ...prev, posts: newPosts };
@@ -287,8 +294,9 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
     setOptions(prev => {
       const newAds = { ...prev.adCreatives };
       for (const key in newAds) {
-        if (newAds[key].generate) {
-          newAds[key] = { ...newAds[key], count };
+        const typedKey = key as keyof typeof newAds;
+        if (newAds[typedKey].generate) {
+          newAds[typedKey] = { ...newAds[typedKey], count };
         }
       }
       return { ...prev, adCreatives: newAds };

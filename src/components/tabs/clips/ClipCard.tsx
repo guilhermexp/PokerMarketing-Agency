@@ -384,7 +384,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             selectedVideoModel,
           );
 
-          onAddImageToGallery({
+          onAddImageToGallery?.({
             src: job.result_url,
             prompt: `[VIDEO:${selectedVideoModel}] ${visualDescription}`,
             source: videoSource as string,
@@ -1419,7 +1419,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             "model:",
             modelUsed,
           );
-          onAddImageToGallery({
+          onAddImageToGallery?.({
             src: videoUrl,
             prompt: `[VIDEO:${modelUsed}] ${currentScene.visual}`,
             source: videoSource as string,
@@ -2361,7 +2361,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
         );
 
         // Add to gallery as a video (linked to clip for filtering)
-        onAddImageToGallery({
+        onAddImageToGallery?.({
           src: videoUrl,
           prompt: `Video editado com ${editorState.clips.length} cenas`,
           source: "Video Final",
@@ -3479,7 +3479,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
       onAddStyleReference({
         src: image.src,
         name:
-          image.prompt.substring(0, 50) ||
+          (image.prompt ?? '').substring(0, 50) ||
           `Favorito ${new Date().toLocaleDateString("pt-BR")}`,
       });
     }
