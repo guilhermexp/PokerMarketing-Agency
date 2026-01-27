@@ -571,7 +571,10 @@ app.get("/api/admin/analytics", requireSuperAdmin, async (req, res) => {
       totalImagesResult,
       imagesPerDayResult,
       totalFlyersResult,
-      imageSuccessRateResult
+      imageSuccessRateResult,
+      aiCostsByOrgResult,
+      totalAiCostResult,
+      totalLatencyResult
     ] = await Promise.all([
       // Total campaigns in period
       sql`SELECT COUNT(*) as count
@@ -622,7 +625,29 @@ app.get("/api/admin/analytics", requireSuperAdmin, async (req, res) => {
             COUNT(*) as total_count
           FROM api_usage_logs
           WHERE created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}
-            AND operation IN ('image', 'flyer', 'edit_image')`
+            AND operation IN ('image', 'flyer', 'edit_image')`,
+
+      // AI costs by organization
+      sql`SELECT
+            COALESCE(organization_id, 'personal') as organization_id,
+            COALESCE(SUM(estimated_cost_cents), 0) as total_cost_cents
+          FROM api_usage_logs
+          WHERE created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}
+          GROUP BY organization_id
+          ORDER BY total_cost_cents DESC`,
+
+      // Total AI costs across all organizations
+      sql`SELECT
+            COALESCE(SUM(estimated_cost_cents), 0) as total_cost_cents
+          FROM api_usage_logs
+          WHERE created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}`,
+
+      // Total latency for time saved calculation (campaign operations)
+      sql`SELECT
+            COALESCE(SUM(latency_ms), 0) as total_latency_ms
+          FROM api_usage_logs
+          WHERE created_at >= NOW() - INTERVAL '1 day' * ${intervalDays}
+            AND operation = 'campaign'`
     ]);
 
     // Calculate success rate
@@ -631,6 +656,14 @@ app.get("/api/admin/analytics", requireSuperAdmin, async (req, res) => {
     const successRate = totalImageJobs > 0
       ? Math.round((successCount / totalImageJobs) * 100 * 100) / 100
       : 0;
+
+    // Calculate time saved
+    // Formula: (campaigns * 2 hours average manual time) - (actual AI generation time)
+    const totalCampaigns = parseInt(totalCampaignsResult[0]?.count || 0);
+    const totalLatencyMs = parseInt(totalLatencyResult[0]?.total_latency_ms || 0);
+    const totalAiTimeHours = totalLatencyMs / (1000 * 60 * 60); // Convert ms to hours
+    const manualTimeHours = totalCampaigns * 2; // 2 hours per campaign avg
+    const estimatedTimeSavedHours = Math.max(0, manualTimeHours - totalAiTimeHours);
 
     res.json({
       period,
@@ -653,7 +686,13 @@ app.get("/api/admin/analytics", requireSuperAdmin, async (req, res) => {
         count: parseInt(row.count)
       })),
       total_flyers: parseInt(totalFlyersResult[0]?.count || 0),
-      success_rate: successRate
+      success_rate: successRate,
+      ai_costs_by_org: aiCostsByOrgResult.map(row => ({
+        organization_id: row.organization_id,
+        total_cost_cents: parseInt(row.total_cost_cents)
+      })),
+      total_ai_cost_cents: parseInt(totalAiCostResult[0]?.total_cost_cents || 0),
+      estimated_time_saved_hours: Math.round(estimatedTimeSavedHours * 100) / 100
     });
   } catch (error) {
     console.error('[Admin] Analytics error:', error);
