@@ -61,6 +61,7 @@ import {
   createImageBatch,
   generateTopicTitle,
 } from "./helpers/image-playground.mjs";
+import { requestLogger } from "./middleware/requestLogger.mjs";
 
 const app = express();
 const PORT = 3002;
@@ -105,6 +106,9 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// Request logging middleware - logs all HTTP requests with structured format
+app.use(requestLogger);
 
 // Helper to get Clerk org context from request
 function getClerkOrgContext(req) {
