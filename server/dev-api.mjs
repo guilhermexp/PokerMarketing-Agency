@@ -62,6 +62,7 @@ import {
   generateTopicTitle,
 } from "./helpers/image-playground.mjs";
 import { requestLogger } from "./middleware/requestLogger.mjs";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler.mjs";
 
 const app = express();
 const PORT = 3002;
@@ -6793,6 +6794,17 @@ app.post("/api/image-playground/generate-title", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ============================================================================
+// ERROR HANDLING MIDDLEWARE
+// ============================================================================
+// CRITICAL: These must be registered LAST, after all routes
+
+// 404 handler - catches undefined routes
+app.use(notFoundHandler);
+
+// Global error handler - catches all errors
+app.use(errorHandler);
 
 const startup = async () => {
   if (DATABASE_URL) {
