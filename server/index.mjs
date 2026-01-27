@@ -4765,7 +4765,26 @@ app.post("/api/ai/flyer", async (req, res) => {
 
       for (const part of response.candidates[0].content.parts) {
         if (part.inlineData) {
-          imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          // Upload to Vercel Blob instead of returning data URL
+          console.log("[Flyer API] Uploading Gemini image to Vercel Blob...");
+          try {
+            const imageBuffer = Buffer.from(part.inlineData.data, 'base64');
+            const contentType = part.inlineData.mimeType || 'image/png';
+            const ext = contentType.includes('png') ? 'png' : 'jpg';
+            const filename = `flyer-${Date.now()}.${ext}`;
+
+            const blob = await put(filename, imageBuffer, {
+              access: 'public',
+              contentType,
+            });
+
+            imageDataUrl = blob.url;
+            console.log("[Flyer API] Uploaded to Vercel Blob:", blob.url);
+          } catch (uploadError) {
+            console.error("[Flyer API] Failed to upload to Vercel Blob:", uploadError.message);
+            // Fallback to data URL only if Blob upload fails
+            imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          }
           break;
         }
       }
@@ -4977,17 +4996,32 @@ app.post("/api/ai/image", async (req, res) => {
       '[Image API] Imagem gerada com sucesso'
     );
 
-    // If image came from Replicate, upload to Vercel Blob (Replicate URLs are temporary)
+    // Upload to Vercel Blob for all providers
     let finalImageUrl = result.imageUrl;
-    if (result.usedProvider === 'replicate' && result.imageUrl && !result.imageUrl.startsWith('data:')) {
-      logger.debug({}, '[Image API] Uploading Replicate image to Vercel Blob');
+    if (result.imageUrl) {
+      logger.debug({}, `[Image API] Uploading ${result.usedProvider} image to Vercel Blob`);
       try {
-        const imageResponse = await fetch(result.imageUrl);
-        if (!imageResponse.ok) {
-          throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+        let imageBuffer;
+        let contentType;
+
+        if (result.imageUrl.startsWith('data:')) {
+          // Handle data URL (from Gemini)
+          const matches = result.imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+          if (!matches) {
+            throw new Error('Invalid data URL format');
+          }
+          contentType = matches[1];
+          imageBuffer = Buffer.from(matches[2], 'base64');
+        } else {
+          // Handle HTTP URL (from Replicate)
+          const imageResponse = await fetch(result.imageUrl);
+          if (!imageResponse.ok) {
+            throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+          }
+          imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+          contentType = imageResponse.headers.get('content-type') || 'image/png';
         }
-        const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-        const contentType = imageResponse.headers.get('content-type') || 'image/png';
+
         const ext = contentType.includes('png') ? 'png' : 'jpg';
         const filename = `generated-${Date.now()}.${ext}`;
 
@@ -5000,6 +5034,7 @@ app.post("/api/ai/image", async (req, res) => {
         logger.info({ blobUrl: blob.url }, '[Image API] Uploaded to Vercel Blob');
       } catch (uploadError) {
         logger.error({ err: uploadError }, "[Image API] Failed to upload to Vercel Blob");
+        // Keep using the original URL/data URL as fallback
       }
     }
 
