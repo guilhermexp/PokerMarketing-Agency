@@ -119,7 +119,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       src: generation.asset.url,
       prompt: '', // We don't have prompt at generation level, it's at batch level
       source: 'playground',
-      model: 'gemini-3-pro-image-preview' as any,
+      model: 'gemini-3-pro-image-preview',
       aspectRatio: undefined,
       imageSize: undefined,
       mediaType: 'image',
