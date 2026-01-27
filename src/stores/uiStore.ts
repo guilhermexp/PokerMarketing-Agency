@@ -124,10 +124,27 @@ export const useUiStore = create<UiState>()(
       // Toast actions
       addToast: (toast) => {
         const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        // Default duration based on severity
+        const defaultDuration = toast.duration ?? (() => {
+          switch (toast.type) {
+            case 'error':
+              return 10000; // 10s - errors need more attention
+            case 'warning':
+              return 7000;  // 7s - warnings are important
+            case 'success':
+              return 4000;  // 4s - success messages can be brief
+            case 'info':
+              return 5000;  // 5s - standard duration
+            default:
+              return 5000;
+          }
+        })();
+
         const newToast: Toast = {
           ...toast,
           id,
-          duration: toast.duration ?? 5000,
+          duration: defaultDuration,
         };
 
         set((state) => ({
