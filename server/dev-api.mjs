@@ -234,8 +234,9 @@ const colors = {
 
 function logExternalAPI(service, action, details = "") {
   const timestamp = new Date().toLocaleTimeString("pt-BR");
-  console.log(
-    `${colors.magenta}[${service}]${colors.reset} ${colors.cyan}${action}${colors.reset}${details ? ` ${colors.dim}${details}${colors.reset}` : ""}`,
+  logger.debug(
+    { service, action, details: details || undefined },
+    `[${service}] ${action}${details ? ` ${details}` : ""}`
   );
 }
 
@@ -243,8 +244,9 @@ function logExternalAPIResult(service, action, duration, success = true) {
   const status = success
     ? `${colors.green}✓${colors.reset}`
     : `${colors.red}✗${colors.reset}`;
-  console.log(
-    `${colors.magenta}[${service}]${colors.reset} ${status} ${action} ${colors.dim}${duration}ms${colors.reset}`,
+  logger.debug(
+    { service, action, durationMs: duration, success },
+    `[${service}] ${success ? '✓' : '✗'} ${action}`
   );
 }
 
@@ -308,7 +310,7 @@ async function warmupDatabase() {
     const start = Date.now();
     const sql = getSql();
     await sql`SELECT 1 as warmup`;
-    console.log(`✓ Database connection warmed up in ${Date.now() - start}ms`);
+    logger.info({ durationMs: Date.now() - start }, 'Database connection warmed up');
   } catch (error) {
     logger.error({ err: error }, "Database warmup failed");
   }
@@ -333,12 +335,10 @@ async function ensureGallerySourceType(sql) {
       column.data_type === "USER-DEFINED" && column.udt_name === "image_source";
     if (!isEnum) return;
 
-    console.log(
-      "[Dev API Server] Migrating gallery_images.source from enum to varchar...",
-    );
+    logger.info({}, '[Dev API Server] Migrating gallery_images.source from enum to varchar');
     await sql`ALTER TABLE gallery_images ALTER COLUMN source TYPE VARCHAR(100) USING source::text`;
     await sql`DROP TYPE IF EXISTS image_source`;
-    console.log("[Dev API Server] gallery_images.source migration complete");
+    logger.info({}, '[Dev API Server] gallery_images.source migration complete');
   } catch (error) {
     logger.error(
       { err: error },
@@ -383,7 +383,7 @@ async function resolveUserId(sql, userId, requestId = 0) {
   }
 
   // User doesn't exist - return the original ID (will fail on insert, but that's expected)
-  console.log("[User Lookup] No user found for auth_provider_id:", userId);
+  logger.debug({ auth_provider_id: userId }, '[User Lookup] No user found for auth_provider_id');
   return null;
 }
 
@@ -426,8 +426,9 @@ app.use("/api/db", (req, res, next) => {
     const statusColor = status < 400 ? colors.green : colors.red;
     const durationColor = duration > 500 ? colors.yellow : colors.dim;
 
-    console.log(
-      `${colors.cyan}${method}${colors.reset} /${endpoint} ${statusColor}${status}${colors.reset} ${durationColor}${duration}ms${colors.reset}`,
+    logger.info(
+      { method, endpoint, status, durationMs: duration },
+      `${method} /${endpoint} ${status}`
     );
 
     logRequestSummary(reqId, req.originalUrl);
@@ -957,7 +958,7 @@ app.post("/api/db/stats/reset", (req, res) => {
   requestCounter = 0;
   queryCounter = 0;
   userIdCache.clear();
-  console.log("[STATS] Counters reset");
+  logger.info({}, '[STATS] Counters reset');
   res.json({ success: true, message: "Stats reset" });
 });
 
@@ -991,11 +992,11 @@ app.get("/api/db/init", async (req, res) => {
         const resolveStart = Date.now();
         resolvedUserId = await resolveUserId(sql, clerk_user_id, reqId);
         resolveTime = Date.now() - resolveStart;
-        console.log(`[Init API] resolveUserId took ${resolveTime}ms`);
+        logger.debug({ durationMs: resolveTime }, '[Init API] resolveUserId took');
         if (!resolvedUserId) {
           // User doesn't exist yet - this happens during parallel loading
           // Return empty data - the frontend will retry after user sync completes
-          console.log("[Init API] User not found for clerk_user_id:", clerk_user_id);
+          logger.debug({ clerk_user_id }, '[Init API] User not found for clerk_user_id');
           return res.json({
             brandProfile: null,
             gallery: [],
@@ -1017,7 +1018,7 @@ app.get("/api/db/init", async (req, res) => {
       // Original behavior: resolve user_id
       resolvedUserId = await resolveUserId(sql, user_id, reqId);
       if (!resolvedUserId) {
-        console.log("[Init API] User not found, returning empty data");
+        logger.debug({}, '[Init API] User not found, returning empty data');
         return res.json({
           brandProfile: null,
           gallery: [],
@@ -1063,10 +1064,10 @@ app.get("/api/db/init", async (req, res) => {
           brandProfileResult = JSON.parse(cached);
           brandProfileCached = true;
           queryTimings.brandProfile = 0; // Cache hit
-          console.log(`[Init API] brandProfile cache HIT for ${cacheKey}`);
+          logger.debug({ cacheKey }, '[Init API] brandProfile cache HIT');
         }
       } catch (e) {
-        console.log(`[Init API] brandProfile cache error:`, e.message);
+        logger.debug({ error: e.message }, '[Init API] brandProfile cache error');
       }
     }
 
@@ -1080,7 +1081,7 @@ app.get("/api/db/init", async (req, res) => {
       if (redis && isRedisAvailable() && brandProfileResult.length > 0) {
         try {
           await redis.set(cacheKey, JSON.stringify(brandProfileResult), 'EX', 300);
-          console.log(`[Init API] brandProfile cached for ${cacheKey}`);
+          logger.debug({ cacheKey }, '[Init API] brandProfile cached');
         } catch (e) {
           // Ignore cache write errors
         }
@@ -1110,7 +1111,7 @@ app.get("/api/db/init", async (req, res) => {
 
     // LOG: Query timing breakdown for performance analysis
     const totalTime = Date.now() - start;
-    console.log(`[Init API] Query timings (total: ${totalTime}ms):`, JSON.stringify(queryTimings));
+    logger.debug({ totalTimeMs: totalTime, queryTimings }, '[Init API] Query timings');
 
     // PERFORMANCE: Only tournament schedule/events are loaded lazily via /api/db/tournaments
     // schedulesList is loaded here because it's essential for flyers page
@@ -1672,7 +1673,7 @@ app.delete("/api/db/gallery", async (req, res) => {
     ) {
       try {
         await del(srcUrl);
-        console.log(`[Gallery] Deleted file from Vercel Blob: ${srcUrl}`);
+        logger.info({ url: srcUrl }, '[Gallery] Deleted file from Vercel Blob');
       } catch (blobError) {
         logger.error(
           { err: blobError, srcUrl },
@@ -1909,7 +1910,7 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
     // Schedule job in BullMQ for exact-time publishing
     try {
       await schedulePostForPublishing(newPost.id, resolvedUserId, timestampMs);
-      console.log(`[API] Scheduled job for post ${newPost.id} at ${new Date(timestampMs).toISOString()}`);
+      logger.info({ postId: newPost.id, scheduledAt: new Date(timestampMs).toISOString() }, '[API] Scheduled job for post');
     } catch (error) {
       logger.error({ err: error, postId: newPost.id }, `[API] Failed to schedule job for post ${newPost.id}`);
       // Don't fail the request if job scheduling fails - fallback checker will catch it
@@ -1980,7 +1981,7 @@ app.put("/api/db/scheduled-posts", async (req, res) => {
     if (updates.status === 'cancelled') {
       try {
         await cancelScheduledPost(id);
-        console.log(`[API] Cancelled scheduled job for post ${id} (status changed to cancelled)`);
+        logger.info({ postId: id }, '[API] Cancelled scheduled job for post (status changed to cancelled)');
       } catch (error) {
         logger.error({ err: error, postId: id }, `[API] Failed to cancel job for post ${id}`);
       }
@@ -2036,7 +2037,7 @@ app.delete("/api/db/scheduled-posts", async (req, res) => {
     // Cancel scheduled job in BullMQ
     try {
       await cancelScheduledPost(id);
-      console.log(`[API] Cancelled scheduled job for deleted post ${id}`);
+      logger.info({ postId: id }, '[API] Cancelled scheduled job for deleted post');
     } catch (error) {
       logger.error({ err: error, postId: id }, `[API] Failed to cancel job for post ${id}`);
       // Don't fail the request if job cancellation fails
@@ -2400,7 +2401,7 @@ app.delete("/api/db/campaigns", async (req, res) => {
       }
     }
 
-    console.log(`[Campaign Delete] Starting cascade delete for campaign: ${id}`);
+    logger.info({ campaignId: id }, '[Campaign Delete] Starting cascade delete for campaign');
 
     // ========================================================================
     // CASCADE DELETE: Delete all resources associated with the campaign
@@ -2415,7 +2416,7 @@ app.delete("/api/db/campaigns", async (req, res) => {
       AND deleted_at IS NULL
     `;
 
-    console.log(`[Campaign Delete] Found ${campaignImages.length} gallery images to delete`);
+    logger.info({ count: campaignImages.length }, '[Campaign Delete] Found gallery images to delete');
 
     // 2. Get all posts with their image URLs
     const posts = await sql`
@@ -2432,7 +2433,7 @@ app.delete("/api/db/campaigns", async (req, res) => {
       SELECT id, thumbnail_url, video_url FROM video_clip_scripts WHERE campaign_id = ${id}
     `;
 
-    console.log(`[Campaign Delete] Found ${posts.length} posts, ${ads.length} ads, ${clips.length} clips`);
+    logger.info({ postsCount: posts.length, adsCount: ads.length, clipsCount: clips.length }, '[Campaign Delete] Found posts, ads, and clips');
 
     // Collect all URLs that need to be deleted from Vercel Blob
     const urlsToDelete = [];
@@ -2489,11 +2490,11 @@ app.delete("/api/db/campaigns", async (req, res) => {
     });
 
     // Delete all files from Vercel Blob Storage
-    console.log(`[Campaign Delete] Deleting ${urlsToDelete.length} files from Vercel Blob`);
+    logger.info({ count: urlsToDelete.length }, '[Campaign Delete] Deleting files from Vercel Blob');
     for (const url of urlsToDelete) {
       try {
         await del(url);
-        console.log(`[Campaign Delete] Deleted file: ${url}`);
+        logger.debug({ url }, '[Campaign Delete] Deleted file');
       } catch (blobError) {
         logger.error({ err: blobError, url }, `[Campaign Delete] Failed to delete file: ${url}`);
         // Continue even if blob deletion fails
@@ -2501,32 +2502,32 @@ app.delete("/api/db/campaigns", async (req, res) => {
     }
 
     // HARD DELETE: Permanently remove all records from database
-    console.log(`[Campaign Delete] Deleting database records...`);
+    logger.info({}, '[Campaign Delete] Deleting database records');
 
     // Delete gallery images (already have the IDs)
     if (campaignImages.length > 0) {
       const imageIds = campaignImages.map((img) => img.id);
       await sql`DELETE FROM gallery_images WHERE id = ANY(${imageIds})`;
-      console.log(`[Campaign Delete] Deleted ${imageIds.length} gallery images from DB`);
+      logger.info({ count: imageIds.length }, '[Campaign Delete] Deleted gallery images from DB');
     }
 
     // Delete posts
     await sql`DELETE FROM posts WHERE campaign_id = ${id}`;
-    console.log(`[Campaign Delete] Deleted posts from DB`);
+    logger.info({}, '[Campaign Delete] Deleted posts from DB');
 
     // Delete ad creatives
     await sql`DELETE FROM ad_creatives WHERE campaign_id = ${id}`;
-    console.log(`[Campaign Delete] Deleted ad creatives from DB`);
+    logger.info({}, '[Campaign Delete] Deleted ad creatives from DB');
 
     // Delete video clip scripts
     await sql`DELETE FROM video_clip_scripts WHERE campaign_id = ${id}`;
-    console.log(`[Campaign Delete] Deleted video clips from DB`);
+    logger.info({}, '[Campaign Delete] Deleted video clips from DB');
 
     // Finally, delete the campaign itself
     await sql`DELETE FROM campaigns WHERE id = ${id}`;
-    console.log(`[Campaign Delete] Deleted campaign from DB`);
+    logger.info({}, '[Campaign Delete] Deleted campaign from DB');
 
-    console.log(`[Campaign Delete] Cascade delete completed successfully for campaign: ${id}`);
+    logger.info({ campaignId: id }, '[Campaign Delete] Cascade delete completed successfully');
 
     res.status(200).json({
       success: true,
@@ -2886,8 +2887,9 @@ app.post("/api/db/tournaments", async (req, res) => {
 
     // Create events if provided - using parallel batch inserts for performance
     if (events && Array.isArray(events) && events.length > 0) {
-      console.log(
-        `[Tournaments API] Inserting ${events.length} events in parallel batches...`,
+      logger.info(
+        { eventsCount: events.length },
+        '[Tournaments API] Inserting events in parallel batches'
       );
 
       // Process in batches - each batch runs concurrently, batches run sequentially
@@ -2897,8 +2899,9 @@ app.post("/api/db/tournaments", async (req, res) => {
       for (let i = 0; i < events.length; i += batchSize) {
         const batch = events.slice(i, i + batchSize);
         const batchNum = Math.floor(i / batchSize) + 1;
-        console.log(
-          `[Tournaments API] Processing batch ${batchNum}/${totalBatches} (${batch.length} events)...`,
+        logger.debug(
+          { batchNum, totalBatches, batchSize: batch.length },
+          '[Tournaments API] Processing batch'
         );
 
         // Execute all inserts in this batch concurrently
@@ -2921,8 +2924,9 @@ app.post("/api/db/tournaments", async (req, res) => {
           ),
         );
       }
-      console.log(
-        `[Tournaments API] All ${events.length} events inserted successfully`,
+      logger.info(
+        { eventsCount: events.length },
+        '[Tournaments API] All events inserted successfully'
       );
     }
 
@@ -3295,7 +3299,7 @@ app.get("/api/proxy-video", async (req, res) => {
         .json({ error: "Only Vercel Blob URLs are allowed" });
     }
 
-    console.log("[Video Proxy] Fetching:", url);
+    logger.debug({ url }, '[Video Proxy] Fetching');
 
     const response = await fetch(url);
 
@@ -3507,8 +3511,7 @@ const generateImageWithReplicate = async (
 
 // Generate image with OpenRouter as fallback
 const generateImageWithOpenRouter = async (prompt, productImages) => {
-  console.log(`[OpenRouter Fallback] ========================================`);
-  console.log(`[OpenRouter Fallback] Tentando gerar imagem via OpenRouter`);
+  logger.info({}, '[OpenRouter Fallback] Tentando gerar imagem via OpenRouter');
 
   const openrouter = getOpenRouter();
 
@@ -3517,7 +3520,7 @@ const generateImageWithOpenRouter = async (prompt, productImages) => {
 
   // Add images first if provided
   if (productImages && productImages.length > 0) {
-    console.log(`[OpenRouter Fallback] Adicionando ${productImages.length} imagens de referência`);
+    logger.debug({ count: productImages.length }, '[OpenRouter Fallback] Adicionando imagens de referência');
     for (const img of productImages) {
       contentParts.push({
         type: "image_url",
@@ -3554,8 +3557,7 @@ const generateImageWithOpenRouter = async (prompt, productImages) => {
   if (message.images && message.images.length > 0) {
     const imageUrl = message.images[0].image_url?.url;
     if (imageUrl) {
-      console.log(`[OpenRouter Fallback] ✅ Imagem gerada com sucesso!`);
-      console.log(`[OpenRouter Fallback] ========================================`);
+      logger.info({}, '[OpenRouter Fallback] Imagem gerada com sucesso');
       return imageUrl;
     }
   }
@@ -3564,8 +3566,7 @@ const generateImageWithOpenRouter = async (prompt, productImages) => {
   if (message.content) {
     const base64Match = message.content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
     if (base64Match) {
-      console.log(`[OpenRouter Fallback] ✅ Imagem encontrada no content!`);
-      console.log(`[OpenRouter Fallback] ========================================`);
+      logger.info({}, '[OpenRouter Fallback] Imagem encontrada no content');
       return base64Match[0];
     }
   }
@@ -3595,8 +3596,9 @@ const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
         error?.status === 503;
 
       if (isRetryable && attempt < maxRetries) {
-        console.log(
-          `[Gemini] Retry ${attempt}/${maxRetries} after ${delayMs}ms...`,
+        logger.debug(
+          { attempt, maxRetries, delayMs },
+          '[Gemini] Retrying after delay'
         );
         await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
         continue;
@@ -3716,10 +3718,7 @@ const generateImageWithFallback = async (
   } catch (error) {
     // Check if this is a quota/rate limit error that warrants fallback
     if (isQuotaOrRateLimitError(error)) {
-      console.log(`[generateImageWithFallback] ========================================`);
-      console.log(`[generateImageWithFallback] ⚠️ Gemini falhou com erro de quota/rate limit`);
-      console.log(`[generateImageWithFallback] Erro original: ${error.message}`);
-      console.log(`[generateImageWithFallback] Tentando fallback para Replicate...`);
+      logger.info({ error: error.message }, '[generateImageWithFallback] Gemini falhou com erro de quota/rate limit, tentando fallback para Replicate');
 
       try {
         const result = await generateImageWithReplicate(
@@ -3730,8 +3729,7 @@ const generateImageWithFallback = async (
           styleReferenceImage,
           personReferenceImage,
         );
-        console.log(`[generateImageWithFallback] ✅ Replicate fallback bem sucedido!`);
-        console.log(`[generateImageWithFallback] ========================================`);
+        logger.info({}, '[generateImageWithFallback] Replicate fallback bem sucedido');
         return { imageUrl: result, usedModel: REPLICATE_IMAGE_MODEL, usedProvider: "replicate", usedFallback: true };
       } catch (fallbackError) {
         logger.error({ err: fallbackError }, '[generateImageWithFallback] ❌ Replicate fallback também falhou');
@@ -4288,14 +4286,13 @@ app.post("/api/ai/campaign", async (req, res) => {
       });
     }
 
-    console.log("[Campaign API] Generating campaign...");
-    console.log("[Campaign API] Images:", {
+    logger.info({
       productImages: productImages?.length || 0,
       inspirationImages: inspirationImages?.length || 0,
       collabLogo: !!collabLogo,
       compositionAssets: compositionAssets?.length || 0,
       toneOverride: toneOfVoiceOverride || null,
-    });
+    }, '[Campaign API] Generating campaign');
 
     // Collect all images for vision models
     const allImages = [];
@@ -4454,8 +4451,8 @@ REGRAS CRÍTICAS:
       }));
 
     // Debug: log structure for troubleshooting (v2 - with carousels)
-    console.log("[Campaign API v2] Raw carousels from AI:", JSON.stringify(campaign.carousels, null, 2));
-    console.log("[Campaign API v2] Campaign structure:", {
+    logger.debug({ carousels: campaign.carousels }, '[Campaign API v2] Raw carousels from AI');
+    logger.debug({
       hasPosts: !!campaign.posts,
       postsCount: campaign.posts?.length,
       hasAdCreatives: !!campaign.adCreatives,
@@ -4471,9 +4468,9 @@ REGRAS CRÍTICAS:
       hasCollabLogo: !!collabLogo,
       compositionAssetsCount: compositionAssets?.length || 0,
       toneOverride: toneOfVoiceOverride || null,
-    });
+    }, '[Campaign API v2] Campaign structure');
 
-    console.log("[Campaign API] Campaign generated successfully");
+    logger.info({}, '[Campaign API] Campaign generated successfully');
 
     // Log AI usage
     const inputTokens = prompt.length / 4; // Estimate: ~4 chars per token
@@ -4544,7 +4541,7 @@ app.post("/api/ai/flyer", async (req, res) => {
         .json({ error: "prompt and brandProfile are required" });
     }
 
-    console.log(`[Flyer API] Generating flyer, aspect ratio: ${aspectRatio}`);
+    logger.info({ aspectRatio }, '[Flyer API] Generating flyer');
 
     const ai = getGeminiAi();
     const brandingInstruction = buildFlyerPrompt(brandProfile);
@@ -4631,7 +4628,7 @@ app.post("/api/ai/flyer", async (req, res) => {
     } catch (geminiError) {
       // Check if quota/rate limit error - fallback to Replicate
       if (isQuotaOrRateLimitError(geminiError)) {
-        console.log("[Flyer API] Gemini quota exceeded, trying Replicate fallback...");
+        logger.info({}, '[Flyer API] Gemini quota exceeded, trying Replicate fallback');
 
         // Build text prompt for Replicate (combine all text parts)
         const textPrompt = parts
@@ -4653,10 +4650,10 @@ app.post("/api/ai/flyer", async (req, res) => {
           undefined,
         );
 
-        console.log("[Flyer API] Replicate fallback successful!");
+        logger.info({}, '[Flyer API] Replicate fallback successful');
 
         // Upload to Vercel Blob (Replicate URLs are temporary)
-        console.log("[Flyer API] Uploading Replicate image to Vercel Blob...");
+        logger.info({}, '[Flyer API] Uploading Replicate image to Vercel Blob');
         try {
           const imageResponse = await fetch(replicateUrl);
           if (!imageResponse.ok) {
@@ -4673,7 +4670,7 @@ app.post("/api/ai/flyer", async (req, res) => {
           });
 
           imageDataUrl = blob.url;
-          console.log("[Flyer API] Uploaded to Vercel Blob:", blob.url);
+          logger.info({ url: blob.url }, '[Flyer API] Uploaded to Vercel Blob');
         } catch (uploadError) {
           logger.error({ err: uploadError }, "[Flyer API] Failed to upload to Vercel Blob");
           imageDataUrl = replicateUrl; // Use temporary URL as fallback
@@ -4686,7 +4683,7 @@ app.post("/api/ai/flyer", async (req, res) => {
       }
     }
 
-    console.log(`[Flyer API] Flyer generated successfully via ${usedProvider}`);
+    logger.info({ provider: usedProvider }, '[Flyer API] Flyer generated successfully');
 
     // Log AI usage
     await logAiUsage(sql, {
@@ -4748,9 +4745,12 @@ app.post("/api/ai/image", async (req, res) => {
         .json({ error: "prompt and brandProfile are required" });
     }
 
-    console.log(
-      `[Image API] Generating image with ${model}, aspect ratio: ${aspectRatio}${personReferenceImage ? ', with person reference' : ''} | productImages: ${productImages?.length || 0}`,
-    );
+    logger.info({
+      model,
+      aspectRatio,
+      hasPersonReference: !!personReferenceImage,
+      productImagesCount: productImages?.length || 0
+    }, '[Image API] Generating image');
 
     // Prepare product images array, including brand logo if available
     let allProductImages = productImages ? [...productImages] : [];
@@ -4761,7 +4761,7 @@ app.post("/api/ai/image", async (req, res) => {
       try {
         const logoBase64 = await urlToBase64(brandProfile.logo);
         if (logoBase64) {
-          console.log("[Image API] Including brand logo from HTTP URL");
+          logger.debug({}, '[Image API] Including brand logo from HTTP URL');
           // Detect mime type from URL or default to png
           const mimeType = brandProfile.logo.includes('.svg') ? 'image/svg+xml'
             : brandProfile.logo.includes('.jpg') || brandProfile.logo.includes('.jpeg') ? 'image/jpeg'
@@ -4791,8 +4791,7 @@ app.post("/api/ai/image", async (req, res) => {
       jsonPrompt,
     );
 
-    console.log("[Image API] Prompt:");
-    console.log(fullPrompt);
+    logger.debug({ prompt: fullPrompt }, '[Image API] Prompt');
 
     const result = await generateImageWithFallback(
       fullPrompt,
@@ -4804,12 +4803,12 @@ app.post("/api/ai/image", async (req, res) => {
       personReferenceImage,
     );
 
-    console.log("[Image API] Image generated successfully via", result.usedProvider);
+    logger.info({ provider: result.usedProvider }, '[Image API] Image generated successfully');
 
     // If image came from Replicate, upload to Vercel Blob (Replicate URLs are temporary)
     let finalImageUrl = result.imageUrl;
     if (result.usedProvider === 'replicate' && result.imageUrl && !result.imageUrl.startsWith('data:')) {
-      console.log("[Image API] Uploading Replicate image to Vercel Blob...");
+      logger.info({}, '[Image API] Uploading Replicate image to Vercel Blob');
       try {
         const imageResponse = await fetch(result.imageUrl);
         if (!imageResponse.ok) {
@@ -4826,7 +4825,7 @@ app.post("/api/ai/image", async (req, res) => {
         });
 
         finalImageUrl = blob.url;
-        console.log("[Image API] Uploaded to Vercel Blob:", blob.url);
+        logger.info({ url: blob.url }, '[Image API] Uploaded to Vercel Blob');
       } catch (uploadError) {
         logger.error({ err: uploadError }, "[Image API] Failed to upload to Vercel Blob");
         // Keep using the Replicate URL as fallback (will work temporarily)
@@ -4888,9 +4887,7 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
       return res.status(400).json({ error: "prompt is required" });
     }
 
-    console.log(
-      `[Convert Prompt API] Converting prompt to JSON, duration: ${duration}s`,
-    );
+    logger.info({ durationSeconds: duration }, '[Convert Prompt API] Converting prompt to JSON');
 
     const ai = getGeminiAi();
     const systemPrompt = getVideoPromptSystemPrompt(duration, aspectRatio);
@@ -4922,7 +4919,7 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
       result = text;
     }
 
-    console.log("[Convert Prompt API] Conversion successful");
+    logger.info({}, '[Convert Prompt API] Conversion successful');
 
     // Log AI usage
     const tokens = extractGeminiTokens(response);
@@ -4981,7 +4978,7 @@ app.post("/api/ai/text", async (req, res) => {
       return res.status(400).json({ error: "brandProfile is required" });
     }
 
-    console.log(`[Text API] Generating ${type} text...`);
+    logger.info({ type }, '[Text API] Generating text');
 
     const model = brandProfile.creativeModel || DEFAULT_TEXT_MODEL;
     const isOpenRouter = model.includes("/");
@@ -5078,7 +5075,7 @@ app.post("/api/ai/text", async (req, res) => {
       }
     }
 
-    console.log("[Text API] Text generated successfully");
+    logger.info({}, '[Text API] Text generated successfully');
 
     // Log AI usage
     const inputTokens = (userPrompt?.length || 0) / 4;
@@ -5132,7 +5129,7 @@ app.post("/api/ai/enhance-prompt", async (req, res) => {
       return res.status(400).json({ error: "prompt is required" });
     }
 
-    console.log("[Enhance Prompt API] Enhancing prompt with Grok...");
+    logger.info({}, '[Enhance Prompt API] Enhancing prompt with Grok');
 
     const openrouter = getOpenRouter();
 
@@ -5210,7 +5207,7 @@ REGRAS:
 
     const enhancedPrompt = response.choices[0]?.message?.content?.trim() || "";
 
-    console.log("[Enhance Prompt API] Successfully enhanced prompt with Grok");
+    logger.info({}, '[Enhance Prompt API] Successfully enhanced prompt with Grok');
 
     // Log AI usage
     const tokens = extractOpenRouterTokens(response);
@@ -5257,13 +5254,13 @@ app.post("/api/ai/edit-image", async (req, res) => {
       return res.status(400).json({ error: "image and prompt are required" });
     }
 
-    console.log("[Edit Image API] Editing image...", {
+    logger.info({
       imageSize: image?.base64?.length,
       mimeType: image?.mimeType,
       promptLength: prompt?.length,
       hasMask: !!mask,
       hasReference: !!referenceImage,
-    });
+    }, '[Edit Image API] Editing image');
 
     const ai = getGeminiAi();
     // Usar prompt direto sem adicionar texto extra que pode confundir o modelo
@@ -5276,16 +5273,16 @@ app.post("/api/ai/edit-image", async (req, res) => {
     }
     // Check for valid base64
     if (cleanBase64.length % 4 !== 0) {
-      console.log("[Edit Image API] Warning: base64 length is not multiple of 4, padding...");
+      logger.debug({}, '[Edit Image API] Warning: base64 length is not multiple of 4, padding');
       cleanBase64 = cleanBase64.padEnd(Math.ceil(cleanBase64.length / 4) * 4, '=');
     }
 
-    console.log("[Edit Image API] parts structure:", {
+    logger.debug({
       textLength: instructionPrompt.length,
       imageBase64Length: cleanBase64.length,
       mimeType: image.mimeType,
       partsCount: 2 + (!!mask) + (!!referenceImage)
-    });
+    }, '[Edit Image API] parts structure');
 
     const parts = [
       { text: instructionPrompt },
@@ -5295,7 +5292,7 @@ app.post("/api/ai/edit-image", async (req, res) => {
     let imageConfig = { imageSize: "1K" };
 
     if (mask) {
-      console.log("[Edit Image API] Adding mask, size:", mask.base64?.length);
+      logger.debug({ maskSize: mask.base64?.length }, '[Edit Image API] Adding mask');
       imageConfig = {
         ...imageConfig,
         mask: {
@@ -5338,11 +5335,11 @@ app.post("/api/ai/edit-image", async (req, res) => {
     }
 
     if (!imageDataUrl) {
-      console.log("[Edit Image API] Empty response:", JSON.stringify(response, null, 2).substring(0, 1000));
+      logger.debug({ response: JSON.stringify(response, null, 2).substring(0, 1000) }, '[Edit Image API] Empty response');
       throw new Error("Failed to edit image - API returned empty response");
     }
 
-    console.log("[Edit Image API] Image edited successfully");
+    logger.info({}, '[Edit Image API] Image edited successfully');
 
     // Log AI usage
     await logAiUsage(sql, {
@@ -5392,7 +5389,7 @@ app.post("/api/ai/extract-colors", async (req, res) => {
       return res.status(400).json({ error: "logo is required" });
     }
 
-    console.log("[Extract Colors API] Analyzing logo...");
+    logger.info({}, '[Extract Colors API] Analyzing logo');
 
     const ai = getGeminiAi();
 
@@ -5440,7 +5437,7 @@ Retorne as cores em formato hexadecimal (#RRGGBB).`,
 
     const colors = JSON.parse(response.text.trim());
 
-    console.log("[Extract Colors API] Colors extracted:", colors);
+    logger.info({ colors }, '[Extract Colors API] Colors extracted');
 
     // Log AI usage
     const tokens = extractGeminiTokens(response);
@@ -5487,7 +5484,7 @@ app.post("/api/ai/speech", async (req, res) => {
       return res.status(400).json({ error: "script is required" });
     }
 
-    console.log("[Speech API] Generating speech...");
+    logger.info({}, '[Speech API] Generating speech');
 
     const ai = getGeminiAi();
 
@@ -5511,7 +5508,7 @@ app.post("/api/ai/speech", async (req, res) => {
       throw new Error("Failed to generate speech");
     }
 
-    console.log("[Speech API] Speech generated successfully");
+    logger.info({}, '[Speech API] Speech generated successfully');
 
     // Log AI usage - TTS is priced per character
     await logAiUsage(sql, {
@@ -5574,7 +5571,7 @@ app.post("/api/ai/assistant", async (req, res) => {
       return res.status(400).json({ error: "history is required" });
     }
 
-    console.log("[Assistant API] Starting streaming conversation...");
+    logger.info({}, '[Assistant API] Starting streaming conversation');
 
     const ai = getGeminiAi();
     const sanitizedHistory = history
@@ -5677,7 +5674,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
     res.write("data: [DONE]\n\n");
     res.end();
 
-    console.log("[Assistant API] Streaming completed");
+    logger.info({}, '[Assistant API] Streaming completed');
 
     // Log AI usage - estimate tokens based on history length
     const inputTokens = JSON.stringify(sanitizedHistory).length / 4;
@@ -5967,9 +5964,11 @@ app.post("/api/ai/video", async (req, res) => {
     }
 
     const isInterpolationMode = useInterpolation && lastFrameUrl;
-    console.log(
-      `[Video API] Generating video with ${model}, audio: ${generateAudio}, interpolation: ${isInterpolationMode}`,
-    );
+    logger.info({
+      model,
+      generateAudio,
+      isInterpolation: isInterpolationMode
+    }, '[Video API] Generating video');
 
     let videoUrl;
     let usedProvider = "google";
@@ -6089,7 +6088,7 @@ async function validateRubeToken(rubeToken) {
       },
     };
 
-    console.log("[Instagram] Validating token with Rube MCP...");
+    logger.info({}, '[Instagram] Validating token with Rube MCP');
     const response = await fetch(RUBE_MCP_URL, {
       method: "POST",
       headers: {
@@ -6101,10 +6100,10 @@ async function validateRubeToken(rubeToken) {
     });
 
     const text = await response.text();
-    console.log("[Instagram] Rube response status:", response.status);
-    console.log(
-      "[Instagram] Rube response (first 500 chars):",
-      text.substring(0, 500),
+    logger.debug({ status: response.status }, '[Instagram] Rube response status');
+    logger.debug(
+      { responsePreview: text.substring(0, 500) },
+      '[Instagram] Rube response (first 500 chars)'
     );
 
     if (text.startsWith("<!DOCTYPE") || text.startsWith("<html")) {
@@ -6127,9 +6126,9 @@ async function validateRubeToken(rubeToken) {
       if (line.startsWith("data: ")) {
         try {
           const json = JSON.parse(line.substring(6));
-          console.log(
-            "[Instagram] Parsed SSE data:",
-            JSON.stringify(json, null, 2).substring(0, 500),
+          logger.debug(
+            { data: JSON.stringify(json, null, 2).substring(0, 500) },
+            '[Instagram] Parsed SSE data'
           );
           if (json?.error) {
             return {
@@ -6140,9 +6139,9 @@ async function validateRubeToken(rubeToken) {
           const nestedData = json?.result?.content?.[0]?.text;
           if (nestedData) {
             const parsed = JSON.parse(nestedData);
-            console.log(
-              "[Instagram] Nested data:",
-              JSON.stringify(parsed, null, 2).substring(0, 500),
+            logger.debug(
+              { nestedData: JSON.stringify(parsed, null, 2).substring(0, 500) },
+              '[Instagram] Nested data'
             );
             if (parsed?.error || parsed?.data?.error) {
               return {
@@ -6155,10 +6154,9 @@ async function validateRubeToken(rubeToken) {
             if (results && results.length > 0) {
               const userData = results[0]?.response?.data;
               if (userData?.id) {
-                console.log(
-                  "[Instagram] Found user:",
-                  userData.username,
-                  userData.id,
+                logger.debug(
+                  { username: userData.username, id: userData.id },
+                  '[Instagram] Found user'
                 );
                 return {
                   success: true,
@@ -6208,7 +6206,7 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
         await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
       resolvedUserId = userResult[0]?.id;
       if (!resolvedUserId) {
-        console.log("[Instagram] User not found for Clerk ID:", user_id);
+        logger.debug({ clerk_user_id: user_id }, '[Instagram] User not found for Clerk ID');
         return res.json([]);
       }
     } else {
@@ -6216,11 +6214,11 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
       const userResult =
         await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
       if (userResult.length === 0) {
-        console.log("[Instagram] User not found for DB UUID:", user_id);
+        logger.debug({ user_id }, '[Instagram] User not found for DB UUID');
         return res.json([]);
       }
     }
-    console.log("[Instagram] Resolved user ID:", resolvedUserId);
+    logger.debug({ resolvedUserId }, '[Instagram] Resolved user ID');
 
     const result = organization_id
       ? await sql`
@@ -6251,11 +6249,11 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
     const sql = getSql();
     const { user_id, organization_id, rube_token } = req.body;
 
-    console.log("[Instagram] POST request:", {
+    logger.debug({
       user_id,
       organization_id,
       hasToken: !!rube_token,
-    });
+    }, '[Instagram] POST request');
 
     if (!user_id || !rube_token) {
       return res
@@ -6271,22 +6269,22 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
         await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
       resolvedUserId = userResult[0]?.id;
       if (!resolvedUserId) {
-        console.log("[Instagram] User not found for Clerk ID:", user_id);
+        logger.debug({ clerk_user_id: user_id }, '[Instagram] User not found for Clerk ID');
         return res.status(400).json({ error: "User not found" });
       }
     } else {
       const userResult =
         await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
       if (userResult.length === 0) {
-        console.log("[Instagram] User not found for DB UUID:", user_id);
+        logger.debug({ user_id }, '[Instagram] User not found for DB UUID');
         return res.status(400).json({ error: "User not found" });
       }
     }
-    console.log("[Instagram] Resolved user ID:", resolvedUserId);
+    logger.debug({ resolvedUserId }, '[Instagram] Resolved user ID');
 
     // Validate the Rube token
     const validation = await validateRubeToken(rube_token);
-    console.log("[Instagram] Validation result:", validation);
+    logger.debug({ validation }, '[Instagram] Validation result');
     if (!validation.success) {
       return res
         .status(400)
@@ -6407,11 +6405,9 @@ app.post("/api/rube", async (req, res) => {
 
     // Multi-tenant mode: use user's token from database
     if (instagram_account_id && user_id) {
-      console.log(
-        "[Rube Proxy] Multi-tenant mode - fetching token for account:",
-        instagram_account_id,
-        "org:",
-        organization_id,
+      logger.debug(
+        { instagram_account_id, organization_id },
+        '[Rube Proxy] Multi-tenant mode - fetching token for account'
       );
 
       // Resolve user_id: can be DB UUID or Clerk ID
@@ -6421,12 +6417,12 @@ app.post("/api/rube", async (req, res) => {
           await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
         resolvedUserId = userResult[0]?.id;
         if (!resolvedUserId) {
-          console.log("[Rube Proxy] User not found for Clerk ID:", user_id);
+          logger.debug({ clerk_user_id: user_id }, '[Rube Proxy] User not found for Clerk ID');
           return res.status(400).json({ error: "User not found" });
         }
-        console.log(
-          "[Rube Proxy] Resolved Clerk ID to DB UUID:",
-          resolvedUserId,
+        logger.debug(
+          { resolvedUserId },
+          '[Rube Proxy] Resolved Clerk ID to DB UUID'
         );
       }
 
@@ -6449,7 +6445,7 @@ app.post("/api/rube", async (req, res) => {
           `;
 
       if (accountResult.length === 0) {
-        console.log("[Rube Proxy] Instagram account not found or not active for user/org");
+        logger.debug({}, '[Rube Proxy] Instagram account not found or not active for user/org');
         return res
           .status(403)
           .json({ error: "Instagram account not found or inactive" });
@@ -6457,9 +6453,9 @@ app.post("/api/rube", async (req, res) => {
 
       token = accountResult[0].rube_token;
       instagramUserId = accountResult[0].instagram_user_id;
-      console.log(
-        "[Rube Proxy] Using token for Instagram user:",
-        instagramUserId,
+      logger.debug(
+        { instagramUserId },
+        '[Rube Proxy] Using token for Instagram user'
       );
 
       // Update last_used_at
@@ -6470,7 +6466,7 @@ app.post("/api/rube", async (req, res) => {
       if (!token) {
         return res.status(500).json({ error: "RUBE_TOKEN not configured" });
       }
-      console.log("[Rube Proxy] Using global RUBE_TOKEN (dev mode)");
+      logger.debug({}, '[Rube Proxy] Using global RUBE_TOKEN (dev mode)');
     }
 
     // Inject ig_user_id into tool arguments if we have it
@@ -6485,19 +6481,18 @@ app.post("/api/rube", async (req, res) => {
             tool.arguments.ig_user_id = instagramUserId;
           }
         });
-        console.log(
-          "[Rube Proxy] Injected ig_user_id into",
-          mcpRequest.params.arguments.tools.length,
-          "tools",
+        logger.debug(
+          { toolsCount: mcpRequest.params.arguments.tools.length },
+          '[Rube Proxy] Injected ig_user_id into tools'
         );
       } else {
         // For direct tool calls
         mcpRequest.params.arguments.ig_user_id = instagramUserId;
-        console.log("[Rube Proxy] Injected ig_user_id directly");
+        logger.debug({}, '[Rube Proxy] Injected ig_user_id directly');
       }
     }
 
-    console.log("[Rube Proxy] Calling Rube MCP:", mcpRequest.params?.name);
+    logger.debug({ methodName: mcpRequest.params?.name }, '[Rube Proxy] Calling Rube MCP');
 
     const response = await fetch(RUBE_MCP_URL, {
       method: "POST",
@@ -6510,7 +6505,7 @@ app.post("/api/rube", async (req, res) => {
     });
 
     const text = await response.text();
-    console.log("[Rube Proxy] Response status:", response.status);
+    logger.debug({ status: response.status }, '[Rube Proxy] Response status');
     res.status(response.status).send(text);
   } catch (error) {
     logger.error({ err: error }, "[Rube Proxy] Error");
@@ -6677,7 +6672,7 @@ app.post("/api/image-playground/generate", async (req, res) => {
           try {
             const logoBase64 = await urlToBase64(mappedBrandProfile.logo);
             if (logoBase64) {
-              console.log("[ImagePlayground] Including brand logo from HTTP URL");
+              logger.debug({}, '[ImagePlayground] Including brand logo from HTTP URL');
               const mimeType = mappedBrandProfile.logo.includes('.svg') ? 'image/svg+xml'
                 : mappedBrandProfile.logo.includes('.jpg') || mappedBrandProfile.logo.includes('.jpeg') ? 'image/jpeg'
                 : 'image/png';
@@ -6708,8 +6703,7 @@ app.post("/api/image-playground/generate", async (req, res) => {
           jsonPrompt
         );
 
-        console.log("[ImagePlayground] Brand profile prompt:");
-        console.log(fullPrompt);
+        logger.debug({ prompt: fullPrompt }, '[ImagePlayground] Brand profile prompt');
 
         // 4. Update enhanced params with full prompt and product images
         enhancedParams = {
@@ -6719,7 +6713,7 @@ app.post("/api/image-playground/generate", async (req, res) => {
           brandProfile: mappedBrandProfile,
         };
 
-        console.log(`[ImagePlayground] Brand profile applied: ${mappedBrandProfile.name}, hasLogo: ${hasLogo}`);
+        logger.debug({ brandProfileName: mappedBrandProfile.name, hasLogo }, '[ImagePlayground] Brand profile applied');
       }
     }
 
@@ -6824,7 +6818,7 @@ const startup = async () => {
   const redisConnected = await waitForRedis(5000);
 
   if (redisConnected) {
-    console.log(`${colors.green}✓ Redis connected${colors.reset}`);
+    logger.info({}, 'Redis connected');
 
     // NOTE: Image generation jobs were REMOVED (2026-01-25)
     // Images are now generated synchronously via /api/images endpoint
@@ -6837,30 +6831,17 @@ const startup = async () => {
         publishScheduledPostById
       );
       if (worker) {
-        console.log(`${colors.green}✓ Scheduled posts worker initialized${colors.reset}`);
+        logger.info({}, 'Scheduled posts worker initialized');
       }
     } catch (error) {
       logger.error({ err: error }, 'Failed to initialize scheduled posts worker');
     }
   } else {
-    console.log(`${colors.yellow}⚠ Redis not available, workers disabled${colors.reset}`);
+    logger.info({}, 'Redis not available, workers disabled');
   }
 
   app.listen(PORT, () => {
-    console.log("");
-    console.log(
-      `${colors.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`,
-    );
-    console.log(
-      `${colors.green}  API Server${colors.reset}  http://localhost:${PORT}`,
-    );
-    console.log(
-      `${colors.green}  Database${colors.reset}    ${DATABASE_URL ? `${colors.green}Connected${colors.reset}` : `${colors.red}NOT CONFIGURED${colors.reset}`}`,
-    );
-    console.log(
-      `${colors.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`,
-    );
-    console.log("");
+    logger.info({ port: PORT, databaseConnected: !!DATABASE_URL }, 'API Server started');
   });
 };
 
