@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getAuthToken } from '../authService';
+import type { WindowWithClerk } from '../../__tests__/test-utils';
+import { createMockClerk } from '../../__tests__/test-utils';
 
 describe('authService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete (window as any).Clerk;
+    delete (window as WindowWithClerk).Clerk;
   });
 
   describe('getAuthToken', () => {
@@ -15,11 +17,7 @@ describe('authService', () => {
 
     it('should return token when Clerk session is available', async () => {
       const mockToken = 'test-auth-token-123';
-      (window as any).Clerk = {
-        session: {
-          getToken: vi.fn().mockResolvedValue(mockToken),
-        },
-      };
+      (window as WindowWithClerk).Clerk = createMockClerk(mockToken);
 
       const token = await getAuthToken();
       expect(token).toBe(mockToken);
@@ -27,15 +25,13 @@ describe('authService', () => {
     });
 
     it('should return null when getToken throws an error', async () => {
-      (window as any).Clerk = {
-        session: {
-          getToken: vi.fn().mockRejectedValue(new Error('Token error')),
-        },
-      };
+      const mockClerk = createMockClerk();
+      mockClerk.session!.getToken.mockRejectedValue(new Error('Token error'));
+      (window as WindowWithClerk).Clerk = mockClerk;
 
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const token = await getAuthToken();
-      
+
       expect(token).toBeNull();
       consoleWarnSpy.mockRestore();
     });
