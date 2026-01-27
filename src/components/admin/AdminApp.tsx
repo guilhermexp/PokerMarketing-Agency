@@ -11,6 +11,7 @@ import { OverviewPage } from './pages/OverviewPage';
 import { UsersPage } from './pages/UsersPage';
 import { OrganizationsPage } from './pages/OrganizationsPage';
 import { UsagePage } from './pages/UsagePage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
 import { LogsPage } from './pages/LogsPage';
 
 export function AdminApp() {
@@ -22,6 +23,7 @@ export function AdminApp() {
           <Route path="users" element={<UsersPage />} />
           <Route path="organizations" element={<OrganizationsPage />} />
           <Route path="usage" element={<UsagePage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="logs" element={<LogsPage />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
