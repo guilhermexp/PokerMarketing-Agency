@@ -119,6 +119,13 @@ export function AnalyticsPage() {
     imagens: parseInt(item.count) || 0,
   }));
 
+  // Transform AI costs by organization for chart
+  const costsByOrgChartData = (data?.ai_costs_by_org || []).map((item) => ({
+    org: item.organization_id.slice(0, 8) + '...',
+    custo_usd: (parseInt(item.total_cost_cents) || 0) / 100,
+    custo_brl: ((parseInt(item.total_cost_cents) || 0) / 100) * 6.0,
+  }));
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -151,7 +158,7 @@ export function AnalyticsPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <StatsCard
           title="Total de Campanhas"
           value={data?.total_campaigns?.toLocaleString('pt-BR') || 0}
@@ -198,13 +205,24 @@ export function AnalyticsPage() {
         <StatsCard
           title="Custo IA"
           value={`$${((data?.total_ai_cost_cents || 0) / 100).toFixed(2)}`}
-          subtitle="Custos totais"
+          subtitle={`R$ ${(((data?.total_ai_cost_cents || 0) / 100) * 6.0).toFixed(2).replace('.', ',')}`}
           icon={
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           }
-          color="default"
+          color="amber"
+        />
+        <StatsCard
+          title="Tempo Economizado"
+          value={`${(data?.estimated_time_saved_hours || 0).toFixed(1)}h`}
+          subtitle="Automação de tarefas"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+          color="green"
         />
       </div>
 
@@ -304,6 +322,67 @@ export function AnalyticsPage() {
                   strokeWidth={1.5}
                 />
               </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* AI Costs by Organization */}
+      {costsByOrgChartData.length > 0 && (
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-5">
+          <h3 className="text-[13px] font-medium text-white/70 mb-4">
+            Custos de IA por Organização (
+            {period === 'day' && 'Últimas 24 horas'}
+            {period === 'week' && 'Últimos 7 dias'}
+            {period === 'month' && 'Últimos 30 dias'}
+            )
+          </h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={costsByOrgChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis
+                  dataKey="org"
+                  stroke="rgba(255,255,255,0.3)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="rgba(255,255,255,0.3)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => `$${value.toFixed(2)}`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1a1a1a',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                  }}
+                  labelStyle={{ color: 'rgba(255,255,255,0.7)' }}
+                  itemStyle={{ color: 'rgba(255,255,255,0.9)' }}
+                  formatter={(value: number, name: string) => {
+                    if (name === 'USD') return [`$${value.toFixed(2)}`, name];
+                    if (name === 'BRL') return [`R$ ${value.toFixed(2).replace('.', ',')}`, name];
+                    return [value, name];
+                  }}
+                />
+                <Bar
+                  dataKey="custo_usd"
+                  name="USD"
+                  fill="#f59e0b"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="custo_brl"
+                  name="BRL"
+                  fill="#10b981"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
