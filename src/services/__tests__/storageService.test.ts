@@ -1,40 +1,49 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { initDB, saveImagesToDB, loadImagesFromDB } from '../storageService';
 import type { GalleryImage } from '../../types';
+import type {
+  MockIDBDatabase,
+  MockIDBFactory,
+  MockIDBOpenDBRequest,
+  MockIDBObjectStore,
+  MockIDBTransaction,
+  MockIDBRequest,
+} from '../../__tests__/test-utils';
+import {
+  createMockIDBDatabase,
+  createMockIDBObjectStore,
+  createMockIDBRequest,
+} from '../../__tests__/test-utils';
 
 describe('storageService', () => {
-  const mockDB = {
-    objectStoreNames: { contains: vi.fn() },
-    transaction: vi.fn(),
-    createObjectStore: vi.fn().mockReturnValue({ createIndex: vi.fn() }),
-  };
+  let mockDB: MockIDBDatabase;
 
-  const createMockRequest = () => ({
-    result: mockDB as any,
-    error: null as any,
-    onsuccess: null as any,
-    onerror: null as any,
-    onupgradeneeded: null as any,
+  const createMockOpenRequest = (): MockIDBOpenDBRequest => ({
+    result: mockDB,
+    error: null,
+    onsuccess: null,
+    onerror: null,
+    onupgradeneeded: null,
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDB.objectStoreNames.contains.mockReturnValue(false);
+    mockDB = createMockIDBDatabase();
 
     // Default mock setup
-    const request = createMockRequest();
-    (global as any).indexedDB = {
+    const request = createMockOpenRequest();
+    (global as { indexedDB: MockIDBFactory }).indexedDB = {
       open: vi.fn().mockReturnValue(request),
     };
   });
 
   describe('initDB', () => {
     it('should initialize database successfully', async () => {
-      const request = createMockRequest();
-      vi.mocked(indexedDB.open).mockReturnValue(request as any);
+      const request = createMockOpenRequest();
+      vi.mocked(indexedDB.open).mockReturnValue(request);
 
       const promise = initDB();
-      setTimeout(() => request.onsuccess?.({} as any), 0);
+      setTimeout(() => request.onsuccess?.(), 0);
 
       const db = await promise;
       expect(db).toBe(mockDB);
@@ -42,24 +51,24 @@ describe('storageService', () => {
     });
 
     it('should reject on database open error', async () => {
-      const request = createMockRequest();
-      vi.mocked(indexedDB.open).mockReturnValue(request as any);
+      const request = createMockOpenRequest();
+      vi.mocked(indexedDB.open).mockReturnValue(request);
 
       const promise = initDB();
-      setTimeout(() => request.onerror?.({} as any), 0);
+      setTimeout(() => request.onerror?.(), 0);
 
       await expect(promise).rejects.toBe('Erro ao abrir o banco de dados');
     });
 
     it('should create stores on upgrade', async () => {
-      const request = createMockRequest();
-      vi.mocked(indexedDB.open).mockReturnValue(request as any);
+      const request = createMockOpenRequest();
+      vi.mocked(indexedDB.open).mockReturnValue(request);
 
       const promise = initDB();
 
       setTimeout(() => {
-        request.onupgradeneeded?.({ target: { result: mockDB } } as any);
-        request.onsuccess?.({} as any);
+        request.onupgradeneeded?.({ target: { result: mockDB } });
+        request.onsuccess?.();
       }, 0);
 
       await promise;
@@ -81,14 +90,14 @@ describe('storageService', () => {
         },
       ];
 
-      const request = createMockRequest();
-      vi.mocked(indexedDB.open).mockReturnValue(request as any);
+      const request = createMockOpenRequest();
+      vi.mocked(indexedDB.open).mockReturnValue(request);
 
-      const mockStore = { clear: vi.fn(), add: vi.fn() };
-      const mockTransaction = {
+      const mockStore = createMockIDBObjectStore();
+      const mockTransaction: MockIDBTransaction = {
         objectStore: vi.fn().mockReturnValue(mockStore),
-        oncomplete: null as any,
-        onerror: null as any,
+        oncomplete: null,
+        onerror: null,
       };
 
       mockDB.transaction.mockReturnValue(mockTransaction);
@@ -97,7 +106,7 @@ describe('storageService', () => {
 
       // Trigger sequence
       setTimeout(() => {
-        request.onsuccess?.({} as any);
+        request.onsuccess?.();
         setTimeout(() => {
           mockTransaction.oncomplete?.();
         }, 10);
@@ -121,23 +130,27 @@ describe('storageService', () => {
         imageSize: '1K',
       }];
 
-      const request = createMockRequest();
-      vi.mocked(indexedDB.open).mockReturnValue(request as any);
+      const request = createMockOpenRequest();
+      vi.mocked(indexedDB.open).mockReturnValue(request);
 
-      const mockGetAllRequest = {
+      const mockGetAllRequest: MockIDBRequest<GalleryImage[]> = {
         result: mockImages,
-        onsuccess: null as any,
-        onerror: null as any,
+        onsuccess: null,
+        onerror: null,
       };
 
-      const mockStore = { getAll: vi.fn().mockReturnValue(mockGetAllRequest) };
-      const mockTransaction = { objectStore: vi.fn().mockReturnValue(mockStore) };
-      mockDB.transaction.mockReturnValue(mockTransaction);
+      const mockStore: Partial<MockIDBObjectStore> = {
+        getAll: vi.fn().mockReturnValue(mockGetAllRequest),
+      };
+      const mockTransaction: Partial<MockIDBTransaction> = {
+        objectStore: vi.fn().mockReturnValue(mockStore),
+      };
+      mockDB.transaction.mockReturnValue(mockTransaction as MockIDBTransaction);
 
       const loadPromise = loadImagesFromDB();
 
       setTimeout(() => {
-        request.onsuccess?.({} as any);
+        request.onsuccess?.();
         setTimeout(() => mockGetAllRequest.onsuccess?.(), 10);
       }, 10);
 
