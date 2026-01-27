@@ -228,7 +228,7 @@ function AppContent() {
     orgId: string | null;
   }>({ userId: null, orgId: null });
 
-  const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
+  const [brandProfile, setBrandProfile] = useState<BrandProfile | undefined>(undefined);
   const [campaign, setCampaign] = useState<MarketingCampaign | null>(null);
   const [campaignProductImages, setCampaignProductImages] = useState<
     { base64: string; mimeType: string }[] | null
@@ -518,7 +518,7 @@ function AppContent() {
   // Clear brandProfile when switching contexts (user/organization)
   useEffect(() => {
     console.debug("[App] Context changed, clearing brandProfile");
-    setBrandProfile(null);
+    setBrandProfile(undefined);
   }, [userId, organizationId]);
 
   // Brand profile is now loaded via useInitialData (single request for ALL data)
@@ -1294,7 +1294,7 @@ function AppContent() {
                 title: c.title,
                 hook: c.hook,
                 cover_prompt: c.cover_prompt,
-                caption: c.caption || null,
+                caption: c.caption ?? undefined,
                 slides: c.slides || [],
               })),
           });
@@ -1438,7 +1438,7 @@ function AppContent() {
             title: c.title,
             hook: c.hook,
             cover_prompt: c.cover_prompt || "",
-            cover_url: c.cover_url || null,
+            cover_url: c.cover_url ?? undefined,
             caption: c.caption || "",
             slides: c.slides || [],
           })),
@@ -2404,7 +2404,7 @@ function AppContent() {
             publishingStates={publishingStates}
             campaignsList={campaignsList}
             onLoadCampaign={handleLoadCampaign}
-            userId={userId}
+            userId={userId ?? undefined}
             organizationId={organizationId}
             isWeekExpired={isWeekExpired}
             onClearExpiredSchedule={async () => {

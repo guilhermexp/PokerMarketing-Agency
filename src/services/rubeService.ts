@@ -194,6 +194,10 @@ export const executeInstagramTool = async (
   context?: InstagramContext
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> => {
+  if (!context) {
+    throw new Error('Instagram context is required for tool execution');
+  }
+
   const result = await callRubeMCP('RUBE_MULTI_EXECUTE_TOOL', {
     tools: [{
       tool_slug: toolSlug,

@@ -27,6 +27,7 @@ import type { DataUIPart } from './DataStreamProvider';
 import { MessageResponse } from './MessageResponse';
 import { MessageActionsEnhanced } from './MessageActionsEnhanced';
 import { ToolWithApproval } from './ToolWithApproval';
+import type { ToolDisplayMetadata } from './ToolDisplay';
 import { LoadingIndicatorEnhanced } from './LoadingIndicatorEnhanced';
 import { uploadDataUrlToBlob } from '../../services/blobService';
 
@@ -176,7 +177,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // useChat hook do Vercel AI SDK
-  const chatOptions: UseChatOptions<UIMessage> = {
+  const chatOptions = {
     id: chatId,
     body: {
       brandProfile: brandProfile,
@@ -195,7 +196,15 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       // Auto-limpar erro após 5 segundos
       setTimeout(() => setErrorMessage(null), 5000);
     },
-    onFinish: (message: UIMessage) => {
+    onFinish: (options: {
+      message: UIMessage;
+      messages: UIMessage[];
+      isAbort: boolean;
+      isDisconnect: boolean;
+      isError: boolean;
+      finishReason?: string;
+    }) => {
+      const { message } = options;
       console.info('[AssistantPanel] Message finished:', {
         role: message.role,
         partsCount: message.parts?.length || 0
@@ -279,7 +288,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     // Verificar se a tool call existe nas mensagens antes de aprovar/rejeitar
     const allToolCalls = messages.flatMap(msg =>
       msg.parts.filter(isToolUIPart).map(part => ({
-        id: part.id,
+        id: 'id' in part ? part.id : part.toolCallId,
         toolName: part.type.replace('tool-', ''),
         state: part.state
       }))
@@ -317,14 +326,12 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       // Notificar o agente que a edição foi aprovada
       console.log('✅ [AssistantPanel] Calling addToolApprovalResponse with:', {
         id: toolCallId,
-        approved: true,
-        result: imageUrl
+        approved: true
       });
 
       addToolApprovalResponse({
         id: toolCallId,
-        approved: true,
-        result: imageUrl
+        approved: true
       });
 
       console.log('✅ [AssistantPanel] addToolApprovalResponse completed');
@@ -644,7 +651,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
                     args={toolArgs}
                     metadata={
                       'metadata' in toolPart
-                        ? (toolPart as { metadata?: { preview?: unknown } }).metadata?.preview
+                        ? (toolPart as { metadata?: { preview?: unknown } }).metadata?.preview as unknown as ToolDisplayMetadata | undefined
                         : undefined
                     }
                     state={mapToolState(toolPart.state)}

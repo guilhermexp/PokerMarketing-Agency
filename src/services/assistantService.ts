@@ -12,7 +12,7 @@ import { getAuthToken } from './authService';
  */
 export async function* runAssistantConversationStream(
   history: ChatMessage[],
-  brandProfile: BrandProfile | null
+  brandProfile: BrandProfile | undefined
 ): AsyncGenerator<{ text: string; functionCall?: AssistantFunctionCall }> {
   const token = await getAuthToken();
 

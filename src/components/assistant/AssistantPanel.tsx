@@ -86,7 +86,7 @@ const ChatBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
         {imagePart && (
           <div className="mb-3 rounded-2xl overflow-hidden border border-white/10 group relative">
             <img
-              src={`data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`}
+              src={`data:${imagePart.inlineData?.mimeType};base64,${imagePart.inlineData?.data}`}
               alt="Anexo"
               className="w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />

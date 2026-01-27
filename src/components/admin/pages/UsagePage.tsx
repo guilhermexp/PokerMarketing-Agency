@@ -258,7 +258,7 @@ export function UsagePage() {
                 <XAxis type="number" stroke="rgba(255,255,255,0.3)" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v.toFixed(0)}`} />
                 <YAxis type="category" dataKey="name" stroke="rgba(255,255,255,0.3)" fontSize={9} width={80} tickLine={false} axisLine={false} />
                 <Tooltip
-                  formatter={(value: number) => [`$${value.toFixed(2)}`, 'Custo']}
+                  formatter={(value: number | undefined) => [`$${(value ?? 0).toFixed(2)}`, 'Custo']}
                   contentStyle={{
                     backgroundColor: '#1a1a1a',
                     border: '1px solid rgba(255,255,255,0.1)',

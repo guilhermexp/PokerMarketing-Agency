@@ -87,7 +87,7 @@ export const useUiStore = create<UiState>()(
       currentView: 'dashboard',
 
       // Modal actions
-      openModal: (modal, data = null) => {
+      openModal: (modal, data = undefined) => {
         set({
           activeModal: modal,
           modalData: data,
@@ -113,7 +113,7 @@ export const useUiStore = create<UiState>()(
       },
 
       // Loading actions
-      setGlobalLoading: (loading, message = null) => {
+      setGlobalLoading: (loading, message = undefined) => {
         set({
           globalLoading: loading,
           loadingMessage: message,

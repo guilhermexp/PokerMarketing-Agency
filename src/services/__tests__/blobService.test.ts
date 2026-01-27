@@ -9,7 +9,7 @@ import { createMockFetchResponse } from '../../__tests__/test-utils';
 
 describe('blobService', () => {
   beforeEach(() => {
-    global.fetch = vi.fn() as MockFetch;
+    global.fetch = vi.fn() as unknown as typeof global.fetch;
     vi.clearAllMocks();
   });
 
@@ -23,7 +23,7 @@ describe('blobService', () => {
     it('should upload image successfully', async () => {
       const mockUrl = 'https://blob.vercel-storage.com/test-image.png';
       const mockResponse = createMockFetchResponse({ url: mockUrl });
-      (global.fetch as MockFetch).mockResolvedValue(mockResponse);
+      (global.fetch as unknown as MockFetch).mockResolvedValue(mockResponse);
 
       const base64Data = 'iVBORw0KGgo=';
       const result = await uploadImageToBlob(base64Data, 'image/png');
@@ -34,7 +34,7 @@ describe('blobService', () => {
 
     it('should throw error on failed upload', async () => {
       const mockResponse = createMockFetchResponse({ error: 'Upload failed' }, false, 500);
-      (global.fetch as MockFetch).mockResolvedValue(mockResponse);
+      (global.fetch as unknown as MockFetch).mockResolvedValue(mockResponse);
 
       await expect(uploadImageToBlob('test-data')).rejects.toThrow('Upload failed');
     });
@@ -50,7 +50,7 @@ describe('uploadDataUrlToBlob', () => {
     it('should upload data URL to blob', async () => {
       const mockUrl = 'https://blob.vercel-storage.com/uploaded.png';
       const mockResponse = createMockFetchResponse({ url: mockUrl });
-      (global.fetch as MockFetch).mockResolvedValue(mockResponse);
+      (global.fetch as unknown as MockFetch).mockResolvedValue(mockResponse);
 
       const dataUrl = 'data:image/png;base64,iVBORw0KGgo=';
       const result = await uploadDataUrlToBlob(dataUrl);

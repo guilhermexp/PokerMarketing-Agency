@@ -5,6 +5,7 @@
  * in test files, improving type safety and IDE autocomplete in tests.
  */
 
+import { vi } from 'vitest';
 import type { Mock } from 'vitest';
 
 // ============================================================================
@@ -236,7 +237,7 @@ export function setupMockIndexedDB(): MockIDBDatabase {
     onupgradeneeded: null,
   };
 
-  (global as { indexedDB: MockIDBFactory }).indexedDB = {
+  (global as unknown as { indexedDB: MockIDBFactory }).indexedDB = {
     open: vi.fn().mockReturnValue(request),
   };
 
