@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "001-add-consistent-focus-ring-styling-across-all-inter",
+  "spec": "020-global-error-handler-with-structured-logging",
   "state": "building",
   "subtasks": {
-    "completed": 16,
-    "total": 17,
+    "completed": 4,
+    "total": 16,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Keyboard Navigation Verification",
+    "current": "Add Error Infrastructure",
     "id": null,
-    "total": 3
+    "total": 4
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 18,
-    "started_at": "2026-01-23T01:08:45.840692"
+    "number": 6,
+    "started_at": "2026-01-26T20:53:49.689570"
   },
-  "last_update": "2026-01-23T01:52:07.270787"
+  "last_update": "2026-01-26T21:08:28.746168"
 }
