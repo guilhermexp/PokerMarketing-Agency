@@ -3,6 +3,7 @@
  * All AI operations go through the server to keep API keys secure
  */
 
+import { z } from 'zod';
 import type { BrandProfile } from '../types';
 import { getAuthToken } from './authService';
 
@@ -33,11 +34,9 @@ export interface PromptPart {
 export const generateCreativeText = async (
   brandProfile: BrandProfile,
   parts: { text?: string; inlineData?: { mimeType: string; data: string } }[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema: any,
+  schema: z.ZodTypeAny,
   temperature: number = 0.7
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> => {
+): Promise<string> => {
   const token = await getAuthToken();
 
   // Extrai texto e imagens das partes
