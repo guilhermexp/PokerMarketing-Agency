@@ -63,17 +63,20 @@ import {
 } from "./helpers/image-playground.mjs";
 import { requestLogger } from "./middleware/requestLogger.mjs";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.mjs";
+import logger from "./lib/logger.mjs";
 
 const app = express();
 const PORT = 3002;
 
 // Surface fatal errors during dev so the API doesn't silently exit.
 process.on("uncaughtException", (error) => {
-  console.error("[Dev API] uncaughtException:", error);
+  logger.fatal({ err: error }, "Uncaught exception in Dev API");
+  process.exit(1); // Exit with error code
 });
 
 process.on("unhandledRejection", (error) => {
-  console.error("[Dev API] unhandledRejection:", error);
+  logger.fatal({ err: error }, "Unhandled rejection in Dev API");
+  process.exit(1); // Exit with error code
 });
 
 app.use(cors());
