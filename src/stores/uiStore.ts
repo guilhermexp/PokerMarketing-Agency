@@ -11,6 +11,7 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { parseApiError } from '../utils/errorMessages';
 
 // =============================================================================
 // Types
@@ -123,10 +124,27 @@ export const useUiStore = create<UiState>()(
       // Toast actions
       addToast: (toast) => {
         const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        // Default duration based on severity
+        const defaultDuration = toast.duration ?? (() => {
+          switch (toast.type) {
+            case 'error':
+              return 10000; // 10s - errors need more attention
+            case 'warning':
+              return 7000;  // 7s - warnings are important
+            case 'success':
+              return 4000;  // 4s - success messages can be brief
+            case 'info':
+              return 5000;  // 5s - standard duration
+            default:
+              return 5000;
+          }
+        })();
+
         const newToast: Toast = {
           ...toast,
           id,
-          duration: toast.duration ?? 5000,
+          duration: defaultDuration,
         };
 
         set((state) => ({
@@ -199,6 +217,18 @@ export const useToast = () => {
       addToast({ type: 'warning', message, duration }),
     info: (message: string, duration?: number) =>
       addToast({ type: 'info', message, duration }),
+    /**
+     * Converts an API error into a user-friendly toast notification
+     * Uses parseApiError to extract message and suggested actions
+     */
+    errorFromApi: (error: unknown, duration?: number) => {
+      const parsed = parseApiError(error);
+      const message = parsed.action
+        ? `${parsed.message}. ${parsed.action}`
+        : parsed.message;
+
+      return addToast({ type: 'error', message, duration });
+    },
     dismiss: removeToast,
   };
 };

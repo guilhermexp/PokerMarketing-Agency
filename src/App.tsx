@@ -49,6 +49,7 @@ import {
 import { useOrganization } from "@clerk/clerk-react";
 import { BackgroundJobsProvider } from "./hooks/useBackgroundJobs";
 import { BackgroundJobsIndicator } from "./components/common/BackgroundJobsIndicator";
+import { ToastContainer } from "./components/common/ToastContainer";
 import { ChatProvider } from "./contexts/ChatContext";
 import {
   getBrandProfile,
@@ -2482,6 +2483,7 @@ function AppContent() {
         </>
       )}
       <BackgroundJobsIndicator isAssistantOpen={isAssistantOpen} />
+      <ToastContainer />
     </>
   );
 }
