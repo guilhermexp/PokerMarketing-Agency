@@ -249,18 +249,17 @@ function logExternalAPIResult(service, action, duration, success = true) {
 }
 
 function logError(context, error) {
-  console.error(`\n${colors.red}━━━ ERROR: ${context} ━━━${colors.reset}`);
-  console.error(`${colors.red}Message:${colors.reset}`, error.message);
+  logger.error({ err: error, context }, `ERROR: ${context}`);
+  logger.error({ message: error.message }, `Message: ${error.message}`);
   if (error.stack) {
-    console.error(`${colors.dim}${error.stack}${colors.reset}`);
+    logger.error({ stack: error.stack }, 'Stack trace');
   }
   if (error.response?.data) {
-    console.error(
-      `${colors.yellow}Response:${colors.reset}`,
-      JSON.stringify(error.response.data, null, 2),
+    logger.error(
+      { responseData: error.response.data },
+      'Response data',
     );
   }
-  console.error(`${colors.red}━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}\n`);
 }
 
 function logQuery(requestId, _endpoint, _queryName) {
@@ -311,7 +310,7 @@ async function warmupDatabase() {
     await sql`SELECT 1 as warmup`;
     console.log(`✓ Database connection warmed up in ${Date.now() - start}ms`);
   } catch (error) {
-    console.error("Database warmup failed:", error.message);
+    logger.error({ err: error }, "Database warmup failed");
   }
 }
 
@@ -341,9 +340,9 @@ async function ensureGallerySourceType(sql) {
     await sql`DROP TYPE IF EXISTS image_source`;
     console.log("[Dev API Server] gallery_images.source migration complete");
   } catch (error) {
-    console.error(
-      "[Dev API Server] Failed to migrate gallery_images.source:",
-      error?.message || error,
+    logger.error(
+      { err: error },
+      "[Dev API Server] Failed to migrate gallery_images.source",
     );
   }
 }
@@ -486,7 +485,7 @@ async function requireSuperAdmin(req, res, next) {
     req.adminEmail = userEmail;
     next();
   } catch (error) {
-    console.error('[Admin] Auth error:', error);
+    logger.error({ err: error }, '[Admin] Auth error');
     res.status(500).json({ error: 'Authentication error' });
   }
 }
@@ -537,7 +536,7 @@ app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
       recentErrors: parseInt(errorsResult[0]?.count || 0)
     });
   } catch (error) {
-    console.error('[Admin] Stats error:', error);
+    logger.error({ err: error }, '[Admin] Stats error');
     res.status(500).json({ error: 'Failed to fetch stats' });
   }
 });
@@ -577,7 +576,7 @@ app.get("/api/admin/usage", requireSuperAdmin, async (req, res) => {
       timeline: Object.values(aggregated).sort((a, b) => a.date.localeCompare(b.date))
     });
   } catch (error) {
-    console.error('[Admin] Usage error:', error);
+    logger.error({ err: error }, '[Admin] Usage error');
     res.status(500).json({ error: 'Failed to fetch usage data' });
   }
 });
@@ -630,7 +629,7 @@ app.get("/api/admin/users", requireSuperAdmin, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Admin] Users error:', error);
+    logger.error({ err: error }, '[Admin] Users error');
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
@@ -772,7 +771,7 @@ app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Admin] Organizations error:', error);
+    logger.error({ err: error }, '[Admin] Organizations error');
     res.status(500).json({ error: 'Failed to fetch organizations' });
   }
 });
@@ -820,7 +819,7 @@ app.get("/api/admin/logs", requireSuperAdmin, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Admin] Logs error:', error);
+    logger.error({ err: error }, '[Admin] Logs error');
     res.status(500).json({ error: 'Failed to fetch logs' });
   }
 });
@@ -848,7 +847,7 @@ app.get("/api/admin/logs/:id", requireSuperAdmin, async (req, res) => {
 
     res.json(logs[0]);
   } catch (error) {
-    console.error('[Admin] Log detail error:', error);
+    logger.error({ err: error }, '[Admin] Log detail error');
     res.status(500).json({ error: 'Failed to fetch log details' });
   }
 });
@@ -933,7 +932,7 @@ Formate em markdown claro com seções.`;
 
     res.json({ suggestions, cached: false });
   } catch (error) {
-    console.error('[Admin] AI suggestions error:', error);
+    logger.error({ err: error }, '[Admin] AI suggestions error');
     res.status(500).json({ error: 'Failed to generate AI suggestions' });
   }
 });
@@ -1675,9 +1674,9 @@ app.delete("/api/db/gallery", async (req, res) => {
         await del(srcUrl);
         console.log(`[Gallery] Deleted file from Vercel Blob: ${srcUrl}`);
       } catch (blobError) {
-        console.error(
-          `[Gallery] Failed to delete file from Vercel Blob: ${srcUrl}`,
-          blobError
+        logger.error(
+          { err: blobError, srcUrl },
+          `[Gallery] Failed to delete file from Vercel Blob: ${srcUrl}`
         );
         // Don't fail the request if blob deletion fails - DB record is already deleted
       }
@@ -1912,7 +1911,7 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
       await schedulePostForPublishing(newPost.id, resolvedUserId, timestampMs);
       console.log(`[API] Scheduled job for post ${newPost.id} at ${new Date(timestampMs).toISOString()}`);
     } catch (error) {
-      console.error(`[API] Failed to schedule job for post ${newPost.id}:`, error.message);
+      logger.error({ err: error, postId: newPost.id }, `[API] Failed to schedule job for post ${newPost.id}`);
       // Don't fail the request if job scheduling fails - fallback checker will catch it
     }
 
@@ -1983,7 +1982,7 @@ app.put("/api/db/scheduled-posts", async (req, res) => {
         await cancelScheduledPost(id);
         console.log(`[API] Cancelled scheduled job for post ${id} (status changed to cancelled)`);
       } catch (error) {
-        console.error(`[API] Failed to cancel job for post ${id}:`, error.message);
+        logger.error({ err: error, postId: id }, `[API] Failed to cancel job for post ${id}`);
       }
     }
 
@@ -2039,7 +2038,7 @@ app.delete("/api/db/scheduled-posts", async (req, res) => {
       await cancelScheduledPost(id);
       console.log(`[API] Cancelled scheduled job for deleted post ${id}`);
     } catch (error) {
-      console.error(`[API] Failed to cancel job for post ${id}:`, error.message);
+      logger.error({ err: error, postId: id }, `[API] Failed to cancel job for post ${id}`);
       // Don't fail the request if job cancellation fails
     }
 
@@ -2496,7 +2495,7 @@ app.delete("/api/db/campaigns", async (req, res) => {
         await del(url);
         console.log(`[Campaign Delete] Deleted file: ${url}`);
       } catch (blobError) {
-        console.error(`[Campaign Delete] Failed to delete file: ${url}`, blobError);
+        logger.error({ err: blobError, url }, `[Campaign Delete] Failed to delete file: ${url}`);
         // Continue even if blob deletion fails
       }
     }
@@ -3571,8 +3570,7 @@ const generateImageWithOpenRouter = async (prompt, productImages) => {
     }
   }
 
-  console.error(`[OpenRouter Fallback] ❌ Nenhuma imagem encontrada na resposta`);
-  console.error(`[OpenRouter Fallback] Response:`, JSON.stringify(response, null, 2));
+  logger.error({ response }, '[OpenRouter Fallback] ❌ Nenhuma imagem encontrada na resposta');
   throw new Error("[OpenRouter] No image data in response");
 };
 
@@ -3680,7 +3678,7 @@ const generateGeminiImage = async (
 
   const responseParts = response?.candidates?.[0]?.content?.parts;
   if (!Array.isArray(responseParts)) {
-    console.error("[Image API] Unexpected response:", JSON.stringify(response, null, 2));
+    logger.error({ response }, "[Image API] Unexpected response");
     throw new Error("Failed to generate image - invalid response structure");
   }
 
@@ -3736,9 +3734,7 @@ const generateImageWithFallback = async (
         console.log(`[generateImageWithFallback] ========================================`);
         return { imageUrl: result, usedModel: REPLICATE_IMAGE_MODEL, usedProvider: "replicate", usedFallback: true };
       } catch (fallbackError) {
-        console.error(`[generateImageWithFallback] ❌ Replicate fallback também falhou`);
-        console.error(`[generateImageWithFallback] Erro do fallback: ${fallbackError.message}`);
-        console.error(`[generateImageWithFallback] ========================================`);
+        logger.error({ err: fallbackError }, '[generateImageWithFallback] ❌ Replicate fallback também falhou');
         // Throw the original error if fallback also fails
         throw error;
       }
@@ -4001,7 +3997,7 @@ const convertImagePromptToJson = async (
 
     return result;
   } catch (error) {
-    console.error('[Image Prompt JSON] Error:', error);
+    logger.error({ err: error }, '[Image Prompt JSON] Error');
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/convert-image-prompt',
@@ -4506,7 +4502,7 @@ REGRAS CRÍTICAS:
       model,
     });
   } catch (error) {
-    console.error("[Campaign API] Error:", error);
+    logger.error({ err: error }, "[Campaign API] Error");
     // Log failed usage
     await logAiUsage(sql, {
       organizationId,
@@ -4679,7 +4675,7 @@ app.post("/api/ai/flyer", async (req, res) => {
           imageDataUrl = blob.url;
           console.log("[Flyer API] Uploaded to Vercel Blob:", blob.url);
         } catch (uploadError) {
-          console.error("[Flyer API] Failed to upload to Vercel Blob:", uploadError.message);
+          logger.error({ err: uploadError }, "[Flyer API] Failed to upload to Vercel Blob");
           imageDataUrl = replicateUrl; // Use temporary URL as fallback
         }
 
@@ -4711,7 +4707,7 @@ app.post("/api/ai/flyer", async (req, res) => {
       imageUrl: imageDataUrl,
     });
   } catch (error) {
-    console.error("[Flyer API] Error:", error);
+    logger.error({ err: error }, "[Flyer API] Error");
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/flyer',
@@ -4832,7 +4828,7 @@ app.post("/api/ai/image", async (req, res) => {
         finalImageUrl = blob.url;
         console.log("[Image API] Uploaded to Vercel Blob:", blob.url);
       } catch (uploadError) {
-        console.error("[Image API] Failed to upload to Vercel Blob:", uploadError.message);
+        logger.error({ err: uploadError }, "[Image API] Failed to upload to Vercel Blob");
         // Keep using the Replicate URL as fallback (will work temporarily)
       }
     }
@@ -4862,7 +4858,7 @@ app.post("/api/ai/image", async (req, res) => {
       model,
     });
   } catch (error) {
-    console.error("[Image API] Error:", error);
+    logger.error({ err: error }, "[Image API] Error");
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/image',
@@ -4946,7 +4942,7 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
       result,
     });
   } catch (error) {
-    console.error("[Convert Prompt API] Error:", error);
+    logger.error({ err: error }, "[Convert Prompt API] Error");
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/convert-prompt',
@@ -5105,7 +5101,7 @@ app.post("/api/ai/text", async (req, res) => {
       model,
     });
   } catch (error) {
-    console.error("[Text API] Error:", error);
+    logger.error({ err: error }, "[Text API] Error");
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/text',
@@ -5231,7 +5227,7 @@ REGRAS:
 
     res.json({ enhancedPrompt });
   } catch (error) {
-    console.error("[Enhance Prompt API] Error:", error);
+    logger.error({ err: error }, "[Enhance Prompt API] Error");
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/enhance-prompt',
@@ -5366,7 +5362,7 @@ app.post("/api/ai/edit-image", async (req, res) => {
       imageUrl: imageDataUrl,
     });
   } catch (error) {
-    console.error("[Edit Image API] Error:", error);
+    logger.error({ err: error }, "[Edit Image API] Error");
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/edit-image',
@@ -5461,7 +5457,7 @@ Retorne as cores em formato hexadecimal (#RRGGBB).`,
 
     res.json(colors);
   } catch (error) {
-    console.error("[Extract Colors API] Error:", error);
+    logger.error({ err: error }, "[Extract Colors API] Error");
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/extract-colors',
@@ -5534,7 +5530,7 @@ app.post("/api/ai/speech", async (req, res) => {
       audioBase64,
     });
   } catch (error) {
-    console.error("[Speech API] Error:", error);
+    logger.error({ err: error }, "[Speech API] Error");
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/speech',
@@ -5696,7 +5692,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
       metadata: { historyLength: sanitizedHistory.length }
     }).catch(() => {});
   } catch (error) {
-    console.error("[Assistant API] Error:", error);
+    logger.error({ err: error }, "[Assistant API] Error");
     await logAiUsage(sql, {
       organizationId,
       endpoint: '/api/ai/assistant',
@@ -6173,13 +6169,13 @@ async function validateRubeToken(rubeToken) {
             }
           }
         } catch (e) {
-          console.error("[Instagram] Parse error:", e);
+          logger.error({ err: e }, "[Instagram] Parse error");
         }
       }
     }
     return { success: false, error: "Instagram não conectado no Rube." };
   } catch (error) {
-    console.error("[Instagram] Validation error:", error);
+    logger.error({ err: error }, "[Instagram] Validation error");
     return { success: false, error: error.message || "Erro ao validar token" };
   }
 }
@@ -6244,7 +6240,7 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error("[Instagram Accounts API] Error:", error);
+    logger.error({ err: error }, "[Instagram Accounts API] Error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6336,7 +6332,7 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
       message: `Conta @${instagramUsername} conectada!`,
     });
   } catch (error) {
-    console.error("[Instagram Accounts API] Error:", error);
+    logger.error({ err: error }, "[Instagram Accounts API] Error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6372,7 +6368,7 @@ app.put("/api/db/instagram-accounts", async (req, res) => {
       message: "Token atualizado!",
     });
   } catch (error) {
-    console.error("[Instagram Accounts API] Error:", error);
+    logger.error({ err: error }, "[Instagram Accounts API] Error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6390,7 +6386,7 @@ app.delete("/api/db/instagram-accounts", async (req, res) => {
     await sql`UPDATE instagram_accounts SET is_active = FALSE, updated_at = NOW() WHERE id = ${id}`;
     res.json({ success: true, message: "Conta desconectada." });
   } catch (error) {
-    console.error("[Instagram Accounts API] Error:", error);
+    logger.error({ err: error }, "[Instagram Accounts API] Error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6517,7 +6513,7 @@ app.post("/api/rube", async (req, res) => {
     console.log("[Rube Proxy] Response status:", response.status);
     res.status(response.status).send(text);
   } catch (error) {
-    console.error("[Rube Proxy] Error:", error);
+    logger.error({ err: error }, "[Rube Proxy] Error");
     res.status(500).json({
       error: error instanceof Error ? error.message : "Unknown error",
     });
@@ -6540,7 +6536,7 @@ app.get("/api/image-playground/topics", async (req, res) => {
 
     res.json({ topics });
   } catch (error) {
-    console.error("[ImagePlayground] Get topics error:", error);
+    logger.error({ err: error }, "[ImagePlayground] Get topics error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6558,7 +6554,7 @@ app.post("/api/image-playground/topics", async (req, res) => {
 
     res.json({ success: true, topic });
   } catch (error) {
-    console.error("[ImagePlayground] Create topic error:", error);
+    logger.error({ err: error }, "[ImagePlayground] Create topic error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6577,7 +6573,7 @@ app.patch("/api/image-playground/topics/:id", async (req, res) => {
 
     res.json({ success: true, topic });
   } catch (error) {
-    console.error("[ImagePlayground] Update topic error:", error);
+    logger.error({ err: error }, "[ImagePlayground] Update topic error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6595,7 +6591,7 @@ app.delete("/api/image-playground/topics/:id", async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error("[ImagePlayground] Delete topic error:", error);
+    logger.error({ err: error }, "[ImagePlayground] Delete topic error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6615,7 +6611,7 @@ app.get("/api/image-playground/batches", async (req, res) => {
 
     res.json({ batches });
   } catch (error) {
-    console.error("[ImagePlayground] Get batches error:", error);
+    logger.error({ err: error }, "[ImagePlayground] Get batches error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6633,7 +6629,7 @@ app.delete("/api/image-playground/batches/:id", async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error("[ImagePlayground] Delete batch error:", error);
+    logger.error({ err: error }, "[ImagePlayground] Delete batch error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6740,7 +6736,7 @@ app.post("/api/image-playground/generate", async (req, res) => {
 
     res.json({ success: true, data: result });
   } catch (error) {
-    console.error("[ImagePlayground] Generate error:", error);
+    logger.error({ err: error }, "[ImagePlayground] Generate error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6759,7 +6755,7 @@ app.get("/api/image-playground/status/:generationId", async (req, res) => {
 
     res.json(status);
   } catch (error) {
-    console.error("[ImagePlayground] Get status error:", error);
+    logger.error({ err: error }, "[ImagePlayground] Get status error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6777,7 +6773,7 @@ app.delete("/api/image-playground/generations/:id", async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error("[ImagePlayground] Delete generation error:", error);
+    logger.error({ err: error }, "[ImagePlayground] Delete generation error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6798,7 +6794,7 @@ app.post("/api/image-playground/generate-title", async (req, res) => {
 
     res.json({ title });
   } catch (error) {
-    console.error("[ImagePlayground] Generate title error:", error);
+    logger.error({ err: error }, "[ImagePlayground] Generate title error");
     res.status(500).json({ error: error.message });
   }
 });
@@ -6820,7 +6816,7 @@ const startup = async () => {
       const sql = getSql();
       await ensureGallerySourceType(sql);
     } catch (error) {
-      console.error(`${colors.red}✗ Startup check failed${colors.reset}`);
+      logger.error('Startup check failed');
     }
   }
 
@@ -6844,7 +6840,7 @@ const startup = async () => {
         console.log(`${colors.green}✓ Scheduled posts worker initialized${colors.reset}`);
       }
     } catch (error) {
-      console.error(`${colors.red}✗ Failed to initialize scheduled posts worker:${colors.reset}`, error.message);
+      logger.error({ err: error }, 'Failed to initialize scheduled posts worker');
     }
   } else {
     console.log(`${colors.yellow}⚠ Redis not available, workers disabled${colors.reset}`);
