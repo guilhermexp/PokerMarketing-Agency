@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useChat } from '@ai-sdk/react';
+import { useChat, type UseChatOptions } from '@ai-sdk/react';
 import {
   isFileUIPart,
   isTextUIPart,
@@ -176,9 +176,9 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // useChat hook do Vercel AI SDK
-  const chatOptions = {
+  const chatOptions: UseChatOptions<UIMessage> = {
     id: chatId,
-    ...({ body: {
+    body: {
       brandProfile: brandProfile,
       chatReferenceImage: referenceImage,
       selectedChatModel: brandProfile?.creativeModel || 'x-ai/grok-4.1-fast'
@@ -201,8 +201,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
         partsCount: message.parts?.length || 0
       });
     }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any) as Parameters<typeof useChat>[0]};
+  };
 
   const { messages, sendMessage, status, addToolApprovalResponse, setMessages } = useChat<UIMessage>(chatOptions);
 
