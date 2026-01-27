@@ -77,6 +77,86 @@ export function AnalyticsPage() {
     fetchData();
   }, [getToken, period]);
 
+  const handleExportCSV = () => {
+    if (!data) return;
+
+    const csvRows: string[] = [];
+
+    // Header
+    csvRows.push('Analytics Report - DirectorAI');
+    csvRows.push(`Period: ${period === 'day' ? 'Dia' : period === 'week' ? 'Semana' : 'Mês'}`);
+    csvRows.push(`Generated: ${new Date().toLocaleString('pt-BR')}`);
+    csvRows.push('');
+
+    // Summary Stats
+    csvRows.push('RESUMO GERAL');
+    csvRows.push('Métrica,Valor');
+    csvRows.push(`Total de Campanhas,${data.total_campaigns}`);
+    csvRows.push(`Total de Imagens,${data.total_images}`);
+    csvRows.push(`Total de Flyers,${data.total_flyers}`);
+    csvRows.push(`Taxa de Sucesso,${((data.success_rate || 0) * 100).toFixed(1)}%`);
+    csvRows.push(`Custo IA (USD),${((data.total_ai_cost_cents || 0) / 100).toFixed(2)}`);
+    csvRows.push(`Custo IA (BRL),${(((data.total_ai_cost_cents || 0) / 100) * 6.0).toFixed(2)}`);
+    csvRows.push(`Tempo Economizado (horas),${(data.estimated_time_saved_hours || 0).toFixed(1)}`);
+    csvRows.push('');
+
+    // Campaigns per day
+    if (data.campaigns_per_day.length > 0) {
+      csvRows.push('CAMPANHAS POR DIA');
+      csvRows.push('Data,Quantidade');
+      data.campaigns_per_day.forEach((item) => {
+        const date = new Date(item.date).toLocaleDateString('pt-BR');
+        csvRows.push(`${date},${item.count}`);
+      });
+      csvRows.push('');
+    }
+
+    // Images per day
+    if (data.images_per_day.length > 0) {
+      csvRows.push('IMAGENS POR DIA');
+      csvRows.push('Data,Quantidade');
+      data.images_per_day.forEach((item) => {
+        const date = new Date(item.date).toLocaleDateString('pt-BR');
+        csvRows.push(`${date},${item.count}`);
+      });
+      csvRows.push('');
+    }
+
+    // Campaigns by organization
+    if (data.campaigns_by_organization.length > 0) {
+      csvRows.push('CAMPANHAS POR ORGANIZAÇÃO');
+      csvRows.push('Organização ID,Quantidade');
+      data.campaigns_by_organization.forEach((item) => {
+        csvRows.push(`${item.organization_id},${item.count}`);
+      });
+      csvRows.push('');
+    }
+
+    // AI costs by organization
+    if (data.ai_costs_by_org.length > 0) {
+      csvRows.push('CUSTOS DE IA POR ORGANIZAÇÃO');
+      csvRows.push('Organização ID,Custo (USD),Custo (BRL)');
+      data.ai_costs_by_org.forEach((item) => {
+        const costUSD = (parseInt(item.total_cost_cents) || 0) / 100;
+        const costBRL = costUSD * 6.0;
+        csvRows.push(`${item.organization_id},${costUSD.toFixed(2)},${costBRL.toFixed(2)}`);
+      });
+    }
+
+    // Create CSV blob and download
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `analytics-${period}-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -137,23 +217,37 @@ export function AnalyticsPage() {
           </p>
         </div>
 
-        {/* Period Selector */}
-        <div className="flex items-center gap-2">
-          {(['day', 'week', 'month'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 text-[13px] rounded-md transition-colors ${
-                period === p
-                  ? 'bg-white/10 text-white/90 border border-white/20'
-                  : 'bg-white/[0.02] text-white/40 border border-white/[0.06] hover:text-white/60'
-              }`}
-            >
-              {p === 'day' && 'Dia'}
-              {p === 'week' && 'Semana'}
-              {p === 'month' && 'Mês'}
-            </button>
-          ))}
+        {/* Period Selector & Export Button */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {(['day', 'week', 'month'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 text-[13px] rounded-md transition-colors ${
+                  period === p
+                    ? 'bg-white/10 text-white/90 border border-white/20'
+                    : 'bg-white/[0.02] text-white/40 border border-white/[0.06] hover:text-white/60'
+                }`}
+              >
+                {p === 'day' && 'Dia'}
+                {p === 'week' && 'Semana'}
+                {p === 'month' && 'Mês'}
+              </button>
+            ))}
+          </div>
+
+          {/* Export Button */}
+          <button
+            onClick={handleExportCSV}
+            disabled={!data}
+            className="flex items-center gap-2 px-3 py-1.5 text-[13px] rounded-md transition-colors bg-white/10 text-white/90 border border-white/20 hover:bg-white/[0.15] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Exportar CSV
+          </button>
         </div>
       </div>
 
