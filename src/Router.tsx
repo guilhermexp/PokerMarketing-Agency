@@ -11,6 +11,13 @@ import { Loader } from './components/common/Loader';
 // Lazy load admin panel for code splitting
 const AdminApp = lazy(() => import('./components/admin/AdminApp'));
 
+// Dev-only: Error notification test page
+const ErrorNotificationTest = lazy(() =>
+  import('./components/test/ErrorNotificationTest').then((m) => ({
+    default: m.ErrorNotificationTest,
+  }))
+);
+
 export function Router() {
   return (
     <BrowserRouter>
@@ -24,6 +31,18 @@ export function Router() {
             </Suspense>
           }
         />
+
+        {/* Dev-only: Test routes */}
+        {import.meta.env.DEV && (
+          <Route
+            path="/test/error-notifications"
+            element={
+              <Suspense fallback={<AdminLoadingFallback />}>
+                <ErrorNotificationTest />
+              </Suspense>
+            }
+          />
+        )}
 
         {/* Main app - catch all other routes */}
         <Route path="/*" element={<App />} />
