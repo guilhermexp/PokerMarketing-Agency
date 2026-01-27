@@ -108,16 +108,21 @@ export const generateCampaignCover = async (
       }
     }
 
-    const imageDataUrl = await generateImage(prompt, context.brandProfile, {
+    const imageUrl = await generateImage(prompt, context.brandProfile, {
       aspectRatio: '4:5',
       model: 'gemini-3-pro-image-preview',
       productImages: productImages.length > 0 ? productImages : undefined,
       compositionAssets: context.compositionAssets?.length > 0 ? context.compositionAssets : undefined,
     });
 
-    const base64Data = imageDataUrl.split(',')[1];
-    const mimeType = imageDataUrl.match(/data:(.*?);/)?.[1] || 'image/png';
-    const httpUrl = await uploadImageToBlob(base64Data, mimeType);
+    // API now returns HTTP URL directly (Vercel Blob), no need to re-upload
+    let httpUrl = imageUrl;
+    if (imageUrl.startsWith('data:')) {
+      // Fallback: if still receiving data URL, upload to blob
+      const base64Data = imageUrl.split(',')[1];
+      const mimeType = imageUrl.match(/data:(.*?);/)?.[1] || 'image/png';
+      httpUrl = await uploadImageToBlob(base64Data, mimeType);
+    }
 
     if (httpUrl && carousel.id) {
       const updated: DbCarouselScript = await updateCarouselCover(
@@ -238,7 +243,7 @@ export const generateCampaignSlide = async (
       }
     }
 
-    const imageDataUrl = await generateImage(prompt, context.brandProfile, {
+    const imageUrl = await generateImage(prompt, context.brandProfile, {
       aspectRatio: '4:5',
       model: 'gemini-3-pro-image-preview',
       styleReferenceImage: styleRef,
@@ -246,9 +251,14 @@ export const generateCampaignSlide = async (
       compositionAssets: context.compositionAssets?.length > 0 ? context.compositionAssets : undefined,
     });
 
-    const base64Data = imageDataUrl.split(',')[1];
-    const mimeType = imageDataUrl.match(/data:(.*?);/)?.[1] || 'image/png';
-    const httpUrl = await uploadImageToBlob(base64Data, mimeType);
+    // API now returns HTTP URL directly (Vercel Blob), no need to re-upload
+    let httpUrl = imageUrl;
+    if (imageUrl.startsWith('data:')) {
+      // Fallback: if still receiving data URL, upload to blob
+      const base64Data = imageUrl.split(',')[1];
+      const mimeType = imageUrl.match(/data:(.*?);/)?.[1] || 'image/png';
+      httpUrl = await uploadImageToBlob(base64Data, mimeType);
+    }
 
     if (httpUrl && carousel.id) {
       const updated: DbCarouselScript = await updateCarouselSlideImage(
