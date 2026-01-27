@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "001-add-consistent-focus-ring-styling-across-all-inter",
-  "state": "building",
+  "spec": "022-typescript-strict-mode-migration",
+  "state": "planning",
   "subtasks": {
-    "completed": 16,
-    "total": 17,
+    "completed": 0,
+    "total": 0,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Keyboard Navigation Verification",
+    "current": "Prepare & Audit",
     "id": null,
-    "total": 3
+    "total": 2
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 18,
-    "started_at": "2026-01-23T01:08:45.840692"
+    "number": 2,
+    "started_at": "2026-01-26T21:19:50.220285"
   },
-  "last_update": "2026-01-23T01:52:07.270787"
+  "last_update": "2026-01-26T21:24:28.490179"
 }
