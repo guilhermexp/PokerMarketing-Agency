@@ -3,6 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { CheckCircle, XCircle, AlertTriangle, Info, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { Button } from "./button"
 
 const toastVariants = cva(
   "relative w-full rounded-lg border px-4 py-3 text-sm shadow-lg [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg~*]:pl-7",
@@ -29,8 +30,12 @@ const Toast = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof toastVariants> & {
     onClose?: () => void
+    action?: {
+      label: string
+      onClick: () => void
+    }
   }
->(({ className, variant, onClose, children, ...props }, ref) => {
+>(({ className, variant, onClose, action, children, ...props }, ref) => {
   const Icon = variant === "success"
     ? CheckCircle
     : variant === "error"
@@ -47,7 +52,19 @@ const Toast = React.forwardRef<
       {...props}
     >
       <Icon className="size-5" />
-      <div className="flex-1">{children}</div>
+      <div className="flex-1">
+        {children}
+        {action && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={action.onClick}
+            className="mt-2"
+          >
+            {action.label}
+          </Button>
+        )}
+      </div>
       {onClose && (
         <button
           onClick={onClose}
