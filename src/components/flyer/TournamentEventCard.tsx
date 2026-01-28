@@ -31,7 +31,7 @@ interface TournamentEventCardProps {
   model: ImageModel;
   imageSize: ImageSize;
   compositionAssets: ImageFile[];
-  collabLogo: string | null;
+  collabLogos: string[];
   styleReference: GalleryImage | null;
   generatedFlyers: (GalleryImage | 'loading')[];
   setGeneratedFlyers: (updater: (prev: (GalleryImage | 'loading')[]) => (GalleryImage | 'loading')[]) => void;
@@ -62,7 +62,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
   model,
   imageSize,
   compositionAssets,
-  collabLogo,
+  collabLogos,
   styleReference,
   generatedFlyers,
   setGeneratedFlyers,
@@ -162,10 +162,10 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
     setGeneratedFlyers((prev) => ['loading', ...prev]);
 
     try {
-      const [logoToUse, collabLogoToUse, refData] = await Promise.all([
+      const [logoToUse, refData, ...collabLogosToUse] = await Promise.all([
         brandProfile.logo ? urlToBase64(brandProfile.logo) : null,
-        collabLogo ? urlToBase64(collabLogo) : null,
         styleReference?.src ? urlToBase64(styleReference.src) : null,
+        ...collabLogos.map(logo => urlToBase64(logo)),
       ]);
       const assetsToUse = compositionAssets.map((a) => ({
         base64: a.base64,
@@ -178,7 +178,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
         refData,
         aspectRatio,
         model,
-        collabLogoToUse,
+        collabLogosToUse.filter(Boolean) as { base64: string; mimeType: string }[],
         imageSize,
         assetsToUse,
       );
@@ -200,7 +200,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [event, brandProfile, currency, model, aspectRatio, imageSize, collabLogo, styleReference, compositionAssets, userId, jobContext, setGeneratedFlyers]);
+  }, [event, brandProfile, currency, model, aspectRatio, imageSize, collabLogos, styleReference, compositionAssets, userId, jobContext, setGeneratedFlyers]);
 
   const handleQuickPost = (flyer: GalleryImage) => {
     setQuickPostFlyer(flyer);

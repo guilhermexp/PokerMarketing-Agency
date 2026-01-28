@@ -124,7 +124,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     selectedDay, selectedAspectRatio, selectedImageSize, selectedCurrency,
     selectedLanguage, selectedImageModel, showIndividualTournaments,
     showPastTournaments, enabledPeriods, isSettingsModalOpen,
-    showOnlyWithGtd, sortBy, collabLogo, manualStyleRef, isStylePanelOpen,
+    showOnlyWithGtd, sortBy, collabLogos, manualStyleRef, isStylePanelOpen,
     batchTrigger, isBatchGenerating, globalStyleReference, isManualModalOpen,
     isSchedulesPanelOpen, compositionAssets, isMobilePanelOpen
   } = state;
@@ -134,7 +134,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
     setSelectedCurrency, setSelectedLanguage, setSelectedImageModel,
     setShowIndividualTournaments, setShowPastTournaments, setEnabledPeriods,
     setIsSettingsModalOpen, setShowOnlyWithGtd, setSortBy,
-    setCollabLogo, setManualStyleRef, setIsStylePanelOpen, setIsManualModalOpen,
+    setCollabLogos, setManualStyleRef, setIsStylePanelOpen, setIsManualModalOpen,
     setIsSchedulesPanelOpen, setCompositionAssets, setBatchTrigger, setIsBatchGenerating,
     setGlobalStyleReference, setIsMobilePanelOpen
   } = setters;
@@ -445,13 +445,6 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   </select>
                 </>
               )}
-              <button
-                onClick={() => setIsManualModalOpen(true)}
-                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs sm:text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-              >
-                <Icon name="edit" className="w-4 h-4" />
-                <span className="hidden sm:inline">Add Manual</span>
-              </button>
               {/* Upload Spreadsheet - only show when no schedule is loaded */}
               {!weekScheduleInfo && (
                 <label className="cursor-pointer group">
@@ -469,6 +462,41 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                   />
                 </label>
               )}
+
+              <button
+                onClick={() => setIsManualModalOpen(true)}
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs sm:text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              >
+                <Icon name="edit" className="w-4 h-4" />
+                <span className="hidden sm:inline">Add Manual</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsBatchGenerating(true);
+                  setDailyFlyerState((prev) => ({
+                    ...prev,
+                    [selectedDay]: {
+                      ALL: [],
+                      MORNING: [],
+                      AFTERNOON: [],
+                      NIGHT: [],
+                      HIGHLIGHTS: [],
+                    },
+                  }));
+                  setBatchTrigger(true);
+                  setTimeout(() => {
+                    setBatchTrigger(false);
+                    setIsBatchGenerating(false);
+                  }, 1500);
+                }}
+                disabled={isBatchGenerating}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs sm:text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              >
+                <Icon name="zap" className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+                <span className="hidden sm:inline">{isBatchGenerating ? "Gerando..." : "Gerar Grade"}</span>
+                <span className="sm:hidden">{isBatchGenerating ? "..." : "Grade"}</span>
+              </button>
 
               {/* Settings button - hidden on mobile (shown in header) */}
               <button
@@ -629,50 +657,61 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 </select>
               </div>
 
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                {/* Logo Colab button */}
-                <label className="relative cursor-pointer group" title="Logo Colaborador">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]">
-                    {collabLogo ? (
-                      <img src={collabLogo} className="w-4 h-4 sm:w-5 sm:h-5 object-contain rounded" />
-                    ) : (
-                      <Icon name="briefcase" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    )}
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Logo Colab buttons - múltiplos logos */}
+                <div className="flex flex-col items-center gap-1">
+                  <div className="flex items-center gap-1.5">
+                    {/* Logos existentes */}
+                    {collabLogos.map((logo, index) => (
+                      <div key={index} className="relative group">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-black/40 backdrop-blur-2xl border border-white/30 flex items-center justify-center overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                          <img src={logo} className="w-full h-full object-contain" />
+                        </div>
+                        <button
+                          onClick={() => setCollabLogos(prev => prev.filter((_, i) => i !== index))}
+                          className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {/* Botão para adicionar mais */}
+                    <label className="relative cursor-pointer group">
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]">
+                        {collabLogos.length === 0 ? (
+                          <Icon name="briefcase" className="w-5 h-5" />
+                        ) : (
+                          <Icon name="plus" className="w-5 h-5" />
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (f) {
+                            const { dataUrl } = await fileToBase64(f);
+                            setCollabLogos(prev => [...prev, dataUrl]);
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
                   </div>
-                  <input
-                    type="file"
-                    className="hidden outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                    accept="image/*"
-                    onChange={async (e) => {
-                      const f = e.target.files?.[0];
-                      if (f) {
-                        const { dataUrl } = await fileToBase64(f);
-                        setCollabLogo(dataUrl);
-                      }
-                    }}
-                  />
-                  {collabLogo && (
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setCollabLogo(null);
-                      }}
-                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                    >
-                      ×
-                    </button>
-                  )}
-                </label>
+                  <span className="text-[9px] sm:text-[10px] font-medium text-white/50">Colab{collabLogos.length > 0 ? ` (${collabLogos.length})` : ''}</span>
+                </div>
 
                 {/* Referência button */}
-                <label className="relative cursor-pointer group" title="Referência de Estilo">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]">
+                <label className="relative cursor-pointer group flex flex-col items-center gap-1">
+                  <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-black/40 backdrop-blur-2xl border ${manualStyleRef ? 'border-white/30' : 'border-white/10'} text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]`}>
                     {manualStyleRef ? (
-                      <img src={manualStyleRef} className="w-4 h-4 sm:w-5 sm:h-5 object-cover rounded" />
+                      <img src={manualStyleRef} className="w-6 h-6 sm:w-7 sm:h-7 object-cover rounded" />
                     ) : (
-                      <Icon name="image" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <Icon name="image" className="w-5 h-5" />
                     )}
                   </div>
+                  <span className="text-[9px] sm:text-[10px] font-medium text-white/50 group-hover:text-white/70 transition-colors">Estilo</span>
                   <input
                     type="file"
                     className="hidden outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
@@ -707,14 +746,15 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                 </label>
 
                 {/* Ativos button */}
-                <label className="relative cursor-pointer group" title="Ativos de Composição">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]">
+                <label className="relative cursor-pointer group flex flex-col items-center gap-1">
+                  <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-black/40 backdrop-blur-2xl border ${compositionAssets.length > 0 ? 'border-white/30' : 'border-white/10'} text-white/60 flex items-center justify-center transition-all active:scale-95 hover:border-white/30 hover:text-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.5)] outline-none focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]`}>
                     {compositionAssets.length > 0 ? (
-                      <span className="text-[9px] sm:text-[10px] font-bold text-white/90">{compositionAssets.length}</span>
+                      <span className="text-sm font-bold text-white/90">{compositionAssets.length}</span>
                     ) : (
-                      <Icon name="layers" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <Icon name="layers" className="w-5 h-5" />
                     )}
                   </div>
+                  <span className="text-[9px] sm:text-[10px] font-medium text-white/50 group-hover:text-white/70 transition-colors">Ativos</span>
                   <input
                     type="file"
                     className="hidden outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
@@ -742,34 +782,6 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     </button>
                   )}
                 </label>
-
-                <button
-                  onClick={() => {
-                    setIsBatchGenerating(true);
-                    // Clear only the current day's flyers
-                    setDailyFlyerState((prev) => ({
-                      ...prev,
-                      [selectedDay]: {
-                        ALL: [],
-                        MORNING: [],
-                        AFTERNOON: [],
-                        NIGHT: [],
-                        HIGHLIGHTS: [],
-                      },
-                    }));
-                    setBatchTrigger(true);
-                    setTimeout(() => {
-                      setBatchTrigger(false);
-                      setIsBatchGenerating(false);
-                    }, 1500);
-                  }}
-                  disabled={isBatchGenerating}
-                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs sm:text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                >
-                  <Icon name="zap" className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
-                  <span className="hidden sm:inline">{isBatchGenerating ? "Gerando..." : "Gerar Grade"}</span>
-                  <span className="sm:hidden">{isBatchGenerating ? "..." : "Grade"}</span>
-                </button>
               </div>
             </div>
           </div>
@@ -825,7 +837,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                     triggerBatch={batchTrigger}
                     styleReference={globalStyleReference}
                     onCloneStyle={handleSetStyleReference}
-                    collabLogo={collabLogo}
+                    collabLogos={collabLogos}
                     compositionAssets={compositionAssets}
                     onPublishToCampaign={onPublishToCampaign}
                     userId={userId}
@@ -891,7 +903,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                                   [e.id]: u(prev[e.id] || []),
                                 }))
                               }
-                              collabLogo={collabLogo}
+                              collabLogos={collabLogos}
                               styleReference={globalStyleReference}
                               compositionAssets={compositionAssets}
                               onPublishToCampaign={onPublishToCampaign}
@@ -927,7 +939,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
                             [e.id]: u(prev[e.id] || []),
                           }))
                         }
-                        collabLogo={collabLogo}
+                        collabLogos={collabLogos}
                         styleReference={globalStyleReference}
                         compositionAssets={compositionAssets}
                         onPublishToCampaign={onPublishToCampaign}

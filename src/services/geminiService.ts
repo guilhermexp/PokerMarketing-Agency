@@ -174,7 +174,7 @@ export const generateFlyer = async (
   referenceImage: { base64: string; mimeType: string } | null,
   aspectRatio: string,
   model: ImageModel,
-  collabLogo?: { base64: string; mimeType: string } | null,
+  collabLogos?: { base64: string; mimeType: string }[],
   imageSize?: ImageSize,
   compositionAssets?: { base64: string; mimeType: string }[],
 ): Promise<string> => {
@@ -184,7 +184,7 @@ export const generateFlyer = async (
     logo,
     referenceImage,
     aspectRatio,
-    collabLogo,
+    collabLogos,
     imageSize,
     compositionAssets,
   });

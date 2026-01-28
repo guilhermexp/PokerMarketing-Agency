@@ -55,7 +55,7 @@ export const PeriodCard: React.FC<{
     triggerBatch: boolean;
     styleReference: GalleryImage | null;
     onCloneStyle: (image: GalleryImage) => void;
-    collabLogo: string | null;
+    collabLogos: string[];
     onPublishToCampaign: (text: string, flyer: GalleryImage) => void;
     userId?: string | null;
     instagramContext?: InstagramContext;
@@ -86,7 +86,7 @@ export const PeriodCard: React.FC<{
     setGeneratedFlyers,
     triggerBatch,
     styleReference,
-    collabLogo,
+    collabLogos,
     onCloneStyle,
     onPublishToCampaign,
     userId,
@@ -225,10 +225,10 @@ export const PeriodCard: React.FC<{
 
                 try {
                     // Convert all image sources to base64 (handles both data URLs and HTTP URLs)
-                    const [logoToUse, collabLogoToUse, refData] = await Promise.all([
+                    const [logoToUse, refData, ...collabLogosToUse] = await Promise.all([
                         brandProfile.logo ? urlToBase64(brandProfile.logo) : null,
-                        collabLogo ? urlToBase64(collabLogo) : null,
                         styleReference?.src ? urlToBase64(styleReference.src) : null,
+                        ...collabLogos.map(logo => urlToBase64(logo)),
                     ]);
                     const assetsToUse = compositionAssets.map((a) => ({
                         base64: a.base64,
@@ -241,7 +241,7 @@ export const PeriodCard: React.FC<{
                         refData,
                         aspectRatio,
                         model,
-                        collabLogoToUse,
+                        collabLogosToUse.filter(Boolean) as { base64: string; mimeType: string }[],
                         imageSize,
                         assetsToUse,
                     );
@@ -275,7 +275,7 @@ export const PeriodCard: React.FC<{
                 styleReference,
                 setGeneratedFlyers,
                 label,
-                collabLogo,
+                collabLogos,
                 imageSize,
                 compositionAssets,
                 userId,

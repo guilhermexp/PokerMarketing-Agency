@@ -94,9 +94,14 @@ export const useFlyerGenerator = (
         return (localStorage.getItem("flyer_sortBy") as "time" | "gtd") || "time";
     });
 
-    const [collabLogo, setCollabLogo] = useState<string | null>(() => {
-        if (typeof window === 'undefined') return null;
-        return localStorage.getItem("flyer_collabLogo") || null;
+    const [collabLogos, setCollabLogos] = useState<string[]>(() => {
+        if (typeof window === 'undefined') return [];
+        try {
+            const stored = localStorage.getItem("flyer_collabLogos");
+            return stored ? JSON.parse(stored) : [];
+        } catch {
+            return [];
+        }
     });
 
     const [manualStyleRef, setManualStyleRef] = useState<string | null>(() => {
@@ -127,10 +132,10 @@ export const useFlyerGenerator = (
 
     useEffect(() => {
         try {
-            if (collabLogo) localStorage.setItem("flyer_collabLogo", collabLogo);
-            else localStorage.removeItem("flyer_collabLogo");
-        } catch (e) { console.warn("Failed to save collabLogo:", e); }
-    }, [collabLogo]);
+            if (collabLogos.length > 0) localStorage.setItem("flyer_collabLogos", JSON.stringify(collabLogos));
+            else localStorage.removeItem("flyer_collabLogos");
+        } catch (e) { console.warn("Failed to save collabLogos:", e); }
+    }, [collabLogos]);
 
     useEffect(() => {
         try {
@@ -335,7 +340,7 @@ export const useFlyerGenerator = (
             activeHelpTooltip,
             showOnlyWithGtd,
             sortBy,
-            collabLogo,
+            collabLogos,
             manualStyleRef,
             isStylePanelOpen,
             batchTrigger,
@@ -360,7 +365,7 @@ export const useFlyerGenerator = (
             setActiveHelpTooltip,
             setShowOnlyWithGtd,
             setSortBy,
-            setCollabLogo,
+            setCollabLogos,
             setManualStyleRef,
             setIsStylePanelOpen,
             setBatchTrigger,

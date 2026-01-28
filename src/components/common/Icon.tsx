@@ -497,6 +497,12 @@ const iconPaths: Record<string, React.ReactNode> = {
       <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
     </>
   ),
+  briefcase: (
+    <>
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+    </>
+  ),
 };
 
 // FIX: Implement the Icon component to render SVGs. This resolves errors where Icon.tsx was not a module.

@@ -82,7 +82,7 @@ export const useFlyerGeneration = ({
           refData,
           selectedAspectRatio as never,
           selectedImageModel,
-          collabLogo,
+          collabLogo ? [collabLogo] : [],
           selectedImageSize as ImageSize,
           assetsToUse,
         );
