@@ -10,6 +10,7 @@ import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 import { extractColorsFromLogo } from '../../services/geminiService';
+import { uploadImageToBlob } from '../../services/blobService';
 import { useOrganization, OrganizationProfile, useUser } from '@clerk/clerk-react';
 import { ConnectInstagramModal, useInstagramAccounts } from './ConnectInstagramModal';
 import { CREATIVE_MODELS_FOR_UI, getDefaultModelId } from '../../config/ai-models';
@@ -207,14 +208,41 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
     e.preventDefault();
     setIsSaving(true);
     try {
-      let logoBase64: string | null = null;
+      let logoUrl: string | null = null;
+
+      // Upload logo to Vercel Blob to get a permanent URL
       if (profile.logo instanceof File) {
-        const { dataUrl } = await fileToBase64(profile.logo);
-        logoBase64 = dataUrl;
+        const { base64, mimeType } = await fileToBase64(profile.logo);
+        console.debug('[Settings] Uploading logo to Vercel Blob...');
+        try {
+          logoUrl = await uploadImageToBlob(base64, mimeType);
+          console.debug('[Settings] Logo uploaded successfully:', logoUrl);
+        } catch (err) {
+          console.error('[Settings] Failed to upload logo to Blob:', err);
+          // Fallback to data URL if upload fails
+          logoUrl = `data:${mimeType};base64,${base64}`;
+        }
       } else if (typeof profile.logo === 'string') {
-        logoBase64 = profile.logo;
+        // If it's already a URL (http/https), use it directly
+        // If it's a data URL, try to upload it to Blob
+        if (profile.logo.startsWith('data:')) {
+          console.debug('[Settings] Converting existing data URL to Blob...');
+          try {
+            const [header, base64Data] = profile.logo.split(',');
+            const mimeType = header.match(/data:([^;]+)/)?.[1] || 'image/png';
+            logoUrl = await uploadImageToBlob(base64Data, mimeType);
+            console.debug('[Settings] Data URL converted to Blob:', logoUrl);
+          } catch (err) {
+            console.error('[Settings] Failed to convert data URL to Blob:', err);
+            logoUrl = profile.logo; // Keep data URL as fallback
+          }
+        } else {
+          // Already a proper URL (http/https)
+          logoUrl = profile.logo;
+        }
       }
-      onSaveProfile({ ...profile, logo: logoBase64 });
+
+      onSaveProfile({ ...profile, logo: logoUrl });
       onClose();
     } finally {
       setIsSaving(false);

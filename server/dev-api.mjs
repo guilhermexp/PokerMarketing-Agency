@@ -1089,10 +1089,11 @@ app.get("/api/db/init", async (req, res) => {
     }
 
     // OPTIMIZATION: Don't return data URLs (base64) for gallery - they're 113MB+ total!
-    // Use thumbnail_url if available, otherwise only return real URLs
+    // Use thumbnail_url if available, otherwise filter out (frontend will hide empty src_url)
+    // NOTE: Old images with data URLs won't appear until migrated to Blob
     const galleryResult = await timedQuery('gallery', () => isOrgContext
-      ? sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 25`
-      : sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 25`);
+      ? sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`
+      : sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`);
 
     // OPTIMIZATION: Don't return data URLs (base64) in image_url - they're huge (26MB+ total!)
     // Use CASE to return empty string for data URLs, full URL otherwise

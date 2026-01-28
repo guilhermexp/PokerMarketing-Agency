@@ -408,7 +408,12 @@ function AppContent() {
 
   // Transform SWR data to local format
   const galleryImages: GalleryImage[] = (swrGalleryImages || [])
-    .filter((img) => !img.src_url.startsWith("blob:"))
+    .filter((img) => {
+      // Filter out invalid images: blob URLs, empty src_url, null/undefined
+      if (!img.src_url || img.src_url === '') return false;
+      if (img.src_url.startsWith('blob:')) return false;
+      return true;
+    })
     .map((img) => ({
       id: img.id,
       src: img.src_url,

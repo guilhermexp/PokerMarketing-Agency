@@ -1063,13 +1063,13 @@ app.get("/api/db/init", async (req, res) => {
         ? sql`SELECT id, user_id, organization_id, name, description, CASE WHEN logo_url LIKE 'data:%' THEN '' ELSE logo_url END as logo_url, primary_color, secondary_color, tertiary_color, tone_of_voice, settings, created_at, updated_at, deleted_at FROM brand_profiles WHERE organization_id = ${organization_id} AND deleted_at IS NULL LIMIT 1`
         : sql`SELECT id, user_id, organization_id, name, description, CASE WHEN logo_url LIKE 'data:%' THEN '' ELSE logo_url END as logo_url, primary_color, secondary_color, tertiary_color, tone_of_voice, settings, created_at, updated_at, deleted_at FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`,
 
-      // 2. Gallery Images (limited to 25 most recent - use loadMore() for pagination)
-      // OPTIMIZATION: Reduced from 100 to 25 for faster initial load (Jan 2025)
+      // 2. Gallery Images (limited to 100 most recent)
       // OPTIMIZATION: Don't return data URLs (base64) for gallery - they're 113MB+ total!
       // Use thumbnail_url if available for data URLs, otherwise return empty string
+      // NOTE: Old images with data URLs won't appear until migrated to Blob
       isOrgContext
-        ? sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 25`
-        : sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 25`,
+        ? sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`
+        : sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`,
 
       // 3. Scheduled Posts (SMART LOADING: last 7 days + next 60 days)
       // OPTIMIZATION: Don't return data URLs (base64) in image_url - they're huge (26MB+ total!)
