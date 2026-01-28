@@ -193,10 +193,27 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
 
   // Handler de download
   const handleDownload = async () => {
-    const link = document.createElement('a');
-    link.href = image.src;
-    link.download = downloadFilename || `image-${image.id}.png`;
-    link.click();
+    try {
+      // Fetch the image as blob to bypass cross-origin download restrictions
+      const response = await fetch(image.src);
+      const blob = await response.blob();
+
+      // Create a blob URL and trigger download
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = downloadFilename || `image-${image.id}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Clean up the blob URL
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Failed to download image:', error);
+      // Fallback: open in new tab
+      window.open(image.src, '_blank');
+    }
   };
 
   // Handler de crop

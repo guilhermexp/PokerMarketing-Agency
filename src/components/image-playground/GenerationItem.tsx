@@ -33,7 +33,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
   const [elapsedTime, setElapsedTime] = useState(0);
   const [previewImage, setPreviewImage] = useState<GalleryImage | null>(null);
   const { deleteGeneration } = useImagePlaygroundBatches(topicId);
-  const { updateGeneration, setParam, topics, updateTopic: updateTopicStore } = useImagePlaygroundStore();
+  const { updateGeneration, topics, updateTopic: updateTopicStore } = useImagePlaygroundStore();
 
   // Get current topic to check if it needs a coverUrl
   const currentTopic = topics.find(t => t.id === topicId);
@@ -104,11 +104,30 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
     }
   }, [generation]);
 
-  const handleUseAsReference = useCallback(() => {
-    if (generation.asset?.url) {
-      setParam('imageUrl', generation.asset.url);
+  const handleUseAsReference = useCallback(async () => {
+    if (!generation.asset?.url) return;
+
+    try {
+      // Fetch the image and convert to base64 data URL
+      const response = await fetch(generation.asset.url);
+      const blob = await response.blob();
+      const mimeType = blob.type || 'image/png';
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        const { addReferenceImage } = useImagePlaygroundStore.getState();
+        addReferenceImage({
+          id: crypto.randomUUID(),
+          dataUrl,
+          mimeType,
+        });
+      };
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      console.error('Failed to add reference image:', error);
     }
-  }, [generation.asset?.url, setParam]);
+  }, [generation.asset?.url]);
 
   const handleOpenPreview = useCallback(() => {
     if (!generation.asset?.url) return;
