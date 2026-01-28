@@ -18,6 +18,61 @@ const openrouter = createOpenRouter({
 
 // Nota: convertToModelMessages agora vem do SDK oficial (import acima)
 
+// Constantes para controle de contexto
+const MAX_MESSAGES = 20; // Máximo de mensagens a enviar
+const MAX_MESSAGE_CONTENT_LENGTH = 10000; // Máximo de chars por conteúdo de mensagem
+
+/**
+ * Trunca mensagens para evitar exceder limite de tokens
+ * Mantém as mensagens mais recentes e remove dados pesados de imagens antigas
+ *
+ * @param {Array} messages - Array de mensagens
+ * @returns {Array} - Mensagens truncadas
+ */
+function truncateMessages(messages) {
+  if (!messages || messages.length <= MAX_MESSAGES) {
+    return messages;
+  }
+
+  console.log(`[Chat API] Truncating messages: ${messages.length} -> ${MAX_MESSAGES}`);
+
+  // Manter as últimas MAX_MESSAGES mensagens
+  const truncated = messages.slice(-MAX_MESSAGES);
+
+  // Para mensagens antigas, remover dados base64 de imagens (muito pesados)
+  return truncated.map((msg, index) => {
+    // Manter as últimas 5 mensagens intactas (para contexto recente)
+    if (index >= truncated.length - 5) {
+      return msg;
+    }
+
+    // Para mensagens mais antigas, limpar dados pesados
+    if (!msg.parts) return msg;
+
+    const lightParts = msg.parts.map(part => {
+      // Remover dados base64 de imagens antigas (manter apenas URL)
+      if (part.type === 'file' && part.url?.startsWith('data:')) {
+        return {
+          ...part,
+          url: '[imagem removida para economia de tokens]'
+        };
+      }
+
+      // Truncar textos muito longos
+      if (part.type === 'text' && part.text?.length > MAX_MESSAGE_CONTENT_LENGTH) {
+        return {
+          ...part,
+          text: part.text.substring(0, MAX_MESSAGE_CONTENT_LENGTH) + '... [truncado]'
+        };
+      }
+
+      return part;
+    });
+
+    return { ...msg, parts: lightParts };
+  });
+}
+
 /**
  * Handler principal do endpoint POST /api/chat
  *
@@ -82,9 +137,9 @@ export async function chatHandler(req, res) {
     // Mensagens para processar
     let messagesToProcess = [];
     if (isToolApprovalFlow) {
-      // Tool approval: enviar todas as mensagens
-      messagesToProcess = messages;
-      console.log(`[Chat API] Tool approval flow | messages: ${messages.length}`);
+      // Tool approval: truncar mensagens para evitar exceder limite de tokens
+      messagesToProcess = truncateMessages(messages);
+      console.log(`[Chat API] Tool approval flow | messages: ${messages.length} (truncated: ${messagesToProcess.length})`);
     } else {
       // Nova mensagem: apenas a última
       messagesToProcess = [message];

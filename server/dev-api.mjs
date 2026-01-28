@@ -3894,10 +3894,24 @@ ${jsonPrompt}
   if (hasLogo) {
     fullPrompt += `
 
-**LOGO DA MARCA (OBRIGATÓRIO):**
-- Use o LOGO EXATO fornecido na imagem de referência anexada - NÃO CRIE UM LOGO DIFERENTE
-- O logo deve aparecer de forma clara e legível na composição
-- Mantenha as proporções e cores originais do logo`;
+**LOGO DA MARCA - PRESERVAÇÃO E POSICIONAMENTO:**
+O logo anexado deve aparecer como uma COLAGEM LITERAL na imagem final.
+
+PRESERVAÇÃO DO LOGO (INVIOLÁVEL):
+- COPIE o logo EXATAMENTE como fornecido - pixel por pixel
+- NÃO redesenhe, NÃO reinterprete, NÃO estilize o logo
+- NÃO altere cores, formas, proporções ou tipografia
+- NÃO adicione efeitos (brilho, sombra, gradiente, 3D)
+- Mantenha bordas nítidas e definidas
+
+POSICIONAMENTO MINIMALISTA:
+- Posicione o logo em um CANTO da imagem (inferior direito ou esquerdo preferencialmente)
+- Use tamanho DISCRETO - como uma marca d'água profissional (10-15% da largura da imagem)
+- O logo NÃO deve competir com o conteúdo principal da imagem
+- Deixe espaço de respiro entre o logo e as bordas
+- Se a imagem tiver área clara, posicione em área mais escura (e vice-versa) para contraste
+
+O logo deve parecer uma assinatura elegante da marca, não o elemento principal.`;
   }
 
   if (hasProductImages) {
@@ -4530,10 +4544,14 @@ app.post("/api/ai/flyer", async (req, res) => {
       logo,
       referenceImage,
       aspectRatio = "9:16",
-      collabLogo,
+      collabLogo: collabLogoSingular,
+      collabLogos, // Frontend sends array
       imageSize = "1K",
       compositionAssets,
     } = req.body;
+
+    // Support both singular and array format for collab logos
+    const collabLogo = collabLogoSingular || (collabLogos && collabLogos[0]) || null;
 
     if (!prompt || !brandProfile) {
       return res
@@ -4541,7 +4559,7 @@ app.post("/api/ai/flyer", async (req, res) => {
         .json({ error: "prompt and brandProfile are required" });
     }
 
-    logger.info({ aspectRatio }, '[Flyer API] Generating flyer');
+    logger.info({ aspectRatio, hasLogo: !!logo, collabLogosCount: collabLogos?.length || 0 }, '[Flyer API] Generating flyer');
 
     const ai = getGeminiAi();
     const brandingInstruction = buildFlyerPrompt(brandProfile);
@@ -4563,16 +4581,86 @@ app.post("/api/ai/flyer", async (req, res) => {
       });
     }
 
+    // Determine collab logos count for instructions
+    const collabLogosCount = (collabLogos && collabLogos.length > 0)
+      ? collabLogos.length
+      : (collabLogo ? 1 : 0);
+    const hasCollabLogos = collabLogosCount > 0;
+
+    // Instruções de logo (se fornecido)
+    if (logo || hasCollabLogos) {
+      let logoInstructions = `
+**LOGOS DA MARCA - PRESERVAÇÃO E POSICIONAMENTO:**
+
+PRESERVAÇÃO (INVIOLÁVEL):
+- COPIE os logos EXATAMENTE como fornecidos - pixel por pixel
+- NÃO redesenhe, NÃO reinterprete, NÃO estilize os logos
+- NÃO altere cores, formas, proporções ou tipografia
+- NÃO adicione efeitos (brilho, sombra, gradiente, 3D)
+- Mantenha bordas nítidas e definidas
+
+POSICIONAMENTO MINIMALISTA:`;
+
+      if (logo && hasCollabLogos) {
+        // Collab mode: logos side by side at the bottom like a sponsor bar
+        const totalLogos = 1 + collabLogosCount; // main logo + collab logos
+        logoInstructions += `
+- CRIAR UMA BARRA DE PATROCINADORES na parte INFERIOR da imagem
+- Posicione TODOS os logos (${totalLogos}) LADO A LADO horizontalmente nessa barra
+- O logo principal fica à ESQUERDA, seguido dos logos parceiros à direita
+- A barra deve ter fundo escuro/semi-transparente para contraste
+- Tamanho dos logos: pequeno e uniforme (altura ~8-10% da imagem)
+- Espaçamento igual entre os logos
+- Estilo: clean, profissional, como rodapé de patrocinadores em eventos
+- Os logos NÃO devem competir com o conteúdo principal do flyer`;
+      } else if (hasCollabLogos && !logo) {
+        // Only collab logos, no main logo
+        logoInstructions += `
+- CRIAR UMA BARRA DE PARCEIROS na parte INFERIOR da imagem
+- Posicione os logos LADO A LADO horizontalmente
+- Fundo escuro/semi-transparente para contraste
+- Tamanho pequeno e uniforme (altura ~8-10% da imagem)
+- Espaçamento igual entre os logos`;
+      } else {
+        logoInstructions += `
+- Posicione o logo em um CANTO da imagem (superior ou inferior)
+- Use tamanho DISCRETO (10-15% da largura) - como marca d'água profissional
+- O logo NÃO deve competir com o conteúdo principal do flyer
+- Deixe espaço de respiro entre o logo e as bordas`;
+      }
+
+      logoInstructions += `
+
+Os logos devem parecer assinaturas elegantes da marca, não elementos principais.`;
+
+      parts.push({ text: logoInstructions });
+    }
+
     if (logo) {
+      parts.push({ text: "LOGO PRINCIPAL DA MARCA (copiar fielmente):" });
       parts.push({
         inlineData: { data: logo.base64, mimeType: logo.mimeType },
       });
     }
 
-    if (collabLogo) {
-      parts.push({
-        inlineData: { data: collabLogo.base64, mimeType: collabLogo.mimeType },
+    // Support both single collabLogo and array collabLogos
+    const allCollabLogos = collabLogos && collabLogos.length > 0
+      ? collabLogos
+      : (collabLogo ? [collabLogo] : []);
+
+    if (allCollabLogos.length > 0) {
+      allCollabLogos.forEach((cLogo, index) => {
+        if (cLogo && cLogo.base64) {
+          const label = allCollabLogos.length > 1
+            ? `LOGO PARCEIRO ${index + 1} (copiar fielmente):`
+            : "LOGO PARCEIRO/COLABORAÇÃO (copiar fielmente):";
+          parts.push({ text: label });
+          parts.push({
+            inlineData: { data: cLogo.base64, mimeType: cLogo.mimeType },
+          });
+        }
       });
+      console.log(`[Flyer API] Added ${allCollabLogos.length} collab logo(s) to parts`);
     }
 
     if (referenceImage) {

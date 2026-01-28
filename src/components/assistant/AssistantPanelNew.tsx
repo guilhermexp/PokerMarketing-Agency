@@ -191,9 +191,19 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     },
     onError: (error: Error) => {
       console.error('[AssistantPanel] Error:', error);
-      setErrorMessage(error.message || 'Erro ao processar mensagem. Tente novamente.');
-      // Auto-limpar erro após 5 segundos
-      setTimeout(() => setErrorMessage(null), 5000);
+
+      // Detectar erro de limite de tokens
+      const isTokenLimitError = error.message?.includes('tokens limit exceeded') ||
+                                 error.message?.includes('context_length_exceeded');
+
+      if (isTokenLimitError) {
+        setErrorMessage('Conversa muito longa. Por favor, inicie uma nova conversa clicando em "Limpar chat".');
+      } else {
+        setErrorMessage(error.message || 'Erro ao processar mensagem. Tente novamente.');
+      }
+
+      // Auto-limpar erro após 8 segundos (mais tempo para erros de token)
+      setTimeout(() => setErrorMessage(null), isTokenLimitError ? 10000 : 5000);
     },
     onFinish: (message: UIMessage) => {
       console.info('[AssistantPanel] Message finished:', {
@@ -240,6 +250,51 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     const timer = setTimeout(() => setToast(null), 2500);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // ========================================================================
+  // LIMPEZA AUTOMÁTICA DE MENSAGENS ANTIGAS
+  // ========================================================================
+  // Limita o histórico para evitar exceder limite de tokens do OpenRouter
+  const MAX_MESSAGES = 12; // Máximo de mensagens a manter
+  const lastTrimmedLengthRef = useRef(0);
+
+  useEffect(() => {
+    // Evitar loop infinito: só trimmar se tiver mais mensagens do que o limite
+    // E se não acabamos de trimmar (length mudou desde o último trim)
+    if (messages.length <= MAX_MESSAGES) {
+      lastTrimmedLengthRef.current = messages.length;
+      return;
+    }
+
+    // Evitar trimmar novamente se já trimmamos e o length é o esperado
+    if (messages.length === lastTrimmedLengthRef.current) {
+      return;
+    }
+
+    console.log(`[AssistantPanel] Trimming messages: ${messages.length} -> ${MAX_MESSAGES}`);
+
+    // Manter apenas as últimas MAX_MESSAGES mensagens
+    const trimmedMessages = messages.slice(-MAX_MESSAGES).map((msg, index, arr) => {
+      // Para mensagens mais antigas (primeiras 50%), remover dados pesados de imagens
+      if (index < arr.length / 2) {
+        const cleanedParts = msg.parts.map(part => {
+          // Remover dados base64 de imagens antigas
+          if (isFileUIPart(part) && part.url?.startsWith('data:')) {
+            return {
+              ...part,
+              url: 'data:image/png;base64,removed' // Placeholder mínimo
+            };
+          }
+          return part;
+        });
+        return { ...msg, parts: cleanedParts };
+      }
+      return msg;
+    });
+
+    lastTrimmedLengthRef.current = trimmedMessages.length;
+    setMessages(trimmedMessages);
+  }, [messages.length, setMessages]);
 
   // ========================================================================
   // SINCRONIZAÇÃO AUTOMÁTICA DE IMAGENS
@@ -298,7 +353,17 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
         totalMessages: messages.length,
         totalToolCalls: allToolCalls.length,
       });
-      // Não processar - a tool call pode ter sido removida ou ainda não carregada
+
+      // Se as mensagens estão vazias mas temos uma edição aprovada com imageUrl,
+      // significa que houve um erro de API (ex: token limit) mas a imagem foi salva.
+      // Neste caso, marcar como handled para não ficar em loop.
+      // A imagem já foi salva com sucesso, apenas não conseguimos notificar o AI.
+      if (messages.length === 0 && result === 'approved' && imageUrl) {
+        console.warn('⚠️ [AssistantPanel] Messages empty after error but edit was saved. Marking as handled.');
+        handledEditResultsRef.current.add(toolCallId);
+        // A imagem já foi salva - apenas não conseguimos notificar o AI devido ao erro
+        // O usuário já vê a imagem atualizada
+      }
       return;
     }
 
