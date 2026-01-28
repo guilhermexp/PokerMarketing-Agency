@@ -3895,7 +3895,7 @@ ${jsonPrompt}
   if (hasLogo) {
     fullPrompt += `
 
-**LOGO DA MARCA - PRESERVAÇÃO E POSICIONAMENTO:**
+**LOGO DA MARCA - PRESERVAÇÃO:**
 O logo anexado deve aparecer como uma COLAGEM LITERAL na imagem final.
 
 PRESERVAÇÃO DO LOGO (INVIOLÁVEL):
@@ -3904,15 +3904,7 @@ PRESERVAÇÃO DO LOGO (INVIOLÁVEL):
 - NÃO altere cores, formas, proporções ou tipografia
 - NÃO adicione efeitos (brilho, sombra, gradiente, 3D)
 - Mantenha bordas nítidas e definidas
-
-POSICIONAMENTO MINIMALISTA:
-- Posicione o logo em um CANTO da imagem (inferior direito ou esquerdo preferencialmente)
-- Use tamanho DISCRETO - como uma marca d'água profissional (10-15% da largura da imagem)
-- O logo NÃO deve competir com o conteúdo principal da imagem
-- Deixe espaço de respiro entre o logo e as bordas
-- Se a imagem tiver área clara, posicione em área mais escura (e vice-versa) para contraste
-
-O logo deve parecer uma assinatura elegante da marca, não o elemento principal.`;
+- O logo deve aparecer de forma clara e legível na composição`;
   }
 
   if (hasProductImages) {
