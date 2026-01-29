@@ -170,16 +170,22 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
   const [chatId] = useState(() => crypto.randomUUID());
   const [isDragging, setIsDragging] = useState(false);
   const [isSending, setIsSending] = useState(false); // Estado local para feedback imediato
+  const [includeBrandLogo, setIncludeBrandLogo] = useState(true); // Toggle para incluir logo nas imagens
   const handledEditResultsRef = useRef<Set<string>>(new Set());
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Preparar brandProfile efetivo baseado no toggle de logo
+  const effectiveBrandProfile = includeBrandLogo
+    ? brandProfile
+    : brandProfile ? { ...brandProfile, logo: null } : null;
+
   // useChat hook do Vercel AI SDK
   const chatOptions = {
     id: chatId,
     ...({ body: {
-      brandProfile: brandProfile,
+      brandProfile: effectiveBrandProfile,
       chatReferenceImage: referenceImage,
       selectedChatModel: brandProfile?.creativeModel || 'x-ai/grok-4.1-fast'
     },
@@ -790,13 +796,30 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
                 rows={2}
               />
               <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-7 h-7 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all flex items-center justify-center"
-                >
-                  <Icon name="plus" className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-7 h-7 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all flex items-center justify-center"
+                  >
+                    <Icon name="plus" className="w-4 h-4" />
+                  </button>
+                  {brandProfile?.logo && (
+                    <button
+                      type="button"
+                      onClick={() => setIncludeBrandLogo(!includeBrandLogo)}
+                      className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all flex items-center gap-1 ${
+                        includeBrandLogo
+                          ? 'bg-primary/20 text-primary border border-primary/30'
+                          : 'bg-white/5 text-white/40 border border-white/10'
+                      }`}
+                      title={includeBrandLogo ? 'Logo será incluído nas imagens' : 'Logo não será incluído'}
+                    >
+                      <Icon name="image" className="w-3 h-3" />
+                      Logo {includeBrandLogo ? 'ON' : 'OFF'}
+                    </button>
+                  )}
+                </div>
                 <button
                   type="submit"
                   className={`w-7 h-7 rounded-lg transition-all flex items-center justify-center ${

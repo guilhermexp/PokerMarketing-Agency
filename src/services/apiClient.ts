@@ -1335,6 +1335,7 @@ export interface AiCampaign {
 
 export interface AiGenerationOptions {
   videoClipScripts: { generate: boolean; count: number };
+  carousels: { generate: boolean; count: number };
   posts: {
     instagram: { generate: boolean; count: number };
     facebook: { generate: boolean; count: number };

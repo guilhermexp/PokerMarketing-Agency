@@ -1500,6 +1500,7 @@ function AppContent() {
     };
     const options: GenerationOptions = {
       videoClipScripts: { generate: true, count: 1 },
+      carousels: { generate: true, count: 1 },
       posts: {
         instagram: { generate: true, count: 1 },
         facebook: { generate: true, count: 1 },

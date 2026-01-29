@@ -132,12 +132,15 @@ export function buildQuantityInstructions(options, mode = "prod") {
     quantities.push(`- Anúncios (adCreatives): 0 (array vazio)`);
   }
 
-  // Carousels - always generate 1 by default for now
-  quantities.push(
-    isProd
-      ? `- Carrosséis Instagram (carousels): EXATAMENTE 1 carrossel com 5 slides`
-      : `- Carrosséis (carousels): 1 carrossel com 5 slides`,
-  );
+  if (options.carousels?.generate && options.carousels.count > 0) {
+    quantities.push(
+      isProd
+        ? `- Carrosséis Instagram (carousels): EXATAMENTE ${options.carousels.count} carrossel(éis) com 5 slides cada`
+        : `- Carrosséis (carousels): ${options.carousels.count} carrossel(éis) com 5 slides cada`,
+    );
+  } else {
+    quantities.push(`- Carrosséis (carousels): 0 (array vazio)`);
+  }
 
   return quantities.join("\n    ");
 }

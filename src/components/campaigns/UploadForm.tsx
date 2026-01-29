@@ -241,6 +241,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
   const [generationOptions, setGenerationOptions] = useState<GenerationOptions>(
     {
       videoClipScripts: { generate: true, count: 1 },
+      carousels: { generate: true, count: 1 },
       posts: {
         linkedin: { generate: false, count: 1 },
         twitter: { generate: false, count: 1 },

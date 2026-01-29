@@ -263,6 +263,7 @@ export interface GenerationSetting {
 
 export interface GenerationOptions {
   videoClipScripts: GenerationSetting;
+  carousels: GenerationSetting;
   posts: Record<
     "linkedin" | "twitter" | "instagram" | "facebook",
     GenerationSetting

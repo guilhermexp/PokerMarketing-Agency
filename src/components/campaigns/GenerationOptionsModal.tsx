@@ -147,13 +147,13 @@ const SectionCard: React.FC<{
     onClick={onToggle}
     whileHover={{ scale: 1.01 }}
     whileTap={{ scale: 0.99 }}
-    className={`rounded-lg border p-3 transition-colors cursor-pointer ${
+    className={`rounded-lg border p-4 transition-colors cursor-pointer flex flex-col h-full ${
       enabled
         ? 'border-white/20 bg-white/[0.04]'
         : 'border-white/10 bg-white/[0.02] hover:border-white/15'
     }`}
   >
-    <div className="flex items-center justify-between gap-3 mb-3">
+    <div className="flex items-start justify-between gap-3 mb-3">
       <div className="flex items-center gap-3 flex-1">
         <div className="flex-1">
           <h3 className={`text-sm font-semibold ${enabled ? 'text-white' : 'text-white/60'}`}>
@@ -174,14 +174,14 @@ const SectionCard: React.FC<{
       </div>
     </div>
 
-    <div className="flex items-center justify-between pt-3 border-t border-white/10">
+    {enabled && children && <div className="mt-3 flex-1" onClick={(e) => e.stopPropagation()}>{children}</div>}
+
+    <div className="flex items-center justify-between pt-3 border-t border-white/10 mt-auto">
       <span className="text-xs text-white/40">Quantidade:</span>
       <div onClick={(e) => e.stopPropagation()}>
         <CountSelector count={count} disabled={!enabled} onChange={onCountChange} />
       </div>
     </div>
-
-    {enabled && children && <div className="mt-3" onClick={(e) => e.stopPropagation()}>{children}</div>}
   </motion.div>
 );
 
@@ -221,9 +221,10 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
 }) => {
   const postsEnabled = Object.values(options.posts).some((v: GenerationSetting) => v.generate);
   const adsEnabled = Object.values(options.adCreatives).some((v: GenerationSetting) => v.generate);
-  const nothingSelected = !options.videoClipScripts.generate && !postsEnabled && !adsEnabled;
+  const nothingSelected = !options.videoClipScripts.generate && !options.carousels.generate && !postsEnabled && !adsEnabled;
 
   const totalCount = (options.videoClipScripts.generate ? options.videoClipScripts.count : 0) +
+    (options.carousels.generate ? options.carousels.count : 0) +
     Object.entries(options.posts).reduce((sum, [, s]: [string, GenerationSetting]) => sum + (s.generate ? s.count : 0), 0) +
     Object.entries(options.adCreatives).reduce((sum, [, s]: [string, GenerationSetting]) => sum + (s.generate ? s.count : 0), 0);
 
@@ -314,7 +315,7 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="bg-[#0a0a0a] rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-white/10"
+            className="bg-[#0a0a0a] rounded-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto border border-white/10"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 border-b border-white/10">
@@ -332,10 +333,10 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
               </motion.p>
             </div>
 
-            <div className="p-4 space-y-3">
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <SectionCard
-              title="Roteiros de Vídeo & Carrosséis"
-              description="Scripts com cenas, narração e carrosséis"
+              title="Roteiros de Vídeo"
+              description="Scripts com cenas e narração"
               enabled={options.videoClipScripts.generate}
               count={options.videoClipScripts.count}
               onToggle={() => setOptions(prev => ({
@@ -345,6 +346,21 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
               onCountChange={(count) => setOptions(prev => ({
                 ...prev,
                 videoClipScripts: { ...prev.videoClipScripts, count }
+              }))}
+            />
+
+            <SectionCard
+              title="Carrosséis"
+              description="Carrosséis com slides para Instagram"
+              enabled={options.carousels.generate}
+              count={options.carousels.count}
+              onToggle={() => setOptions(prev => ({
+                ...prev,
+                carousels: { ...prev.carousels, generate: !prev.carousels.generate }
+              }))}
+              onCountChange={(count) => setOptions(prev => ({
+                ...prev,
+                carousels: { ...prev.carousels, count }
               }))}
             />
 
