@@ -14,6 +14,23 @@ const THUMBNAIL_WIDTH = 400;
 const THUMBNAIL_QUALITY = 80;
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+function mapTopic(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    userId: r.user_id,
+    organizationId: r.organization_id,
+    title: r.title,
+    coverUrl: r.cover_url,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+// =============================================================================
 // Topics
 // =============================================================================
 
@@ -21,7 +38,7 @@ export async function getTopics(sql, userId, organizationId) {
   // Handle null/undefined organizationId properly
   const orgId = organizationId || null;
 
-  const topics = orgId
+  const rows = orgId
     ? await sql`
         SELECT * FROM image_generation_topics
         WHERE organization_id = ${orgId}
@@ -33,16 +50,16 @@ export async function getTopics(sql, userId, organizationId) {
         AND organization_id IS NULL
         ORDER BY updated_at DESC
       `;
-  return topics;
+  return rows.map(mapTopic);
 }
 
 export async function createTopic(sql, userId, organizationId, title = null) {
-  const [topic] = await sql`
+  const [r] = await sql`
     INSERT INTO image_generation_topics (user_id, organization_id, title)
     VALUES (${userId}, ${organizationId}, ${title})
     RETURNING *
   `;
-  return topic;
+  return mapTopic(r);
 }
 
 export async function updateTopic(
@@ -73,7 +90,7 @@ export async function updateTopic(
     const [existing] = orgId
       ? await sql`SELECT * FROM image_generation_topics WHERE id = ${topicId} AND organization_id = ${orgId}`
       : await sql`SELECT * FROM image_generation_topics WHERE id = ${topicId} AND user_id = ${userId}`;
-    return existing;
+    return mapTopic(existing);
   }
 
   // Always update updated_at
@@ -90,7 +107,7 @@ export async function updateTopic(
         WHERE id = ${topicId} AND user_id = ${userId}
         RETURNING *
       `;
-  return topic;
+  return mapTopic(topic);
 }
 
 export async function deleteTopic(sql, topicId, userId, organizationId) {

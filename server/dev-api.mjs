@@ -4089,7 +4089,7 @@ PRESERVAÇÃO DO LOGO (INVIOLÁVEL):
 - O produto deve aparecer com destaque na composição`;
   }
 
-  if (hasStyleReference) {
+  if (hasStyleReference || brandProfile) {
     fullPrompt += `
 
 **TIPOGRAFIA OBRIGATÓRIA PARA CENAS (REGRA INVIOLÁVEL):**
