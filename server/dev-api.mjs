@@ -100,14 +100,18 @@ app.use(
 );
 
 const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
-const getHeaderValue = (value) => Array.isArray(value) ? value[0] : value;
+const getHeaderValue = (value) => (Array.isArray(value) ? value[0] : value);
 
 // Internal auth bridge for server-to-server tool calls
 app.use((req, res, next) => {
   const token = getHeaderValue(req.headers["x-internal-token"]);
   if (INTERNAL_API_TOKEN && token === INTERNAL_API_TOKEN) {
-    const userId = getHeaderValue(req.headers["x-internal-user-id"]) || req.body?.user_id;
-    const orgId = getHeaderValue(req.headers["x-internal-org-id"]) || req.body?.organization_id || null;
+    const userId =
+      getHeaderValue(req.headers["x-internal-user-id"]) || req.body?.user_id;
+    const orgId =
+      getHeaderValue(req.headers["x-internal-org-id"]) ||
+      req.body?.organization_id ||
+      null;
     if (!userId) {
       return res.status(400).json({ error: "internal user id is required" });
     }
@@ -180,7 +184,10 @@ function checkAiRateLimit(identifier) {
   }
 
   record.count++;
-  return { allowed: true, remaining: AI_RATE_LIMIT_MAX_REQUESTS - record.count };
+  return {
+    allowed: true,
+    remaining: AI_RATE_LIMIT_MAX_REQUESTS - record.count,
+  };
 }
 
 // Middleware for AI endpoints with stricter rate limiting
@@ -236,7 +243,7 @@ function logExternalAPI(service, action, details = "") {
   const timestamp = new Date().toLocaleTimeString("pt-BR");
   logger.debug(
     { service, action, details: details || undefined },
-    `[${service}] ${action}${details ? ` ${details}` : ""}`
+    `[${service}] ${action}${details ? ` ${details}` : ""}`,
   );
 }
 
@@ -246,7 +253,7 @@ function logExternalAPIResult(service, action, duration, success = true) {
     : `${colors.red}✗${colors.reset}`;
   logger.debug(
     { service, action, durationMs: duration, success },
-    `[${service}] ${success ? '✓' : '✗'} ${action}`
+    `[${service}] ${success ? "✓" : "✗"} ${action}`,
   );
 }
 
@@ -254,13 +261,10 @@ function logError(context, error) {
   logger.error({ err: error, context }, `ERROR: ${context}`);
   logger.error({ message: error.message }, `Message: ${error.message}`);
   if (error.stack) {
-    logger.error({ stack: error.stack }, 'Stack trace');
+    logger.error({ stack: error.stack }, "Stack trace");
   }
   if (error.response?.data) {
-    logger.error(
-      { responseData: error.response.data },
-      'Response data',
-    );
+    logger.error({ responseData: error.response.data }, "Response data");
   }
 }
 
@@ -310,7 +314,10 @@ async function warmupDatabase() {
     const start = Date.now();
     const sql = getSql();
     await sql`SELECT 1 as warmup`;
-    logger.info({ durationMs: Date.now() - start }, 'Database connection warmed up');
+    logger.info(
+      { durationMs: Date.now() - start },
+      "Database connection warmed up",
+    );
   } catch (error) {
     logger.error({ err: error }, "Database warmup failed");
   }
@@ -335,10 +342,16 @@ async function ensureGallerySourceType(sql) {
       column.data_type === "USER-DEFINED" && column.udt_name === "image_source";
     if (!isEnum) return;
 
-    logger.info({}, '[Dev API Server] Migrating gallery_images.source from enum to varchar');
+    logger.info(
+      {},
+      "[Dev API Server] Migrating gallery_images.source from enum to varchar",
+    );
     await sql`ALTER TABLE gallery_images ALTER COLUMN source TYPE VARCHAR(100) USING source::text`;
     await sql`DROP TYPE IF EXISTS image_source`;
-    logger.info({}, '[Dev API Server] gallery_images.source migration complete');
+    logger.info(
+      {},
+      "[Dev API Server] gallery_images.source migration complete",
+    );
   } catch (error) {
     logger.error(
       { err: error },
@@ -383,7 +396,10 @@ async function resolveUserId(sql, userId, requestId = 0) {
   }
 
   // User doesn't exist - return the original ID (will fail on insert, but that's expected)
-  logger.debug({ auth_provider_id: userId }, '[User Lookup] No user found for auth_provider_id');
+  logger.debug(
+    { auth_provider_id: userId },
+    "[User Lookup] No user found for auth_provider_id",
+  );
   return null;
 }
 
@@ -404,7 +420,10 @@ async function setRLSContext(sql, userId, organizationId = null) {
   } catch (error) {
     // Don't fail the request if RLS context can't be set
     // The application-level security (WHERE clauses) will still work
-    logger.warn({ err: error, userId, organizationId }, "Failed to set RLS context");
+    logger.warn(
+      { err: error, userId, organizationId },
+      "Failed to set RLS context",
+    );
   }
 }
 
@@ -428,7 +447,7 @@ app.use("/api/db", (req, res, next) => {
 
     logger.info(
       { method, endpoint, status, durationMs: duration },
-      `${method} /${endpoint} ${status}`
+      `${method} /${endpoint} ${status}`,
     );
 
     logRequestSummary(reqId, req.originalUrl);
@@ -453,9 +472,9 @@ app.get("/api/db/health", async (req, res) => {
 // ============================================================================
 
 // Super admin emails from environment
-const SUPER_ADMIN_EMAILS = (process.env.VITE_SUPER_ADMIN_EMAILS || '')
-  .split(',')
-  .map(email => email.trim().toLowerCase())
+const SUPER_ADMIN_EMAILS = (process.env.VITE_SUPER_ADMIN_EMAILS || "")
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
   .filter(Boolean);
 
 // Middleware to verify super admin access
@@ -463,31 +482,37 @@ async function requireSuperAdmin(req, res, next) {
   try {
     const auth = getAuth(req);
     if (!auth?.userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     // Get user email from Clerk
     const clerkSecretKey = process.env.CLERK_SECRET_KEY;
-    const userResponse = await fetch(`https://api.clerk.com/v1/users/${auth.userId}`, {
-      headers: { Authorization: `Bearer ${clerkSecretKey}` }
-    });
+    const userResponse = await fetch(
+      `https://api.clerk.com/v1/users/${auth.userId}`,
+      {
+        headers: { Authorization: `Bearer ${clerkSecretKey}` },
+      },
+    );
 
     if (!userResponse.ok) {
-      return res.status(401).json({ error: 'Failed to verify user' });
+      return res.status(401).json({ error: "Failed to verify user" });
     }
 
     const userData = await userResponse.json();
-    const userEmail = userData.email_addresses?.[0]?.email_address?.toLowerCase();
+    const userEmail =
+      userData.email_addresses?.[0]?.email_address?.toLowerCase();
 
     if (!userEmail || !SUPER_ADMIN_EMAILS.includes(userEmail)) {
-      return res.status(403).json({ error: 'Access denied. Super admin only.' });
+      return res
+        .status(403)
+        .json({ error: "Access denied. Super admin only." });
     }
 
     req.adminEmail = userEmail;
     next();
   } catch (error) {
-    logger.error({ err: error }, '[Admin] Auth error');
-    res.status(500).json({ error: 'Authentication error' });
+    logger.error({ err: error }, "[Admin] Auth error");
+    res.status(500).json({ error: "Authentication error" });
   }
 }
 
@@ -505,7 +530,7 @@ app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
       galleryResult,
       aiUsageResult,
       errorsResult,
-      orgCountResult
+      orgCountResult,
     ] = await Promise.all([
       sql`SELECT COUNT(*) as count FROM users`,
       sql`SELECT COUNT(*) as count FROM campaigns`,
@@ -521,7 +546,7 @@ app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
       sql`SELECT COUNT(*) as count FROM api_usage_logs
           WHERE created_at >= NOW() - INTERVAL '24 hours'
           AND status = 'failed'`,
-      sql`SELECT COUNT(DISTINCT organization_id) as count FROM api_usage_logs WHERE organization_id IS NOT NULL`
+      sql`SELECT COUNT(DISTINCT organization_id) as count FROM api_usage_logs WHERE organization_id IS NOT NULL`,
     ]);
 
     res.json({
@@ -534,11 +559,11 @@ app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
       totalGalleryImages: parseInt(galleryResult[0]?.count || 0),
       aiCostThisMonth: parseInt(aiUsageResult[0]?.total_cost || 0),
       aiRequestsThisMonth: parseInt(aiUsageResult[0]?.total_requests || 0),
-      recentErrors: parseInt(errorsResult[0]?.count || 0)
+      recentErrors: parseInt(errorsResult[0]?.count || 0),
     });
   } catch (error) {
-    logger.error({ err: error }, '[Admin] Stats error');
-    res.status(500).json({ error: 'Failed to fetch stats' });
+    logger.error({ err: error }, "[Admin] Stats error");
+    res.status(500).json({ error: "Failed to fetch stats" });
   }
 });
 
@@ -563,22 +588,29 @@ app.get("/api/admin/usage", requireSuperAdmin, async (req, res) => {
     // Aggregate by date
     const aggregated = {};
     for (const row of timeline) {
-      const dateKey = row.date instanceof Date
-        ? row.date.toISOString().split('T')[0]
-        : String(row.date);
+      const dateKey =
+        row.date instanceof Date
+          ? row.date.toISOString().split("T")[0]
+          : String(row.date);
       if (!aggregated[dateKey]) {
-        aggregated[dateKey] = { date: dateKey, total_requests: 0, total_cost_cents: 0 };
+        aggregated[dateKey] = {
+          date: dateKey,
+          total_requests: 0,
+          total_cost_cents: 0,
+        };
       }
       aggregated[dateKey].total_requests += parseInt(row.total_requests);
       aggregated[dateKey].total_cost_cents += parseInt(row.total_cost_cents);
     }
 
     res.json({
-      timeline: Object.values(aggregated).sort((a, b) => a.date.localeCompare(b.date))
+      timeline: Object.values(aggregated).sort((a, b) =>
+        a.date.localeCompare(b.date),
+      ),
     });
   } catch (error) {
-    logger.error({ err: error }, '[Admin] Usage error');
-    res.status(500).json({ error: 'Failed to fetch usage data' });
+    logger.error({ err: error }, "[Admin] Usage error");
+    res.status(500).json({ error: "Failed to fetch usage data" });
   }
 });
 
@@ -586,7 +618,7 @@ app.get("/api/admin/usage", requireSuperAdmin, async (req, res) => {
 app.get("/api/admin/users", requireSuperAdmin, async (req, res) => {
   try {
     const sql = getSql();
-    const { limit = 20, page = 1, search = '' } = req.query;
+    const { limit = 20, page = 1, search = "" } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const searchFilter = search ? `%${search}%` : null;
@@ -626,12 +658,12 @@ app.get("/api/admin/users", requireSuperAdmin, async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        totalPages
-      }
+        totalPages,
+      },
     });
   } catch (error) {
-    logger.error({ err: error }, '[Admin] Users error');
-    res.status(500).json({ error: 'Failed to fetch users' });
+    logger.error({ err: error }, "[Admin] Users error");
+    res.status(500).json({ error: "Failed to fetch users" });
   }
 });
 
@@ -735,7 +767,7 @@ app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
     `;
 
     // Transform data to match frontend interface
-    const organizations = orgs.map(org => ({
+    const organizations = orgs.map((org) => ({
       organization_id: org.organization_id,
       primary_brand_name: org.primary_brand_name,
       brand_count: String(org.brand_count),
@@ -747,8 +779,8 @@ app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
       aiUsageThisMonth: {
         requests: parseInt(org.ai_requests) || 0,
         costCents: parseInt(org.ai_cost_cents) || 0,
-        costUsd: (parseInt(org.ai_cost_cents) || 0) / 100
-      }
+        costUsd: (parseInt(org.ai_cost_cents) || 0) / 100,
+      },
     }));
 
     // Count total organizations
@@ -768,12 +800,12 @@ app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        totalPages
-      }
+        totalPages,
+      },
     });
   } catch (error) {
-    logger.error({ err: error }, '[Admin] Organizations error');
-    res.status(500).json({ error: 'Failed to fetch organizations' });
+    logger.error({ err: error }, "[Admin] Organizations error");
+    res.status(500).json({ error: "Failed to fetch organizations" });
   }
 });
 
@@ -798,10 +830,12 @@ app.get("/api/admin/logs", requireSuperAdmin, async (req, res) => {
     const totalResult = await sql`SELECT COUNT(*) as count FROM api_usage_logs`;
 
     // Get unique categories
-    const categoriesResult = await sql`SELECT DISTINCT operation as category FROM api_usage_logs WHERE operation IS NOT NULL`;
+    const categoriesResult =
+      await sql`SELECT DISTINCT operation as category FROM api_usage_logs WHERE operation IS NOT NULL`;
 
     // Get recent error count
-    const errorCountResult = await sql`SELECT COUNT(*) as count FROM api_usage_logs WHERE status = 'failed' AND created_at >= NOW() - INTERVAL '24 hours'`;
+    const errorCountResult =
+      await sql`SELECT COUNT(*) as count FROM api_usage_logs WHERE status = 'failed' AND created_at >= NOW() - INTERVAL '24 hours'`;
 
     const total = parseInt(totalResult[0]?.count || 0);
     const totalPages = Math.ceil(total / parseInt(limit));
@@ -812,16 +846,16 @@ app.get("/api/admin/logs", requireSuperAdmin, async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        totalPages
+        totalPages,
       },
       filters: {
-        categories: categoriesResult.map(r => r.category),
-        recentErrorCount: parseInt(errorCountResult[0]?.count || 0)
-      }
+        categories: categoriesResult.map((r) => r.category),
+        recentErrorCount: parseInt(errorCountResult[0]?.count || 0),
+      },
     });
   } catch (error) {
-    logger.error({ err: error }, '[Admin] Logs error');
-    res.status(500).json({ error: 'Failed to fetch logs' });
+    logger.error({ err: error }, "[Admin] Logs error");
+    res.status(500).json({ error: "Failed to fetch logs" });
   }
 });
 
@@ -843,13 +877,13 @@ app.get("/api/admin/logs/:id", requireSuperAdmin, async (req, res) => {
     `;
 
     if (!logs || logs.length === 0) {
-      return res.status(404).json({ error: 'Log not found' });
+      return res.status(404).json({ error: "Log not found" });
     }
 
     res.json(logs[0]);
   } catch (error) {
-    logger.error({ err: error }, '[Admin] Log detail error');
-    res.status(500).json({ error: 'Failed to fetch log details' });
+    logger.error({ err: error }, "[Admin] Log detail error");
+    res.status(500).json({ error: "Failed to fetch log details" });
   }
 });
 
@@ -858,50 +892,54 @@ const aiSuggestionsCache = new Map();
 const CACHE_DURATION_MS = 3600000; // 1 hour
 
 // Admin: Get AI suggestions for a log
-app.post("/api/admin/logs/:id/ai-suggestions", requireSuperAdmin, async (req, res) => {
-  try {
-    const sql = getSql();
-    const { id } = req.params;
+app.post(
+  "/api/admin/logs/:id/ai-suggestions",
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      const sql = getSql();
+      const { id } = req.params;
 
-    // Check cache first
-    const cacheKey = `suggestions_${id}`;
-    const cached = aiSuggestionsCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
-      return res.json({ suggestions: cached.suggestions, cached: true });
-    }
+      // Check cache first
+      const cacheKey = `suggestions_${id}`;
+      const cached = aiSuggestionsCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
+        return res.json({ suggestions: cached.suggestions, cached: true });
+      }
 
-    // Fetch log from database
-    const logs = await sql`
+      // Fetch log from database
+      const logs = await sql`
       SELECT id, endpoint, operation, model_id, error_message,
              metadata, latency_ms, status
       FROM api_usage_logs
       WHERE id = ${id}
     `;
 
-    if (!logs || logs.length === 0) {
-      return res.status(404).json({ error: 'Log not found' });
-    }
+      if (!logs || logs.length === 0) {
+        return res.status(404).json({ error: "Log not found" });
+      }
 
-    const log = logs[0];
+      const log = logs[0];
 
-    // Only generate suggestions for failed logs
-    if (log.status !== 'failed') {
-      return res.json({
-        suggestions: 'Este log não contém erros. Sugestões de IA estão disponíveis apenas para logs com status "failed".',
-        cached: false
-      });
-    }
+      // Only generate suggestions for failed logs
+      if (log.status !== "failed") {
+        return res.json({
+          suggestions:
+            'Este log não contém erros. Sugestões de IA estão disponíveis apenas para logs com status "failed".',
+          cached: false,
+        });
+      }
 
-    // Construct prompt for AI
-    const prompt = `Você é um expert em análise de erros de API. Forneça sugestões para corrigir este erro:
+      // Construct prompt for AI
+      const prompt = `Você é um expert em análise de erros de API. Forneça sugestões para corrigir este erro:
 
 **Detalhes do Erro:**
-- Endpoint: ${log.endpoint || 'N/A'}
-- Operação: ${log.operation || 'N/A'}
-- Modelo: ${log.model_id || 'N/A'}
-- Mensagem: ${log.error_message || 'N/A'}
-- Metadata: ${log.metadata ? JSON.stringify(log.metadata) : 'N/A'}
-- Latência: ${log.latency_ms || 'N/A'}ms
+- Endpoint: ${log.endpoint || "N/A"}
+- Operação: ${log.operation || "N/A"}
+- Modelo: ${log.model_id || "N/A"}
+- Mensagem: ${log.error_message || "N/A"}
+- Metadata: ${log.metadata ? JSON.stringify(log.metadata) : "N/A"}
+- Latência: ${log.latency_ms || "N/A"}ms
 
 **Sua Tarefa:**
 1. Análise da causa raiz (2-3 frases)
@@ -911,32 +949,37 @@ app.post("/api/admin/logs/:id/ai-suggestions", requireSuperAdmin, async (req, re
 
 Formate em markdown claro com seções.`;
 
-    // Call Gemini API
-    const gemini = getGeminiAi();
-    const result = await withRetry(() =>
-      gemini.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: [{
-          role: 'user',
-          parts: [{ text: prompt }]
-        }]
-      })
-    );
+      // Call Gemini API
+      const gemini = getGeminiAi();
+      const result = await withRetry(() =>
+        gemini.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }],
+            },
+          ],
+        }),
+      );
 
-    const suggestions = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || 'Não foi possível gerar sugestões.';
+      const suggestions =
+        result.response?.candidates?.[0]?.content?.parts?.[0]?.text ||
+        "Não foi possível gerar sugestões.";
 
-    // Cache the result
-    aiSuggestionsCache.set(cacheKey, {
-      suggestions,
-      timestamp: Date.now()
-    });
+      // Cache the result
+      aiSuggestionsCache.set(cacheKey, {
+        suggestions,
+        timestamp: Date.now(),
+      });
 
-    res.json({ suggestions, cached: false });
-  } catch (error) {
-    logger.error({ err: error }, '[Admin] AI suggestions error');
-    res.status(500).json({ error: 'Failed to generate AI suggestions' });
-  }
-});
+      res.json({ suggestions, cached: false });
+    } catch (error) {
+      logger.error({ err: error }, "[Admin] AI suggestions error");
+      res.status(500).json({ error: "Failed to generate AI suggestions" });
+    }
+  },
+);
 
 // ============================================================================
 // DEBUG: Stats endpoint to monitor database usage
@@ -958,7 +1001,7 @@ app.post("/api/db/stats/reset", (req, res) => {
   requestCounter = 0;
   queryCounter = 0;
   userIdCache.clear();
-  logger.info({}, '[STATS] Counters reset');
+  logger.info({}, "[STATS] Counters reset");
   res.json({ success: true, message: "Stats reset" });
 });
 
@@ -976,7 +1019,9 @@ app.get("/api/db/init", async (req, res) => {
     const { user_id, organization_id, clerk_user_id } = req.query;
 
     if (!user_id && !clerk_user_id) {
-      return res.status(400).json({ error: "user_id or clerk_user_id is required" });
+      return res
+        .status(400)
+        .json({ error: "user_id or clerk_user_id is required" });
     }
 
     // If clerk_user_id is provided explicitly, try to find/create user
@@ -984,7 +1029,8 @@ app.get("/api/db/init", async (req, res) => {
     let resolveTime = 0;
     if (clerk_user_id) {
       // First check if it's a UUID (db user id)
-      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const uuidPattern =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (uuidPattern.test(clerk_user_id)) {
         resolvedUserId = clerk_user_id;
       } else {
@@ -992,11 +1038,17 @@ app.get("/api/db/init", async (req, res) => {
         const resolveStart = Date.now();
         resolvedUserId = await resolveUserId(sql, clerk_user_id, reqId);
         resolveTime = Date.now() - resolveStart;
-        logger.debug({ durationMs: resolveTime }, '[Init API] resolveUserId took');
+        logger.debug(
+          { durationMs: resolveTime },
+          "[Init API] resolveUserId took",
+        );
         if (!resolvedUserId) {
           // User doesn't exist yet - this happens during parallel loading
           // Return empty data - the frontend will retry after user sync completes
-          logger.debug({ clerk_user_id }, '[Init API] User not found for clerk_user_id');
+          logger.debug(
+            { clerk_user_id },
+            "[Init API] User not found for clerk_user_id",
+          );
           return res.json({
             brandProfile: null,
             gallery: [],
@@ -1018,7 +1070,7 @@ app.get("/api/db/init", async (req, res) => {
       // Original behavior: resolve user_id
       resolvedUserId = await resolveUserId(sql, user_id, reqId);
       if (!resolvedUserId) {
-        logger.debug({}, '[Init API] User not found, returning empty data');
+        logger.debug({}, "[Init API] User not found, returning empty data");
         return res.json({
           brandProfile: null,
           gallery: [],
@@ -1064,24 +1116,34 @@ app.get("/api/db/init", async (req, res) => {
           brandProfileResult = JSON.parse(cached);
           brandProfileCached = true;
           queryTimings.brandProfile = 0; // Cache hit
-          logger.debug({ cacheKey }, '[Init API] brandProfile cache HIT');
+          logger.debug({ cacheKey }, "[Init API] brandProfile cache HIT");
         }
       } catch (e) {
-        logger.debug({ error: e.message }, '[Init API] brandProfile cache error');
+        logger.debug(
+          { error: e.message },
+          "[Init API] brandProfile cache error",
+        );
       }
     }
 
     if (!brandProfileCached) {
       // OPTIMIZATION: Don't return data URLs for logo_url - they can be 3MB each!
-      brandProfileResult = await timedQuery('brandProfile', () => isOrgContext
-        ? sql`SELECT id, user_id, organization_id, name, description, CASE WHEN logo_url LIKE 'data:%' THEN '' ELSE logo_url END as logo_url, primary_color, secondary_color, tertiary_color, tone_of_voice, settings, created_at, updated_at, deleted_at FROM brand_profiles WHERE organization_id = ${organization_id} AND deleted_at IS NULL LIMIT 1`
-        : sql`SELECT id, user_id, organization_id, name, description, CASE WHEN logo_url LIKE 'data:%' THEN '' ELSE logo_url END as logo_url, primary_color, secondary_color, tertiary_color, tone_of_voice, settings, created_at, updated_at, deleted_at FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`);
+      brandProfileResult = await timedQuery("brandProfile", () =>
+        isOrgContext
+          ? sql`SELECT id, user_id, organization_id, name, description, CASE WHEN logo_url LIKE 'data:%' THEN '' ELSE logo_url END as logo_url, primary_color, secondary_color, tertiary_color, tone_of_voice, settings, created_at, updated_at, deleted_at FROM brand_profiles WHERE organization_id = ${organization_id} AND deleted_at IS NULL LIMIT 1`
+          : sql`SELECT id, user_id, organization_id, name, description, CASE WHEN logo_url LIKE 'data:%' THEN '' ELSE logo_url END as logo_url, primary_color, secondary_color, tertiary_color, tone_of_voice, settings, created_at, updated_at, deleted_at FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`,
+      );
 
       // Cache for 5 minutes
       if (redis && isRedisAvailable() && brandProfileResult.length > 0) {
         try {
-          await redis.set(cacheKey, JSON.stringify(brandProfileResult), 'EX', 300);
-          logger.debug({ cacheKey }, '[Init API] brandProfile cached');
+          await redis.set(
+            cacheKey,
+            JSON.stringify(brandProfileResult),
+            "EX",
+            300,
+          );
+          logger.debug({ cacheKey }, "[Init API] brandProfile cached");
         } catch (e) {
           // Ignore cache write errors
         }
@@ -1091,28 +1153,38 @@ app.get("/api/db/init", async (req, res) => {
     // OPTIMIZATION: Don't return data URLs (base64) for gallery - they're 113MB+ total!
     // Use thumbnail_url if available, otherwise filter out (frontend will hide empty src_url)
     // NOTE: Old images with data URLs won't appear until migrated to Blob
-    const galleryResult = await timedQuery('gallery', () => isOrgContext
-      ? sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`
-      : sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`);
+    const galleryResult = await timedQuery("gallery", () =>
+      isOrgContext
+        ? sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE organization_id = ${organization_id} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`
+        : sql`SELECT id, user_id, organization_id, source, CASE WHEN src_url LIKE 'data:%' THEN COALESCE(thumbnail_url, '') ELSE src_url END as src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name FROM gallery_images WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`,
+    );
 
     // OPTIMIZATION: Don't return data URLs (base64) in image_url - they're huge (26MB+ total!)
     // Use CASE to return empty string for data URLs, full URL otherwise
-    const scheduledPostsResult = await timedQuery('scheduledPosts', () => isOrgContext
-      ? sql`SELECT id, user_id, organization_id, content_type, content_id, CASE WHEN image_url LIKE 'data:%' THEN '' ELSE image_url END as image_url, carousel_image_urls, caption, hashtags, scheduled_date, scheduled_time, scheduled_timestamp, timezone, platforms, instagram_content_type, status, published_at, error_message, created_from, created_at, updated_at FROM scheduled_posts WHERE organization_id = ${organization_id} AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000 AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000 ORDER BY scheduled_timestamp ASC`
-      : sql`SELECT id, user_id, organization_id, content_type, content_id, CASE WHEN image_url LIKE 'data:%' THEN '' ELSE image_url END as image_url, carousel_image_urls, caption, hashtags, scheduled_date, scheduled_time, scheduled_timestamp, timezone, platforms, instagram_content_type, status, published_at, error_message, created_from, created_at, updated_at FROM scheduled_posts WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000 AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000 ORDER BY scheduled_timestamp ASC`);
+    const scheduledPostsResult = await timedQuery("scheduledPosts", () =>
+      isOrgContext
+        ? sql`SELECT id, user_id, organization_id, content_type, content_id, CASE WHEN image_url LIKE 'data:%' THEN '' ELSE image_url END as image_url, carousel_image_urls, caption, hashtags, scheduled_date, scheduled_time, scheduled_timestamp, timezone, platforms, instagram_content_type, status, published_at, error_message, created_from, created_at, updated_at FROM scheduled_posts WHERE organization_id = ${organization_id} AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000 AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000 ORDER BY scheduled_timestamp ASC`
+        : sql`SELECT id, user_id, organization_id, content_type, content_id, CASE WHEN image_url LIKE 'data:%' THEN '' ELSE image_url END as image_url, carousel_image_urls, caption, hashtags, scheduled_date, scheduled_time, scheduled_timestamp, timezone, platforms, instagram_content_type, status, published_at, error_message, created_from, created_at, updated_at FROM scheduled_posts WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000 AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000 ORDER BY scheduled_timestamp ASC`,
+    );
 
-    const campaignsResult = await timedQuery('campaigns', () => isOrgContext
-      ? sql`SELECT c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at, COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count, COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count, COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count, COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count, (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url, (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url, (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url, (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url FROM campaigns c WHERE c.organization_id = ${organization_id} AND c.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT 10`
-      : sql`SELECT c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at, COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count, COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count, COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count, COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count, (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url, (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url, (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url, (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url FROM campaigns c WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT 10`);
+    const campaignsResult = await timedQuery("campaigns", () =>
+      isOrgContext
+        ? sql`SELECT c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at, COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count, COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count, COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count, COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count, (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url, (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url, (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url, (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url FROM campaigns c WHERE c.organization_id = ${organization_id} AND c.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT 10`
+        : sql`SELECT c.id, c.user_id, c.organization_id, c.name, c.description, c.input_transcript, c.status, c.created_at, c.updated_at, COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count, COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count, COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count, COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count, (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url, (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url, (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url, (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url FROM campaigns c WHERE c.user_id = ${resolvedUserId} AND c.organization_id IS NULL AND c.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT 10`,
+    );
 
-    const schedulesListResult = await timedQuery('schedulesList', () => isOrgContext
-      ? sql`SELECT ws.id, ws.user_id, ws.organization_id, ws.original_filename as name, ws.start_date, ws.end_date, ws.created_at, ws.updated_at, COUNT(te.id)::int as event_count FROM week_schedules ws LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id WHERE ws.organization_id = ${organization_id} GROUP BY ws.id, ws.original_filename ORDER BY ws.created_at DESC`
-      : sql`SELECT ws.id, ws.user_id, ws.organization_id, ws.original_filename as name, ws.start_date, ws.end_date, ws.created_at, ws.updated_at, COUNT(te.id)::int as event_count FROM week_schedules ws LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id WHERE ws.user_id = ${resolvedUserId} AND ws.organization_id IS NULL GROUP BY ws.id, ws.original_filename ORDER BY ws.created_at DESC`);
-
+    const schedulesListResult = await timedQuery("schedulesList", () =>
+      isOrgContext
+        ? sql`SELECT ws.id, ws.user_id, ws.organization_id, ws.original_filename as name, ws.start_date, ws.end_date, ws.created_at, ws.updated_at, COUNT(te.id)::int as event_count FROM week_schedules ws LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id WHERE ws.organization_id = ${organization_id} GROUP BY ws.id, ws.original_filename ORDER BY ws.created_at DESC`
+        : sql`SELECT ws.id, ws.user_id, ws.organization_id, ws.original_filename as name, ws.start_date, ws.end_date, ws.created_at, ws.updated_at, COUNT(te.id)::int as event_count FROM week_schedules ws LEFT JOIN tournament_events te ON te.week_schedule_id = ws.id WHERE ws.user_id = ${resolvedUserId} AND ws.organization_id IS NULL GROUP BY ws.id, ws.original_filename ORDER BY ws.created_at DESC`,
+    );
 
     // LOG: Query timing breakdown for performance analysis
     const totalTime = Date.now() - start;
-    logger.debug({ totalTimeMs: totalTime, queryTimings }, '[Init API] Query timings');
+    logger.debug(
+      { totalTimeMs: totalTime, queryTimings },
+      "[Init API] Query timings",
+    );
 
     // PERFORMANCE: Only tournament schedule/events are loaded lazily via /api/db/tournaments
     // schedulesList is loaded here because it's essential for flyers page
@@ -1238,7 +1310,10 @@ app.get("/api/db/brand-profiles", async (req, res) => {
 
     throw new ValidationError("user_id or id is required");
   } catch (error) {
-    if (error instanceof OrganizationAccessError || error instanceof ValidationError) {
+    if (
+      error instanceof OrganizationAccessError ||
+      error instanceof ValidationError
+    ) {
       throw error;
     }
     throw new DatabaseError("Failed to fetch brand profile", error);
@@ -1390,9 +1465,10 @@ app.get("/api/db/gallery", async (req, res) => {
 
     // OPTIMIZATION: Only include src (base64 image data) when explicitly requested
     // This dramatically reduces egress data transfer (50-250MB → 50KB per request)
-    const selectColumns = include_src === 'true'
-      ? '*'
-      : 'id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name';
+    const selectColumns =
+      include_src === "true"
+        ? "*"
+        : "id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name";
 
     if (organization_id) {
       // Organization context - verify membership
@@ -1434,7 +1510,10 @@ app.get("/api/db/gallery", async (req, res) => {
 
     res.json(query);
   } catch (error) {
-    if (error instanceof OrganizationAccessError || error instanceof ValidationError) {
+    if (
+      error instanceof OrganizationAccessError ||
+      error instanceof ValidationError
+    ) {
       throw error;
     }
     throw new DatabaseError("Failed to fetch gallery images", error);
@@ -1494,8 +1573,8 @@ app.get("/api/db/gallery/daily-flyers", async (req, res) => {
     // Transform to a structured format: { DAY: { PERIOD: [images] } }
     const structured = {};
     for (const img of query) {
-      const day = img.daily_flyer_day || 'UNKNOWN';
-      const period = img.daily_flyer_period || 'UNKNOWN';
+      const day = img.daily_flyer_day || "UNKNOWN";
+      const period = img.daily_flyer_period || "UNKNOWN";
 
       if (!structured[day]) {
         structured[day] = {};
@@ -1598,7 +1677,8 @@ app.patch("/api/db/gallery", async (req, res) => {
   try {
     const sql = getSql();
     const { id } = req.query;
-    const { published_at, is_style_reference, style_reference_name, src_url } = req.body;
+    const { published_at, is_style_reference, style_reference_name, src_url } =
+      req.body;
 
     if (!id) {
       return res.status(400).json({ error: "id is required" });
@@ -1613,9 +1693,9 @@ app.patch("/api/db/gallery", async (req, res) => {
     const result = await sql`
       UPDATE gallery_images
       SET
-        published_at = ${published_at !== undefined ? (published_at || null) : current[0].published_at},
+        published_at = ${published_at !== undefined ? published_at || null : current[0].published_at},
         is_style_reference = ${is_style_reference !== undefined ? is_style_reference : current[0].is_style_reference},
-        style_reference_name = ${style_reference_name !== undefined ? (style_reference_name || null) : current[0].style_reference_name},
+        style_reference_name = ${style_reference_name !== undefined ? style_reference_name || null : current[0].style_reference_name},
         src_url = ${src_url !== undefined ? src_url : current[0].src_url},
         updated_at = NOW()
       WHERE id = ${id}
@@ -1674,11 +1754,11 @@ app.delete("/api/db/gallery", async (req, res) => {
     ) {
       try {
         await del(srcUrl);
-        logger.info({ url: srcUrl }, '[Gallery] Deleted file from Vercel Blob');
+        logger.info({ url: srcUrl }, "[Gallery] Deleted file from Vercel Blob");
       } catch (blobError) {
         logger.error(
           { err: blobError, srcUrl },
-          `[Gallery] Failed to delete file from Vercel Blob: ${srcUrl}`
+          `[Gallery] Failed to delete file from Vercel Blob: ${srcUrl}`,
         );
         // Don't fail the request if blob deletion fails - DB record is already deleted
       }
@@ -1822,7 +1902,10 @@ app.get("/api/db/scheduled-posts", async (req, res) => {
 
     res.json(query);
   } catch (error) {
-    if (error instanceof OrganizationAccessError || error instanceof ValidationError) {
+    if (
+      error instanceof OrganizationAccessError ||
+      error instanceof ValidationError
+    ) {
       throw error;
     }
     throw new DatabaseError("Failed to fetch scheduled posts", error);
@@ -1889,8 +1972,10 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
 
     // Validate content_id: only use if it's a valid UUID, otherwise set to null
     // Flyer IDs like "flyer-123-abc" are not valid UUIDs
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const validContentId = content_id && uuidRegex.test(content_id) ? content_id : null;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const validContentId =
+      content_id && uuidRegex.test(content_id) ? content_id : null;
 
     const result = await sql`
       INSERT INTO scheduled_posts (
@@ -1911,9 +1996,18 @@ app.post("/api/db/scheduled-posts", async (req, res) => {
     // Schedule job in BullMQ for exact-time publishing
     try {
       await schedulePostForPublishing(newPost.id, resolvedUserId, timestampMs);
-      logger.info({ postId: newPost.id, scheduledAt: new Date(timestampMs).toISOString() }, '[API] Scheduled job for post');
+      logger.info(
+        {
+          postId: newPost.id,
+          scheduledAt: new Date(timestampMs).toISOString(),
+        },
+        "[API] Scheduled job for post",
+      );
     } catch (error) {
-      logger.error({ err: error, postId: newPost.id }, `[API] Failed to schedule job for post ${newPost.id}`);
+      logger.error(
+        { err: error, postId: newPost.id },
+        `[API] Failed to schedule job for post ${newPost.id}`,
+      );
       // Don't fail the request if job scheduling fails - fallback checker will catch it
     }
 
@@ -1979,12 +2073,18 @@ app.put("/api/db/scheduled-posts", async (req, res) => {
     const updatedPost = result[0];
 
     // If status changed to 'cancelled', cancel the scheduled job
-    if (updates.status === 'cancelled') {
+    if (updates.status === "cancelled") {
       try {
         await cancelScheduledPost(id);
-        logger.info({ postId: id }, '[API] Cancelled scheduled job for post (status changed to cancelled)');
+        logger.info(
+          { postId: id },
+          "[API] Cancelled scheduled job for post (status changed to cancelled)",
+        );
       } catch (error) {
-        logger.error({ err: error, postId: id }, `[API] Failed to cancel job for post ${id}`);
+        logger.error(
+          { err: error, postId: id },
+          `[API] Failed to cancel job for post ${id}`,
+        );
       }
     }
 
@@ -2038,9 +2138,15 @@ app.delete("/api/db/scheduled-posts", async (req, res) => {
     // Cancel scheduled job in BullMQ
     try {
       await cancelScheduledPost(id);
-      logger.info({ postId: id }, '[API] Cancelled scheduled job for deleted post');
+      logger.info(
+        { postId: id },
+        "[API] Cancelled scheduled job for deleted post",
+      );
     } catch (error) {
-      logger.error({ err: error, postId: id }, `[API] Failed to cancel job for post ${id}`);
+      logger.error(
+        { err: error, postId: id },
+        `[API] Failed to cancel job for post ${id}`,
+      );
       // Don't fail the request if job cancellation fails
     }
 
@@ -2061,7 +2167,8 @@ app.delete("/api/db/scheduled-posts", async (req, res) => {
 app.get("/api/db/campaigns", async (req, res) => {
   try {
     const sql = getSql();
-    const { user_id, organization_id, id, include_content, limit, offset } = req.query;
+    const { user_id, organization_id, id, include_content, limit, offset } =
+      req.query;
 
     // Get single campaign by ID
     if (id) {
@@ -2079,28 +2186,29 @@ app.get("/api/db/campaigns", async (req, res) => {
       if (include_content === "true") {
         const campaign = result[0];
 
-        const [videoScripts, posts, adCreatives, carouselScripts] = await Promise.all([
-          sql`
+        const [videoScripts, posts, adCreatives, carouselScripts] =
+          await Promise.all([
+            sql`
             SELECT * FROM video_clip_scripts
             WHERE campaign_id = ${id}
             ORDER BY sort_order ASC
           `,
-          sql`
+            sql`
             SELECT * FROM posts
             WHERE campaign_id = ${id}
             ORDER BY sort_order ASC
           `,
-          sql`
+            sql`
             SELECT * FROM ad_creatives
             WHERE campaign_id = ${id}
             ORDER BY sort_order ASC
           `,
-          sql`
+            sql`
             SELECT * FROM carousel_scripts
             WHERE campaign_id = ${id}
             ORDER BY sort_order ASC
           `,
-        ]);
+          ]);
 
         return res.status(200).json({
           ...campaign,
@@ -2129,7 +2237,8 @@ app.get("/api/db/campaigns", async (req, res) => {
     const parsedLimit = Number.parseInt(limit, 10);
     const parsedOffset = Number.parseInt(offset, 10);
     const hasLimit = Number.isFinite(parsedLimit) && parsedLimit > 0;
-    const safeOffset = Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
+    const safeOffset =
+      Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
 
     let result;
     if (organization_id) {
@@ -2238,7 +2347,10 @@ app.get("/api/db/campaigns", async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    if (error instanceof OrganizationAccessError || error instanceof ValidationError) {
+    if (
+      error instanceof OrganizationAccessError ||
+      error instanceof ValidationError
+    ) {
       throw error;
     }
     throw new DatabaseError("Failed to fetch campaigns", error);
@@ -2402,7 +2514,10 @@ app.delete("/api/db/campaigns", async (req, res) => {
       }
     }
 
-    logger.info({ campaignId: id }, '[Campaign Delete] Starting cascade delete for campaign');
+    logger.info(
+      { campaignId: id },
+      "[Campaign Delete] Starting cascade delete for campaign",
+    );
 
     // ========================================================================
     // CASCADE DELETE: Delete all resources associated with the campaign
@@ -2417,7 +2532,10 @@ app.delete("/api/db/campaigns", async (req, res) => {
       AND deleted_at IS NULL
     `;
 
-    logger.info({ count: campaignImages.length }, '[Campaign Delete] Found gallery images to delete');
+    logger.info(
+      { count: campaignImages.length },
+      "[Campaign Delete] Found gallery images to delete",
+    );
 
     // 2. Get all posts with their image URLs
     const posts = await sql`
@@ -2434,7 +2552,14 @@ app.delete("/api/db/campaigns", async (req, res) => {
       SELECT id, thumbnail_url, video_url FROM video_clip_scripts WHERE campaign_id = ${id}
     `;
 
-    logger.info({ postsCount: posts.length, adsCount: ads.length, clipsCount: clips.length }, '[Campaign Delete] Found posts, ads, and clips');
+    logger.info(
+      {
+        postsCount: posts.length,
+        adsCount: ads.length,
+        clipsCount: clips.length,
+      },
+      "[Campaign Delete] Found posts, ads, and clips",
+    );
 
     // Collect all URLs that need to be deleted from Vercel Blob
     const urlsToDelete = [];
@@ -2491,44 +2616,56 @@ app.delete("/api/db/campaigns", async (req, res) => {
     });
 
     // Delete all files from Vercel Blob Storage
-    logger.info({ count: urlsToDelete.length }, '[Campaign Delete] Deleting files from Vercel Blob');
+    logger.info(
+      { count: urlsToDelete.length },
+      "[Campaign Delete] Deleting files from Vercel Blob",
+    );
     for (const url of urlsToDelete) {
       try {
         await del(url);
-        logger.debug({ url }, '[Campaign Delete] Deleted file');
+        logger.debug({ url }, "[Campaign Delete] Deleted file");
       } catch (blobError) {
-        logger.error({ err: blobError, url }, `[Campaign Delete] Failed to delete file: ${url}`);
+        logger.error(
+          { err: blobError, url },
+          `[Campaign Delete] Failed to delete file: ${url}`,
+        );
         // Continue even if blob deletion fails
       }
     }
 
     // HARD DELETE: Permanently remove all records from database
-    logger.info({}, '[Campaign Delete] Deleting database records');
+    logger.info({}, "[Campaign Delete] Deleting database records");
 
     // Delete gallery images (already have the IDs)
     if (campaignImages.length > 0) {
       const imageIds = campaignImages.map((img) => img.id);
       await sql`DELETE FROM gallery_images WHERE id = ANY(${imageIds})`;
-      logger.info({ count: imageIds.length }, '[Campaign Delete] Deleted gallery images from DB');
+      logger.info(
+        { count: imageIds.length },
+        "[Campaign Delete] Deleted gallery images from DB",
+      );
     }
 
     // Delete posts
     await sql`DELETE FROM posts WHERE campaign_id = ${id}`;
-    logger.info({}, '[Campaign Delete] Deleted posts from DB');
+    logger.info({}, "[Campaign Delete] Deleted posts from DB");
 
     // Delete ad creatives
     await sql`DELETE FROM ad_creatives WHERE campaign_id = ${id}`;
-    logger.info({}, '[Campaign Delete] Deleted ad creatives from DB');
+    logger.info({}, "[Campaign Delete] Deleted ad creatives from DB");
 
     // Delete video clip scripts
     await sql`DELETE FROM video_clip_scripts WHERE campaign_id = ${id}`;
-    logger.info({}, '[Campaign Delete] Deleted video clips from DB');
+    logger.info({}, "[Campaign Delete] Deleted video clips from DB");
 
     // Finally, delete the campaign itself
     await sql`DELETE FROM campaigns WHERE id = ${id}`;
-    logger.info({}, '[Campaign Delete] Deleted campaign from DB');
+    logger.info({}, "[Campaign Delete] Deleted campaign from DB");
 
-    logger.info({ campaignId: id }, '[Campaign Delete] Cascade delete completed successfully');
+    logger.info(
+      { campaignId: id },
+      "[Campaign Delete] Cascade delete completed successfully",
+    );
 
     res.status(200).json({
       success: true,
@@ -2539,7 +2676,7 @@ app.delete("/api/db/campaigns", async (req, res) => {
         clips: clips.length,
         galleryImages: campaignImages.length,
         files: urlsToDelete.length,
-      }
+      },
     });
   } catch (error) {
     if (
@@ -2847,7 +2984,10 @@ app.get("/api/db/tournaments", async (req, res) => {
 
     res.json({ schedule, events });
   } catch (error) {
-    if (error instanceof OrganizationAccessError || error instanceof ValidationError) {
+    if (
+      error instanceof OrganizationAccessError ||
+      error instanceof ValidationError
+    ) {
       throw error;
     }
     throw new DatabaseError("Failed to fetch tournaments", error);
@@ -2890,7 +3030,7 @@ app.post("/api/db/tournaments", async (req, res) => {
     if (events && Array.isArray(events) && events.length > 0) {
       logger.info(
         { eventsCount: events.length },
-        '[Tournaments API] Inserting events in parallel batches'
+        "[Tournaments API] Inserting events in parallel batches",
       );
 
       // Process in batches - each batch runs concurrently, batches run sequentially
@@ -2902,7 +3042,7 @@ app.post("/api/db/tournaments", async (req, res) => {
         const batchNum = Math.floor(i / batchSize) + 1;
         logger.debug(
           { batchNum, totalBatches, batchSize: batch.length },
-          '[Tournaments API] Processing batch'
+          "[Tournaments API] Processing batch",
         );
 
         // Execute all inserts in this batch concurrently
@@ -2927,7 +3067,7 @@ app.post("/api/db/tournaments", async (req, res) => {
       }
       logger.info(
         { eventsCount: events.length },
-        '[Tournaments API] All events inserted successfully'
+        "[Tournaments API] All events inserted successfully",
       );
     }
 
@@ -3108,7 +3248,8 @@ app.patch("/api/db/tournaments/daily-flyer", async (req, res) => {
 // DISABLED: Background job queue - use synchronous generation instead
 app.post("/api/generate/queue", async (req, res) => {
   return res.status(503).json({
-    error: "Background job queue is disabled. Use synchronous image generation.",
+    error:
+      "Background job queue is disabled. Use synchronous image generation.",
     disabled: true,
   });
 });
@@ -3148,7 +3289,9 @@ app.get("/api/generate/status", async (req, res) => {
     if (userId) {
       let jobs;
       const limitNum = Math.min(parseInt(limit) || 30, 50); // Max 50, default 30
-      const cutoffDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); // 24 hours ago
+      const cutoffDate = new Date(
+        Date.now() - 24 * 60 * 60 * 1000,
+      ).toISOString(); // 24 hours ago
       // For active jobs, only show recent ones (1 hour) to avoid showing stale queued jobs
       const activeCutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString(); // 1 hour ago
 
@@ -3262,7 +3405,7 @@ app.post("/api/generate/cancel-all", async (req, res) => {
     res.json({
       success: true,
       cancelledCount,
-      message: `${cancelledCount} job(s) cancelled`
+      message: `${cancelledCount} job(s) cancelled`,
     });
   } catch (error) {
     logError("Cancel All Jobs API", error);
@@ -3300,7 +3443,7 @@ app.get("/api/proxy-video", async (req, res) => {
         .json({ error: "Only Vercel Blob URLs are allowed" });
     }
 
-    logger.debug({ url }, '[Video Proxy] Fetching');
+    logger.debug({ url }, "[Video Proxy] Fetching");
 
     const response = await fetch(url);
 
@@ -3442,14 +3585,14 @@ const getReplicate = () => {
 
 // Check if an error is a quota/rate limit error that warrants fallback
 const isQuotaOrRateLimitError = (error) => {
-  const errorString = String(error?.message || error || '').toLowerCase();
+  const errorString = String(error?.message || error || "").toLowerCase();
   return (
-    errorString.includes('resource_exhausted') ||
-    errorString.includes('quota') ||
-    errorString.includes('429') ||
-    errorString.includes('rate') ||
-    errorString.includes('limit') ||
-    errorString.includes('exceeded')
+    errorString.includes("resource_exhausted") ||
+    errorString.includes("quota") ||
+    errorString.includes("429") ||
+    errorString.includes("rate") ||
+    errorString.includes("limit") ||
+    errorString.includes("exceeded")
   );
 };
 
@@ -3483,7 +3626,8 @@ const generateImageWithReplicate = async (
   const imageInputs = [];
   if (personReferenceImage) imageInputs.push(personReferenceImage);
   if (styleReferenceImage) imageInputs.push(styleReferenceImage);
-  if (productImages && productImages.length > 0) imageInputs.push(...productImages);
+  if (productImages && productImages.length > 0)
+    imageInputs.push(...productImages);
 
   const input = {
     prompt,
@@ -3512,7 +3656,7 @@ const generateImageWithReplicate = async (
 
 // Generate image with OpenRouter as fallback
 const generateImageWithOpenRouter = async (prompt, productImages) => {
-  logger.info({}, '[OpenRouter Fallback] Tentando gerar imagem via OpenRouter');
+  logger.info({}, "[OpenRouter Fallback] Tentando gerar imagem via OpenRouter");
 
   const openrouter = getOpenRouter();
 
@@ -3521,7 +3665,10 @@ const generateImageWithOpenRouter = async (prompt, productImages) => {
 
   // Add images first if provided
   if (productImages && productImages.length > 0) {
-    logger.debug({ count: productImages.length }, '[OpenRouter Fallback] Adicionando imagens de referência');
+    logger.debug(
+      { count: productImages.length },
+      "[OpenRouter Fallback] Adicionando imagens de referência",
+    );
     for (const img of productImages) {
       contentParts.push({
         type: "image_url",
@@ -3558,21 +3705,26 @@ const generateImageWithOpenRouter = async (prompt, productImages) => {
   if (message.images && message.images.length > 0) {
     const imageUrl = message.images[0].image_url?.url;
     if (imageUrl) {
-      logger.info({}, '[OpenRouter Fallback] Imagem gerada com sucesso');
+      logger.info({}, "[OpenRouter Fallback] Imagem gerada com sucesso");
       return imageUrl;
     }
   }
 
   // Check for base64 image in content
   if (message.content) {
-    const base64Match = message.content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
+    const base64Match = message.content.match(
+      /data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/,
+    );
     if (base64Match) {
-      logger.info({}, '[OpenRouter Fallback] Imagem encontrada no content');
+      logger.info({}, "[OpenRouter Fallback] Imagem encontrada no content");
       return base64Match[0];
     }
   }
 
-  logger.error({ response }, '[OpenRouter Fallback] ❌ Nenhuma imagem encontrada na resposta');
+  logger.error(
+    { response },
+    "[OpenRouter Fallback] ❌ Nenhuma imagem encontrada na resposta",
+  );
   throw new Error("[OpenRouter] No image data in response");
 };
 
@@ -3599,7 +3751,7 @@ const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
       if (isRetryable && attempt < maxRetries) {
         logger.debug(
           { attempt, maxRetries, delayMs },
-          '[Gemini] Retrying after delay'
+          "[Gemini] Retrying after delay",
         );
         await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
         continue;
@@ -3715,11 +3867,19 @@ const generateImageWithFallback = async (
       styleReferenceImage,
       personReferenceImage,
     );
-    return { imageUrl, usedModel: model, usedProvider: "google", usedFallback: false };
+    return {
+      imageUrl,
+      usedModel: model,
+      usedProvider: "google",
+      usedFallback: false,
+    };
   } catch (error) {
     // Check if this is a quota/rate limit error that warrants fallback
     if (isQuotaOrRateLimitError(error)) {
-      logger.info({ error: error.message }, '[generateImageWithFallback] Gemini falhou com erro de quota/rate limit, tentando fallback para Replicate');
+      logger.info(
+        { error: error.message },
+        "[generateImageWithFallback] Gemini falhou com erro de quota/rate limit, tentando fallback para Replicate",
+      );
 
       try {
         const result = await generateImageWithReplicate(
@@ -3730,10 +3890,21 @@ const generateImageWithFallback = async (
           styleReferenceImage,
           personReferenceImage,
         );
-        logger.info({}, '[generateImageWithFallback] Replicate fallback bem sucedido');
-        return { imageUrl: result, usedModel: REPLICATE_IMAGE_MODEL, usedProvider: "replicate", usedFallback: true };
+        logger.info(
+          {},
+          "[generateImageWithFallback] Replicate fallback bem sucedido",
+        );
+        return {
+          imageUrl: result,
+          usedModel: REPLICATE_IMAGE_MODEL,
+          usedProvider: "replicate",
+          usedFallback: true,
+        };
       } catch (fallbackError) {
-        logger.error({ err: fallbackError }, '[generateImageWithFallback] ❌ Replicate fallback também falhou');
+        logger.error(
+          { err: fallbackError },
+          "[generateImageWithFallback] ❌ Replicate fallback também falhou",
+        );
         // Throw the original error if fallback also fails
         throw error;
       }
@@ -3762,7 +3933,7 @@ const generateStructuredContent = async (
         responseSchema,
         temperature,
       },
-    })
+    }),
   );
 
   return response.text.trim();
@@ -3854,7 +4025,9 @@ const shouldUseTone = (brandProfile, target) => {
 
 const getToneText = (brandProfile, target) => {
   if (!brandProfile) return "";
-  return shouldUseTone(brandProfile, target) ? (brandProfile.toneOfVoice || "") : "";
+  return shouldUseTone(brandProfile, target)
+    ? brandProfile.toneOfVoice || ""
+    : "";
 };
 
 const buildImagePrompt = (
@@ -3954,7 +4127,7 @@ const convertImagePromptToJson = async (
           responseMimeType: "application/json",
           temperature: 0.2,
         },
-      })
+      }),
     );
 
     const text = response.text?.trim() || "";
@@ -3991,25 +4164,25 @@ const convertImagePromptToJson = async (
     const tokens = extractGeminiTokens(response);
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/convert-image-prompt',
-      operation: 'text',
+      endpoint: "/api/ai/convert-image-prompt",
+      operation: "text",
       model: DEFAULT_FAST_TEXT_MODEL,
       inputTokens: tokens.inputTokens,
       outputTokens: tokens.outputTokens,
       latencyMs: timer(),
-      status: 'success',
+      status: "success",
     });
 
     return result;
   } catch (error) {
-    logger.error({ err: error }, '[Image Prompt JSON] Error');
+    logger.error({ err: error }, "[Image Prompt JSON] Error");
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/convert-image-prompt',
-      operation: 'text',
+      endpoint: "/api/ai/convert-image-prompt",
+      operation: "text",
       model: DEFAULT_FAST_TEXT_MODEL,
       latencyMs: timer(),
-      status: 'failed',
+      status: "failed",
       error: error.message,
     }).catch(() => {});
     return null;
@@ -4293,13 +4466,16 @@ app.post("/api/ai/campaign", async (req, res) => {
       });
     }
 
-    logger.info({
-      productImages: productImages?.length || 0,
-      inspirationImages: inspirationImages?.length || 0,
-      collabLogo: !!collabLogo,
-      compositionAssets: compositionAssets?.length || 0,
-      toneOverride: toneOfVoiceOverride || null,
-    }, '[Campaign API] Generating campaign');
+    logger.info(
+      {
+        productImages: productImages?.length || 0,
+        inspirationImages: inspirationImages?.length || 0,
+        collabLogo: !!collabLogo,
+        compositionAssets: compositionAssets?.length || 0,
+        toneOverride: toneOfVoiceOverride || null,
+      },
+      "[Campaign API] Generating campaign",
+    );
 
     // Collect all images for vision models
     const allImages = [];
@@ -4458,46 +4634,52 @@ REGRAS CRÍTICAS:
       }));
 
     // Debug: log structure for troubleshooting (v2 - with carousels)
-    logger.debug({ carousels: campaign.carousels }, '[Campaign API v2] Raw carousels from AI');
-    logger.debug({
-      hasPosts: !!campaign.posts,
-      postsCount: campaign.posts?.length,
-      hasAdCreatives: !!campaign.adCreatives,
-      adCreativesCount: campaign.adCreatives?.length,
-      hasVideoScripts: !!campaign.videoClipScripts,
-      videoScriptsCount: campaign.videoClipScripts?.length,
-      hasCarousels: !!campaign.carousels,
-      carouselsCount: campaign.carousels?.length,
-      hasProductImages: !!productImages?.length,
-      productImagesCount: productImages?.length || 0,
-      hasInspirationImages: !!inspirationImages?.length,
-      inspirationImagesCount: inspirationImages?.length || 0,
-      hasCollabLogo: !!collabLogo,
-      compositionAssetsCount: compositionAssets?.length || 0,
-      toneOverride: toneOfVoiceOverride || null,
-    }, '[Campaign API v2] Campaign structure');
+    logger.debug(
+      { carousels: campaign.carousels },
+      "[Campaign API v2] Raw carousels from AI",
+    );
+    logger.debug(
+      {
+        hasPosts: !!campaign.posts,
+        postsCount: campaign.posts?.length,
+        hasAdCreatives: !!campaign.adCreatives,
+        adCreativesCount: campaign.adCreatives?.length,
+        hasVideoScripts: !!campaign.videoClipScripts,
+        videoScriptsCount: campaign.videoClipScripts?.length,
+        hasCarousels: !!campaign.carousels,
+        carouselsCount: campaign.carousels?.length,
+        hasProductImages: !!productImages?.length,
+        productImagesCount: productImages?.length || 0,
+        hasInspirationImages: !!inspirationImages?.length,
+        inspirationImagesCount: inspirationImages?.length || 0,
+        hasCollabLogo: !!collabLogo,
+        compositionAssetsCount: compositionAssets?.length || 0,
+        toneOverride: toneOfVoiceOverride || null,
+      },
+      "[Campaign API v2] Campaign structure",
+    );
 
-    logger.info({}, '[Campaign API] Campaign generated successfully');
+    logger.info({}, "[Campaign API] Campaign generated successfully");
 
     // Log AI usage
     const inputTokens = prompt.length / 4; // Estimate: ~4 chars per token
     const outputTokens = cleanResult.length / 4;
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/campaign',
-      operation: 'campaign',
+      endpoint: "/api/ai/campaign",
+      operation: "campaign",
       model,
       inputTokens: Math.round(inputTokens),
       outputTokens: Math.round(outputTokens),
       latencyMs: timer(),
-      status: 'success',
+      status: "success",
       metadata: {
         productImagesCount: productImages?.length || 0,
         inspirationImagesCount: inspirationImages?.length || 0,
         hasCollabLogo: !!collabLogo,
         postsCount: campaign.posts?.length || 0,
         videoScriptsCount: campaign.videoClipScripts?.length || 0,
-      }
+      },
     });
 
     res.json({
@@ -4510,11 +4692,11 @@ REGRAS CRÍTICAS:
     // Log failed usage
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/campaign',
-      operation: 'campaign',
+      endpoint: "/api/ai/campaign",
+      operation: "campaign",
       model: req.body?.brandProfile?.creativeModel || DEFAULT_TEXT_MODEL,
       latencyMs: timer(),
-      status: 'failed',
+      status: "failed",
       error: error.message,
     }).catch(() => {});
     return res
@@ -4544,7 +4726,8 @@ app.post("/api/ai/flyer", async (req, res) => {
     } = req.body;
 
     // Support both singular and array format for collab logos
-    const collabLogo = collabLogoSingular || (collabLogos && collabLogos[0]) || null;
+    const collabLogo =
+      collabLogoSingular || (collabLogos && collabLogos[0]) || null;
 
     if (!prompt || !brandProfile) {
       return res
@@ -4552,7 +4735,14 @@ app.post("/api/ai/flyer", async (req, res) => {
         .json({ error: "prompt and brandProfile are required" });
     }
 
-    logger.info({ aspectRatio, hasLogo: !!logo, collabLogosCount: collabLogos?.length || 0 }, '[Flyer API] Generating flyer');
+    logger.info(
+      {
+        aspectRatio,
+        hasLogo: !!logo,
+        collabLogosCount: collabLogos?.length || 0,
+      },
+      "[Flyer API] Generating flyer",
+    );
 
     const ai = getGeminiAi();
     const brandingInstruction = buildFlyerPrompt(brandProfile);
@@ -4575,9 +4765,12 @@ app.post("/api/ai/flyer", async (req, res) => {
     }
 
     // Determine collab logos count for instructions
-    const collabLogosCount = (collabLogos && collabLogos.length > 0)
-      ? collabLogos.length
-      : (collabLogo ? 1 : 0);
+    const collabLogosCount =
+      collabLogos && collabLogos.length > 0
+        ? collabLogos.length
+        : collabLogo
+          ? 1
+          : 0;
     const hasCollabLogos = collabLogosCount > 0;
 
     // Instruções de logo (se fornecido)
@@ -4637,23 +4830,29 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
     }
 
     // Support both single collabLogo and array collabLogos
-    const allCollabLogos = collabLogos && collabLogos.length > 0
-      ? collabLogos
-      : (collabLogo ? [collabLogo] : []);
+    const allCollabLogos =
+      collabLogos && collabLogos.length > 0
+        ? collabLogos
+        : collabLogo
+          ? [collabLogo]
+          : [];
 
     if (allCollabLogos.length > 0) {
       allCollabLogos.forEach((cLogo, index) => {
         if (cLogo && cLogo.base64) {
-          const label = allCollabLogos.length > 1
-            ? `LOGO PARCEIRO ${index + 1} (copiar fielmente):`
-            : "LOGO PARCEIRO/COLABORAÇÃO (copiar fielmente):";
+          const label =
+            allCollabLogos.length > 1
+              ? `LOGO PARCEIRO ${index + 1} (copiar fielmente):`
+              : "LOGO PARCEIRO/COLABORAÇÃO (copiar fielmente):";
           parts.push({ text: label });
           parts.push({
             inlineData: { data: cLogo.base64, mimeType: cLogo.mimeType },
           });
         }
       });
-      console.log(`[Flyer API] Added ${allCollabLogos.length} collab logo(s) to parts`);
+      console.log(
+        `[Flyer API] Added ${allCollabLogos.length} collab logo(s) to parts`,
+      );
     }
 
     if (referenceImage) {
@@ -4678,7 +4877,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
     }
 
     let imageDataUrl = null;
-    let usedProvider = 'google';
+    let usedProvider = "google";
     let usedModel = DEFAULT_IMAGE_MODEL;
 
     try {
@@ -4693,7 +4892,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
               imageSize,
             },
           },
-        })
+        }),
       );
 
       for (const part of response.candidates[0].content.parts) {
@@ -4701,20 +4900,23 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           // Upload to Vercel Blob instead of returning data URL
           console.log("[Flyer API] Uploading Gemini image to Vercel Blob...");
           try {
-            const imageBuffer = Buffer.from(part.inlineData.data, 'base64');
-            const contentType = part.inlineData.mimeType || 'image/png';
-            const ext = contentType.includes('png') ? 'png' : 'jpg';
+            const imageBuffer = Buffer.from(part.inlineData.data, "base64");
+            const contentType = part.inlineData.mimeType || "image/png";
+            const ext = contentType.includes("png") ? "png" : "jpg";
             const filename = `flyer-${Date.now()}.${ext}`;
 
             const blob = await put(filename, imageBuffer, {
-              access: 'public',
+              access: "public",
               contentType,
             });
 
             imageDataUrl = blob.url;
             console.log("[Flyer API] Uploaded to Vercel Blob:", blob.url);
           } catch (uploadError) {
-            console.error("[Flyer API] Failed to upload to Vercel Blob:", uploadError.message);
+            console.error(
+              "[Flyer API] Failed to upload to Vercel Blob:",
+              uploadError.message,
+            );
             // Fallback to data URL only if Blob upload fails
             imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
           }
@@ -4728,18 +4930,24 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
     } catch (geminiError) {
       // Check if quota/rate limit error - fallback to Replicate
       if (isQuotaOrRateLimitError(geminiError)) {
-        logger.info({}, '[Flyer API] Gemini quota exceeded, trying Replicate fallback');
+        logger.info(
+          {},
+          "[Flyer API] Gemini quota exceeded, trying Replicate fallback",
+        );
 
         // Build text prompt for Replicate (combine all text parts)
         const textPrompt = parts
-          .filter(p => p.text)
-          .map(p => p.text)
-          .join('\n\n');
+          .filter((p) => p.text)
+          .map((p) => p.text)
+          .join("\n\n");
 
         // Collect image inputs for Replicate
         const imageInputs = parts
-          .filter(p => p.inlineData)
-          .map(p => ({ base64: p.inlineData.data, mimeType: p.inlineData.mimeType }));
+          .filter((p) => p.inlineData)
+          .map((p) => ({
+            base64: p.inlineData.data,
+            mimeType: p.inlineData.mimeType,
+          }));
 
         const replicateUrl = await generateImageWithReplicate(
           textPrompt,
@@ -4750,53 +4958,65 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           undefined,
         );
 
-        logger.info({}, '[Flyer API] Replicate fallback successful');
+        logger.info({}, "[Flyer API] Replicate fallback successful");
 
         // Upload to Vercel Blob (Replicate URLs are temporary)
-        logger.info({}, '[Flyer API] Uploading Replicate image to Vercel Blob');
+        logger.info({}, "[Flyer API] Uploading Replicate image to Vercel Blob");
         try {
           const imageResponse = await fetch(replicateUrl);
           if (!imageResponse.ok) {
             throw new Error(`Failed to fetch image: ${imageResponse.status}`);
           }
           const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-          const contentType = imageResponse.headers.get('content-type') || 'image/png';
-          const ext = contentType.includes('png') ? 'png' : 'jpg';
+          const contentType =
+            imageResponse.headers.get("content-type") || "image/png";
+          const ext = contentType.includes("png") ? "png" : "jpg";
           const filename = `flyer-${Date.now()}.${ext}`;
 
           const blob = await put(filename, imageBuffer, {
-            access: 'public',
+            access: "public",
             contentType,
           });
 
           imageDataUrl = blob.url;
-          logger.info({ url: blob.url }, '[Flyer API] Uploaded to Vercel Blob');
+          logger.info({ url: blob.url }, "[Flyer API] Uploaded to Vercel Blob");
         } catch (uploadError) {
-          logger.error({ err: uploadError }, "[Flyer API] Failed to upload to Vercel Blob");
+          logger.error(
+            { err: uploadError },
+            "[Flyer API] Failed to upload to Vercel Blob",
+          );
           imageDataUrl = replicateUrl; // Use temporary URL as fallback
         }
 
-        usedProvider = 'replicate';
-        usedModel = 'google/nano-banana-pro';
+        usedProvider = "replicate";
+        usedModel = "google/nano-banana-pro";
       } else {
         throw geminiError;
       }
     }
 
-    logger.info({ provider: usedProvider }, '[Flyer API] Flyer generated successfully');
+    logger.info(
+      { provider: usedProvider },
+      "[Flyer API] Flyer generated successfully",
+    );
 
     // Log AI usage
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/flyer',
-      operation: 'flyer',
+      endpoint: "/api/ai/flyer",
+      operation: "flyer",
       model: usedModel,
       provider: usedProvider,
       imageCount: 1,
-      imageSize: imageSize || '1K',
+      imageSize: imageSize || "1K",
       latencyMs: timer(),
-      status: 'success',
-      metadata: { aspectRatio, hasLogo: !!logo, hasReference: !!referenceImage, fallbackUsed: usedProvider === 'replicate' }
+      status: "success",
+      metadata: {
+        aspectRatio,
+        hasLogo: !!logo,
+        hasReference: !!referenceImage,
+        fallbackUsed: usedProvider === "replicate",
+      },
     });
 
     res.json({
@@ -4807,11 +5027,11 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
     logger.error({ err: error }, "[Flyer API] Error");
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/flyer',
-      operation: 'flyer',
+      endpoint: "/api/ai/flyer",
+      operation: "flyer",
       model: DEFAULT_IMAGE_MODEL,
       latencyMs: timer(),
-      status: 'failed',
+      status: "failed",
       error: error.message,
     }).catch(() => {});
     return res
@@ -4845,31 +5065,40 @@ app.post("/api/ai/image", async (req, res) => {
         .json({ error: "prompt and brandProfile are required" });
     }
 
-    logger.info({
-      model,
-      aspectRatio,
-      hasPersonReference: !!personReferenceImage,
-      productImagesCount: productImages?.length || 0
-    }, '[Image API] Generating image');
+    logger.info(
+      {
+        model,
+        aspectRatio,
+        hasPersonReference: !!personReferenceImage,
+        productImagesCount: productImages?.length || 0,
+      },
+      "[Image API] Generating image",
+    );
 
     // Prepare product images array, including brand logo if available
     let allProductImages = productImages ? [...productImages] : [];
 
     // Auto-include brand logo as reference if it's an HTTP URL
     // (Frontend handles data URLs, server handles HTTP URLs)
-    if (brandProfile.logo && brandProfile.logo.startsWith('http')) {
+    if (brandProfile.logo && brandProfile.logo.startsWith("http")) {
       try {
         const logoBase64 = await urlToBase64(brandProfile.logo);
         if (logoBase64) {
-          logger.debug({}, '[Image API] Including brand logo from HTTP URL');
+          logger.debug({}, "[Image API] Including brand logo from HTTP URL");
           // Detect mime type from URL or default to png
-          const mimeType = brandProfile.logo.includes('.svg') ? 'image/svg+xml'
-            : brandProfile.logo.includes('.jpg') || brandProfile.logo.includes('.jpeg') ? 'image/jpeg'
-            : 'image/png';
+          const mimeType = brandProfile.logo.includes(".svg")
+            ? "image/svg+xml"
+            : brandProfile.logo.includes(".jpg") ||
+                brandProfile.logo.includes(".jpeg")
+              ? "image/jpeg"
+              : "image/png";
           allProductImages.unshift({ base64: logoBase64, mimeType });
         }
       } catch (err) {
-        logger.warn({ err, brandProfileId: brandProfile.id }, "Failed to include brand logo in image generation");
+        logger.warn(
+          { err, brandProfileId: brandProfile.id },
+          "Failed to include brand logo in image generation",
+        );
       }
     }
 
@@ -4891,7 +5120,7 @@ app.post("/api/ai/image", async (req, res) => {
       jsonPrompt,
     );
 
-    logger.debug({ prompt: fullPrompt }, '[Image API] Prompt');
+    logger.debug({ prompt: fullPrompt }, "[Image API] Prompt");
 
     const result = await generateImageWithFallback(
       fullPrompt,
@@ -4903,24 +5132,30 @@ app.post("/api/ai/image", async (req, res) => {
       personReferenceImage,
     );
 
-    logger.info({ provider: result.usedProvider }, '[Image API] Image generated successfully');
+    logger.info(
+      { provider: result.usedProvider },
+      "[Image API] Image generated successfully",
+    );
 
     // Upload to Vercel Blob for all providers
     let finalImageUrl = result.imageUrl;
     if (result.imageUrl) {
-      logger.info({}, `[Image API] Uploading ${result.usedProvider} image to Vercel Blob`);
+      logger.info(
+        {},
+        `[Image API] Uploading ${result.usedProvider} image to Vercel Blob`,
+      );
       try {
         let imageBuffer;
         let contentType;
 
-        if (result.imageUrl.startsWith('data:')) {
+        if (result.imageUrl.startsWith("data:")) {
           // Handle data URL (from Gemini)
           const matches = result.imageUrl.match(/^data:([^;]+);base64,(.+)$/);
           if (!matches) {
-            throw new Error('Invalid data URL format');
+            throw new Error("Invalid data URL format");
           }
           contentType = matches[1];
-          imageBuffer = Buffer.from(matches[2], 'base64');
+          imageBuffer = Buffer.from(matches[2], "base64");
         } else {
           // Handle HTTP URL (from Replicate)
           const imageResponse = await fetch(result.imageUrl);
@@ -4928,21 +5163,25 @@ app.post("/api/ai/image", async (req, res) => {
             throw new Error(`Failed to fetch image: ${imageResponse.status}`);
           }
           imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-          contentType = imageResponse.headers.get('content-type') || 'image/png';
+          contentType =
+            imageResponse.headers.get("content-type") || "image/png";
         }
 
-        const ext = contentType.includes('png') ? 'png' : 'jpg';
+        const ext = contentType.includes("png") ? "png" : "jpg";
         const filename = `generated-${Date.now()}.${ext}`;
 
         const blob = await put(filename, imageBuffer, {
-          access: 'public',
+          access: "public",
           contentType,
         });
 
         finalImageUrl = blob.url;
-        logger.info({ url: blob.url }, '[Image API] Uploaded to Vercel Blob');
+        logger.info({ url: blob.url }, "[Image API] Uploaded to Vercel Blob");
       } catch (uploadError) {
-        logger.error({ err: uploadError }, "[Image API] Failed to upload to Vercel Blob");
+        logger.error(
+          { err: uploadError },
+          "[Image API] Failed to upload to Vercel Blob",
+        );
         // Keep using the original URL/data URL as fallback
       }
     }
@@ -4950,20 +5189,20 @@ app.post("/api/ai/image", async (req, res) => {
     // Log AI usage
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/image',
-      operation: 'image',
+      endpoint: "/api/ai/image",
+      operation: "image",
       model: result.usedModel,
       provider: result.usedProvider,
       imageCount: 1,
-      imageSize: imageSize || '1K',
+      imageSize: imageSize || "1K",
       latencyMs: timer(),
-      status: 'success',
+      status: "success",
       metadata: {
         aspectRatio,
         hasProductImages: !!productImages?.length,
         hasStyleRef: !!styleReferenceImage,
         fallbackUsed: result.usedFallback,
-      }
+      },
     });
 
     res.json({
@@ -4975,11 +5214,11 @@ app.post("/api/ai/image", async (req, res) => {
     logger.error({ err: error }, "[Image API] Error");
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/image',
-      operation: 'image',
+      endpoint: "/api/ai/image",
+      operation: "image",
       model: DEFAULT_IMAGE_MODEL,
       latencyMs: timer(),
-      status: 'failed',
+      status: "failed",
       error: error.message,
     }).catch(() => {});
     return res
@@ -5002,7 +5241,10 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
       return res.status(400).json({ error: "prompt is required" });
     }
 
-    logger.info({ durationSeconds: duration }, '[Convert Prompt API] Converting prompt to JSON');
+    logger.info(
+      { durationSeconds: duration },
+      "[Convert Prompt API] Converting prompt to JSON",
+    );
 
     const ai = getGeminiAi();
     const systemPrompt = getVideoPromptSystemPrompt(duration, aspectRatio);
@@ -5020,7 +5262,7 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
           responseMimeType: "application/json",
           temperature: 0.7,
         },
-      })
+      }),
     );
 
     const text = response.text?.trim() || "";
@@ -5034,19 +5276,19 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
       result = text;
     }
 
-    logger.info({}, '[Convert Prompt API] Conversion successful');
+    logger.info({}, "[Convert Prompt API] Conversion successful");
 
     // Log AI usage
     const tokens = extractGeminiTokens(response);
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/convert-prompt',
-      operation: 'text',
+      endpoint: "/api/ai/convert-prompt",
+      operation: "text",
       model: DEFAULT_FAST_TEXT_MODEL,
       inputTokens: tokens.inputTokens,
       outputTokens: tokens.outputTokens,
       latencyMs: timer(),
-      status: 'success',
+      status: "success",
     });
 
     res.json({
@@ -5057,11 +5299,11 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
     logger.error({ err: error }, "[Convert Prompt API] Error");
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/convert-prompt',
-      operation: 'text',
+      endpoint: "/api/ai/convert-prompt",
+      operation: "text",
       model: DEFAULT_FAST_TEXT_MODEL,
       latencyMs: timer(),
-      status: 'failed',
+      status: "failed",
       error: error.message,
     }).catch(() => {});
     return res
@@ -5093,7 +5335,7 @@ app.post("/api/ai/text", async (req, res) => {
       return res.status(400).json({ error: "brandProfile is required" });
     }
 
-    logger.info({ type }, '[Text API] Generating text');
+    logger.info({ type }, "[Text API] Generating text");
 
     const model = brandProfile.creativeModel || DEFAULT_TEXT_MODEL;
     const isOpenRouter = model.includes("/");
@@ -5190,21 +5432,21 @@ app.post("/api/ai/text", async (req, res) => {
       }
     }
 
-    logger.info({}, '[Text API] Text generated successfully');
+    logger.info({}, "[Text API] Text generated successfully");
 
     // Log AI usage
     const inputTokens = (userPrompt?.length || 0) / 4;
     const outputTokens = result.length / 4;
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/text',
-      operation: 'text',
+      endpoint: "/api/ai/text",
+      operation: "text",
       model,
       inputTokens: Math.round(inputTokens),
       outputTokens: Math.round(outputTokens),
       latencyMs: timer(),
-      status: 'success',
-      metadata: { type, hasImage: !!image }
+      status: "success",
+      metadata: { type, hasImage: !!image },
     });
 
     res.json({
@@ -5216,11 +5458,11 @@ app.post("/api/ai/text", async (req, res) => {
     logger.error({ err: error }, "[Text API] Error");
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/text',
-      operation: 'text',
+      endpoint: "/api/ai/text",
+      operation: "text",
       model: req.body?.brandProfile?.creativeModel || DEFAULT_TEXT_MODEL,
       latencyMs: timer(),
-      status: 'failed',
+      status: "failed",
       error: error.message,
     }).catch(() => {});
     return res
@@ -5244,7 +5486,7 @@ app.post("/api/ai/enhance-prompt", async (req, res) => {
       return res.status(400).json({ error: "prompt is required" });
     }
 
-    logger.info({}, '[Enhance Prompt API] Enhancing prompt with Grok');
+    logger.info({}, "[Enhance Prompt API] Enhancing prompt with Grok");
 
     const openrouter = getOpenRouter();
 
@@ -5322,19 +5564,22 @@ REGRAS:
 
     const enhancedPrompt = response.choices[0]?.message?.content?.trim() || "";
 
-    logger.info({}, '[Enhance Prompt API] Successfully enhanced prompt with Grok');
+    logger.info(
+      {},
+      "[Enhance Prompt API] Successfully enhanced prompt with Grok",
+    );
 
     // Log AI usage
     const tokens = extractOpenRouterTokens(response);
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/enhance-prompt',
-      operation: 'text',
-      model: 'x-ai/grok-4.1-fast',
+      endpoint: "/api/ai/enhance-prompt",
+      operation: "text",
+      model: "x-ai/grok-4.1-fast",
       inputTokens: tokens.inputTokens,
       outputTokens: tokens.outputTokens,
       latencyMs: timer(),
-      status: 'success',
+      status: "success",
     });
 
     res.json({ enhancedPrompt });
@@ -5342,11 +5587,11 @@ REGRAS:
     logger.error({ err: error }, "[Enhance Prompt API] Error");
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/enhance-prompt',
-      operation: 'text',
-      model: 'x-ai/grok-4.1-fast',
+      endpoint: "/api/ai/enhance-prompt",
+      operation: "text",
+      model: "x-ai/grok-4.1-fast",
       latencyMs: timer(),
-      status: 'failed',
+      status: "failed",
       error: error.message,
     }).catch(() => {});
     return res
@@ -5369,13 +5614,16 @@ app.post("/api/ai/edit-image", async (req, res) => {
       return res.status(400).json({ error: "image and prompt are required" });
     }
 
-    logger.info({
-      imageSize: image?.base64?.length,
-      mimeType: image?.mimeType,
-      promptLength: prompt?.length,
-      hasMask: !!mask,
-      hasReference: !!referenceImage,
-    }, '[Edit Image API] Editing image');
+    logger.info(
+      {
+        imageSize: image?.base64?.length,
+        mimeType: image?.mimeType,
+        promptLength: prompt?.length,
+        hasMask: !!mask,
+        hasReference: !!referenceImage,
+      },
+      "[Edit Image API] Editing image",
+    );
 
     const ai = getGeminiAi();
     // Usar prompt direto sem adicionar texto extra que pode confundir o modelo
@@ -5383,21 +5631,30 @@ app.post("/api/ai/edit-image", async (req, res) => {
 
     // Validate and clean base64 data
     let cleanBase64 = image.base64;
-    if (cleanBase64.startsWith('data:')) {
-      cleanBase64 = cleanBase64.split(',')[1];
+    if (cleanBase64.startsWith("data:")) {
+      cleanBase64 = cleanBase64.split(",")[1];
     }
     // Check for valid base64
     if (cleanBase64.length % 4 !== 0) {
-      logger.debug({}, '[Edit Image API] Warning: base64 length is not multiple of 4, padding');
-      cleanBase64 = cleanBase64.padEnd(Math.ceil(cleanBase64.length / 4) * 4, '=');
+      logger.debug(
+        {},
+        "[Edit Image API] Warning: base64 length is not multiple of 4, padding",
+      );
+      cleanBase64 = cleanBase64.padEnd(
+        Math.ceil(cleanBase64.length / 4) * 4,
+        "=",
+      );
     }
 
-    logger.debug({
-      textLength: instructionPrompt.length,
-      imageBase64Length: cleanBase64.length,
-      mimeType: image.mimeType,
-      partsCount: 2 + (!!mask) + (!!referenceImage)
-    }, '[Edit Image API] parts structure');
+    logger.debug(
+      {
+        textLength: instructionPrompt.length,
+        imageBase64Length: cleanBase64.length,
+        mimeType: image.mimeType,
+        partsCount: 2 + !!mask + !!referenceImage,
+      },
+      "[Edit Image API] parts structure",
+    );
 
     const parts = [
       { text: instructionPrompt },
@@ -5407,7 +5664,10 @@ app.post("/api/ai/edit-image", async (req, res) => {
     let imageConfig = { imageSize: "1K" };
 
     if (mask) {
-      logger.debug({ maskSize: mask.base64?.length }, '[Edit Image API] Adding mask');
+      logger.debug(
+        { maskSize: mask.base64?.length },
+        "[Edit Image API] Adding mask",
+      );
       imageConfig = {
         ...imageConfig,
         mask: {
@@ -5435,7 +5695,7 @@ app.post("/api/ai/edit-image", async (req, res) => {
         model: "gemini-3-pro-image-preview",
         contents: { parts },
         config: { imageConfig },
-      })
+      }),
     );
 
     let imageDataUrl = null;
@@ -5450,23 +5710,26 @@ app.post("/api/ai/edit-image", async (req, res) => {
     }
 
     if (!imageDataUrl) {
-      logger.debug({ response: JSON.stringify(response, null, 2).substring(0, 1000) }, '[Edit Image API] Empty response');
+      logger.debug(
+        { response: JSON.stringify(response, null, 2).substring(0, 1000) },
+        "[Edit Image API] Empty response",
+      );
       throw new Error("Failed to edit image - API returned empty response");
     }
 
-    logger.info({}, '[Edit Image API] Image edited successfully');
+    logger.info({}, "[Edit Image API] Image edited successfully");
 
     // Log AI usage
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/edit-image',
-      operation: 'edit_image',
-      model: 'gemini-3-pro-image-preview',
+      endpoint: "/api/ai/edit-image",
+      operation: "edit_image",
+      model: "gemini-3-pro-image-preview",
       imageCount: 1,
-      imageSize: '1K',
+      imageSize: "1K",
       latencyMs: timer(),
-      status: 'success',
-      metadata: { hasMask: !!mask, hasReference: !!referenceImage }
+      status: "success",
+      metadata: { hasMask: !!mask, hasReference: !!referenceImage },
     });
 
     res.json({
@@ -5477,11 +5740,11 @@ app.post("/api/ai/edit-image", async (req, res) => {
     logger.error({ err: error }, "[Edit Image API] Error");
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/edit-image',
-      operation: 'edit_image',
-      model: 'gemini-3-pro-image-preview',
+      endpoint: "/api/ai/edit-image",
+      operation: "edit_image",
+      model: "gemini-3-pro-image-preview",
       latencyMs: timer(),
-      status: 'failed',
+      status: "failed",
       error: error.message,
     }).catch(() => {});
     return res
@@ -5504,7 +5767,7 @@ app.post("/api/ai/extract-colors", async (req, res) => {
       return res.status(400).json({ error: "logo is required" });
     }
 
-    logger.info({}, '[Extract Colors API] Analyzing logo');
+    logger.info({}, "[Extract Colors API] Analyzing logo");
 
     const ai = getGeminiAi();
 
@@ -5547,24 +5810,24 @@ Retorne as cores em formato hexadecimal (#RRGGBB).`,
           responseMimeType: "application/json",
           responseSchema: colorSchema,
         },
-      })
+      }),
     );
 
     const colors = JSON.parse(response.text.trim());
 
-    logger.info({ colors }, '[Extract Colors API] Colors extracted');
+    logger.info({ colors }, "[Extract Colors API] Colors extracted");
 
     // Log AI usage
     const tokens = extractGeminiTokens(response);
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/extract-colors',
-      operation: 'text',
+      endpoint: "/api/ai/extract-colors",
+      operation: "text",
       model: DEFAULT_TEXT_MODEL,
       inputTokens: tokens.inputTokens,
       outputTokens: tokens.outputTokens,
       latencyMs: timer(),
-      status: 'success',
+      status: "success",
     });
 
     res.json(colors);
@@ -5572,11 +5835,11 @@ Retorne as cores em formato hexadecimal (#RRGGBB).`,
     logger.error({ err: error }, "[Extract Colors API] Error");
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/extract-colors',
-      operation: 'text',
+      endpoint: "/api/ai/extract-colors",
+      operation: "text",
       model: DEFAULT_TEXT_MODEL,
       latencyMs: timer(),
-      status: 'failed',
+      status: "failed",
       error: error.message,
     }).catch(() => {});
     return res
@@ -5599,7 +5862,7 @@ app.post("/api/ai/speech", async (req, res) => {
       return res.status(400).json({ error: "script is required" });
     }
 
-    logger.info({}, '[Speech API] Generating speech');
+    logger.info({}, "[Speech API] Generating speech");
 
     const ai = getGeminiAi();
 
@@ -5613,7 +5876,7 @@ app.post("/api/ai/speech", async (req, res) => {
             voiceConfig: { prebuiltVoiceConfig: { voiceName } },
           },
         },
-      })
+      }),
     );
 
     const audioBase64 =
@@ -5623,18 +5886,18 @@ app.post("/api/ai/speech", async (req, res) => {
       throw new Error("Failed to generate speech");
     }
 
-    logger.info({}, '[Speech API] Speech generated successfully');
+    logger.info({}, "[Speech API] Speech generated successfully");
 
     // Log AI usage - TTS is priced per character
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/speech',
-      operation: 'speech',
-      model: 'gemini-2.5-flash-preview-tts',
+      endpoint: "/api/ai/speech",
+      operation: "speech",
+      model: "gemini-2.5-flash-preview-tts",
       characterCount: script.length,
       latencyMs: timer(),
-      status: 'success',
-      metadata: { voiceName }
+      status: "success",
+      metadata: { voiceName },
     });
 
     res.json({
@@ -5645,11 +5908,11 @@ app.post("/api/ai/speech", async (req, res) => {
     logger.error({ err: error }, "[Speech API] Error");
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/speech',
-      operation: 'speech',
-      model: 'gemini-2.5-flash-preview-tts',
+      endpoint: "/api/ai/speech",
+      operation: "speech",
+      model: "gemini-2.5-flash-preview-tts",
       latencyMs: timer(),
-      status: 'failed',
+      status: "failed",
       error: error.message,
     }).catch(() => {});
     return res
@@ -5663,8 +5926,8 @@ app.post("/api/ai/speech", async (req, res) => {
 // ============================================================================
 app.post("/api/chat", requireAuthWithAiRateLimit, async (req, res) => {
   // Feature flag: only enable if VITE_USE_VERCEL_AI_SDK=true
-  if (process.env.VITE_USE_VERCEL_AI_SDK !== 'true') {
-    return res.status(404).json({ error: 'Endpoint not available' });
+  if (process.env.VITE_USE_VERCEL_AI_SDK !== "true") {
+    return res.status(404).json({ error: "Endpoint not available" });
   }
 
   return chatHandler(req, res);
@@ -5686,7 +5949,7 @@ app.post("/api/ai/assistant", async (req, res) => {
       return res.status(400).json({ error: "history is required" });
     }
 
-    logger.info({}, '[Assistant API] Starting streaming conversation');
+    logger.info({}, "[Assistant API] Starting streaming conversation");
 
     const ai = getGeminiAi();
     const sanitizedHistory = history
@@ -5789,29 +6052,29 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
     res.write("data: [DONE]\n\n");
     res.end();
 
-    logger.info({}, '[Assistant API] Streaming completed');
+    logger.info({}, "[Assistant API] Streaming completed");
 
     // Log AI usage - estimate tokens based on history length
     const inputTokens = JSON.stringify(sanitizedHistory).length / 4;
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/assistant',
-      operation: 'text',
+      endpoint: "/api/ai/assistant",
+      operation: "text",
       model: DEFAULT_ASSISTANT_MODEL,
       inputTokens: Math.round(inputTokens),
       latencyMs: timer(),
-      status: 'success',
-      metadata: { historyLength: sanitizedHistory.length }
+      status: "success",
+      metadata: { historyLength: sanitizedHistory.length },
     }).catch(() => {});
   } catch (error) {
     logger.error({ err: error }, "[Assistant API] Error");
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/assistant',
-      operation: 'text',
+      endpoint: "/api/ai/assistant",
+      operation: "text",
       model: DEFAULT_ASSISTANT_MODEL,
       latencyMs: timer(),
-      status: 'failed',
+      status: "failed",
       error: error.message,
     }).catch(() => {});
     if (!res.headersSent) {
@@ -6079,11 +6342,14 @@ app.post("/api/ai/video", async (req, res) => {
     }
 
     const isInterpolationMode = useInterpolation && lastFrameUrl;
-    logger.info({
-      model,
-      generateAudio,
-      isInterpolation: isInterpolationMode
-    }, '[Video API] Generating video');
+    logger.info(
+      {
+        model,
+        generateAudio,
+        isInterpolation: isInterpolationMode,
+      },
+      "[Video API] Generating video",
+    );
 
     let videoUrl;
     let usedProvider = "google";
@@ -6140,13 +6406,18 @@ app.post("/api/ai/video", async (req, res) => {
     const durationSeconds = sceneDuration || 5; // Default 5 seconds
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/video',
-      operation: 'video',
-      model: model.includes('veo') ? 'veo-3.1-fast' : model,
+      endpoint: "/api/ai/video",
+      operation: "video",
+      model: model.includes("veo") ? "veo-3.1-fast" : model,
       videoDurationSeconds: durationSeconds,
       latencyMs: timer(),
-      status: 'success',
-      metadata: { aspectRatio, provider: usedProvider, hasImageUrl: !!imageUrl, isInterpolation: isInterpolationMode }
+      status: "success",
+      metadata: {
+        aspectRatio,
+        provider: usedProvider,
+        hasImageUrl: !!imageUrl,
+        isInterpolation: isInterpolationMode,
+      },
     });
 
     return res.status(200).json({
@@ -6159,12 +6430,12 @@ app.post("/api/ai/video", async (req, res) => {
     logError("Video API", error);
     await logAiUsage(sql, {
       organizationId,
-      endpoint: '/api/ai/video',
-      operation: 'video',
-      model: req.body?.model || 'veo-3.1-fast',
+      endpoint: "/api/ai/video",
+      operation: "video",
+      model: req.body?.model || "veo-3.1-fast",
       latencyMs: timer(),
-      status: 'failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      status: "failed",
+      error: error instanceof Error ? error.message : "Unknown error",
     }).catch(() => {});
     return res.status(500).json({
       error:
@@ -6203,7 +6474,7 @@ async function validateRubeToken(rubeToken) {
       },
     };
 
-    logger.info({}, '[Instagram] Validating token with Rube MCP');
+    logger.info({}, "[Instagram] Validating token with Rube MCP");
     const response = await fetch(RUBE_MCP_URL, {
       method: "POST",
       headers: {
@@ -6215,10 +6486,13 @@ async function validateRubeToken(rubeToken) {
     });
 
     const text = await response.text();
-    logger.debug({ status: response.status }, '[Instagram] Rube response status');
+    logger.debug(
+      { status: response.status },
+      "[Instagram] Rube response status",
+    );
     logger.debug(
       { responsePreview: text.substring(0, 500) },
-      '[Instagram] Rube response (first 500 chars)'
+      "[Instagram] Rube response (first 500 chars)",
     );
 
     if (text.startsWith("<!DOCTYPE") || text.startsWith("<html")) {
@@ -6243,7 +6517,7 @@ async function validateRubeToken(rubeToken) {
           const json = JSON.parse(line.substring(6));
           logger.debug(
             { data: JSON.stringify(json, null, 2).substring(0, 500) },
-            '[Instagram] Parsed SSE data'
+            "[Instagram] Parsed SSE data",
           );
           if (json?.error) {
             return {
@@ -6256,7 +6530,7 @@ async function validateRubeToken(rubeToken) {
             const parsed = JSON.parse(nestedData);
             logger.debug(
               { nestedData: JSON.stringify(parsed, null, 2).substring(0, 500) },
-              '[Instagram] Nested data'
+              "[Instagram] Nested data",
             );
             if (parsed?.error || parsed?.data?.error) {
               return {
@@ -6271,7 +6545,7 @@ async function validateRubeToken(rubeToken) {
               if (userData?.id) {
                 logger.debug(
                   { username: userData.username, id: userData.id },
-                  '[Instagram] Found user'
+                  "[Instagram] Found user",
                 );
                 return {
                   success: true,
@@ -6321,7 +6595,10 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
         await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
       resolvedUserId = userResult[0]?.id;
       if (!resolvedUserId) {
-        logger.debug({ clerk_user_id: user_id }, '[Instagram] User not found for Clerk ID');
+        logger.debug(
+          { clerk_user_id: user_id },
+          "[Instagram] User not found for Clerk ID",
+        );
         return res.json([]);
       }
     } else {
@@ -6329,11 +6606,11 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
       const userResult =
         await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
       if (userResult.length === 0) {
-        logger.debug({ user_id }, '[Instagram] User not found for DB UUID');
+        logger.debug({ user_id }, "[Instagram] User not found for DB UUID");
         return res.json([]);
       }
     }
-    logger.debug({ resolvedUserId }, '[Instagram] Resolved user ID');
+    logger.debug({ resolvedUserId }, "[Instagram] Resolved user ID");
 
     const result = organization_id
       ? await sql`
@@ -6364,11 +6641,14 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
     const sql = getSql();
     const { user_id, organization_id, rube_token } = req.body;
 
-    logger.debug({
-      user_id,
-      organization_id,
-      hasToken: !!rube_token,
-    }, '[Instagram] POST request');
+    logger.debug(
+      {
+        user_id,
+        organization_id,
+        hasToken: !!rube_token,
+      },
+      "[Instagram] POST request",
+    );
 
     if (!user_id || !rube_token) {
       return res
@@ -6384,22 +6664,25 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
         await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
       resolvedUserId = userResult[0]?.id;
       if (!resolvedUserId) {
-        logger.debug({ clerk_user_id: user_id }, '[Instagram] User not found for Clerk ID');
+        logger.debug(
+          { clerk_user_id: user_id },
+          "[Instagram] User not found for Clerk ID",
+        );
         return res.status(400).json({ error: "User not found" });
       }
     } else {
       const userResult =
         await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
       if (userResult.length === 0) {
-        logger.debug({ user_id }, '[Instagram] User not found for DB UUID');
+        logger.debug({ user_id }, "[Instagram] User not found for DB UUID");
         return res.status(400).json({ error: "User not found" });
       }
     }
-    logger.debug({ resolvedUserId }, '[Instagram] Resolved user ID');
+    logger.debug({ resolvedUserId }, "[Instagram] Resolved user ID");
 
     // Validate the Rube token
     const validation = await validateRubeToken(rube_token);
-    logger.debug({ validation }, '[Instagram] Validation result');
+    logger.debug({ validation }, "[Instagram] Validation result");
     if (!validation.success) {
       return res
         .status(400)
@@ -6513,7 +6796,8 @@ app.delete("/api/db/instagram-accounts", async (req, res) => {
 app.post("/api/rube", async (req, res) => {
   try {
     const sql = getSql();
-    const { instagram_account_id, user_id, organization_id, ...mcpRequest } = req.body;
+    const { instagram_account_id, user_id, organization_id, ...mcpRequest } =
+      req.body;
 
     let token;
     let instagramUserId;
@@ -6522,7 +6806,7 @@ app.post("/api/rube", async (req, res) => {
     if (instagram_account_id && user_id) {
       logger.debug(
         { instagram_account_id, organization_id },
-        '[Rube Proxy] Multi-tenant mode - fetching token for account'
+        "[Rube Proxy] Multi-tenant mode - fetching token for account",
       );
 
       // Resolve user_id: can be DB UUID or Clerk ID
@@ -6532,12 +6816,15 @@ app.post("/api/rube", async (req, res) => {
           await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
         resolvedUserId = userResult[0]?.id;
         if (!resolvedUserId) {
-          logger.debug({ clerk_user_id: user_id }, '[Rube Proxy] User not found for Clerk ID');
+          logger.debug(
+            { clerk_user_id: user_id },
+            "[Rube Proxy] User not found for Clerk ID",
+          );
           return res.status(400).json({ error: "User not found" });
         }
         logger.debug(
           { resolvedUserId },
-          '[Rube Proxy] Resolved Clerk ID to DB UUID'
+          "[Rube Proxy] Resolved Clerk ID to DB UUID",
         );
       }
 
@@ -6560,7 +6847,10 @@ app.post("/api/rube", async (req, res) => {
           `;
 
       if (accountResult.length === 0) {
-        logger.debug({}, '[Rube Proxy] Instagram account not found or not active for user/org');
+        logger.debug(
+          {},
+          "[Rube Proxy] Instagram account not found or not active for user/org",
+        );
         return res
           .status(403)
           .json({ error: "Instagram account not found or inactive" });
@@ -6570,7 +6860,7 @@ app.post("/api/rube", async (req, res) => {
       instagramUserId = accountResult[0].instagram_user_id;
       logger.debug(
         { instagramUserId },
-        '[Rube Proxy] Using token for Instagram user'
+        "[Rube Proxy] Using token for Instagram user",
       );
 
       // Update last_used_at
@@ -6581,7 +6871,7 @@ app.post("/api/rube", async (req, res) => {
       if (!token) {
         return res.status(500).json({ error: "RUBE_TOKEN not configured" });
       }
-      logger.debug({}, '[Rube Proxy] Using global RUBE_TOKEN (dev mode)');
+      logger.debug({}, "[Rube Proxy] Using global RUBE_TOKEN (dev mode)");
     }
 
     // Inject ig_user_id into tool arguments if we have it
@@ -6598,16 +6888,19 @@ app.post("/api/rube", async (req, res) => {
         });
         logger.debug(
           { toolsCount: mcpRequest.params.arguments.tools.length },
-          '[Rube Proxy] Injected ig_user_id into tools'
+          "[Rube Proxy] Injected ig_user_id into tools",
         );
       } else {
         // For direct tool calls
         mcpRequest.params.arguments.ig_user_id = instagramUserId;
-        logger.debug({}, '[Rube Proxy] Injected ig_user_id directly');
+        logger.debug({}, "[Rube Proxy] Injected ig_user_id directly");
       }
     }
 
-    logger.debug({ methodName: mcpRequest.params?.name }, '[Rube Proxy] Calling Rube MCP');
+    logger.debug(
+      { methodName: mcpRequest.params?.name },
+      "[Rube Proxy] Calling Rube MCP",
+    );
 
     const response = await fetch(RUBE_MCP_URL, {
       method: "POST",
@@ -6620,7 +6913,7 @@ app.post("/api/rube", async (req, res) => {
     });
 
     const text = await response.text();
-    logger.debug({ status: response.status }, '[Rube Proxy] Response status');
+    logger.debug({ status: response.status }, "[Rube Proxy] Response status");
     res.status(response.status).send(text);
   } catch (error) {
     logger.error({ err: error }, "[Rube Proxy] Error");
@@ -6679,7 +6972,13 @@ app.patch("/api/image-playground/topics/:id", async (req, res) => {
     const { title, coverUrl } = req.body;
     const sql = getSql();
     const resolvedUserId = await resolveUserId(sql, userId);
-    const topic = await updateTopic(sql, id, resolvedUserId, { title, coverUrl });
+    const topic = await updateTopic(
+      sql,
+      id,
+      resolvedUserId,
+      { title, coverUrl },
+      orgId,
+    );
 
     res.json({ success: true, topic });
   } catch (error) {
@@ -6697,7 +6996,7 @@ app.delete("/api/image-playground/topics/:id", async (req, res) => {
     const { id } = req.params;
     const sql = getSql();
     const resolvedUserId = await resolveUserId(sql, userId);
-    await deleteTopic(sql, id, resolvedUserId);
+    await deleteTopic(sql, id, resolvedUserId, orgId);
 
     res.json({ success: true });
   } catch (error) {
@@ -6717,7 +7016,7 @@ app.get("/api/image-playground/batches", async (req, res) => {
 
     const sql = getSql();
     const resolvedUserId = await resolveUserId(sql, userId);
-    const batches = await getBatches(sql, topicId, resolvedUserId);
+    const batches = await getBatches(sql, topicId, resolvedUserId, orgId);
 
     res.json({ batches });
   } catch (error) {
@@ -6735,7 +7034,7 @@ app.delete("/api/image-playground/batches/:id", async (req, res) => {
     const { id } = req.params;
     const sql = getSql();
     const resolvedUserId = await resolveUserId(sql, userId);
-    await deleteBatch(sql, id, resolvedUserId);
+    await deleteBatch(sql, id, resolvedUserId, orgId);
 
     res.json({ success: true });
   } catch (error) {
@@ -6778,32 +7077,49 @@ app.post("/api/image-playground/generate", async (req, res) => {
           primaryColor: brandProfile.primary_color,
           secondaryColor: brandProfile.secondary_color,
           toneOfVoice: brandProfile.tone_of_voice,
-          toneTargets: brandProfile.settings?.toneTargets || ['campaigns', 'posts', 'images', 'flyers'],
+          toneTargets: brandProfile.settings?.toneTargets || [
+            "campaigns",
+            "posts",
+            "images",
+            "flyers",
+          ],
         };
 
         // 1. Prepare productImages with logo (same as /api/ai/image)
         let productImages = [];
-        if (mappedBrandProfile.logo && mappedBrandProfile.logo.startsWith('http')) {
+        if (
+          mappedBrandProfile.logo &&
+          mappedBrandProfile.logo.startsWith("http")
+        ) {
           try {
             const logoBase64 = await urlToBase64(mappedBrandProfile.logo);
             if (logoBase64) {
-              logger.debug({}, '[ImagePlayground] Including brand logo from HTTP URL');
-              const mimeType = mappedBrandProfile.logo.includes('.svg') ? 'image/svg+xml'
-                : mappedBrandProfile.logo.includes('.jpg') || mappedBrandProfile.logo.includes('.jpeg') ? 'image/jpeg'
-                : 'image/png';
+              logger.debug(
+                {},
+                "[ImagePlayground] Including brand logo from HTTP URL",
+              );
+              const mimeType = mappedBrandProfile.logo.includes(".svg")
+                ? "image/svg+xml"
+                : mappedBrandProfile.logo.includes(".jpg") ||
+                    mappedBrandProfile.logo.includes(".jpeg")
+                  ? "image/jpeg"
+                  : "image/png";
               productImages.push({ base64: logoBase64, mimeType });
             }
           } catch (err) {
-            logger.warn({ err, brandProfileId: mappedBrandProfile.id }, "Failed to include brand logo in image playground");
+            logger.warn(
+              { err, brandProfileId: mappedBrandProfile.id },
+              "Failed to include brand logo in image playground",
+            );
           }
         }
 
         // 2. Convert prompt to JSON structured format (same as /api/ai/image)
         const jsonPrompt = await convertImagePromptToJson(
           params.prompt,
-          params.aspectRatio || '1:1',
+          params.aspectRatio || "1:1",
           orgId,
-          sql
+          sql,
         );
 
         // 3. Build full prompt using buildImagePrompt (same as /api/ai/image)
@@ -6815,10 +7131,13 @@ app.post("/api/image-playground/generate", async (req, res) => {
           hasLogo,
           false, // hasPersonReference
           false, // hasProductImages (beyond logo)
-          jsonPrompt
+          jsonPrompt,
         );
 
-        logger.debug({ prompt: fullPrompt }, '[ImagePlayground] Brand profile prompt');
+        logger.debug(
+          { prompt: fullPrompt },
+          "[ImagePlayground] Brand profile prompt",
+        );
 
         // 4. Update enhanced params with full prompt and product images
         enhancedParams = {
@@ -6828,7 +7147,10 @@ app.post("/api/image-playground/generate", async (req, res) => {
           brandProfile: mappedBrandProfile,
         };
 
-        logger.debug({ brandProfileName: mappedBrandProfile.name, hasLogo }, '[ImagePlayground] Brand profile applied');
+        logger.debug(
+          { brandProfileName: mappedBrandProfile.name, hasLogo },
+          "[ImagePlayground] Brand profile applied",
+        );
       }
     }
 
@@ -6837,10 +7159,16 @@ app.post("/api/image-playground/generate", async (req, res) => {
 
     const result = await createImageBatch(
       sql,
-      { topicId, provider, model, imageNum: imageNum || 1, params: enhancedParams },
+      {
+        topicId,
+        provider,
+        model,
+        imageNum: imageNum || 1,
+        params: enhancedParams,
+      },
       resolvedUserId,
       orgId,
-      genai
+      genai,
     );
 
     res.json({ success: true, data: result });
@@ -6872,13 +7200,13 @@ app.get("/api/image-playground/status/:generationId", async (req, res) => {
 // Delete generation
 app.delete("/api/image-playground/generations/:id", async (req, res) => {
   try {
-    const { userId } = getAuth(req);
+    const { userId, orgId } = getAuth(req);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { id } = req.params;
     const sql = getSql();
     const resolvedUserId = await resolveUserId(sql, userId);
-    await deleteGeneration(sql, id, resolvedUserId);
+    await deleteGeneration(sql, id, resolvedUserId, orgId);
 
     res.json({ success: true });
   } catch (error) {
@@ -6925,7 +7253,7 @@ const startup = async () => {
       const sql = getSql();
       await ensureGallerySourceType(sql);
     } catch (error) {
-      logger.error('Startup check failed');
+      logger.error("Startup check failed");
     }
   }
 
@@ -6933,7 +7261,7 @@ const startup = async () => {
   const redisConnected = await waitForRedis(5000);
 
   if (redisConnected) {
-    logger.info({}, 'Redis connected');
+    logger.info({}, "Redis connected");
 
     // NOTE: Image generation jobs were REMOVED (2026-01-25)
     // Images are now generated synchronously via /api/images endpoint
@@ -6943,20 +7271,26 @@ const startup = async () => {
     try {
       const worker = await initializeScheduledPostsChecker(
         checkAndPublishScheduledPosts,
-        publishScheduledPostById
+        publishScheduledPostById,
       );
       if (worker) {
-        logger.info({}, 'Scheduled posts worker initialized');
+        logger.info({}, "Scheduled posts worker initialized");
       }
     } catch (error) {
-      logger.error({ err: error }, 'Failed to initialize scheduled posts worker');
+      logger.error(
+        { err: error },
+        "Failed to initialize scheduled posts worker",
+      );
     }
   } else {
-    logger.info({}, 'Redis not available, workers disabled');
+    logger.info({}, "Redis not available, workers disabled");
   }
 
   app.listen(PORT, () => {
-    logger.info({ port: PORT, databaseConnected: !!DATABASE_URL }, 'API Server started');
+    logger.info(
+      { port: PORT, databaseConnected: !!DATABASE_URL },
+      "API Server started",
+    );
   });
 };
 
