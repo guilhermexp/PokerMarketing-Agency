@@ -50,6 +50,7 @@ import { useOrganization } from "@clerk/clerk-react";
 import { BackgroundJobsProvider } from "./hooks/useBackgroundJobs";
 import { BackgroundJobsIndicator } from "./components/common/BackgroundJobsIndicator";
 import { ToastContainer } from "./components/common/ToastContainer";
+import { OverlayPortal } from "./components/common/OverlayPortal";
 import { ChatProvider } from "./contexts/ChatContext";
 import {
   getBrandProfile,
@@ -2243,13 +2244,15 @@ function AppContent() {
   return (
     <>
       {error && (
-        <div className="fixed bottom-6 right-6 bg-surface border border-red-500/50 rounded-xl z-[100] max-w-sm p-4 flex items-start space-x-4 animate-fade-in-up">
-          <Icon name="x" className="w-4 h-4 text-red-400" />
-          <div className="flex-1">
-            <p className="font-bold text-sm">Erro</p>
-            <p className="text-sm opacity-50">{error}</p>
+        <OverlayPortal>
+          <div className="fixed bottom-6 right-6 bg-surface border border-red-500/50 rounded-xl z-[2147483645] max-w-sm p-4 flex items-start space-x-4 animate-fade-in-up">
+            <Icon name="x" className="w-4 h-4 text-red-400" />
+            <div className="flex-1">
+              <p className="font-bold text-sm">Erro</p>
+              <p className="text-sm opacity-50">{error}</p>
+            </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
       {!brandProfile ? (
         <BrandProfileSetup

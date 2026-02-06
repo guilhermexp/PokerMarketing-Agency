@@ -14,6 +14,7 @@ import {
   cancelAllGenerationJobs,
 } from "../../services/apiClient";
 import { Icon } from "./Icon";
+import { OverlayPortal } from "./OverlayPortal";
 
 interface BackgroundJobsIndicatorProps {
   isAssistantOpen?: boolean;
@@ -167,21 +168,22 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
   };
 
   return (
-    <div className={`fixed bottom-4 sm:bottom-6 z-40 transition-all duration-300 ${isAssistantOpen ? "right-[400px] sm:right-[420px]" : "right-16 sm:right-20"}`}>
-      {/* Notification Toast */}
-      {showNotification && (
-        <div className={`absolute bottom-full right-0 mb-2 px-4 py-2 backdrop-blur-md rounded-lg border shadow-xl animate-fade-in-up ${
-          notificationType === "error"
-            ? "bg-red-900/90 border-red-500/30"
-            : "bg-black/90 border-white/10"
-        }`}>
-          <p className={`text-xs font-bold whitespace-nowrap ${
-            notificationType === "error" ? "text-red-200" : "text-white"
+    <OverlayPortal>
+      <div className={`fixed bottom-4 sm:bottom-6 z-[2147483640] transition-all duration-300 ${isAssistantOpen ? "right-[400px] sm:right-[420px]" : "right-16 sm:right-20"}`}>
+        {/* Notification Toast */}
+        {showNotification && (
+          <div className={`absolute bottom-full right-0 mb-2 px-4 py-2 backdrop-blur-md rounded-lg border shadow-xl animate-fade-in-up ${
+            notificationType === "error"
+              ? "bg-red-900/90 border-red-500/30"
+              : "bg-black/90 border-white/10"
           }`}>
-            {notificationMessage}
-          </p>
-        </div>
-      )}
+            <p className={`text-xs font-bold whitespace-nowrap ${
+              notificationType === "error" ? "text-red-200" : "text-white"
+            }`}>
+              {notificationMessage}
+            </p>
+          </div>
+        )}
 
       {/* Main Indicator */}
       <div className="relative">
@@ -430,6 +432,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
           )}
         </button>
       </div>
-    </div>
+      </div>
+    </OverlayPortal>
   );
 };

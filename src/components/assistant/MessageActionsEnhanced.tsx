@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { MessageActions, MessageAction } from '@/components/ai-elements/message';
 import { Icon } from '../common/Icon';
+import { OverlayPortal } from '../common/OverlayPortal';
 
 export interface MessageActionsEnhancedProps {
   messageId: string;
@@ -117,12 +118,14 @@ export function MessageActionsEnhanced({
 
       {/* Toast de sucesso */}
       {toast && (
-        <div className="fixed bottom-4 right-4 bg-green-500/90 text-white px-4 py-2 rounded-lg shadow-lg z-[100] animate-fade-in">
-          <div className="flex items-center gap-2">
-            <Icon name="check" className="w-4 h-4" />
-            <span className="text-sm font-medium">{toast.message}</span>
+        <OverlayPortal>
+          <div className="fixed bottom-4 right-4 bg-green-500/90 text-white px-4 py-2 rounded-lg shadow-lg z-[2147483645] animate-fade-in">
+            <div className="flex items-center gap-2">
+              <Icon name="check" className="w-4 h-4" />
+              <span className="text-sm font-medium">{toast.message}</span>
+            </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
     </>
   );
