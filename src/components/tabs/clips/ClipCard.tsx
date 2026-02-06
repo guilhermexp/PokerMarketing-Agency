@@ -27,8 +27,6 @@ import {
   generateVideo as generateServerVideo,
   updateClipThumbnail,
   updateSceneImage,
-  queueVideoJob,
-  type VideoJobConfig,
 } from "../../../services/apiClient";
 import { uploadImageToBlob } from "../../../services/blobService";
 import { getAuthToken } from "../../../services/authService";
@@ -49,9 +47,6 @@ import { uploadVideo, getVideoDisplayUrl } from "../../../services/apiClient";
 import {
   useBackgroundJobs,
 } from "../../../hooks/useBackgroundJobs";
-
-// Dev mode flag - set to false to use BullMQ queue in development (Redis configured)
-const isDevMode = false;
 
 const CLIP_ASPECT_RATIO = "9:16" as const;
 
@@ -1097,12 +1092,12 @@ export const ClipCard: React.FC<ClipCardProps> = ({
   };
 
   // Returns whether fallback was used (for batch operations to skip Gemini on subsequent calls)
-  // waitForCompletion: when true, waits for background job to complete before returning (for batch operations)
+  // _waitForCompletion kept for compatibility with existing batch call sites
   const handleGenerateVideo = useCallback(
     async (
       sceneNumber: number,
       useFallbackDirectly: boolean = false,
-      waitForCompletion: boolean = false,
+      _waitForCompletion: boolean = false,
     ): Promise<{ usedFallback: boolean; error: string | null }> => {
       // Set loading state for this scene
       setIsGeneratingVideo((prev) => ({ ...prev, [sceneNumber]: true }));
@@ -1238,71 +1233,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
           }
         }
 
-        // Try to use background jobs if available
-        if (userId && !isDevMode && !(useFrameInterpolation && isVeoModel)) {
-          try {
-            console.debug(
-              `[ClipsTab] Queueing video job for scene ${sceneNumber}...`,
-            );
-            const jobConfig: VideoJobConfig = {
-              model: apiModel,
-              aspectRatio: CLIP_ASPECT_RATIO,
-              imageUrl,
-              lastFrameUrl,
-              sceneDuration:
-                useFrameInterpolation && lastFrameUrl
-                  ? 8
-                  : currentScene.duration,
-              useInterpolation: useFrameInterpolation && !!lastFrameUrl,
-            };
-
-            const jobContext = `video-${clip.id}-scene-${sceneNumber}`;
-
-            await queueVideoJob(
-              userId,
-              jsonPrompt,
-              jobConfig,
-              jobContext,
-            );
-
-            console.debug(`[ClipsTab] Video job queued for scene ${sceneNumber}`);
-
-            // If waitForCompletion is true (batch mode), wait for the job to complete
-            if (waitForCompletion) {
-              console.debug(
-                `[ClipsTab] Waiting for job completion (batch mode) for scene ${sceneNumber}...`,
-              );
-              try {
-                await new Promise<void>((resolve, reject) => {
-                  jobCompletionResolvers.current.set(jobContext, {
-                    resolve,
-                    reject,
-                  });
-                });
-                console.debug(
-                  `[ClipsTab] Job completed for scene ${sceneNumber}, proceeding to next`,
-                );
-              } catch (jobError) {
-                console.error(
-                  `[ClipsTab] Job failed for scene ${sceneNumber}:`,
-                  jobError,
-                );
-                return { usedFallback: false, error: String(jobError) };
-              }
-            }
-
-            // Job is queued (or completed in batch mode)
-            return { usedFallback: false, error: null };
-          } catch (queueErr) {
-            console.error(
-              "[ClipsTab] Failed to queue video job, falling back to sync:",
-              queueErr,
-            );
-            // Fall through to synchronous generation
-          }
-        }
-
-        // Synchronous generation (dev mode or queue failed)
+        // Synchronous generation (background queue is currently disabled server-side)
         let videoUrl: string;
 
         if (isFalModel(selectedVideoModel)) {
@@ -1373,10 +1304,37 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
           // Fallback to logo if no reference image
           if (!referenceImage && brandProfile.logo) {
-            referenceImage = {
-              base64: brandProfile.logo.split(",")[1],
-              mimeType: brandProfile.logo.match(/:(.*?);/)?.[1] || "image/png",
-            };
+            if (brandProfile.logo.startsWith("data:")) {
+              const logoBase64 = brandProfile.logo.split(",")[1];
+              if (logoBase64) {
+                referenceImage = {
+                  base64: logoBase64,
+                  mimeType: brandProfile.logo.match(/:(.*?);/)?.[1] || "image/png",
+                };
+              }
+            } else {
+              try {
+                const response = await fetch(brandProfile.logo);
+                const blob = await response.blob();
+                const base64 = await new Promise<string>((resolve) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const result = reader.result as string;
+                    resolve(result.split(",")[1]);
+                  };
+                  reader.readAsDataURL(blob);
+                });
+                referenceImage = {
+                  base64,
+                  mimeType: blob.type || "image/png",
+                };
+              } catch (logoErr) {
+                console.warn(
+                  "[ClipsTab] Failed to fetch brand logo for reference image",
+                  logoErr,
+                );
+              }
+            }
           }
 
           // Pass useFallbackDirectly to skip Gemini if already failed in batch

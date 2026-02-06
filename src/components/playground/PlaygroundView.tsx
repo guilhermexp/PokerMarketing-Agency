@@ -1,321 +1,293 @@
 /**
  * PlaygroundView Component
- * Main view for video generation playground with TikTok-style feed
+ * Video Studio workspace with 3-panel layout inspired by Image Studio
  */
 
 import { AnimatePresence, motion } from 'framer-motion';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Video, ImageIcon } from 'lucide-react';
-import { ApiKeyDialog } from './ApiKeyDialog';
-import { BottomPromptBar } from './BottomPromptBar';
-import { VideoCard } from './VideoCard';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AlertCircle,
+  Clapperboard,
+  Film,
+  Loader2,
+  Palette,
+  Plus,
+  Sparkles,
+  Upload,
+  Video,
+  X,
+} from 'lucide-react';
 import { OverlayPortal } from '../common/OverlayPortal';
+import { VideoCard } from './VideoCard';
 import {
   FeedPost,
-  GenerateVideoParams,
-  PostStatus,
-  GenerationMode,
   MediaType,
   PlaygroundAspectRatio,
+  PlaygroundResolution,
+  PostStatus,
 } from './types';
-import { queueVideoJob, type ApiVideoModel, type VideoJobConfig } from '../../services/apiClient';
-import { generateImage } from '../../services/geminiService';
-import { urlToBase64 } from '../../utils/imageHelpers';
-import { getErrorMessage } from '../../utils/errorMessages';
-import { useBackgroundJobs } from '../../hooks/useBackgroundJobs';
-import type { ActiveJob } from '../../hooks/useBackgroundJobs';
+import { generateVideo as generateVideoDirect, type ApiVideoModel } from '../../services/apiClient';
 import type { BrandProfile } from '../../types';
-
-// Sample video URLs for the feed
-const sampleVideos: FeedPost[] = [
-  {
-    id: 's1',
-    videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-alisa.mp4',
-    mediaType: MediaType.VIDEO,
-    username: 'alisa_fortin',
-    avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Maria',
-    description: 'Tomando um cafe em um charmoso cafe parisiense',
-    modelTag: 'Veo Fast',
-    status: PostStatus.SUCCESS,
-    aspectRatio: PlaygroundAspectRatio.PORTRAIT,
-  },
-  {
-    id: 's2',
-    videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-omar.mp4',
-    mediaType: MediaType.VIDEO,
-    username: 'osanseviero',
-    avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Emery',
-    description: 'Em um zoologico de lhamas',
-    modelTag: 'Veo Fast',
-    status: PostStatus.SUCCESS,
-    aspectRatio: PlaygroundAspectRatio.PORTRAIT,
-  },
-  {
-    id: 's3',
-    videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-ammaar.mp4',
-    mediaType: MediaType.VIDEO,
-    username: 'ammaar',
-    avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Kimberly',
-    description: 'Caminhando no tapete vermelho de uma cerimonia',
-    modelTag: 'Veo',
-    status: PostStatus.SUCCESS,
-    aspectRatio: PlaygroundAspectRatio.PORTRAIT,
-  },
-];
 
 interface PlaygroundViewProps {
   brandProfile: BrandProfile;
   userId?: string;
 }
 
+interface ReferenceImage {
+  base64: string;
+  mimeType: string;
+  previewUrl: string;
+  fileName: string;
+}
+
+const MODEL_OPTIONS: Array<{ value: ApiVideoModel; label: string; color: string }> = [
+  { value: 'veo-3.1', label: 'Veo 3.1', color: '#3B82F6' },
+  { value: 'sora-2', label: 'Sora 2', color: '#10B981' },
+];
+
+const ASPECT_RATIO_OPTIONS: Array<{ value: PlaygroundAspectRatio; label: string }> = [
+  { value: PlaygroundAspectRatio.PORTRAIT, label: '9:16' },
+  { value: PlaygroundAspectRatio.LANDSCAPE, label: '16:9' },
+];
+
+const RESOLUTION_OPTIONS: Array<{ value: PlaygroundResolution; label: string }> = [
+  { value: PlaygroundResolution.P720, label: '720p' },
+  { value: PlaygroundResolution.P1080, label: '1080p' },
+];
+
+const fileToReferenceImage = (file: File): Promise<ReferenceImage> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Falha ao ler a imagem de referencia.'));
+        return;
+      }
+
+      const base64 = reader.result.split(',')[1];
+      if (!base64) {
+        reject(new Error('Falha ao converter a imagem de referencia.'));
+        return;
+      }
+
+      resolve({
+        base64,
+        mimeType: file.type || 'image/png',
+        previewUrl: URL.createObjectURL(file),
+        fileName: file.name,
+      });
+    };
+    reader.onerror = () => reject(new Error('Erro ao processar a imagem de referencia.'));
+    reader.readAsDataURL(file);
+  });
+};
+
+const modelToLabel = (model: ApiVideoModel): string => {
+  return model === 'sora-2' ? 'Sora 2' : 'Veo 3.1';
+};
+
 export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, userId }) => {
-  const [feed, setFeed] = useState<FeedPost[]>(sampleVideos);
-  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [feed, setFeed] = useState<FeedPost[]>([]);
   const [errorToast, setErrorToast] = useState<string | null>(null);
-  const [mediaType, setMediaType] = useState<MediaType>(MediaType.VIDEO);
-  // Image to edit (passed from VideoCard when clicking "Add to prompt")
-  const [editingImage, setEditingImage] = useState<{ url: string; base64: string; mimeType: string } | null>(null);
 
-  // Background jobs for video generation
-  const { onJobComplete, onJobFailed } = useBackgroundJobs();
+  const [prompt, setPrompt] = useState('');
+  const [selectedModel, setSelectedModel] = useState<ApiVideoModel>('veo-3.1');
+  const [aspectRatio, setAspectRatio] = useState<PlaygroundAspectRatio>(PlaygroundAspectRatio.PORTRAIT);
+  const [resolution, setResolution] = useState<PlaygroundResolution>(PlaygroundResolution.P720);
+  const [useBrandProfile, setUseBrandProfile] = useState(false);
+  const [referenceImage, setReferenceImage] = useState<ReferenceImage | null>(null);
+  const [activePostId, setActivePostId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Track pending video jobs (jobContext -> postId mapping)
-  const pendingVideoJobs = React.useRef<Map<string, string>>(new Map());
-  // Track pending image jobs
-  const pendingImageJobs = React.useRef<Map<string, string>>(new Map());
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+  const referenceInputRef = useRef<HTMLInputElement>(null);
+  const postRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Auto-dismiss error toast
   useEffect(() => {
-    if (errorToast) {
-      const timer = setTimeout(() => setErrorToast(null), 5000);
-      return () => clearTimeout(timer);
-    }
+    if (!errorToast) return;
+    const timer = setTimeout(() => setErrorToast(null), 5000);
+    return () => clearTimeout(timer);
   }, [errorToast]);
 
+  // Keep active card in sync with feed
+  useEffect(() => {
+    if (feed.length === 0) {
+      setActivePostId(null);
+      return;
+    }
+
+    if (!activePostId || !feed.some((post) => post.id === activePostId)) {
+      setActivePostId(feed[0].id);
+    }
+  }, [feed, activePostId]);
+
+  // Release object URL when reference image changes/unmounts
+  useEffect(() => {
+    return () => {
+      if (referenceImage?.previewUrl) {
+        URL.revokeObjectURL(referenceImage.previewUrl);
+      }
+    };
+  }, [referenceImage]);
+
   const updateFeedPost = useCallback((id: string, updates: Partial<FeedPost>) => {
-    setFeed(prevFeed =>
-      prevFeed.map(post =>
-        post.id === id ? { ...post, ...updates } : post
-      )
+    setFeed((prevFeed) =>
+      prevFeed.map((post) => (post.id === id ? { ...post, ...updates } : post)),
     );
   }, []);
 
-  // Handle clearing editing image after generation
-  const handleClearEditingImage = useCallback(() => {
-    setEditingImage(null);
-  }, []);
+  const buildPrompt = useCallback((basePrompt: string) => {
+    const additions: string[] = [];
 
-  // Handle background job completion
-  useEffect(() => {
-    const handleComplete = (job: ActiveJob) => {
-      const jobContext = job.context;
-      if (!jobContext) return;
-
-      // Check for video jobs
-      const videoPostId = pendingVideoJobs.current.get(jobContext);
-      if (videoPostId) {
-        const resultUrl = job.result_url || "";
-        console.debug(`[PlaygroundView] Video job completed for post ${videoPostId}:`, resultUrl);
-        updateFeedPost(videoPostId, { videoUrl: resultUrl, status: PostStatus.SUCCESS });
-        pendingVideoJobs.current.delete(jobContext);
-        return;
+    if (useBrandProfile) {
+      additions.push(`Marca: ${brandProfile.name}`);
+      if (brandProfile.description) {
+        additions.push(`Descricao da marca: ${brandProfile.description}`);
       }
-
-      // Check for image jobs
-      const imagePostId = pendingImageJobs.current.get(jobContext);
-      if (imagePostId) {
-        const resultUrl = job.result_url || "";
-        console.debug(`[PlaygroundView] Image job completed for post ${imagePostId}:`, resultUrl);
-        updateFeedPost(imagePostId, { imageUrl: resultUrl, status: PostStatus.SUCCESS });
-        pendingImageJobs.current.delete(jobContext);
-      }
-    };
-
-    const handleFailed = (job: ActiveJob) => {
-      const jobContext = job.context;
-      if (!jobContext) return;
-
-      const errorMessage = getErrorMessage(job.error_message) || "Erro na geração";
-
-      // Check for video jobs
-      const videoPostId = pendingVideoJobs.current.get(jobContext);
-      if (videoPostId) {
-        console.error(`[PlaygroundView] Video job failed for post ${videoPostId}:`, errorMessage);
-        updateFeedPost(videoPostId, { status: PostStatus.ERROR, errorMessage });
-        pendingVideoJobs.current.delete(jobContext);
-        return;
-      }
-
-      // Check for image jobs
-      const imagePostId = pendingImageJobs.current.get(jobContext);
-      if (imagePostId) {
-        console.error(`[PlaygroundView] Image job failed for post ${imagePostId}:`, errorMessage);
-        updateFeedPost(imagePostId, { status: PostStatus.ERROR, errorMessage });
-        pendingImageJobs.current.delete(jobContext);
-      }
-    };
-
-    onJobComplete(handleComplete);
-    onJobFailed(handleFailed);
-  }, [onJobComplete, onJobFailed, updateFeedPost]);
-
-
-
-  const processGeneration = useCallback(async (postId: string, params: GenerateVideoParams) => {
-    try {
-      const isImageGeneration = params.mediaType === MediaType.IMAGE;
-      const aspectRatio: "16:9" | "9:16" = params.aspectRatio === '16:9' ? '16:9' : '9:16';
-
-      // Build productImages array with logo if brand profile is enabled + user-added assets
-      const allProductImages: { base64: string; mimeType: string }[] = [];
-      if (params.useBrandProfile && brandProfile.logo) {
-        const logoData = await urlToBase64(brandProfile.logo);
-        if (logoData?.base64) {
-          allProductImages.push({ base64: logoData.base64, mimeType: logoData.mimeType });
-        }
-      }
-      if (params.productImages && params.productImages.length > 0) {
-        allProductImages.push(...params.productImages);
-      }
-
-      if (isImageGeneration) {
-        // Synchronous generation (background jobs were removed)
-        const profileToUse = params.useBrandProfile ? brandProfile : {
-          name: brandProfile.name,
-          description: '',
-          logo: null,
-          primaryColor: '',
-          secondaryColor: '',
-          tertiaryColor: '',
-          toneOfVoice: brandProfile.toneOfVoice,
-        } as BrandProfile;
-
-        let personReferenceImage: { base64: string; mimeType: string } | undefined;
-        if (params.referenceImages && params.referenceImages.length > 0) {
-          personReferenceImage = {
-            base64: params.referenceImages[0].base64,
-            mimeType: 'image/png',
-          };
-        }
-
-        const imageDataUrl = await generateImage(
-          params.prompt,
-          profileToUse,
-          {
-            aspectRatio: params.aspectRatio,
-            model: 'gemini-3-pro-image-preview',
-            imageSize: params.imageSize as '1K' | '2K' | '4K' | undefined,
-            productImages: allProductImages.length > 0 ? allProductImages : undefined,
-            styleReferenceImage: params.styleReference,
-            personReferenceImage,
-          }
-        );
-        updateFeedPost(postId, { imageUrl: imageDataUrl, status: PostStatus.SUCCESS });
-      } else {
-        // Video Generation
-        if (!userId) {
-          throw new Error('Usuário não autenticado. Faça login para gerar vídeos.');
-        }
-
-        const apiModel: ApiVideoModel = 'veo-3.1';
-        let imageUrl: string | undefined;
-        if (params.referenceImages && params.referenceImages.length > 0) {
-          imageUrl = `data:image/png;base64,${params.referenceImages[0].base64}`;
-        }
-
-        const jobConfig: VideoJobConfig = {
-          model: apiModel,
-          aspectRatio,
-          imageUrl,
-        };
-
-        const jobContext = `playground-video-${postId}`;
-        pendingVideoJobs.current.set(jobContext, postId);
-        await queueVideoJob(userId, params.prompt, jobConfig, jobContext);
-        console.debug(`[PlaygroundView] Video job queued for post ${postId}`);
-      }
-    } catch (error) {
-      console.error('Generation failed:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
-      updateFeedPost(postId, { status: PostStatus.ERROR, errorMessage });
-
-      if (typeof errorMessage === 'string' && (
-        errorMessage.includes('API_KEY_INVALID') ||
-        errorMessage.includes('permission denied') ||
-        errorMessage.includes('Requested entity was not found')
-      )) {
-        setErrorToast('Chave de API inválida ou sem permissões. Verifique o faturamento no Google Cloud.');
-      }
+      additions.push(`Tom de voz: ${brandProfile.toneOfVoice}`);
     }
-  }, [brandProfile, updateFeedPost, userId]);
 
-  // Handle adding an image to the prompt for editing
-  const handleAddToPrompt = useCallback(async (imageUrl: string) => {
-    try {
-      // Fetch the image and convert to base64
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
-      const base64Data = base64.split(',')[1];
+    additions.push(`Qualidade visual alvo: ${resolution}`);
 
-      setEditingImage({
-        url: imageUrl,
-        base64: base64Data,
-        mimeType: blob.type || 'image/png',
-      });
-    } catch (error) {
-      console.error('Failed to load image for editing:', error);
-      setErrorToast('Falha ao carregar imagem para edição');
+    if (additions.length === 0) return basePrompt.trim();
+
+    return `${basePrompt.trim()}\n\nDiretrizes adicionais:\n- ${additions.join('\n- ')}`;
+  }, [brandProfile, resolution, useBrandProfile]);
+
+  const handleGenerate = useCallback(async () => {
+    const promptValue = prompt.trim();
+    if (!promptValue || isSubmitting) return;
+
+    if (!userId) {
+      setErrorToast('Usuario nao autenticado. Faça login para gerar videos.');
+      return;
     }
-  }, []);
 
-  const handleGenerate = useCallback(async (params: GenerateVideoParams) => {
     const newPostId = Date.now().toString();
-    const refImage = params.referenceImages?.[0]?.base64;
-    const isImage = params.mediaType === MediaType.IMAGE;
+    const modelLabel = modelToLabel(selectedModel);
 
-    // Determine model tag based on media type and generation mode
-    let modelTag: string;
-    if (isImage) {
-      modelTag = 'Gemini';
-    } else {
-      modelTag = params.mode === GenerationMode.REFERENCES_TO_VIDEO ? 'Veo' : 'Veo Fast';
-    }
-
-    // Create new post object with GENERATING status
     const newPost: FeedPost = {
       id: newPostId,
-      mediaType: params.mediaType,
+      mediaType: MediaType.VIDEO,
       username: brandProfile.name || 'voce',
       avatarUrl: brandProfile.logo || 'https://api.dicebear.com/7.x/avataaars/svg?seed=voce',
-      description: params.prompt,
-      modelTag,
+      description: promptValue,
+      modelTag: `${modelLabel} • ${resolution}`,
       status: PostStatus.GENERATING,
-      aspectRatio: params.aspectRatio,
-      referenceImageBase64: refImage,
+      aspectRatio,
+      referenceImageBase64: referenceImage?.base64,
     };
 
-    // Prepend to feed immediately
-    setFeed(prev => [newPost, ...prev]);
+    setFeed((prev) => [newPost, ...prev]);
+    setActivePostId(newPostId);
+    setPrompt('');
+    if (promptRef.current) {
+      promptRef.current.style.height = 'auto';
+    }
 
-    // Start generation in background
-    processGeneration(newPostId, params);
-  }, [brandProfile, processGeneration]);
+    setIsSubmitting(true);
 
-  const handleApiKeyDialogContinue = () => {
-    setShowApiKeyDialog(false);
-  };
+    try {
+      const promptWithContext = buildPrompt(promptValue);
+      const apiAspectRatio: '16:9' | '9:16' =
+        aspectRatio === PlaygroundAspectRatio.LANDSCAPE ? '16:9' : '9:16';
+      const videoUrl = await generateVideoDirect({
+        prompt: promptWithContext,
+        model: selectedModel,
+        aspectRatio: apiAspectRatio,
+        generateAudio: true,
+        imageUrl: referenceImage
+          ? `data:${referenceImage.mimeType};base64,${referenceImage.base64}`
+          : undefined,
+      });
+      updateFeedPost(newPostId, { status: PostStatus.SUCCESS, videoUrl });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      updateFeedPost(newPostId, { status: PostStatus.ERROR, errorMessage });
+      setErrorToast(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    aspectRatio,
+    brandProfile.logo,
+    brandProfile.name,
+    buildPrompt,
+    isSubmitting,
+    prompt,
+    referenceImage,
+    resolution,
+    selectedModel,
+    updateFeedPost,
+    userId,
+  ]);
+
+  const handlePromptKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleGenerate();
+    }
+  }, [handleGenerate]);
+
+  const handleReferenceUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErrorToast('Selecione um arquivo de imagem para referencia.');
+      return;
+    }
+
+    try {
+      const parsed = await fileToReferenceImage(file);
+      setReferenceImage((previous) => {
+        if (previous?.previewUrl) {
+          URL.revokeObjectURL(previous.previewUrl);
+        }
+        return parsed;
+      });
+    } catch (error) {
+      console.error('Failed to load reference image:', error);
+      setErrorToast('Falha ao carregar imagem de referencia.');
+    } finally {
+      if (referenceInputRef.current) {
+        referenceInputRef.current.value = '';
+      }
+    }
+  }, []);
+
+  const clearReferenceImage = useCallback(() => {
+    setReferenceImage((previous) => {
+      if (previous?.previewUrl) {
+        URL.revokeObjectURL(previous.previewUrl);
+      }
+      return null;
+    });
+  }, []);
+
+  const handleClearSession = useCallback(() => {
+    setFeed([]);
+    setActivePostId(null);
+  }, []);
+
+  const handleSelectPost = useCallback((postId: string) => {
+    setActivePostId(postId);
+    const element = postRefs.current[postId];
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, []);
+
+  const showEmptyState = feed.length === 0;
+  const activePost = useMemo(() => {
+    if (!activePostId) return null;
+    return feed.find((post) => post.id === activePostId) || null;
+  }, [activePostId, feed]);
 
   return (
-    <div className="h-full w-full bg-[#000000] text-white flex flex-col font-sans selection:bg-white/20 selection:text-white">
-      {showApiKeyDialog && (
-        <ApiKeyDialog onContinue={handleApiKeyDialogContinue} />
-      )}
-
+    <div className="h-full w-full bg-[#0a0a0a] text-white flex overflow-hidden">
       {/* Error Toast */}
       <OverlayPortal>
         <AnimatePresence>
@@ -324,74 +296,344 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
               initial={{ opacity: 0, y: -20, scale: 0.95 }}
               animate={{ opacity: 1, y: 24, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="fixed top-0 left-1/2 -translate-x-1/2 z-[2147483645] bg-[#000000]/95 border border-white/10 text-white px-5 py-3 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] backdrop-blur-2xl max-w-md text-center text-sm font-medium flex items-center gap-3"
             >
-              <div className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse"></div>
+              <div className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
               {errorToast}
             </motion.div>
           )}
         </AnimatePresence>
       </OverlayPortal>
 
-      <main className="flex-1 relative overflow-y-auto overflow-x-hidden no-scrollbar bg-[#000000]">
-        {/* Top Bar */}
-        <header className="sticky top-0 z-30 w-full px-6 py-4 pointer-events-none">
-          <div className="absolute inset-0 bg-[#000000]/80 backdrop-blur-2xl border-b border-white/10" style={{ maskImage: 'linear-gradient(to bottom, black, transparent)' }} />
+      {/* Left Panel: Config */}
+      <div className="w-80 shrink-0 border-r border-white/10 overflow-y-auto no-scrollbar">
+        <div className="h-full flex flex-col bg-black/40 backdrop-blur-xl">
+          <div className="px-4 py-5 border-b border-white/10">
+            <h1 className="text-2xl font-bold text-white">Studio Video</h1>
+            <p className="text-xs text-white/50 mt-1">Defina parametros e gere videos em segundos</p>
+          </div>
 
-          <div className="relative flex items-center justify-between text-white pointer-events-auto max-w-[1600px] mx-auto w-full">
-            <h1 className="text-3xl font-semibold text-white tracking-tight">Playground</h1>
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            {/* Model Selection */}
+            <div className="relative">
+              <label className="text-sm font-medium text-white/80 block mb-2">Modelo</label>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value as ApiVideoModel)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white focus:outline-none focus:border-white/20 transition-colors appearance-none cursor-pointer"
+              >
+                {MODEL_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-black">
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <div
+                className="absolute left-4 top-[54px] -translate-y-1/2 w-3 h-3 rounded-full"
+                style={{
+                  backgroundColor:
+                    MODEL_OPTIONS.find((option) => option.value === selectedModel)?.color || '#3B82F6',
+                }}
+              />
+            </div>
 
-            {/* Media Type Toggle */}
-            <div className="flex items-center bg-black/40 rounded-full p-1 border border-white/10 backdrop-blur-2xl">
+            {/* Brand Profile Toggle */}
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-white/80">Usar perfil da marca</label>
               <button
-                onClick={() => setMediaType(MediaType.VIDEO)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                  mediaType === MediaType.VIDEO
-                    ? 'bg-primary/20 border border-primary/40 text-primary'
-                    : 'text-white/60 hover:text-white'
+                onClick={() => setUseBrandProfile((prev) => !prev)}
+                className={`flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200 ${
+                  useBrandProfile
+                    ? 'bg-white text-black shadow-md'
+                    : 'bg-white/5 text-white/60 border border-white/10 hover:text-white hover:border-white/20'
                 }`}
+                title={useBrandProfile ? 'Diretrizes da marca ativas' : 'Diretrizes da marca desativadas'}
               >
-                <Video className="w-3.5 h-3.5" />
-                Video
-              </button>
-              <button
-                onClick={() => setMediaType(MediaType.IMAGE)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                  mediaType === MediaType.IMAGE
-                    ? 'bg-primary/20 border border-primary/40 text-primary'
-                    : 'text-white/60 hover:text-white'
-                }`}
-              >
-                <ImageIcon className="w-3.5 h-3.5" />
-                Imagem
+                <Palette className="w-4 h-4" />
               </button>
             </div>
-          </div>
-        </header>
 
-        {/* Video Grid */}
-        <div className="w-full max-w-[1600px] mx-auto p-4 md:p-6 pt-2 md:pt-3 pb-48 relative z-10">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-            <AnimatePresence initial={false}>
-              {feed.map((post) => (
-                <VideoCard key={post.id} post={post} onAddToPrompt={handleAddToPrompt} />
-              ))}
-            </AnimatePresence>
+            {/* Reference Image */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-white/80">Imagem de referencia</label>
+                {referenceImage && (
+                  <button
+                    onClick={clearReferenceImage}
+                    className="text-xs text-white/50 hover:text-white transition-colors"
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+
+              <input
+                ref={referenceInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleReferenceUpload}
+                className="hidden"
+              />
+
+              {referenceImage ? (
+                <div className="relative rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                  <img
+                    src={referenceImage.previewUrl}
+                    alt={referenceImage.fileName}
+                    className="w-full h-36 object-cover"
+                  />
+                  <button
+                    onClick={clearReferenceImage}
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 transition-colors"
+                    title="Remover imagem"
+                  >
+                    <X className="w-3.5 h-3.5 text-white" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => referenceInputRef.current?.click()}
+                  className="w-full border-2 border-dashed border-white/10 rounded-xl p-6 flex flex-col items-center justify-center gap-2 hover:border-white/20 hover:bg-white/5 transition-colors"
+                >
+                  <Upload className="w-6 h-6 text-white/35" />
+                  <span className="text-xs text-white/45">Adicionar imagem para guiar o video</span>
+                </button>
+              )}
+            </div>
+
+            {/* Aspect Ratio */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-white/80">Proporcao</label>
+              <div className="grid grid-cols-3 gap-2">
+                {ASPECT_RATIO_OPTIONS.map((ratio) => (
+                  <button
+                    key={ratio.value}
+                    onClick={() => setAspectRatio(ratio.value)}
+                    className={`py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      aspectRatio === ratio.value
+                        ? 'bg-white/15 border border-white/20 text-white'
+                        : 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {ratio.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Resolution */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-white/80">Resolucao</label>
+              <div className="flex gap-2">
+                {RESOLUTION_OPTIONS.map((item) => (
+                  <button
+                    key={item.value}
+                    onClick={() => setResolution(item.value)}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      resolution === item.value
+                        ? 'bg-white/15 border border-white/20 text-white'
+                        : 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={handleClearSession}
+              disabled={feed.length === 0}
+              className="w-full py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white/70 hover:bg-white/10 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Limpar sessao
+            </button>
           </div>
         </div>
-      </main>
+      </div>
 
-      <BottomPromptBar
-        onGenerate={handleGenerate}
-        editingImage={editingImage}
-        onClearEditingImage={handleClearEditingImage}
-        setFeed={setFeed}
-        setErrorToast={setErrorToast}
-        brandProfile={brandProfile}
-        mediaType={mediaType}
-        setMediaType={setMediaType}
-      />
+      {/* Center Panel: Workspace */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#0a0a0a]">
+        {!showEmptyState && (
+          <div className="px-6 py-4 border-b border-white/10">
+            <h1 className="text-xl font-semibold text-white">Studio Video</h1>
+            <p className="text-xs text-white/50 mt-1">
+              {activePost ? `Selecionado: ${activePost.modelTag}` : 'Gerencie suas geracoes de video'}
+            </p>
+          </div>
+        )}
+
+        {showEmptyState ? (
+          <div className="flex-1 flex flex-col items-center justify-center px-6">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                <Video className="w-8 h-8 text-white/75" />
+              </div>
+              <h1 className="text-4xl font-semibold text-white">Studio Video</h1>
+            </div>
+
+            <div className="w-full max-w-2xl">
+              <div className="relative bg-white/5 border border-white/10 rounded-2xl overflow-hidden focus-within:border-white/20 transition-colors">
+                <textarea
+                  ref={promptRef}
+                  value={prompt}
+                  onChange={(e) => {
+                    setPrompt(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 180)}px`;
+                  }}
+                  onKeyDown={handlePromptKeyDown}
+                  rows={1}
+                  className="w-full bg-transparent px-5 py-4 pr-16 text-sm text-white placeholder:text-white/40 resize-none focus:outline-none"
+                  placeholder="Descreva a cena do video que deseja gerar"
+                  style={{ minHeight: '56px', maxHeight: '180px' }}
+                />
+
+                <button
+                  onClick={handleGenerate}
+                  disabled={!prompt.trim() || isSubmitting}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                    prompt.trim() && !isSubmitting
+                      ? 'bg-white/10 text-white hover:bg-white/20 active:scale-95'
+                      : 'bg-white/5 text-white/30 cursor-not-allowed'
+                  }`}
+                  title="Gerar video (Ctrl/Cmd + Enter)"
+                >
+                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto no-scrollbar">
+              <div className="p-6 grid grid-cols-[repeat(auto-fill,minmax(240px,340px))] gap-6 justify-center xl:justify-start">
+                <AnimatePresence initial={false}>
+                  {feed.map((post) => (
+                    <motion.div
+                      key={post.id}
+                      ref={(el) => {
+                        postRefs.current[post.id] = el;
+                      }}
+                      className={`w-full max-w-[340px] rounded-2xl transition-all ${
+                        activePostId === post.id ? 'ring-2 ring-primary/60' : 'ring-1 ring-transparent'
+                      }`}
+                      layout
+                    >
+                      <VideoCard post={post} />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 p-4 bg-black/40 backdrop-blur-xl">
+              <div className="relative bg-white/5 border border-white/10 rounded-2xl overflow-hidden focus-within:border-white/20 transition-colors">
+                <textarea
+                  ref={promptRef}
+                  value={prompt}
+                  onChange={(e) => {
+                    setPrompt(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 180)}px`;
+                  }}
+                  onKeyDown={handlePromptKeyDown}
+                  rows={1}
+                  className="w-full bg-transparent px-5 py-4 pr-16 text-sm text-white placeholder:text-white/40 resize-none focus:outline-none"
+                  placeholder="Descreva o proximo video"
+                  style={{ minHeight: '56px', maxHeight: '180px' }}
+                />
+
+                <button
+                  onClick={handleGenerate}
+                  disabled={!prompt.trim() || isSubmitting}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                    prompt.trim() && !isSubmitting
+                      ? 'bg-white/10 text-white hover:bg-white/20 active:scale-95'
+                      : 'bg-white/5 text-white/30 cursor-not-allowed'
+                  }`}
+                  title="Gerar video (Ctrl/Cmd + Enter)"
+                >
+                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Right Panel: Mini Gallery */}
+      <div className="w-20 shrink-0 border-l border-white/10 overflow-y-auto no-scrollbar">
+        <div className="h-full flex flex-col bg-black/40 backdrop-blur-xl">
+          <div className="px-3 py-3 border-b border-white/10 flex items-center justify-center">
+            <button
+              onClick={handleClearSession}
+              disabled={feed.length === 0}
+              className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center"
+              title="Nova sessao"
+            >
+              <Plus className="w-5 h-5 text-white/60 shrink-0" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto py-3 px-3">
+            {feed.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center mx-auto">
+                  <Film className="w-7 h-7 text-white/30" />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {feed.map((post) => (
+                  <button
+                    key={post.id}
+                    onClick={() => handleSelectPost(post.id)}
+                    className={`relative w-full aspect-square rounded-xl overflow-hidden transition-colors ${
+                      activePostId === post.id
+                        ? 'ring-2 ring-primary/60'
+                        : 'ring-1 ring-transparent hover:ring-white/20'
+                    }`}
+                    title={post.description}
+                  >
+                    {post.status === PostStatus.SUCCESS && post.videoUrl ? (
+                      <video
+                        src={post.videoUrl}
+                        className="w-full h-full object-cover"
+                        muted
+                        playsInline
+                        loop
+                        autoPlay
+                      />
+                    ) : post.referenceImageBase64 ? (
+                      <img
+                        src={`data:image/png;base64,${post.referenceImageBase64}`}
+                        alt="Referencia"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-white/5 flex items-center justify-center">
+                        {post.status === PostStatus.GENERATING ? (
+                          <Loader2 className="w-5 h-5 text-white/40 animate-spin" />
+                        ) : post.status === PostStatus.ERROR ? (
+                          <AlertCircle className="w-5 h-5 text-red-400" />
+                        ) : (
+                          <Clapperboard className="w-5 h-5 text-white/35" />
+                        )}
+                      </div>
+                    )}
+
+                    <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-wider bg-black/60 text-white/75">
+                      {post.status === PostStatus.GENERATING ? '...' : post.modelTag.split('•')[0].trim()}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

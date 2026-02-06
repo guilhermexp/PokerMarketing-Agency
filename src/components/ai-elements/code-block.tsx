@@ -12,7 +12,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { type BundledLanguage, codeToHtml, type ShikiTransformer } from "shiki";
+import type { BundledLanguage, ShikiTransformer } from "shiki";
+
+let shikiModulePromise: Promise<typeof import("shiki")> | null = null;
+
+async function getShikiModule() {
+  if (!shikiModulePromise) {
+    shikiModulePromise = import("shiki");
+  }
+
+  return shikiModulePromise;
+}
 
 type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
   code: string;
@@ -54,6 +64,7 @@ export async function highlightCode(
   language: BundledLanguage,
   showLineNumbers = false
 ) {
+  const { codeToHtml } = await getShikiModule();
   const transformers: ShikiTransformer[] = showLineNumbers
     ? [lineNumberTransformer]
     : [];

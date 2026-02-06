@@ -76,10 +76,27 @@ export const generateCampaignCover = async (
 
     if (context.brandProfile.logo) {
       if (context.brandProfile.logo.startsWith('data:')) {
-        productImages.push({
-          base64: context.brandProfile.logo.split(',')[1],
-          mimeType: context.brandProfile.logo.match(/:(.*?);/)?.[1] || 'image/png',
-        });
+        const base64Data = context.brandProfile.logo.split(',')[1];
+        if (base64Data) {
+          productImages.push({
+            base64: base64Data,
+            mimeType: context.brandProfile.logo.match(/:(.*?);/)?.[1] || 'image/png',
+          });
+        }
+      } else {
+        try {
+          const response = await fetch(context.brandProfile.logo);
+          const blob = await response.blob();
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          const base64Data = base64.split(',')[1];
+          productImages.push({ base64: base64Data, mimeType: blob.type || 'image/png' });
+        } catch (err) {
+          console.error('[CarrosselTab] Failed to fetch brand logo:', err);
+        }
       }
     }
 
@@ -211,10 +228,27 @@ export const generateCampaignSlide = async (
 
     if (context.brandProfile.logo) {
       if (context.brandProfile.logo.startsWith('data:')) {
-        productImages.push({
-          base64: context.brandProfile.logo.split(',')[1],
-          mimeType: context.brandProfile.logo.match(/:(.*?);/)?.[1] || 'image/png',
-        });
+        const base64Data = context.brandProfile.logo.split(',')[1];
+        if (base64Data) {
+          productImages.push({
+            base64: base64Data,
+            mimeType: context.brandProfile.logo.match(/:(.*?);/)?.[1] || 'image/png',
+          });
+        }
+      } else {
+        try {
+          const response = await fetch(context.brandProfile.logo);
+          const blob = await response.blob();
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          const base64Data = base64.split(',')[1];
+          productImages.push({ base64: base64Data, mimeType: blob.type || 'image/png' });
+        } catch (err) {
+          console.error('[CarrosselTab] Failed to fetch brand logo:', err);
+        }
       }
     }
 

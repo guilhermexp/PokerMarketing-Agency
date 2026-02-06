@@ -1,9 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { BrandProfileSetup } from "./components/brand/BrandProfileSetup";
-import { Dashboard } from "./components/dashboard/Dashboard";
-import { AssistantPanel } from "./components/assistant/AssistantPanel";
-import { AssistantPanelNew } from "./components/assistant/AssistantPanelNew";
 import { SettingsModal } from "./components/settings/SettingsModal";
 import { useInstagramAccounts } from "./components/settings/ConnectInstagramModal";
 import { Loader } from "./components/common/Loader";
@@ -99,6 +96,24 @@ export type ViewType =
   | "image-playground";
 
 const MAX_CHAT_HISTORY_MESSAGES = 10;
+
+const Dashboard = lazy(() =>
+  import("./components/dashboard/Dashboard").then((m) => ({ default: m.Dashboard })),
+);
+const AssistantPanel = lazy(() =>
+  import("./components/assistant/AssistantPanel").then((m) => ({ default: m.AssistantPanel })),
+);
+const AssistantPanelNew = lazy(() =>
+  import("./components/assistant/AssistantPanelNew").then((m) => ({
+    default: m.AssistantPanelNew,
+  })),
+);
+
+const LazyFallback = () => (
+  <div className="w-full h-full min-h-[220px] flex items-center justify-center">
+    <span className="text-xs text-white/50">Carregando...</span>
+  </div>
+);
 
 const excelTimeToStr = (val: unknown): string => {
   if (typeof val === "number") {
@@ -2175,31 +2190,35 @@ function AppContent() {
     isAssistantOpen,
     setIsAssistantOpen,
     renderPreviewChatPanel: () =>
-      import.meta.env.VITE_USE_VERCEL_AI_SDK === 'true' ? (
-        <AssistantPanelNew
-          isOpen={true}
-          onClose={() => {}}
-          referenceImage={chatReferenceImage}
-          onClearReference={() => handleSetChatReferenceSilent(null)}
-          onUpdateReference={(ref) => handleSetChatReferenceSilent(ref)}
-          galleryImages={galleryImages}
-          brandProfile={brandProfile}
-          pendingToolEdit={pendingToolEdit}
-          onRequestImageEdit={handleRequestImageEdit}
-          onToolEditApproved={handleToolEditApproved}
-          onToolEditRejected={handleToolEditRejected}
-          onShowToolEditPreview={handleShowToolEditPreview}
-        />
-      ) : (
-        <AssistantPanel
-          isOpen={true}
-          onClose={() => {}}
-          history={chatHistory}
-          isLoading={isAssistantLoading}
-          onSendMessage={handleAssistantSendMessage}
-          referenceImage={chatReferenceImage}
-          onClearReference={() => handleSetChatReferenceSilent(null)}
-        />
+      (
+        <Suspense fallback={<LazyFallback />}>
+          {import.meta.env.VITE_USE_VERCEL_AI_SDK === 'true' ? (
+            <AssistantPanelNew
+              isOpen={true}
+              onClose={() => {}}
+              referenceImage={chatReferenceImage}
+              onClearReference={() => handleSetChatReferenceSilent(null)}
+              onUpdateReference={(ref) => handleSetChatReferenceSilent(ref)}
+              galleryImages={galleryImages}
+              brandProfile={brandProfile}
+              pendingToolEdit={pendingToolEdit}
+              onRequestImageEdit={handleRequestImageEdit}
+              onToolEditApproved={handleToolEditApproved}
+              onToolEditRejected={handleToolEditRejected}
+              onShowToolEditPreview={handleShowToolEditPreview}
+            />
+          ) : (
+            <AssistantPanel
+              isOpen={true}
+              onClose={() => {}}
+              history={chatHistory}
+              isLoading={isAssistantLoading}
+              onSendMessage={handleAssistantSendMessage}
+              referenceImage={chatReferenceImage}
+              onClearReference={() => handleSetChatReferenceSilent(null)}
+            />
+          )}
+        </Suspense>
       )
   }), [
     handleSetChatReference,
@@ -2340,164 +2359,166 @@ function AppContent() {
             }}
           />
           <ChatProvider value={chatContextValue}>
-            <Dashboard
-              brandProfile={brandProfile!}
-            campaign={campaign}
-            productImages={campaignProductImages}
-            compositionAssets={campaignCompositionAssets}
-            onGenerate={handleGenerateCampaign}
-            isGenerating={isGenerating}
-            onEditProfile={() => setIsEditingProfile(true)}
-            onResetCampaign={() => {
-              setCampaign(null);
-              setCampaignProductImages(null);
-              setCampaignCompositionAssets(null);
-            }}
-            isAssistantOpen={isAssistantOpen}
-            onToggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
-            assistantHistory={chatHistory}
-            isAssistantLoading={isAssistantLoading}
-            onAssistantSendMessage={handleAssistantSendMessage}
-            chatReferenceImage={chatReferenceImage}
-            onSetChatReference={handleSetChatReference}
-            onSetChatReferenceSilent={handleSetChatReferenceSilent}
-            theme={theme}
-            onThemeToggle={() =>
-              setTheme((t) => (t === "light" ? "dark" : "light"))
-            }
-            galleryImages={galleryImages}
-            onAddImageToGallery={handleAddImageToGallery}
-            onUpdateGalleryImage={handleUpdateGalleryImage}
-            onDeleteGalleryImage={handleDeleteGalleryImage}
-            onMarkGalleryImagePublished={handleMarkGalleryImagePublished}
-            tournamentEvents={tournamentEvents}
-            weekScheduleInfo={weekScheduleInfo}
-            onTournamentFileUpload={handleTournamentFileUpload}
-            onAddTournamentEvent={(ev) =>
-              setTournamentEvents((p) => [ev, ...p])
-            }
-            allSchedules={allSchedules}
-            currentScheduleId={currentScheduleId}
-            onSelectSchedule={handleSelectSchedule}
-            onDeleteSchedule={async (scheduleId) => {
-              if (!userId) return;
-              try {
-                await deleteWeekSchedule(userId, scheduleId, organizationId);
-                // Update local state
-                setAllSchedules((prev) =>
-                  prev.filter((s) => s.id !== scheduleId),
-                );
-                // If deleted the current schedule, clear it
-                if (currentScheduleId === scheduleId) {
-                  setCurrentScheduleId(null);
-                  setTournamentEvents([]);
-                  setWeekScheduleInfo(null);
-                  setIsWeekExpired(false);
+            <Suspense fallback={<LazyFallback />}>
+              <Dashboard
+                brandProfile={brandProfile!}
+                campaign={campaign}
+                productImages={campaignProductImages}
+                compositionAssets={campaignCompositionAssets}
+                onGenerate={handleGenerateCampaign}
+                isGenerating={isGenerating}
+                onEditProfile={() => setIsEditingProfile(true)}
+                onResetCampaign={() => {
+                  setCampaign(null);
+                  setCampaignProductImages(null);
+                  setCampaignCompositionAssets(null);
+                }}
+                isAssistantOpen={isAssistantOpen}
+                onToggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
+                assistantHistory={chatHistory}
+                isAssistantLoading={isAssistantLoading}
+                onAssistantSendMessage={handleAssistantSendMessage}
+                chatReferenceImage={chatReferenceImage}
+                onSetChatReference={handleSetChatReference}
+                onSetChatReferenceSilent={handleSetChatReferenceSilent}
+                theme={theme}
+                onThemeToggle={() =>
+                  setTheme((t) => (t === "light" ? "dark" : "light"))
                 }
-                console.debug("[Tournaments] Deleted schedule:", scheduleId);
-              } catch (e) {
-                console.error("[Tournaments] Failed to delete schedule:", e);
-              }
-            }}
-            flyerState={flyerState}
-            setFlyerState={setFlyerState}
-            dailyFlyerState={dailyFlyerState}
-            setDailyFlyerState={setDailyFlyerState}
-            selectedDailyFlyerIds={selectedDailyFlyerIds}
-            setSelectedDailyFlyerIds={setSelectedDailyFlyerIds}
-            activeView={activeView}
-            onViewChange={setActiveView}
-            onPublishToCampaign={handlePublishFlyerToCampaign}
-            styleReferences={styleReferences}
-            onAddStyleReference={handleAddStyleReference}
-            onRemoveStyleReference={handleRemoveStyleReference}
-            onSelectStyleReference={handleSelectStyleReference}
-            selectedStyleReference={selectedStyleReference}
-            onClearSelectedStyleReference={() =>
-              setSelectedStyleReference(null)
-            }
-            scheduledPosts={scheduledPosts}
-            onSchedulePost={handleSchedulePost}
-            onUpdateScheduledPost={handleUpdateScheduledPost}
-            onDeleteScheduledPost={handleDeleteScheduledPost}
-            onPublishToInstagram={handlePublishToInstagram}
-            publishingStates={publishingStates}
-            campaignsList={campaignsList}
-            onLoadCampaign={handleLoadCampaign}
-            userId={userId}
-            organizationId={organizationId}
-            isWeekExpired={isWeekExpired}
-            onClearExpiredSchedule={async () => {
-              if (userId && currentScheduleId) {
-                try {
-                  await deleteWeekSchedule(
-                    userId,
-                    currentScheduleId,
-                    organizationId,
-                  );
-                  setCurrentScheduleId(null);
-                  setTournamentEvents([]);
-                  setWeekScheduleInfo(null);
-                  setIsWeekExpired(false);
-                } catch (e) {
-                  console.error(
-                    "[Tournaments] Failed to clear expired schedule:",
-                    e,
-                  );
+                galleryImages={galleryImages}
+                onAddImageToGallery={handleAddImageToGallery}
+                onUpdateGalleryImage={handleUpdateGalleryImage}
+                onDeleteGalleryImage={handleDeleteGalleryImage}
+                onMarkGalleryImagePublished={handleMarkGalleryImagePublished}
+                tournamentEvents={tournamentEvents}
+                weekScheduleInfo={weekScheduleInfo}
+                onTournamentFileUpload={handleTournamentFileUpload}
+                onAddTournamentEvent={(ev) =>
+                  setTournamentEvents((p) => [ev, ...p])
                 }
-              }
-            }}
-            instagramContext={getInstagramContext()}
-            onUpdateCreativeModel={async (model: CreativeModel) => {
-              // Update local state immediately
-              setBrandProfile((prev) =>
-                prev ? { ...prev, creativeModel: model } : prev,
-              );
-              // Save to database in background
-              if (userId) {
-                try {
-                  const existingProfile = await getBrandProfile(
-                    userId,
-                    organizationId,
-                  );
-                  if (existingProfile) {
-                    await updateBrandProfile(existingProfile.id, {
-                      settings: {
-                        ...existingProfile.settings,
-                        creativeModel: model,
-                      },
-                    });
-                    console.debug(
-                      "[BrandProfile] Creative model updated to:",
-                      model,
+                allSchedules={allSchedules}
+                currentScheduleId={currentScheduleId}
+                onSelectSchedule={handleSelectSchedule}
+                onDeleteSchedule={async (scheduleId) => {
+                  if (!userId) return;
+                  try {
+                    await deleteWeekSchedule(userId, scheduleId, organizationId);
+                    // Update local state
+                    setAllSchedules((prev) =>
+                      prev.filter((s) => s.id !== scheduleId),
                     );
+                    // If deleted the current schedule, clear it
+                    if (currentScheduleId === scheduleId) {
+                      setCurrentScheduleId(null);
+                      setTournamentEvents([]);
+                      setWeekScheduleInfo(null);
+                      setIsWeekExpired(false);
+                    }
+                    console.debug("[Tournaments] Deleted schedule:", scheduleId);
+                  } catch (e) {
+                    console.error("[Tournaments] Failed to delete schedule:", e);
                   }
-                } catch (e) {
-                  console.error("Failed to update creative model:", e);
+                }}
+                flyerState={flyerState}
+                setFlyerState={setFlyerState}
+                dailyFlyerState={dailyFlyerState}
+                setDailyFlyerState={setDailyFlyerState}
+                selectedDailyFlyerIds={selectedDailyFlyerIds}
+                setSelectedDailyFlyerIds={setSelectedDailyFlyerIds}
+                activeView={activeView}
+                onViewChange={setActiveView}
+                onPublishToCampaign={handlePublishFlyerToCampaign}
+                styleReferences={styleReferences}
+                onAddStyleReference={handleAddStyleReference}
+                onRemoveStyleReference={handleRemoveStyleReference}
+                onSelectStyleReference={handleSelectStyleReference}
+                selectedStyleReference={selectedStyleReference}
+                onClearSelectedStyleReference={() =>
+                  setSelectedStyleReference(null)
                 }
-              }
-            }}
-            onCarouselUpdate={(updatedCarousel) => {
-              // Update carousel in campaign state
-              setCampaign((prev) => {
-                if (!prev) return prev;
-                return {
-                  ...prev,
-                  carousels: prev.carousels?.map((c) =>
-                    c.id === updatedCarousel.id ? updatedCarousel : c
-                  ) || [],
-                };
-              });
-            }}
-            pendingToolEdit={pendingToolEdit}
-            editingImage={editingImage}
-            onRequestImageEdit={handleRequestImageEdit}
-            onToolEditApproved={handleToolEditApproved}
-            onToolEditRejected={handleToolEditRejected}
-            onShowToolEditPreview={handleShowToolEditPreview}
-            toolEditPreview={toolEditPreview}
-            onCloseImageEditor={handleCloseImageEditor}
-          />
+                scheduledPosts={scheduledPosts}
+                onSchedulePost={handleSchedulePost}
+                onUpdateScheduledPost={handleUpdateScheduledPost}
+                onDeleteScheduledPost={handleDeleteScheduledPost}
+                onPublishToInstagram={handlePublishToInstagram}
+                publishingStates={publishingStates}
+                campaignsList={campaignsList}
+                onLoadCampaign={handleLoadCampaign}
+                userId={userId}
+                organizationId={organizationId}
+                isWeekExpired={isWeekExpired}
+                onClearExpiredSchedule={async () => {
+                  if (userId && currentScheduleId) {
+                    try {
+                      await deleteWeekSchedule(
+                        userId,
+                        currentScheduleId,
+                        organizationId,
+                      );
+                      setCurrentScheduleId(null);
+                      setTournamentEvents([]);
+                      setWeekScheduleInfo(null);
+                      setIsWeekExpired(false);
+                    } catch (e) {
+                      console.error(
+                        "[Tournaments] Failed to clear expired schedule:",
+                        e,
+                      );
+                    }
+                  }
+                }}
+                instagramContext={getInstagramContext()}
+                onUpdateCreativeModel={async (model: CreativeModel) => {
+                  // Update local state immediately
+                  setBrandProfile((prev) =>
+                    prev ? { ...prev, creativeModel: model } : prev,
+                  );
+                  // Save to database in background
+                  if (userId) {
+                    try {
+                      const existingProfile = await getBrandProfile(
+                        userId,
+                        organizationId,
+                      );
+                      if (existingProfile) {
+                        await updateBrandProfile(existingProfile.id, {
+                          settings: {
+                            ...existingProfile.settings,
+                            creativeModel: model,
+                          },
+                        });
+                        console.debug(
+                          "[BrandProfile] Creative model updated to:",
+                          model,
+                        );
+                      }
+                    } catch (e) {
+                      console.error("Failed to update creative model:", e);
+                    }
+                  }
+                }}
+                onCarouselUpdate={(updatedCarousel) => {
+                  // Update carousel in campaign state
+                  setCampaign((prev) => {
+                    if (!prev) return prev;
+                    return {
+                      ...prev,
+                      carousels: prev.carousels?.map((c) =>
+                        c.id === updatedCarousel.id ? updatedCarousel : c
+                      ) || [],
+                    };
+                  });
+                }}
+                pendingToolEdit={pendingToolEdit}
+                editingImage={editingImage}
+                onRequestImageEdit={handleRequestImageEdit}
+                onToolEditApproved={handleToolEditApproved}
+                onToolEditRejected={handleToolEditRejected}
+                onShowToolEditPreview={handleShowToolEditPreview}
+                toolEditPreview={toolEditPreview}
+                onCloseImageEditor={handleCloseImageEditor}
+              />
+            </Suspense>
           </ChatProvider>
         </>
       )}

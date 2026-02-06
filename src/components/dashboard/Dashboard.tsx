@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { useClerk } from "@clerk/clerk-react";
 import type {
   BrandProfile,
@@ -21,25 +21,12 @@ import type { InstagramContext } from "../../services/rubeService";
 import type { WeekScheduleWithCount } from "../../services/apiClient";
 import { useCampaigns } from "../../hooks/useAppData";
 import { UploadForm } from "../campaigns/UploadForm";
-import { ClipsTab } from "../tabs/ClipsTab";
-import { CarrosselTab } from "../tabs/CarrosselTab";
-import { PostsTab } from "../tabs/PostsTab";
-import { AdCreativesTab } from "../tabs/AdCreativesTab";
 import { Icon } from "../common/Icon";
-import { FlyerGenerator, TimePeriod } from "../flyer/FlyerGenerator";
-import { AssistantPanel } from "../assistant/AssistantPanel";
-import { AssistantPanelNew } from "../assistant/AssistantPanelNew";
-import { GalleryView } from "../gallery/GalleryView";
-import { CalendarView } from "../calendar/CalendarView";
-import { CampaignsList } from "../campaigns/CampaignsList";
-import { SchedulesListView } from "../schedules/SchedulesListView";
+import type { TimePeriod } from "../flyer/FlyerGenerator";
 import { QuickPostModal } from "../common/QuickPostModal";
 import { FloatingSidebar } from "../layout/FloatingSidebar";
-import { ImagePreviewModal } from "../image-preview/ImagePreviewModal";
 import { Zap, Layers, Image, Calendar, LayoutGrid, Video } from "lucide-react";
 import type { ScheduledPost } from "../../types";
-import { PlaygroundView } from "../playground";
-import { ImagePlaygroundPage } from "../image-playground";
 import { GeneratingLoader } from "../ui/quantum-pulse-loade";
 import { PublishedStoriesWidget } from "../ui/published-stories-widget";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";
@@ -161,6 +148,63 @@ interface DashboardProps {
 }
 
 type Tab = "clips" | "carrossel" | "posts" | "ads";
+
+const ClipsTab = lazy(() =>
+  import("../tabs/ClipsTab").then((m) => ({ default: m.ClipsTab })),
+);
+const CarrosselTab = lazy(() =>
+  import("../tabs/CarrosselTab").then((m) => ({ default: m.CarrosselTab })),
+);
+const PostsTab = lazy(() =>
+  import("../tabs/PostsTab").then((m) => ({ default: m.PostsTab })),
+);
+const AdCreativesTab = lazy(() =>
+  import("../tabs/AdCreativesTab").then((m) => ({ default: m.AdCreativesTab })),
+);
+const FlyerGenerator = lazy(() =>
+  import("../flyer/FlyerGenerator").then((m) => ({ default: m.FlyerGenerator })),
+);
+const SchedulesListView = lazy(() =>
+  import("../schedules/SchedulesListView").then((m) => ({
+    default: m.SchedulesListView,
+  })),
+);
+const GalleryView = lazy(() =>
+  import("../gallery/GalleryView").then((m) => ({ default: m.GalleryView })),
+);
+const CalendarView = lazy(() =>
+  import("../calendar/CalendarView").then((m) => ({ default: m.CalendarView })),
+);
+const CampaignsList = lazy(() =>
+  import("../campaigns/CampaignsList").then((m) => ({ default: m.CampaignsList })),
+);
+const PlaygroundView = lazy(() =>
+  import("../playground").then((m) => ({ default: m.PlaygroundView })),
+);
+const ImagePlaygroundPage = lazy(() =>
+  import("../image-playground").then((m) => ({
+    default: m.ImagePlaygroundPage,
+  })),
+);
+const ImagePreviewModal = lazy(() =>
+  import("../image-preview/ImagePreviewModal").then((m) => ({
+    default: m.ImagePreviewModal,
+  })),
+);
+const AssistantPanel = lazy(() =>
+  import("../assistant/AssistantPanel").then((m) => ({ default: m.AssistantPanel })),
+);
+const AssistantPanelNew = lazy(() =>
+  import("../assistant/AssistantPanelNew").then((m) => ({
+    default: m.AssistantPanelNew,
+  })),
+);
+
+const ViewLoadingFallback = () => (
+  <div className="w-full h-full min-h-[220px] flex items-center justify-center">
+    <span className="text-xs text-white/50">Carregando...</span>
+  </div>
+);
 
 export const Dashboard: React.FC<DashboardProps> = (props) => {
   const {
@@ -508,6 +552,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 {/* Content */}
                 <div className="space-y-4">
                   {activeTab === "clips" && (
+                    <Suspense fallback={<ViewLoadingFallback />}>
                       <ClipsTab
                         brandProfile={brandProfile}
                         videoClipScripts={campaign.videoClipScripts}
@@ -524,104 +569,111 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                         onSchedulePost={onSchedulePost}
                         productImages={productImages}
                       />
+                    </Suspense>
                   )}
                   {activeTab === "carrossel" && (
-                    <CarrosselTab
-                      videoClipScripts={campaign.videoClipScripts}
-                      carousels={campaign.carousels}
-                      galleryImages={galleryImages}
-                      brandProfile={brandProfile}
-                      chatReferenceImage={chatReferenceImage || undefined}
-                      selectedStyleReference={selectedStyleReference || undefined}
-                      compositionAssets={compositionAssets || undefined}
-                      productImages={productImages || undefined}
-                      onAddImageToGallery={onAddImageToGallery}
-                      onUpdateGalleryImage={onUpdateGalleryImage}
-                      onSetChatReference={onSetChatReference}
-                      onPublishCarousel={instagramContext?.instagramAccountId ? handlePublishCarousel : undefined}
-                      onSchedulePost={onSchedulePost}
-                      onCarouselUpdate={onCarouselUpdate}
-                    />
+                    <Suspense fallback={<ViewLoadingFallback />}>
+                      <CarrosselTab
+                        videoClipScripts={campaign.videoClipScripts}
+                        carousels={campaign.carousels}
+                        galleryImages={galleryImages}
+                        brandProfile={brandProfile}
+                        chatReferenceImage={chatReferenceImage || undefined}
+                        selectedStyleReference={selectedStyleReference || undefined}
+                        compositionAssets={compositionAssets || undefined}
+                        productImages={productImages || undefined}
+                        onAddImageToGallery={onAddImageToGallery}
+                        onUpdateGalleryImage={onUpdateGalleryImage}
+                        onSetChatReference={onSetChatReference}
+                        onPublishCarousel={instagramContext?.instagramAccountId ? handlePublishCarousel : undefined}
+                        onSchedulePost={onSchedulePost}
+                        onCarouselUpdate={onCarouselUpdate}
+                      />
+                    </Suspense>
                   )}
                   {activeTab === "posts" && (
-                    <PostsTab
-                      posts={campaign.posts}
-                      brandProfile={brandProfile}
-                      referenceImage={productImages?.[0] || null}
-                      chatReferenceImage={chatReferenceImage || undefined}
-                      onAddImageToGallery={onAddImageToGallery}
-                      onUpdateGalleryImage={onUpdateGalleryImage}
-                      onSetChatReference={onSetChatReference}
-                      styleReferences={styleReferences}
-                      onAddStyleReference={onAddStyleReference}
-                      onRemoveStyleReference={onRemoveStyleReference}
-                      selectedStyleReference={selectedStyleReference || undefined}
-                      compositionAssets={compositionAssets || undefined}
-                      userId={userId}
-                      galleryImages={galleryImages}
-                      campaignId={campaign.id}
-                      onQuickPost={setQuickPostImage}
-                      onSchedulePost={(image) => {
-                        const tomorrow = new Date();
-                        tomorrow.setDate(tomorrow.getDate() + 1);
-                        tomorrow.setHours(12, 0, 0, 0);
-                        const dateStr = tomorrow.toISOString().split("T")[0];
-                        onSchedulePost({
-                          type: "flyer",
-                          contentId: image.id,
-                          imageUrl: image.src,
-                          caption: "",
-                          createdFrom: "campaign",
-                          hashtags: [],
-                          scheduledDate: dateStr,
-                          scheduledTime: "12:00",
-                          scheduledTimestamp: tomorrow.getTime(),
-                          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                          platforms: "instagram",
-                          status: "scheduled",
-                        });
-                      }}
-                    />
+                    <Suspense fallback={<ViewLoadingFallback />}>
+                      <PostsTab
+                        posts={campaign.posts}
+                        brandProfile={brandProfile}
+                        referenceImage={productImages?.[0] || null}
+                        chatReferenceImage={chatReferenceImage || undefined}
+                        onAddImageToGallery={onAddImageToGallery}
+                        onUpdateGalleryImage={onUpdateGalleryImage}
+                        onSetChatReference={onSetChatReference}
+                        styleReferences={styleReferences}
+                        onAddStyleReference={onAddStyleReference}
+                        onRemoveStyleReference={onRemoveStyleReference}
+                        selectedStyleReference={selectedStyleReference || undefined}
+                        compositionAssets={compositionAssets || undefined}
+                        userId={userId}
+                        galleryImages={galleryImages}
+                        campaignId={campaign.id}
+                        onQuickPost={setQuickPostImage}
+                        onSchedulePost={(image) => {
+                          const tomorrow = new Date();
+                          tomorrow.setDate(tomorrow.getDate() + 1);
+                          tomorrow.setHours(12, 0, 0, 0);
+                          const dateStr = tomorrow.toISOString().split("T")[0];
+                          onSchedulePost({
+                            type: "flyer",
+                            contentId: image.id,
+                            imageUrl: image.src,
+                            caption: "",
+                            createdFrom: "campaign",
+                            hashtags: [],
+                            scheduledDate: dateStr,
+                            scheduledTime: "12:00",
+                            scheduledTimestamp: tomorrow.getTime(),
+                            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                            platforms: "instagram",
+                            status: "scheduled",
+                          });
+                        }}
+                      />
+                    </Suspense>
                   )}
                   {activeTab === "ads" && (
-                    <AdCreativesTab
-                      adCreatives={campaign.adCreatives}
-                      brandProfile={brandProfile}
-                      referenceImage={productImages?.[0] || null}
-                      chatReferenceImage={chatReferenceImage || undefined}
-                      onAddImageToGallery={onAddImageToGallery}
-                      onUpdateGalleryImage={onUpdateGalleryImage}
-                      onSetChatReference={onSetChatReference}
-                      styleReferences={styleReferences}
-                      onAddStyleReference={onAddStyleReference}
-                      onRemoveStyleReference={onRemoveStyleReference}
-                      selectedStyleReference={selectedStyleReference || undefined}
-                      compositionAssets={compositionAssets || undefined}
-                      userId={userId}
-                      galleryImages={galleryImages}
-                      campaignId={campaign.id}
-                      onQuickPost={setQuickPostImage}
-                      onSchedulePost={(image) => {
-                        const tomorrow = new Date();
-                        tomorrow.setDate(tomorrow.getDate() + 1);
-                        tomorrow.setHours(12, 0, 0, 0);
-                        const dateStr = tomorrow.toISOString().split("T")[0];
-                        onSchedulePost({
-                          type: "flyer",
-                          contentId: image.id,
-                          imageUrl: image.src,
-                          caption: "",
-                          createdFrom: "campaign",
-                          hashtags: [],
-                          scheduledDate: dateStr,
-                          scheduledTime: "12:00",
-                          scheduledTimestamp: tomorrow.getTime(),
-                          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                          platforms: "instagram",
-                          status: "scheduled",
-                        });
-                      }}
-                    />
+                    <Suspense fallback={<ViewLoadingFallback />}>
+                      <AdCreativesTab
+                        adCreatives={campaign.adCreatives}
+                        brandProfile={brandProfile}
+                        referenceImage={productImages?.[0] || null}
+                        chatReferenceImage={chatReferenceImage || undefined}
+                        onAddImageToGallery={onAddImageToGallery}
+                        onUpdateGalleryImage={onUpdateGalleryImage}
+                        onSetChatReference={onSetChatReference}
+                        styleReferences={styleReferences}
+                        onAddStyleReference={onAddStyleReference}
+                        onRemoveStyleReference={onRemoveStyleReference}
+                        selectedStyleReference={selectedStyleReference || undefined}
+                        compositionAssets={compositionAssets || undefined}
+                        userId={userId}
+                        galleryImages={galleryImages}
+                        campaignId={campaign.id}
+                        onQuickPost={setQuickPostImage}
+                        onSchedulePost={(image) => {
+                          const tomorrow = new Date();
+                          tomorrow.setDate(tomorrow.getDate() + 1);
+                          tomorrow.setHours(12, 0, 0, 0);
+                          const dateStr = tomorrow.toISOString().split("T")[0];
+                          onSchedulePost({
+                            type: "flyer",
+                            contentId: image.id,
+                            imageUrl: image.src,
+                            caption: "",
+                            createdFrom: "campaign",
+                            hashtags: [],
+                            scheduledDate: dateStr,
+                            scheduledTime: "12:00",
+                            scheduledTimestamp: tomorrow.getTime(),
+                            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                            platforms: "instagram",
+                            status: "scheduled",
+                          });
+                        }}
+                      />
+                    </Suspense>
                   )}
                 </div>
               </div>
@@ -629,18 +681,20 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           </div>
         )}
         {activeView === "flyer" && !isInsideSchedule && (
-          <SchedulesListView
-            schedules={allSchedules || []}
-            onSelectSchedule={handleEnterSchedule}
-            onFileUpload={onTournamentFileUpload}
-            currentScheduleId={currentScheduleId}
-            onEnterAfterUpload={() => setIsInsideSchedule(true)}
-            onDeleteSchedule={onDeleteSchedule}
-            onAddEvent={(event) => {
-              onAddTournamentEvent(event);
-              setIsInsideSchedule(true);
-            }}
-          />
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <SchedulesListView
+              schedules={allSchedules || []}
+              onSelectSchedule={handleEnterSchedule}
+              onFileUpload={onTournamentFileUpload}
+              currentScheduleId={currentScheduleId}
+              onEnterAfterUpload={() => setIsInsideSchedule(true)}
+              onDeleteSchedule={onDeleteSchedule}
+              onAddEvent={(event) => {
+                onAddTournamentEvent(event);
+                setIsInsideSchedule(true);
+              }}
+            />
+          </Suspense>
         )}
         {activeView === "flyer" && isInsideSchedule && (
           <div className="flex flex-col h-full">
@@ -666,94 +720,106 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
               )}
             </div>
             <div className="flex-1 overflow-hidden">
-              <FlyerGenerator
-                brandProfile={brandProfile}
-                events={tournamentEvents}
-                weekScheduleInfo={weekScheduleInfo}
-                onFileUpload={onTournamentFileUpload}
-                onAddEvent={onAddTournamentEvent}
-                onAddImageToGallery={onAddImageToGallery}
-                flyerState={flyerState}
-                setFlyerState={setFlyerState}
-                dailyFlyerState={dailyFlyerState}
-                setDailyFlyerState={setDailyFlyerState}
-                selectedDailyFlyerIds={selectedDailyFlyerIds}
-                setSelectedDailyFlyerIds={setSelectedDailyFlyerIds}
-                onUpdateGalleryImage={onUpdateGalleryImage}
-                onDeleteGalleryImage={onDeleteGalleryImage}
-                onSetChatReference={onSetChatReference}
-                onPublishToCampaign={onPublishToCampaign}
-                selectedStyleReference={selectedStyleReference}
-                onClearSelectedStyleReference={onClearSelectedStyleReference}
-                styleReferences={styleReferences}
-                onSelectStyleReference={onSelectStyleReference}
-                isWeekExpired={isWeekExpired}
-                onClearExpiredSchedule={onClearExpiredSchedule}
-                userId={userId}
-                allSchedules={allSchedules}
-                currentScheduleId={currentScheduleId}
-                onSelectSchedule={onSelectSchedule}
-                instagramContext={instagramContext}
-                galleryImages={galleryImages}
-                onSchedulePost={onSchedulePost}
-              />
+              <Suspense fallback={<ViewLoadingFallback />}>
+                <FlyerGenerator
+                  brandProfile={brandProfile}
+                  events={tournamentEvents}
+                  weekScheduleInfo={weekScheduleInfo}
+                  onFileUpload={onTournamentFileUpload}
+                  onAddEvent={onAddTournamentEvent}
+                  onAddImageToGallery={onAddImageToGallery}
+                  flyerState={flyerState}
+                  setFlyerState={setFlyerState}
+                  dailyFlyerState={dailyFlyerState}
+                  setDailyFlyerState={setDailyFlyerState}
+                  selectedDailyFlyerIds={selectedDailyFlyerIds}
+                  setSelectedDailyFlyerIds={setSelectedDailyFlyerIds}
+                  onUpdateGalleryImage={onUpdateGalleryImage}
+                  onDeleteGalleryImage={onDeleteGalleryImage}
+                  onSetChatReference={onSetChatReference}
+                  onPublishToCampaign={onPublishToCampaign}
+                  selectedStyleReference={selectedStyleReference}
+                  onClearSelectedStyleReference={onClearSelectedStyleReference}
+                  styleReferences={styleReferences}
+                  onSelectStyleReference={onSelectStyleReference}
+                  isWeekExpired={isWeekExpired}
+                  onClearExpiredSchedule={onClearExpiredSchedule}
+                  userId={userId}
+                  allSchedules={allSchedules}
+                  currentScheduleId={currentScheduleId}
+                  onSelectSchedule={onSelectSchedule}
+                  instagramContext={instagramContext}
+                  galleryImages={galleryImages}
+                  onSchedulePost={onSchedulePost}
+                />
+              </Suspense>
             </div>
           </div>
         )}
         {activeView === "gallery" && (
           <div className="px-4 py-4 sm:px-6 sm:py-5">
-            <GalleryView
-              images={galleryImages}
-              onUpdateImage={onUpdateGalleryImage}
-              onDeleteImage={onDeleteGalleryImage}
-              onSetChatReference={onSetChatReference}
-              styleReferences={styleReferences}
-              onAddStyleReference={onAddStyleReference}
-              onRemoveStyleReference={onRemoveStyleReference}
-              onSelectStyleReference={onSelectStyleReference}
-              onPublishToCampaign={onPublishToCampaign}
-              onQuickPost={setQuickPostImage}
-              onSchedulePost={(image) => {
-                // Open schedule modal with image
-                setScheduleModalImage(image);
-                setScheduleModalOpen(true);
-              }}
-            />
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <GalleryView
+                images={galleryImages}
+                onUpdateImage={onUpdateGalleryImage}
+                onDeleteImage={onDeleteGalleryImage}
+                onSetChatReference={onSetChatReference}
+                styleReferences={styleReferences}
+                onAddStyleReference={onAddStyleReference}
+                onRemoveStyleReference={onRemoveStyleReference}
+                onSelectStyleReference={onSelectStyleReference}
+                onPublishToCampaign={onPublishToCampaign}
+                onQuickPost={setQuickPostImage}
+                onSchedulePost={(image) => {
+                  // Open schedule modal with image
+                  setScheduleModalImage(image);
+                  setScheduleModalOpen(true);
+                }}
+              />
+            </Suspense>
           </div>
         )}
         {activeView === "calendar" && (
           <div className="px-4 py-4 sm:px-6 sm:py-5 h-full">
-            <CalendarView
-              scheduledPosts={scheduledPosts}
-              onSchedulePost={onSchedulePost}
-              onUpdateScheduledPost={onUpdateScheduledPost}
-              onDeleteScheduledPost={onDeleteScheduledPost}
-              galleryImages={galleryImages}
-              campaigns={campaigns}
-              onPublishToInstagram={onPublishToInstagram}
-              publishingStates={publishingStates}
-            />
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <CalendarView
+                scheduledPosts={scheduledPosts}
+                onSchedulePost={onSchedulePost}
+                onUpdateScheduledPost={onUpdateScheduledPost}
+                onDeleteScheduledPost={onDeleteScheduledPost}
+                galleryImages={galleryImages}
+                campaigns={campaigns}
+                onPublishToInstagram={onPublishToInstagram}
+                publishingStates={publishingStates}
+              />
+            </Suspense>
           </div>
         )}
         {activeView === "campaigns" && userId && (
           <div className="px-4 py-4 sm:px-6 sm:py-5">
-            <CampaignsList
-              userId={userId}
-              organizationId={organizationId}
-              onSelectCampaign={onLoadCampaign}
-              onNewCampaign={() => onViewChange("campaign")}
-              currentCampaignId={campaign?.id}
-            />
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <CampaignsList
+                userId={userId}
+                organizationId={organizationId}
+                onSelectCampaign={onLoadCampaign}
+                onNewCampaign={() => onViewChange("campaign")}
+                currentCampaignId={campaign?.id}
+              />
+            </Suspense>
           </div>
         )}
         {activeView === "playground" && (
           <div className="h-full">
-            <PlaygroundView brandProfile={brandProfile} userId={userId} />
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <PlaygroundView brandProfile={brandProfile} userId={userId} />
+            </Suspense>
           </div>
         )}
         {activeView === "image-playground" && (
           <div className="h-full">
-            <ImagePlaygroundPage userId={userId} organizationId={organizationId} />
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <ImagePlaygroundPage userId={userId} organizationId={organizationId} />
+            </Suspense>
           </div>
         )}
       </main>
@@ -762,49 +828,53 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
       {/* ImagePreviewModal for Tool Edit Approval */}
       {editingImage && (
-        <ImagePreviewModal
-          image={editingImage}
-          onClose={onCloseImageEditor || (() => {})}
-          onImageUpdate={(newSrc) => {
-            // Update gallery image
-            onUpdateGalleryImage?.(editingImage.id, newSrc);
-          }}
-          onSetChatReference={onSetChatReference}
-          onSetChatReferenceSilent={onSetChatReferenceSilent ? (image) => onSetChatReferenceSilent(image) : undefined}
-          pendingToolEdit={pendingToolEdit}
-          onToolEditApproved={onToolEditApproved}
-          onToolEditRejected={onToolEditRejected}
-          initialEditPreview={props.toolEditPreview || null}
-          chatReferenceImageId={chatReferenceImage?.id || null}
-          chatComponent={
-            import.meta.env.VITE_USE_VERCEL_AI_SDK === 'true' ? (
-              <AssistantPanelNew
-                isOpen={true}
-                onClose={() => {}}
-                referenceImage={chatReferenceImage}
-                onClearReference={() => onSetChatReference(null)}
-                onUpdateReference={(ref) => onSetChatReference({ id: ref.id, src: ref.src, source: '', model: '' } as unknown as GalleryImage)}
-                galleryImages={galleryImages}
-                brandProfile={brandProfile}
-                pendingToolEdit={props.pendingToolEdit}
-                onRequestImageEdit={props.onRequestImageEdit}
-                onToolEditApproved={props.onToolEditApproved}
-                onToolEditRejected={props.onToolEditRejected}
-                onShowToolEditPreview={props.onShowToolEditPreview}
-              />
-            ) : (
-              <AssistantPanel
-                isOpen={true}
-                onClose={() => {}}
-                history={assistantHistory}
-                isLoading={isAssistantLoading}
-                onSendMessage={onAssistantSendMessage}
-                referenceImage={chatReferenceImage}
-                onClearReference={() => onSetChatReference(null)}
-              />
-            )
-          }
-        />
+        <Suspense fallback={<ViewLoadingFallback />}>
+          <ImagePreviewModal
+            image={editingImage}
+            onClose={onCloseImageEditor || (() => {})}
+            onImageUpdate={(newSrc) => {
+              // Update gallery image
+              onUpdateGalleryImage?.(editingImage.id, newSrc);
+            }}
+            onSetChatReference={onSetChatReference}
+            onSetChatReferenceSilent={onSetChatReferenceSilent ? (image) => onSetChatReferenceSilent(image) : undefined}
+            pendingToolEdit={pendingToolEdit}
+            onToolEditApproved={onToolEditApproved}
+            onToolEditRejected={onToolEditRejected}
+            initialEditPreview={props.toolEditPreview || null}
+            chatReferenceImageId={chatReferenceImage?.id || null}
+            chatComponent={
+              <Suspense fallback={<ViewLoadingFallback />}>
+                {import.meta.env.VITE_USE_VERCEL_AI_SDK === 'true' ? (
+                  <AssistantPanelNew
+                    isOpen={true}
+                    onClose={() => {}}
+                    referenceImage={chatReferenceImage}
+                    onClearReference={() => onSetChatReference(null)}
+                    onUpdateReference={(ref) => onSetChatReference({ id: ref.id, src: ref.src, source: '', model: '' } as unknown as GalleryImage)}
+                    galleryImages={galleryImages}
+                    brandProfile={brandProfile}
+                    pendingToolEdit={props.pendingToolEdit}
+                    onRequestImageEdit={props.onRequestImageEdit}
+                    onToolEditApproved={props.onToolEditApproved}
+                    onToolEditRejected={props.onToolEditRejected}
+                    onShowToolEditPreview={props.onShowToolEditPreview}
+                  />
+                ) : (
+                  <AssistantPanel
+                    isOpen={true}
+                    onClose={() => {}}
+                    history={assistantHistory}
+                    isLoading={isAssistantLoading}
+                    onSendMessage={onAssistantSendMessage}
+                    referenceImage={chatReferenceImage}
+                    onClearReference={() => onSetChatReference(null)}
+                  />
+                )}
+              </Suspense>
+            }
+          />
+        </Suspense>
       )}
 
       {/* QuickPost Modal for Gallery */}

@@ -1,4 +1,4 @@
-import { ActionIcon } from '@lobehub/ui';
+import { Button } from '@/components/ui/button';
 import { Send, Calendar, Megaphone } from 'lucide-react';
 
 interface ImagePreviewActionsBarProps {
@@ -21,30 +21,45 @@ export const ImagePreviewActionsBar = ({
     <div className="preview-actions-bar">
       <div className="actions-toolbar">
         {onQuickPost && (
-          <ActionIcon
-            icon={Send}
+          <Button
+            aria-label="Quick Post"
+            className="h-8 w-8 rounded-md"
             onClick={onQuickPost}
+            size="icon-sm"
             title="Quick Post"
-            size="small"
-          />
+            type="button"
+            variant="ghost"
+          >
+            <Send />
+          </Button>
         )}
 
         {onSchedulePost && (
-          <ActionIcon
-            icon={Calendar}
+          <Button
+            aria-label="Agendar"
+            className="h-8 w-8 rounded-md"
             onClick={onSchedulePost}
+            size="icon-sm"
             title="Agendar"
-            size="small"
-          />
+            type="button"
+            variant="ghost"
+          >
+            <Calendar />
+          </Button>
         )}
 
         {onPublish && (
-          <ActionIcon
-            icon={Megaphone}
+          <Button
+            aria-label="Campanha"
+            className="h-8 w-8 rounded-md"
             onClick={onPublish}
+            size="icon-sm"
             title="Campanha"
-            size="small"
-          />
+            type="button"
+            variant="ghost"
+          >
+            <Megaphone />
+          </Button>
         )}
       </div>
     </div>

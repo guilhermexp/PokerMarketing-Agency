@@ -105,6 +105,9 @@ export default defineConfig(({ mode }) => {
           mode: "development",
           sourcemap: false,
           navigateFallback: "/index.html",
+          // Allow SPA fallback for authenticated Clerk handshake routes (/?__clerk_handshake=...)
+          navigateFallbackAllowlist: [/^(?!\/api\/).*/],
+          navigateFallbackDenylist: [/^\/api\//],
           globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff2}"],
           // Force immediate update - don't wait for user to close all tabs
           skipWaiting: true,
@@ -162,17 +165,9 @@ export default defineConfig(({ mode }) => {
               },
             },
             {
-              // Network-first for API calls
+              // Never cache authenticated API responses in SW cache
               urlPattern: /\/api\//,
-              handler: "NetworkFirst",
-              options: {
-                cacheName: "api-cache",
-                expiration: {
-                  maxEntries: 50,
-                  maxAgeSeconds: 60 * 5, // 5 minutes
-                },
-                networkTimeoutSeconds: 5,
-              },
+              handler: "NetworkOnly",
             },
           ],
         },
@@ -198,6 +193,24 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
+            if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/") || id.includes("node_modules/scheduler/")) {
+              return "vendor-react";
+            }
+            if (id.includes("node_modules/@ai-sdk/") || id.includes("node_modules/ai/") || id.includes("node_modules/@openrouter/") || id.includes("node_modules/@google/genai/")) {
+              return "vendor-ai";
+            }
+            if (id.includes("node_modules/streamdown/")) {
+              return "vendor-streamdown";
+            }
+            if (id.includes("node_modules/shiki/core/") || id.includes("node_modules/shiki/engine/")) {
+              return "vendor-shiki-core";
+            }
+            if (id.includes("node_modules/@lobehub/ui/")) {
+              return "vendor-lobehub-ui";
+            }
+            if (id.includes("node_modules/mermaid/")) {
+              return "vendor-mermaid";
+            }
             if (id.includes("node_modules/xlsx")) {
               return "vendor-xlsx";
             }
@@ -219,6 +232,7 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
+      chunkSizeWarningLimit: 3000,
     },
   };
 });

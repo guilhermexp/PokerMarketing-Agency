@@ -19,7 +19,7 @@ const menuItems: MenuItem[] = [
   { icon: "poker-chip", label: "Tournament Flyers", key: "flyer" },
   { icon: "calendar", label: "Agenda", key: "calendar" },
   { icon: "folder-open", label: "Galeria", key: "gallery" },
-  { icon: "video", label: "Playground", key: "playground" },
+  { icon: "video", label: "Studio Video", key: "playground" },
   { icon: "image", label: "Image Studio", key: "image-playground" },
 ];
 
