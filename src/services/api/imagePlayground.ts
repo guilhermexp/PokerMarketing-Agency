@@ -152,7 +152,8 @@ export async function deleteTopic(topicId: string): Promise<void> {
  * Get batches for a topic
  */
 export async function getBatches(topicId: string): Promise<GenerationBatch[]> {
-  const response = await fetchWithAuth(`${API_BASE}/batches?topicId=${topicId}`);
+  const safeTopicId = encodeURIComponent(topicId);
+  const response = await fetchWithAuth(`${API_BASE}/batches?topicId=${safeTopicId}&limit=100`);
   const data = await response.json();
   return data.batches || [];
 }
@@ -174,11 +175,19 @@ export async function deleteBatch(batchId: string): Promise<void> {
  * Create a new image generation batch
  */
 export async function createImage(input: CreateImageInput): Promise<CreateImageResponse> {
-  const response = await fetchWithAuth(`${API_BASE}/generate`, {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
-  return response.json();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
+  try {
+    const response = await fetchWithAuth(`${API_BASE}/generate`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+      signal: controller.signal,
+    });
+    return response.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**

@@ -114,80 +114,99 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
     isDbSyncing,
   };
 
+  const signInAppearance = {
+    elements: {
+      rootBox: "mx-auto flex w-full justify-center",
+      cardBox: "w-full max-w-[430px]",
+      card: "w-full border-0 bg-transparent p-0 shadow-none",
+      headerTitle: "text-2xl font-semibold tracking-tight text-white",
+      headerSubtitle: "text-sm text-white/60",
+      socialButtonsBlockButton:
+        "h-11 rounded-xl border border-white/15 bg-white/5 text-white transition-colors hover:bg-white/10",
+      socialButtonsBlockButtonText: "text-sm font-medium text-white",
+      dividerLine: "bg-white/10",
+      dividerText: "text-xs uppercase tracking-[0.2em] text-white/40",
+      formFieldLabel: "text-sm font-medium text-white/75",
+      formFieldInput:
+        "h-11 rounded-xl border border-white/15 bg-black/40 text-white placeholder:text-white/35 transition-colors focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20",
+      formFieldAction: "text-amber-400 transition-colors hover:text-amber-300",
+      formButtonPrimary:
+        "h-11 rounded-xl border border-neutral-700 bg-gradient-to-r from-neutral-900 to-neutral-700 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all hover:from-neutral-800 hover:to-neutral-600",
+      footerActionText: "text-white/60",
+      footerActionLink: "font-medium text-amber-400 transition-colors hover:text-amber-300",
+      formResendCodeLink: "text-amber-400 transition-colors hover:text-amber-300",
+      identityPreviewText: "text-white/80",
+      identityPreviewEditButton: "text-amber-400 transition-colors hover:text-amber-300",
+      otpCodeFieldInput:
+        "rounded-xl border border-white/15 bg-black/40 text-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20",
+      alert: "rounded-xl border border-amber-300/20 bg-amber-500/10 text-amber-100",
+      formFieldSuccessText: "text-emerald-300",
+    },
+  } as const;
+
   return (
     <AuthContext.Provider value={contextValue}>
       <SignedOut>
-        <div className="min-h-screen grid grid-cols-2 bg-black overflow-hidden">
-          {/* Left side: Icons */}
-          <div className="relative flex items-center justify-center overflow-hidden border-r border-white/[0.08]">
-            {/* Center Text */}
-            <style>{`
-              @keyframes shimmer {
-                0%, 70% { opacity: 0.05; }
-                85% { opacity: 0.12; }
-                100% { opacity: 0.05; }
-              }
-            `}</style>
-            <h1
-              className="text-2xl font-extralight text-white tracking-[0.3em] uppercase select-none"
+        <div className="relative min-h-screen overflow-hidden bg-[#040404] text-white">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-amber-500/20 blur-3xl" />
+            <div className="absolute right-[-8rem] top-[20%] h-96 w-96 rounded-full bg-white/[0.08] blur-3xl" />
+            <div className="absolute bottom-[-5rem] left-[30%] h-72 w-72 rounded-full bg-amber-300/15 blur-3xl" />
+            <div
+              className="absolute inset-0 opacity-[0.05]"
               style={{
-                animation: 'shimmer 6s ease-in-out infinite'
+                backgroundImage:
+                  "linear-gradient(to right, rgba(255,255,255,0.35) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.35) 1px, transparent 1px)",
+                backgroundSize: "56px 56px",
               }}
-            >
-              Social Lab
-            </h1>
-
-            {/* Top area */}
-            <img src="/logo-socialab.png" alt="" className="absolute top-[8%] left-[12%] w-32 h-32 opacity-8 -rotate-12" />
-            <img src="/icon.png" alt="" className="absolute top-[6%] right-[18%] w-24 h-24 opacity-12 rotate-[25deg] rounded-2xl" />
-            <img src="/logo-socialab.png" alt="" className="absolute top-[15%] left-[45%] w-20 h-20 opacity-6 rotate-[35deg]" />
-
-            {/* Upper-middle area */}
-            <img src="/icon.png" alt="" className="absolute top-[25%] left-[8%] w-28 h-28 opacity-15 -rotate-[20deg] rounded-3xl" />
-            <img src="/logo-socialab.png" alt="" className="absolute top-[28%] right-[25%] w-24 h-24 opacity-9 rotate-[45deg]" />
-            <img src="/icon.png" alt="" className="absolute top-[32%] left-[60%] w-20 h-20 opacity-10 -rotate-[35deg] rounded-xl" />
-
-            {/* Center area - logo maior e mais destacado */}
-            <img src="/logo-socialab.png" alt="" className="absolute top-[45%] left-[15%] w-36 h-36 opacity-18 rotate-[15deg]" />
-            <img src="/icon.png" alt="" className="absolute top-[48%] right-[12%] w-32 h-32 opacity-20 -rotate-[18deg] rounded-3xl" />
-
-            {/* Lower-middle area */}
-            <img src="/icon.png" alt="" className="absolute top-[62%] left-[25%] w-28 h-28 opacity-14 rotate-[40deg] rounded-2xl" />
-            <img src="/logo-socialab.png" alt="" className="absolute top-[60%] right-[20%] w-24 h-24 opacity-8 -rotate-[25deg]" />
-            <img src="/icon.png" alt="" className="absolute top-[68%] left-[55%] w-20 h-20 opacity-11 rotate-[50deg] rounded-xl" />
-
-            {/* Bottom area */}
-            <img src="/logo-socialab.png" alt="" className="absolute bottom-[12%] left-[18%] w-26 h-26 opacity-7 rotate-[30deg]" />
-            <img src="/icon.png" alt="" className="absolute bottom-[10%] right-[15%] w-24 h-24 opacity-12 -rotate-[40deg] rounded-2xl" />
-            <img src="/logo-socialab.png" alt="" className="absolute bottom-[8%] left-[48%] w-18 h-18 opacity-6 -rotate-[15deg]" />
-
-            {/* Very bottom */}
-            <img src="/icon.png" alt="" className="absolute bottom-[3%] left-[35%] w-20 h-20 opacity-8 rotate-[55deg] rounded-lg" />
+            />
           </div>
 
-          {/* Right side: Login */}
-          <div className="flex items-center justify-center relative z-10 border-l border-white/[0.08]">
-            <div className="text-center py-[18px] px-[3px] w-full max-w-md">
-              <img src="/logo-socialab.png" alt="Socialab" className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-6 flex flex-wrap py-[3px]" />
-              <p className="text-white/40 mb-6">Seu laboratório de Mídia Social</p>
-              <SignIn
-                appearance={{
-                  elements: {
-                    rootBox: "mx-auto",
-                    card: "bg-[#0a0a0a] border border-white/10",
-                    headerTitle: "text-white",
-                    headerSubtitle: "text-white/50",
-                    socialButtonsBlockButton:
-                      "bg-white/5 border-white/10 text-white hover:bg-white/10",
-                    formFieldLabel: "text-white/70",
-                    formFieldInput: "bg-white/5 border-white/10 text-white",
-                    footerActionLink: "text-amber-500 hover:text-amber-400",
-                    identityPreviewText: "text-white",
-                    identityPreviewEditButton: "text-amber-500",
-                    formButtonPrimary: "bg-white text-black hover:bg-white/90",
-                  },
-                }}
+          <div className="relative mx-auto grid min-h-screen w-full max-w-[1360px] lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="relative hidden border-r border-white/[0.08] px-10 py-16 lg:flex lg:flex-col">
+              <img src="/logo-socialab.png" alt="Social Lab" className="h-12 w-12" />
+              <div className="mt-auto">
+                <p className="max-w-md text-4xl font-semibold leading-tight tracking-tight text-white">
+                  Plataforma profissional para operacao criativa de Midia Social.
+                </p>
+                <p className="mt-5 max-w-md text-base leading-relaxed text-white/55">
+                  Centralize campanhas, producao e performance em um unico fluxo com padrao de agencia.
+                </p>
+              </div>
+
+              <img
+                src="/icon.png"
+                alt=""
+                aria-hidden="true"
+                className="absolute left-[12%] top-[14%] h-20 w-20 rotate-[-18deg] rounded-2xl opacity-20"
               />
+              <img
+                src="/logo-socialab.png"
+                alt=""
+                aria-hidden="true"
+                className="absolute right-[10%] top-[38%] h-24 w-24 rotate-[20deg] opacity-[0.15]"
+              />
+              <img
+                src="/icon.png"
+                alt=""
+                aria-hidden="true"
+                className="absolute bottom-[11%] right-[18%] h-16 w-16 rotate-[22deg] rounded-xl opacity-[0.18]"
+              />
+            </div>
+
+            <div className="relative flex items-center justify-center px-4 py-8 sm:px-8 sm:py-12">
+              <div className="w-full max-w-[520px] rounded-[28px] border border-white/[0.12] bg-black/[0.45] p-6 shadow-[0_22px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-8">
+                <div className="mb-8 text-center">
+                  <img src="/logo-socialab.png" alt="Social Lab" className="mx-auto h-14 w-14 sm:h-16 sm:w-16" />
+                  <h1 className="mt-5 text-2xl font-semibold tracking-tight text-white sm:text-[1.85rem]">
+                    Bem-vindo ao Social Lab
+                  </h1>
+                  <p className="mt-2 text-sm text-white/60">
+                    Entre para continuar com sua operacao de marketing.
+                  </p>
+                </div>
+                <SignIn appearance={signInAppearance} />
+              </div>
             </div>
           </div>
         </div>

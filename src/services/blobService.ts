@@ -3,6 +3,8 @@
  * Uses /api/upload endpoint to keep tokens secure on server
  */
 
+import { getAuthToken } from "./authService";
+
 /**
  * Check if Blob upload is available (always true, server handles token)
  */
@@ -25,10 +27,12 @@ export const uploadImageToBlob = async (
   const extension = mimeType.split('/')[1] || 'png';
   const filename = `upload-${Date.now()}.${extension}`;
 
+  const token = await getAuthToken();
   const response = await fetch('/api/upload', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
       filename,

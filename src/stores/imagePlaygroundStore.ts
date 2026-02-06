@@ -5,7 +5,7 @@
  */
 
 import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
+import { devtools, persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
 
 // =============================================================================
 // Types
@@ -178,12 +178,114 @@ const DEFAULT_MODEL = 'gemini-3-pro-image-preview';
 const DEFAULT_PROVIDER = 'google';
 const DEFAULT_ASPECT_RATIO = '1:1';
 const DEFAULT_IMAGE_SIZE: '1K' | '2K' | '4K' = '1K';
+const MAX_PERSISTED_STATE_SIZE_BYTES = 400_000;
+const MAX_PERSISTED_PARAM_STRING_LENGTH = 4_000;
+const NON_PERSISTED_PARAM_KEYS = new Set([
+  'referenceImages',
+  'imageUrl',
+  'productImages',
+  'brandProfile',
+]);
 
 const defaultParameters: RuntimeImageGenParams = {
   prompt: '',
   aspectRatio: DEFAULT_ASPECT_RATIO,
   imageSize: DEFAULT_IMAGE_SIZE,
 };
+
+let persistenceDisabledForSession = false;
+
+function isQuotaExceededError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const maybeError = error as { name?: string; code?: number; message?: string };
+  if (maybeError.name === 'QuotaExceededError') return true;
+  if (maybeError.code === 22 || maybeError.code === 1014) return true;
+  return typeof maybeError.message === 'string' && maybeError.message.toLowerCase().includes('quota');
+}
+
+function sanitizeParametersForPersistence(parameters: RuntimeImageGenParams): Partial<RuntimeImageGenParams> {
+  const safeEntries = Object.entries(parameters).flatMap(([key, value]) => {
+    if (NON_PERSISTED_PARAM_KEYS.has(key)) {
+      return [];
+    }
+
+    if (
+      value === null ||
+      typeof value === 'boolean' ||
+      typeof value === 'number'
+    ) {
+      return [[key, value] as const];
+    }
+
+    if (typeof value === 'string') {
+      if (value.length <= MAX_PERSISTED_PARAM_STRING_LENGTH) {
+        return [[key, value] as const];
+      }
+
+      if (key === 'prompt') {
+        return [[key, value.slice(0, MAX_PERSISTED_PARAM_STRING_LENGTH)] as const];
+      }
+
+      return [];
+    }
+
+    // Ignore arrays/objects in persisted parameters to avoid oversized localStorage payloads.
+    return [];
+  });
+
+  return Object.fromEntries(safeEntries) as Partial<RuntimeImageGenParams>;
+}
+
+const noopStorage: StateStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
+const safePersistStorage = createJSONStorage((): StateStorage => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return noopStorage;
+  }
+
+  return {
+    getItem: (name) => {
+      const value = window.localStorage.getItem(name);
+      if (!value) return null;
+
+      // Legacy protection: if persisted payload is too large, drop it before Zustand hydrate.
+      if (value.length > MAX_PERSISTED_STATE_SIZE_BYTES) {
+        try {
+          window.localStorage.removeItem(name);
+        } catch {
+          // ignore cleanup errors
+        }
+        return null;
+      }
+
+      return value;
+    },
+    setItem: (name, value) => {
+      if (persistenceDisabledForSession) return;
+
+      try {
+        window.localStorage.setItem(name, value);
+      } catch (error) {
+        if (isQuotaExceededError(error)) {
+          persistenceDisabledForSession = true;
+          console.warn('[ImagePlaygroundStore] localStorage quota exceeded; skipping persistence for now');
+          try {
+            window.localStorage.removeItem(name);
+          } catch {
+            // ignore
+          }
+          return;
+        }
+        throw error;
+      }
+    },
+    removeItem: (name) => window.localStorage.removeItem(name),
+  };
+});
 
 // =============================================================================
 // Store Implementation
@@ -508,11 +610,31 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
       }),
       {
         name: 'IMAGE_PLAYGROUND_STORE',
+        version: 2,
+        storage: safePersistStorage,
+        migrate: (persistedState) => {
+          if (!persistedState || typeof persistedState !== 'object') {
+            return persistedState;
+          }
+
+          const typedState = persistedState as Partial<ImagePlaygroundStore> & {
+            parameters?: RuntimeImageGenParams;
+          };
+          const currentParams = (typedState.parameters || {}) as RuntimeImageGenParams;
+          const safeParams = sanitizeParametersForPersistence(currentParams);
+
+          return {
+            ...typedState,
+            parameters: safeParams,
+          };
+        },
         partialize: (state) => ({
           // Only persist config, not topics/batches (those come from server)
+          // IMPORTANT: Do NOT persist base64 reference images to avoid localStorage quota errors.
+          // They stay only in-memory for the current session.
+          parameters: sanitizeParametersForPersistence(state.parameters),
           model: state.model,
           provider: state.provider,
-          parameters: state.parameters,
           imageNum: state.imageNum,
           isAspectRatioLocked: state.isAspectRatioLocked,
           activeAspectRatio: state.activeAspectRatio,
@@ -530,7 +652,6 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
 
 // Stable empty array to avoid infinite re-renders in selectors
 const EMPTY_BATCHES: GenerationBatch[] = [];
-const EMPTY_TOPICS: ImageGenerationTopic[] = [];
 
 export const imagePlaygroundSelectors = {
   // Config selectors

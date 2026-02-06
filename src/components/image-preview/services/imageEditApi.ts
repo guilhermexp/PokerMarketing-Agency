@@ -4,6 +4,7 @@
  */
 
 import type { GalleryImage } from '../../../types';
+import { getAuthToken } from '../../../services/authService';
 
 interface EditOptions {
   brightness?: number;
@@ -33,9 +34,13 @@ export const imageEditApi = {
     options: EditOptions
   ): Promise<ApiResponse<{ editedUrl: string }>> => {
     try {
+      const token = await getAuthToken();
       const response = await fetch('/api/ai/edit-image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ imageUrl, ...options }),
       });
       return await response.json();
@@ -52,9 +57,13 @@ export const imageEditApi = {
     enhanceType: 'upscale' | 'restore' | 'background-remove'
   ): Promise<ApiResponse<{ enhancedUrl: string }>> => {
     try {
+      const token = await getAuthToken();
       const response = await fetch('/api/ai/enhance-image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ imageUrl, enhanceType }),
       });
       return await response.json();
@@ -71,9 +80,13 @@ export const imageEditApi = {
     count: number = 4
   ): Promise<ApiResponse<{ variations: string[] }>> => {
     try {
+      const token = await getAuthToken();
       const response = await fetch('/api/ai/generate-variations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ imageUrl, count }),
       });
       return await response.json();
@@ -89,9 +102,13 @@ export const imageEditApi = {
     imageUrl: string
   ): Promise<ApiResponse<{ noBgUrl: string }>> => {
     try {
+      const token = await getAuthToken();
       const response = await fetch('/api/ai/remove-background', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ imageUrl }),
       });
       return await response.json();
@@ -108,31 +125,40 @@ export const imageEditApi = {
     onProgress?: (progress: number) => void
   ): Promise<ApiResponse<{ image: GalleryImage }>> => {
     return new Promise((resolve) => {
-      const formData = new FormData();
-      formData.append('file', file);
+      getAuthToken()
+        .then((token) => {
+          const formData = new FormData();
+          formData.append('file', file);
 
-      const xhr = new XMLHttpRequest();
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable && onProgress) {
-          onProgress(Math.round((e.loaded / e.total) * 100));
-        }
-      });
+          const xhr = new XMLHttpRequest();
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable && onProgress) {
+              onProgress(Math.round((e.loaded / e.total) * 100));
+            }
+          });
 
-      xhr.addEventListener('load', () => {
-        try {
-          const response = JSON.parse(xhr.responseText);
-          resolve({ success: true, data: response });
-        } catch {
-          resolve({ success: false, error: 'Invalid response' });
-        }
-      });
+          xhr.addEventListener('load', () => {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              resolve({ success: true, data: response });
+            } catch {
+              resolve({ success: false, error: 'Invalid response' });
+            }
+          });
 
-      xhr.addEventListener('error', () => {
-        resolve({ success: false, error: 'Upload failed' });
-      });
+          xhr.addEventListener('error', () => {
+            resolve({ success: false, error: 'Upload failed' });
+          });
 
-      xhr.open('POST', '/api/upload');
-      xhr.send(formData);
+          xhr.open('POST', '/api/upload');
+          if (token) {
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          }
+          xhr.send(formData);
+        })
+        .catch(() => {
+          resolve({ success: false, error: 'Failed to read authentication token' });
+        });
     });
   },
 };

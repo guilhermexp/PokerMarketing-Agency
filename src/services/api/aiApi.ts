@@ -267,19 +267,9 @@ export async function generateVideo(params: {
   generateAudio?: boolean;
   useInterpolation?: boolean;
 }): Promise<string> {
-  const response = await fetch('/api/ai/video', {
+  const result = await fetchAiApi<VideoGenerationResult>('/video', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(
-      error.error || `Video generation failed: HTTP ${response.status}`,
-    );
-  }
-
-  const result: VideoGenerationResult = await response.json();
   return result.url;
 }

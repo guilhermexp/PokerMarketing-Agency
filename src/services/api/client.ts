@@ -5,6 +5,8 @@
  * and typed responses. Used by all domain-specific API modules.
  */
 
+import { getAuthToken } from '../authService';
+
 export const API_BASE = '/api/db';
 export const AI_API_BASE = '/api/ai';
 
@@ -35,6 +37,7 @@ export async function fetchApi<T>(
   const canRetry = method === 'GET';
   const maxAttempts = canRetry ? 2 : 1;
   let lastError: unknown = null;
+  const token = await getAuthToken();
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
@@ -42,6 +45,7 @@ export async function fetchApi<T>(
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...options.headers,
         },
       });
@@ -78,16 +82,15 @@ export async function fetchAiApi<T>(
   options: RequestInit = {},
   getToken?: () => Promise<string | null>,
 ): Promise<T> {
+  const resolvedGetToken = getToken || getAuthToken;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
 
   // Add auth token if available
-  if (getToken) {
-    const token = await getToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+  const token = await resolvedGetToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   const response = await fetch(`${AI_API_BASE}${endpoint}`, {

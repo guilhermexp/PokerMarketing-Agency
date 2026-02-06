@@ -3,8 +3,8 @@
  * Verifies if the current user is a super admin based on email
  */
 
-import { useUser } from '@clerk/clerk-react';
-import { useMemo } from 'react';
+import { useAuth, useUser } from '@clerk/clerk-react';
+import { useEffect, useState } from 'react';
 
 
 export interface SuperAdminState {
@@ -15,30 +15,63 @@ export interface SuperAdminState {
 
 export function useSuperAdmin(): SuperAdminState {
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
+  const [state, setState] = useState<SuperAdminState>({
+    isSuperAdmin: false,
+    isLoading: true,
+    userEmail: null,
+  });
 
-  const state = useMemo(() => {
-    if (!isLoaded) {
-      return {
-        isSuperAdmin: false,
-        isLoading: true,
-        userEmail: null,
-      };
-    }
+  useEffect(() => {
+    let cancelled = false;
 
-    const SUPER_ADMIN_EMAILS = (import.meta.env.VITE_SUPER_ADMIN_EMAILS || "")
-      .split(",")
-      .map((email: string) => email.trim().toLowerCase())
-      .filter(Boolean);
+    const verifySuperAdmin = async () => {
+      if (!isLoaded) {
+        return;
+      }
 
-    const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || null;
-    const isSuperAdmin = userEmail !== null && SUPER_ADMIN_EMAILS.includes(userEmail);
+      const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || null;
 
-    return {
-      isSuperAdmin,
-      isLoading: false,
-      userEmail,
+      if (!user) {
+        if (!cancelled) {
+          setState({ isSuperAdmin: false, isLoading: false, userEmail: null });
+        }
+        return;
+      }
+
+      try {
+        const token = await getToken();
+        if (!token) {
+          if (!cancelled) {
+            setState({ isSuperAdmin: false, isLoading: false, userEmail });
+          }
+          return;
+        }
+
+        const response = await fetch('/api/admin/stats', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!cancelled) {
+          setState({
+            isSuperAdmin: response.ok,
+            isLoading: false,
+            userEmail,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setState({ isSuperAdmin: false, isLoading: false, userEmail });
+        }
+      }
     };
-  }, [user, isLoaded]);
+
+    verifySuperAdmin();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, isLoaded, user]);
 
   return state;
 }

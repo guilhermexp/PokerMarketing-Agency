@@ -12,6 +12,7 @@ import sharp from "sharp";
 // Thumbnail settings
 const THUMBNAIL_WIDTH = 400;
 const THUMBNAIL_QUALITY = 80;
+const MAX_STORED_STRING_LENGTH = 4096;
 
 // =============================================================================
 // Helpers
@@ -28,6 +29,30 @@ function mapTopic(r) {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
+}
+
+function compactForStorage(value) {
+  if (typeof value === "string") {
+    if (value.startsWith("data:")) {
+      return "[inline-data-omitted]";
+    }
+    if (value.length > MAX_STORED_STRING_LENGTH) {
+      return `${value.slice(0, MAX_STORED_STRING_LENGTH)}...[truncated:${value.length}]`;
+    }
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(compactForStorage);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, compactForStorage(entry)]),
+    );
+  }
+
+  return value;
 }
 
 // =============================================================================
@@ -124,13 +149,44 @@ export async function deleteTopic(sql, topicId, userId, organizationId) {
 // Batches
 // =============================================================================
 
-export async function getBatches(sql, topicId, userId, organizationId) {
+export async function getBatches(sql, topicId, userId, organizationId, limit = 100) {
   const orgId = organizationId || null;
+  const safeLimit = Number.isFinite(limit)
+    ? Math.max(1, Math.min(200, Number(limit)))
+    : 100;
   // Get batches with their generations
   const batches = orgId
     ? await sql`
+        WITH selected_batches AS (
+          SELECT
+            b.id,
+            b.topic_id,
+            b.user_id,
+            b.organization_id,
+            b.provider,
+            b.model,
+            b.prompt,
+            (COALESCE(b.config, '{}'::jsonb) - 'referenceImages' - 'productImages' - 'imageUrl') AS config,
+            b.width,
+            b.height,
+            b.created_at
+          FROM image_generation_batches b
+          WHERE b.topic_id = ${topicId} AND b.organization_id = ${orgId}
+          ORDER BY b.created_at DESC
+          LIMIT ${safeLimit}
+        )
         SELECT
-          b.*,
+          sb.id,
+          sb.topic_id,
+          sb.user_id,
+          sb.organization_id,
+          sb.provider,
+          sb.model,
+          sb.prompt,
+          sb.config,
+          sb.width,
+          sb.height,
+          sb.created_at,
           COALESCE(
             json_agg(
               json_build_object(
@@ -140,15 +196,42 @@ export async function getBatches(sql, topicId, userId, organizationId) {
               ) ORDER BY g.created_at ASC
             ) FILTER (WHERE g.id IS NOT NULL), '[]'
           ) as generations
-        FROM image_generation_batches b
-        LEFT JOIN image_generations g ON g.batch_id = b.id
-        WHERE b.topic_id = ${topicId} AND b.organization_id = ${orgId}
-        GROUP BY b.id
-        ORDER BY b.created_at DESC
+        FROM selected_batches sb
+        LEFT JOIN image_generations g ON g.batch_id = sb.id
+        GROUP BY sb.id, sb.topic_id, sb.user_id, sb.organization_id, sb.provider, sb.model, sb.prompt, sb.config, sb.width, sb.height, sb.created_at
+        ORDER BY sb.created_at DESC
       `
     : await sql`
+        WITH selected_batches AS (
+          SELECT
+            b.id,
+            b.topic_id,
+            b.user_id,
+            b.organization_id,
+            b.provider,
+            b.model,
+            b.prompt,
+            (COALESCE(b.config, '{}'::jsonb) - 'referenceImages' - 'productImages' - 'imageUrl') AS config,
+            b.width,
+            b.height,
+            b.created_at
+          FROM image_generation_batches b
+          WHERE b.topic_id = ${topicId} AND b.user_id = ${userId}
+          ORDER BY b.created_at DESC
+          LIMIT ${safeLimit}
+        )
         SELECT
-          b.*,
+          sb.id,
+          sb.topic_id,
+          sb.user_id,
+          sb.organization_id,
+          sb.provider,
+          sb.model,
+          sb.prompt,
+          sb.config,
+          sb.width,
+          sb.height,
+          sb.created_at,
           COALESCE(
             json_agg(
               json_build_object(
@@ -158,11 +241,10 @@ export async function getBatches(sql, topicId, userId, organizationId) {
               ) ORDER BY g.created_at ASC
             ) FILTER (WHERE g.id IS NOT NULL), '[]'
           ) as generations
-        FROM image_generation_batches b
-        LEFT JOIN image_generations g ON g.batch_id = b.id
-        WHERE b.topic_id = ${topicId} AND b.user_id = ${userId}
-        GROUP BY b.id
-        ORDER BY b.created_at DESC
+        FROM selected_batches sb
+        LEFT JOIN image_generations g ON g.batch_id = sb.id
+        GROUP BY sb.id, sb.topic_id, sb.user_id, sb.organization_id, sb.provider, sb.model, sb.prompt, sb.config, sb.width, sb.height, sb.created_at
+        ORDER BY sb.created_at DESC
       `;
 
   return batches.map((b) => ({
@@ -332,6 +414,8 @@ export async function createImageBatch(
   const aspectRatio =
     params.aspectRatio || getAspectRatioFromDimensions(width, height);
   const imageSize = params.imageSize || getImageSizeFromWidth(width);
+  const generationParams = { ...params, aspectRatio, imageSize };
+  const storedParams = compactForStorage(generationParams);
 
   // Create batch
   const [batch] = await sql`
@@ -340,7 +424,7 @@ export async function createImageBatch(
     )
     VALUES (
       ${topicId}, ${userId}, ${organizationId}, ${provider}, ${model},
-      ${params.prompt}, ${JSON.stringify({ ...params, aspectRatio, imageSize })}, ${width}, ${height}
+      ${params.prompt}, ${JSON.stringify(storedParams)}, ${width}, ${height}
     )
     RETURNING *
   `;
@@ -359,7 +443,7 @@ export async function createImageBatch(
           batchId: batch.id,
           provider,
           model,
-          params: { ...params, aspectRatio, imageSize },
+          params: storedParams,
           index: i,
         })}
       )
@@ -393,11 +477,7 @@ export async function createImageBatch(
       sql,
       task.id,
       generation.id,
-      {
-        ...params,
-        aspectRatio,
-        imageSize,
-      },
+      generationParams,
       genai,
     ).catch((err) => {
       console.error("[ImagePlayground] Background generation failed:", err);

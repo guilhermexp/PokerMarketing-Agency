@@ -225,7 +225,7 @@ export const EditPanelSlideIn = (props: EditPanelSlideInProps) => {
             padding: '16px',
             background: '#000000',
           },
-          content: {
+          wrapper: {
             background: '#000000',
             borderTopLeftRadius: '16px',
             borderTopRightRadius: '16px',

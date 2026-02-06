@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fork Safe Sync"
+  short_description: "Sync upstream sem perder customizacoes privadas"
+  default_prompt: "Use $fork-safe-upstream-sync para atualizar meu fork com upstream preservando minhas customizacoes locais e registrando changelog privado."

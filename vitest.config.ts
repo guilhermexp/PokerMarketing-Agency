@@ -22,10 +22,11 @@ export default defineConfig({
 
     // Excluir
     exclude: [
-      'node_modules',
-      'dist',
-      '.vercel',
-      'server',
+      '**/node_modules/**',
+      '**/.auto-claude/**',
+      '**/dist/**',
+      '**/.vercel/**',
+      'server/**',
     ],
 
     // Coverage

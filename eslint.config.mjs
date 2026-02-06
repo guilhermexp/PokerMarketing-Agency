@@ -34,6 +34,8 @@ export default [
                 // Common Web APIs
                 Promise: 'readonly',
                 fetch: 'readonly',
+                caches: 'readonly',
+                AbortController: 'readonly',
                 localStorage: 'readonly',
                 sessionStorage: 'readonly',
                 indexedDB: 'readonly',

@@ -13,6 +13,21 @@ import { AppError, ERROR_CODES, HTTP_STATUS } from "../lib/errors/index.mjs";
 import { randomUUID } from "crypto";
 
 /**
+ * Detect client disconnect errors (ECONNABORTED, ECONNRESET, EPIPE)
+ * @param {Error} error
+ * @returns {boolean}
+ */
+export function isClientDisconnectError(error) {
+  if (!error) return false;
+  const code = error.code || "";
+  const message = error.message || "";
+  return (
+    /ECONNABORTED|ECONNRESET|EPIPE/.test(code) ||
+    /ECONNABORTED|ECONNRESET|EPIPE|aborted|socket hang up/.test(message)
+  );
+}
+
+/**
  * Generate or retrieve request ID for error tracking
  * @param {Object} req - Express request object
  * @returns {string}
@@ -101,6 +116,15 @@ function logError(error, req, requestId) {
     ip: req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress,
   };
 
+  // Client disconnect — log as warn, not error
+  if (isClientDisconnectError(error)) {
+    logger.warn(
+      { err: error, ...context },
+      `Client disconnected: ${error.message}`
+    );
+    return;
+  }
+
   // Determine log level based on error type
   if (error instanceof AppError) {
     // Operational errors (expected errors)
@@ -167,6 +191,11 @@ export function errorHandler(err, req, res, next) {
 
   // Log the error with context
   logError(err, req, requestId);
+
+  // Skip response if client already disconnected or headers already sent
+  if (res.headersSent || req.destroyed || res.destroyed) {
+    return;
+  }
 
   // Determine status code
   const statusCode =

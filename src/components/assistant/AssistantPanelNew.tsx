@@ -341,7 +341,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     // Verificar se a tool call existe nas mensagens antes de aprovar/rejeitar
     const allToolCalls = messages.flatMap(msg =>
       msg.parts.filter(isToolUIPart).map(part => ({
-        id: part.id,
+        id: part.toolCallId,
         toolName: part.type.replace('tool-', ''),
         state: part.state
       }))
@@ -390,13 +390,13 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       console.log('✅ [AssistantPanel] Calling addToolApprovalResponse with:', {
         id: toolCallId,
         approved: true,
-        result: imageUrl
+        reason: imageUrl
       });
 
       addToolApprovalResponse({
         id: toolCallId,
         approved: true,
-        result: imageUrl
+        reason: imageUrl
       });
 
       console.log('✅ [AssistantPanel] addToolApprovalResponse completed');

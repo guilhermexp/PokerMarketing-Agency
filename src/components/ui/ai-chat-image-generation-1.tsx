@@ -11,6 +11,8 @@ export interface ImageGenerationLoaderProps {
   className?: string;
   /** Whether currently generating */
   isGenerating?: boolean;
+  /** Show animated status label text */
+  showLabel?: boolean;
   /** Callback when reveal animation completes */
   onRevealComplete?: () => void;
 }
@@ -20,6 +22,7 @@ export const ImageGenerationLoader = ({
   prompt,
   className,
   isGenerating = true,
+  showLabel = true,
   onRevealComplete,
 }: ImageGenerationLoaderProps) => {
   const [progress, setProgress] = React.useState(0);
@@ -139,7 +142,7 @@ export const ImageGenerationLoader = ({
 
       {/* Loading text - Centralized */}
       <AnimatePresence>
-        {(showLoader || isRevealing) && !isCompleted && (
+        {showLabel && (showLoader || isRevealing) && !isCompleted && (
           <motion.div
             className="absolute inset-0 flex items-center justify-center z-20"
             initial={{ opacity: 0, scale: 0.9 }}

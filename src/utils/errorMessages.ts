@@ -83,6 +83,13 @@ const ERROR_PATTERNS: Array<{
     message: 'Tempo limite excedido',
     action: 'A operação demorou muito. Tente novamente.',
   },
+  // Abort / client disconnect errors (must come before generic network pattern)
+  {
+    pattern: /aborted|abort|ECONNABORTED|AbortError|signal.*aborted/i,
+    type: 'network',
+    message: 'Requisição cancelada',
+    action: 'A operação foi interrompida. Tente novamente.',
+  },
   // Network errors
   {
     pattern: /network|connection|ECONNREFUSED|ENOTFOUND|fetch.*failed/i,

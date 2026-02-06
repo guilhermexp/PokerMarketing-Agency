@@ -786,11 +786,13 @@ export async function uploadToBlob(
       "",
     ),
   );
+  const token = await getAuthToken();
 
   const response = await fetch("/api/upload", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
       filename,
@@ -1102,6 +1104,26 @@ export interface ImageJobConfig {
   systemPrompt?: string;
 }
 
+function getApiErrorMessage(payload: unknown, status: number): string {
+  if (payload && typeof payload === "object") {
+    const maybeError = (payload as { error?: unknown }).error;
+    if (typeof maybeError === "string" && maybeError.trim()) {
+      return maybeError;
+    }
+    if (maybeError && typeof maybeError === "object") {
+      const nestedMessage = (maybeError as { message?: unknown }).message;
+      if (typeof nestedMessage === "string" && nestedMessage.trim()) {
+        return nestedMessage;
+      }
+    }
+    const maybeMessage = (payload as { message?: unknown }).message;
+    if (typeof maybeMessage === "string" && maybeMessage.trim()) {
+      return maybeMessage;
+    }
+  }
+  return `HTTP ${status}`;
+}
+
 /**
  * Queue an image generation job for background processing
  * Returns immediately, job runs in background via BullMQ
@@ -1129,13 +1151,18 @@ export async function queueImageJob(
 export async function getGenerationJobStatus(
   jobId: string,
 ): Promise<GenerationJob> {
-  const response = await fetch(`/api/generate/status?jobId=${jobId}`);
+  const token = await getAuthToken();
+  const response = await fetch(`/api/generate/status?jobId=${jobId}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
 
   if (!response.ok) {
-    const error = await response
+    const errorPayload = await response
       .json()
       .catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    throw new Error(getApiErrorMessage(errorPayload, response.status));
   }
 
   return response.json();
@@ -1154,13 +1181,18 @@ export async function getGenerationJobs(
   if (options?.status) params.append("status", options.status);
   if (options?.limit) params.append("limit", options.limit.toString());
 
-  const response = await fetch(`/api/generate/status?${params}`);
+  const token = await getAuthToken();
+  const response = await fetch(`/api/generate/status?${params}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
 
   if (!response.ok) {
-    const error = await response
+    const errorPayload = await response
       .json()
       .catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    throw new Error(getApiErrorMessage(errorPayload, response.status));
   }
 
   return response.json();
@@ -1201,15 +1233,19 @@ export async function pollGenerationJob(
  * Cancel a specific generation job
  */
 export async function cancelGenerationJob(jobId: string): Promise<void> {
+  const token = await getAuthToken();
   const response = await fetch(`/api/generate/job/${jobId}`, {
     method: "DELETE",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
 
   if (!response.ok) {
-    const error = await response
+    const errorPayload = await response
       .json()
       .catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    throw new Error(getApiErrorMessage(errorPayload, response.status));
   }
 }
 

@@ -5,6 +5,8 @@
  * processed by BullMQ.
  */
 
+import { getAuthToken } from '../authService';
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -76,6 +78,17 @@ export interface QueueJobResult {
 
 export type JobType = 'flyer' | 'flyer_daily' | 'post' | 'ad' | 'clip' | 'video' | 'image';
 
+async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = await getAuthToken();
+  const headers = new Headers(options.headers);
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  return fetch(url, { ...options, headers });
+}
+
 // =============================================================================
 // Queue Operations
 // =============================================================================
@@ -92,7 +105,7 @@ export async function queueGenerationJob(
   context?: string,
   organizationId?: string | null,
 ): Promise<QueueJobResult> {
-  const response = await fetch('/api/generate/queue', {
+  const response = await fetchWithAuth('/api/generate/queue', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -167,7 +180,7 @@ export async function queueImageJob(
 export async function getGenerationJobStatus(
   jobId: string,
 ): Promise<GenerationJob> {
-  const response = await fetch(`/api/generate/status?jobId=${jobId}`);
+  const response = await fetchWithAuth(`/api/generate/status?jobId=${jobId}`);
 
   if (!response.ok) {
     const error = await response
@@ -192,7 +205,7 @@ export async function getGenerationJobs(
   if (options?.status) params.append('status', options.status);
   if (options?.limit) params.append('limit', options.limit.toString());
 
-  const response = await fetch(`/api/generate/status?${params}`);
+  const response = await fetchWithAuth(`/api/generate/status?${params}`);
 
   if (!response.ok) {
     const error = await response
@@ -243,7 +256,7 @@ export async function pollGenerationJob(
  * Cancel a specific generation job
  */
 export async function cancelGenerationJob(jobId: string): Promise<void> {
-  const response = await fetch(`/api/generate/job/${jobId}`, {
+  const response = await fetchWithAuth(`/api/generate/job/${jobId}`, {
     method: 'DELETE',
   });
 
@@ -259,7 +272,7 @@ export async function cancelGenerationJob(jobId: string): Promise<void> {
  * Cancel all pending jobs for a user
  */
 export async function cancelAllGenerationJobs(userId: string): Promise<number> {
-  const response = await fetch('/api/generate/cancel-all', {
+  const response = await fetchWithAuth('/api/generate/cancel-all', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId }),

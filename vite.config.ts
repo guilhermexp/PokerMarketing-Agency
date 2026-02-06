@@ -101,6 +101,9 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
+          // Avoid terser hook race when generating very large precache manifests.
+          mode: "development",
+          sourcemap: false,
           navigateFallback: "/index.html",
           globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff2}"],
           // Force immediate update - don't wait for user to close all tabs
@@ -181,10 +184,6 @@ export default defineConfig(({ mode }) => {
     define: {
       "import.meta.env.VITE_CLERK_PUBLISHABLE_KEY": JSON.stringify(
         env.VITE_CLERK_PUBLISHABLE_KEY,
-      ),
-      // Super admin emails for client-side admin check
-      "import.meta.env.VITE_SUPER_ADMIN_EMAILS": JSON.stringify(
-        process.env.VITE_SUPER_ADMIN_EMAILS || envFile.VITE_SUPER_ADMIN_EMAILS || "",
       ),
     },
     resolve: {

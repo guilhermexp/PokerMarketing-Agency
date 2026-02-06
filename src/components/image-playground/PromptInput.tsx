@@ -32,9 +32,8 @@ export const PromptInput: React.FC = () => {
       // Cmd/Ctrl + Enter to generate
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && canGenerate) {
         e.preventDefault();
-        createImage().catch((err) => {
-          console.error('Failed to generate:', err);
-        });
+        // Error already handled by useCreateImage hook via toast
+        createImage().catch(() => {});
       }
     },
     [canGenerate, createImage]
@@ -42,9 +41,8 @@ export const PromptInput: React.FC = () => {
 
   const handleGenerate = useCallback(() => {
     if (canGenerate) {
-      createImage().catch((err) => {
-        console.error('Failed to generate:', err);
-      });
+      // Error already handled by useCreateImage hook via toast
+      createImage().catch(() => {});
     }
   }, [canGenerate, createImage]);
 

@@ -5,7 +5,7 @@
  * and Initial Data loading.
  */
 
-import { fetchApi, API_BASE } from './client';
+import { fetchApi } from './client';
 import type { DbCampaign } from './campaignsApi';
 import type { DbWeekSchedule, DbTournamentEvent, WeekScheduleWithCount } from './tournamentApi';
 
@@ -206,13 +206,7 @@ export async function createGalleryImage(
 }
 
 export async function deleteGalleryImage(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/gallery?id=${id}`, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to delete image: HTTP ${response.status}`);
-  }
+  await fetchApi(`/gallery?id=${id}`, { method: 'DELETE' });
 }
 
 export async function updateGalleryImage(
@@ -337,8 +331,7 @@ export async function deleteScheduledPost(id: string): Promise<void> {
 
 export async function checkDatabaseHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE}/health`);
-    const data = await response.json();
+    const data = await fetchApi<{ status: string }>('/health');
     return data.status === 'healthy';
   } catch {
     return false;

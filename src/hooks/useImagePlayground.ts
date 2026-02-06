@@ -8,6 +8,7 @@ import useSWR from 'swr';
 import { useImagePlaygroundStore, imagePlaygroundSelectors } from '../stores/imagePlaygroundStore';
 import * as api from '../services/api/imagePlayground';
 import type { GenerationBatch, AsyncTaskStatus } from '../stores/imagePlaygroundStore';
+import { useApiErrorHandler } from './useApiErrorHandler';
 
 // =============================================================================
 // Topics Hook
@@ -223,6 +224,7 @@ export function useCreateImage() {
 
   const { createTopic } = useImagePlaygroundTopics();
   const { refresh: refreshBatches } = useImagePlaygroundBatches(activeTopicId);
+  const { handleApiError } = useApiErrorHandler();
 
   const createImage = useCallback(async () => {
     const prompt = parameters.prompt?.trim();
@@ -287,6 +289,9 @@ export function useCreateImage() {
       }
 
       return result.data;
+    } catch (error) {
+      handleApiError(error, () => { createImage().catch(() => {}); });
+      throw error;
     } finally {
       setIsCreating(false);
       setIsCreatingWithNewTopic(false);
@@ -306,6 +311,7 @@ export function useCreateImage() {
     setParam,
     refreshBatches,
     updateTopic,
+    handleApiError,
   ]);
 
   return {

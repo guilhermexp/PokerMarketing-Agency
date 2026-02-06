@@ -4,6 +4,8 @@
  * Handles uploads to Vercel Blob storage for images, videos, and audio.
  */
 
+import { getAuthToken } from '../authService';
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -47,11 +49,13 @@ export async function uploadToBlob(
       '',
     ),
   );
+  const token = await getAuthToken();
 
   const response = await fetch('/api/upload', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
       filename,

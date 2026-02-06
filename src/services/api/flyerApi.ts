@@ -5,6 +5,7 @@
  */
 
 import { fetchApi } from './client';
+import { getAuthToken } from '../authService';
 import type { GalleryImage } from '@/types';
 import type { WeekScheduleInfo, TournamentEvent } from '@/types';
 import type { TimePeriod } from '@/types/flyer.types';
@@ -101,8 +102,10 @@ export const getScheduleById = async (id: string): Promise<WeekScheduleInfo> => 
 export const createSchedule = async (file: File): Promise<WeekScheduleInfo> => {
   const formData = new FormData();
   formData.append('file', file);
+  const token = await getAuthToken();
   const response = await fetch('/api/db/schedules', {
     method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: formData,
   });
   if (!response.ok) {
@@ -135,8 +138,10 @@ export const uploadScheduleFile = async (
 ): Promise<{ tournaments: TournamentEvent[]; scheduleInfo: WeekScheduleInfo }> => {
   const formData = new FormData();
   formData.append('file', file);
+  const token = await getAuthToken();
   const response = await fetch('/api/schedule/upload', {
     method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: formData,
   });
   if (!response.ok) {

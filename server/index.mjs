@@ -1,6 +1,8 @@
 /**
- * Development API Server
- * Runs alongside Vite to handle API routes during development
+ * Unified API Server (development + production).
+ *
+ * Development entrypoint (`server/dev-api.mjs`) delegates to this file.
+ * Production entrypoint (`server/index.mjs`) runs this file directly.
  */
 
 // CRITICAL: This import auto-loads .env BEFORE other imports are evaluated
@@ -88,7 +90,32 @@ process.on("unhandledRejection", (error) => {
   process.exit(1); // Exit with error code
 });
 
-app.use(cors());
+const CORS_ORIGINS = (
+  process.env.CORS_ORIGINS ||
+  process.env.APP_URL ||
+  "http://localhost:3000,http://127.0.0.1:3000"
+)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    credentials: true,
+    origin(origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (CORS_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+
+      logger.warn({ origin }, "[CORS] Blocked request from unauthorized origin");
+      return callback(new Error("Not allowed by CORS"));
+    },
+  }),
+);
 app.use(express.json({ limit: "50mb" }));
 
 // Clerk authentication middleware
@@ -126,6 +153,22 @@ app.use((req, res, next) => {
 
 // Request logging middleware - logs all HTTP requests with structured format
 app.use(requestLogger);
+
+const PROTECTED_API_PREFIXES = [
+  "/api/db",
+  "/api/ai",
+  "/api/chat",
+  "/api/generate",
+  "/api/upload",
+  "/api/proxy-video",
+  "/api/rube",
+  "/api/image-playground",
+  "/api/admin",
+];
+
+for (const prefix of PROTECTED_API_PREFIXES) {
+  app.use(prefix, requireAuthenticatedRequest, enforceAuthenticatedIdentity);
+}
 
 // Helper to get Clerk org context from request
 function getClerkOrgContext(req) {
@@ -191,9 +234,128 @@ function checkAiRateLimit(identifier) {
   };
 }
 
+function getRequestAuthContext(req) {
+  if (req.auth?.userId) {
+    return {
+      userId: req.auth.userId,
+      orgId: req.auth.orgId || null,
+    };
+  }
+
+  const auth = getAuth(req);
+  if (!auth?.userId) {
+    return null;
+  }
+
+  return {
+    userId: auth.userId,
+    orgId: auth.orgId || null,
+  };
+}
+
+function requireAuthenticatedRequest(req, res, next) {
+  if (req.method === "OPTIONS") {
+    return next();
+  }
+
+  const authContext = getRequestAuthContext(req);
+  if (!authContext?.userId) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "UNAUTHORIZED",
+    });
+  }
+
+  req.authUserId = authContext.userId;
+  req.authOrgId = authContext.orgId;
+  next();
+}
+
+function enforceAuthenticatedIdentity(req, res, next) {
+  const authUserId = req.authUserId;
+  const authOrgId = req.authOrgId || null;
+
+  if (!authUserId) {
+    return next();
+  }
+
+  const queryUserIds = [req.query?.user_id, req.query?.clerk_user_id, req.query?.userId]
+    .filter(Boolean)
+    .map((value) => String(value));
+
+  const bodyUserIds =
+    req.body && typeof req.body === "object"
+      ? [req.body.user_id, req.body.clerk_user_id, req.body.userId]
+          .filter(Boolean)
+          .map((value) => String(value))
+      : [];
+
+  const mismatchedUserId = [...queryUserIds, ...bodyUserIds].find(
+    (value) => value !== authUserId,
+  );
+
+  if (mismatchedUserId) {
+    return res.status(403).json({
+      error: "User context mismatch",
+      code: "FORBIDDEN_USER_CONTEXT",
+    });
+  }
+
+  const queryOrgIds = [req.query?.organization_id, req.query?.organizationId]
+    .filter((value) => value !== undefined && value !== null && value !== "")
+    .map((value) => String(value));
+
+  const bodyOrgIds =
+    req.body && typeof req.body === "object"
+      ? [req.body.organization_id, req.body.organizationId]
+          .filter((value) => value !== undefined && value !== null && value !== "")
+          .map((value) => String(value))
+      : [];
+
+  const allOrgIds = [...queryOrgIds, ...bodyOrgIds];
+  if (authOrgId) {
+    const mismatchedOrgId = allOrgIds.find((value) => value !== authOrgId);
+    if (mismatchedOrgId) {
+      return res.status(403).json({
+        error: "Organization context mismatch",
+        code: "FORBIDDEN_ORG_CONTEXT",
+      });
+    }
+  } else if (allOrgIds.length > 0) {
+    return res.status(403).json({
+      error: "Organization context not available in authentication token",
+      code: "FORBIDDEN_ORG_CONTEXT",
+    });
+  }
+
+  if (req.query && typeof req.query === "object") {
+    req.query.user_id = authUserId;
+    req.query.clerk_user_id = authUserId;
+    req.query.userId = authUserId;
+
+    if (authOrgId) {
+      req.query.organization_id = authOrgId;
+      req.query.organizationId = authOrgId;
+    }
+  }
+
+  if (req.body && typeof req.body === "object" && !Array.isArray(req.body)) {
+    req.body.user_id = authUserId;
+    req.body.clerk_user_id = authUserId;
+    req.body.userId = authUserId;
+
+    if (authOrgId) {
+      req.body.organization_id = authOrgId;
+      req.body.organizationId = authOrgId;
+    }
+  }
+
+  next();
+}
+
 // Middleware for AI endpoints with stricter rate limiting
 function requireAuthWithAiRateLimit(req, res, next) {
-  const auth = getAuth(req);
+  const auth = getRequestAuthContext(req);
 
   if (!auth?.userId) {
     return res.status(401).json({
@@ -361,48 +523,190 @@ async function ensureGallerySourceType(sql) {
   }
 }
 
+function isUndefinedColumnError(error, columnName) {
+  if (!error || typeof error !== "object") return false;
+  const message = typeof error.message === "string" ? error.message : "";
+  const matchesCode = error.code === "42703";
+  if (!columnName) {
+    return matchesCode || message.includes('does not exist');
+  }
+  return (
+    matchesCode ||
+    message.includes(`column "${columnName}" does not exist`) ||
+    message.includes(`column ${columnName} does not exist`)
+  );
+}
+
 // Helper to resolve user ID (handles both Clerk IDs and UUIDs)
 // Clerk IDs look like: user_2qyqJjnqMXEGJWJNf9jx86C0oQT
 // UUIDs look like: 550e8400-e29b-41d4-a716-446655440000
 // NOW WITH CACHING to avoid repeated DB lookups!
 async function resolveUserId(sql, userId, requestId = 0) {
   if (!userId) return null;
+  const normalizedUserId = String(userId).trim();
+  if (!normalizedUserId) return null;
 
   // Check if it's a UUID format (8-4-4-4-12 hex characters)
   const uuidPattern =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (uuidPattern.test(userId)) {
-    return userId; // Already a UUID
+  if (uuidPattern.test(normalizedUserId)) {
+    return normalizedUserId; // Already a UUID
   }
 
   // Check cache first
-  const cachedId = getCachedUserId(userId);
+  const cachedId = getCachedUserId(normalizedUserId);
   if (cachedId) {
     return cachedId;
   }
 
   // It's a Clerk ID - look up the user by auth_provider_id
   logQuery(requestId, "resolveUserId", "users.auth_provider_id lookup");
-  const result = await sql`
-    SELECT id FROM users
-    WHERE auth_provider_id = ${userId}
-    AND deleted_at IS NULL
-    LIMIT 1
-  `;
+  let result;
+  try {
+    result = await sql`
+      SELECT id FROM users
+      WHERE auth_provider_id = ${normalizedUserId}
+      AND deleted_at IS NULL
+      LIMIT 1
+    `;
+  } catch (error) {
+    // Backward compatibility for legacy schemas without deleted_at on users
+    if (!isUndefinedColumnError(error, "deleted_at")) {
+      throw error;
+    }
+    result = await sql`
+      SELECT id FROM users
+      WHERE auth_provider_id = ${normalizedUserId}
+      LIMIT 1
+    `;
+  }
 
   if (result.length > 0) {
     const resolvedId = result[0].id;
-    setCachedUserId(userId, resolvedId); // Cache it!
+    setCachedUserId(normalizedUserId, resolvedId); // Cache it!
     return resolvedId;
   }
 
   // User doesn't exist - return the original ID (will fail on insert, but that's expected)
   logger.debug(
-    { auth_provider_id: userId },
+    { auth_provider_id: normalizedUserId },
     "[User Lookup] No user found for auth_provider_id",
   );
   return null;
 }
+
+const RESOURCE_ACCESS_RULES = [
+  { methods: ["PUT"], path: "/api/db/brand-profiles", idKey: "id", table: "brand_profiles" },
+  { methods: ["PATCH", "DELETE"], path: "/api/db/gallery", idKey: "id", table: "gallery_images" },
+  { methods: ["PATCH"], path: "/api/db/posts", idKey: "id", table: "posts" },
+  { methods: ["PATCH"], path: "/api/db/ad-creatives", idKey: "id", table: "ad_creatives" },
+  { methods: ["PUT", "DELETE"], path: "/api/db/scheduled-posts", idKey: "id", table: "scheduled_posts" },
+  { methods: ["DELETE"], path: "/api/db/campaigns", idKey: "id", table: "campaigns" },
+  { methods: ["PATCH"], path: "/api/db/campaigns", idKey: "clip_id", table: "video_clip_scripts" },
+  { methods: ["PATCH"], path: "/api/db/campaigns/scene", idKey: "clip_id", table: "video_clip_scripts" },
+  { methods: ["PATCH"], path: "/api/db/carousels", idKey: "id", table: "carousel_scripts" },
+  { methods: ["PATCH"], path: "/api/db/carousels/slide", idKey: "carousel_id", table: "carousel_scripts" },
+  { methods: ["DELETE"], path: "/api/db/tournaments", idKey: "id", table: "week_schedules" },
+  { methods: ["PATCH"], path: "/api/db/tournaments/event-flyer", idKey: "event_id", table: "tournament_events" },
+  { methods: ["PATCH"], path: "/api/db/tournaments/daily-flyer", idKey: "schedule_id", table: "week_schedules" },
+  { methods: ["PUT", "DELETE"], path: "/api/db/instagram-accounts", idKey: "id", table: "instagram_accounts" },
+];
+
+async function getResourceOwner(sql, table, id) {
+  switch (table) {
+    case "brand_profiles":
+      return (
+        await sql`SELECT user_id, organization_id FROM brand_profiles WHERE id = ${id} AND deleted_at IS NULL LIMIT 1`
+      )[0];
+    case "gallery_images":
+      return (
+        await sql`SELECT user_id, organization_id FROM gallery_images WHERE id = ${id} AND deleted_at IS NULL LIMIT 1`
+      )[0];
+    case "posts":
+      return (await sql`SELECT user_id, organization_id FROM posts WHERE id = ${id} LIMIT 1`)[0];
+    case "ad_creatives":
+      return (
+        await sql`SELECT user_id, organization_id FROM ad_creatives WHERE id = ${id} LIMIT 1`
+      )[0];
+    case "scheduled_posts":
+      return (
+        await sql`SELECT user_id, organization_id FROM scheduled_posts WHERE id = ${id} LIMIT 1`
+      )[0];
+    case "campaigns":
+      return (
+        await sql`SELECT user_id, organization_id FROM campaigns WHERE id = ${id} AND deleted_at IS NULL LIMIT 1`
+      )[0];
+    case "video_clip_scripts":
+      return (
+        await sql`SELECT user_id, organization_id FROM video_clip_scripts WHERE id = ${id} LIMIT 1`
+      )[0];
+    case "carousel_scripts":
+      return (
+        await sql`SELECT user_id, organization_id FROM carousel_scripts WHERE id = ${id} LIMIT 1`
+      )[0];
+    case "week_schedules":
+      return (
+        await sql`SELECT user_id, organization_id FROM week_schedules WHERE id = ${id} LIMIT 1`
+      )[0];
+    case "tournament_events":
+      return (
+        await sql`SELECT user_id, organization_id FROM tournament_events WHERE id = ${id} LIMIT 1`
+      )[0];
+    case "instagram_accounts":
+      return (
+        await sql`SELECT user_id, organization_id FROM instagram_accounts WHERE id = ${id} LIMIT 1`
+      )[0];
+    default:
+      return null;
+  }
+}
+
+app.use("/api/db", async (req, res, next) => {
+  try {
+    const method = req.method.toUpperCase();
+    const requestPath = `${req.baseUrl}${req.path}`;
+    const matchingRules = RESOURCE_ACCESS_RULES.filter(
+      (rule) => rule.path === requestPath && rule.methods.includes(method),
+    );
+
+    if (matchingRules.length === 0) {
+      return next();
+    }
+
+    const rule = matchingRules.find((candidate) => req.query?.[candidate.idKey] !== undefined);
+    if (!rule) {
+      return next();
+    }
+
+    const id = String(req.query[rule.idKey]);
+    if (!id) {
+      return next();
+    }
+
+    const sql = getSql();
+    const resolvedUserId = await resolveUserId(sql, req.authUserId, req.requestId || 0);
+    if (!resolvedUserId) {
+      return res.status(401).json({ error: "Authenticated user not found in database" });
+    }
+
+    const owner = await getResourceOwner(sql, rule.table, id);
+    if (!owner) {
+      return res.status(404).json({ error: "Resource not found" });
+    }
+
+    if (owner.organization_id) {
+      if (!req.authOrgId || req.authOrgId !== owner.organization_id) {
+        return res.status(403).json({ error: "Forbidden resource access" });
+      }
+    } else if (owner.user_id && owner.user_id !== resolvedUserId) {
+      return res.status(403).json({ error: "Forbidden resource access" });
+    }
+
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+});
 
 // ============================================================================
 // RLS: Set session variables for Row Level Security
@@ -484,7 +788,9 @@ app.get("/api/db/health", async (req, res) => {
 // ============================================================================
 
 // Super admin emails from environment
-const SUPER_ADMIN_EMAILS = (process.env.VITE_SUPER_ADMIN_EMAILS || "")
+const SUPER_ADMIN_EMAILS = (
+  process.env.SUPER_ADMIN_EMAILS || process.env.VITE_SUPER_ADMIN_EMAILS || ""
+)
   .split(",")
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean);
@@ -1312,9 +1618,29 @@ app.get("/api/db/brand-profiles", async (req, res) => {
     const { user_id, id, organization_id } = req.query;
 
     if (id) {
+      if (!user_id) {
+        throw new ValidationError("user_id is required when querying by id");
+      }
+
+      const resolvedUserId = await resolveUserId(sql, user_id);
+      if (!resolvedUserId) {
+        return res.json(null);
+      }
+
       const result =
         await sql`SELECT * FROM brand_profiles WHERE id = ${id} AND deleted_at IS NULL LIMIT 1`;
-      return res.json(result[0] || null);
+      const profile = result[0] || null;
+      if (!profile) {
+        return res.json(null);
+      }
+
+      if (profile.organization_id) {
+        await resolveOrganizationContext(sql, resolvedUserId, profile.organization_id);
+      } else if (profile.user_id !== resolvedUserId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      return res.json(profile);
     }
 
     if (user_id) {
@@ -3330,6 +3656,12 @@ app.get("/api/generate/status", async (req, res) => {
 
     // Single job query
     if (jobId) {
+      const resolvedUserId = await resolveUserId(sql, req.authUserId);
+      if (!resolvedUserId) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const effectiveOrgId = req.authOrgId || null;
       const jobs = await sql`
         SELECT
           id, user_id, organization_id, job_type, status, progress,
@@ -3338,6 +3670,10 @@ app.get("/api/generate/status", async (req, res) => {
           config->>'_context' as context
         FROM generation_jobs
         WHERE id = ${jobId}
+          AND (
+            (${effectiveOrgId}::text IS NOT NULL AND organization_id = ${effectiveOrgId})
+            OR (${effectiveOrgId}::text IS NULL AND user_id = ${resolvedUserId} AND organization_id IS NULL)
+          )
         LIMIT 1
       `;
 
@@ -3351,7 +3687,12 @@ app.get("/api/generate/status", async (req, res) => {
     // List jobs for user
     if (userId) {
       let jobs;
-      const limitNum = Math.min(parseInt(limit) || 30, 50); // Max 50, default 30
+      const resolvedUserId = await resolveUserId(sql, userId, req.requestId || 0);
+      if (!resolvedUserId) {
+        return res.json({ jobs: [], total: 0 });
+      }
+
+      const limitNum = Math.min(parseInt(String(limit || "30"), 10) || 30, 50); // Max 50, default 30
       const cutoffDate = new Date(
         Date.now() - 24 * 60 * 60 * 1000,
       ).toISOString(); // 24 hours ago
@@ -3404,7 +3745,7 @@ app.get("/api/generate/status", async (req, res) => {
               created_at, started_at, completed_at,
               config->>'_context' as context
             FROM generation_jobs
-            WHERE user_id = ${userId} AND organization_id IS NULL AND status = ${filterStatus}
+            WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND status = ${filterStatus}
             ORDER BY created_at DESC
             LIMIT ${limitNum}
           `;
@@ -3418,7 +3759,7 @@ app.get("/api/generate/status", async (req, res) => {
               created_at, started_at, completed_at,
               config->>'_context' as context
             FROM generation_jobs
-            WHERE user_id = ${userId} AND organization_id IS NULL
+            WHERE user_id = ${resolvedUserId} AND organization_id IS NULL
               AND (
                 (status IN ('queued', 'processing') AND created_at > ${activeCutoff})
                 OR created_at > ${cutoffDate}
@@ -6755,32 +7096,10 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
       return res.status(400).json({ error: "user_id is required" });
     }
 
-    // user_id can be either DB UUID or Clerk ID - try both
-    let resolvedUserId = user_id;
-
-    // Check if it's a Clerk ID (starts with 'user_')
-    if (user_id.startsWith("user_")) {
-      const userResult =
-        await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
-      resolvedUserId = userResult[0]?.id;
-      if (!resolvedUserId) {
-        logger.debug(
-          { clerkUserId: user_id },
-          "[Instagram] User not found for Clerk ID",
-        );
-        return res.json([]);
-      }
-    } else {
-      // Assume it's a DB UUID - verify it exists
-      const userResult =
-        await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
-      if (userResult.length === 0) {
-        logger.debug(
-          { dbUserId: user_id },
-          "[Instagram] User not found for DB UUID",
-        );
-        return res.json([]);
-      }
+    const resolvedUserId = await resolveUserId(sql, String(user_id), req.requestId || 0);
+    if (!resolvedUserId) {
+      logger.debug({ user_id }, "[Instagram] User not found");
+      return res.json([]);
     }
     logger.debug({ resolvedUserId }, "[Instagram] Resolved user ID");
 
@@ -6824,30 +7143,10 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
         .json({ error: "user_id and rube_token are required" });
     }
 
-    // user_id can be either DB UUID or Clerk ID - try both
-    let resolvedUserId = user_id;
-
-    if (user_id.startsWith("user_")) {
-      const userResult =
-        await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
-      resolvedUserId = userResult[0]?.id;
-      if (!resolvedUserId) {
-        logger.debug(
-          { clerkUserId: user_id },
-          "[Instagram] User not found for Clerk ID",
-        );
-        return res.status(400).json({ error: "User not found" });
-      }
-    } else {
-      const userResult =
-        await sql`SELECT id FROM users WHERE id = ${user_id} LIMIT 1`;
-      if (userResult.length === 0) {
-        logger.debug(
-          { dbUserId: user_id },
-          "[Instagram] User not found for DB UUID",
-        );
-        return res.status(400).json({ error: "User not found" });
-      }
+    const resolvedUserId = await resolveUserId(sql, String(user_id), req.requestId || 0);
+    if (!resolvedUserId) {
+      logger.debug({ user_id }, "[Instagram] User not found");
+      return res.status(400).json({ error: "User not found" });
     }
     logger.debug({ resolvedUserId }, "[Instagram] Resolved user ID");
 
@@ -7101,7 +7400,9 @@ app.post("/api/rube", async (req, res) => {
 // Get all topics
 app.get("/api/image-playground/topics", async (req, res) => {
   try {
-    const { userId, orgId } = getAuth(req);
+    const auth = getRequestAuthContext(req);
+    const userId = auth?.userId || null;
+    const orgId = auth?.orgId || null;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const sql = getSql();
@@ -7118,7 +7419,9 @@ app.get("/api/image-playground/topics", async (req, res) => {
 // Create topic
 app.post("/api/image-playground/topics", async (req, res) => {
   try {
-    const { userId, orgId } = getAuth(req);
+    const auth = getRequestAuthContext(req);
+    const userId = auth?.userId || null;
+    const orgId = auth?.orgId || null;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { title } = req.body;
@@ -7136,7 +7439,9 @@ app.post("/api/image-playground/topics", async (req, res) => {
 // Update topic
 app.patch("/api/image-playground/topics/:id", async (req, res) => {
   try {
-    const { userId, orgId } = getAuth(req);
+    const auth = getRequestAuthContext(req);
+    const userId = auth?.userId || null;
+    const orgId = auth?.orgId || null;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { id } = req.params;
@@ -7161,7 +7466,9 @@ app.patch("/api/image-playground/topics/:id", async (req, res) => {
 // Delete topic
 app.delete("/api/image-playground/topics/:id", async (req, res) => {
   try {
-    const { userId, orgId } = getAuth(req);
+    const auth = getRequestAuthContext(req);
+    const userId = auth?.userId || null;
+    const orgId = auth?.orgId || null;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { id } = req.params;
@@ -7179,18 +7486,39 @@ app.delete("/api/image-playground/topics/:id", async (req, res) => {
 // Get batches for topic
 app.get("/api/image-playground/batches", async (req, res) => {
   try {
-    const { userId, orgId } = getAuth(req);
+    const auth = getRequestAuthContext(req);
+    const userId = auth?.userId || null;
+    const orgId = auth?.orgId || null;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const { topicId } = req.query;
+    const topicId = String(req.query.topicId || "");
     if (!topicId) return res.status(400).json({ error: "topicId required" });
+    const requestedLimit = Number.parseInt(String(req.query.limit || ""), 10);
+    const limit = Number.isFinite(requestedLimit) ? requestedLimit : 100;
 
     const sql = getSql();
     const resolvedUserId = await resolveUserId(sql, userId);
-    const batches = await getBatches(sql, topicId, resolvedUserId, orgId);
+    const batches = await getBatches(sql, topicId, resolvedUserId, orgId, limit);
 
     res.json({ batches });
   } catch (error) {
+    if (
+      typeof error?.message === "string" &&
+      error.message.toLowerCase().includes("response is too large")
+    ) {
+      logger.warn(
+        { err: error },
+        "[ImagePlayground] Batches payload too large - returning empty list",
+      );
+      return res.json({ batches: [] });
+    }
+    if (error?.code === "42P01" || error?.code === "42703") {
+      logger.warn(
+        { err: error },
+        "[ImagePlayground] Batches schema not ready - returning empty list",
+      );
+      return res.json({ batches: [] });
+    }
     logger.error({ err: error }, "[ImagePlayground] Get batches error");
     res.status(500).json({ error: error.message });
   }
@@ -7199,7 +7527,9 @@ app.get("/api/image-playground/batches", async (req, res) => {
 // Delete batch
 app.delete("/api/image-playground/batches/:id", async (req, res) => {
   try {
-    const { userId, orgId } = getAuth(req);
+    const auth = getRequestAuthContext(req);
+    const userId = auth?.userId || null;
+    const orgId = auth?.orgId || null;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { id } = req.params;
@@ -7217,7 +7547,9 @@ app.delete("/api/image-playground/batches/:id", async (req, res) => {
 // Create image generation
 app.post("/api/image-playground/generate", async (req, res) => {
   try {
-    const { userId, orgId } = getAuth(req);
+    const auth = getRequestAuthContext(req);
+    const userId = auth?.userId || null;
+    const orgId = auth?.orgId || null;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { topicId, provider, model, imageNum, params } = req.body;
@@ -7341,6 +7673,10 @@ app.post("/api/image-playground/generate", async (req, res) => {
 
     res.json({ success: true, data: result });
   } catch (error) {
+    if (req.destroyed || res.headersSent) {
+      logger.warn({ err: error }, "[ImagePlayground] Client disconnected during generate");
+      return;
+    }
     logger.error({ err: error }, "[ImagePlayground] Generate error");
     res.status(500).json({ error: error.message });
   }
@@ -7349,7 +7685,8 @@ app.post("/api/image-playground/generate", async (req, res) => {
 // Get generation status (for polling)
 app.get("/api/image-playground/status/:generationId", async (req, res) => {
   try {
-    const { userId } = getAuth(req);
+    const auth = getRequestAuthContext(req);
+    const userId = auth?.userId || null;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { generationId } = req.params;
@@ -7368,7 +7705,9 @@ app.get("/api/image-playground/status/:generationId", async (req, res) => {
 // Delete generation
 app.delete("/api/image-playground/generations/:id", async (req, res) => {
   try {
-    const { userId, orgId } = getAuth(req);
+    const auth = getRequestAuthContext(req);
+    const userId = auth?.userId || null;
+    const orgId = auth?.orgId || null;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { id } = req.params;
@@ -7386,7 +7725,8 @@ app.delete("/api/image-playground/generations/:id", async (req, res) => {
 // Generate topic title
 app.post("/api/image-playground/generate-title", async (req, res) => {
   try {
-    const { userId } = getAuth(req);
+    const auth = getRequestAuthContext(req);
+    const userId = auth?.userId || null;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { prompts } = req.body;

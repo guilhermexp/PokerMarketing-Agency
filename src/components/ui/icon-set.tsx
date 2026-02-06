@@ -1,5 +1,5 @@
 import * as React from "react";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { cn } from "@/lib/utils"; // Your utility for classname merging
 
 // Define the shape of each item in the grid
@@ -16,7 +16,7 @@ export interface IconGridProps {
 }
 
 // Animation variants for the container to orchestrate children animations
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -27,7 +27,7 @@ const containerVariants = {
 };
 
 // Animation variants for each individual grid item
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: {
     opacity: 1,
