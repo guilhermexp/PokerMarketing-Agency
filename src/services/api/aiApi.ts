@@ -260,12 +260,14 @@ export async function generateAiCampaign(
 export async function generateVideo(params: {
   prompt: string;
   aspectRatio: '16:9' | '9:16';
+  resolution?: '720p' | '1080p';
   model: ApiVideoModel;
   imageUrl?: string;
   lastFrameUrl?: string;
   sceneDuration?: number;
   generateAudio?: boolean;
   useInterpolation?: boolean;
+  useBrandProfile?: boolean;
 }): Promise<string> {
   const result = await fetchAiApi<VideoGenerationResult>('/video', {
     method: 'POST',

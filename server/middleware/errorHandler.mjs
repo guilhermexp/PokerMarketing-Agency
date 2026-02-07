@@ -111,8 +111,8 @@ function logError(error, req, requestId) {
     method: req.method,
     url: req.url,
     path: req.path,
-    userId: req.auth?.userId,
-    organizationId: req.auth?.orgId,
+    userId: req.authUserId || req.internalAuth?.userId,
+    organizationId: req.authOrgId || req.internalAuth?.orgId || null,
     ip: req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress,
   };
 

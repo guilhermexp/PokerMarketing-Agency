@@ -55,8 +55,8 @@ function customRequestSerializer(req) {
     path: req.path,
     query: req.query,
     // Include auth context if available
-    userId: req.auth?.userId,
-    organizationId: req.auth?.orgId,
+    userId: req.authUserId || req.internalAuth?.userId,
+    organizationId: req.authOrgId || req.internalAuth?.orgId || null,
     // Include IP for security auditing
     ip: req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress,
     // Include user agent for debugging

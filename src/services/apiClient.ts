@@ -6,6 +6,12 @@
 import { getAuthToken } from "./authService";
 
 const API_BASE = "/api/db";
+const DEV_API_ORIGIN =
+  import.meta.env.DEV && import.meta.env.VITE_API_ORIGIN
+    ? import.meta.env.VITE_API_ORIGIN
+    : import.meta.env.DEV
+      ? "http://localhost:3002"
+      : "";
 
 // ============================================================================
 // OPTIMIZED: Unified Initial Data Load
@@ -1275,7 +1281,7 @@ export async function cancelAllGenerationJobs(userId: string): Promise<number> {
 // These endpoints run on Vercel Serverless with rate limiting
 // ============================================================================
 
-const AI_API_BASE = "/api/ai";
+const AI_API_BASE = `${DEV_API_ORIGIN}/api/ai`;
 
 /**
  * Helper to make authenticated AI API calls
@@ -1289,21 +1295,30 @@ async function fetchAiApi<T>(
     "Content-Type": "application/json",
   };
 
-  // Add auth token if available
-  if (getToken) {
-    const token = await getToken();
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
+  // Add auth token (explicit getter first, then Clerk fallback)
+  const token = getToken ? await getToken() : await getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${AI_API_BASE}${endpoint}`, {
-    ...options,
-    headers: {
-      ...headers,
-      ...options.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${AI_API_BASE}${endpoint}`, {
+      ...options,
+      credentials: "include",
+      headers: {
+        ...headers,
+        ...options.headers,
+      },
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(
+        "Nao foi possivel conectar ao servidor de IA. Verifique se a API local (porta 3002) esta ativa.",
+      );
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     const error = await response
@@ -1550,26 +1565,33 @@ export interface VideoGenerationResult {
 export async function generateVideo(params: {
   prompt: string;
   aspectRatio: "16:9" | "9:16";
+  resolution?: "720p" | "1080p";
   model: ApiVideoModel;
   imageUrl?: string;
   lastFrameUrl?: string;
   sceneDuration?: number;
   generateAudio?: boolean;
   useInterpolation?: boolean;
+  useBrandProfile?: boolean;
 }): Promise<string> {
-  const response = await fetch("/api/ai/video", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(
-      error.error || `Video generation failed: HTTP ${response.status}`,
+  try {
+    const result = await fetchAiApi<VideoGenerationResult>(
+      "/video",
+      {
+        method: "POST",
+        body: JSON.stringify(params),
+      },
     );
+    return result.url;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("Nao foi possivel conectar ao servidor de IA")
+    ) {
+      throw new Error(
+        "Servidor de video indisponivel no momento. Verifique se a API local esta rodando na porta 3002.",
+      );
+    }
+    throw error;
   }
-
-  const result: VideoGenerationResult = await response.json();
-  return result.url;
 }

@@ -138,24 +138,6 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
     );
   }, []);
 
-  const buildPrompt = useCallback((basePrompt: string) => {
-    const additions: string[] = [];
-
-    if (useBrandProfile) {
-      additions.push(`Marca: ${brandProfile.name}`);
-      if (brandProfile.description) {
-        additions.push(`Descricao da marca: ${brandProfile.description}`);
-      }
-      additions.push(`Tom de voz: ${brandProfile.toneOfVoice}`);
-    }
-
-    additions.push(`Qualidade visual alvo: ${resolution}`);
-
-    if (additions.length === 0) return basePrompt.trim();
-
-    return `${basePrompt.trim()}\n\nDiretrizes adicionais:\n- ${additions.join('\n- ')}`;
-  }, [brandProfile, resolution, useBrandProfile]);
-
   const handleGenerate = useCallback(async () => {
     const promptValue = prompt.trim();
     if (!promptValue || isSubmitting) return;
@@ -190,13 +172,14 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
     setIsSubmitting(true);
 
     try {
-      const promptWithContext = buildPrompt(promptValue);
       const apiAspectRatio: '16:9' | '9:16' =
         aspectRatio === PlaygroundAspectRatio.LANDSCAPE ? '16:9' : '9:16';
       const videoUrl = await generateVideoDirect({
-        prompt: promptWithContext,
+        prompt: promptValue,
         model: selectedModel,
         aspectRatio: apiAspectRatio,
+        resolution,
+        useBrandProfile,
         generateAudio: true,
         imageUrl: referenceImage
           ? `data:${referenceImage.mimeType};base64,${referenceImage.base64}`
@@ -214,13 +197,13 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
     aspectRatio,
     brandProfile.logo,
     brandProfile.name,
-    buildPrompt,
     isSubmitting,
     prompt,
     referenceImage,
     resolution,
     selectedModel,
     updateFeedPost,
+    useBrandProfile,
     userId,
   ]);
 

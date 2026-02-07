@@ -134,7 +134,7 @@ app.use((req, res, next) => {
     if (!userId) {
       return res.status(400).json({ error: "internal user id is required" });
     }
-    req.auth = {
+    req.internalAuth = {
       userId,
       orgId,
     };
@@ -226,10 +226,10 @@ function checkAiRateLimit(identifier) {
 }
 
 function getRequestAuthContext(req) {
-  if (req.auth?.userId) {
+  if (req.internalAuth?.userId) {
     return {
-      userId: req.auth.userId,
-      orgId: req.auth.orgId || null,
+      userId: req.internalAuth.userId,
+      orgId: req.internalAuth.orgId || null,
     };
   }
 
@@ -4563,6 +4563,68 @@ PRESERVAÇÃO DO LOGO (INVIOLÁVEL):
   return fullPrompt;
 };
 
+const buildVideoPrompt = (
+  prompt,
+  brandProfile,
+  {
+    resolution = "720p",
+    aspectRatio = "16:9",
+    hasReferenceImage = false,
+    isInterpolationMode = false,
+    useCampaignGradePrompt = true,
+  } = {},
+) => {
+  const toneText =
+    getToneText(brandProfile, "videos") || brandProfile?.toneOfVoice || "";
+  const primaryColor = brandProfile?.primaryColor || "#000000";
+  const secondaryColor = brandProfile?.secondaryColor || "#FFFFFF";
+  const tertiaryColor = brandProfile?.tertiaryColor || "";
+  const palette = [primaryColor, secondaryColor, tertiaryColor]
+    .filter(Boolean)
+    .join(", ");
+
+  if (useCampaignGradePrompt) {
+    return `BRIEF CRIATIVO (MODO CAMPAIGN-GRADE):
+- Prompt base: ${prompt}
+- Formato: ${aspectRatio}
+- Qualidade alvo: ${resolution}
+- Marca: ${brandProfile?.name || "Não especificado"}
+- Descrição da marca: ${brandProfile?.description || "Não especificado"}
+- Cores oficiais: ${palette || "Não especificado"}
+- Tom de voz: ${toneText || "Profissional"}
+
+REGRAS OBRIGATÓRIAS:
+1. Gere um vídeo com padrão de agência premium, cinematográfico e altamente profissional.
+2. Preserve a identidade da marca em TODOS os frames (paleta, linguagem visual e tom).
+3. Use direção de arte sofisticada, iluminação profissional e composição com hierarquia clara.
+4. Evite estética genérica: o resultado deve parecer campanha publicitária de alto nível.
+5. Se houver texto em cena, ele deve estar em PORTUGUÊS e com legibilidade alta.
+6. Mantenha consistência de continuidade visual entre início, meio e fim.
+
+DIRETRIZES DE EXECUÇÃO:
+- Garanta movimento de câmera intencional e fluido, sem jitter.
+- Priorize acabamento clean/premium e contraste adequado.
+- Evite elementos fora da paleta principal da marca.
+${hasReferenceImage ? "- Use a imagem de referência como base de estilo/composição, sem perder identidade da marca." : ""}
+${isInterpolationMode ? "- Interpole de forma suave entre quadro inicial e final, preservando continuidade cinematográfica." : ""}`;
+  }
+
+  return `PROMPT TÉCNICO: ${prompt}
+ESTILO DE VÍDEO: ${toneText ? `${toneText}, ` : ""}Identidade visual da marca (${palette}), composição cinematográfica, iluminação profissional e acabamento premium.
+QUALIDADE VISUAL ALVO: ${resolution}.
+
+CONTEXTO DA MARCA:
+- Nome: ${brandProfile?.name || "Não especificado"}
+- Descrição: ${brandProfile?.description || "Não especificado"}
+- Cores oficiais: ${palette}
+- Tom de voz: ${toneText || "Não especificado"}
+
+REGRAS DE IDENTIDADE:
+- Preserve consistência visual com a marca em todos os frames
+- Evite elementos fora da paleta principal da marca
+- Priorize estética de marketing premium e legibilidade visual`;
+};
+
 const convertImagePromptToJson = async (
   prompt,
   aspectRatio,
@@ -6834,20 +6896,24 @@ async function generateVideoWithFal(
 
 app.post("/api/ai/video", async (req, res) => {
   const timer = createTimer();
-  const auth = getAuth(req);
-  const organizationId = auth?.orgId || null;
+  const authContext = getRequestAuthContext(req);
+  const organizationId = authContext?.orgId || null;
+  const authUserId = authContext?.userId || null;
   const sql = getSql();
 
   try {
     const {
       prompt,
       aspectRatio,
+      resolution = "720p",
       model,
       imageUrl,
       lastFrameUrl,
       sceneDuration,
       generateAudio = true,
       useInterpolation = false,
+      useBrandProfile = false,
+      useCampaignGradePrompt = true,
     } = req.body;
 
     if (!prompt || !aspectRatio || !model) {
@@ -6857,8 +6923,56 @@ app.post("/api/ai/video", async (req, res) => {
     }
 
     const isInterpolationMode = useInterpolation && lastFrameUrl;
+    let finalPrompt = prompt;
+    let mappedBrandProfile = null;
+
+    if (useBrandProfile && authUserId) {
+      const resolvedUserId = await resolveUserId(sql, authUserId);
+      const isOrgContext = !!organizationId;
+      const brandProfileResult =
+        isOrgContext
+          ? await sql`SELECT * FROM brand_profiles WHERE organization_id = ${organizationId} AND deleted_at IS NULL LIMIT 1`
+          : resolvedUserId
+            ? await sql`SELECT * FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`
+            : [];
+
+      const brandProfile = brandProfileResult[0];
+      if (brandProfile) {
+        mappedBrandProfile = {
+          name: brandProfile.name,
+          description: brandProfile.description,
+          logo: brandProfile.logo_url,
+          primaryColor: brandProfile.primary_color,
+          secondaryColor: brandProfile.secondary_color,
+          tertiaryColor: brandProfile.tertiary_color,
+          toneOfVoice: brandProfile.tone_of_voice,
+          toneTargets: brandProfile.settings?.toneTargets || [
+            "campaigns",
+            "posts",
+            "images",
+            "flyers",
+          ],
+        };
+
+        finalPrompt = buildVideoPrompt(prompt, mappedBrandProfile, {
+          resolution,
+          aspectRatio,
+          hasReferenceImage: !!imageUrl,
+          isInterpolationMode,
+          useCampaignGradePrompt,
+        });
+      }
+    }
+
     logger.info(
-      { model, generateAudio, isInterpolation: isInterpolationMode },
+      {
+        model,
+        generateAudio,
+        isInterpolation: isInterpolationMode,
+        useBrandProfile,
+        useCampaignGradePrompt,
+        hasBrandProfile: !!mappedBrandProfile,
+      },
       "[Video API] Generating video",
     );
 
@@ -6868,7 +6982,7 @@ app.post("/api/ai/video", async (req, res) => {
     // For Veo 3.1, use Google API only (no fallback).
     if (model === "veo-3.1" || model === "veo-3.1-fast-generate-preview") {
       videoUrl = await generateVideoWithGoogleVeo(
-        prompt,
+        finalPrompt,
         aspectRatio,
         imageUrl,
         isInterpolationMode ? lastFrameUrl : null,
@@ -6877,7 +6991,7 @@ app.post("/api/ai/video", async (req, res) => {
       // For Sora-2 or other models, use FAL.ai directly.
       usedProvider = "fal.ai";
       videoUrl = await generateVideoWithFal(
-        prompt,
+        finalPrompt,
         aspectRatio,
         model,
         imageUrl,
@@ -6925,9 +7039,13 @@ app.post("/api/ai/video", async (req, res) => {
       status: "success",
       metadata: {
         aspectRatio,
+        resolution,
         provider: usedProvider,
         hasImageUrl: !!imageUrl,
         isInterpolation: isInterpolationMode,
+        useBrandProfile,
+        useCampaignGradePrompt,
+        hasBrandProfile: !!mappedBrandProfile,
       },
     });
 

@@ -24,6 +24,77 @@ export function registerImagePlaygroundRoutes(
     buildImagePrompt,
   },
 ) {
+  const inferMimeTypeFromSource = (source) => {
+    if (!source || typeof source !== "string") return "image/png";
+    const cleanSource = source.split("?")[0].toLowerCase();
+    if (cleanSource.endsWith(".svg")) return "image/svg+xml";
+    if (cleanSource.endsWith(".jpg") || cleanSource.endsWith(".jpeg")) {
+      return "image/jpeg";
+    }
+    if (cleanSource.endsWith(".webp")) return "image/webp";
+    return "image/png";
+  };
+
+  const parseDataUrl = (value) => {
+    if (!value || typeof value !== "string") return null;
+    const match = value.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return null;
+    return { mimeType: match[1], base64: match[2] };
+  };
+
+  const getLogoInlineImage = async (logoSource) => {
+    if (!logoSource || typeof logoSource !== "string") return null;
+
+    // data URL
+    const parsedDataUrl = parseDataUrl(logoSource);
+    if (parsedDataUrl) {
+      return {
+        base64: parsedDataUrl.base64,
+        mimeType: parsedDataUrl.mimeType || "image/png",
+      };
+    }
+
+    // http URL
+    if (logoSource.startsWith("http")) {
+      const logoBase64 = await urlToBase64(logoSource);
+      if (!logoBase64) return null;
+      return {
+        base64: logoBase64,
+        mimeType: inferMimeTypeFromSource(logoSource),
+      };
+    }
+
+    // raw base64 fallback
+    return { base64: logoSource, mimeType: "image/png" };
+  };
+
+  const buildCampaignGradeImagePrompt = (prompt, brandProfile) => {
+    const toneText = brandProfile?.toneOfVoice
+      ? `Tom de voz: ${brandProfile.toneOfVoice}.`
+      : "";
+    const colorsText = [
+      brandProfile?.primaryColor,
+      brandProfile?.secondaryColor,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    return `BRIEF CRIATIVO (MODO CAMPAIGN-GRADE):
+- Prompt base: ${prompt}
+- Marca: ${brandProfile?.name || "Não especificado"}
+- Descrição da marca: ${brandProfile?.description || "Não especificado"}
+- Cores oficiais: ${colorsText || "Não especificado"}
+- ${toneText || "Tom de voz: profissional."}
+
+REGRAS OBRIGATÓRIAS:
+1. A imagem deve parecer peça publicitária premium de agência.
+2. Use composição cinematográfica, acabamento luxuoso e direção de arte profissional.
+3. Preserve consistência de identidade visual (cores, tom e linguagem da marca).
+4. Se houver texto na peça, ele deve estar em PORTUGUÊS e com alta legibilidade.
+5. Evite visual genérico; entregue resultado autoral e sofisticado.
+6. Priorize hierarquia visual forte, contraste e clareza da mensagem.`;
+  };
+
   // Get all topics
   app.get("/api/image-playground/topics", async (req, res) => {
     try {
@@ -221,52 +292,56 @@ export function registerImagePlaygroundRoutes(
             ],
           };
 
-          // 1. Prepare productImages with logo (same as /api/ai/image)
-          let productImages = [];
-          if (
-            mappedBrandProfile.logo &&
-            mappedBrandProfile.logo.startsWith("http")
-          ) {
-            try {
-              const logoBase64 = await urlToBase64(mappedBrandProfile.logo);
-              if (logoBase64) {
-                logger.debug(
-                  {},
-                  "[ImagePlayground] Including brand logo from HTTP URL",
-                );
-                const mimeType = mappedBrandProfile.logo.includes(".svg")
-                  ? "image/svg+xml"
-                  : mappedBrandProfile.logo.includes(".jpg") ||
-                      mappedBrandProfile.logo.includes(".jpeg")
-                    ? "image/jpeg"
-                    : "image/png";
-                productImages.push({ base64: logoBase64, mimeType });
-              }
-            } catch (err) {
-              logger.warn(
-                { errorMessage: err.message },
-                "[ImagePlayground] Failed to include brand logo",
-              );
+          // 1. Prepare productImages with logo + optional client images
+          const clientProductImages = Array.isArray(params.productImages)
+            ? params.productImages.filter((img) => img?.base64 && img?.mimeType)
+            : [];
+          const productImages = [...clientProductImages];
+          let hasLogo = false;
+          try {
+            const logoInlineImage = await getLogoInlineImage(mappedBrandProfile.logo);
+            if (logoInlineImage) {
+              productImages.unshift(logoInlineImage);
+              hasLogo = true;
+              logger.debug({}, "[ImagePlayground] Brand logo included in prompt");
             }
+          } catch (err) {
+            logger.warn(
+              { errorMessage: err.message },
+              "[ImagePlayground] Failed to include brand logo",
+            );
           }
+
+          const hasStyleReference =
+            (Array.isArray(params.referenceImages) &&
+              params.referenceImages.length > 0) ||
+            !!params.imageUrl;
+          const hasPersonReference = !!params.personReferenceImage;
+          const hasProductImagesBeyondLogo =
+            productImages.length > (hasLogo ? 1 : 0);
+
+          // Optional safety valve for future UI toggle; defaults to enabled.
+          const useCampaignGradePrompt = params.useCampaignGradePrompt !== false;
+          const basePrompt = useCampaignGradePrompt
+            ? buildCampaignGradeImagePrompt(params.prompt, mappedBrandProfile)
+            : params.prompt;
 
           // 2. Convert prompt to JSON structured format (same as /api/ai/image)
           const jsonPrompt = await convertImagePromptToJson(
-            params.prompt,
+            basePrompt,
             params.aspectRatio || "1:1",
             orgId,
             sql,
           );
 
           // 3. Build full prompt using buildImagePrompt (same as /api/ai/image)
-          const hasLogo = productImages.length > 0;
           const fullPrompt = buildImagePrompt(
-            params.prompt,
+            basePrompt,
             mappedBrandProfile,
-            false, // hasStyleReference
+            hasStyleReference,
             hasLogo,
-            false, // hasPersonReference
-            false, // hasProductImages (beyond logo)
+            hasPersonReference,
+            hasProductImagesBeyondLogo,
             jsonPrompt,
           );
 
@@ -281,7 +356,13 @@ export function registerImagePlaygroundRoutes(
           };
 
           logger.info(
-            { brandName: mappedBrandProfile.name, hasLogo },
+            {
+              brandName: mappedBrandProfile.name,
+              hasLogo,
+              hasStyleReference,
+              hasProductImagesBeyondLogo,
+              useCampaignGradePrompt,
+            },
             "[ImagePlayground] Brand profile applied",
           );
         }
