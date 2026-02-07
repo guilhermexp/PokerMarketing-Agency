@@ -10,6 +10,7 @@ import "dotenv/config";
 
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import path from "path";
 import { fileURLToPath } from "url";
 import { neon } from "@neondatabase/serverless";
@@ -108,6 +109,27 @@ app.use(
   }),
 );
 app.use(express.json({ limit: "50mb" }));
+
+// Security headers middleware
+// Helmet adds various HTTP security headers to protect against common vulnerabilities
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://clerk.*.clerk.accounts.dev"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+        connectSrc: ["'self'", "https:", "wss:"],
+        fontSrc: ["'self'", "data:", "https:"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'", "blob:", "https:"],
+        frameSrc: ["'self'", "https://clerk.*.clerk.accounts.dev"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 
 // Clerk authentication middleware
 // Adds auth object to all requests (non-blocking)
