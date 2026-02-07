@@ -354,6 +354,7 @@ function AppContent() {
     addImage: swrAddGalleryImage,
     removeImage: swrRemoveGalleryImage,
     updateImage: swrUpdateGalleryImage,
+    refresh: refreshGallery,
     // loadMore: galleryLoadMore,
     // isLoadingMore: galleryIsLoadingMore,
     // hasMore: galleryHasMore,
@@ -912,6 +913,10 @@ function AppContent() {
             setToolImageReference({ id: imageId, src: srcUrl });
           console.log('🗃️ [App] Cache updated with blob URL');
         }
+
+        // Refresh gallery to ensure UI reflects the edit
+        refreshGallery();
+        console.log('🗃️ [App] Gallery refreshed after image edit');
       } catch (e) {
         console.error("🗃️ [App] Failed to update image in database:", e);
       }
@@ -919,6 +924,7 @@ function AppContent() {
   }, [
     setToolImageReference,
     swrUpdateGalleryImage,
+    refreshGallery,
     toolImageReference?.id,
   ]);
 
