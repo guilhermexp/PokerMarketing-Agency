@@ -53,6 +53,7 @@ interface GalleryItemProps {
   getVideoPoster: (img: GalleryImage) => string | undefined;
   onDelete?: (id: string) => void;
   className?: string;
+  isNew?: boolean;
 }
 
 const GalleryItem: React.FC<GalleryItemProps> = ({
@@ -66,14 +67,30 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
   getVideoPoster,
   onDelete,
   className = "",
+  isNew = false,
 }) => {
   const [videoError, setVideoError] = React.useState(false);
+  const [showHighlight, setShowHighlight] = React.useState(isNew);
   const poster = getVideoPoster(image);
+
+  useEffect(() => {
+    if (isNew) {
+      setShowHighlight(true);
+      const timer = setTimeout(() => setShowHighlight(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isNew]);
 
   return (
     <div
       onClick={() => !isAudio(image) && onSelect(image)}
-      className={`group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 ${isAudio(image) ? "" : "cursor-pointer"} ${className}`}
+      className={`group relative overflow-hidden rounded-xl border transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 ${
+        isAudio(image) ? "" : "cursor-pointer"
+      } ${
+        showHighlight
+          ? "border-primary/60 shadow-lg shadow-primary/30 animate-[pulse_2s_ease-in-out] bg-[#111111]"
+          : "border-white/5 bg-[#111111]"
+      } ${className}`}
     >
       {isAudio(image) ? (
         <div className="w-full aspect-[4/3] bg-gradient-to-br from-primary/20 via-[#1a1a1a] to-[#111] flex flex-col items-center justify-center p-4">
@@ -258,6 +275,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [newImageIds, setNewImageIds] = useState<Set<string>>(new Set());
+  const previousImageIdsRef = React.useRef<Set<string>>(new Set());
 
   const handleImageUpdate = (newSrc: string) => {
     if (selectedImage) {
@@ -393,6 +412,34 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       filterConfig.sources.some((source) => img.source === source),
     );
   }, [deduplicatedImages, sourceFilter]);
+
+  // Track newly added images
+  useEffect(() => {
+    const currentImageIds = new Set(images.map((img) => img.id));
+    const previousIds = previousImageIdsRef.current;
+
+    // Find new images (in current but not in previous)
+    const newIds = new Set<string>();
+    currentImageIds.forEach((id) => {
+      if (!previousIds.has(id)) {
+        newIds.add(id);
+      }
+    });
+
+    if (newIds.size > 0) {
+      setNewImageIds(newIds);
+      // Clear new image indicators after 3 seconds
+      const timer = setTimeout(() => setNewImageIds(new Set()), 3000);
+
+      // Update ref for next comparison
+      previousImageIdsRef.current = currentImageIds;
+
+      return () => clearTimeout(timer);
+    } else {
+      // Update ref even if no new images
+      previousImageIdsRef.current = currentImageIds;
+    }
+  }, [images]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -613,6 +660,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       getVideoPoster={getVideoPoster}
                       onDelete={onDeleteImage}
                       className="break-inside-avoid mb-3"
+                      isNew={newImageIds.has(image.id)}
                     />
                   ))}
                 </div>
