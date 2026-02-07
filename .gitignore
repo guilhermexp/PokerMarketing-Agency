@@ -38,3 +38,16 @@ dev-dist
 .security-key
 logs/security/
 qa_report.md
+
+# Auto-claude verification artifacts (test scripts & reports in root)
+test-*.mjs
+verify-*.mjs
+test-*.sh
+verify-*.sh
+*-verification-report.md
+*-VERIFICATION*.md
+*-SUMMARY.md
+*-TEST.md
+ACCEPTANCE-*.md
+docs/IMAGE-GENERATION-SUMMARY.md
+docs/security/XSS_PROTECTION_VERIFICATION.md

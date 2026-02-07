@@ -109,31 +109,52 @@ app.use(
   }),
 );
 
-// JSON body size limit for DoS prevention
-// Images are uploaded to Vercel Blob separately (not in request body)
-// Largest legitimate payloads (campaign data, posts) are typically <100KB
-app.use(express.json({ limit: "10mb" }));
-
-// Security headers middleware
-// Helmet adds various HTTP security headers to protect against common vulnerabilities
+// Security headers middleware (placed first so even error responses get headers)
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://clerk.*.clerk.accounts.dev"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
-        connectSrc: ["'self'", "https:", "wss:"],
-        fontSrc: ["'self'", "data:", "https:"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'", // required by Vite dev + importmap dynamic imports
+          "https://*.clerk.accounts.dev",
+          "https://cdn.jsdelivr.net",
+          "https://aistudiocdn.com",
+        ],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "blob:",
+          "https://*.blob.vercel-storage.com",
+          "https://*.public.blob.vercel-storage.com",
+        ],
+        connectSrc: [
+          "'self'",
+          "https://*.clerk.accounts.dev",
+          "https://api.clerk.com",
+          "https://*.blob.vercel-storage.com",
+          "https://cdn.jsdelivr.net",
+          "https://aistudiocdn.com",
+          "wss:", // Vite HMR in dev
+        ],
+        fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
-        mediaSrc: ["'self'", "blob:", "https:"],
-        frameSrc: ["'self'", "https://clerk.*.clerk.accounts.dev"],
+        mediaSrc: ["'self'", "blob:", "https://*.blob.vercel-storage.com"],
+        frameSrc: ["'self'", "https://*.clerk.accounts.dev"],
+        workerSrc: ["'self'", "blob:"], // ffmpeg web workers
       },
     },
     crossOriginEmbedderPolicy: false,
   }),
 );
+
+// JSON body size limit for DoS prevention
+// Images are uploaded to Vercel Blob separately (not in request body)
+// Largest legitimate payloads (campaign data, posts) are typically <100KB
+app.use(express.json({ limit: "10mb" }));
 
 // Clerk authentication middleware
 // Adds auth object to all requests (non-blocking)

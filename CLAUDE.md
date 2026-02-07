@@ -46,7 +46,7 @@ node scripts/check-all-data-urls.mjs  # Diagnose remaining data URLs
 
 ### Stack
 - **Frontend**: React 19 + TypeScript + Vite + TailwindCSS 4
-- **Backend**: Express 5 (Node.js) - two files: `server/dev-api.mjs` (dev) and `server/index.mjs` (prod)
+- **Backend**: Express 5 (Node.js) - unified server in `server/index.mjs` (dev entrypoint `server/dev-api.mjs` just re-exports it)
 - **Database**: Neon Serverless Postgres via `@neondatabase/serverless`
 - **Storage**: Vercel Blob for images
 - **Queue**: Redis + BullMQ (for scheduled posts only; image jobs removed)
@@ -76,8 +76,8 @@ Frontend (React) → Express API → Neon Postgres
 ## Key Files
 
 ### Server (Express API)
-- `server/dev-api.mjs` - Development API (~6,900 lines, monolithic)
-- `server/index.mjs` - Production API (~6,900 lines, mirrors dev-api)
+- `server/index.mjs` - Unified API server (~7K lines, monolithic)
+- `server/dev-api.mjs` - Development entrypoint (1-line, imports index.mjs)
 - `server/helpers/job-queue.mjs` - BullMQ setup for scheduled posts
 
 ### Frontend Entry Points
@@ -116,13 +116,13 @@ CLERK_SECRET_KEY=sk_test_...
 
 ### Request Body Size Limits
 - JSON request bodies are limited to **10MB** to prevent denial-of-service attacks
-- This limit is enforced in both `server/dev-api.mjs` and `server/index.mjs`
+- This limit is enforced in `server/index.mjs` (used by both dev and prod entrypoints)
 - Requests exceeding this limit will receive a 413 (Payload Too Large) error
 - For large data transfers, use multipart uploads or chunked transfers instead
 
 ## Known Technical Debt
 
-- Server files are monolithic (~7K lines each) - see `docs/REFACTORING_PLAN.md`
+- Server file is monolithic (~7K lines) - see `docs/REFACTORING_PLAN.md`
 - `src/components/tabs/clips/ClipCard.tsx` is ~5,500 lines
 - Many `console.log` statements need structured logging
 - 66+ uses of TypeScript `any` type
