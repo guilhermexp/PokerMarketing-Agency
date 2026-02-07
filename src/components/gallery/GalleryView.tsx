@@ -5,9 +5,11 @@ import { ImagePreviewModal } from "../common/ImagePreviewModal";
 
 interface GalleryViewProps {
   images: GalleryImage[];
+  isLoading?: boolean;
   onUpdateImage: (imageId: string, newImageSrc: string) => void;
   onDeleteImage?: (imageId: string) => void;
   onSetChatReference: (image: GalleryImage) => void;
+  onRefresh?: () => void;
   styleReferences: StyleReference[];
   onAddStyleReference: (ref: Omit<StyleReference, "id" | "createdAt">) => void;
   onRemoveStyleReference: (id: string) => void;
@@ -52,6 +54,7 @@ interface GalleryItemProps {
   getVideoPoster: (img: GalleryImage) => string | undefined;
   onDelete?: (id: string) => void;
   className?: string;
+  isNew?: boolean;
 }
 
 const GalleryItem: React.FC<GalleryItemProps> = ({
@@ -65,14 +68,30 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
   getVideoPoster,
   onDelete,
   className = "",
+  isNew = false,
 }) => {
   const [videoError, setVideoError] = React.useState(false);
+  const [showHighlight, setShowHighlight] = React.useState(isNew);
   const poster = getVideoPoster(image);
+
+  useEffect(() => {
+    if (isNew) {
+      setShowHighlight(true);
+      const timer = setTimeout(() => setShowHighlight(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isNew]);
 
   return (
     <div
       onClick={() => !isAudio(image) && onSelect(image)}
-      className={`group relative overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 ${isAudio(image) ? "" : "cursor-pointer"} ${className}`}
+      className={`group relative overflow-hidden rounded-xl border transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 ${
+        isAudio(image) ? "" : "cursor-pointer"
+      } ${
+        showHighlight
+          ? "border-primary/60 shadow-lg shadow-primary/30 animate-[pulse_2s_ease-in-out] bg-[#111111]"
+          : "border-white/5 bg-[#111111]"
+      } ${className}`}
     >
       {isAudio(image) ? (
         <div className="w-full aspect-[4/3] bg-gradient-to-br from-primary/20 via-[#1a1a1a] to-[#111] flex flex-col items-center justify-center p-4">
@@ -240,9 +259,11 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
 
 export const GalleryView: React.FC<GalleryViewProps> = ({
   images,
+  isLoading = false,
   onUpdateImage,
   onDeleteImage,
   onSetChatReference,
+  onRefresh,
   styleReferences,
   onAddStyleReference,
   onRemoveStyleReference,
@@ -256,14 +277,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [newImageIds, setNewImageIds] = useState<Set<string>>(new Set());
+  const previousImageIdsRef = React.useRef<Set<string>>(new Set());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleImageUpdate = (newSrc: string) => {
     if (selectedImage) {
-      console.log('🖼️ [GalleryView] handleImageUpdate:', {
-        imageId: selectedImage.id,
-        oldSrc: selectedImage.src.substring(0, 50),
-        newSrc: newSrc.substring(0, 50),
-      });
       onUpdateImage(selectedImage.id, newSrc);
       setSelectedImage((prev) => (prev ? { ...prev, src: newSrc } : null));
     }
@@ -281,6 +300,16 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleRefresh = async () => {
+    if (!onRefresh || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Check if image is already in favorites
@@ -391,6 +420,34 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       filterConfig.sources.some((source) => img.source === source),
     );
   }, [deduplicatedImages, sourceFilter]);
+
+  // Track newly added images
+  useEffect(() => {
+    const currentImageIds = new Set(images.map((img) => img.id));
+    const previousIds = previousImageIdsRef.current;
+
+    // Find new images (in current but not in previous)
+    const newIds = new Set<string>();
+    currentImageIds.forEach((id) => {
+      if (!previousIds.has(id)) {
+        newIds.add(id);
+      }
+    });
+
+    if (newIds.size > 0) {
+      setNewImageIds(newIds);
+      // Clear new image indicators after 3 seconds
+      const timer = setTimeout(() => setNewImageIds(new Set()), 3000);
+
+      // Update ref for next comparison
+      previousImageIdsRef.current = currentImageIds;
+
+      return () => clearTimeout(timer);
+    } else {
+      // Update ref even if no new images
+      previousImageIdsRef.current = currentImageIds;
+    }
+  }, [images]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -528,6 +585,21 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                   </button>
                 </div>
 
+                {/* Refresh button */}
+                {onRefresh && (
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="flex items-center justify-center w-9 h-9 bg-transparent border border-white/[0.06] rounded-lg text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Atualizar galeria"
+                  >
+                    <Icon
+                      name="refresh-cw"
+                      className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+                    />
+                  </button>
+                )}
+
                 {/* Add button - only show in references mode */}
                 {viewMode === "references" && (
                   <button
@@ -583,7 +655,17 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
         {viewMode === "gallery" ? (
           /* Gallery View - Masonry Layout */
-          filteredImages.length > 0 ? (
+          isLoading ? (
+            /* Loading State */
+            <div className="flex flex-col items-center justify-center w-full min-h-[60vh]">
+              <div className="w-12 h-12 mb-4">
+                <Icon name="refresh" className="w-12 h-12 text-primary animate-spin" />
+              </div>
+              <p className="text-white/50 text-sm font-medium">
+                Carregando galeria...
+              </p>
+            </div>
+          ) : filteredImages.length > 0 ? (
             <div className="space-y-6">
               {/* Gallery Grid */}
               {sortedImages.length > 0 && (
@@ -601,6 +683,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       getVideoPoster={getVideoPoster}
                       onDelete={onDeleteImage}
                       className="break-inside-avoid mb-3"
+                      isNew={newImageIds.has(image.id)}
                     />
                   ))}
                 </div>
@@ -642,7 +725,17 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           /* References View */
           <div className="space-y-4">
             {/* References Grid */}
-            {styleReferences.length > 0 ? (
+            {isLoading ? (
+              /* Loading State */
+              <div className="flex flex-col items-center justify-center w-full min-h-[60vh]">
+                <div className="w-12 h-12 mb-4">
+                  <Icon name="refresh" className="w-12 h-12 text-primary animate-spin" />
+                </div>
+                <p className="text-white/50 text-sm font-medium">
+                  Carregando favoritos...
+                </p>
+              </div>
+            ) : styleReferences.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {[...styleReferences].reverse().map((ref) => (
                   <div

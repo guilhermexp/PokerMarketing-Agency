@@ -354,6 +354,8 @@ function AppContent() {
     addImage: swrAddGalleryImage,
     removeImage: swrRemoveGalleryImage,
     updateImage: swrUpdateGalleryImage,
+    refresh: refreshGallery,
+    isLoading: galleryIsLoading,
     // loadMore: galleryLoadMore,
     // isLoadingMore: galleryIsLoadingMore,
     // hasMore: galleryHasMore,
@@ -853,6 +855,9 @@ function AppContent() {
           if (toolImageReference?.id === tempId) {
             setToolImageReference({ id: dbImage.id, src: dbImage.src_url });
           }
+
+          // Refresh gallery to ensure UI reflects the new image
+          refreshGallery();
         } catch (e) {
           console.error("Failed to save image to database:", e);
         }
@@ -865,6 +870,7 @@ function AppContent() {
     setToolImageReference,
     swrAddGalleryImage,
     swrRemoveGalleryImage,
+    refreshGallery,
     toolImageReference?.id,
     userId,
   ]);
@@ -912,6 +918,9 @@ function AppContent() {
             setToolImageReference({ id: imageId, src: srcUrl });
           console.log('🗃️ [App] Cache updated with blob URL');
         }
+
+        // Refresh gallery to ensure UI reflects the edit
+        refreshGallery();
       } catch (e) {
         console.error("🗃️ [App] Failed to update image in database:", e);
       }
@@ -919,6 +928,7 @@ function AppContent() {
   }, [
     setToolImageReference,
     swrUpdateGalleryImage,
+    refreshGallery,
     toolImageReference?.id,
   ]);
 
@@ -2390,6 +2400,8 @@ function AppContent() {
                 onUpdateGalleryImage={handleUpdateGalleryImage}
                 onDeleteGalleryImage={handleDeleteGalleryImage}
                 onMarkGalleryImagePublished={handleMarkGalleryImagePublished}
+                onRefreshGallery={refreshGallery}
+                galleryIsLoading={galleryIsLoading}
                 tournamentEvents={tournamentEvents}
                 weekScheduleInfo={weekScheduleInfo}
                 onTournamentFileUpload={handleTournamentFileUpload}
