@@ -112,6 +112,14 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
 ```
 
+## Security
+
+### Request Body Size Limits
+- JSON request bodies are limited to **10MB** to prevent denial-of-service attacks
+- This limit is enforced in both `server/dev-api.mjs` and `server/index.mjs`
+- Requests exceeding this limit will receive a 413 (Payload Too Large) error
+- For large data transfers, use multipart uploads or chunked transfers instead
+
 ## Known Technical Debt
 
 - Server files are monolithic (~7K lines each) - see `docs/REFACTORING_PLAN.md`
