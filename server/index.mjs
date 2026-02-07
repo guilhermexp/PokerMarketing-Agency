@@ -4572,6 +4572,7 @@ const buildVideoPrompt = (
     hasReferenceImage = false,
     isInterpolationMode = false,
     useCampaignGradePrompt = true,
+    hasBrandLogoReference = false,
   } = {},
 ) => {
   const toneText =
@@ -4605,7 +4606,9 @@ DIRETRIZES DE EXECUÇÃO:
 - Garanta movimento de câmera intencional e fluido, sem jitter.
 - Priorize acabamento clean/premium e contraste adequado.
 - Evite elementos fora da paleta principal da marca.
+- NÃO invente logos novos, variações de símbolo ou tipografias de marca.
 ${hasReferenceImage ? "- Use a imagem de referência como base de estilo/composição, sem perder identidade da marca." : ""}
+${hasBrandLogoReference ? "- A imagem de referência contém o logo oficial da marca: preserve-o fielmente, sem redesenhar." : ""}
 ${isInterpolationMode ? "- Interpole de forma suave entre quadro inicial e final, preservando continuidade cinematográfica." : ""}`;
   }
 
@@ -4622,7 +4625,8 @@ CONTEXTO DA MARCA:
 REGRAS DE IDENTIDADE:
 - Preserve consistência visual com a marca em todos os frames
 - Evite elementos fora da paleta principal da marca
-- Priorize estética de marketing premium e legibilidade visual`;
+- Priorize estética de marketing premium e legibilidade visual
+- Não invente logos novos; use apenas elementos oficiais da marca`;
 };
 
 const convertImagePromptToJson = async (
@@ -6676,6 +6680,45 @@ const configureFal = () => {
   fal.config({ credentials: apiKey });
 };
 
+const parseDataUrlImage = (dataUrl) => {
+  if (!dataUrl || typeof dataUrl !== "string") return null;
+  const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return null;
+  const [, mimeType, base64] = matches;
+  return { mimeType, base64 };
+};
+
+const mimeTypeToExtension = (mimeType) => {
+  switch (mimeType) {
+    case "image/jpeg":
+      return "jpg";
+    case "image/webp":
+      return "webp";
+    case "image/svg+xml":
+      return "svg";
+    case "image/png":
+    default:
+      return "png";
+  }
+};
+
+async function uploadDataUrlImageToBlob(dataUrl, prefix = "video-reference") {
+  const parsed = parseDataUrlImage(dataUrl);
+  if (!parsed) return null;
+
+  const { mimeType, base64 } = parsed;
+  const buffer = Buffer.from(base64, "base64");
+  const extension = mimeTypeToExtension(mimeType);
+  const filename = `${prefix}-${Date.now()}.${extension}`;
+
+  const blob = await put(filename, buffer, {
+    access: "public",
+    contentType: mimeType,
+  });
+
+  return blob.url;
+}
+
 // Generate video using Google Veo API directly
 // Nota: Google Veo SDK não suporta duration nem generateAudio
 // lastFrameUrl enables first/last frame interpolation mode (requires durationSeconds: 8)
@@ -6925,6 +6968,8 @@ app.post("/api/ai/video", async (req, res) => {
     const isInterpolationMode = useInterpolation && lastFrameUrl;
     let finalPrompt = prompt;
     let mappedBrandProfile = null;
+    let effectiveImageUrl = imageUrl;
+    let usedBrandLogoAsReference = false;
 
     if (useBrandProfile && authUserId) {
       const resolvedUserId = await resolveUserId(sql, authUserId);
@@ -6954,13 +6999,48 @@ app.post("/api/ai/video", async (req, res) => {
           ],
         };
 
+        // Use brand logo as reference fallback when user did not provide one.
+        if (!effectiveImageUrl && mappedBrandProfile.logo) {
+          effectiveImageUrl = mappedBrandProfile.logo;
+          usedBrandLogoAsReference = true;
+        }
+
         finalPrompt = buildVideoPrompt(prompt, mappedBrandProfile, {
           resolution,
           aspectRatio,
-          hasReferenceImage: !!imageUrl,
+          hasReferenceImage: !!effectiveImageUrl,
           isInterpolationMode,
           useCampaignGradePrompt,
+          hasBrandLogoReference: usedBrandLogoAsReference,
         });
+      }
+    }
+
+    const isFalProviderModel =
+      model !== "veo-3.1" && model !== "veo-3.1-fast-generate-preview";
+
+    // FAL image-to-video requires HTTP URL. Convert data URLs when needed.
+    if (
+      effectiveImageUrl &&
+      effectiveImageUrl.startsWith("data:") &&
+      isFalProviderModel
+    ) {
+      try {
+        const uploadedRefUrl = await uploadDataUrlImageToBlob(
+          effectiveImageUrl,
+          usedBrandLogoAsReference ? "brand-logo-reference" : "video-reference",
+        );
+        if (uploadedRefUrl) {
+          effectiveImageUrl = uploadedRefUrl;
+        } else {
+          effectiveImageUrl = undefined;
+        }
+      } catch (uploadErr) {
+        logger.warn(
+          { err: uploadErr },
+          "[Video API] Failed to upload reference image for FAL provider",
+        );
+        effectiveImageUrl = undefined;
       }
     }
 
@@ -6972,6 +7052,8 @@ app.post("/api/ai/video", async (req, res) => {
         useBrandProfile,
         useCampaignGradePrompt,
         hasBrandProfile: !!mappedBrandProfile,
+        hasReferenceImage: !!effectiveImageUrl,
+        usedBrandLogoAsReference,
       },
       "[Video API] Generating video",
     );
@@ -6984,7 +7066,7 @@ app.post("/api/ai/video", async (req, res) => {
       videoUrl = await generateVideoWithGoogleVeo(
         finalPrompt,
         aspectRatio,
-        imageUrl,
+        effectiveImageUrl,
         isInterpolationMode ? lastFrameUrl : null,
       );
     } else {
@@ -6994,7 +7076,7 @@ app.post("/api/ai/video", async (req, res) => {
         finalPrompt,
         aspectRatio,
         model,
-        imageUrl,
+        effectiveImageUrl,
         sceneDuration,
         generateAudio,
       );
@@ -7041,11 +7123,12 @@ app.post("/api/ai/video", async (req, res) => {
         aspectRatio,
         resolution,
         provider: usedProvider,
-        hasImageUrl: !!imageUrl,
+        hasImageUrl: !!effectiveImageUrl,
         isInterpolation: isInterpolationMode,
         useBrandProfile,
         useCampaignGradePrompt,
         hasBrandProfile: !!mappedBrandProfile,
+        usedBrandLogoAsReference,
       },
     });
 

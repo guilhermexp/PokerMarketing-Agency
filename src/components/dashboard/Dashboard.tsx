@@ -811,7 +811,11 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         {activeView === "playground" && (
           <div className="h-full">
             <Suspense fallback={<ViewLoadingFallback />}>
-              <PlaygroundView brandProfile={brandProfile} userId={userId} />
+              <PlaygroundView
+                brandProfile={brandProfile}
+                userId={userId}
+                onAddImageToGallery={onAddImageToGallery}
+              />
             </Suspense>
           </div>
         )}

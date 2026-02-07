@@ -27,11 +27,12 @@ import {
   PostStatus,
 } from './types';
 import { generateVideo as generateVideoDirect, type ApiVideoModel } from '../../services/apiClient';
-import type { BrandProfile } from '../../types';
+import type { BrandProfile, GalleryImage } from '../../types';
 
 interface PlaygroundViewProps {
   brandProfile: BrandProfile;
   userId?: string;
+  onAddImageToGallery?: (image: Omit<GalleryImage, "id">) => GalleryImage;
 }
 
 interface ReferenceImage {
@@ -87,7 +88,11 @@ const modelToLabel = (model: ApiVideoModel): string => {
   return model === 'sora-2' ? 'Sora 2' : 'Veo 3.1';
 };
 
-export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, userId }) => {
+export const PlaygroundView: React.FC<PlaygroundViewProps> = ({
+  brandProfile,
+  userId,
+  onAddImageToGallery,
+}) => {
   const [feed, setFeed] = useState<FeedPost[]>([]);
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
@@ -186,6 +191,17 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
           : undefined,
       });
       updateFeedPost(newPostId, { status: PostStatus.SUCCESS, videoUrl });
+
+      // Persist generated videos to gallery (same behavior as other studios/tabs).
+      if (onAddImageToGallery) {
+        onAddImageToGallery({
+          src: videoUrl,
+          prompt: `[VIDEO:${selectedModel}] ${promptValue}`,
+          source: 'Video-Playground',
+          model: 'video-export',
+          mediaType: 'video',
+        });
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       updateFeedPost(newPostId, { status: PostStatus.ERROR, errorMessage });
@@ -204,6 +220,7 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({ brandProfile, us
     selectedModel,
     updateFeedPost,
     useBrandProfile,
+    onAddImageToGallery,
     userId,
   ]);
 
