@@ -3911,6 +3911,18 @@ app.get("/api/proxy-video", async (req, res) => {
 // FILE UPLOAD API (Vercel Blob)
 // ============================================================================
 
+// Allowed content types for file uploads (security: prevent XSS/code injection)
+const ALLOWED_UPLOAD_CONTENT_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "image/gif",
+  "video/mp4",
+  "video/webm",
+];
+
 // Max file size: 100MB
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
@@ -3921,6 +3933,13 @@ app.post("/api/upload", async (req, res) => {
     if (!filename || !contentType || !data) {
       return res.status(400).json({
         error: "Missing required fields: filename, contentType, data",
+      });
+    }
+
+    // Validate content type against whitelist
+    if (!ALLOWED_UPLOAD_CONTENT_TYPES.includes(contentType)) {
+      return res.status(400).json({
+        error: `Invalid content type. Allowed types: ${ALLOWED_UPLOAD_CONTENT_TYPES.join(", ")}`,
       });
     }
 
