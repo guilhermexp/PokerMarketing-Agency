@@ -2400,6 +2400,7 @@ function AppContent() {
                 onUpdateGalleryImage={handleUpdateGalleryImage}
                 onDeleteGalleryImage={handleDeleteGalleryImage}
                 onMarkGalleryImagePublished={handleMarkGalleryImagePublished}
+                onRefreshGallery={refreshGallery}
                 tournamentEvents={tournamentEvents}
                 weekScheduleInfo={weekScheduleInfo}
                 onTournamentFileUpload={handleTournamentFileUpload}

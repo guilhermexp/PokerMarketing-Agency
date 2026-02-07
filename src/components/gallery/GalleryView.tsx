@@ -9,6 +9,7 @@ interface GalleryViewProps {
   onUpdateImage: (imageId: string, newImageSrc: string) => void;
   onDeleteImage?: (imageId: string) => void;
   onSetChatReference: (image: GalleryImage) => void;
+  onRefresh?: () => void;
   styleReferences: StyleReference[];
   onAddStyleReference: (ref: Omit<StyleReference, "id" | "createdAt">) => void;
   onRemoveStyleReference: (id: string) => void;
@@ -262,6 +263,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   onUpdateImage,
   onDeleteImage,
   onSetChatReference,
+  onRefresh,
   styleReferences,
   onAddStyleReference,
   onRemoveStyleReference,
@@ -277,6 +279,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [newImageIds, setNewImageIds] = useState<Set<string>>(new Set());
   const previousImageIdsRef = React.useRef<Set<string>>(new Set());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleImageUpdate = (newSrc: string) => {
     if (selectedImage) {
@@ -302,6 +305,16 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleRefresh = async () => {
+    if (!onRefresh || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Check if image is already in favorites
@@ -576,6 +589,21 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     Favoritos
                   </button>
                 </div>
+
+                {/* Refresh button */}
+                {onRefresh && (
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="flex items-center justify-center w-9 h-9 bg-transparent border border-white/[0.06] rounded-lg text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Atualizar galeria"
+                  >
+                    <Icon
+                      name="refresh-cw"
+                      className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+                    />
+                  </button>
+                )}
 
                 {/* Add button - only show in references mode */}
                 {viewMode === "references" && (
