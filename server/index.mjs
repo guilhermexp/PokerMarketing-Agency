@@ -108,7 +108,11 @@ app.use(
     },
   }),
 );
-app.use(express.json({ limit: "50mb" }));
+
+// JSON body size limit for DoS prevention
+// Images are uploaded to Vercel Blob separately (not in request body)
+// Largest legitimate payloads (campaign data, posts) are typically <100KB
+app.use(express.json({ limit: "10mb" }));
 
 // Security headers middleware
 // Helmet adds various HTTP security headers to protect against common vulnerabilities
