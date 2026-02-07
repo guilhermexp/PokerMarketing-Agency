@@ -283,11 +283,6 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
   const handleImageUpdate = (newSrc: string) => {
     if (selectedImage) {
-      console.log('🖼️ [GalleryView] handleImageUpdate:', {
-        imageId: selectedImage.id,
-        oldSrc: selectedImage.src.substring(0, 50),
-        newSrc: newSrc.substring(0, 50),
-      });
       onUpdateImage(selectedImage.id, newSrc);
       setSelectedImage((prev) => (prev ? { ...prev, src: newSrc } : null));
     }

@@ -61,6 +61,7 @@ interface DashboardProps {
   onDeleteGalleryImage?: (imageId: string) => void;
   onMarkGalleryImagePublished?: (imageId: string) => void;
   onRefreshGallery?: () => void;
+  galleryIsLoading?: boolean;
   tournamentEvents: TournamentEvent[];
   weekScheduleInfo: WeekScheduleInfo | null;
   onTournamentFileUpload: (file: File) => Promise<void>;
@@ -266,6 +267,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     onDeleteSchedule,
     onMarkGalleryImagePublished,
     onRefreshGallery,
+    galleryIsLoading,
     instagramContext,
     onCarouselUpdate,
     // Tool edit approval
@@ -763,6 +765,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             <Suspense fallback={<ViewLoadingFallback />}>
               <GalleryView
                 images={galleryImages}
+                isLoading={galleryIsLoading}
                 onUpdateImage={onUpdateGalleryImage}
                 onDeleteImage={onDeleteGalleryImage}
                 onSetChatReference={onSetChatReference}

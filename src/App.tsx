@@ -355,6 +355,7 @@ function AppContent() {
     removeImage: swrRemoveGalleryImage,
     updateImage: swrUpdateGalleryImage,
     refresh: refreshGallery,
+    isLoading: galleryIsLoading,
     // loadMore: galleryLoadMore,
     // isLoadingMore: galleryIsLoadingMore,
     // hasMore: galleryHasMore,
@@ -920,7 +921,6 @@ function AppContent() {
 
         // Refresh gallery to ensure UI reflects the edit
         refreshGallery();
-        console.log('🗃️ [App] Gallery refreshed after image edit');
       } catch (e) {
         console.error("🗃️ [App] Failed to update image in database:", e);
       }
@@ -2401,6 +2401,7 @@ function AppContent() {
                 onDeleteGalleryImage={handleDeleteGalleryImage}
                 onMarkGalleryImagePublished={handleMarkGalleryImagePublished}
                 onRefreshGallery={refreshGallery}
+                galleryIsLoading={galleryIsLoading}
                 tournamentEvents={tournamentEvents}
                 weekScheduleInfo={weekScheduleInfo}
                 onTournamentFileUpload={handleTournamentFileUpload}
