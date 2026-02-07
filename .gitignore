@@ -37,3 +37,4 @@ dev-dist
 .worktrees/
 .security-key
 logs/security/
+qa_report.md
