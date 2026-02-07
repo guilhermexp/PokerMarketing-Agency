@@ -854,6 +854,9 @@ function AppContent() {
           if (toolImageReference?.id === tempId) {
             setToolImageReference({ id: dbImage.id, src: dbImage.src_url });
           }
+
+          // Refresh gallery to ensure UI reflects the new image
+          refreshGallery();
         } catch (e) {
           console.error("Failed to save image to database:", e);
         }
@@ -866,6 +869,7 @@ function AppContent() {
     setToolImageReference,
     swrAddGalleryImage,
     swrRemoveGalleryImage,
+    refreshGallery,
     toolImageReference?.id,
     userId,
   ]);
