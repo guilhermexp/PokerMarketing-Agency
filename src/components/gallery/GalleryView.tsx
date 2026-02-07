@@ -5,6 +5,7 @@ import { ImagePreviewModal } from "../common/ImagePreviewModal";
 
 interface GalleryViewProps {
   images: GalleryImage[];
+  isLoading?: boolean;
   onUpdateImage: (imageId: string, newImageSrc: string) => void;
   onDeleteImage?: (imageId: string) => void;
   onSetChatReference: (image: GalleryImage) => void;
@@ -240,6 +241,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
 
 export const GalleryView: React.FC<GalleryViewProps> = ({
   images,
+  isLoading = false,
   onUpdateImage,
   onDeleteImage,
   onSetChatReference,
@@ -583,7 +585,17 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
         {viewMode === "gallery" ? (
           /* Gallery View - Masonry Layout */
-          filteredImages.length > 0 ? (
+          isLoading ? (
+            /* Loading State */
+            <div className="flex flex-col items-center justify-center w-full min-h-[60vh]">
+              <div className="w-12 h-12 mb-4">
+                <Icon name="refresh" className="w-12 h-12 text-primary animate-spin" />
+              </div>
+              <p className="text-white/50 text-sm font-medium">
+                Carregando galeria...
+              </p>
+            </div>
+          ) : filteredImages.length > 0 ? (
             <div className="space-y-6">
               {/* Gallery Grid */}
               {sortedImages.length > 0 && (
@@ -642,7 +654,17 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           /* References View */
           <div className="space-y-4">
             {/* References Grid */}
-            {styleReferences.length > 0 ? (
+            {isLoading ? (
+              /* Loading State */
+              <div className="flex flex-col items-center justify-center w-full min-h-[60vh]">
+                <div className="w-12 h-12 mb-4">
+                  <Icon name="refresh" className="w-12 h-12 text-primary animate-spin" />
+                </div>
+                <p className="text-white/50 text-sm font-medium">
+                  Carregando favoritos...
+                </p>
+              </div>
+            ) : styleReferences.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {[...styleReferences].reverse().map((ref) => (
                   <div
