@@ -106,6 +106,7 @@ const TopicItem: React.FC<TopicItemProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(topic.title || '');
   const [showMenu, setShowMenu] = useState(false);
+  const [coverError, setCoverError] = useState(false);
 
   const handleStartEdit = useCallback(() => {
     setEditTitle(topic.title || '');
@@ -178,11 +179,12 @@ const TopicItem: React.FC<TopicItemProps> = ({
         onClick={onSelect}
         className="w-full aspect-square bg-white/5 overflow-hidden"
       >
-        {topic.coverUrl ? (
+        {topic.coverUrl && !coverError ? (
           <img
             src={topic.coverUrl}
             alt={topic.title || 'Projeto'}
             className="w-full h-full object-cover"
+            onError={() => setCoverError(true)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

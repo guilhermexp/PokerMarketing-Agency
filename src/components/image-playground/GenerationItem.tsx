@@ -32,6 +32,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
   const [showActions, setShowActions] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [previewImage, setPreviewImage] = useState<GalleryImage | null>(null);
+  const [imageError, setImageError] = useState(false);
   const { deleteGeneration } = useImagePlaygroundBatches(topicId);
   const { updateGeneration, topics, updateTopic: updateTopicStore } = useImagePlaygroundStore();
 
@@ -203,12 +204,27 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       onMouseLeave={() => setShowActions(false)}
     >
       {/* Image */}
-      <img
-        src={generation.asset.thumbnailUrl || generation.asset.url}
-        alt="Generated image"
-        className="w-full h-full object-cover"
-        loading="lazy"
-      />
+      {imageError ? (
+        <div className="w-full h-full bg-white/5 border border-white/10 flex flex-col items-center justify-center gap-3">
+          <AlertCircle className="w-8 h-8 text-white/40" />
+          <p className="text-xs text-white/40 font-medium">Imagem indisponível</p>
+          <button
+            onClick={handleDelete}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-xs hover:bg-red-500/20 transition-colors"
+          >
+            <Trash2 className="w-3 h-3" />
+            Remover
+          </button>
+        </div>
+      ) : (
+        <img
+          src={generation.asset.thumbnailUrl || generation.asset.url}
+          alt="Generated image"
+          className="w-full h-full object-cover"
+          loading="lazy"
+          onError={() => setImageError(true)}
+        />
+      )}
 
       {/* Seed Badge */}
       {generation.seed && (
