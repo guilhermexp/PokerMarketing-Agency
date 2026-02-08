@@ -9,9 +9,12 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 # Copy package files
 COPY package.json package-lock.json* ./
 
+# Force cache invalidation for fresh dependency install
+ARG CACHEBUST=1
+
 # Install dependencies with npm (more stable for build)
 # Use --legacy-peer-deps to resolve the ai@6.x vs @openrouter/ai-sdk-provider peer dependency conflict
-RUN npm install --legacy-peer-deps
+RUN npm cache clean --force && npm install --legacy-peer-deps
 
 # Copy source code
 COPY . .
@@ -47,7 +50,7 @@ RUN echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env && \
     echo "FAL_KEY=$FAL_KEY" >> .env
 
 # Build the app
-# Cache bust: 2026-02-08-fix-runtime
+# Cache bust: 2026-02-08-force-fresh-build-v2
 RUN npm run build && \
     echo "=== Build complete ===" && \
     ls -la dist/
