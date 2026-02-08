@@ -826,6 +826,13 @@ app.get("/api/db/health", async (req, res) => {
   }
 });
 
+// CSRF token endpoint
+// Returns the CSRF token for client-side usage
+// The csrfProtection middleware automatically generates and sets the token
+app.get("/api/csrf-token", csrfProtection, (req, res) => {
+  res.json({ csrfToken: req.csrfToken });
+});
+
 // ============================================================================
 // ADMIN ENDPOINTS
 // ============================================================================
