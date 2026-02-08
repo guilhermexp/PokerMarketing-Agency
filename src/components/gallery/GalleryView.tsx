@@ -660,7 +660,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 py-6">
+        <main className={`flex-1 py-6 ${viewMode === "gallery" && totalPages > 1 ? "pb-20" : ""}`}>
 
         {viewMode === "gallery" ? (
           /* Gallery View - Masonry Layout */
@@ -698,30 +698,6 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 </div>
               )}
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-3 pt-6 pb-2">
-                  <button
-                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
-                  >
-                    <Icon name="chevron-left" className="w-4 h-4" />
-                    Anterior
-                  </button>
-                  <span className="text-sm text-white/50 font-medium px-4">
-                    Página {currentPage} de {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
-                  >
-                    Próxima
-                    <Icon name="chevron-right" className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
             </div>
           ) : (
             <div className="flex items-center justify-center w-full min-h-[60vh]">
@@ -788,6 +764,33 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           </div>
         )}
         </main>
+
+        {/* Fixed Pagination Footer */}
+        {viewMode === "gallery" && totalPages > 1 && (
+          <footer className="sticky bottom-0 bg-black/80 backdrop-blur-xl border-t border-white/10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 z-40">
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+              >
+                <Icon name="chevron-left" className="w-4 h-4" />
+                Anterior
+              </button>
+              <span className="text-sm text-white/50 font-medium px-4">
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+              >
+                Próxima
+                <Icon name="chevron-right" className="w-4 h-4" />
+              </button>
+            </div>
+          </footer>
+        )}
 
         {/* Image Preview Modal */}
         {selectedImage && (
