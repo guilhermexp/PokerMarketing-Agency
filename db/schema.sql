@@ -54,8 +54,7 @@ CREATE TYPE instagram_content_type AS ENUM (
 );
 
 CREATE TYPE image_model AS ENUM (
-    'gemini-3-pro-image-preview',
-    'imagen-4.0-generate-001'
+    'gemini-3-pro-image-preview'
 );
 
 CREATE TYPE image_size AS ENUM (
@@ -312,6 +311,7 @@ CREATE TABLE gallery_images (
     organization_id VARCHAR(50),  -- Clerk organization ID
 
     src_url TEXT NOT NULL,
+    thumbnail_url TEXT,
     prompt TEXT,
     source VARCHAR(100) NOT NULL,
     model image_model NOT NULL,
@@ -322,6 +322,11 @@ CREATE TABLE gallery_images (
     post_id UUID REFERENCES posts(id) ON DELETE SET NULL,
     ad_creative_id UUID REFERENCES ad_creatives(id) ON DELETE SET NULL,
     video_script_id UUID REFERENCES video_clip_scripts(id) ON DELETE SET NULL,
+
+    -- Daily flyer reference
+    week_schedule_id UUID,
+    daily_flyer_day VARCHAR(20),
+    daily_flyer_period VARCHAR(50),
 
     -- Style reference
     is_style_reference BOOLEAN DEFAULT FALSE,
@@ -338,6 +343,9 @@ CREATE TABLE gallery_images (
 CREATE INDEX idx_gallery_images_user ON gallery_images(user_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_gallery_images_org ON gallery_images(organization_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_gallery_images_source ON gallery_images(source);
+CREATE INDEX idx_gallery_images_week_schedule ON gallery_images(week_schedule_id);
+CREATE INDEX idx_gallery_images_daily_flyers ON gallery_images(week_schedule_id, daily_flyer_day, daily_flyer_period)
+    WHERE week_schedule_id IS NOT NULL;
 CREATE INDEX idx_gallery_images_style_ref ON gallery_images(user_id, is_style_reference)
     WHERE is_style_reference = TRUE AND deleted_at IS NULL;
 CREATE INDEX idx_gallery_images_created ON gallery_images(created_at DESC);
@@ -578,10 +586,12 @@ CREATE TYPE generation_job_type AS ENUM (
     'flyer_daily',
     'post',
     'ad',
-    'clip'
+    'clip',
+    'image',
+    'video'
 );
 
--- Note: 'clip' value added for video clip generation support
+-- Note: 'clip' for video clips, 'image' for generic images, 'video' for full videos
 
 CREATE TABLE generation_jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -864,7 +874,8 @@ ORDER BY week DESC;
 CREATE TYPE ai_provider AS ENUM (
     'google',      -- Gemini and Imagen
     'openrouter',  -- GPT-5.2, Grok 4.1, Claude
-    'fal'          -- Sora 2, Veo 3.1
+    'fal',         -- Sora 2, Veo 3.1
+    'replicate'    -- Replicate (Gemini Image 3 Pro fallback)
 );
 
 CREATE TYPE ai_operation AS ENUM (
@@ -1123,7 +1134,6 @@ INSERT INTO model_pricing (provider, model_id, display_name, input_cost_per_mill
 -- Google
 ('google', 'gemini-3-pro-preview', 'Gemini 3 Pro', 125, 500, NULL, NULL, NULL),
 ('google', 'gemini-3-pro-image-preview', 'Gemini 3 Pro Image', NULL, NULL, 4, NULL, NULL),
-('google', 'imagen-4.0-generate-001', 'Imagen 4', NULL, NULL, 4, NULL, NULL),
 ('google', 'gemini-2.5-flash-preview-tts', 'Gemini TTS', NULL, NULL, NULL, NULL, 1500),
 -- OpenRouter
 ('openrouter', 'openai/gpt-5.2', 'GPT-5.2', 500, 1500, NULL, NULL, NULL),

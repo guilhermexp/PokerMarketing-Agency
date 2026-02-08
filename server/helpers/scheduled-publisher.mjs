@@ -6,6 +6,7 @@
 
 import { neon } from "@neondatabase/serverless";
 import { put } from "@vercel/blob";
+import { validateContentType } from "../lib/validation/contentType.mjs";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const RUBE_TOKEN = process.env.RUBE_TOKEN; // Fallback for legacy posts
@@ -172,6 +173,15 @@ async function ensureHttpUrl(imageUrl) {
     }
 
     const mimeType = matches[1];
+
+    // SECURITY: Validate content type BEFORE uploading to Vercel Blob
+    // WHY: Data URLs can contain ANY content type, including malicious ones
+    // - Attacker could craft data:text/html;base64,... with XSS payload
+    // - When published to Instagram/stored in blob, could execute in user's browser
+    // - validateContentType() rejects HTML, SVG, JavaScript, and executable MIME types
+    // - Only safe static image/video formats pass validation
+    validateContentType(mimeType);
+
     const base64Data = matches[2];
     const buffer = Buffer.from(base64Data, 'base64');
     const extension = mimeType.split('/')[1] || 'png';
@@ -248,6 +258,78 @@ async function publishContainer(containerId, credentials) {
 }
 
 /**
+ * Create carousel container with multiple images
+ * Uses Rube's simplified API with child_image_urls
+ * @param mediaUrls - Array of image URLs
+ * @param caption - Post caption
+ * @param credentials - { token, instagramUserId }
+ */
+async function createCarouselContainer(mediaUrls, caption, credentials) {
+  const { token, instagramUserId } = credentials;
+
+  console.log(`[Publisher] Creating carousel with ${mediaUrls.length} items...`);
+
+  // Ensure all URLs are HTTP (upload data URLs to blob)
+  const httpUrls = [];
+  const videoUrls = [];
+
+  for (let i = 0; i < mediaUrls.length; i++) {
+    const url = mediaUrls[i];
+    const httpUrl = await ensureHttpUrl(url);
+    const isVideo = httpUrl.includes('.mp4') || httpUrl.includes('.mov') || httpUrl.includes('video');
+
+    if (isVideo) {
+      videoUrls.push(httpUrl);
+    } else {
+      httpUrls.push(httpUrl);
+    }
+    console.log(`[Publisher] Prepared item ${i + 1}/${mediaUrls.length}: ${httpUrl.substring(0, 50)}...`);
+  }
+
+  if (httpUrls.length + videoUrls.length < 2) {
+    throw new Error('Carousel requires at least 2 items');
+  }
+
+  // Use Rube's simplified carousel API with child_image_urls
+  const carouselArgs = {
+    ig_user_id: instagramUserId,
+    caption
+  };
+
+  if (httpUrls.length > 0) {
+    carouselArgs.child_image_urls = httpUrls;
+  }
+  if (videoUrls.length > 0) {
+    carouselArgs.child_video_urls = videoUrls;
+  }
+
+  console.log(`[Publisher] Creating carousel container with ${httpUrls.length} images and ${videoUrls.length} videos...`);
+  const result = await executeInstagramTool('INSTAGRAM_CREATE_CAROUSEL_CONTAINER', carouselArgs, token);
+  const carouselId = result?.id || result?.creation_id || result?.container_id || result?.data?.id;
+
+  if (!carouselId) {
+    throw new Error(`Failed to create carousel container: ${JSON.stringify(result)}`);
+  }
+
+  console.log(`[Publisher] Carousel container created: ${carouselId}`);
+  return carouselId;
+}
+
+/**
+ * Publish carousel using INSTAGRAM_CREATE_POST
+ * @param containerId - Carousel container ID
+ * @param credentials - { token, instagramUserId }
+ */
+async function publishCarousel(containerId, credentials) {
+  const { token, instagramUserId } = credentials;
+  const result = await executeInstagramTool('INSTAGRAM_CREATE_POST', {
+    ig_user_id: instagramUserId,
+    creation_id: containerId
+  }, token);
+  return result?.id || result?.data?.id;
+}
+
+/**
  * Publish a single post
  * Fetches Instagram credentials from database if instagram_account_id is set
  */
@@ -279,29 +361,49 @@ async function publishPost(post) {
       console.log('[Publisher] Warning: Using legacy global token');
     }
 
-    // Ensure HTTP URL
-    const httpUrl = await ensureHttpUrl(post.image_url);
-    console.log(`[Publisher] Image URL ready: ${httpUrl.substring(0, 50)}...`);
-
     // Build caption with hashtags
     const hashtags = post.hashtags || [];
     const fullCaption = hashtags.length > 0
       ? `${post.caption}\n\n${hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ')}`
       : post.caption;
 
-    // Create container
-    const containerId = await createMediaContainer(
-      post.instagram_content_type || 'photo',
-      httpUrl,
-      fullCaption,
-      credentials
-    );
+    // Check if this is a carousel post
+    const isCarousel = post.instagram_content_type === 'carousel' &&
+      post.carousel_image_urls &&
+      post.carousel_image_urls.length > 1;
+
+    let containerId;
+    let isCarouselPost = false;
+
+    if (isCarousel) {
+      // Create carousel container with all images
+      console.log(`[Publisher] Creating carousel with ${post.carousel_image_urls.length} images...`);
+      isCarouselPost = true;
+      containerId = await createCarouselContainer(
+        post.carousel_image_urls,
+        fullCaption,
+        credentials
+      );
+    } else {
+      // Single image post - ensure HTTP URL
+      const httpUrl = await ensureHttpUrl(post.image_url);
+      console.log(`[Publisher] Image URL ready: ${httpUrl.substring(0, 50)}...`);
+
+      // Create single media container
+      containerId = await createMediaContainer(
+        post.instagram_content_type || 'photo',
+        httpUrl,
+        fullCaption,
+        credentials
+      );
+    }
     console.log(`[Publisher] Container created: ${containerId}`);
 
-    // Wait for processing (max 60 seconds)
+    // Wait for processing (max 60 seconds for single, 120 for carousel)
+    const maxAttempts = isCarouselPost ? 120 : 60;
     let status = 'IN_PROGRESS';
     let attempts = 0;
-    while (status === 'IN_PROGRESS' && attempts < 60) {
+    while (status === 'IN_PROGRESS' && attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       try {
         status = await getContainerStatus(containerId, credentials);
@@ -315,8 +417,13 @@ async function publishPost(post) {
       throw new Error('Instagram rejected the media');
     }
 
-    // Publish
-    const mediaId = await publishContainer(containerId, credentials);
+    // Publish using appropriate method
+    let mediaId;
+    if (isCarouselPost) {
+      mediaId = await publishCarousel(containerId, credentials);
+    } else {
+      mediaId = await publishContainer(containerId, credentials);
+    }
     console.log(`[Publisher] Published! Media ID: ${mediaId}`);
 
     return { success: true, mediaId };

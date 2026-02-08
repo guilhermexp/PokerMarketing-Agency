@@ -12,6 +12,11 @@ DirectorAi é um kit de crescimento com IA projetado para criadores, com foco em
 - **Galeria de Mídia:** Armazena todas as imagens geradas, permitindo fácil acesso, reutilização e edição.
 - **Assistente de IA:** Um chatbot integrado que entende o contexto da aplicação, permitindo executar ações como criar logos, editar imagens da galeria e consultar informações de torneios.
 
+Para mais detalhes técnicos e guias de uso, consulte o diretório [docs/](./docs/), incluindo:
+- [Documentação Técnica Principal](docs/DOCUMENTATION.md)
+- [Documentação dos Modelos de IA](docs/MODEL_DOCUMENTATION.md)
+- [Especificação de Refatoração](docs/REFACTOR_SPEC.md)
+
 ## 🚀 Arquitetura e Tecnologias
 
 A aplicação é um Single Page Application (SPA) construído com as seguintes tecnologias:
@@ -24,7 +29,7 @@ A aplicação é um Single Page Application (SPA) construído com as seguintes t
 - **Serviços de IA e Backend:**
   - **Google Gemini API (`@google/genai`):**
     - `gemini-2.5-flash`: Utilizado para tarefas de texto, como a geração de campanhas e a lógica do assistente.
-    - `imagen-4.0-generate-001`: Modelo principal para geração de imagens (text-to-image).
+    - `gemini-3-pro-image-preview`: Modelo principal para geração de imagens (text-to-image).
     - `gemini-2.5-flash-image-preview`: Modelo multimodal para edição avançada de imagens, variações de marca e geração de flyers com inputs visuais.
     - `veo-2.0-generate-001`: Utilizado para a geração de vídeos a partir de roteiros.
   - **Fal.ai API:**
@@ -34,21 +39,24 @@ A aplicação é um Single Page Application (SPA) construído com as seguintes t
 
 ```
 /
-├── components/
-│   ├── tabs/             # Componentes para cada aba da dashboard (Clipes, Posts, etc.)
-│   ├── common/           # Componentes reutilizáveis (Botões, Cards, Ícones)
-│   ├── assistant/        # Componentes relacionados ao painel do Assistente de IA
-│   ├── BrandProfileSetup.tsx # Formulário de configuração da marca
-│   ├── Dashboard.tsx       # Componente principal da dashboard
-│   ├── FlyerGenerator.tsx  # Lógica e UI do gerador de flyers
+├── docs/                 # Documentação do projeto
+│   ├── DOCUMENTATION.md    # Documentação técnica detalhada
+│   ├── MODEL_DOCUMENTATION.md # Docs dos modelos de IA
 │   └── ...
-├── services/
-│   ├── geminiService.ts    # Lógica central para chamadas à API do Gemini e Bytedance
-│   └── assistantService.ts # Lógica para a conversa com o Assistente de IA
-├── types.ts              # Definições de tipos do TypeScript para todo o projeto
-├── App.tsx                 # Componente raiz, gerencia o estado principal
-├── index.html              # Ponto de entrada HTML
-└── index.tsx               # Ponto de entrada do React
+├── src/                  # Código fonte da aplicação
+│   ├── components/       # Componentes React
+│   │   ├── dashboard/    # Componentes da dashboard
+│   │   ├── flyer/        # Gerador de flyers
+│   │   └── ...
+│   ├── services/         # Serviços (API clients, lógica de IA)
+│   ├── types.ts          # Definições de tipos
+│   ├── App.tsx           # Componente raiz
+│   └── ...
+├── server/               # Backend API
+├── db/                   # Migrações de banco de dados
+├── public/               # Ativos estáticos
+├── index.html            # Ponto de entrada HTML
+└── vite.config.ts        # Configuração do Vite
 ```
 
 ## 🏁 Como Começar
@@ -57,7 +65,7 @@ Para rodar esta aplicação, o ambiente de execução precisa ter a seguinte var
 
 - `API_KEY`: Sua chave de API do Google AI Studio para acessar os modelos Gemini.
 
-A chave da API da Fal.ai para o modelo Bytedance está atualmente hardcoded em `services/geminiService.ts`, mas idealmente também seria gerenciada via variáveis de ambiente.
+A chave da API da Fal.ai para o modelo Bytedance está atualmente hardcoded em `src/services/geminiService.ts`, mas idealmente também seria gerenciada via variáveis de ambiente.
 
 A aplicação utiliza um `importmap` em `index.html` para carregar as dependências (React, @google/genai, etc.) diretamente de um CDN, simplificando o processo de build.
 

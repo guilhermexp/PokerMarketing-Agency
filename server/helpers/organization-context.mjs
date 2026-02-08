@@ -36,6 +36,7 @@ export const MEMBER_PERMISSIONS = [
   PERMISSIONS.PUBLISH_POST,
   PERMISSIONS.VIEW_GALLERY,
   PERMISSIONS.VIEW_ANALYTICS,
+  PERMISSIONS.MANAGE_BRAND, // Allow members to create/edit brand profile
 ];
 
 /**

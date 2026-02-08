@@ -1,141 +1,105 @@
 /**
- * BullMQ Job Queue for Background Image Generation & Scheduled Post Publishing
+ * BullMQ Job Queue for Scheduled Post Publishing
  * Uses Redis for job queue management
+ *
+ * NOTE: Image generation jobs were REMOVED (2026-01-25)
+ * Images are now generated synchronously via /api/images endpoint
  */
 
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 
 // Redis connection - Railway provides REDIS_URL
-const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || 'redis://localhost:6380';
+// In development without Redis, scheduled posts will use fallback polling
+const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || null;
 
 let connection = null;
-let imageQueue = null;
 let scheduledPostsQueue = null;
-let worker = null;
 let scheduledPostsWorker = null;
+let redisAvailable = false;
+
+/**
+ * Check if Redis is available
+ */
+export function isRedisAvailable() {
+  return redisAvailable;
+}
+
+/**
+ * Wait for Redis to connect (with timeout)
+ * Returns true if connected, false if timeout/failed
+ */
+export async function waitForRedis(timeoutMs = 5000) {
+  if (redisAvailable) return true;
+  if (!REDIS_URL) return false;
+
+  // Ensure connection is initiated
+  getRedisConnection();
+
+  // Wait for connection or timeout
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+    const checkInterval = setInterval(() => {
+      if (redisAvailable) {
+        clearInterval(checkInterval);
+        resolve(true);
+      } else if (Date.now() - startTime > timeoutMs) {
+        clearInterval(checkInterval);
+        console.log('[JobQueue] Redis connection timeout after', timeoutMs, 'ms');
+        resolve(false);
+      }
+    }, 100);
+  });
+}
 
 /**
  * Get or create Redis connection
+ * Returns null if Redis is not configured or unavailable
  */
 export function getRedisConnection() {
+  if (!REDIS_URL) {
+    return null;
+  }
+
   if (!connection) {
     console.log('[JobQueue] Connecting to Redis:', REDIS_URL.replace(/\/\/.*@/, '//***@'));
     connection = new IORedis(REDIS_URL, {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
+      lazyConnect: true,
+      retryStrategy: (times) => {
+        if (times > 3) {
+          console.log('[JobQueue] Redis connection failed after 3 attempts, giving up');
+          redisAvailable = false;
+          return null; // Stop retrying
+        }
+        return Math.min(times * 100, 2000);
+      },
     });
 
     connection.on('error', (err) => {
-      console.error('[JobQueue] Redis error:', err.message);
+      if (!err.message.includes('ECONNREFUSED')) {
+        console.error('[JobQueue] Redis error:', err.message);
+      }
+      redisAvailable = false;
     });
 
     connection.on('connect', () => {
       console.log('[JobQueue] Redis connected');
+      redisAvailable = true;
+    });
+
+    connection.on('close', () => {
+      redisAvailable = false;
+    });
+
+    // Try to connect
+    connection.connect().catch((err) => {
+      console.log('[JobQueue] Redis not available (development mode OK, will use fallback)');
+      redisAvailable = false;
     });
   }
   return connection;
-}
-
-/**
- * Get or create the image generation queue
- */
-export function getImageQueue() {
-  if (!imageQueue) {
-    const conn = getRedisConnection();
-    imageQueue = new Queue('image-generation', {
-      connection: conn,
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
-        removeOnComplete: {
-          count: 100, // Keep last 100 completed jobs
-        },
-        removeOnFail: {
-          count: 50, // Keep last 50 failed jobs
-        },
-      },
-    });
-    console.log('[JobQueue] Image queue created');
-  }
-  return imageQueue;
-}
-
-/**
- * Add a job to the queue
- */
-export async function addJob(jobId, data) {
-  const queue = getImageQueue();
-
-  const job = await queue.add('generate', {
-    jobId,
-    ...data,
-  }, {
-    jobId: jobId, // Use DB job ID as BullMQ job ID for easy lookup
-  });
-
-  console.log(`[JobQueue] Added job ${jobId} to queue`);
-  return job;
-}
-
-/**
- * Get job status from queue
- */
-export async function getQueueJobStatus(jobId) {
-  const queue = getImageQueue();
-  const job = await queue.getJob(jobId);
-
-  if (!job) return null;
-
-  const state = await job.getState();
-  return {
-    id: job.id,
-    state,
-    progress: job.progress,
-    data: job.data,
-    failedReason: job.failedReason,
-    finishedOn: job.finishedOn,
-    processedOn: job.processedOn,
-  };
-}
-
-/**
- * Initialize the worker with a processor function
- */
-export function initializeWorker(processorFn) {
-  if (worker) {
-    console.log('[JobQueue] Worker already initialized');
-    return worker;
-  }
-
-  const conn = getRedisConnection();
-
-  worker = new Worker('image-generation', processorFn, {
-    connection: conn,
-    concurrency: 2, // Process 2 jobs at a time
-  });
-
-  worker.on('completed', (job, result) => {
-    console.log(`[JobQueue] Job ${job.id} completed`);
-  });
-
-  worker.on('failed', (job, err) => {
-    console.error(`[JobQueue] Job ${job?.id} failed:`, err.message);
-  });
-
-  worker.on('progress', (job, progress) => {
-    console.log(`[JobQueue] Job ${job.id} progress: ${progress}%`);
-  });
-
-  worker.on('error', (err) => {
-    console.error('[JobQueue] Worker error:', err.message);
-  });
-
-  console.log('[JobQueue] Worker initialized with concurrency 2');
-  return worker;
 }
 
 /**
@@ -144,6 +108,9 @@ export function initializeWorker(processorFn) {
 export function getScheduledPostsQueue() {
   if (!scheduledPostsQueue) {
     const conn = getRedisConnection();
+    if (!conn || !redisAvailable) {
+      return null;
+    }
     scheduledPostsQueue = new Queue('scheduled-posts', {
       connection: conn,
       defaultJobOptions: {
@@ -173,6 +140,11 @@ export function getScheduledPostsQueue() {
  */
 export async function schedulePostForPublishing(postId, userId, scheduledTime) {
   const queue = getScheduledPostsQueue();
+
+  if (!queue) {
+    console.log(`[JobQueue] Redis not available, post ${postId} will be handled by fallback checker`);
+    return { jobId: null, fallback: true };
+  }
 
   // Calculate delay in milliseconds
   const targetTime = new Date(scheduledTime).getTime();
@@ -217,6 +189,12 @@ export async function schedulePostForPublishing(postId, userId, scheduledTime) {
  */
 export async function cancelScheduledPost(postId) {
   const queue = getScheduledPostsQueue();
+
+  if (!queue) {
+    console.log(`[JobQueue] Redis not available, skipping job cancellation for post ${postId}`);
+    return false;
+  }
+
   const jobId = `publish-${postId}`;
 
   try {
@@ -241,6 +219,11 @@ export async function cancelScheduledPost(postId) {
 export async function initializeScheduledPostsChecker(publishFn, publishSingleFn) {
   const queue = getScheduledPostsQueue();
   const conn = getRedisConnection();
+
+  if (!queue || !conn || !redisAvailable) {
+    console.log('[ScheduledPosts] Redis not available, using fallback-only mode (checks every 5min via database polling)');
+    return null;
+  }
 
   // Create worker for scheduled posts
   scheduledPostsWorker = new Worker('scheduled-posts', async (job) => {
@@ -303,17 +286,9 @@ export async function initializeScheduledPostsChecker(publishFn, publishSingleFn
  * Graceful shutdown
  */
 export async function closeQueue() {
-  if (worker) {
-    await worker.close();
-    worker = null;
-  }
   if (scheduledPostsWorker) {
     await scheduledPostsWorker.close();
     scheduledPostsWorker = null;
-  }
-  if (imageQueue) {
-    await imageQueue.close();
-    imageQueue = null;
   }
   if (scheduledPostsQueue) {
     await scheduledPostsQueue.close();

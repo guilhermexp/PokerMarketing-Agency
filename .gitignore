@@ -8,7 +8,6 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-package-lock.json
 bun.lock
 dist
 dist-ssr
@@ -27,3 +26,28 @@ dev-dist
 *.sw?
 .env
 .vercel
+
+# Auto Claude data directory
+.auto-claude/
+
+# Auto Claude generated files
+.auto-claude-security.json
+.auto-claude-status
+.claude_settings.json
+.worktrees/
+.security-key
+logs/security/
+qa_report.md
+
+# Auto-claude verification artifacts (test scripts & reports in root)
+test-*.mjs
+verify-*.mjs
+test-*.sh
+verify-*.sh
+*-verification-report.md
+*-VERIFICATION*.md
+*-SUMMARY.md
+*-TEST.md
+ACCEPTANCE-*.md
+docs/IMAGE-GENERATION-SUMMARY.md
+docs/security/XSS_PROTECTION_VERIFICATION.md
