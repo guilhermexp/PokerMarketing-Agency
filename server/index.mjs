@@ -1968,15 +1968,10 @@ app.get("/api/db/gallery/daily-flyers", async (req, res) => {
       await resolveOrganizationContext(sql, resolvedUserId, organization_id);
     }
 
-    // Select all relevant columns including daily flyer fields
-    const selectColumns = `id, user_id, organization_id, source, src_url, thumbnail_url, prompt, model,
-                          aspect_ratio, image_size, week_schedule_id, daily_flyer_day, daily_flyer_period,
-                          created_at, updated_at`;
-
     let query;
     if (organization_id) {
       query = await sql`
-        SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
+        SELECT id, user_id, organization_id, source, src_url, thumbnail_url, prompt, model, aspect_ratio, image_size, week_schedule_id, daily_flyer_day, daily_flyer_period, created_at, updated_at FROM gallery_images
         WHERE organization_id = ${organization_id}
           AND week_schedule_id = ${week_schedule_id}
           AND deleted_at IS NULL
@@ -1984,7 +1979,7 @@ app.get("/api/db/gallery/daily-flyers", async (req, res) => {
       `;
     } else {
       query = await sql`
-        SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
+        SELECT id, user_id, organization_id, source, src_url, thumbnail_url, prompt, model, aspect_ratio, image_size, week_schedule_id, daily_flyer_day, daily_flyer_period, created_at, updated_at FROM gallery_images
         WHERE user_id = ${resolvedUserId}
           AND organization_id IS NULL
           AND week_schedule_id = ${week_schedule_id}
