@@ -279,6 +279,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [newImageIds, setNewImageIds] = useState<Set<string>>(new Set());
   const previousImageIdsRef = React.useRef<Set<string>>(new Set());
+  const isInitialLoadRef = React.useRef(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleImageUpdate = (newSrc: string) => {
@@ -421,9 +422,17 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     );
   }, [deduplicatedImages, sourceFilter]);
 
-  // Track newly added images
+  // Track newly added images (skip initial load to avoid highlighting all images)
   useEffect(() => {
     const currentImageIds = new Set(images.map((img) => img.id));
+
+    // On initial load, just store the IDs without highlighting
+    if (isInitialLoadRef.current) {
+      previousImageIdsRef.current = currentImageIds;
+      isInitialLoadRef.current = false;
+      return;
+    }
+
     const previousIds = previousImageIdsRef.current;
 
     // Find new images (in current but not in previous)
