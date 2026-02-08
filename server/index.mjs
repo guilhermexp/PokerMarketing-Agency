@@ -5496,6 +5496,10 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           try {
             const imageBuffer = Buffer.from(part.inlineData.data, "base64");
             const contentType = part.inlineData.mimeType || "image/png";
+
+            // Validate content type before upload
+            validateContentType(contentType);
+
             const ext = contentType.includes("png") ? "png" : "jpg";
             const filename = `flyer-${Date.now()}.${ext}`;
 
