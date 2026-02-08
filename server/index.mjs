@@ -53,6 +53,9 @@ import {
 import {
   registerImagePlaygroundRoutes,
 } from "./routes/image-playground.mjs";
+import {
+  registerVideoPlaygroundRoutes,
+} from "./routes/video-playground.mjs";
 import { requestLogger } from "./middleware/requestLogger.mjs";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.mjs";
 import logger from "./lib/logger.mjs";
@@ -201,6 +204,7 @@ const PROTECTED_API_PREFIXES = [
   "/api/proxy-video",
   "/api/rube",
   "/api/image-playground",
+  "/api/video-playground",
   "/api/admin",
 ];
 
@@ -7680,6 +7684,17 @@ registerImagePlaygroundRoutes(app, {
   logger,
   convertImagePromptToJson,
   buildImagePrompt,
+});
+
+// =============================================================================
+// VIDEO PLAYGROUND ENDPOINTS
+// =============================================================================
+
+registerVideoPlaygroundRoutes(app, {
+  getRequestAuthContext,
+  getSql,
+  resolveUserId,
+  logger,
 });
 
 // ============================================================================

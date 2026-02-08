@@ -64,6 +64,10 @@ export default defineConfig(({ mode }) => {
           target: "http://localhost:3002",
           changeOrigin: true,
         },
+        "/api/video-playground": {
+          target: "http://localhost:3002",
+          changeOrigin: true,
+        },
       },
     },
     plugins: [
