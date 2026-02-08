@@ -110,9 +110,55 @@ REDIS_URL=redis://... (optional, for scheduled posts)
 GOOGLE_GENERATIVE_AI_API_KEY=AIza...
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
+CSRF_SECRET=... (required for CSRF protection)
 ```
 
 ## Security
+
+### CSRF Protection
+DirectorAi implements **CSRF (Cross-Site Request Forgery) protection** using the Double Submit Cookie pattern to prevent malicious state-changing operations.
+
+#### How It Works
+1. **Token Generation**: Cryptographically secure tokens are generated using `crypto.randomBytes(32)` (256 bits) and signed with HMAC-SHA256
+2. **Double Submit**: Token is sent in both a cookie (`csrf-token`) and a custom header (`X-CSRF-Token`)
+3. **Validation**: Backend compares cookie and header values using timing-safe comparison and validates HMAC signature
+4. **Cookie Security**: Tokens stored in httpOnly cookies with `sameSite='strict'` and `secure` flag in production
+
+#### Protected Endpoints
+CSRF validation is enforced on **all state-changing operations** (POST, PUT, DELETE, PATCH) for these API prefixes:
+- `/api/db/*` - Database operations
+- `/api/ai/*` - AI generation
+- `/api/chat/*` - Chat operations
+- `/api/generate/*` - Content generation
+- `/api/upload/*` - File uploads
+- `/api/proxy-video/*` - Video proxy
+- `/api/rube/*` - Rube Goldberg
+- `/api/image-playground/*` - Image operations
+- `/api/admin/*` - Admin operations
+
+**Note:** GET, HEAD, and OPTIONS requests do NOT require CSRF tokens.
+
+#### Token Handling
+- **Frontend**: `apiClient.ts` automatically fetches tokens via `/api/csrf-token` and includes them in the `X-CSRF-Token` header for state-changing requests
+- **Token Caching**: Tokens are cached in memory (not localStorage) for security
+- **Auto-Refresh**: On 403 errors, the frontend automatically clears the cached token and re-fetches on the next request
+- **Token Lifetime**: Tokens expire after 24 hours
+
+#### Error Handling
+- **403 Forbidden**: Returned when CSRF token is missing, invalid, or mismatched
+- **Error Messages**:
+  - "CSRF token missing from cookie" - No token provided
+  - "CSRF token mismatch" - Cookie and header tokens don't match
+  - "Invalid CSRF token" - HMAC signature validation failed
+- **Logging**: CSRF failures are logged with structured logging (token values redacted)
+
+#### Production Requirements
+- Set `CSRF_SECRET` environment variable to a cryptographically random value:
+  ```bash
+  node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+  ```
+- Ensure `NODE_ENV=production` to enable secure cookies
+- HTTPS must be enabled for secure cookies to work
 
 ### Request Body Size Limits
 - JSON request bodies are limited to **10MB** to prevent denial-of-service attacks
