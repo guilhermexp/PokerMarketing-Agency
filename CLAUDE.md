@@ -120,6 +120,20 @@ CLERK_SECRET_KEY=sk_test_...
 - Requests exceeding this limit will receive a 413 (Payload Too Large) error
 - For large data transfers, use multipart uploads or chunked transfers instead
 
+### File Upload Content-Type Validation
+- All file uploads to Vercel Blob are validated against a whitelist of allowed MIME types
+- **Allowed types**: `image/jpeg`, `image/png`, `image/webp`, `image/heic`, `image/heif`, `image/gif`, `video/mp4`, `video/webm`
+- **Blocked types**: HTML (`text/html`), SVG (`image/svg+xml`), JavaScript, executables, and any other non-whitelisted types
+- This prevents XSS attacks via uploaded HTML/SVG files containing malicious scripts
+- Validation is enforced via `validateContentType()` in `server/lib/validation/contentType.mjs`
+- All upload paths validate content-type before uploading to Vercel Blob:
+  - `/api/upload` endpoint (direct uploads)
+  - `uploadDataUrlImageToBlob()` (data URL uploads)
+  - Gemini and Replicate image generation endpoints
+  - Scheduled post image processing
+  - Image playground generation
+- Invalid content types return 400 (Bad Request) with descriptive error messages
+
 ## Known Technical Debt
 
 - Server file is monolithic (~7K lines) - see `docs/REFACTORING_PLAN.md`
