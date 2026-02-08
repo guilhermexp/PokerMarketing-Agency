@@ -6,6 +6,7 @@
 
 import { neon } from "@neondatabase/serverless";
 import { put } from "@vercel/blob";
+import { validateContentType } from "../lib/validation/contentType.mjs";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const RUBE_TOKEN = process.env.RUBE_TOKEN; // Fallback for legacy posts
@@ -172,6 +173,10 @@ async function ensureHttpUrl(imageUrl) {
     }
 
     const mimeType = matches[1];
+
+    // Validate content type before uploading
+    validateContentType(mimeType);
+
     const base64Data = matches[2];
     const buffer = Buffer.from(base64Data, 'base64');
     const extension = mimeType.split('/')[1] || 'png';
