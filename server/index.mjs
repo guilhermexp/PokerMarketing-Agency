@@ -67,6 +67,7 @@ import {
   ExternalServiceError,
   RateLimitError,
 } from "./lib/errors/index.mjs";
+import { validateContentType } from "./lib/validation/contentType.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -3958,18 +3959,6 @@ app.get("/api/proxy-video", async (req, res) => {
 // FILE UPLOAD API (Vercel Blob)
 // ============================================================================
 
-// Allowed content types for file uploads (security: prevent XSS/code injection)
-const ALLOWED_UPLOAD_CONTENT_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-  "image/gif",
-  "video/mp4",
-  "video/webm",
-];
-
 // Max file size: 100MB
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
@@ -3983,10 +3972,18 @@ app.post("/api/upload", async (req, res) => {
       });
     }
 
-    // Validate content type against whitelist
-    if (!ALLOWED_UPLOAD_CONTENT_TYPES.includes(contentType)) {
+    // SECURITY: Validate content type against whitelist to prevent XSS/code injection
+    // WHY: Users can upload ANY file type via multipart upload
+    // - Without validation, attacker uploads text/html with <script> tags
+    // - Vercel Blob serves file publicly with attacker-controlled MIME type
+    // - Victim clicks link → browser executes malicious JavaScript (Stored XSS)
+    // - validateContentType() blocks HTML, SVG, JavaScript, executables
+    // - Only safe image/video formats (JPEG, PNG, WebP, MP4, etc.) are allowed
+    try {
+      validateContentType(contentType);
+    } catch (error) {
       return res.status(400).json({
-        error: `Invalid content type. Allowed types: ${ALLOWED_UPLOAD_CONTENT_TYPES.join(", ")}`,
+        error: error instanceof Error ? error.message : "Invalid content type",
       });
     }
 
@@ -5517,6 +5514,15 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           try {
             const imageBuffer = Buffer.from(part.inlineData.data, "base64");
             const contentType = part.inlineData.mimeType || "image/png";
+
+            // SECURITY: Validate Gemini API response content type (defense in depth)
+            // WHY: Even though Gemini is trusted, we validate to prevent:
+            // - API compromise or man-in-the-middle attacks modifying responses
+            // - Future API changes that could return unexpected MIME types
+            // - Accidental upload of non-image content if API behavior changes
+            // - Stored XSS if API ever returns HTML/SVG instead of images
+            validateContentType(contentType);
+
             const ext = contentType.includes("png") ? "png" : "jpg";
             const filename = `flyer-${Date.now()}.${ext}`;
 
@@ -5588,6 +5594,16 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
           const contentType =
             imageResponse.headers.get("content-type") || "image/png";
+
+          // SECURITY: Validate external image fetch content type
+          // WHY: Fetching images from external URLs (imageUrl) is HIGH RISK:
+          // - Attacker-controlled server can return ANY content type
+          // - Could return text/html with XSS payload instead of image
+          // - Could return image/svg+xml with embedded JavaScript
+          // - Content-Type header from external server cannot be trusted
+          // - Validation prevents upload of malicious content to Vercel Blob
+          validateContentType(contentType);
+
           const ext = contentType.includes("png") ? "png" : "jpg";
           const filename = `flyer-${Date.now()}.${ext}`;
 
@@ -5816,6 +5832,15 @@ app.post("/api/ai/image", async (req, res) => {
           contentType =
             imageResponse.headers.get("content-type") || "image/png";
         }
+
+        // SECURITY: Validate content type before storing in Vercel Blob
+        // WHY: Image generation can come from multiple sources:
+        // - External image URLs (attacker-controlled servers)
+        // - AI provider responses (could be compromised)
+        // - User-supplied content type headers
+        // Validation ensures only safe static media formats reach blob storage,
+        // preventing Stored XSS attacks via malicious HTML/SVG/JavaScript files
+        validateContentType(contentType);
 
         const ext = contentType.includes("png") ? "png" : "jpg";
         const filename = `generated-${Date.now()}.${ext}`;
@@ -6795,6 +6820,15 @@ async function uploadDataUrlImageToBlob(dataUrl, prefix = "video-reference") {
   if (!parsed) return null;
 
   const { mimeType, base64 } = parsed;
+
+  // SECURITY: Validate data URL content type before upload
+  // WHY: Data URLs can contain ANY content type in the format data:[MIME];base64,[DATA]
+  // - Attacker crafts data:text/html;base64,PHNjcmlwdD5hbGVydCgneHNzJyk8L3NjcmlwdD4=
+  // - Without validation, malicious HTML uploaded to Vercel Blob
+  // - When served, browser executes JavaScript (Stored XSS attack)
+  // - validateContentType() ensures only safe image/video MIME types proceed
+  validateContentType(mimeType);
+
   const buffer = Buffer.from(base64, "base64");
   const extension = mimeTypeToExtension(mimeType);
   const filename = `${prefix}-${Date.now()}.${extension}`;
