@@ -64,6 +64,7 @@ import {
   ExternalServiceError,
   RateLimitError,
 } from "./lib/errors/index.mjs";
+import { validateContentType } from "./lib/validation/contentType.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -6773,6 +6774,10 @@ async function uploadDataUrlImageToBlob(dataUrl, prefix = "video-reference") {
   if (!parsed) return null;
 
   const { mimeType, base64 } = parsed;
+
+  // Validate content type before upload
+  validateContentType(mimeType);
+
   const buffer = Buffer.from(base64, "base64");
   const extension = mimeTypeToExtension(mimeType);
   const filename = `${prefix}-${Date.now()}.${extension}`;
