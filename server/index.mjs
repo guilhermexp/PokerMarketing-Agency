@@ -1865,46 +1865,69 @@ app.get("/api/db/gallery", async (req, res) => {
 
     // OPTIMIZATION: Only include src (base64 image data) when explicitly requested
     // This dramatically reduces egress data transfer (50-250MB → 50KB per request)
-    const selectColumns =
-      include_src === "true"
-        ? "*"
-        : "id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period";
-
     if (organization_id) {
       // Organization context - verify membership
       await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
       if (source) {
-        query = await sql`
-          SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
-          WHERE organization_id = ${organization_id} AND source = ${source} AND deleted_at IS NULL
-          ORDER BY created_at DESC
-          LIMIT ${limitNum}
-        `;
+        query = include_src === "true"
+          ? await sql`
+              SELECT * FROM gallery_images
+              WHERE organization_id = ${organization_id} AND source = ${source} AND deleted_at IS NULL
+              ORDER BY created_at DESC
+              LIMIT ${limitNum}
+            `
+          : await sql`
+              SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images
+              WHERE organization_id = ${organization_id} AND source = ${source} AND deleted_at IS NULL
+              ORDER BY created_at DESC
+              LIMIT ${limitNum}
+            `;
       } else {
-        query = await sql`
-          SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
-          WHERE organization_id = ${organization_id} AND deleted_at IS NULL
-          ORDER BY created_at DESC
-          LIMIT ${limitNum}
-        `;
+        query = include_src === "true"
+          ? await sql`
+              SELECT * FROM gallery_images
+              WHERE organization_id = ${organization_id} AND deleted_at IS NULL
+              ORDER BY created_at DESC
+              LIMIT ${limitNum}
+            `
+          : await sql`
+              SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images
+              WHERE organization_id = ${organization_id} AND deleted_at IS NULL
+              ORDER BY created_at DESC
+              LIMIT ${limitNum}
+            `;
       }
     } else {
       // Personal context
       if (source) {
-        query = await sql`
-          SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
-          WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND source = ${source} AND deleted_at IS NULL
-          ORDER BY created_at DESC
-          LIMIT ${limitNum}
-        `;
+        query = include_src === "true"
+          ? await sql`
+              SELECT * FROM gallery_images
+              WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND source = ${source} AND deleted_at IS NULL
+              ORDER BY created_at DESC
+              LIMIT ${limitNum}
+            `
+          : await sql`
+              SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images
+              WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND source = ${source} AND deleted_at IS NULL
+              ORDER BY created_at DESC
+              LIMIT ${limitNum}
+            `;
       } else {
-        query = await sql`
-          SELECT ${sql.unsafe(selectColumns)} FROM gallery_images
-          WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL
-          ORDER BY created_at DESC
-          LIMIT ${limitNum}
-        `;
+        query = include_src === "true"
+          ? await sql`
+              SELECT * FROM gallery_images
+              WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL
+              ORDER BY created_at DESC
+              LIMIT ${limitNum}
+            `
+          : await sql`
+              SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images
+              WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL
+              ORDER BY created_at DESC
+              LIMIT ${limitNum}
+            `;
       }
     }
 
