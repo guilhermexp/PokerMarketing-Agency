@@ -194,48 +194,6 @@ export default defineConfig(({ mode }) => {
       exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/util"],
     },
     build: {
-      rollupOptions: {
-        output: {
-          manualChunks(id) {
-            if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/") || id.includes("node_modules/scheduler/")) {
-              return "vendor-react";
-            }
-            if (id.includes("node_modules/@ai-sdk/") || id.includes("node_modules/ai/") || id.includes("node_modules/@openrouter/") || id.includes("node_modules/@google/genai/")) {
-              return "vendor-ai";
-            }
-            if (id.includes("node_modules/streamdown/")) {
-              return "vendor-streamdown";
-            }
-            if (id.includes("node_modules/shiki/core/") || id.includes("node_modules/shiki/engine/")) {
-              return "vendor-shiki-core";
-            }
-            if (id.includes("node_modules/@lobehub/ui/")) {
-              return "vendor-lobehub-ui";
-            }
-            if (id.includes("node_modules/mermaid/")) {
-              return "vendor-mermaid";
-            }
-            if (id.includes("node_modules/xlsx")) {
-              return "vendor-xlsx";
-            }
-            if (id.includes("node_modules/tesseract.js")) {
-              return "vendor-tesseract";
-            }
-            if (id.includes("node_modules/@ffmpeg")) {
-              return "vendor-ffmpeg";
-            }
-            if (id.includes("node_modules/@clerk")) {
-              return "vendor-clerk";
-            }
-            if (id.includes("node_modules/recharts")) {
-              return "vendor-recharts";
-            }
-            if (id.includes("node_modules/framer-motion")) {
-              return "vendor-framer-motion";
-            }
-          },
-        },
-      },
       chunkSizeWarningLimit: 3000,
     },
   };
