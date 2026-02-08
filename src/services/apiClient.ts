@@ -14,6 +14,60 @@ const DEV_API_ORIGIN =
       : "";
 
 // ============================================================================
+// CSRF Token Management
+// Stores CSRF token in memory (not localStorage for security)
+// ============================================================================
+
+let csrfToken: string | null = null;
+
+/**
+ * Get CSRF token from server
+ * Fetches a new token from /api/csrf-token endpoint
+ * Returns null if fetch fails
+ */
+export async function getCsrfToken(): Promise<string | null> {
+  try {
+    const response = await fetch("/api/csrf-token", {
+      method: "GET",
+      credentials: "include", // Include cookies for CSRF token generation
+    });
+
+    if (!response.ok) {
+      console.warn("[CSRF] Failed to fetch token:", response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.csrfToken) {
+      csrfToken = data.csrfToken;
+      return csrfToken;
+    }
+
+    console.warn("[CSRF] No token in response");
+    return null;
+  } catch (error) {
+    console.warn("[CSRF] Failed to get token:", error);
+    return null;
+  }
+}
+
+/**
+ * Get the current CSRF token from memory
+ * Returns the cached token or null if not fetched yet
+ */
+export function getCurrentCsrfToken(): string | null {
+  return csrfToken;
+}
+
+/**
+ * Clear the cached CSRF token
+ * Used when token validation fails to force refresh
+ */
+export function clearCsrfToken(): void {
+  csrfToken = null;
+}
+
+// ============================================================================
 // OPTIMIZED: Unified Initial Data Load
 // Loads ALL user data in a SINGLE request instead of 6 separate requests
 // ============================================================================
