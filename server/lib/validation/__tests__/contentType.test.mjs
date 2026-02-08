@@ -127,6 +127,7 @@ describe('contentType validation', () => {
       it('should provide helpful error message with allowed types', () => {
         try {
           validateContentType('text/html');
+          expect.fail('Expected validateContentType to throw');
         } catch (error) {
           expect(error.message).toContain('Invalid content type: text/html');
           expect(error.message).toContain('Allowed types:');

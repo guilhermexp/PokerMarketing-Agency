@@ -165,7 +165,7 @@ export async function createSession(sql, data, userId, organizationId) {
   const aspectRatioStr = String(aspectRatio || '9:16');
   const resolutionStr = String(resolution || '720p');
 
-  console.log('[VideoPlayground] createSession data:', { topicId, model, aspectRatioStr, resolutionStr, userId });
+  // Structured logging is handled by the route layer
 
   const [session] = await sql`
     INSERT INTO video_generation_sessions (topic_id, user_id, organization_id, model, prompt, aspect_ratio, resolution, reference_image_url)
@@ -189,19 +189,34 @@ export async function createSession(sql, data, userId, organizationId) {
   };
 }
 
-export async function updateGeneration(sql, generationId, updates) {
+export async function updateGeneration(sql, generationId, updates, userId, organizationId) {
   const { status, videoUrl, duration, errorMessage } = updates;
+  const orgId = organizationId || null;
 
-  const [gen] = await sql`
-    UPDATE video_generations
-    SET
-      status = COALESCE(${status}, status),
-      video_url = COALESCE(${videoUrl}, video_url),
-      duration = COALESCE(${duration}, duration),
-      error_message = COALESCE(${errorMessage}, error_message)
-    WHERE id = ${generationId}
-    RETURNING *
-  `;
+  const [gen] = orgId
+    ? await sql`
+      UPDATE video_generations g
+      SET
+        status = COALESCE(${status}, g.status),
+        video_url = COALESCE(${videoUrl}, g.video_url),
+        duration = COALESCE(${duration}, g.duration),
+        error_message = COALESCE(${errorMessage}, g.error_message)
+      FROM video_generation_sessions s
+      WHERE g.id = ${generationId}
+      AND g.session_id = s.id
+      AND s.organization_id = ${orgId}
+      RETURNING g.*
+    `
+    : await sql`
+      UPDATE video_generations
+      SET
+        status = COALESCE(${status}, status),
+        video_url = COALESCE(${videoUrl}, video_url),
+        duration = COALESCE(${duration}, duration),
+        error_message = COALESCE(${errorMessage}, error_message)
+      WHERE id = ${generationId} AND user_id = ${userId}
+      RETURNING *
+    `;
   return mapGeneration(gen);
 }
 
@@ -241,7 +256,6 @@ export async function generateTopicTitle(prompts, genai) {
 
   try {
     const promptsText = prompts.slice(0, 3).join("\n- ");
-    const model = genai.models.generateContent;
 
     const result = await genai.models.generateContent({
       model: "gemini-2.0-flash",
@@ -265,7 +279,7 @@ Prompts:
       return text.trim().slice(0, 50);
     }
   } catch (error) {
-    console.error("[VideoPlayground] Generate title error:", error);
+    // Title generation is best-effort; fallback below handles failure
   }
 
   // Fallback

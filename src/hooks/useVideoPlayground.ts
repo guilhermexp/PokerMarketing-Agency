@@ -8,6 +8,7 @@ import useSWR from 'swr';
 import { useVideoPlaygroundStore, videoPlaygroundSelectors } from '../stores/videoPlaygroundStore';
 import * as api from '../services/api/videoPlayground';
 import { generateVideo as generateVideoApi, type ApiVideoModel } from '../services/apiClient';
+import { uploadDataUrlToBlob } from '../services/blobService';
 
 // =============================================================================
 // Topics Hook
@@ -167,9 +168,9 @@ export function useCreateVideo(onAddToGallery?: (data: {
       // Convert aspect ratio format
       const apiAspectRatio: '16:9' | '9:16' = aspectRatio;
 
-      // Build reference image URL if exists
+      // Upload reference image to Vercel Blob if exists (never send base64 to API)
       const referenceImageUrl = referenceImage
-        ? `data:${referenceImage.mimeType};base64,${referenceImage.dataUrl.replace(/^data:[^;]+;base64,/, '')}`
+        ? await uploadDataUrlToBlob(referenceImage.dataUrl)
         : undefined;
 
       // Create session record via our API first (with pending status)

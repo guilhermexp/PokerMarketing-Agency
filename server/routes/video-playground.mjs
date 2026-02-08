@@ -78,6 +78,9 @@ export function registerVideoPlaygroundRoutes(
 
       const { id } = req.params;
       const { title, coverUrl } = req.body;
+      if (coverUrl && coverUrl.startsWith('data:')) {
+        return res.status(400).json({ error: "Base64 data URLs not allowed; upload to blob storage first" });
+      }
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       const topic = await updateTopic(
@@ -165,6 +168,9 @@ export function registerVideoPlaygroundRoutes(
       if (!topicId || !model || !prompt) {
         return res.status(400).json({ error: "Missing required fields" });
       }
+      if (referenceImageUrl && referenceImageUrl.startsWith('data:')) {
+        return res.status(400).json({ error: "Base64 data URLs not allowed; upload to blob storage first" });
+      }
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
@@ -228,13 +234,19 @@ export function registerVideoPlaygroundRoutes(
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
+      const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
       const { id } = req.params;
       const { status, videoUrl, duration, errorMessage } = req.body;
 
+      if (videoUrl && videoUrl.startsWith('data:')) {
+        return res.status(400).json({ error: "Base64 data URLs not allowed; upload to blob storage first" });
+      }
+
       const sql = getSql();
-      const generation = await updateGeneration(sql, id, { status, videoUrl, duration, errorMessage });
+      const resolvedUserId = await resolveUserId(sql, userId);
+      const generation = await updateGeneration(sql, id, { status, videoUrl, duration, errorMessage }, resolvedUserId, orgId);
 
       res.json({ success: true, generation });
     } catch (error) {
