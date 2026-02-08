@@ -136,6 +136,12 @@ async function fetchApi<T>(
   // Get Clerk authentication token
   const token = await getAuthToken();
 
+  // For state-changing operations, ensure we have a CSRF token
+  const requiresCsrf = method !== "GET" && method !== "HEAD";
+  if (requiresCsrf && !csrfToken) {
+    await getCsrfToken();
+  }
+
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -143,6 +149,7 @@ async function fetchApi<T>(
         headers: {
           "Content-Type": "application/json",
           ...(token && { Authorization: `Bearer ${token}` }),
+          ...(requiresCsrf && csrfToken && { "X-CSRF-Token": csrfToken }),
           ...options.headers,
         },
       });
@@ -151,6 +158,12 @@ async function fetchApi<T>(
         const error = await response
           .json()
           .catch(() => ({ error: "Unknown error" }));
+
+        // If CSRF validation failed, clear the token for next time
+        if (response.status === 403 && requiresCsrf) {
+          clearCsrfToken();
+        }
+
         throw new Error(error.error || `HTTP ${response.status}`);
       }
 
