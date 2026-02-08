@@ -9,6 +9,7 @@
 import "dotenv/config";
 
 import express from "express";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
 import path from "path";
@@ -55,6 +56,7 @@ import {
 } from "./routes/image-playground.mjs";
 import { requestLogger } from "./middleware/requestLogger.mjs";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.mjs";
+import { csrfProtection } from "./middleware/csrfProtection.mjs";
 import logger from "./lib/logger.mjs";
 import {
   ValidationError,
@@ -156,6 +158,9 @@ app.use(
 // Largest legitimate payloads (campaign data, posts) are typically <100KB
 app.use(express.json({ limit: "10mb" }));
 
+// Cookie parser middleware for CSRF token handling
+app.use(cookieParser());
+
 // Clerk authentication middleware
 // Adds auth object to all requests (non-blocking)
 app.use(
@@ -205,7 +210,7 @@ const PROTECTED_API_PREFIXES = [
 ];
 
 for (const prefix of PROTECTED_API_PREFIXES) {
-  app.use(prefix, requireAuthenticatedRequest, enforceAuthenticatedIdentity);
+  app.use(prefix, requireAuthenticatedRequest, enforceAuthenticatedIdentity, csrfProtection);
 }
 
 // Helper to get Clerk org context from request
