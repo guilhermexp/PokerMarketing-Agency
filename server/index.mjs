@@ -5571,6 +5571,10 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
           const contentType =
             imageResponse.headers.get("content-type") || "image/png";
+
+          // Validate content type for security
+          validateContentType(contentType);
+
           const ext = contentType.includes("png") ? "png" : "jpg";
           const filename = `flyer-${Date.now()}.${ext}`;
 
@@ -5799,6 +5803,9 @@ app.post("/api/ai/image", async (req, res) => {
           contentType =
             imageResponse.headers.get("content-type") || "image/png";
         }
+
+        // Validate content type for security
+        validateContentType(contentType);
 
         const ext = contentType.includes("png") ? "png" : "jpg";
         const filename = `generated-${Date.now()}.${ext}`;
