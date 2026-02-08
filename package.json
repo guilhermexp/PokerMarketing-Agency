@@ -1,7 +1,7 @@
 {
   "name": "poker-marketing-agency",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n api,vite -c cyan,green \"bun run dev:api:debug\" \"sleep 3 && vite\"",
