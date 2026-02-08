@@ -8,6 +8,7 @@
 
 import { put } from "@vercel/blob";
 import sharp from "sharp";
+import { validateContentType } from "../lib/validation/contentType.mjs";
 
 // Thumbnail settings
 const THUMBNAIL_WIDTH = 400;
@@ -731,6 +732,9 @@ async function processImageGeneration(
       );
       throw new Error("Falha ao gerar imagem. Tente um prompt diferente.");
     }
+
+    // Validate content type from Gemini API response
+    validateContentType(mimeType);
 
     // Upload to Vercel Blob
     const buffer = Buffer.from(imageBase64, "base64");
