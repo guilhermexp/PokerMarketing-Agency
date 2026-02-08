@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-DirectorAi is an AI-powered growth toolkit for poker marketing agencies. It transforms content (transcripts, videos, posts) into complete marketing campaigns including video clips, social media posts, ad creatives, and tournament flyers.
+Socialab is an AI-powered growth toolkit for poker marketing agencies. It transforms content (transcripts, videos, posts) into complete marketing campaigns including video clips, social media posts, ad creatives, and tournament flyers.
 
 ## Commands
 
@@ -45,13 +45,13 @@ node scripts/check-all-data-urls.mjs  # Diagnose remaining data URLs
 ## Architecture
 
 ### Stack
-- **Frontend**: React 19 + TypeScript + Vite + TailwindCSS 4
+- **Frontend**: React 19 + TypeScript + Vite 7 + TailwindCSS 4
 - **Backend**: Express 5 (Node.js) - unified server in `server/index.mjs` (dev entrypoint `server/dev-api.mjs` just re-exports it)
 - **Database**: Neon Serverless Postgres via `@neondatabase/serverless`
 - **Storage**: Vercel Blob for images
 - **Queue**: Redis + BullMQ (for scheduled posts only; image jobs removed)
 - **Auth**: Clerk (multi-tenant with organizations)
-- **AI**: Google Gemini (`@google/genai`) for text/image generation
+- **AI**: Google Gemini via `@google/genai` (sync operations) + Vercel AI SDK `ai` + `@ai-sdk/google` (streaming chat)
 
 ### Data Flow
 ```
@@ -79,6 +79,10 @@ Frontend (React) → Express API → Neon Postgres
 - `server/index.mjs` - Unified API server (~7K lines, monolithic)
 - `server/dev-api.mjs` - Development entrypoint (1-line, imports index.mjs)
 - `server/helpers/job-queue.mjs` - BullMQ setup for scheduled posts
+- `server/lib/` - AI providers, CSRF, logger, errors, validation
+- `server/api/` - Chat route handler
+- `server/middleware/` - CSRF protection, error handler, request logger
+- `server/routes/` - Video playground routes
 
 ### Frontend Entry Points
 - `src/App.tsx` - Main app component (~91K chars, handles all state)
@@ -134,6 +138,7 @@ CSRF validation is enforced on **all state-changing operations** (POST, PUT, DEL
 - `/api/proxy-video/*` - Video proxy
 - `/api/rube/*` - Rube Goldberg
 - `/api/image-playground/*` - Image operations
+- `/api/video-playground/*` - Video playground operations
 - `/api/admin/*` - Admin operations
 
 **Note:** GET, HEAD, and OPTIONS requests do NOT require CSRF tokens.
