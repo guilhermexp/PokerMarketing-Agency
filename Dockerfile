@@ -47,7 +47,7 @@ RUN echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env && \
     echo "FAL_KEY=$FAL_KEY" >> .env
 
 # Build the app
-# Cache bust: 2026-01-20-rebuild
+# Cache bust: 2026-02-08-fix-runtime
 RUN npm run build && \
     echo "=== Build complete ===" && \
     ls -la dist/
