@@ -18,6 +18,14 @@ import crypto from 'crypto';
 // In production, this should be loaded from environment variable
 const CSRF_SECRET = process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production';
 
+// Validate CSRF_SECRET in production
+if (process.env.NODE_ENV === 'production' && CSRF_SECRET === 'default-csrf-secret-change-in-production') {
+  throw new Error(
+    'CSRF_SECRET environment variable must be set in production. ' +
+    'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"'
+  );
+}
+
 // Token length in bytes (32 bytes = 256 bits)
 const TOKEN_LENGTH = 32;
 

@@ -355,13 +355,7 @@ export async function getDailyFlyers(
 }
 
 export async function deleteGalleryImage(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/gallery?id=${id}`, {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to delete image: HTTP ${response.status}`);
-  }
+  await fetchApi(`/gallery?id=${id}`, { method: "DELETE" });
 }
 
 export async function updateGalleryImage(
@@ -861,12 +855,20 @@ export async function uploadToBlob(
   );
   const token = await getAuthToken();
 
+  // Get CSRF token if not cached
+  const requiresCsrf = true;
+  if (requiresCsrf && !getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+
   const response = await fetch("/api/upload", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(getCurrentCsrfToken() ? { "X-CSRF-Token": getCurrentCsrfToken()! } : {}),
     },
+    credentials: "include",
     body: JSON.stringify({
       filename,
       contentType,
@@ -875,6 +877,10 @@ export async function uploadToBlob(
   });
 
   if (!response.ok) {
+    // Clear token on 403 for retry
+    if (response.status === 403) {
+      clearCsrfToken();
+    }
     const error = await response
       .json()
       .catch(() => ({ error: "Unknown error" }));
@@ -1117,9 +1123,18 @@ export async function queueGenerationJob(
   context?: string,
   organizationId?: string | null,
 ): Promise<QueueJobResult> {
+  // Get CSRF token if not cached
+  if (!getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+
   const response = await fetch("/api/generate/queue", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(getCurrentCsrfToken() ? { "X-CSRF-Token": getCurrentCsrfToken()! } : {}),
+    },
+    credentials: "include",
     body: JSON.stringify({
       userId,
       organizationId,
@@ -1131,6 +1146,10 @@ export async function queueGenerationJob(
   });
 
   if (!response.ok) {
+    // Clear token on 403 for retry
+    if (response.status === 403) {
+      clearCsrfToken();
+    }
     const error = await response
       .json()
       .catch(() => ({ error: "Unknown error" }));
@@ -1307,14 +1326,26 @@ export async function pollGenerationJob(
  */
 export async function cancelGenerationJob(jobId: string): Promise<void> {
   const token = await getAuthToken();
+
+  // Get CSRF token if not cached
+  if (!getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+
   const response = await fetch(`/api/generate/job/${jobId}`, {
     method: "DELETE",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(getCurrentCsrfToken() ? { "X-CSRF-Token": getCurrentCsrfToken()! } : {}),
     },
+    credentials: "include",
   });
 
   if (!response.ok) {
+    // Clear token on 403 for retry
+    if (response.status === 403) {
+      clearCsrfToken();
+    }
     const errorPayload = await response
       .json()
       .catch(() => ({ error: "Unknown error" }));
@@ -1326,13 +1357,26 @@ export async function cancelGenerationJob(jobId: string): Promise<void> {
  * Cancel all pending jobs for a user
  */
 export async function cancelAllGenerationJobs(userId: string): Promise<number> {
+  // Get CSRF token if not cached
+  if (!getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+
   const response = await fetch("/api/generate/cancel-all", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(getCurrentCsrfToken() ? { "X-CSRF-Token": getCurrentCsrfToken()! } : {}),
+    },
+    credentials: "include",
     body: JSON.stringify({ userId }),
   });
 
   if (!response.ok) {
+    // Clear token on 403 for retry
+    if (response.status === 403) {
+      clearCsrfToken();
+    }
     const error = await response
       .json()
       .catch(() => ({ error: "Unknown error" }));
@@ -1368,6 +1412,16 @@ async function fetchAiApi<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
+  // Add CSRF token for state-changing methods
+  const method = (options.method || "GET").toUpperCase();
+  const requiresCsrf = method !== "GET" && method !== "HEAD";
+  if (requiresCsrf && !getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+  if (requiresCsrf && getCurrentCsrfToken()) {
+    headers["X-CSRF-Token"] = getCurrentCsrfToken()!;
+  }
+
   let response: Response;
   try {
     response = await fetch(`${AI_API_BASE}${endpoint}`, {
@@ -1387,7 +1441,11 @@ async function fetchAiApi<T>(
     throw error;
   }
 
+  // Clear CSRF token on 403 for retry
   if (!response.ok) {
+    if (response.status === 403 && requiresCsrf) {
+      clearCsrfToken();
+    }
     const error = await response
       .json()
       .catch(() => ({ error: "Unknown error" }));
