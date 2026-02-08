@@ -174,7 +174,12 @@ async function ensureHttpUrl(imageUrl) {
 
     const mimeType = matches[1];
 
-    // Validate content type before uploading
+    // SECURITY: Validate content type BEFORE uploading to Vercel Blob
+    // WHY: Data URLs can contain ANY content type, including malicious ones
+    // - Attacker could craft data:text/html;base64,... with XSS payload
+    // - When published to Instagram/stored in blob, could execute in user's browser
+    // - validateContentType() rejects HTML, SVG, JavaScript, and executable MIME types
+    // - Only safe static image/video formats pass validation
     validateContentType(mimeType);
 
     const base64Data = matches[2];

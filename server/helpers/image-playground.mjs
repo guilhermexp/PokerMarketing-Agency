@@ -733,7 +733,13 @@ async function processImageGeneration(
       throw new Error("Falha ao gerar imagem. Tente um prompt diferente.");
     }
 
-    // Validate content type from Gemini API response
+    // SECURITY: Validate content type even from trusted AI provider (Gemini API)
+    // WHY: Defense in depth - never trust external APIs completely
+    // - API response could be compromised (man-in-the-middle, API breach)
+    // - API bug could return unexpected MIME types
+    // - Future API changes could introduce new content types
+    // - Prevents accidental upload of HTML/SVG/JS if API behavior changes
+    // - Validates BEFORE upload to Vercel Blob prevents stored XSS attacks
     validateContentType(mimeType);
 
     // Upload to Vercel Blob
