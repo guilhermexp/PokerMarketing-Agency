@@ -176,6 +176,28 @@ export async function deleteGeneration(generationId: string): Promise<void> {
   });
 }
 
+export interface UpdateGenerationInput {
+  status?: 'pending' | 'generating' | 'success' | 'error';
+  videoUrl?: string;
+  duration?: number;
+  errorMessage?: string;
+}
+
+/**
+ * Update a generation (set status and video URL after generation completes)
+ */
+export async function updateGeneration(
+  generationId: string,
+  updates: UpdateGenerationInput
+): Promise<VideoGeneration> {
+  const response = await fetchWithAuth(`${API_BASE}/generations/${generationId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+  const data = await response.json();
+  return data.generation;
+}
+
 // =============================================================================
 // Utility API
 // =============================================================================

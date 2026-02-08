@@ -172,18 +172,7 @@ export function useCreateVideo(onAddToGallery?: (data: {
         ? `data:${referenceImage.mimeType};base64,${referenceImage.dataUrl.replace(/^data:[^;]+;base64,/, '')}`
         : undefined;
 
-      // Call video generation API directly (same as before, but we also persist)
-      const videoUrl = await generateVideoApi({
-        prompt: trimmedPrompt,
-        model: model as ApiVideoModel,
-        aspectRatio: apiAspectRatio,
-        resolution,
-        useBrandProfile,
-        generateAudio: true,
-        imageUrl: referenceImageUrl,
-      });
-
-      // Create session record via our API
+      // Create session record via our API first (with pending status)
       const result = await api.createVideo({
         topicId,
         model,
@@ -194,17 +183,51 @@ export function useCreateVideo(onAddToGallery?: (data: {
         referenceImageUrl,
       });
 
-      // Update session with video URL
-      const sessionWithVideo: typeof result.data.session = {
-        ...result.data.session,
-        generations: [{
-          ...result.data.generation,
-          status: 'success',
-          asset: { url: videoUrl },
-        }],
-      };
+      const generationId = result.data.generation.id;
 
-      addSession(topicId, sessionWithVideo);
+      // Add session to store with pending status immediately
+      addSession(topicId, result.data.session);
+
+      let videoUrl: string;
+      let sessionWithVideo: typeof result.data.session;
+
+      try {
+        // Call video generation API
+        videoUrl = await generateVideoApi({
+          prompt: trimmedPrompt,
+          model: model as ApiVideoModel,
+          aspectRatio: apiAspectRatio,
+          resolution,
+          useBrandProfile,
+          generateAudio: true,
+          imageUrl: referenceImageUrl,
+        });
+
+        // Update generation in database with video URL and success status
+        await api.updateGeneration(generationId, {
+          status: 'success',
+          videoUrl,
+        });
+
+        // Update local store with video URL
+        sessionWithVideo = {
+          ...result.data.session,
+          generations: [{
+            ...result.data.generation,
+            status: 'success',
+            asset: { url: videoUrl },
+          }],
+        };
+
+        addSession(topicId, sessionWithVideo);
+      } catch (genError) {
+        // Update generation as error
+        await api.updateGeneration(generationId, {
+          status: 'error',
+          errorMessage: genError instanceof Error ? genError.message : 'Video generation failed',
+        });
+        throw genError;
+      }
 
       // Clear prompt
       clearPrompt();

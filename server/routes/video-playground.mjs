@@ -8,6 +8,7 @@ import {
   createSession,
   deleteSession,
   deleteGeneration,
+  updateGeneration,
   generateTopicTitle,
 } from "../helpers/video-playground.mjs";
 
@@ -218,6 +219,26 @@ export function registerVideoPlaygroundRoutes(
       res.json({ success: true });
     } catch (error) {
       logger.error({ err: error }, "[VideoPlayground] Delete generation error");
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update generation (set video URL and status after generation completes)
+  app.patch("/api/video-playground/generations/:id", async (req, res) => {
+    try {
+      const auth = getRequestAuthContext(req);
+      const userId = auth?.userId || null;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { id } = req.params;
+      const { status, videoUrl, duration, errorMessage } = req.body;
+
+      const sql = getSql();
+      const generation = await updateGeneration(sql, id, { status, videoUrl, duration, errorMessage });
+
+      res.json({ success: true, generation });
+    } catch (error) {
+      logger.error({ err: error }, "[VideoPlayground] Update generation error");
       res.status(500).json({ error: error.message });
     }
   });
