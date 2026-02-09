@@ -150,6 +150,7 @@ export interface DbGalleryImage {
   id: string;
   user_id: string;
   src_url: string;
+  thumbnail_url?: string | null;
   prompt: string | null;
   source: string;
   model: string;

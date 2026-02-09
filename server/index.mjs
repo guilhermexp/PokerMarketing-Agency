@@ -1865,7 +1865,8 @@ app.put("/api/db/brand-profiles", async (req, res) => {
 app.get("/api/db/gallery", async (req, res) => {
   try {
     const sql = getSql();
-    const { user_id, organization_id, source, limit, include_src } = req.query;
+    const { user_id, organization_id, source, limit, offset, include_src } =
+      req.query;
 
     if (!user_id) {
       throw new ValidationError("user_id is required");
@@ -1879,6 +1880,7 @@ app.get("/api/db/gallery", async (req, res) => {
 
     let query;
     const limitNum = parseInt(limit) || 50;
+    const offsetNum = parseInt(offset) || 0;
 
     // OPTIMIZATION: Only include src (base64 image data) when explicitly requested
     // This dramatically reduces egress data transfer (50-250MB → 50KB per request)
@@ -1893,12 +1895,14 @@ app.get("/api/db/gallery", async (req, res) => {
               WHERE organization_id = ${organization_id} AND source = ${source} AND deleted_at IS NULL
               ORDER BY created_at DESC
               LIMIT ${limitNum}
+              OFFSET ${offsetNum}
             `
           : await sql`
               SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images
               WHERE organization_id = ${organization_id} AND source = ${source} AND deleted_at IS NULL
               ORDER BY created_at DESC
               LIMIT ${limitNum}
+              OFFSET ${offsetNum}
             `;
       } else {
         query = include_src === "true"
@@ -1907,12 +1911,14 @@ app.get("/api/db/gallery", async (req, res) => {
               WHERE organization_id = ${organization_id} AND deleted_at IS NULL
               ORDER BY created_at DESC
               LIMIT ${limitNum}
+              OFFSET ${offsetNum}
             `
           : await sql`
               SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images
               WHERE organization_id = ${organization_id} AND deleted_at IS NULL
               ORDER BY created_at DESC
               LIMIT ${limitNum}
+              OFFSET ${offsetNum}
             `;
       }
     } else {
@@ -1924,12 +1930,14 @@ app.get("/api/db/gallery", async (req, res) => {
               WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND source = ${source} AND deleted_at IS NULL
               ORDER BY created_at DESC
               LIMIT ${limitNum}
+              OFFSET ${offsetNum}
             `
           : await sql`
               SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images
               WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND source = ${source} AND deleted_at IS NULL
               ORDER BY created_at DESC
               LIMIT ${limitNum}
+              OFFSET ${offsetNum}
             `;
       } else {
         query = include_src === "true"
@@ -1938,12 +1946,14 @@ app.get("/api/db/gallery", async (req, res) => {
               WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL
               ORDER BY created_at DESC
               LIMIT ${limitNum}
+              OFFSET ${offsetNum}
             `
           : await sql`
               SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period FROM gallery_images
               WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL
               ORDER BY created_at DESC
               LIMIT ${limitNum}
+              OFFSET ${offsetNum}
             `;
       }
     }

@@ -435,6 +435,7 @@ function AppContent() {
     .map((img) => ({
       id: img.id,
       src: img.src_url,
+      thumbnailSrc: img.thumbnail_url || undefined,
       prompt: img.prompt || undefined,
       source: img.source as GalleryImage["source"],
       model: img.model as GalleryImage["model"],
@@ -680,6 +681,7 @@ function AppContent() {
             const galleryImagesForPeriod: GalleryImage[] = dbImages.map((dbImg) => ({
               id: dbImg.id,
               src: dbImg.src_url,
+              thumbnailSrc: dbImg.thumbnail_url || undefined,
               prompt: dbImg.prompt || undefined,
               source: dbImg.source,
               model: dbImg.model as GalleryImage['model'],

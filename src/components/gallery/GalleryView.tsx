@@ -81,6 +81,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
   const [showHighlight, setShowHighlight] = React.useState(isNew);
   const [isLoaded, setIsLoaded] = React.useState(false);
   const poster = getVideoPoster(image);
+  const imagePreviewSrc = image.thumbnailSrc || image.src;
 
   useEffect(() => {
     if (isNew) {
@@ -89,6 +90,11 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
       return () => clearTimeout(timer);
     }
   }, [isNew]);
+
+  useEffect(() => {
+    setIsLoaded(false);
+    setImageError(false);
+  }, [imagePreviewSrc]);
 
   const handleClick = () => {
     if (isSelectMode && onToggleSelection) {
@@ -195,7 +201,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
             </div>
           )}
           <img
-            src={image.src}
+            src={imagePreviewSrc}
             alt={image.prompt}
             className={`w-full h-auto object-cover transition-all duration-500 group-hover:scale-[1.02] ${
               isLoaded ? 'opacity-100' : 'opacity-0'
