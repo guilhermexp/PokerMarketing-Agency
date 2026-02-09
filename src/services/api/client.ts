@@ -6,6 +6,7 @@
  */
 
 import { getAuthToken } from '../authService';
+import { getCsrfToken, getCurrentCsrfToken } from '../apiClient';
 
 export const API_BASE = '/api/db';
 export const AI_API_BASE = '/api/ai';
@@ -39,13 +40,22 @@ export async function fetchApi<T>(
   let lastError: unknown = null;
   const token = await getAuthToken();
 
+  // Ensure CSRF token for state-changing requests
+  const needsCsrf = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
+  if (needsCsrf && !getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
+      const csrfToken = getCurrentCsrfToken();
       const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(needsCsrf && csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
           ...options.headers,
         },
       });
@@ -93,8 +103,20 @@ export async function fetchAiApi<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  // Add CSRF token for state-changing requests
+  const method = (options.method || 'GET').toUpperCase();
+  const needsCsrf = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
+  if (needsCsrf && !getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+  const csrfToken = getCurrentCsrfToken();
+  if (needsCsrf && csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
+  }
+
   const response = await fetch(`${AI_API_BASE}${endpoint}`, {
     ...options,
+    credentials: 'include',
     headers: {
       ...headers,
       ...options.headers,

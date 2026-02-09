@@ -8,6 +8,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
+import { getCsrfToken, getCurrentCsrfToken } from '../../services/apiClient';
 
 interface InstagramAccount {
   id: string;
@@ -55,11 +56,18 @@ export function ConnectInstagramModal({
     setError(null);
 
     try {
+      if (!getCurrentCsrfToken()) {
+        await getCsrfToken();
+      }
+      const csrfToken = getCurrentCsrfToken();
+
       const response = await fetch('/api/db/instagram-accounts', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
         },
+        credentials: 'include',
         body: JSON.stringify({
           user_id: userId,
           organization_id: organizationId || null,
@@ -280,8 +288,17 @@ export function useInstagramAccounts(userId: string, organizationId?: string | n
 
   const removeAccount = async (accountId: string) => {
     try {
+      if (!getCurrentCsrfToken()) {
+        await getCsrfToken();
+      }
+      const csrfToken = getCurrentCsrfToken();
+
       const response = await fetch(`/api/db/instagram-accounts?id=${accountId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        },
+        credentials: 'include',
       });
 
       if (!response.ok) {

@@ -5,6 +5,7 @@
 
 import type { GalleryImage } from '../../../types';
 import { getAuthToken } from '../../../services/authService';
+import { getCsrfToken, getCurrentCsrfToken } from '../../../services/apiClient';
 
 interface EditOptions {
   brightness?: number;
@@ -25,6 +26,15 @@ interface ApiResponse<T> {
   error?: string;
 }
 
+/** Helper to get CSRF headers for state-changing requests */
+async function getCsrfHeaders(): Promise<Record<string, string>> {
+  if (!getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+  const csrfToken = getCurrentCsrfToken();
+  return csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
+}
+
 export const imageEditApi = {
   /**
    * Apply edits to an image
@@ -35,12 +45,15 @@ export const imageEditApi = {
   ): Promise<ApiResponse<{ editedUrl: string }>> => {
     try {
       const token = await getAuthToken();
+      const csrfHeaders = await getCsrfHeaders();
       const response = await fetch('/api/ai/edit-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...csrfHeaders,
         },
+        credentials: 'include',
         body: JSON.stringify({ imageUrl, ...options }),
       });
       return await response.json();
@@ -58,12 +71,15 @@ export const imageEditApi = {
   ): Promise<ApiResponse<{ enhancedUrl: string }>> => {
     try {
       const token = await getAuthToken();
+      const csrfHeaders = await getCsrfHeaders();
       const response = await fetch('/api/ai/enhance-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...csrfHeaders,
         },
+        credentials: 'include',
         body: JSON.stringify({ imageUrl, enhanceType }),
       });
       return await response.json();
@@ -81,12 +97,15 @@ export const imageEditApi = {
   ): Promise<ApiResponse<{ variations: string[] }>> => {
     try {
       const token = await getAuthToken();
+      const csrfHeaders = await getCsrfHeaders();
       const response = await fetch('/api/ai/generate-variations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...csrfHeaders,
         },
+        credentials: 'include',
         body: JSON.stringify({ imageUrl, count }),
       });
       return await response.json();
@@ -103,12 +122,15 @@ export const imageEditApi = {
   ): Promise<ApiResponse<{ noBgUrl: string }>> => {
     try {
       const token = await getAuthToken();
+      const csrfHeaders = await getCsrfHeaders();
       const response = await fetch('/api/ai/remove-background', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...csrfHeaders,
         },
+        credentials: 'include',
         body: JSON.stringify({ imageUrl }),
       });
       return await response.json();
@@ -151,8 +173,13 @@ export const imageEditApi = {
           });
 
           xhr.open('POST', '/api/upload');
+          xhr.withCredentials = true;
           if (token) {
             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          }
+          const csrfToken = getCurrentCsrfToken();
+          if (csrfToken) {
+            xhr.setRequestHeader('X-CSRF-Token', csrfToken);
           }
           xhr.send(formData);
         })

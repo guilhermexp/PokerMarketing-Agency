@@ -43,7 +43,7 @@ import {
 } from "../../../services/ffmpegService";
 
 const loadFfmpegService = () => import("../../../services/ffmpegService");
-import { uploadVideo, getVideoDisplayUrl } from "../../../services/apiClient";
+import { uploadVideo, getVideoDisplayUrl, getCsrfToken, getCurrentCsrfToken } from "../../../services/apiClient";
 import {
   useBackgroundJobs,
 } from "../../../hooks/useBackgroundJobs";
@@ -1791,12 +1791,18 @@ export const ClipCard: React.FC<ClipCardProps> = ({
         // Convert blob to base64 for upload
         const base64Data = await blobToBase64(wavBlob);
         const token = await getAuthToken();
+        if (!getCurrentCsrfToken()) {
+          await getCsrfToken();
+        }
+        const csrfToken = getCurrentCsrfToken();
         const response = await fetch("/api/upload", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
           },
+          credentials: "include",
           body: JSON.stringify({
             filename: `narration-${getAudioKey()}.wav`,
             contentType: "audio/wav",
