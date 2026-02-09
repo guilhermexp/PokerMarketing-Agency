@@ -115,6 +115,8 @@ REGRAS OBRIGATÓRIAS:
 - Cores vibrantes e contraste alto para se destacar no feed
 - Evite excesso de elementos — simplicidade premium
 - O resultado deve parecer peça criada por agência de marketing digital profissional
+- O branding da marca deve estar integrado de forma orgânica e envolvente na composição
+- Evite aparência de "logo colado"; integre marca com harmonia de luz, cor, textura e layout
 
 PROMPT DO USUÁRIO:
 ${userPrompt}`;

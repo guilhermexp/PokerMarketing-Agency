@@ -329,7 +329,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                   </div>
 
                   {/* Technical Grid */}
-                  <div className={`grid grid-cols-2 gap-2.5 ${profile.tertiaryColor ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                     <CustomSelect
                       label="Tone"
                       value={profile.toneOfVoice}
@@ -350,15 +350,6 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                       onChange={handleChange}
                       isAnalyzing={isAnalyzingLogo}
                     />
-                    {profile.tertiaryColor && (
-                      <ColorWidget
-                        label="Tertiary"
-                        name="tertiaryColor"
-                        color={profile.tertiaryColor}
-                        onChange={handleChange}
-                        isAnalyzing={isAnalyzingLogo}
-                      />
-                    )}
                   </div>
                 </div>
               </div>

@@ -395,7 +395,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                     </div>
 
                     {/* Colors Grid */}
-                    <div className={`grid gap-3 ${profile.tertiaryColor ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                    <div className="grid gap-3 grid-cols-2">
                       <ColorWidget
                         label="Primária"
                         name="primaryColor"
@@ -410,15 +410,6 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                         onChange={handleChange}
                         isAnalyzing={isAnalyzingLogo}
                       />
-                      {profile.tertiaryColor && (
-                        <ColorWidget
-                          label="Terciária"
-                          name="tertiaryColor"
-                          color={profile.tertiaryColor}
-                          onChange={handleChange}
-                          isAnalyzing={isAnalyzingLogo}
-                        />
-                      )}
                     </div>
                   </div>
                 </div>
