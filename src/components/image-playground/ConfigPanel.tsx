@@ -13,8 +13,10 @@ import {
   X,
   Palette,
   Instagram,
+  Loader2,
 } from 'lucide-react';
 import { useImagePlaygroundStore, type ReferenceImage } from '../../stores/imagePlaygroundStore';
+import { uploadDataUrlToBlob } from '../../services/blobService';
 
 // =============================================================================
 // Model Options - Only Gemini 3 Pro Image Preview
@@ -76,6 +78,9 @@ export const ConfigPanel: React.FC = () => {
     toggleInstagramMode,
     addReferenceImage,
     removeReferenceImage,
+    updateReferenceImageBlobUrl,
+    uploadingImageIds,
+    setUploadingImageIds,
   } = useImagePlaygroundStore();
 
   const referenceImages = parameters.referenceImages || [];
@@ -126,16 +131,33 @@ export const ConfigPanel: React.FC = () => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const dataUrl = event.target?.result as string;
+        const imageId = crypto.randomUUID();
         const newImage: ReferenceImage = {
-          id: crypto.randomUUID(),
+          id: imageId,
           dataUrl,
           mimeType: file.type || 'image/png',
         };
         addReferenceImage(newImage);
+
+        // Upload to Vercel Blob in background
+        setUploadingImageIds([...useImagePlaygroundStore.getState().uploadingImageIds, imageId]);
+        uploadDataUrlToBlob(dataUrl)
+          .then((blobUrl) => {
+            updateReferenceImageBlobUrl(imageId, blobUrl);
+            setUploadingImageIds(
+              useImagePlaygroundStore.getState().uploadingImageIds.filter((id) => id !== imageId)
+            );
+          })
+          .catch((err) => {
+            console.error('[ConfigPanel] Blob upload failed, will use base64 fallback:', err);
+            setUploadingImageIds(
+              useImagePlaygroundStore.getState().uploadingImageIds.filter((id) => id !== imageId)
+            );
+          });
       };
       reader.readAsDataURL(file);
     },
-    [referenceImages.length, addReferenceImage]
+    [referenceImages.length, addReferenceImage, updateReferenceImageBlobUrl, setUploadingImageIds]
   );
 
   const handleFileChange = useCallback(
@@ -285,24 +307,32 @@ export const ConfigPanel: React.FC = () => {
           {referenceImages.length > 0 ? (
             <div className="space-y-2">
               <div className="grid grid-cols-4 gap-2">
-                {referenceImages.map((img) => (
-                  <div
-                    key={img.id}
-                    className="relative aspect-square rounded-lg overflow-hidden border border-white/10 group"
-                  >
-                    <img
-                      src={img.dataUrl}
-                      alt="Reference"
-                      className="w-full h-full object-cover"
-                    />
-                    <button
-                      onClick={() => handleRemoveReferenceImage(img.id)}
-                      className="absolute top-1 right-1 p-1 bg-black/60 rounded-md hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100"
+                {referenceImages.map((img) => {
+                  const isUploading = uploadingImageIds.includes(img.id);
+                  return (
+                    <div
+                      key={img.id}
+                      className="relative aspect-square rounded-lg overflow-hidden border border-white/10 group"
                     >
-                      <X className="w-3 h-3 text-white" />
-                    </button>
-                  </div>
-                ))}
+                      <img
+                        src={img.dataUrl}
+                        alt="Reference"
+                        className="w-full h-full object-cover"
+                      />
+                      {isUploading && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <Loader2 className="w-4 h-4 text-white animate-spin" />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => handleRemoveReferenceImage(img.id)}
+                        className="absolute top-1 right-1 p-1 bg-black/60 rounded-md hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <X className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  );
+                })}
 
                 {/* Add button when under limit */}
                 {referenceImages.length < MAX_REFERENCE_IMAGES && (

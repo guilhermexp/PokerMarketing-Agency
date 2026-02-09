@@ -258,8 +258,12 @@ export function useCreateImage() {
           quality: parameters.quality,
           aspectRatio: parameters.aspectRatio,
           imageSize: parameters.imageSize,
-          // Send referenceImages array (new approach), fallback to imageUrl for compatibility
-          referenceImages: parameters.referenceImages,
+          // Send referenceImages with blobUrl preferred over dataUrl to keep payload small
+          referenceImages: parameters.referenceImages?.map((img) => ({
+            id: img.id,
+            dataUrl: img.blobUrl || img.dataUrl,
+            mimeType: img.mimeType,
+          })),
           imageUrl: parameters.imageUrl,
           useBrandProfile,
           useInstagramMode,

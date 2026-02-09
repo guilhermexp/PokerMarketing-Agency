@@ -13,8 +13,9 @@ import { devtools, persist, createJSONStorage, type StateStorage } from 'zustand
 
 export interface ReferenceImage {
   id: string;        // UUID for unique identification
-  dataUrl: string;   // data:image/...;base64,...
+  dataUrl: string;   // data:image/...;base64,... (kept for local preview)
   mimeType: string;  // image/png, image/jpeg, etc.
+  blobUrl?: string;  // Vercel Blob URL after upload (preferred over dataUrl for API calls)
 }
 
 export interface ImageGenerationTopic {
@@ -94,6 +95,7 @@ interface GenerationConfigState {
   activeImageSize: '1K' | '2K' | '4K';
   useBrandProfile: boolean;
   useInstagramMode: boolean;
+  uploadingImageIds: string[];
 }
 
 interface GenerationTopicState {
@@ -133,6 +135,8 @@ interface GenerationConfigActions {
   addReferenceImage: (image: ReferenceImage) => void;
   removeReferenceImage: (id: string) => void;
   clearReferenceImages: () => void;
+  updateReferenceImageBlobUrl: (id: string, blobUrl: string) => void;
+  setUploadingImageIds: (ids: string[]) => void;
 }
 
 interface GenerationTopicActions {
@@ -309,6 +313,7 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
         activeImageSize: DEFAULT_IMAGE_SIZE,
         useBrandProfile: false,
         useInstagramMode: false,
+        uploadingImageIds: [],
 
         // =============================================================================
         // Generation Topic State
@@ -477,6 +482,7 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
               ...get().parameters,
               referenceImages: current.filter((img) => img.id !== id),
             },
+            uploadingImageIds: get().uploadingImageIds.filter((uid) => uid !== id),
           });
         },
 
@@ -486,7 +492,24 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
               ...get().parameters,
               referenceImages: [],
             },
+            uploadingImageIds: [],
           });
+        },
+
+        updateReferenceImageBlobUrl: (id, blobUrl) => {
+          const current = get().parameters.referenceImages || [];
+          set({
+            parameters: {
+              ...get().parameters,
+              referenceImages: current.map((img) =>
+                img.id === id ? { ...img, blobUrl } : img
+              ),
+            },
+          });
+        },
+
+        setUploadingImageIds: (ids) => {
+          set({ uploadingImageIds: ids });
         },
 
         // =============================================================================
