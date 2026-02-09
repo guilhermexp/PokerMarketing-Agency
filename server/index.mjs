@@ -916,6 +916,7 @@ app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
     // Note: organizations are managed by Clerk, not in our DB
     const [
       usersResult,
+      activeUsersResult,
       campaignsResult,
       postsResult,
       galleryResult,
@@ -924,6 +925,7 @@ app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
       orgCountResult,
     ] = await Promise.all([
       sql`SELECT COUNT(*) as count FROM users`,
+      sql`SELECT COUNT(*) as count FROM users WHERE last_login_at >= DATE_TRUNC('day', NOW())`,
       sql`SELECT COUNT(*) as count FROM campaigns`,
       sql`SELECT COUNT(*) as count,
           COUNT(*) FILTER (WHERE status = 'scheduled') as pending
@@ -937,12 +939,25 @@ app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
       sql`SELECT COUNT(*) as count FROM api_usage_logs
           WHERE created_at >= NOW() - INTERVAL '24 hours'
           AND status = 'failed'`,
-      sql`SELECT COUNT(DISTINCT organization_id) as count FROM api_usage_logs WHERE organization_id IS NOT NULL`,
+      sql`
+        SELECT COUNT(DISTINCT organization_id) as count
+        FROM (
+          SELECT organization_id FROM brand_profiles WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+          UNION
+          SELECT organization_id FROM campaigns WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+          UNION
+          SELECT organization_id FROM gallery_images WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+          UNION
+          SELECT organization_id FROM scheduled_posts WHERE organization_id IS NOT NULL
+          UNION
+          SELECT organization_id FROM api_usage_logs WHERE organization_id IS NOT NULL
+        ) organizations
+      `,
     ]);
 
     res.json({
       totalUsers: parseInt(usersResult[0]?.count || 0),
-      activeUsersToday: 0, // Would need session tracking
+      activeUsersToday: parseInt(activeUsersResult[0]?.count || 0),
       totalOrganizations: parseInt(orgCountResult[0]?.count || 0),
       totalCampaigns: parseInt(campaignsResult[0]?.count || 0),
       totalScheduledPosts: parseInt(postsResult[0]?.count || 0),
@@ -962,42 +977,153 @@ app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
 app.get("/api/admin/usage", requireSuperAdmin, async (req, res) => {
   try {
     const sql = getSql();
-    const { days = 30 } = req.query;
+    const normalizedGroupBy = String(req.query?.groupBy || "day").toLowerCase();
+    const groupBy = ["day", "provider", "model", "operation"].includes(normalizedGroupBy)
+      ? normalizedGroupBy
+      : "day";
+    const parsedDays = Number.parseInt(String(req.query?.days || "30"), 10);
+    const days = Number.isFinite(parsedDays)
+      ? Math.min(Math.max(parsedDays, 1), 365)
+      : 30;
 
-    const timeline = await sql`
+    const totalsResult = await sql`
       SELECT
-        DATE(created_at) as date,
         COUNT(*) as total_requests,
+        COUNT(*) FILTER (WHERE status = 'success') as success_count,
+        COUNT(*) FILTER (WHERE status = 'failed') as failed_count,
         COALESCE(SUM(estimated_cost_cents), 0) as total_cost_cents,
-        operation
+        COALESCE(SUM(input_tokens), 0) as total_input_tokens,
+        COALESCE(SUM(output_tokens), 0) as total_output_tokens,
+        COALESCE(SUM(image_count), 0) as total_images,
+        COALESCE(SUM(video_duration_seconds), 0) as total_video_seconds
       FROM api_usage_logs
-      WHERE created_at >= NOW() - INTERVAL '1 day' * ${parseInt(days)}
-      GROUP BY DATE(created_at), operation
-      ORDER BY date DESC
+      WHERE created_at >= NOW() - INTERVAL '1 day' * ${days}
     `;
 
-    // Aggregate by date
-    const aggregated = {};
-    for (const row of timeline) {
-      const dateKey =
-        row.date instanceof Date
-          ? row.date.toISOString().split("T")[0]
-          : String(row.date);
-      if (!aggregated[dateKey]) {
-        aggregated[dateKey] = {
-          date: dateKey,
-          total_requests: 0,
-          total_cost_cents: 0,
-        };
-      }
-      aggregated[dateKey].total_requests += parseInt(row.total_requests);
-      aggregated[dateKey].total_cost_cents += parseInt(row.total_cost_cents);
+    let timeline = [];
+    if (groupBy === "provider") {
+      timeline = await sql`
+        SELECT
+          provider,
+          COUNT(*) as total_requests,
+          COALESCE(SUM(estimated_cost_cents), 0) as total_cost_cents
+        FROM api_usage_logs
+        WHERE created_at >= NOW() - INTERVAL '1 day' * ${days}
+        GROUP BY provider
+        ORDER BY total_requests DESC
+        LIMIT 20
+      `;
+    } else if (groupBy === "model") {
+      timeline = await sql`
+        SELECT
+          model_id,
+          COUNT(*) as total_requests,
+          COALESCE(SUM(estimated_cost_cents), 0) as total_cost_cents
+        FROM api_usage_logs
+        WHERE created_at >= NOW() - INTERVAL '1 day' * ${days}
+        GROUP BY model_id
+        ORDER BY total_requests DESC
+        LIMIT 20
+      `;
+    } else if (groupBy === "operation") {
+      timeline = await sql`
+        SELECT
+          operation,
+          COUNT(*) as total_requests,
+          COALESCE(SUM(estimated_cost_cents), 0) as total_cost_cents
+        FROM api_usage_logs
+        WHERE created_at >= NOW() - INTERVAL '1 day' * ${days}
+        GROUP BY operation
+        ORDER BY total_requests DESC
+      `;
+    } else {
+      timeline = await sql`
+        SELECT
+          DATE(created_at) as date,
+          COUNT(*) as total_requests,
+          COALESCE(SUM(estimated_cost_cents), 0) as total_cost_cents
+        FROM api_usage_logs
+        WHERE created_at >= NOW() - INTERVAL '1 day' * ${days}
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+      `;
     }
 
+    const topUsers = await sql`
+      SELECT
+        l.user_id,
+        COALESCE(u.email, '') as email,
+        COALESCE(u.name, '') as name,
+        COUNT(*) as total_requests,
+        COALESCE(SUM(l.estimated_cost_cents), 0) as total_cost_cents
+      FROM api_usage_logs l
+      LEFT JOIN users u ON u.id = l.user_id
+      WHERE l.created_at >= NOW() - INTERVAL '1 day' * ${days}
+        AND l.user_id IS NOT NULL
+      GROUP BY l.user_id, u.email, u.name
+      ORDER BY total_cost_cents DESC
+      LIMIT 10
+    `;
+
+    const topOrganizations = await sql`
+      SELECT
+        organization_id,
+        COUNT(*) as total_requests,
+        COALESCE(SUM(estimated_cost_cents), 0) as total_cost_cents
+      FROM api_usage_logs
+      WHERE created_at >= NOW() - INTERVAL '1 day' * ${days}
+        AND organization_id IS NOT NULL
+      GROUP BY organization_id
+      ORDER BY total_cost_cents DESC
+      LIMIT 10
+    `;
+
+    const totals = totalsResult[0] || {};
+
     res.json({
-      timeline: Object.values(aggregated).sort((a, b) =>
-        a.date.localeCompare(b.date),
-      ),
+      totals: {
+        totalRequests: parseInt(totals.total_requests || 0),
+        successCount: parseInt(totals.success_count || 0),
+        failedCount: parseInt(totals.failed_count || 0),
+        totalCostCents: parseInt(totals.total_cost_cents || 0),
+        totalCostUsd: (parseInt(totals.total_cost_cents || 0) || 0) / 100,
+        totalInputTokens: parseInt(totals.total_input_tokens || 0),
+        totalOutputTokens: parseInt(totals.total_output_tokens || 0),
+        totalImages: parseInt(totals.total_images || 0),
+        totalVideoSeconds: parseInt(totals.total_video_seconds || 0),
+      },
+      timeline: timeline.map((row) => {
+        const mapped = {
+          total_requests: String(parseInt(row.total_requests || 0)),
+          total_cost_cents: String(parseInt(row.total_cost_cents || 0)),
+        };
+
+        if (row.date) {
+          const dateValue = row.date instanceof Date
+            ? row.date.toISOString().split("T")[0]
+            : String(row.date);
+          return { ...mapped, date: dateValue };
+        }
+
+        if (row.provider) return { ...mapped, provider: row.provider };
+        if (row.model_id) return { ...mapped, model_id: row.model_id };
+        if (row.operation) return { ...mapped, operation: row.operation };
+        return mapped;
+      }),
+      topUsers: topUsers.map((row) => ({
+        user_id: row.user_id,
+        email: row.email || "",
+        name: row.name || "",
+        total_requests: String(parseInt(row.total_requests || 0)),
+        total_cost_cents: String(parseInt(row.total_cost_cents || 0)),
+        totalCostUsd: (parseInt(row.total_cost_cents || 0) || 0) / 100,
+      })),
+      topOrganizations: topOrganizations.map((row) => ({
+        organization_id: row.organization_id,
+        total_requests: String(parseInt(row.total_requests || 0)),
+        total_cost_cents: String(parseInt(row.total_cost_cents || 0)),
+        totalCostUsd: (parseInt(row.total_cost_cents || 0) || 0) / 100,
+      })),
     });
   } catch (error) {
     logger.error({ err: error }, "[Admin] Usage error");
@@ -1021,7 +1147,7 @@ app.get("/api/admin/users", requireSuperAdmin, async (req, res) => {
         u.email,
         u.name,
         u.avatar_url,
-        u.last_login_at,
+        u.last_login_at as last_login,
         u.created_at,
         COUNT(DISTINCT c.id) as campaign_count,
         COUNT(DISTINCT bp.id) as brand_count,
@@ -1075,6 +1201,18 @@ app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
         SELECT DISTINCT organization_id
         FROM campaigns
         WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+        UNION
+        SELECT DISTINCT organization_id
+        FROM gallery_images
+        WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+        UNION
+        SELECT DISTINCT organization_id
+        FROM scheduled_posts
+        WHERE organization_id IS NOT NULL
+        UNION
+        SELECT DISTINCT organization_id
+        FROM api_usage_logs
+        WHERE organization_id IS NOT NULL
       ),
       brand_data AS (
         SELECT
@@ -1122,6 +1260,8 @@ app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
           SELECT organization_id, created_at FROM gallery_images WHERE organization_id IS NOT NULL
           UNION ALL
           SELECT organization_id, created_at FROM scheduled_posts WHERE organization_id IS NOT NULL
+          UNION ALL
+          SELECT organization_id, created_at FROM api_usage_logs WHERE organization_id IS NOT NULL
         ) all_activity
         GROUP BY organization_id
       ),
@@ -1180,6 +1320,12 @@ app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
         SELECT organization_id FROM brand_profiles WHERE organization_id IS NOT NULL AND deleted_at IS NULL
         UNION
         SELECT organization_id FROM campaigns WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+        UNION
+        SELECT organization_id FROM gallery_images WHERE organization_id IS NOT NULL AND deleted_at IS NULL
+        UNION
+        SELECT organization_id FROM scheduled_posts WHERE organization_id IS NOT NULL
+        UNION
+        SELECT organization_id FROM api_usage_logs WHERE organization_id IS NOT NULL
       ) orgs
     `;
     const total = parseInt(countResult[0]?.total || 0);
@@ -1204,21 +1350,45 @@ app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
 app.get("/api/admin/logs", requireSuperAdmin, async (req, res) => {
   try {
     const sql = getSql();
-    const { limit = 100, page = 1 } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const { limit = 100, page = 1, action = "", category = "", severity = "" } =
+      req.query;
+    const safeLimit = Math.min(Math.max(parseInt(limit) || 100, 1), 200);
+    const safePage = Math.max(parseInt(page) || 1, 1);
+    const offset = (safePage - 1) * safeLimit;
+    const actionFilter = action ? `%${action}%` : null;
+    const categoryFilter = category ? String(category) : null;
+    const severityFilter = severity ? String(severity).toLowerCase() : null;
 
-    // Simple query without dynamic filters for now
     const logs = await sql`
       SELECT id, user_id, organization_id, endpoint, operation as category, model_id as model,
              estimated_cost_cents as cost_cents, error_message as error,
              CASE WHEN status = 'failed' THEN 'error' ELSE 'info' END as severity,
              status, latency_ms as duration_ms, created_at as timestamp
       FROM api_usage_logs
+      WHERE
+        (${actionFilter}::text IS NULL OR endpoint ILIKE ${actionFilter} OR operation::text ILIKE ${actionFilter} OR model_id ILIKE ${actionFilter})
+        AND (${categoryFilter}::text IS NULL OR operation::text = ${categoryFilter})
+        AND (
+          ${severityFilter}::text IS NULL
+          OR (${severityFilter} = 'error' AND status = 'failed')
+          OR (${severityFilter} IN ('info', 'warning', 'critical') AND status != 'failed')
+        )
       ORDER BY created_at DESC
-      LIMIT ${parseInt(limit)} OFFSET ${offset}
+      LIMIT ${safeLimit} OFFSET ${offset}
     `;
 
-    const totalResult = await sql`SELECT COUNT(*) as count FROM api_usage_logs`;
+    const totalResult = await sql`
+      SELECT COUNT(*) as count
+      FROM api_usage_logs
+      WHERE
+        (${actionFilter}::text IS NULL OR endpoint ILIKE ${actionFilter} OR operation::text ILIKE ${actionFilter} OR model_id ILIKE ${actionFilter})
+        AND (${categoryFilter}::text IS NULL OR operation::text = ${categoryFilter})
+        AND (
+          ${severityFilter}::text IS NULL
+          OR (${severityFilter} = 'error' AND status = 'failed')
+          OR (${severityFilter} IN ('info', 'warning', 'critical') AND status != 'failed')
+        )
+    `;
 
     // Get unique categories
     const categoriesResult =
@@ -1229,13 +1399,13 @@ app.get("/api/admin/logs", requireSuperAdmin, async (req, res) => {
       await sql`SELECT COUNT(*) as count FROM api_usage_logs WHERE status = 'failed' AND created_at >= NOW() - INTERVAL '24 hours'`;
 
     const total = parseInt(totalResult[0]?.count || 0);
-    const totalPages = Math.ceil(total / parseInt(limit));
+    const totalPages = Math.ceil(total / safeLimit);
 
     res.json({
       logs,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: safePage,
+        limit: safeLimit,
         total,
         totalPages,
       },
