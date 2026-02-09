@@ -10,6 +10,7 @@ import { ConfigPanel } from './ConfigPanel';
 import { Workspace } from './Workspace';
 import { TopicsSidebar } from './TopicsSidebar';
 import { useImagePlayground } from '../../hooks/useImagePlayground';
+import { useBrandProfile } from '../../hooks/useAppData';
 
 interface ImagePlaygroundPageProps {
   userId?: string;
@@ -17,16 +18,17 @@ interface ImagePlaygroundPageProps {
 }
 
 export const ImagePlaygroundPage: React.FC<ImagePlaygroundPageProps> = ({
-  userId: _userId,
-  organizationId: _organizationId,
+  userId,
+  organizationId,
 }) => {
   useImagePlayground(); // Initialize the store
+  const { brandProfile } = useBrandProfile(userId || null, organizationId);
 
   return (
     <div className="h-full w-full bg-[#0a0a0a] text-white flex overflow-hidden">
       {/* Left Panel: Config - wider like reference */}
       <div className="w-80 shrink-0 border-r border-white/10 overflow-y-auto no-scrollbar">
-        <ConfigPanel />
+        <ConfigPanel defaultBrandTone={brandProfile?.tone_of_voice || null} />
       </div>
 
       {/* Center Panel: Workspace */}

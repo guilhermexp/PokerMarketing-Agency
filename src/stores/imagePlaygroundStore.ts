@@ -445,9 +445,20 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
         toggleBrandProfile: () => {
           const newBrandState = !get().useBrandProfile;
           if (!newBrandState && get().useInstagramMode) {
-            set({ useBrandProfile: false, useInstagramMode: false });
+            set({
+              useBrandProfile: false,
+              useInstagramMode: false,
+              parameters: { ...get().parameters, toneOfVoiceOverride: undefined },
+            });
           } else {
-            set({ useBrandProfile: newBrandState });
+            set(
+              newBrandState
+                ? { useBrandProfile: true }
+                : {
+                    useBrandProfile: false,
+                    parameters: { ...get().parameters, toneOfVoiceOverride: undefined },
+                  }
+            );
           }
         },
 

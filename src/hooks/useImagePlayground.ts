@@ -266,7 +266,7 @@ export function useCreateImage() {
             mimeType: img.mimeType,
           })),
           imageUrl: parameters.imageUrl,
-          toneOfVoiceOverride: parameters.toneOfVoiceOverride,
+          toneOfVoiceOverride: useBrandProfile ? parameters.toneOfVoiceOverride : undefined,
           useBrandProfile,
           useInstagramMode,
         },
