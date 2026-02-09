@@ -7344,6 +7344,7 @@ app.post("/api/ai/video", async (req, res) => {
 // ============================================================================
 
 const RUBE_MCP_URL = "https://rube.app/mcp";
+const RUBE_TIMEOUT_MS = 15_000; // 15s timeout for Rube MCP calls
 
 // Validate Rube token by calling Instagram API
 async function validateRubeToken(rubeToken) {
@@ -7378,6 +7379,7 @@ async function validateRubeToken(rubeToken) {
         Authorization: `Bearer ${rubeToken}`,
       },
       body: JSON.stringify(request),
+      signal: AbortSignal.timeout(RUBE_TIMEOUT_MS),
     });
 
     const text = await response.text();
@@ -7755,12 +7757,18 @@ app.post("/api/rube", async (req, res) => {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(mcpRequest),
+      signal: AbortSignal.timeout(RUBE_TIMEOUT_MS),
     });
 
     const text = await response.text();
     logger.debug({ status: response.status }, "[Rube Proxy] Response received");
     res.status(response.status).send(text);
   } catch (error) {
+    const isTimeout = error?.name === "TimeoutError" || error?.name === "AbortError";
+    if (isTimeout) {
+      logger.warn({}, "[Rube Proxy] Request to Rube MCP timed out");
+      return res.status(504).json({ error: "Rube MCP timeout - serviço não respondeu" });
+    }
     logger.error({ err: error }, "[Rube Proxy] Error");
     res.status(500).json({
       error: error instanceof Error ? error.message : "Unknown error",

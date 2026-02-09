@@ -56,13 +56,14 @@ const ASPECT_RATIOS = [
 const IMAGE_NUM_OPTIONS = [1, 2, 4, 8];
 const MAX_REFERENCE_IMAGES = 14;
 const TONE_OPTIONS: ToneOfVoice[] = ['Profissional', 'Espirituoso', 'Casual', 'Inspirador', 'Técnico'];
-const FONT_OPTIONS = ['Bebas Neue', 'Oswald', 'Anton', 'Impact', 'Montserrat ExtraBold'] as const;
+const FONT_OPTIONS = ['Bebas Neue', 'Oswald', 'Anton', 'Impact', 'Montserrat ExtraBold', 'Gilroy'] as const;
 const FONT_PREVIEW_FAMILIES: Record<(typeof FONT_OPTIONS)[number], string> = {
   'Bebas Neue': '"Bebas Neue", "Oswald", "Arial Narrow", sans-serif',
   Oswald: '"Oswald", "Arial Narrow", sans-serif',
   Anton: '"Anton", "Impact", "Arial Black", sans-serif',
   Impact: 'Impact, "Arial Black", sans-serif',
   'Montserrat ExtraBold': '"Montserrat", "Helvetica Neue", Arial, sans-serif',
+  Gilroy: '"Gilroy", "Avenir Next", "Nunito Sans", sans-serif',
 };
 
 // =============================================================================

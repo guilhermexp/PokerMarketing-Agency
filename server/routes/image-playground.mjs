@@ -37,6 +37,7 @@ export function registerImagePlaygroundRoutes(
     "Anton",
     "Impact",
     "Montserrat ExtraBold",
+    "Gilroy",
   ]);
   const inferMimeTypeFromSource = (source) => {
     if (!source || typeof source !== "string") return "image/png";
