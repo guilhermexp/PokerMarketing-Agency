@@ -9,6 +9,7 @@ import {
   Hash,
   Trash2,
   AlertCircle,
+  AlertTriangle,
   Loader2,
   ZoomIn,
   ImagePlus,
@@ -159,26 +160,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
     return (
       <div className="aspect-square bg-white/5 rounded-xl border border-white/10 flex flex-col items-center justify-center gap-3">
         {status === 'error' ? (
-          <>
-            <AlertCircle className="w-8 h-8 text-red-400" />
-            <p className="text-xs text-red-400 text-center px-4 font-medium">
-              Falha na geração
-            </p>
-            {pollingError && (
-              <p className="text-[10px] text-red-400/70 text-center px-4 max-w-full break-words">
-                {typeof pollingError === 'object' && 'message' in pollingError
-                  ? (pollingError as { message: string }).message
-                  : String(pollingError)}
-              </p>
-            )}
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-xs hover:bg-red-500/20 transition-colors"
-            >
-              <Trash2 className="w-3 h-3" />
-              Remover
-            </button>
-          </>
+          <GenerationError error={pollingError} onDelete={handleDelete} />
         ) : (
           <>
             <Loader2 className="w-8 h-8 text-primary animate-spin" />
@@ -295,6 +277,85 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
     </div>
   );
 };
+
+// =============================================================================
+// Error Display Component
+// =============================================================================
+
+interface GenerationErrorProps {
+  error: unknown;
+  onDelete: () => void;
+}
+
+function GenerationError({ error, onDelete }: GenerationErrorProps) {
+  const errorObj = error && typeof error === 'object' ? (error as Record<string, unknown>) : null;
+  const code = errorObj?.code as string | undefined;
+  const message = errorObj?.message as string | undefined;
+
+  const isQuota = code === 'QUOTA_EXCEEDED'
+    || (message?.toLowerCase().includes('quota') ?? false)
+    || (message?.toLowerCase().includes('429') ?? false)
+    || (message?.toLowerCase().includes('exceeded') ?? false)
+    || (message?.toLowerCase().includes('rate') ?? false);
+
+  const isSafety = code === 'SAFETY'
+    || (message?.toLowerCase().includes('segurança') ?? false)
+    || (message?.toLowerCase().includes('safety') ?? false);
+
+  // Pick icon, title and description based on error type
+  let Icon = AlertCircle;
+  let title = 'Falha na geração';
+  let description = message || 'Erro desconhecido. Tente novamente.';
+  let accentColor = 'red';
+
+  if (isQuota) {
+    Icon = AlertTriangle;
+    title = 'Limite de uso atingido';
+    description = 'O limite de geração de imagens foi excedido. Tente novamente mais tarde.';
+    accentColor = 'amber';
+  } else if (isSafety) {
+    title = 'Conteúdo bloqueado';
+    description = 'O prompt foi bloqueado por políticas de segurança. Tente reformular.';
+  }
+
+  const colorMap: Record<string, { icon: string; text: string; bg: string; border: string }> = {
+    red: {
+      icon: 'text-red-400',
+      text: 'text-red-400',
+      bg: 'bg-red-500/10',
+      border: 'border-red-500/20',
+    },
+    amber: {
+      icon: 'text-amber-400',
+      text: 'text-amber-400',
+      bg: 'bg-amber-500/10',
+      border: 'border-amber-500/20',
+    },
+  };
+
+  const colors = colorMap[accentColor] || colorMap.red;
+
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 px-4">
+      <div className={`w-10 h-10 rounded-full ${colors.bg} flex items-center justify-center`}>
+        <Icon className={`w-5 h-5 ${colors.icon}`} />
+      </div>
+      <p className={`text-xs ${colors.text} text-center font-medium`}>
+        {title}
+      </p>
+      <p className="text-[11px] text-white/50 text-center leading-snug max-w-[200px]">
+        {description}
+      </p>
+      <button
+        onClick={onDelete}
+        className="flex items-center gap-1.5 px-3 py-1.5 mt-1 rounded-lg bg-white/5 text-white/50 text-xs hover:bg-white/10 transition-colors"
+      >
+        <Trash2 className="w-3 h-3" />
+        Remover
+      </button>
+    </div>
+  );
+}
 
 // Helper function to format time
 function formatTime(seconds: number): string {

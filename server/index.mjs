@@ -850,6 +850,12 @@ const SUPER_ADMIN_EMAILS = (
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean);
 
+if (SUPER_ADMIN_EMAILS.length === 0) {
+  logger.warn(
+    "[Admin] SUPER_ADMIN_EMAILS is empty. All /api/admin routes will return 403.",
+  );
+}
+
 // Middleware to verify super admin access
 async function requireSuperAdmin(req, res, next) {
   try {
@@ -872,10 +878,22 @@ async function requireSuperAdmin(req, res, next) {
     }
 
     const userData = await userResponse.json();
-    const userEmail =
-      userData.email_addresses?.[0]?.email_address?.toLowerCase();
+    const primaryEmailId = userData.primary_email_address_id;
+    const primaryEmail =
+      userData.email_addresses?.find((email) => email.id === primaryEmailId)
+        ?.email_address || userData.email_addresses?.[0]?.email_address;
+    const userEmail = primaryEmail?.toLowerCase();
 
     if (!userEmail || !SUPER_ADMIN_EMAILS.includes(userEmail)) {
+      logger.warn(
+        {
+          requestId: req.id,
+          clerkUserId: auth.userId,
+          userEmail,
+          superAdminCount: SUPER_ADMIN_EMAILS.length,
+        },
+        "[Admin] Access denied for super admin endpoint",
+      );
       return res
         .status(403)
         .json({ error: "Access denied. Super admin only." });

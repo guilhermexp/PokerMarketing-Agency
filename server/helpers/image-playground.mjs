@@ -8,7 +8,44 @@
 
 import { put } from "@vercel/blob";
 import sharp from "sharp";
+import Replicate from "replicate";
 import { validateContentType } from "../lib/validation/contentType.mjs";
+
+// Replicate fallback config
+const REPLICATE_IMAGE_MODEL = "google/nano-banana-pro";
+
+function getReplicate() {
+  const apiToken = process.env.REPLICATE_API_TOKEN;
+  if (!apiToken) {
+    throw new Error("REPLICATE_API_TOKEN not configured");
+  }
+  return new Replicate({ auth: apiToken });
+}
+
+function isQuotaOrRateLimitError(error) {
+  const errorString = String(error?.message || error || "").toLowerCase();
+  return (
+    errorString.includes("resource_exhausted") ||
+    errorString.includes("quota") ||
+    errorString.includes("429") ||
+    errorString.includes("rate") ||
+    errorString.includes("limit") ||
+    errorString.includes("exceeded")
+  );
+}
+
+function normalizeReplicateOutputUrl(output) {
+  if (typeof output === "string") return output;
+  if (Array.isArray(output)) {
+    const first = output[0];
+    if (typeof first === "string") return first;
+    if (first && typeof first.url === "function") return first.url();
+    if (first && typeof first.url === "string") return first.url;
+  }
+  if (output && typeof output.url === "function") return output.url();
+  if (output && typeof output.url === "string") return output.url;
+  return null;
+}
 
 // Thumbnail settings
 const THUMBNAIL_WIDTH = 400;
@@ -536,8 +573,217 @@ function mapAspectRatio(ratio) {
 }
 
 /**
- * Background image generation processor using Gemini SDK
- * Uses the SAME approach as generateGeminiImage in dev-api.mjs
+ * Build content parts array from params (reference images, product images, etc.)
+ * Shared between Gemini and used to extract image inputs for Replicate fallback.
+ */
+async function buildContentParts(params) {
+  const parts = [{ text: params.prompt }];
+
+  // Add multiple reference images if provided (array of up to 14 images)
+  if (
+    params.referenceImages &&
+    Array.isArray(params.referenceImages) &&
+    params.referenceImages.length > 0
+  ) {
+    for (const refImage of params.referenceImages) {
+      try {
+        let base64Data = refImage.dataUrl;
+        let mimeType = refImage.mimeType || "image/png";
+
+        if (refImage.dataUrl.startsWith("data:")) {
+          const matches = refImage.dataUrl.match(
+            /^data:([^;]+);base64,(.+)$/,
+          );
+          if (matches) {
+            mimeType = matches[1];
+            base64Data = matches[2];
+          }
+        } else if (refImage.dataUrl.startsWith("http")) {
+          const response = await fetch(refImage.dataUrl);
+          const arrayBuffer = await response.arrayBuffer();
+          base64Data = Buffer.from(arrayBuffer).toString("base64");
+          mimeType = response.headers.get("content-type") || "image/png";
+        }
+
+        parts.push({ inlineData: { data: base64Data, mimeType } });
+      } catch (imgError) {
+        console.warn(
+          `[ImagePlayground] Failed to process reference image ${refImage.id}:`,
+          imgError.message,
+        );
+      }
+    }
+    console.log(
+      `[ImagePlayground] Added ${params.referenceImages.length} reference images`,
+    );
+  }
+  // Legacy single reference image (DEPRECATED)
+  else if (params.imageUrl) {
+    try {
+      let base64Data = params.imageUrl;
+      let mimeType = "image/png";
+
+      if (params.imageUrl.startsWith("data:")) {
+        const matches = params.imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          mimeType = matches[1];
+          base64Data = matches[2];
+        }
+      } else if (params.imageUrl.startsWith("http")) {
+        const response = await fetch(params.imageUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        base64Data = Buffer.from(arrayBuffer).toString("base64");
+        mimeType = response.headers.get("content-type") || "image/png";
+      }
+
+      parts.push({ inlineData: { data: base64Data, mimeType } });
+      console.log(
+        `[ImagePlayground] Added legacy reference image (${mimeType})`,
+      );
+    } catch (imgError) {
+      console.warn(
+        `[ImagePlayground] Failed to process reference image:`,
+        imgError.message,
+      );
+    }
+  }
+
+  // Add product images (logo, etc.)
+  if (params.productImages && Array.isArray(params.productImages)) {
+    for (const img of params.productImages) {
+      if (img.base64 && img.mimeType) {
+        parts.push({ inlineData: { data: img.base64, mimeType: img.mimeType } });
+        console.log(`[ImagePlayground] Added product image (${img.mimeType})`);
+      }
+    }
+  }
+
+  return parts;
+}
+
+/**
+ * Generate image via Gemini SDK. Returns { imageBase64, mimeType }.
+ * Throws on failure (caller handles fallback).
+ */
+async function generateWithGemini(genai, parts, params) {
+  const model = "gemini-3-pro-image-preview";
+  const mappedAspectRatio = mapAspectRatio(params.aspectRatio || "1:1");
+
+  console.log(
+    `[ImagePlayground] Calling Gemini SDK with model=${model}, aspectRatio=${mappedAspectRatio}, imageSize=${params.imageSize || "1K"}`,
+  );
+
+  const response = await genai.models.generateContent({
+    model,
+    contents: { parts },
+    config: {
+      temperature: 0.7,
+      imageConfig: {
+        aspectRatio: mappedAspectRatio,
+        imageSize: params.imageSize || "1K",
+      },
+    },
+  });
+
+  const responseParts = response?.candidates?.[0]?.content?.parts;
+
+  if (!Array.isArray(responseParts)) {
+    const finishReason = response?.candidates?.[0]?.finishReason;
+    if (finishReason === "NO_IMAGE") {
+      throw new Error(
+        'O modelo não conseguiu gerar a imagem. Tente um prompt mais descritivo e específico (ex: "um pôr do sol na praia com cores vibrantes")',
+      );
+    } else if (finishReason === "SAFETY") {
+      throw new Error(
+        "O prompt foi bloqueado por políticas de segurança. Tente reformular.",
+      );
+    } else if (finishReason === "RECITATION") {
+      throw new Error(
+        "O modelo detectou possível violação de direitos autorais.",
+      );
+    }
+    throw new Error("Falha ao gerar imagem - resposta inválida do modelo");
+  }
+
+  for (const part of responseParts) {
+    if (part.inlineData) {
+      return {
+        imageBase64: part.inlineData.data,
+        mimeType: part.inlineData.mimeType || "image/png",
+        usedProvider: "google",
+        usedModel: model,
+      };
+    }
+  }
+
+  throw new Error("Falha ao gerar imagem. Tente um prompt diferente.");
+}
+
+/**
+ * Generate image via Replicate (fallback when Gemini quota is exhausted).
+ * Returns { imageBase64, mimeType }.
+ */
+async function generateWithReplicate(parts, params) {
+  console.log(
+    `[ImagePlayground] Gemini quota exceeded, trying Replicate fallback (${REPLICATE_IMAGE_MODEL})`,
+  );
+
+  const replicate = getReplicate();
+
+  const toDataUrl = (img) => `data:${img.mimeType};base64,${img.base64}`;
+
+  // Collect image inputs from parts (same images that were prepared for Gemini)
+  const imageInputs = parts
+    .filter((p) => p.inlineData)
+    .map((p) => ({ base64: p.inlineData.data, mimeType: p.inlineData.mimeType }));
+
+  const input = {
+    prompt: params.prompt,
+    output_format: "png",
+  };
+
+  const aspectRatio = mapAspectRatio(params.aspectRatio || "1:1");
+  if (aspectRatio) {
+    input.aspect_ratio = aspectRatio;
+  }
+
+  if (["1K", "2K", "4K"].includes(params.imageSize)) {
+    input.resolution = params.imageSize;
+  }
+
+  if (imageInputs.length > 0) {
+    input.image_input = imageInputs.slice(0, 14).map(toDataUrl);
+  }
+
+  const output = await replicate.run(REPLICATE_IMAGE_MODEL, { input });
+  const outputUrl = normalizeReplicateOutputUrl(output);
+  if (!outputUrl) {
+    throw new Error("[Replicate] No image URL in output");
+  }
+
+  // Fetch the image from Replicate's temporary URL and convert to base64
+  const imageResponse = await fetch(outputUrl);
+  if (!imageResponse.ok) {
+    throw new Error(`[Replicate] Failed to fetch image: ${imageResponse.status}`);
+  }
+  const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+  const contentType = imageResponse.headers.get("content-type") || "image/png";
+
+  validateContentType(contentType);
+
+  console.log(`[ImagePlayground] Replicate fallback successful`);
+
+  return {
+    imageBase64: imageBuffer.toString("base64"),
+    mimeType: contentType,
+    usedProvider: "replicate",
+    usedModel: REPLICATE_IMAGE_MODEL,
+  };
+}
+
+/**
+ * Background image generation processor.
+ * Tries Gemini first, falls back to Replicate on quota/rate-limit errors.
  */
 async function processImageGeneration(
   sql,
@@ -565,186 +811,36 @@ async function processImageGeneration(
       hasBrandProfile: !!params.brandProfile,
     });
 
-    // Build content parts (same structure as generateGeminiImage in dev-api.mjs)
-    const parts = [{ text: params.prompt }];
+    // Build content parts (shared between Gemini and Replicate)
+    const parts = await buildContentParts(params);
 
-    // Add multiple reference images if provided (NEW - array of up to 14 images)
-    if (
-      params.referenceImages &&
-      Array.isArray(params.referenceImages) &&
-      params.referenceImages.length > 0
-    ) {
-      for (const refImage of params.referenceImages) {
-        try {
-          let base64Data = refImage.dataUrl;
-          let mimeType = refImage.mimeType || "image/png";
+    // Try Gemini first, fallback to Replicate on quota errors
+    let imageBase64;
+    let mimeType;
+    let usedProvider = "google";
+    let usedModel = "gemini-3-pro-image-preview";
 
-          // If it's a data URL, extract base64 and mime type
-          if (refImage.dataUrl.startsWith("data:")) {
-            const matches = refImage.dataUrl.match(
-              /^data:([^;]+);base64,(.+)$/,
-            );
-            if (matches) {
-              mimeType = matches[1];
-              base64Data = matches[2];
-            }
-          } else if (refImage.dataUrl.startsWith("http")) {
-            // Fetch external image and convert to base64
-            const response = await fetch(refImage.dataUrl);
-            const arrayBuffer = await response.arrayBuffer();
-            base64Data = Buffer.from(arrayBuffer).toString("base64");
-            mimeType = response.headers.get("content-type") || "image/png";
-          }
-
-          parts.push({
-            inlineData: {
-              data: base64Data,
-              mimeType,
-            },
-          });
-        } catch (imgError) {
-          console.warn(
-            `[ImagePlayground] Failed to process reference image ${refImage.id}:`,
-            imgError.message,
-          );
-          // Continue with other images
-        }
-      }
-      console.log(
-        `[ImagePlayground] Added ${params.referenceImages.length} reference images`,
-      );
-    }
-    // Fallback: Add single reference image if provided (DEPRECATED - for backwards compatibility)
-    else if (params.imageUrl) {
-      try {
-        let base64Data = params.imageUrl;
-        let mimeType = "image/png";
-
-        // If it's a data URL, extract base64 and mime type
-        if (params.imageUrl.startsWith("data:")) {
-          const matches = params.imageUrl.match(/^data:([^;]+);base64,(.+)$/);
-          if (matches) {
-            mimeType = matches[1];
-            base64Data = matches[2];
-          }
-        } else if (params.imageUrl.startsWith("http")) {
-          // Fetch external image and convert to base64
-          const response = await fetch(params.imageUrl);
-          const arrayBuffer = await response.arrayBuffer();
-          base64Data = Buffer.from(arrayBuffer).toString("base64");
-          mimeType = response.headers.get("content-type") || "image/png";
-        }
-
-        parts.push({
-          inlineData: {
-            data: base64Data,
-            mimeType,
-          },
-        });
-
-        console.log(
-          `[ImagePlayground] Added legacy reference image (${mimeType})`,
-        );
-      } catch (imgError) {
-        console.warn(
-          `[ImagePlayground] Failed to process reference image:`,
-          imgError.message,
-        );
-        // Continue without reference image
+    try {
+      const geminiResult = await generateWithGemini(genai, parts, params);
+      imageBase64 = geminiResult.imageBase64;
+      mimeType = geminiResult.mimeType;
+      usedProvider = geminiResult.usedProvider;
+      usedModel = geminiResult.usedModel;
+    } catch (geminiError) {
+      if (isQuotaOrRateLimitError(geminiError)) {
+        // Fallback to Replicate
+        const replicateResult = await generateWithReplicate(parts, params);
+        imageBase64 = replicateResult.imageBase64;
+        mimeType = replicateResult.mimeType;
+        usedProvider = replicateResult.usedProvider;
+        usedModel = replicateResult.usedModel;
+      } else {
+        // Non-quota error (safety, recitation, etc.) - re-throw as-is
+        throw geminiError;
       }
     }
 
-    // Add product images (logo, etc.) - same as generateGeminiImage
-    if (params.productImages && Array.isArray(params.productImages)) {
-      for (const img of params.productImages) {
-        if (img.base64 && img.mimeType) {
-          parts.push({
-            inlineData: {
-              data: img.base64,
-              mimeType: img.mimeType,
-            },
-          });
-          console.log(
-            `[ImagePlayground] Added product image (${img.mimeType})`,
-          );
-        }
-      }
-    }
-
-    // Use Gemini SDK (same approach as generateGeminiImage in dev-api.mjs)
-    const model = "gemini-3-pro-image-preview";
-    const mappedAspectRatio = mapAspectRatio(params.aspectRatio || "1:1");
-
-    console.log(
-      `[ImagePlayground] Calling Gemini SDK with model=${model}, aspectRatio=${mappedAspectRatio}, imageSize=${params.imageSize || "1K"}`,
-    );
-
-    const response = await genai.models.generateContent({
-      model,
-      contents: { parts },
-      config: {
-        temperature: 0.7,
-        imageConfig: {
-          aspectRatio: mappedAspectRatio,
-          imageSize: params.imageSize || "1K",
-        },
-      },
-    });
-
-    // Extract image from response (same as generateGeminiImage)
-    const responseParts = response?.candidates?.[0]?.content?.parts;
-
-    if (!Array.isArray(responseParts)) {
-      console.error(
-        `[ImagePlayground] Unexpected response:`,
-        JSON.stringify(response, null, 2).substring(0, 500),
-      );
-
-      // Check for specific finish reasons
-      const finishReason = response?.candidates?.[0]?.finishReason;
-      if (finishReason === "NO_IMAGE") {
-        throw new Error(
-          'O modelo não conseguiu gerar a imagem. Tente um prompt mais descritivo e específico (ex: "um pôr do sol na praia com cores vibrantes")',
-        );
-      } else if (finishReason === "SAFETY") {
-        throw new Error(
-          "O prompt foi bloqueado por políticas de segurança. Tente reformular.",
-        );
-      } else if (finishReason === "RECITATION") {
-        throw new Error(
-          "O modelo detectou possível violação de direitos autorais.",
-        );
-      }
-
-      throw new Error("Falha ao gerar imagem - resposta inválida do modelo");
-    }
-
-    let imageBase64 = null;
-    let mimeType = "image/png";
-
-    for (const part of responseParts) {
-      if (part.inlineData) {
-        imageBase64 = part.inlineData.data;
-        mimeType = part.inlineData.mimeType || "image/png";
-        break;
-      }
-    }
-
-    if (!imageBase64) {
-      console.error(
-        `[ImagePlayground] No image in response parts:`,
-        JSON.stringify(responseParts).substring(0, 500),
-      );
-      throw new Error("Falha ao gerar imagem. Tente um prompt diferente.");
-    }
-
-    // SECURITY: Validate content type even from trusted AI provider (Gemini API)
-    // WHY: Defense in depth - never trust external APIs completely
-    // - API response could be compromised (man-in-the-middle, API breach)
-    // - API bug could return unexpected MIME types
-    // - Future API changes could introduce new content types
-    // - Prevents accidental upload of HTML/SVG/JS if API behavior changes
-    // - Validates BEFORE upload to Vercel Blob prevents stored XSS attacks
+    // Validate content type before upload
     validateContentType(mimeType);
 
     // Upload to Vercel Blob
@@ -777,7 +873,6 @@ async function processImageGeneration(
         `[ImagePlayground] Failed to generate thumbnail:`,
         thumbError.message,
       );
-      // Continue without thumbnail - will use full image
     }
 
     // Get actual dimensions from aspect ratio and size
@@ -857,7 +952,7 @@ async function processImageGeneration(
           ${thumbnailUrl},
           ${generationInfo.prompt},
           'playground',
-          ${generationInfo.model},
+          ${usedModel},
           ${params.aspectRatio || "1:1"},
           ${params.imageSize || "1K"},
           'image'
@@ -866,7 +961,7 @@ async function processImageGeneration(
     }
 
     console.log(
-      `[ImagePlayground] Generation ${generationId} completed successfully`,
+      `[ImagePlayground] Generation ${generationId} completed successfully (provider: ${usedProvider})`,
     );
   } catch (error) {
     console.error(
@@ -874,15 +969,21 @@ async function processImageGeneration(
       error,
     );
 
+    // Build user-friendly error for the frontend
+    const isQuota = isQuotaOrRateLimitError(error);
+    const errorPayload = {
+      code: isQuota ? "QUOTA_EXCEEDED" : (error.code || "GENERATION_FAILED"),
+      message: isQuota
+        ? "Limite de uso da IA atingido. Tente novamente mais tarde ou entre em contato com o suporte."
+        : error.message,
+    };
+
     // Update task to error
     await sql`
       UPDATE image_async_tasks
       SET
         status = 'error',
-        error = ${JSON.stringify({
-          code: error.code || "GENERATION_FAILED",
-          message: error.message,
-        })},
+        error = ${JSON.stringify(errorPayload)},
         updated_at = NOW()
       WHERE id = ${taskId}
     `;

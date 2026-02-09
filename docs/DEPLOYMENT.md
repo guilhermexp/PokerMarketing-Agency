@@ -51,8 +51,11 @@ railway variables set GEMINI_API_KEY="sua-chave-gemini"
 railway variables set BLOB_READ_WRITE_TOKEN="vercel_blob_xxxxx"
 
 # Clerk Authentication
-railway variables set VITE_CLERK_PUBLISHABLE_KEY="pk_test_xxxxx"
-railway variables set CLERK_SECRET_KEY="sk_test_xxxxx"
+railway variables set VITE_CLERK_PUBLISHABLE_KEY="pk_live_xxxxx"
+railway variables set CLERK_SECRET_KEY="sk_live_xxxxx"
+
+# Admin panel access (comma-separated emails)
+railway variables set SUPER_ADMIN_EMAILS="admin@yourdomain.com"
 ```
 
 ### 2.2 Variaveis Opcionais
