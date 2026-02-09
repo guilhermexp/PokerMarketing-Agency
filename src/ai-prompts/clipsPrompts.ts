@@ -95,9 +95,7 @@ export const buildThumbnailPrompt = (
   const formatBlock = "\n\nFORMATO OBRIGATÓRIO: 9:16 VERTICAL (REELS/STORIES)";
   const noTextBlock =
     "\n\nSEM TEXTO DE NARRACAO NA IMAGEM: não gerar tipografia, títulos ou legendas na capa";
-  const compositionBlock =
-    "\n\nCOMPOSIÇÃO: Capa cinematográfica de alta qualidade para vídeo. O conteúdo visual é o protagonista. Se houver logo da marca, posicione-o PEQUENO em um CANTO como assinatura discreta - nunca no centro ou em tamanho grande.";
   const extra = extraInstruction?.trim();
-  if (!extra) return `${basePrompt}${formatBlock}${noTextBlock}${compositionBlock}`;
-  return `${basePrompt}${formatBlock}${noTextBlock}${compositionBlock}\n\nInstrucoes extras: ${extra}`;
+  if (!extra) return `${basePrompt}${formatBlock}${noTextBlock}`;
+  return `${basePrompt}${formatBlock}${noTextBlock}\n\nInstrucoes extras: ${extra}`;
 };
