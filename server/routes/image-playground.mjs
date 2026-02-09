@@ -109,7 +109,8 @@ REGRAS OBRIGATÓRIAS:
 5. Evite visual genérico; entregue resultado autoral e sofisticado.
 6. Priorize hierarquia visual forte, contraste e clareza da mensagem.
 7. A identidade da marca deve aparecer de forma ORGÂNICA e envolvente na cena, não como elementos soltos.
-8. Integre paleta, iluminação, textura e direção de arte para que a marca faça parte natural da composição.`;
+8. Integre paleta, iluminação, textura e direção de arte para que a marca faça parte natural da composição.
+9. O resultado final deve ser HIPER-REALISTA, com materiais, iluminação, profundidade e texturas fisicamente plausíveis, mantendo padrão profissional de campanha.`;
   };
 
   const buildInstagramPostPrompt = (userPrompt) => {
