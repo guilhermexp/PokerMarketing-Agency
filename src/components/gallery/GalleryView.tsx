@@ -21,7 +21,7 @@ interface GalleryViewProps {
 
 type ViewMode = "gallery" | "references";
 type SourceFilter = "all" | "flyer" | "campaign" | "post" | "video";
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 30;
 
 const SOURCE_FILTERS: {
   value: SourceFilter;
@@ -55,6 +55,9 @@ interface GalleryItemProps {
   onDelete?: (id: string) => void;
   className?: string;
   isNew?: boolean;
+  isSelectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelection?: (id: string) => void;
 }
 
 const GalleryItem: React.FC<GalleryItemProps> = ({
@@ -69,6 +72,9 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
   onDelete,
   className = "",
   isNew = false,
+  isSelectMode = false,
+  isSelected = false,
+  onToggleSelection,
 }) => {
   const [videoError, setVideoError] = React.useState(false);
   const [showHighlight, setShowHighlight] = React.useState(isNew);
@@ -82,13 +88,23 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
     }
   }, [isNew]);
 
+  const handleClick = () => {
+    if (isSelectMode && onToggleSelection) {
+      onToggleSelection(image.id);
+    } else if (!isAudio(image)) {
+      onSelect(image);
+    }
+  };
+
   return (
     <div
-      onClick={() => !isAudio(image) && onSelect(image)}
+      onClick={handleClick}
       className={`group relative overflow-hidden rounded-xl border transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 ${
-        isAudio(image) ? "" : "cursor-pointer"
+        isAudio(image) && !isSelectMode ? "" : "cursor-pointer"
       } ${
-        showHighlight
+        isSelected
+          ? "border-primary/60 ring-2 ring-primary/40 bg-[#111111]"
+          : showHighlight
           ? "border-primary/60 shadow-lg shadow-primary/30 animate-[pulse_2s_ease-in-out] bg-[#111111]"
           : "border-white/5 bg-[#111111]"
       } ${className}`}
@@ -188,7 +204,8 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
         </div>
       )}
 
-      {/* Actions */}
+      {/* Actions - hide in select mode */}
+      {!isSelectMode && (
       <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
         {!isAudio(image) && (
           <>
@@ -238,9 +255,23 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
           </button>
         )}
       </div>
+      )}
+
+      {/* Selection checkbox */}
+      {isSelectMode && (
+        <div
+          className={`absolute top-2 left-2 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
+            isSelected
+              ? "bg-primary border-primary"
+              : "bg-black/60 border-white/30 group-hover:border-white/50"
+          }`}
+        >
+          {isSelected && <Icon name="check" className="w-3.5 h-3.5 text-black" />}
+        </div>
+      )}
 
       {/* Favorite indicator */}
-      {!isAudio(image) && isFavorite(image) && (
+      {!isSelectMode && !isAudio(image) && isFavorite(image) && (
         <div className="absolute top-2 left-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
           <Icon name="heart" className="w-3 h-3 text-black" />
         </div>
@@ -281,6 +312,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const previousImageIdsRef = React.useRef<Set<string>>(new Set());
   const isInitialLoadRef = React.useRef(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const handleImageUpdate = (newSrc: string) => {
     if (selectedImage) {
@@ -311,6 +344,43 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  const toggleSelectMode = () => {
+    setIsSelectMode((prev) => !prev);
+    setSelectedIds(new Set());
+  };
+
+  const toggleImageSelection = (imageId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(imageId)) {
+        next.delete(imageId);
+      } else {
+        next.add(imageId);
+      }
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(sortedImages.map((img) => img.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0 || !onDeleteImage) return;
+    const count = selectedIds.size;
+    if (!confirm(`Tem certeza que deseja excluir ${count} ${count === 1 ? "item" : "itens"}?`)) return;
+
+    for (const id of selectedIds) {
+      onDeleteImage(id);
+    }
+    setSelectedIds(new Set());
+    setIsSelectMode(false);
   };
 
   // Check if image is already in favorites
@@ -460,6 +530,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedIds(new Set());
+    setIsSelectMode(false);
   }, [viewMode, sourceFilter, images.length]);
 
   const totalPages = Math.max(1, Math.ceil(filteredImages.length / PAGE_SIZE));
@@ -594,6 +666,21 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                   </button>
                 </div>
 
+                {/* Select mode button - only in gallery mode */}
+                {viewMode === "gallery" && onDeleteImage && (
+                  <button
+                    onClick={toggleSelectMode}
+                    className={`flex items-center justify-center w-9 h-9 border rounded-lg transition-all active:scale-95 flex-shrink-0 ${
+                      isSelectMode
+                        ? "bg-primary/20 border-primary/40 text-primary"
+                        : "bg-transparent border-white/[0.06] text-white/50 hover:border-white/[0.1] hover:text-white/70"
+                    }`}
+                    title={isSelectMode ? "Cancelar seleção" : "Selecionar múltiplos"}
+                  >
+                    <Icon name="check-square" className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
                 {/* Refresh button */}
                 {onRefresh && (
                   <button
@@ -659,6 +746,49 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           </div>
         </header>
 
+        {/* Selection Action Bar */}
+        {isSelectMode && (
+          <div className="sticky top-[88px] z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 bg-black/90 backdrop-blur-xl border-b border-white/10">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-white/70">
+                  {selectedIds.size} {selectedIds.size === 1 ? "selecionado" : "selecionados"}
+                </span>
+                <button
+                  onClick={selectAllVisible}
+                  className="text-xs text-primary hover:text-primary/80 transition-colors"
+                >
+                  Selecionar todos
+                </button>
+                {selectedIds.size > 0 && (
+                  <button
+                    onClick={clearSelection}
+                    className="text-xs text-white/50 hover:text-white/70 transition-colors"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={selectedIds.size === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 border border-red-500/30 rounded-lg text-xs font-medium text-red-400 hover:bg-red-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Icon name="trash" className="w-3.5 h-3.5" />
+                  Excluir
+                </button>
+                <button
+                  onClick={toggleSelectMode}
+                  className="px-3 py-1.5 text-xs text-white/50 hover:text-white/70 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Main Content */}
         <main className={`flex-1 py-6 ${viewMode === "gallery" && totalPages > 1 ? "pb-20" : ""}`}>
 
@@ -678,7 +808,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             <div className="space-y-6">
               {/* Gallery Grid */}
               {sortedImages.length > 0 && (
-                <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3">
+                <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-3">
                   {sortedImages.map((image) => (
                     <GalleryItem
                       key={image.id}
@@ -693,6 +823,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       onDelete={onDeleteImage}
                       className="break-inside-avoid mb-3"
                       isNew={newImageIds.has(image.id)}
+                      isSelectMode={isSelectMode}
+                      isSelected={selectedIds.has(image.id)}
+                      onToggleSelection={toggleImageSelection}
                     />
                   ))}
                 </div>
