@@ -95,6 +95,22 @@ REGRAS OBRIGATÓRIAS:
 6. Priorize hierarquia visual forte, contraste e clareza da mensagem.`;
   };
 
+  const buildInstagramPostPrompt = (userPrompt) => {
+    return `CONTEXTO DE COMPOSIÇÃO — POST PARA INSTAGRAM (FEED):
+- Formato: quadrado (1:1), otimizado para feed do Instagram
+- A imagem deve funcionar como um POST PROFISSIONAL de Instagram para uma marca/agência
+- Composição impactante mesmo em tamanho pequeno (visualização mobile)
+- Hierarquia visual forte: um elemento principal que capture atenção imediatamente
+- Se houver texto, deve ser grande, legível e em PORTUGUÊS
+- Estilo: editorial/publicitário de alto nível, pronto para publicação
+- Cores vibrantes e contraste alto para se destacar no feed
+- Evite excesso de elementos — simplicidade premium
+- O resultado deve parecer peça criada por agência de marketing digital profissional
+
+PROMPT DO USUÁRIO:
+${userPrompt}`;
+  };
+
   // Get all topics
   app.get("/api/image-playground/topics", async (req, res) => {
     try {
@@ -267,8 +283,16 @@ REGRAS OBRIGATÓRIAS:
       // Enhanced params to pass to helper
       let enhancedParams = { ...params };
 
+      // Instagram Post Mode: apply composition context + force brand + 1:1
+      if (params.useInstagramMode) {
+        enhancedParams.useBrandProfile = true;
+        enhancedParams.aspectRatio = '1:1';
+        enhancedParams.prompt = buildInstagramPostPrompt(params.prompt);
+        logger.info({}, "[ImagePlayground] Instagram Post mode enabled");
+      }
+
       // If useBrandProfile is enabled, use SAME logic as /api/ai/image
-      if (params.useBrandProfile) {
+      if (enhancedParams.useBrandProfile) {
         const isOrgContext = !!orgId;
         const brandProfileResult = isOrgContext
           ? await sql`SELECT * FROM brand_profiles WHERE organization_id = ${orgId} AND deleted_at IS NULL LIMIT 1`

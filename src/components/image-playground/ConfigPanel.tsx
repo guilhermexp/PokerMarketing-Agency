@@ -12,6 +12,7 @@ import {
   Plus,
   X,
   Palette,
+  Instagram,
 } from 'lucide-react';
 import { useImagePlaygroundStore, type ReferenceImage } from '../../stores/imagePlaygroundStore';
 
@@ -65,12 +66,14 @@ export const ConfigPanel: React.FC = () => {
     activeAspectRatio,
     activeImageSize,
     useBrandProfile,
+    useInstagramMode,
     setModelAndProvider,
     setImageNum,
     toggleAspectRatioLock,
     setAspectRatio,
     setImageSize,
     toggleBrandProfile,
+    toggleInstagramMode,
     addReferenceImage,
     removeReferenceImage,
   } = useImagePlaygroundStore();
@@ -238,6 +241,24 @@ export const ConfigPanel: React.FC = () => {
             title={useBrandProfile ? "Usando cores e tom da marca" : "Sem personalização de marca"}
           >
             <Palette className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Instagram Post Mode Toggle */}
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-white/80">
+            Modo Instagram Post
+          </label>
+          <button
+            onClick={toggleInstagramMode}
+            className={`flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200 ${
+              useInstagramMode
+                ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-md'
+                : 'bg-white/5 text-white/60 border border-white/10 hover:text-white hover:border-white/20'
+            }`}
+            title={useInstagramMode ? "Modo Instagram ativo (1:1 + marca)" : "Ativar modo Instagram Post"}
+          >
+            <Instagram className="w-4 h-4" />
           </button>
         </div>
 

@@ -93,6 +93,7 @@ interface GenerationConfigState {
   activeAspectRatio: string | null;
   activeImageSize: '1K' | '2K' | '4K';
   useBrandProfile: boolean;
+  useInstagramMode: boolean;
 }
 
 interface GenerationTopicState {
@@ -127,6 +128,7 @@ interface GenerationConfigActions {
   reuseSettings: (model: string, provider: string, settings: Record<string, unknown>) => void;
   reuseSeed: (seed: number) => void;
   toggleBrandProfile: () => void;
+  toggleInstagramMode: () => void;
   // Reference images actions
   addReferenceImage: (image: ReferenceImage) => void;
   removeReferenceImage: (id: string) => void;
@@ -306,6 +308,7 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
         activeAspectRatio: DEFAULT_ASPECT_RATIO,
         activeImageSize: DEFAULT_IMAGE_SIZE,
         useBrandProfile: false,
+        useInstagramMode: false,
 
         // =============================================================================
         // Generation Topic State
@@ -433,7 +436,26 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
         },
 
         toggleBrandProfile: () => {
-          set({ useBrandProfile: !get().useBrandProfile });
+          const newBrandState = !get().useBrandProfile;
+          if (!newBrandState && get().useInstagramMode) {
+            set({ useBrandProfile: false, useInstagramMode: false });
+          } else {
+            set({ useBrandProfile: newBrandState });
+          }
+        },
+
+        toggleInstagramMode: () => {
+          const newValue = !get().useInstagramMode;
+          if (newValue) {
+            set({
+              useInstagramMode: true,
+              useBrandProfile: true,
+              activeAspectRatio: '1:1',
+              parameters: { ...get().parameters, aspectRatio: '1:1' },
+            });
+          } else {
+            set({ useInstagramMode: false });
+          }
         },
 
         // Reference images actions
@@ -640,6 +662,7 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
           activeAspectRatio: state.activeAspectRatio,
           activeImageSize: state.activeImageSize,
           useBrandProfile: state.useBrandProfile,
+          useInstagramMode: state.useInstagramMode,
         }),
       }
     )

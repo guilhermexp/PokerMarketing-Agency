@@ -214,6 +214,7 @@ export function useCreateImage() {
     imageNum,
     activeTopicId,
     useBrandProfile,
+    useInstagramMode,
     setIsCreating,
     setIsCreatingWithNewTopic,
     addBatch,
@@ -261,6 +262,7 @@ export function useCreateImage() {
           referenceImages: parameters.referenceImages,
           imageUrl: parameters.imageUrl,
           useBrandProfile,
+          useInstagramMode,
         },
       });
 
@@ -303,6 +305,7 @@ export function useCreateImage() {
     model,
     imageNum,
     useBrandProfile,
+    useInstagramMode,
     topics,
     setIsCreating,
     setIsCreatingWithNewTopic,

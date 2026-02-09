@@ -193,8 +193,10 @@ export const UploadForm: React.FC<UploadFormProps> = ({
     // Get the scroll height (content height)
     const scrollHeight = textarea.scrollHeight;
 
-    // Set new height between min (60px) and max (200px)
-    const newHeight = Math.max(60, Math.min(scrollHeight, 200));
+    // Set new height between min (60px) and max (200px on desktop, 150px on mobile)
+    const maxHeight = window.innerWidth >= 640 ? 200 : 150;
+    const minHeight = window.innerWidth >= 640 ? 80 : 60;
+    const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
     textarea.style.height = `${newHeight}px`;
   }, [transcript]);
 
@@ -467,7 +469,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                   onChange={(e) => setTranscript(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Descreva sua ideia..."
-                  className="hide-scrollbar w-full rounded-[18px] sm:rounded-[22px] rounded-b-none text-xs sm:text-sm leading-relaxed text-white/90 placeholder:text-white/50 !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-3 sm:!px-4 !py-2 sm:!py-2.5 touch-manipulation resize-none outline-none overflow-hidden min-h-[36px] sm:min-h-[42px] max-h-[80px] sm:max-h-[120px]"
+                  className="hide-scrollbar w-full rounded-[18px] sm:rounded-[22px] rounded-b-none text-xs sm:text-sm leading-relaxed text-white/90 placeholder:text-white/50 !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-3 sm:!px-4 !py-2 sm:!py-2.5 touch-manipulation resize-none outline-none overflow-y-auto min-h-[60px] sm:min-h-[80px] max-h-[150px] sm:max-h-[200px]"
                   style={{
                     WebkitUserSelect: 'text',
                     WebkitTouchCallout: 'none',

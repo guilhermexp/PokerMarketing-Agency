@@ -4146,11 +4146,34 @@ const generateImageWithReplicate = async (
   return outputUrl;
 };
 
+// Helper for direct OpenRouter API calls (bypassing SDK validation issues)
+const callOpenRouterApi = async (body) => {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY not configured");
+  }
+
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": process.env.APP_URL || "https://socialab.app",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || `OpenRouter API error: ${response.status}`);
+  }
+
+  return response.json();
+};
+
 // Generate image with OpenRouter as fallback
 const generateImageWithOpenRouter = async (prompt, productImages) => {
   logger.info({}, "[OpenRouter Fallback] Tentando gerar imagem via OpenRouter");
-
-  const openrouter = getOpenRouter();
 
   // Build content parts with optional images
   const contentParts = [];
@@ -4177,7 +4200,7 @@ const generateImageWithOpenRouter = async (prompt, productImages) => {
     text: prompt,
   });
 
-  const response = await openrouter.chat.send({
+  const data = await callOpenRouterApi({
     model: "google/gemini-3-pro-image-preview",
     messages: [
       {
@@ -4188,7 +4211,7 @@ const generateImageWithOpenRouter = async (prompt, productImages) => {
     modalities: ["image", "text"],
   });
 
-  const message = response?.choices?.[0]?.message;
+  const message = data?.choices?.[0]?.message;
   if (!message) {
     throw new Error("[OpenRouter] No message in response");
   }
@@ -4214,7 +4237,7 @@ const generateImageWithOpenRouter = async (prompt, productImages) => {
   }
 
   logger.error(
-    { response },
+    { data },
     "[OpenRouter Fallback] ❌ Nenhuma imagem encontrada na resposta",
   );
   throw new Error("[OpenRouter] No image data in response");
@@ -4504,19 +4527,17 @@ const generateTextWithOpenRouter = async (
   userPrompt,
   temperature = 0.7,
 ) => {
-  const openrouter = getOpenRouter();
-
-  const response = await openrouter.chat.send({
+  const data = await callOpenRouterApi({
     model,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    responseFormat: { type: "json_object" },
+    response_format: { type: "json_object" },
     temperature,
   });
 
-  const content = response.choices[0]?.message?.content;
+  const content = data.choices?.[0]?.message?.content;
   if (!content) {
     throw new Error(`OpenRouter (${model}) no content returned`);
   }
@@ -4531,27 +4552,25 @@ const generateTextWithOpenRouterVision = async (
   imageParts,
   temperature = 0.7,
 ) => {
-  const openrouter = getOpenRouter();
-
   const content = textParts.map((text) => ({ type: "text", text }));
 
   for (const img of imageParts) {
     content.push({
       type: "image_url",
-      imageUrl: {
+      image_url: {
         url: `data:${img.mimeType};base64,${img.base64}`,
       },
     });
   }
 
-  const response = await openrouter.chat.send({
+  const data = await callOpenRouterApi({
     model,
     messages: [{ role: "user", content }],
-    responseFormat: { type: "json_object" },
+    response_format: { type: "json_object" },
     temperature,
   });
 
-  const result = response.choices[0]?.message?.content;
+  const result = data.choices?.[0]?.message?.content;
   if (!result) {
     throw new Error(`OpenRouter (${model}) no content returned`);
   }
@@ -6203,8 +6222,6 @@ app.post("/api/ai/enhance-prompt", async (req, res) => {
 
     logger.info({}, "[Enhance Prompt API] Enhancing prompt with Grok");
 
-    const openrouter = getOpenRouter();
-
     const systemPrompt = `Você é um especialista em marketing digital e criação de conteúdo multiplataforma. Sua função é aprimorar briefings de campanhas para gerar máximo engajamento em TODOS os formatos de conteúdo.
 
 TIPOS DE CONTEÚDO QUE A CAMPANHA PODE GERAR:
@@ -6267,17 +6284,37 @@ REGRAS:
 
     const userPrompt = `BRIEFING ORIGINAL:\n${prompt}`;
 
-    const response = await openrouter.chat.send({
-      model: "x-ai/grok-4.1-fast",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.5,
-      max_tokens: 2048,
+    // Direct API call to OpenRouter (bypassing SDK validation issues)
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error("OPENROUTER_API_KEY not configured");
+    }
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.APP_URL || "https://socialab.app",
+      },
+      body: JSON.stringify({
+        model: "x-ai/grok-4.1-fast",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.5,
+        max_tokens: 2048,
+      }),
     });
 
-    const enhancedPrompt = response.choices[0]?.message?.content?.trim() || "";
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `OpenRouter API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const enhancedPrompt = data.choices?.[0]?.message?.content?.trim() || "";
 
     logger.info(
       {},
@@ -6285,14 +6322,15 @@ REGRAS:
     );
 
     // Log AI usage
-    const tokens = extractOpenRouterTokens(response);
+    const inputTokens = data.usage?.prompt_tokens || Math.round((systemPrompt.length + userPrompt.length) / 4);
+    const outputTokens = data.usage?.completion_tokens || Math.round(enhancedPrompt.length / 4);
     await logAiUsage(sql, {
       organizationId,
       endpoint: "/api/ai/enhance-prompt",
       operation: "text",
       model: "x-ai/grok-4.1-fast",
-      inputTokens: tokens.inputTokens,
-      outputTokens: tokens.outputTokens,
+      inputTokens,
+      outputTokens,
       latencyMs: timer(),
       status: "success",
     });
