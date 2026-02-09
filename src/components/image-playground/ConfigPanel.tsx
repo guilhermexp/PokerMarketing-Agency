@@ -59,7 +59,11 @@ const TONE_OPTIONS: ToneOfVoice[] = ['Profissional', 'Espirituoso', 'Casual', 'I
 // Component
 // =============================================================================
 
-export const ConfigPanel: React.FC = () => {
+interface ConfigPanelProps {
+  defaultBrandTone?: string | null;
+}
+
+export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -312,7 +316,9 @@ export const ConfigPanel: React.FC = () => {
                 : 'text-white/40 cursor-not-allowed opacity-60'
             }`}
           >
-            <option value="" className="bg-black">Padrão da marca</option>
+            <option value="" className="bg-black">
+              {defaultBrandTone ? `Padrão da marca (${defaultBrandTone})` : 'Padrão da marca'}
+            </option>
             {TONE_OPTIONS.map((tone) => (
               <option key={tone} value={tone} className="bg-black">
                 {tone}
