@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useImagePlaygroundStore, type ReferenceImage } from '../../stores/imagePlaygroundStore';
 import { uploadDataUrlToBlob } from '../../services/blobService';
+import type { ToneOfVoice } from '../../types';
 
 // =============================================================================
 // Model Options - Only Gemini 3 Pro Image Preview
@@ -52,6 +53,7 @@ const ASPECT_RATIOS = [
 
 const IMAGE_NUM_OPTIONS = [1, 2, 4, 8];
 const MAX_REFERENCE_IMAGES = 14;
+const TONE_OPTIONS: ToneOfVoice[] = ['Profissional', 'Espirituoso', 'Casual', 'Inspirador', 'Técnico'];
 
 // =============================================================================
 // Component
@@ -74,6 +76,7 @@ export const ConfigPanel: React.FC = () => {
     toggleAspectRatioLock,
     setAspectRatio,
     setImageSize,
+    setParam,
     toggleBrandProfile,
     toggleInstagramMode,
     addReferenceImage,
@@ -188,6 +191,14 @@ export const ConfigPanel: React.FC = () => {
     [removeReferenceImage]
   );
 
+  const handleToneChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value;
+      setParam('toneOfVoiceOverride', value || undefined);
+    },
+    [setParam]
+  );
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -248,40 +259,66 @@ export const ConfigPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Brand Profile Toggle */}
-        <div className="flex items-center justify-between">
+        {/* Brand + Instagram Toggles (Compact) */}
+        <div className="space-y-2">
           <label className="text-sm font-medium text-white/80">
-            Usar perfil da marca
+            Modos
           </label>
-          <button
-            onClick={toggleBrandProfile}
-            className={`flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200 ${
-              useBrandProfile
-                ? 'bg-white text-black shadow-md'
-                : 'bg-white/5 text-white/60 border border-white/10 hover:text-white hover:border-white/20'
-            }`}
-            title={useBrandProfile ? "Usando cores e tom da marca" : "Sem personalização de marca"}
-          >
-            <Palette className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleBrandProfile}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all duration-200 ${
+                useBrandProfile
+                  ? 'bg-white text-black shadow-md'
+                  : 'bg-white/5 text-white/60 border border-white/10 hover:text-white hover:border-white/20'
+              }`}
+              title={useBrandProfile ? "Usando cores e tom da marca" : "Sem personalização de marca"}
+            >
+              <Palette className="w-3.5 h-3.5" />
+              Perfil
+            </button>
+            <button
+              onClick={toggleInstagramMode}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all duration-200 ${
+                useInstagramMode
+                  ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-md'
+                  : 'bg-white/5 text-white/60 border border-white/10 hover:text-white hover:border-white/20'
+              }`}
+              title={useInstagramMode ? "Modo Instagram ativo (1:1 + marca)" : "Ativar modo Instagram Post"}
+            >
+              <Instagram className="w-3.5 h-3.5" />
+              Instagram
+            </button>
+          </div>
         </div>
 
-        {/* Instagram Post Mode Toggle */}
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-white/80">
-            Modo Instagram Post
-          </label>
-          <button
-            onClick={toggleInstagramMode}
-            className={`flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200 ${
-              useInstagramMode
-                ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-md'
-                : 'bg-white/5 text-white/60 border border-white/10 hover:text-white hover:border-white/20'
+        {/* Tone Override */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-white/80">
+              Tom da geração
+            </label>
+            {!useBrandProfile && (
+              <span className="text-[10px] text-white/40">Ative perfil da marca</span>
+            )}
+          </div>
+          <select
+            value={typeof parameters.toneOfVoiceOverride === 'string' ? parameters.toneOfVoiceOverride : ''}
+            onChange={handleToneChange}
+            disabled={!useBrandProfile}
+            className={`w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm transition-colors appearance-none ${
+              useBrandProfile
+                ? 'text-white focus:outline-none focus:border-white/20 cursor-pointer'
+                : 'text-white/40 cursor-not-allowed opacity-60'
             }`}
-            title={useInstagramMode ? "Modo Instagram ativo (1:1 + marca)" : "Ativar modo Instagram Post"}
           >
-            <Instagram className="w-4 h-4" />
-          </button>
+            <option value="" className="bg-black">Padrão da marca</option>
+            {TONE_OPTIONS.map((tone) => (
+              <option key={tone} value={tone} className="bg-black">
+                {tone}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Reference Images (Multiple) */}
@@ -361,13 +398,13 @@ export const ConfigPanel: React.FC = () => {
               onClick={handleReferenceImageClick}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
-              className="border-2 border-dashed border-white/10 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-white/20 hover:bg-white/5 transition-colors"
+              className="border-2 border-dashed border-white/10 rounded-xl p-4 min-h-[140px] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-white/20 hover:bg-white/5 transition-colors"
             >
-              <ImagePlus className="w-10 h-10 text-white/30" />
-              <p className="text-xs text-white/40 text-center">
+              <ImagePlus className="w-8 h-8 text-white/30" />
+              <p className="text-[11px] text-white/40 text-center">
                 Clique ou arraste para enviar imagens
               </p>
-              <p className="text-[10px] text-white/30">
+              <p className="text-[9px] text-white/30">
                 Suporta até {MAX_REFERENCE_IMAGES} imagens
               </p>
             </div>

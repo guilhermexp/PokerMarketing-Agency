@@ -183,7 +183,7 @@ export interface ImagePlaygroundStore extends
 const DEFAULT_MODEL = 'gemini-3-pro-image-preview';
 const DEFAULT_PROVIDER = 'google';
 const DEFAULT_ASPECT_RATIO = '1:1';
-const DEFAULT_IMAGE_SIZE: '1K' | '2K' | '4K' = '1K';
+const DEFAULT_IMAGE_SIZE: '1K' | '2K' | '4K' = '2K';
 const MAX_PERSISTED_STATE_SIZE_BYTES = 400_000;
 const MAX_PERSISTED_PARAM_STRING_LENGTH = 4_000;
 const NON_PERSISTED_PARAM_KEYS = new Set([
@@ -191,6 +191,8 @@ const NON_PERSISTED_PARAM_KEYS = new Set([
   'imageUrl',
   'productImages',
   'brandProfile',
+  'aspectRatio',
+  'imageSize',
 ]);
 
 const defaultParameters: RuntimeImageGenParams = {
@@ -655,7 +657,7 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
       }),
       {
         name: 'IMAGE_PLAYGROUND_STORE',
-        version: 2,
+        version: 3,
         storage: safePersistStorage,
         migrate: (persistedState) => {
           if (!persistedState || typeof persistedState !== 'object') {
@@ -670,22 +672,35 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
 
           return {
             ...typedState,
-            parameters: safeParams,
+            parameters: {
+              ...defaultParameters,
+              ...safeParams,
+            },
+            imageNum: 1,
+            isAspectRatioLocked: false,
+            activeAspectRatio: DEFAULT_ASPECT_RATIO,
+            activeImageSize: DEFAULT_IMAGE_SIZE,
+            useBrandProfile: false,
+            useInstagramMode: false,
           };
         },
         partialize: (state) => ({
           // Only persist config, not topics/batches (those come from server)
           // IMPORTANT: Do NOT persist base64 reference images to avoid localStorage quota errors.
           // They stay only in-memory for the current session.
-          parameters: sanitizeParametersForPersistence(state.parameters),
+          parameters: {
+            ...sanitizeParametersForPersistence(state.parameters),
+            aspectRatio: DEFAULT_ASPECT_RATIO,
+            imageSize: DEFAULT_IMAGE_SIZE,
+          },
           model: state.model,
           provider: state.provider,
-          imageNum: state.imageNum,
-          isAspectRatioLocked: state.isAspectRatioLocked,
-          activeAspectRatio: state.activeAspectRatio,
-          activeImageSize: state.activeImageSize,
-          useBrandProfile: state.useBrandProfile,
-          useInstagramMode: state.useInstagramMode,
+          imageNum: 1,
+          isAspectRatioLocked: false,
+          activeAspectRatio: DEFAULT_ASPECT_RATIO,
+          activeImageSize: DEFAULT_IMAGE_SIZE,
+          useBrandProfile: false,
+          useInstagramMode: false,
         }),
       }
     )

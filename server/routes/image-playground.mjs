@@ -24,6 +24,13 @@ export function registerImagePlaygroundRoutes(
     buildImagePrompt,
   },
 ) {
+  const ALLOWED_TONES = new Set([
+    "Profissional",
+    "Espirituoso",
+    "Casual",
+    "Inspirador",
+    "Técnico",
+  ]);
   const inferMimeTypeFromSource = (source) => {
     if (!source || typeof source !== "string") return "image/png";
     const cleanSource = source.split("?")[0].toLowerCase();
@@ -92,7 +99,9 @@ REGRAS OBRIGATÓRIAS:
 3. Preserve consistência de identidade visual (cores, tom e linguagem da marca).
 4. Se houver texto na peça, ele deve estar em PORTUGUÊS e com alta legibilidade.
 5. Evite visual genérico; entregue resultado autoral e sofisticado.
-6. Priorize hierarquia visual forte, contraste e clareza da mensagem.`;
+6. Priorize hierarquia visual forte, contraste e clareza da mensagem.
+7. A identidade da marca deve aparecer de forma ORGÂNICA e envolvente na cena, não como elementos soltos.
+8. Integre paleta, iluminação, textura e direção de arte para que a marca faça parte natural da composição.`;
   };
 
   const buildInstagramPostPrompt = (userPrompt) => {
@@ -316,9 +325,18 @@ ${userPrompt}`;
             ],
           };
 
+          const toneOverride =
+            typeof enhancedParams.toneOfVoiceOverride === "string" &&
+            ALLOWED_TONES.has(enhancedParams.toneOfVoiceOverride)
+              ? enhancedParams.toneOfVoiceOverride
+              : null;
+          if (toneOverride) {
+            mappedBrandProfile.toneOfVoice = toneOverride;
+          }
+
           // 1. Prepare productImages with logo + optional client images
-          const clientProductImages = Array.isArray(params.productImages)
-            ? params.productImages.filter((img) => img?.base64 && img?.mimeType)
+          const clientProductImages = Array.isArray(enhancedParams.productImages)
+            ? enhancedParams.productImages.filter((img) => img?.base64 && img?.mimeType)
             : [];
           const productImages = [...clientProductImages];
           let hasLogo = false;
@@ -337,23 +355,37 @@ ${userPrompt}`;
           }
 
           const hasStyleReference =
-            (Array.isArray(params.referenceImages) &&
-              params.referenceImages.length > 0) ||
-            !!params.imageUrl;
-          const hasPersonReference = !!params.personReferenceImage;
+            (Array.isArray(enhancedParams.referenceImages) &&
+              enhancedParams.referenceImages.length > 0) ||
+            !!enhancedParams.imageUrl;
+          const hasPersonReference = !!enhancedParams.personReferenceImage;
           const hasProductImagesBeyondLogo =
             productImages.length > (hasLogo ? 1 : 0);
 
           // Optional safety valve for future UI toggle; defaults to enabled.
-          const useCampaignGradePrompt = params.useCampaignGradePrompt !== false;
-          const basePrompt = useCampaignGradePrompt
-            ? buildCampaignGradeImagePrompt(params.prompt, mappedBrandProfile)
-            : params.prompt;
+          const useCampaignGradePrompt = enhancedParams.useCampaignGradePrompt !== false;
+          const basePromptCore = useCampaignGradePrompt
+            ? buildCampaignGradeImagePrompt(enhancedParams.prompt, mappedBrandProfile)
+            : enhancedParams.prompt;
+          const brandIntegrationDirectives = hasLogo
+            ? `
+
+INTEGRAÇÃO DE MARCA (OBRIGATÓRIO):
+- Use o logo/anexos da marca com fidelidade visual, mas integrado de forma natural ao layout.
+- Evite aparência de "adesivo colado" ou elemento deslocado.
+- O branding deve parecer parte nativa da arte, com harmonia de luz, cor e composição.
+- Priorize acabamento premium/editorial com consistência visual entre todos os elementos.`
+            : `
+
+INTEGRAÇÃO DE MARCA (OBRIGATÓRIO):
+- Reforce a presença da marca por direção de arte (paleta, contraste, textura e composição).
+- O resultado deve parecer peça de campanha profissional de agência, com branding envolvente e coeso.`;
+          const basePrompt = `${basePromptCore}${brandIntegrationDirectives}`;
 
           // 2. Convert prompt to JSON structured format (same as /api/ai/image)
           const jsonPrompt = await convertImagePromptToJson(
             basePrompt,
-            params.aspectRatio || "1:1",
+            enhancedParams.aspectRatio || "1:1",
             orgId,
             sql,
           );
@@ -363,7 +395,7 @@ ${userPrompt}`;
             basePrompt,
             mappedBrandProfile,
             hasStyleReference,
-            hasLogo,
+            false,
             hasPersonReference,
             hasProductImagesBeyondLogo,
             jsonPrompt,
@@ -373,7 +405,7 @@ ${userPrompt}`;
 
           // 4. Update enhanced params with full prompt and product images
           enhancedParams = {
-            ...params,
+            ...enhancedParams,
             prompt: fullPrompt,
             productImages: productImages.length > 0 ? productImages : undefined,
             brandProfile: mappedBrandProfile,
@@ -386,6 +418,7 @@ ${userPrompt}`;
               hasStyleReference,
               hasProductImagesBeyondLogo,
               useCampaignGradePrompt,
+              toneOverride,
             },
             "[ImagePlayground] Brand profile applied",
           );

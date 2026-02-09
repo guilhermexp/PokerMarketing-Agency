@@ -417,6 +417,10 @@ export async function createImageBatch(
   const imageSize = params.imageSize || getImageSizeFromWidth(width);
   const generationParams = { ...params, aspectRatio, imageSize };
   const storedParams = compactForStorage(generationParams);
+  const displayPrompt =
+    typeof params.userPrompt === "string" && params.userPrompt.trim()
+      ? params.userPrompt
+      : params.prompt;
 
   // Create batch
   const [batch] = await sql`
@@ -425,7 +429,7 @@ export async function createImageBatch(
     )
     VALUES (
       ${topicId}, ${userId}, ${organizationId}, ${provider}, ${model},
-      ${params.prompt}, ${JSON.stringify(storedParams)}, ${width}, ${height}
+      ${displayPrompt}, ${JSON.stringify(storedParams)}, ${width}, ${height}
     )
     RETURNING *
   `;

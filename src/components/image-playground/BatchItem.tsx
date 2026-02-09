@@ -22,6 +22,36 @@ interface BatchItemProps {
   topicId: string;
 }
 
+function getStringConfig(config: Record<string, unknown>, key: string): string | null {
+  const value = config[key];
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function getBooleanConfig(config: Record<string, unknown>, key: string): boolean {
+  return config[key] === true;
+}
+
+function extractUserPrompt(batchPrompt: string, config: Record<string, unknown>): string {
+  const configPrompt = getStringConfig(config, 'userPrompt');
+  if (configPrompt) return configPrompt;
+
+  if (batchPrompt.includes('PROMPT DO USUÁRIO:')) {
+    return batchPrompt.split('PROMPT DO USUÁRIO:').pop()?.trim() || batchPrompt;
+  }
+
+  const technicalPromptMatch = batchPrompt.match(/^PROMPT TÉCNICO:\s*(.+?)\s*ESTILO VISUAL:/s);
+  if (technicalPromptMatch?.[1]) {
+    return technicalPromptMatch[1].trim();
+  }
+
+  const campaignGradePromptMatch = batchPrompt.match(/- Prompt base:\s*(.+)/);
+  if (campaignGradePromptMatch?.[1]) {
+    return campaignGradePromptMatch[1].trim();
+  }
+
+  return batchPrompt;
+}
+
 export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
@@ -68,6 +98,13 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
 
   const successCount = batch.generations.filter((g) => g.asset?.url).length;
   const totalCount = batch.generations.length;
+  const config = batch.config || {};
+  const displayPrompt = extractUserPrompt(batch.prompt, config);
+  const imageSize = getStringConfig(config, 'imageSize');
+  const aspectRatio = getStringConfig(config, 'aspectRatio');
+  const toneOverride = getStringConfig(config, 'toneOfVoiceOverride');
+  const useBrandProfile = getBooleanConfig(config, 'useBrandProfile');
+  const useInstagramMode = getBooleanConfig(config, 'useInstagramMode');
 
   return (
     <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden">
@@ -85,11 +122,36 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
         </button>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-white/90 line-clamp-2">{batch.prompt}</p>
+          <p className="text-sm text-white/90 line-clamp-2">{displayPrompt}</p>
           <div className="flex items-center gap-2 mt-1.5 text-[10px] text-white/40">
             <span className="px-1.5 py-0.5 bg-white/5 rounded">
               {batch.model.split('/').pop() || batch.model}
             </span>
+            {useInstagramMode && (
+              <span className="px-1.5 py-0.5 bg-pink-500/20 text-pink-200 rounded">
+                Instagram
+              </span>
+            )}
+            {useBrandProfile && (
+              <span className="px-1.5 py-0.5 bg-white/10 text-white/80 rounded">
+                Perfil da marca
+              </span>
+            )}
+            {toneOverride && (
+              <span className="px-1.5 py-0.5 bg-white/10 text-white/80 rounded">
+                Tom: {toneOverride}
+              </span>
+            )}
+            {imageSize && (
+              <span className="px-1.5 py-0.5 bg-white/10 text-white/80 rounded">
+                Resolução {imageSize}
+              </span>
+            )}
+            {aspectRatio && (
+              <span className="px-1.5 py-0.5 bg-white/10 text-white/80 rounded">
+                {aspectRatio}
+              </span>
+            )}
             <span>
               {batch.width}×{batch.height}
             </span>

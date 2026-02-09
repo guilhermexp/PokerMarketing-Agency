@@ -252,6 +252,7 @@ export function useCreateImage() {
         imageNum,
         params: {
           prompt,
+          userPrompt: prompt,
           width: parameters.width,
           height: parameters.height,
           seed: parameters.seed,
@@ -265,6 +266,7 @@ export function useCreateImage() {
             mimeType: img.mimeType,
           })),
           imageUrl: parameters.imageUrl,
+          toneOfVoiceOverride: parameters.toneOfVoiceOverride,
           useBrandProfile,
           useInstagramMode,
         },
