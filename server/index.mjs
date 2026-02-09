@@ -4390,6 +4390,7 @@ const generateGeminiImage = async (
       model,
       contents: { parts },
       config: {
+        temperature: 0.7,
         imageConfig: {
           aspectRatio: mapAspectRatio(aspectRatio),
           imageSize,

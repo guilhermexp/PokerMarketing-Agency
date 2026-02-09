@@ -683,6 +683,7 @@ async function processImageGeneration(
       model,
       contents: { parts },
       config: {
+        temperature: 0.7,
         imageConfig: {
           aspectRatio: mappedAspectRatio,
           imageSize: params.imageSize || "1K",
