@@ -122,6 +122,17 @@ PROMPT DO USUÁRIO:
 ${userPrompt}`;
   };
 
+  const enforcePortugueseBrPrompt = (prompt) => {
+    if (typeof prompt !== "string" || !prompt.trim()) return prompt;
+    if (prompt.includes("IDIOMA OBRIGATÓRIO (pt-BR):")) return prompt;
+    return `${prompt}
+
+IDIOMA OBRIGATÓRIO (pt-BR):
+- Responda e componha a direção criativa em PORTUGUÊS DO BRASIL.
+- Se houver qualquer texto na imagem (título, CTA, preço, legenda, selo), ele DEVE estar em português do Brasil.
+- Nunca use inglês ou outro idioma nos textos visíveis da arte.`;
+  };
+
   // Get all topics
   app.get("/api/image-playground/topics", async (req, res) => {
     try {
@@ -426,6 +437,9 @@ INTEGRAÇÃO DE MARCA (OBRIGATÓRIO):
           );
         }
       }
+
+      // Enforce pt-BR in all image playground generations (with or without brand/instagram modes)
+      enhancedParams.prompt = enforcePortugueseBrPrompt(enhancedParams.prompt);
 
       // Initialize Gemini
       const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
