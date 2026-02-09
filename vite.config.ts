@@ -28,43 +28,7 @@ export default defineConfig(({ mode }) => {
         "Cross-Origin-Opener-Policy": "same-origin",
       },
       proxy: {
-        "/api/chat": {
-          target: "http://localhost:3002",
-          changeOrigin: true,
-        },
-        "/api/db": {
-          target: "http://localhost:3002",
-          changeOrigin: true,
-        },
-        "/api/ai": {
-          target: "http://localhost:3002",
-          changeOrigin: true,
-        },
-        "/api/generate": {
-          target: "http://localhost:3002",
-          changeOrigin: true,
-        },
-        "/api/upload": {
-          target: "http://localhost:3002",
-          changeOrigin: true,
-        },
-        "/api/proxy-video": {
-          target: "http://localhost:3002",
-          changeOrigin: true,
-        },
-        "/api/rube": {
-          target: "http://localhost:3002",
-          changeOrigin: true,
-        },
-        "/api/admin": {
-          target: "http://localhost:3002",
-          changeOrigin: true,
-        },
-        "/api/image-playground": {
-          target: "http://localhost:3002",
-          changeOrigin: true,
-        },
-        "/api/video-playground": {
+        "/api": {
           target: "http://localhost:3002",
           changeOrigin: true,
         },

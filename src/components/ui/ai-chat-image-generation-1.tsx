@@ -166,22 +166,6 @@ export const ImageGenerationLoader = ({
         )}
       </AnimatePresence>
 
-      {/* Progress bar */}
-      {(showLoader || isRevealing) && !isCompleted && (
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10 z-20">
-          <motion.div
-            className="h-full bg-gradient-to-r from-primary/80 to-primary"
-            initial={{ width: "0%" }}
-            animate={{ width: isRevealing ? `${progress}%` : "30%" }}
-            transition={isRevealing ? { ease: "linear" } : {
-              repeat: Infinity,
-              repeatType: "reverse",
-              duration: 1.5,
-              ease: "easeInOut"
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 };

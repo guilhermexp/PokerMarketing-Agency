@@ -4626,16 +4626,22 @@ ${jsonPrompt}
   if (hasLogo) {
     fullPrompt += `
 
-**LOGO DA MARCA - PRESERVAÇÃO:**
-O logo anexado deve aparecer como uma COLAGEM LITERAL na imagem final.
+**LOGO DA MARCA - PRESERVAÇÃO E POSICIONAMENTO:**
+O logo anexado é a identidade visual oficial da marca. Ele deve aparecer na imagem de forma PROFISSIONAL e DISCRETA.
 
 PRESERVAÇÃO DO LOGO (INVIOLÁVEL):
 - COPIE o logo EXATAMENTE como fornecido - pixel por pixel
-- NÃO redesenhe, NÃO reinterprete, NÃO estilize o logo
-- NÃO altere cores, formas, proporções ou tipografia
-- NÃO adicione efeitos (brilho, sombra, gradiente, 3D)
-- Mantenha bordas nítidas e definidas
-- O logo deve aparecer de forma clara e legível na composição`;
+- NÃO redesenhe, NÃO reinterprete, NÃO crie versões alternativas do logo
+- NÃO altere cores, formas, proporções ou tipografia do logo
+- NÃO adicione efeitos ao logo (brilho, sombra, gradiente, 3D)
+- Mantenha bordas nítidas e definidas do logo original
+
+POSICIONAMENTO (OBRIGATÓRIO):
+- Posicione o logo em um CANTO da imagem (inferior direito ou superior esquerdo)
+- Tamanho DISCRETO: entre 8% e 12% da largura da imagem
+- O logo NÃO deve ficar no CENTRO da imagem
+- O logo NÃO deve dominar a composição - o CONTEÚDO/CENA é o protagonista
+- O logo funciona como uma ASSINATURA da marca, não como elemento principal`;
   }
 
   if (hasProductImages) {

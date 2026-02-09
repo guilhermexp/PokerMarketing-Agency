@@ -158,30 +158,30 @@ const CampaignCard: React.FC<{
                 className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
                 onClick={() => setShowPrompt(false)}
               >
-                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                <div className="absolute inset-0 bg-black/90 backdrop-blur-md" />
                 <div
-                  className="relative w-full max-w-lg bg-[#0d0d0d] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+                  className="relative w-full max-w-lg bg-black border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Icon name="eye" className="w-4 h-4 text-primary" />
+                      <div className="w-9 h-9 rounded-xl bg-white/[0.06] flex items-center justify-center">
+                        <Icon name="file-text" className="w-4 h-4 text-white/60" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-white">Requisição Original</h4>
-                        <p className="text-[10px] text-white/40">Prompt usado para criar esta campanha</p>
+                        <h4 className="text-sm font-semibold text-white">Prompt Original</h4>
+                        <p className="text-[10px] text-white/30 mt-0.5">Requisição usada para criar esta campanha</p>
                       </div>
                     </div>
                     <button
                       onClick={() => setShowPrompt(false)}
-                      className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.06] transition-all"
+                      className="p-2 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all"
                     >
                       <Icon name="x" className="w-4 h-4" />
                     </button>
                   </div>
                   <div className="p-5 max-h-[60vh] overflow-y-auto">
-                    <p className="text-sm text-white/70 whitespace-pre-wrap leading-relaxed">
+                    <p className="text-sm text-white/60 whitespace-pre-wrap leading-relaxed">
                       {campaign.inputTranscript}
                     </p>
                   </div>
@@ -190,9 +190,9 @@ const CampaignCard: React.FC<{
                       onClick={() => {
                         navigator.clipboard.writeText(campaign.inputTranscript || "");
                       }}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] text-[10px] font-bold text-white/50 hover:text-white hover:bg-white/[0.08] transition-all"
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-white/70 hover:text-white hover:bg-white/[0.1] transition-all"
                     >
-                      <Icon name="copy" className="w-3 h-3" />
+                      <Icon name="copy" className="w-3.5 h-3.5" />
                       Copiar
                     </button>
                   </div>
@@ -501,7 +501,7 @@ export function CampaignsList({
 
       {/* Fixed Pagination Footer */}
       {totalPages > 1 && !isLoading && allCampaigns.length > 0 && (
-        <footer className="sticky bottom-0 bg-black/80 backdrop-blur-xl border-t border-white/10 px-4 sm:px-6 py-3 z-40">
+        <footer className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-xl border-t border-white/10 px-4 sm:px-6 py-3 z-40">
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}

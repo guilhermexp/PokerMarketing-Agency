@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import { useClerk } from "@clerk/clerk-react";
 import type {
   BrandProfile,
@@ -504,7 +505,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 </div>
               </div>
             )}
-            {isGenerating && <GeneratingLoader />}
+            <AnimatePresence>
+              {isGenerating && <GeneratingLoader />}
+            </AnimatePresence>
             {campaign && (
               <div className="animate-fade-in-up space-y-8">
                 {/* Header Section */}

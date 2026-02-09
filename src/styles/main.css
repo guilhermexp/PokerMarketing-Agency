@@ -36,99 +36,14 @@ body,
     outline-offset: 2px;
 }
 
-@theme inline {
-  @keyframes generating-loader-letter-anim {
-  0% {
-    opacity: 0;
-    transform: translateY(20px) rotateX(-90deg);
-    text-shadow: 0 0 0px rgba(255, 255, 255, 0);
-        }
-  10% {
-    opacity: 1;
-    transform: translateY(0) rotateX(0deg);
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-        }
-  30% {
-    opacity: 1;
-    transform: translateY(0) rotateX(0deg);
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-        }
-  50% {
-    opacity: 0;
-    transform: translateY(-20px) rotateX(90deg);
-    text-shadow: 0 0 0px rgba(255, 255, 255, 0);
-        }
-  100% {
-    opacity: 0;
-        }
+/* Generating Loader - styles now in component via Tailwind + Framer Motion */
+
+/* Gallery image shimmer effect */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
     }
-  @keyframes generating-loader-bar-anim {
-  0% {
-    left: -100%;
-        }
-  50% {
-    left: 100%;
-        }
-  100% {
-    left: -100%;
-        }
+    100% {
+        background-position: 200% 0;
     }
-}
-
-/* Generating Loader Styles */
-.generating-loader-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2rem;
-  height: 100vh;
-  width: 100%;
-  background: #000000;
-}
-
-.generating-loader-text {
-  display: flex;
-  gap: 0.25rem;
-  font-size: 3rem;
-  font-weight: 700;
-  color: #ffffff;
-  perspective: 1000px;
-}
-
-.generating-loader-letter {
-  display: inline-block;
-  animation: generating-loader-letter-anim 3s ease-in-out infinite;
-  animation-fill-mode: both;
-}
-
-.generating-loader-letter:nth-child(1) { animation-delay: 0s; }
-.generating-loader-letter:nth-child(2) { animation-delay: 0.1s; }
-.generating-loader-letter:nth-child(3) { animation-delay: 0.2s; }
-.generating-loader-letter:nth-child(4) { animation-delay: 0.3s; }
-.generating-loader-letter:nth-child(5) { animation-delay: 0.4s; }
-.generating-loader-letter:nth-child(6) { animation-delay: 0.5s; }
-.generating-loader-letter:nth-child(7) { animation-delay: 0.6s; }
-.generating-loader-letter:nth-child(8) { animation-delay: 0.7s; }
-.generating-loader-letter:nth-child(9) { animation-delay: 0.8s; }
-.generating-loader-letter:nth-child(10) { animation-delay: 0.9s; }
-
-.generating-loader-bar {
-  position: relative;
-  width: 200px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.generating-loader-bar::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, #f59e0b, transparent);
-  animation: generating-loader-bar-anim 2s linear infinite;
 }

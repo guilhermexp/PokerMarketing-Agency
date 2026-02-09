@@ -1410,6 +1410,8 @@ function AppContent() {
       }
 
       setCampaign(r);
+      // Keep loader visible for a minimum time to allow content to load
+      await new Promise(resolve => setTimeout(resolve, 1500));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

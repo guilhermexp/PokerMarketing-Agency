@@ -77,7 +77,9 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
   onToggleSelection,
 }) => {
   const [videoError, setVideoError] = React.useState(false);
+  const [imageError, setImageError] = React.useState(false);
   const [showHighlight, setShowHighlight] = React.useState(isNew);
+  const [isLoaded, setIsLoaded] = React.useState(false);
   const poster = getVideoPoster(image);
 
   useEffect(() => {
@@ -168,15 +170,43 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
             onError={() => setVideoError(true)}
           />
         )
+      ) : imageError ? (
+        // Fallback when image fails to load
+        <div className="w-full aspect-square bg-gradient-to-br from-white/[0.02] via-[#1a1a1a] to-[#111] flex flex-col items-center justify-center p-4">
+          <div className="w-10 h-10 rounded-full bg-white/[0.06] flex items-center justify-center mb-2">
+            <Icon name="image" className="w-5 h-5 text-white/20" />
+          </div>
+          <p className="text-[9px] text-white/30 font-medium text-center">
+            Imagem indisponível
+          </p>
+        </div>
       ) : (
-        <img
-          src={image.src}
-          alt={image.prompt}
-          className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-          loading="lazy"
-          decoding="async"
-          fetchPriority="low"
-        />
+        <div className="relative w-full min-h-[120px]">
+          {/* Shimmer placeholder */}
+          {!isLoaded && (
+            <div className="absolute inset-0 bg-[#1a1a1a] rounded-xl overflow-hidden">
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                style={{
+                  animation: 'shimmer 1.5s infinite',
+                  backgroundSize: '200% 100%',
+                }}
+              />
+            </div>
+          )}
+          <img
+            src={image.src}
+            alt={image.prompt}
+            className={`w-full h-auto object-cover transition-all duration-500 group-hover:scale-[1.02] ${
+              isLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
+            onLoad={() => setIsLoaded(true)}
+            onError={() => setImageError(true)}
+          />
+        </div>
       )}
 
       {/* Overlay */}
