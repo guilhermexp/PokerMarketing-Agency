@@ -448,7 +448,11 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
             set({
               useBrandProfile: false,
               useInstagramMode: false,
-              parameters: { ...get().parameters, toneOfVoiceOverride: undefined },
+              parameters: {
+                ...get().parameters,
+                toneOfVoiceOverride: undefined,
+                fontStyleOverride: undefined,
+              },
             });
           } else {
             set(
@@ -456,7 +460,11 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
                 ? { useBrandProfile: true }
                 : {
                     useBrandProfile: false,
-                    parameters: { ...get().parameters, toneOfVoiceOverride: undefined },
+                    parameters: {
+                      ...get().parameters,
+                      toneOfVoiceOverride: undefined,
+                      fontStyleOverride: undefined,
+                    },
                   }
             );
           }

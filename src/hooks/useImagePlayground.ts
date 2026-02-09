@@ -267,6 +267,7 @@ export function useCreateImage() {
           })),
           imageUrl: parameters.imageUrl,
           toneOfVoiceOverride: useBrandProfile ? parameters.toneOfVoiceOverride : undefined,
+          fontStyleOverride: useBrandProfile ? parameters.fontStyleOverride : undefined,
           useBrandProfile,
           useInstagramMode,
         },

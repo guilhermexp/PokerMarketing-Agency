@@ -31,6 +31,13 @@ export function registerImagePlaygroundRoutes(
     "Inspirador",
     "Técnico",
   ]);
+  const ALLOWED_FONT_STYLES = new Set([
+    "Bebas Neue",
+    "Oswald",
+    "Anton",
+    "Impact",
+    "Montserrat ExtraBold",
+  ]);
   const inferMimeTypeFromSource = (source) => {
     if (!source || typeof source !== "string") return "image/png";
     const cleanSource = source.split("?")[0].toLowerCase();
@@ -343,6 +350,11 @@ IDIOMA OBRIGATÓRIO (pt-BR):
             ALLOWED_TONES.has(enhancedParams.toneOfVoiceOverride)
               ? enhancedParams.toneOfVoiceOverride
               : null;
+          const fontStyleOverride =
+            typeof enhancedParams.fontStyleOverride === "string" &&
+            ALLOWED_FONT_STYLES.has(enhancedParams.fontStyleOverride)
+              ? enhancedParams.fontStyleOverride
+              : null;
           if (toneOverride) {
             mappedBrandProfile.toneOfVoice = toneOverride;
           }
@@ -393,7 +405,14 @@ INTEGRAÇÃO DE MARCA (OBRIGATÓRIO):
 INTEGRAÇÃO DE MARCA (OBRIGATÓRIO):
 - Reforce a presença da marca por direção de arte (paleta, contraste, textura e composição).
 - O resultado deve parecer peça de campanha profissional de agência, com branding envolvente e coeso.`;
-          const basePrompt = `${basePromptCore}${brandIntegrationDirectives}`;
+          const fontDirectives = fontStyleOverride
+            ? `
+
+TIPOGRAFIA PREFERENCIAL (OBRIGATÓRIO):
+- Use prioritariamente a fonte "${fontStyleOverride}" para títulos e textos principais.
+- Mantenha estilo bold/condensed com alta legibilidade e consistência visual.`
+            : "";
+          const basePrompt = `${basePromptCore}${brandIntegrationDirectives}${fontDirectives}`;
 
           // 2. Convert prompt to JSON structured format (same as /api/ai/image)
           const jsonPrompt = await convertImagePromptToJson(
@@ -432,6 +451,7 @@ INTEGRAÇÃO DE MARCA (OBRIGATÓRIO):
               hasProductImagesBeyondLogo,
               useCampaignGradePrompt,
               toneOverride,
+              fontStyleOverride,
             },
             "[ImagePlayground] Brand profile applied",
           );

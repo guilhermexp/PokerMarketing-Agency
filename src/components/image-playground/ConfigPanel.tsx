@@ -4,7 +4,7 @@
  * Design based on LobeChat reference
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Lock,
   Unlock,
@@ -14,6 +14,8 @@ import {
   Palette,
   Instagram,
   Loader2,
+  Check,
+  ChevronDown,
 } from 'lucide-react';
 import { useImagePlaygroundStore, type ReferenceImage } from '../../stores/imagePlaygroundStore';
 import { uploadDataUrlToBlob } from '../../services/blobService';
@@ -54,6 +56,14 @@ const ASPECT_RATIOS = [
 const IMAGE_NUM_OPTIONS = [1, 2, 4, 8];
 const MAX_REFERENCE_IMAGES = 14;
 const TONE_OPTIONS: ToneOfVoice[] = ['Profissional', 'Espirituoso', 'Casual', 'Inspirador', 'Técnico'];
+const FONT_OPTIONS = ['Bebas Neue', 'Oswald', 'Anton', 'Impact', 'Montserrat ExtraBold'] as const;
+const FONT_PREVIEW_FAMILIES: Record<(typeof FONT_OPTIONS)[number], string> = {
+  'Bebas Neue': '"Bebas Neue", "Oswald", "Arial Narrow", sans-serif',
+  Oswald: '"Oswald", "Arial Narrow", sans-serif',
+  Anton: '"Anton", "Impact", "Arial Black", sans-serif',
+  Impact: 'Impact, "Arial Black", sans-serif',
+  'Montserrat ExtraBold': '"Montserrat", "Helvetica Neue", Arial, sans-serif',
+};
 
 // =============================================================================
 // Component
@@ -65,6 +75,8 @@ interface ConfigPanelProps {
 
 export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fontDropdownRef = useRef<HTMLDivElement>(null);
+  const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
 
   const {
     model,
@@ -203,6 +215,24 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
     [setParam]
   );
 
+  const handleFontChange = useCallback(
+    (value: string) => {
+      setParam('fontStyleOverride', value || undefined);
+      setIsFontDropdownOpen(false);
+    },
+    [setParam]
+  );
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (fontDropdownRef.current && !fontDropdownRef.current.contains(event.target as Node)) {
+        setIsFontDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -325,6 +355,82 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Font Override */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-white/80">
+              Fonte da geração
+            </label>
+            {!useBrandProfile && (
+              <span className="text-[10px] text-white/40">Ative perfil da marca</span>
+            )}
+          </div>
+          <div ref={fontDropdownRef} className="relative">
+            <button
+              type="button"
+              disabled={!useBrandProfile}
+              onClick={() => useBrandProfile && setIsFontDropdownOpen((prev) => !prev)}
+              className={`w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
+                useBrandProfile
+                  ? 'text-white hover:border-white/20'
+                  : 'text-white/40 cursor-not-allowed opacity-60'
+              }`}
+            >
+              <span className="truncate">
+                {typeof parameters.fontStyleOverride === 'string' && parameters.fontStyleOverride
+                  ? parameters.fontStyleOverride
+                  : 'Padrão (bold condensed sans-serif)'}
+              </span>
+              <ChevronDown className={`w-4 h-4 text-white/50 transition-transform ${isFontDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {useBrandProfile && isFontDropdownOpen && (
+              <div className="absolute z-30 mt-2 w-full bg-[#0a0a0a]/95 border border-white/10 rounded-xl shadow-2xl backdrop-blur-xl overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => handleFontChange('')}
+                  className="w-full px-3 py-2.5 hover:bg-white/5 text-left flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm text-white/90 truncate">Padrão</p>
+                    <p className="text-[11px] text-white/50 truncate" style={{ fontFamily: '"Oswald", "Arial Narrow", sans-serif' }}>
+                      ABC 123 Exemplo
+                    </p>
+                  </div>
+                  {(!parameters.fontStyleOverride || parameters.fontStyleOverride === '') && (
+                    <Check className="w-4 h-4 text-white/70 shrink-0" />
+                  )}
+                </button>
+                <div className="h-px bg-white/10" />
+                {FONT_OPTIONS.map((font) => (
+                  <button
+                    key={font}
+                    type="button"
+                    onClick={() => handleFontChange(font)}
+                    className="w-full px-3 py-2.5 hover:bg-white/5 text-left flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm text-white/90 truncate">{font}</p>
+                      <p
+                        className="text-[11px] text-white/55 truncate tracking-[0.02em]"
+                        style={{
+                          fontFamily: FONT_PREVIEW_FAMILIES[font],
+                          fontWeight: font === 'Montserrat ExtraBold' ? 800 : 700,
+                        }}
+                      >
+                        ABC 123 Exemplo
+                      </p>
+                    </div>
+                    {parameters.fontStyleOverride === font && (
+                      <Check className="w-4 h-4 text-white/70 shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Reference Images (Multiple) */}

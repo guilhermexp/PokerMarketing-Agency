@@ -103,6 +103,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
   const imageSize = getStringConfig(config, 'imageSize');
   const aspectRatio = getStringConfig(config, 'aspectRatio');
   const toneOverride = getStringConfig(config, 'toneOfVoiceOverride');
+  const fontStyleOverride = getStringConfig(config, 'fontStyleOverride');
   const useBrandProfile = getBooleanConfig(config, 'useBrandProfile');
   const useInstagramMode = getBooleanConfig(config, 'useInstagramMode');
 
@@ -140,6 +141,11 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
             {toneOverride && (
               <span className="px-1.5 py-0.5 bg-white/10 text-white/80 rounded">
                 Tom: {toneOverride}
+              </span>
+            )}
+            {fontStyleOverride && (
+              <span className="px-1.5 py-0.5 bg-white/10 text-white/80 rounded">
+                Fonte: {fontStyleOverride}
               </span>
             )}
             {imageSize && (
