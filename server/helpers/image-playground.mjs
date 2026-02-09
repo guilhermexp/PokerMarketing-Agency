@@ -10,6 +10,7 @@ import { put } from "@vercel/blob";
 import sharp from "sharp";
 import Replicate from "replicate";
 import { validateContentType } from "../lib/validation/contentType.mjs";
+import { logAiUsage } from "./usage-tracking.mjs";
 
 // Replicate fallback config
 const REPLICATE_IMAGE_MODEL = "google/nano-banana-pro";
@@ -960,6 +961,29 @@ async function processImageGeneration(
       `;
     }
 
+    // Log AI usage to admin dashboard
+    if (generationInfo) {
+      await logAiUsage(sql, {
+        userId: generationInfo.user_id,
+        organizationId: generationInfo.organization_id,
+        endpoint: "/api/image-playground/generate",
+        operation: "image",
+        model: usedModel,
+        provider: usedProvider,
+        imageCount: 1,
+        imageSize: params.imageSize || "1K",
+        status: "success",
+        metadata: {
+          source: "playground",
+          aspectRatio: params.aspectRatio || "1:1",
+          fallbackUsed: usedProvider === "replicate",
+          generationId,
+        },
+      }).catch((err) => {
+        console.warn("[ImagePlayground] Failed to log usage:", err.message);
+      });
+    }
+
     console.log(
       `[ImagePlayground] Generation ${generationId} completed successfully (provider: ${usedProvider})`,
     );
@@ -968,6 +992,16 @@ async function processImageGeneration(
       `[ImagePlayground] Generation ${generationId} failed:`,
       error,
     );
+
+    // Log failed usage to admin dashboard
+    await logAiUsage(sql, {
+      endpoint: "/api/image-playground/generate",
+      operation: "image",
+      model: "gemini-3-pro-image-preview",
+      status: "failed",
+      error: error.message,
+      metadata: { source: "playground", generationId },
+    }).catch(() => {});
 
     // Build user-friendly error for the frontend
     const isQuota = isQuotaOrRateLimitError(error);
