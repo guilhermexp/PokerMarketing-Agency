@@ -4328,6 +4328,8 @@ const sanitizeErrorForClient = (error, defaultMessage = "Ocorreu um erro. Tente 
 };
 
 const REPLICATE_IMAGE_MODEL = "google/nano-banana-pro";
+const REPLICATE_OUTPUT_FORMAT = "png";
+const REPLICATE_SAFETY_FILTER_LEVEL = "block_only_high";
 
 const toDataUrl = (img) => `data:${img.mimeType};base64,${img.base64}`;
 
@@ -4362,7 +4364,8 @@ const generateImageWithReplicate = async (
 
   const input = {
     prompt,
-    output_format: "png",
+    output_format: REPLICATE_OUTPUT_FORMAT,
+    safety_filter_level: REPLICATE_SAFETY_FILTER_LEVEL,
   };
 
   if (aspectRatio) {
@@ -4408,78 +4411,6 @@ const callOpenRouterApi = async (body) => {
   }
 
   return response.json();
-};
-
-// Generate image with OpenRouter as fallback
-const generateImageWithOpenRouter = async (prompt, productImages) => {
-  logger.info({}, "[OpenRouter Fallback] Tentando gerar imagem via OpenRouter");
-
-  // Build content parts with optional images
-  const contentParts = [];
-
-  // Add images first if provided
-  if (productImages && productImages.length > 0) {
-    logger.debug(
-      { count: productImages.length },
-      "[OpenRouter Fallback] Adicionando imagens de referência",
-    );
-    for (const img of productImages) {
-      contentParts.push({
-        type: "image_url",
-        image_url: {
-          url: `data:${img.mimeType};base64,${img.base64}`,
-        },
-      });
-    }
-  }
-
-  // Add text prompt
-  contentParts.push({
-    type: "text",
-    text: prompt,
-  });
-
-  const data = await callOpenRouterApi({
-    model: "google/gemini-3-pro-image-preview",
-    messages: [
-      {
-        role: "user",
-        content: contentParts,
-      },
-    ],
-    modalities: ["image", "text"],
-  });
-
-  const message = data?.choices?.[0]?.message;
-  if (!message) {
-    throw new Error("[OpenRouter] No message in response");
-  }
-
-  // Check for image in response
-  if (message.images && message.images.length > 0) {
-    const imageUrl = message.images[0].image_url?.url;
-    if (imageUrl) {
-      logger.info({}, "[OpenRouter Fallback] Imagem gerada com sucesso");
-      return imageUrl;
-    }
-  }
-
-  // Check for base64 image in content
-  if (message.content) {
-    const base64Match = message.content.match(
-      /data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/,
-    );
-    if (base64Match) {
-      logger.info({}, "[OpenRouter Fallback] Imagem encontrada no content");
-      return base64Match[0];
-    }
-  }
-
-  logger.error(
-    { data },
-    "[OpenRouter Fallback] ❌ Nenhuma imagem encontrada na resposta",
-  );
-  throw new Error("[OpenRouter] No image data in response");
 };
 
 // Model defaults
