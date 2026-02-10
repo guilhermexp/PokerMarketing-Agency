@@ -6,8 +6,6 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Lock,
-  Unlock,
   ImagePlus,
   Plus,
   X,
@@ -83,14 +81,12 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
     model,
     parameters,
     imageNum,
-    isAspectRatioLocked,
     activeAspectRatio,
     activeImageSize,
     useBrandProfile,
     useInstagramMode,
     setModelAndProvider,
     setImageNum,
-    toggleAspectRatioLock,
     setAspectRatio,
     setImageSize,
     setParam,
@@ -548,26 +544,9 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
 
         {/* Aspect Ratio / Proporção */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-white/80">
-              Proporção
-            </label>
-            <button
-              onClick={toggleAspectRatioLock}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isAspectRatioLocked
-                  ? 'bg-white/15 text-white'
-                  : 'bg-white/5 text-white/40 hover:text-white/60'
-              }`}
-              title={isAspectRatioLocked ? 'Proporção travada' : 'Travar proporção'}
-            >
-              {isAspectRatioLocked ? (
-                <Lock className="w-4 h-4" />
-              ) : (
-                <Unlock className="w-4 h-4" />
-              )}
-            </button>
-          </div>
+          <label className="text-sm font-medium text-white/80">
+            Proporção
+          </label>
           <div className="grid grid-cols-5 gap-2">
             {ASPECT_RATIOS.map((ratio) => {
               const [w, h] = ratio.value.split(':').map(Number);

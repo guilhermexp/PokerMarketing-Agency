@@ -10,13 +10,15 @@ import {
   Trash2,
   AlertCircle,
   AlertTriangle,
-  Loader2,
   ZoomIn,
   ImagePlus,
+  Pause,
+  Play,
 } from 'lucide-react';
-import { useGenerationPolling, useImagePlaygroundBatches, useImagePlaygroundTopics } from '../../hooks/useImagePlayground';
+import { useGenerationPolling, useImagePlaygroundBatches } from '../../hooks/useImagePlayground';
 import { useImagePlaygroundStore } from '../../stores/imagePlaygroundStore';
 import { ImagePreviewModal } from '../image-preview/ImagePreviewModal';
+import { ImageGenerationLoader } from '../ui/ai-chat-image-generation-1';
 import type { Generation } from '../../stores/imagePlaygroundStore';
 import type { GalleryImage } from '../../types';
 import * as api from '../../services/api/imagePlayground';
@@ -34,6 +36,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
   const [elapsedTime, setElapsedTime] = useState(0);
   const [previewImage, setPreviewImage] = useState<GalleryImage | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [isPollingPaused, setIsPollingPaused] = useState(false);
   const { deleteGeneration } = useImagePlaygroundBatches(topicId);
   const { updateGeneration, topics, updateTopic: updateTopicStore } = useImagePlaygroundStore();
 
@@ -49,6 +52,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
     generation.asyncTaskId,
     {
       enabled: needsPolling,
+      paused: isPollingPaused,
       onSuccess: async (gen) => {
         if (gen) {
           updateGeneration(topicId, generation.id, gen);
@@ -158,19 +162,32 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
   // Loading State
   if (!generation.asset) {
     return (
-      <div className="aspect-square bg-white/5 rounded-xl border border-white/10 flex flex-col items-center justify-center gap-3">
+      <div className="aspect-square rounded-xl border border-white/10 overflow-hidden relative">
         {status === 'error' ? (
-          <GenerationError error={pollingError} onDelete={handleDelete} />
+          <div className="w-full h-full bg-white/5 flex flex-col items-center justify-center gap-3">
+            <GenerationError error={pollingError} onDelete={handleDelete} />
+          </div>
         ) : (
           <>
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-            <div className="text-center">
-              <p className="text-xs text-white/60">
-                {status === 'processing' ? 'Processando...' : 'Gerando...'}
-              </p>
-              <p className="text-[10px] text-white/40 mt-0.5">
+            <ImageGenerationLoader
+              isGenerating={!isPollingPaused}
+              showLabel={true}
+            />
+            {/* Time elapsed overlay */}
+            <div className="absolute bottom-3 left-0 right-0 flex flex-col items-center gap-2 z-30">
+              <span className="text-[10px] text-white/50 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full">
                 {formatTime(elapsedTime)}
-              </p>
+              </span>
+              {needsPolling && (
+                <button
+                  onClick={() => setIsPollingPaused((prev) => !prev)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/40 backdrop-blur-sm text-white/80 text-xs hover:bg-black/60 transition-colors"
+                  title={isPollingPaused ? 'Retomar atualização do status' : 'Pausar atualização do status'}
+                >
+                  {isPollingPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                  {isPollingPaused ? 'Retomar' : 'Pausar'}
+                </button>
+              )}
             </div>
           </>
         )}
@@ -292,11 +309,13 @@ function GenerationError({ error, onDelete }: GenerationErrorProps) {
   const code = errorObj?.code as string | undefined;
   const message = errorObj?.message as string | undefined;
 
+  const lowerMessage = message?.toLowerCase() ?? '';
   const isQuota = code === 'QUOTA_EXCEEDED'
-    || (message?.toLowerCase().includes('quota') ?? false)
-    || (message?.toLowerCase().includes('429') ?? false)
-    || (message?.toLowerCase().includes('exceeded') ?? false)
-    || (message?.toLowerCase().includes('rate') ?? false);
+    || code === 'RATE_LIMITED'
+    || lowerMessage.includes('quota')
+    || lowerMessage.includes('rate limit')
+    || lowerMessage.includes('too many requests')
+    || message?.includes('429') === true;
 
   const isSafety = code === 'SAFETY'
     || (message?.toLowerCase().includes('segurança') ?? false)

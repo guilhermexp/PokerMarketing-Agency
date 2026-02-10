@@ -43,7 +43,7 @@ const monthNames = [
 const dayNames = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const dayNamesShort = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
-export const CalendarView: React.FC<CalendarViewProps> = ({
+export const CalendarView = React.memo<CalendarViewProps>(function CalendarView({
   scheduledPosts,
   onSchedulePost,
   onUpdateScheduledPost,
@@ -52,7 +52,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   campaigns = [],
   onPublishToInstagram,
   publishingStates: _publishingStates,
-}) => {
+}) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -978,4 +978,4 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       )}
     </div>
   );
-};
+});

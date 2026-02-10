@@ -12,6 +12,7 @@ import { isFalModel } from "../../../types";
 import { Button } from "../../common/Button";
 import { Loader } from "../../common/Loader";
 import { Icon } from "../../common/Icon";
+import { ImageGenerationLoader } from "../../ui/ai-chat-image-generation-1";
 import {
   generateImage,
   generateVideo,
@@ -1423,7 +1424,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
       } catch (err: unknown) {
         setIsGeneratingVideo((prev) => ({ ...prev, [sceneNumber]: false }));
         console.error("[ClipsTab] Video generation error:", err);
-        return { usedFallback, error: (err as Error).message || "Erro ao gerar vídeo" };
+        return { usedFallback, error: getErrorMessage(err) };
       }
     },
     [
@@ -1750,7 +1751,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
         [sceneNumber]: {
           dataUrl: prev[sceneNumber]?.dataUrl || "",
           isUploading: false,
-          error: (err as Error).message,
+          error: getErrorMessage(err),
         },
       }));
     }
@@ -1857,7 +1858,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
     } catch (err: unknown) {
       setAudioState({
         isLoading: false,
-        error: (err as Error).message || "Falha ao gerar áudio.",
+        error: getErrorMessage(err),
       });
     }
   };
@@ -4530,8 +4531,8 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                 {previewSlide === "thumbnail" && (
                   <>
                     {isGeneratingThumbnail ? (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Loader className="text-white/60" />
+                      <div className="absolute inset-0">
+                        <ImageGenerationLoader isGenerating={true} showLabel={true} />
                       </div>
                     ) : thumbnail ? (
                       <>
@@ -4770,11 +4771,8 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                             </p>
                           </div>
                         ) : isLoadingImage ? (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <Loader className="text-white/60" />
-                            <p className="text-[7px] text-white/40 mt-2">
-                              Gerando imagem...
-                            </p>
+                          <div className="absolute inset-0">
+                            <ImageGenerationLoader isGenerating={true} showLabel={true} />
                           </div>
                         ) : (
                           <>

@@ -15,6 +15,17 @@ import { logAiUsage } from "./usage-tracking.mjs";
 // Replicate fallback config
 const REPLICATE_IMAGE_MODEL = "google/nano-banana-pro";
 
+// Timeout for fetching remote reference images (30 seconds)
+const FETCH_TIMEOUT_MS = 30_000;
+
+function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
+    clearTimeout(timeoutId),
+  );
+}
+
 function getReplicate() {
   const apiToken = process.env.REPLICATE_API_TOKEN;
   if (!apiToken) {
@@ -358,7 +369,8 @@ export async function getGenerationStatus(sql, generationId, asyncTaskId) {
     SELECT
       g.*,
       t.status as task_status,
-      t.error as task_error
+      t.error as task_error,
+      t.updated_at as task_updated_at
     FROM image_generations g
     LEFT JOIN image_async_tasks t ON t.id = g.async_task_id
     WHERE g.id = ${generationId}
@@ -371,7 +383,42 @@ export async function getGenerationStatus(sql, generationId, asyncTaskId) {
     };
   }
 
-  const status = result.task_status || (result.asset ? "success" : "pending");
+  const STALE_TASK_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
+  const hasAsset = !!result.asset;
+  const taskStatus = result.task_status || null;
+  const lastActivityAt = result.task_updated_at || result.created_at;
+  const elapsedMs = lastActivityAt
+    ? Date.now() - new Date(lastActivityAt).getTime()
+    : 0;
+  const isStalePendingTask =
+    !hasAsset &&
+    (taskStatus === "pending" || taskStatus === "processing") &&
+    elapsedMs > STALE_TASK_TIMEOUT_MS;
+
+  if (isStalePendingTask && result.async_task_id) {
+    const timeoutError = {
+      code: "GENERATION_TIMEOUT",
+      message:
+        "A geração expirou por tempo limite. Remova e tente novamente.",
+    };
+
+    await sql`
+      UPDATE image_async_tasks
+      SET
+        status = 'error',
+        error = ${JSON.stringify(timeoutError)},
+        updated_at = NOW()
+      WHERE id = ${result.async_task_id}
+    `;
+
+    return {
+      status: "error",
+      generation: null,
+      error: timeoutError,
+    };
+  }
+
+  const status = taskStatus || (hasAsset ? "success" : "pending");
 
   return {
     status,
@@ -600,7 +647,7 @@ async function buildContentParts(params) {
             base64Data = matches[2];
           }
         } else if (refImage.dataUrl.startsWith("http")) {
-          const response = await fetch(refImage.dataUrl);
+          const response = await fetchWithTimeout(refImage.dataUrl);
           const arrayBuffer = await response.arrayBuffer();
           base64Data = Buffer.from(arrayBuffer).toString("base64");
           mimeType = response.headers.get("content-type") || "image/png";
@@ -631,7 +678,7 @@ async function buildContentParts(params) {
           base64Data = matches[2];
         }
       } else if (params.imageUrl.startsWith("http")) {
-        const response = await fetch(params.imageUrl);
+        const response = await fetchWithTimeout(params.imageUrl);
         const arrayBuffer = await response.arrayBuffer();
         base64Data = Buffer.from(arrayBuffer).toString("base64");
         mimeType = response.headers.get("content-type") || "image/png";
@@ -993,14 +1040,24 @@ async function processImageGeneration(
       error,
     );
 
+    // Look up user context for the failed generation
+    const [genInfo] = await sql`
+      SELECT b.user_id, b.organization_id
+      FROM image_generations g
+      JOIN image_generation_batches b ON b.id = g.batch_id
+      WHERE g.id = ${generationId}
+    `.catch(() => [{}]);
+
     // Log failed usage to admin dashboard
     await logAiUsage(sql, {
+      userId: genInfo?.user_id,
+      organizationId: genInfo?.organization_id,
       endpoint: "/api/image-playground/generate",
       operation: "image",
-      model: "gemini-3-pro-image-preview",
+      model: usedModel,
       status: "failed",
       error: error.message,
-      metadata: { source: "playground", generationId },
+      metadata: { source: "playground", generationId, provider: usedProvider },
     }).catch(() => {});
 
     // Build user-friendly error for the frontend

@@ -51,7 +51,7 @@ export interface CarrosselTabProps {
 }
 
 // Carousel Preview Component - Instagram-style preview
-export const CarouselTab: React.FC<CarrosselTabProps> = ({
+export const CarouselTab = React.memo<CarrosselTabProps>(function CarouselTab({
   videoClipScripts,
   carousels = [],
   galleryImages,
@@ -66,7 +66,7 @@ export const CarouselTab: React.FC<CarrosselTabProps> = ({
   onPublishCarousel,
   onSchedulePost,
   onCarouselUpdate,
-}) => {
+}) {
   // Track which images are being generated: { "clipId-sceneNumber": true }
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
   // Track publishing state per clip
@@ -611,4 +611,4 @@ export const CarouselTab: React.FC<CarrosselTabProps> = ({
       )}
     </div>
   );
-};
+});

@@ -157,6 +157,10 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: {
       exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/util"],
     },
+    esbuild: {
+      drop: mode === 'production' ? ['debugger'] : [],
+      pure: mode === 'production' ? ['console.log', 'console.debug'] : [],
+    },
     build: {
       chunkSizeWarningLimit: 3000,
     },

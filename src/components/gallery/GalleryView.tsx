@@ -324,7 +324,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
   );
 };
 
-export const GalleryView: React.FC<GalleryViewProps> = ({
+export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
   images,
   isLoading = false,
   onUpdateImage,
@@ -338,7 +338,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   onQuickPost,
   onPublishToCampaign,
   onSchedulePost,
-}) => {
+}) {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("gallery");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
@@ -993,4 +993,4 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       </div>
     </>
   );
-};
+});

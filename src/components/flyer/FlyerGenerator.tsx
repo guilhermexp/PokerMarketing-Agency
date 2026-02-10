@@ -87,7 +87,7 @@ interface FlyerGeneratorProps {
   ) => void;
 }
 
-export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
+export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGenerator({
   brandProfile,
   events,
   weekScheduleInfo,
@@ -117,7 +117,7 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
   instagramContext,
   galleryImages = [],
   onSchedulePost,
-}) => {
+}) {
   const { state, setters, data, methods } = useFlyerGenerator(events, weekScheduleInfo, setDailyFlyerState);
 
   const {
@@ -1305,4 +1305,4 @@ export const FlyerGenerator: React.FC<FlyerGeneratorProps> = ({
       </div>
     </div>
   );
-};
+});

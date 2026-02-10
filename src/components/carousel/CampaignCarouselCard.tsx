@@ -7,6 +7,7 @@ import type { CarouselScript, GalleryImage } from '../../types';
 import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 import { CarouselPreview } from './CarouselPreview';
+import { ImageGenerationLoader } from '../ui/ai-chat-image-generation-1';
 
 interface CampaignCarouselCardProps {
   carousel: CarouselScript;
@@ -206,29 +207,23 @@ export const CampaignCarouselCard: React.FC<CampaignCarouselCardProps> = ({
               <div className="flex-shrink-0">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="px-2 py-0.5 rounded bg-white/10 text-[10px] font-medium text-white/60 border border-white/10">
-                    Gerando carrossel...
+                    Feed Instagram 4:5
                   </span>
                 </div>
                 <div className="w-[320px] bg-black rounded-[32px] p-2 shadow-2xl border border-white/10">
                   <div className="w-24 h-6 bg-black rounded-full mx-auto mb-1" />
                   <div className="relative bg-[#0a0a0a] rounded-[24px] overflow-hidden">
                     <div className="px-3 py-2 flex items-center gap-2 border-b border-white/5">
-                      <div className="w-7 h-7 rounded-full bg-white/10" />
-                      <div className="flex-1 space-y-1">
-                        <div className="w-16 h-2.5 bg-white/10 rounded" />
-                        <div className="w-12 h-2 bg-white/5 rounded" />
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                        <span className="text-[8px] font-bold text-white">CPC</span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[10px] font-semibold text-white">cpc_poker</p>
+                        <p className="text-[8px] text-white/40">Patrocinado</p>
                       </div>
                     </div>
-                    <div className="aspect-[4/5] bg-gradient-to-b from-white/5 to-white/0 flex items-center justify-center">
-                      <div className="text-center">
-                        <Loader size={32} className="mx-auto mb-3 text-white/60" />
-                        <p className="text-sm text-white/70">
-                          Gerando capa...
-                        </p>
-                        <p className="text-xs text-white/40 mt-1">
-                          Depois os slides
-                        </p>
-                      </div>
+                    <div className="aspect-[4/5] bg-black overflow-hidden">
+                      <ImageGenerationLoader isGenerating={true} showLabel={true} />
                     </div>
                     <div className="flex justify-center gap-1 py-2">
                       {Array.from({
@@ -242,12 +237,6 @@ export const CampaignCarouselCard: React.FC<CampaignCarouselCardProps> = ({
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Loader size={14} className="text-white/60" />
-                <span className="text-xs text-white/50">
-                  Gerando imagens do carrossel...
-                </span>
               </div>
             </div>
           ) : null}

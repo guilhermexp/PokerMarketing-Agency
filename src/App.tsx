@@ -1,5 +1,5 @@
-import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback } from "react";
-import * as XLSX from "xlsx";
+import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback, useTransition } from "react";
+
 import { BrandProfileSetup } from "./components/brand/BrandProfileSetup";
 import { SettingsModal } from "./components/settings/SettingsModal";
 import { useInstagramAccounts } from "./components/settings/ConnectInstagramModal";
@@ -294,6 +294,10 @@ function AppContent() {
   const [error, setError] = useState<string | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [activeView, setActiveView] = useState<ViewType>("campaign");
+  const [, startViewTransition] = useTransition();
+  const handleViewChange = useCallback((view: ViewType) => {
+    startViewTransition(() => setActiveView(view));
+  }, []);
 
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -1013,7 +1017,7 @@ function AppContent() {
 
   const handleSelectStyleReference = (ref: StyleReference) => {
     setSelectedStyleReference(ref);
-    setActiveView("flyer");
+    handleViewChange("flyer");
   };
 
   // Scheduled Posts Handlers
@@ -1281,7 +1285,7 @@ function AppContent() {
   ) => {
     setIsGenerating(true);
     setError(null);
-    setActiveView("campaign");
+    handleViewChange("campaign");
     // Store product images for use in PostsTab and AdCreativesTab
     console.debug("[App] Storing productImages:", input.productImages ? `${input.productImages.length} image(s)` : "null");
     setCampaignProductImages(input.productImages);
@@ -1502,7 +1506,7 @@ function AppContent() {
           "carousels",
         );
         setCampaign(loadedCampaign);
-        setActiveView("campaign");
+        handleViewChange("campaign");
 
         // Restore productImages from localStorage for this campaign
         const storedProductImages = loadProductImagesFromStorage(campaignId);
@@ -1897,6 +1901,7 @@ function AppContent() {
         try {
           console.debug("[Upload] File read complete, parsing...");
           const data = new Uint8Array(e.target!.result as ArrayBuffer);
+          const XLSX = await import("xlsx");
           const wb = XLSX.read(data, { type: "array" });
           const sheet = wb.Sheets[wb.SheetNames[0]];
           const json = XLSX.utils.sheet_to_json(sheet, {
@@ -2442,7 +2447,7 @@ function AppContent() {
                 selectedDailyFlyerIds={selectedDailyFlyerIds}
                 setSelectedDailyFlyerIds={setSelectedDailyFlyerIds}
                 activeView={activeView}
-                onViewChange={setActiveView}
+                onViewChange={handleViewChange}
                 onPublishToCampaign={handlePublishFlyerToCampaign}
                 styleReferences={styleReferences}
                 onAddStyleReference={handleAddStyleReference}

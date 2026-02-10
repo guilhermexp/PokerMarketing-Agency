@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import React, { Suspense, lazy, useEffect, useMemo, useState, useTransition } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useClerk } from "@clerk/clerk-react";
 import type {
@@ -33,6 +33,34 @@ import { PublishedStoriesWidget } from "../ui/published-stories-widget";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";
 
 type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar" | "playground" | "image-playground";
+
+const DOT_GRID_STYLE_40 = {
+  backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)',
+  backgroundSize: '40px 40px',
+  backgroundPosition: '10px 10px',
+} as const;
+
+const DOT_GRID_STYLE_20 = {
+  backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)',
+  backgroundSize: '20px 20px',
+  backgroundPosition: '10px 10px',
+} as const;
+
+const DOT_GRID_STYLE_50 = {
+  backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)',
+  backgroundSize: '50px 50px',
+  backgroundPosition: '15px 15px',
+} as const;
+
+const DOT_GRID_STYLE_30 = {
+  backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)',
+  backgroundSize: '30px 30px',
+  backgroundPosition: '15px 15px',
+} as const;
+
+const VIGNETTE_STYLE = {
+  background: 'radial-gradient(80% 70%, transparent 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.9) 75%, black 100%)',
+} as const;
 
 interface DashboardProps {
   brandProfile: BrandProfile;
@@ -286,6 +314,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
   const { signOut } = useClerk();
   const { campaigns } = useCampaigns(userId || null, organizationId);
   const [activeTab, setActiveTab] = useState<Tab>("clips");
+  const [isTabPending, startTabTransition] = useTransition();
   const [isInsideSchedule, setIsInsideSchedule] = useState(false);
   const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(
     null,
@@ -385,11 +414,11 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           <>
             {/* Dot Grid Background - only on upload form */}
             <div className="fixed inset-0 pointer-events-none z-0">
-              <div className="absolute inset-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)', backgroundSize: '40px 40px', backgroundPosition: '10px 10px' }} />
-              <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)', backgroundSize: '20px 20px', backgroundPosition: '10px 10px' }} />
-              <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)', backgroundSize: '50px 50px', backgroundPosition: '15px 15px' }} />
-              <div className="absolute inset-0 opacity-25" style={{ backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)', backgroundSize: '30px 30px', backgroundPosition: '15px 15px' }} />
-              <div className="absolute inset-0" style={{ background: 'radial-gradient(80% 70%, transparent 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.9) 75%, black 100%)' }} />
+              <div className="absolute inset-0 opacity-50" style={DOT_GRID_STYLE_40} />
+              <div className="absolute inset-0 opacity-30" style={DOT_GRID_STYLE_20} />
+              <div className="absolute inset-0 opacity-40" style={DOT_GRID_STYLE_50} />
+              <div className="absolute inset-0 opacity-25" style={DOT_GRID_STYLE_30} />
+              <div className="absolute inset-0" style={VIGNETTE_STYLE} />
             </div>
           </>
         )}
@@ -537,7 +566,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     {availableTabs.map((tab) => (
                       <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
+                        onClick={() => startTabTransition(() => setActiveTab(tab.id))}
                         className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 backdrop-blur-2xl border shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${activeTab === tab.id
                           ? "bg-black/40 border-white/10 text-white/90"
                           : "bg-black/40 border-white/10 text-white/60 hover:text-white/90 hover:border-white/30"
@@ -557,7 +586,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 </div>
 
                 {/* Content */}
-                <div className="space-y-4">
+                <div className={`space-y-4 ${isTabPending ? 'opacity-70 transition-opacity duration-150' : ''}`}>
                   {activeTab === "clips" && (
                     <Suspense fallback={<ViewLoadingFallback />}>
                       <ClipsTab

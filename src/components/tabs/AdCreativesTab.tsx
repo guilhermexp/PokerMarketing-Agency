@@ -236,7 +236,7 @@ const AdCard: React.FC<{
     );
   };
 
-export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
+export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativesTab({
   adCreatives,
   brandProfile,
   referenceImage,
@@ -254,7 +254,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
   campaignId,
   onQuickPost,
   onSchedulePost,
-}) => {
+}) {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
   const [generationState, setGenerationState] = useState<{
     isGenerating: boolean[];
@@ -592,7 +592,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
     } catch (err: unknown) {
       setGenerationState((prev) => {
         const newErrors = [...prev.errors];
-        newErrors[index] = (err as Error).message || "Falha ao gerar imagem do anúncio.";
+        newErrors[index] = getErrorMessage(err);
         return { ...prev, errors: newErrors };
       });
     } finally {
@@ -750,4 +750,4 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
       )}
     </div>
   );
-};
+});

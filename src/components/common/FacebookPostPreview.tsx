@@ -93,7 +93,7 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
 
         {/* Image - fills remaining space */}
         <div
-          className={`flex-1 bg-white/5 overflow-hidden min-h-[120px] relative ${onImageClick ? "cursor-pointer" : ""}`}
+          className={`flex-1 bg-black overflow-hidden min-h-[120px] relative ${onImageClick ? "cursor-pointer" : ""}`}
           onClick={onImageClick}
         >
           {showLoader && (
@@ -133,7 +133,7 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
                     e.stopPropagation();
                     onGenerate();
                   }}
-                  className="mt-2 px-3 py-1 text-[9px] font-medium rounded-md bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors flex items-center gap-1"
+                  className="mt-2 px-3 py-1 text-[9px] font-medium rounded-md bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors flex items-center gap-1 border border-white/5"
                 >
                   <Icon name="zap" className="w-3 h-3" />
                   Gerar

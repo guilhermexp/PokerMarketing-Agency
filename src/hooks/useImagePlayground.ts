@@ -139,6 +139,7 @@ interface UseGenerationPollingOptions {
   onSuccess?: (generation: api.GenerationStatusResponse['generation']) => void;
   onError?: (error: api.GenerationStatusResponse['error']) => void;
   enabled?: boolean;
+  paused?: boolean;
 }
 
 export function useGenerationPolling(
@@ -146,7 +147,7 @@ export function useGenerationPolling(
   asyncTaskId: string | null,
   options: UseGenerationPollingOptions = {}
 ) {
-  const { onSuccess, onError, enabled = true } = options;
+  const { onSuccess, onError, enabled = true, paused = false } = options;
 
   const [status, setStatus] = useState<AsyncTaskStatus>('pending');
   const [pollInterval, setPollInterval] = useState(1000); // Start at 1s
@@ -157,7 +158,7 @@ export function useGenerationPolling(
   const MAX_INTERVAL = 30000; // 30s
 
   const { data, error } = useSWR(
-    enabled && asyncTaskId && !isCompleteRef.current
+    enabled && !paused && asyncTaskId && !isCompleteRef.current
       ? ['generation-status', generationId, asyncTaskId]
       : null,
     () => api.getGenerationStatus(generationId, asyncTaskId!),

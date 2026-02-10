@@ -248,7 +248,7 @@ const PostCard: React.FC<{
     );
   };
 
-export const PostsTab: React.FC<PostsTabProps> = ({
+export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
   posts,
   brandProfile,
   referenceImage,
@@ -266,7 +266,7 @@ export const PostsTab: React.FC<PostsTabProps> = ({
   campaignId,
   onQuickPost,
   onSchedulePost,
-}) => {
+}) {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
   const [generationState, setGenerationState] = useState<{
     isGenerating: boolean[];
@@ -296,6 +296,8 @@ export const PostsTab: React.FC<PostsTabProps> = ({
     index: number;
   } | null>(null);
   const galleryImagesRef = useRef(galleryImages);
+  // Track which indices are actively generating to prevent useEffect from overwriting them
+  const generatingIndicesRef = useRef<Set<number>>(new Set());
 
   // Keep ref updated
   useEffect(() => {
@@ -392,11 +394,25 @@ export const PostsTab: React.FC<PostsTabProps> = ({
 
       return null;
     });
-    setImages(initialImages);
-    setGenerationState({
-      isGenerating: Array(length).fill(false),
-      errors: Array(length).fill(null),
+    // Preserve images that are currently being generated
+    setImages((prevImages) => {
+      return initialImages.map((img, idx) => {
+        if (generatingIndicesRef.current.has(idx)) {
+          // Keep null for generating indices to show loader
+          return prevImages[idx] ?? null;
+        }
+        return img;
+      });
     });
+    // Only reset generation state for indices that aren't actively generating
+    setGenerationState((prev) => ({
+      isGenerating: Array(length).fill(false).map((_, idx) =>
+        generatingIndicesRef.current.has(idx) ? (prev.isGenerating[idx] ?? false) : false
+      ),
+      errors: Array(length).fill(null).map((_, idx) =>
+        generatingIndicesRef.current.has(idx) ? (prev.errors[idx] ?? null) : null
+      ),
+    }));
   }, [posts, galleryImages, campaignId, getPostSource]);
 
   // Listen for job completions
@@ -420,6 +436,8 @@ export const PostsTab: React.FC<PostsTabProps> = ({
             newImages[index] = galleryImage;
             return newImages;
           });
+          // Clear from generating indices
+          generatingIndicesRef.current.delete(index);
           setGenerationState((prev) => {
             const newGenerating = [...prev.isGenerating];
             newGenerating[index] = false;
@@ -445,6 +463,8 @@ export const PostsTab: React.FC<PostsTabProps> = ({
         const indexMatch = job.context.match(/post-(\d+)/);
         if (indexMatch) {
           const index = parseInt(indexMatch[1]);
+          // Clear from generating indices
+          generatingIndicesRef.current.delete(index);
           setGenerationState((prev) => {
             const newErrors = [...prev.errors];
             const newGenerating = [...prev.isGenerating];
@@ -484,6 +504,16 @@ export const PostsTab: React.FC<PostsTabProps> = ({
 
     const post = posts[index];
     if (!post.image_prompt) return;
+
+    // Mark this index as generating to prevent useEffect from overwriting it
+    generatingIndicesRef.current.add(index);
+
+    // Clear the current image to show loading state during regeneration
+    setImages((prev) => {
+      const newImages = [...prev];
+      newImages[index] = null;
+      return newImages;
+    });
 
     setGenerationState((prev) => {
       const newGenerating = [...prev.isGenerating];
@@ -618,10 +648,12 @@ export const PostsTab: React.FC<PostsTabProps> = ({
     } catch (err: unknown) {
       setGenerationState((prev) => {
         const newErrors = [...prev.errors];
-        newErrors[index] = (err as Error).message || "Falha ao gerar imagem.";
+        newErrors[index] = getErrorMessage(err);
         return { ...prev, errors: newErrors };
       });
     } finally {
+      // Remove from generating indices so useEffect can update this index again
+      generatingIndicesRef.current.delete(index);
       setGenerationState((prev) => {
         const newGenerating = [...prev.isGenerating];
         newGenerating[index] = false;
@@ -873,4 +905,4 @@ export const PostsTab: React.FC<PostsTabProps> = ({
       )}
     </div>
   );
-};
+});
