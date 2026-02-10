@@ -33,6 +33,10 @@ export interface GenerationAsset {
   thumbnailUrl?: string;
   width?: number;
   height?: number;
+  provider?: string;
+  model?: string;
+  inputTokens?: number;
+  outputTokens?: number;
 }
 
 export interface Generation {
@@ -57,6 +61,7 @@ export interface GenerationBatch {
   width: number | null;
   height: number | null;
   createdAt: string;
+  userEmail?: string | null;
   generations: Generation[];
 }
 

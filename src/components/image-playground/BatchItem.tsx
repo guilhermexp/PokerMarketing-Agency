@@ -107,6 +107,26 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
   const useBrandProfile = getBooleanConfig(config, 'useBrandProfile');
   const useInstagramMode = getBooleanConfig(config, 'useInstagramMode');
 
+  // Aggregate token usage across all generations in this batch
+  const totalTokens = batch.generations.reduce(
+    (acc, g) => {
+      if (g.asset?.inputTokens) acc.input += g.asset.inputTokens;
+      if (g.asset?.outputTokens) acc.output += g.asset.outputTokens;
+      return acc;
+    },
+    { input: 0, output: 0 },
+  );
+  const hasTokens = totalTokens.input > 0 || totalTokens.output > 0;
+
+  // Format date/time
+  const createdDate = batch.createdAt ? new Date(batch.createdAt) : null;
+  const formattedDate = createdDate
+    ? createdDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+    : null;
+  const formattedTime = createdDate
+    ? createdDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : null;
+
   return (
     <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl">
       {/* Header */}
@@ -124,7 +144,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
 
         <div className="flex-1 min-w-0">
           <p className="text-sm text-white/90 line-clamp-2">{displayPrompt}</p>
-          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-white/40">
+          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-white/40 flex-wrap">
             <span className="px-1.5 py-0.5 bg-white/5 rounded">
               {batch.model.split('/').pop() || batch.model}
             </span>
@@ -164,6 +184,21 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
             <span>
               {successCount}/{totalCount} imagens
             </span>
+            {hasTokens && (
+              <span className="px-1.5 py-0.5 bg-emerald-500/15 text-emerald-300 rounded" title={`Input: ${totalTokens.input.toLocaleString()} · Output: ${totalTokens.output.toLocaleString()}`}>
+                {(totalTokens.input + totalTokens.output).toLocaleString()} tokens
+              </span>
+            )}
+            {formattedDate && (
+              <span title={createdDate?.toLocaleString('pt-BR')}>
+                {formattedDate} {formattedTime}
+              </span>
+            )}
+            {batch.userEmail && (
+              <span className="truncate max-w-[140px]" title={batch.userEmail}>
+                {batch.userEmail}
+              </span>
+            )}
           </div>
         </div>
 

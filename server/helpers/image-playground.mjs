@@ -204,7 +204,7 @@ export async function getBatches(sql, topicId, userId, organizationId, limit = 1
   const safeLimit = Number.isFinite(limit)
     ? Math.max(1, Math.min(200, Number(limit)))
     : 100;
-  // Get batches with their generations
+  // Get batches with their generations (includes user email via JOIN)
   const batches = orgId
     ? await sql`
         WITH selected_batches AS (
@@ -237,6 +237,7 @@ export async function getBatches(sql, topicId, userId, organizationId, limit = 1
           sb.width,
           sb.height,
           sb.created_at,
+          u.email AS user_email,
           COALESCE(
             json_agg(
               json_build_object(
@@ -248,7 +249,8 @@ export async function getBatches(sql, topicId, userId, organizationId, limit = 1
           ) as generations
         FROM selected_batches sb
         LEFT JOIN image_generations g ON g.batch_id = sb.id
-        GROUP BY sb.id, sb.topic_id, sb.user_id, sb.organization_id, sb.provider, sb.model, sb.prompt, sb.config, sb.width, sb.height, sb.created_at
+        LEFT JOIN users u ON u.id = sb.user_id
+        GROUP BY sb.id, sb.topic_id, sb.user_id, sb.organization_id, sb.provider, sb.model, sb.prompt, sb.config, sb.width, sb.height, sb.created_at, u.email
         ORDER BY sb.created_at DESC
       `
     : await sql`
@@ -282,6 +284,7 @@ export async function getBatches(sql, topicId, userId, organizationId, limit = 1
           sb.width,
           sb.height,
           sb.created_at,
+          u.email AS user_email,
           COALESCE(
             json_agg(
               json_build_object(
@@ -293,7 +296,8 @@ export async function getBatches(sql, topicId, userId, organizationId, limit = 1
           ) as generations
         FROM selected_batches sb
         LEFT JOIN image_generations g ON g.batch_id = sb.id
-        GROUP BY sb.id, sb.topic_id, sb.user_id, sb.organization_id, sb.provider, sb.model, sb.prompt, sb.config, sb.width, sb.height, sb.created_at
+        LEFT JOIN users u ON u.id = sb.user_id
+        GROUP BY sb.id, sb.topic_id, sb.user_id, sb.organization_id, sb.provider, sb.model, sb.prompt, sb.config, sb.width, sb.height, sb.created_at, u.email
         ORDER BY sb.created_at DESC
       `;
 
@@ -309,6 +313,7 @@ export async function getBatches(sql, topicId, userId, organizationId, limit = 1
     width: b.width,
     height: b.height,
     createdAt: b.created_at,
+    userEmail: b.user_email || null,
     generations: b.generations,
   }));
 }
@@ -753,6 +758,12 @@ async function generateWithGemini(genai, parts, params) {
     throw new Error("Falha ao gerar imagem - resposta inválida do modelo");
   }
 
+  // Extract token usage from Gemini response
+  const usageMetadata = response?.usageMetadata;
+  console.log(`[ImagePlayground] Gemini usageMetadata:`, JSON.stringify(usageMetadata || null));
+  const inputTokens = usageMetadata?.promptTokenCount || 0;
+  const outputTokens = usageMetadata?.candidatesTokenCount || 0;
+
   for (const part of responseParts) {
     if (part.inlineData) {
       return {
@@ -760,6 +771,8 @@ async function generateWithGemini(genai, parts, params) {
         mimeType: part.inlineData.mimeType || "image/png",
         usedProvider: "google",
         usedModel: model,
+        inputTokens,
+        outputTokens,
       };
     }
   }
@@ -867,6 +880,8 @@ async function processImageGeneration(
     let mimeType;
     let usedProvider = "google";
     let usedModel = "gemini-3-pro-image-preview";
+    let inputTokens = 0;
+    let outputTokens = 0;
 
     try {
       const geminiResult = await generateWithGemini(genai, parts, params);
@@ -874,6 +889,8 @@ async function processImageGeneration(
       mimeType = geminiResult.mimeType;
       usedProvider = geminiResult.usedProvider;
       usedModel = geminiResult.usedModel;
+      inputTokens = geminiResult.inputTokens || 0;
+      outputTokens = geminiResult.outputTokens || 0;
     } catch (geminiError) {
       if (isQuotaOrRateLimitError(geminiError)) {
         // Fallback to Replicate
@@ -929,11 +946,15 @@ async function processImageGeneration(
       params.imageSize || "1K",
     );
 
-    // Update generation with asset
+    // Update generation with asset (include token usage and provider info)
     const asset = {
       url: blob.url,
       width: dimensions.width,
       height: dimensions.height,
+      provider: usedProvider,
+      model: usedModel,
+      inputTokens: inputTokens || undefined,
+      outputTokens: outputTokens || undefined,
     };
 
     await sql`
@@ -1017,6 +1038,8 @@ async function processImageGeneration(
         operation: "image",
         model: usedModel,
         provider: usedProvider,
+        inputTokens,
+        outputTokens,
         imageCount: 1,
         imageSize: params.imageSize || "1K",
         status: "success",

@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     server: {
-      port: 3000,
+      port: 3010,
       host: "0.0.0.0",
       headers: {
         // Use 'credentialless' instead of 'require-corp' to allow cross-origin resources

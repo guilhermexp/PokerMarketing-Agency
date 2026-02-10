@@ -91,7 +91,7 @@ process.on("unhandledRejection", (error) => {
 const CORS_ORIGINS = (
   process.env.CORS_ORIGINS ||
   process.env.APP_URL ||
-  "http://localhost:3000,http://127.0.0.1:3000"
+  "http://localhost:3010,http://127.0.0.1:3010,http://localhost:3000,http://127.0.0.1:3000"
 )
   .split(",")
   .map((origin) => origin.trim())
@@ -504,6 +504,38 @@ function getCachedUserId(clerkId) {
 
 function setCachedUserId(clerkId, userId) {
   userIdCache.set(clerkId, { userId, timestamp: Date.now() });
+}
+
+// Sanitize error messages from external APIs (Gemini, etc.) for client responses
+function sanitizeErrorForClient(error) {
+  const msg = error?.message || "Unknown error";
+
+  // Detect known API error patterns and return friendly messages
+  if (msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota") || msg.includes("429")) {
+    return "Cota da API de IA esgotada. Tente novamente em alguns minutos.";
+  }
+  if (msg.includes("PERMISSION_DENIED") || msg.includes("403")) {
+    return "Sem permissão para acessar a API de IA. Verifique as credenciais.";
+  }
+  if (msg.includes("INVALID_ARGUMENT") || msg.includes("400")) {
+    return "Requisição inválida para a API de IA. Tente com parâmetros diferentes.";
+  }
+  if (msg.includes("UNAVAILABLE") || msg.includes("503")) {
+    return "Serviço de IA temporariamente indisponível. Tente novamente em instantes.";
+  }
+  if (msg.includes("DEADLINE_EXCEEDED") || msg.includes("timeout") || msg.includes("504")) {
+    return "A requisição de IA demorou demais. Tente novamente.";
+  }
+  if (msg.includes("SAFETY") || msg.includes("safety") || msg.includes("blocked")) {
+    return "O conteúdo foi bloqueado pelo filtro de segurança. Tente um prompt diferente.";
+  }
+
+  // If the message is too long (likely raw API JSON), truncate it
+  if (msg.length > 200) {
+    return "Erro ao processar a requisição de IA. Tente novamente.";
+  }
+
+  return msg;
 }
 
 // SINGLETON: Reuse connection to avoid cold start on every request
@@ -5515,7 +5547,7 @@ REGRAS CRÍTICAS:
     }).catch(() => {});
     return res
       .status(500)
-      .json({ error: error.message || "Failed to generate campaign" });
+      .json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -5875,7 +5907,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
     }).catch(() => {});
     return res
       .status(500)
-      .json({ error: error.message || "Failed to generate flyer" });
+      .json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -6207,7 +6239,7 @@ app.post("/api/ai/convert-prompt", async (req, res) => {
     }).catch(() => {});
     return res
       .status(500)
-      .json({ error: error.message || "Failed to convert prompt" });
+      .json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -6366,7 +6398,7 @@ app.post("/api/ai/text", async (req, res) => {
     }).catch(() => {});
     return res
       .status(500)
-      .json({ error: error.message || "Failed to generate text" });
+      .json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -6514,7 +6546,7 @@ REGRAS:
     }).catch(() => {});
     return res
       .status(500)
-      .json({ error: error.message || "Failed to enhance prompt" });
+      .json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -6664,7 +6696,7 @@ app.post("/api/ai/edit-image", async (req, res) => {
     }).catch(() => {});
     return res
       .status(500)
-      .json({ error: error.message || "Failed to edit image" });
+      .json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -6759,7 +6791,7 @@ Retorne as cores em formato hexadecimal (#RRGGBB).`,
     }).catch(() => {});
     return res
       .status(500)
-      .json({ error: error.message || "Failed to extract colors" });
+      .json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -6832,7 +6864,7 @@ app.post("/api/ai/speech", async (req, res) => {
     }).catch(() => {});
     return res
       .status(500)
-      .json({ error: error.message || "Failed to generate speech" });
+      .json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -6995,7 +7027,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
     if (!res.headersSent) {
       return res
         .status(500)
-        .json({ error: error.message || "Failed to run assistant" });
+        .json({ error: sanitizeErrorForClient(error) });
     }
     res.end();
   }

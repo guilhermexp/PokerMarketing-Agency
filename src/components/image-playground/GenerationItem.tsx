@@ -324,7 +324,9 @@ function GenerationError({ error, onDelete }: GenerationErrorProps) {
   // Pick icon, title and description based on error type
   let Icon = AlertCircle;
   let title = 'Falha na geração';
-  let description = message || 'Erro desconhecido. Tente novamente.';
+  let description = (message && message.length < 200 && !message.startsWith('{'))
+    ? message
+    : 'Erro desconhecido. Tente novamente.';
   let accentColor = 'red';
 
   if (isQuota) {
