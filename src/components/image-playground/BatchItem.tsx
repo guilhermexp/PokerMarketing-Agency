@@ -108,9 +108,9 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
   const useInstagramMode = getBooleanConfig(config, 'useInstagramMode');
 
   return (
-    <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden">
+    <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl">
       {/* Header */}
-      <div className="px-4 py-3 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 flex items-start gap-3">
+      <div className="px-4 py-3 flex items-start gap-3 relative">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="mt-0.5 p-1 -ml-1 rounded-lg hover:bg-white/10 transition-colors"
@@ -168,7 +168,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
         </div>
 
         {/* Menu */}
-        <div className="relative">
+        <div className="relative z-50">
           <button
             onClick={() => setShowMenu(!showMenu)}
             className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
@@ -179,30 +179,30 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
           {showMenu && (
             <>
               <div
-                className="fixed inset-0 z-10"
+                className="fixed inset-0 z-40"
                 onClick={() => setShowMenu(false)}
               />
-              <div className="absolute right-0 top-full mt-1 w-48 bg-black/95 border border-white/10 rounded-xl shadow-2xl z-20 py-1 overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 w-48 bg-zinc-900 border border-white/20 rounded-xl shadow-2xl z-50 py-1">
                 <button
                   onClick={handleReuseSettings}
-                  className="w-full px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10 flex items-center gap-2"
+                  className="w-full px-3 py-2.5 text-left text-sm text-white hover:bg-white/10 flex items-center gap-2.5"
                 >
-                  <Settings2 className="w-4 h-4" />
+                  <Settings2 className="w-4 h-4 text-white/70" />
                   Reusar configurações
                 </button>
                 {successCount > 0 && (
                   <button
                     onClick={handleDownloadAll}
-                    className="w-full px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10 flex items-center gap-2"
+                    className="w-full px-3 py-2.5 text-left text-sm text-white hover:bg-white/10 flex items-center gap-2.5"
                   >
-                    <Download className="w-4 h-4" />
+                    <Download className="w-4 h-4 text-white/70" />
                     Baixar {successCount > 1 ? 'todas' : 'imagem'}
                   </button>
                 )}
                 <div className="border-t border-white/10 my-1" />
                 <button
                   onClick={handleDelete}
-                  className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2"
+                  className="w-full px-3 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2.5"
                 >
                   <Trash2 className="w-4 h-4" />
                   Excluir batch
@@ -215,7 +215,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
 
       {/* Generations Grid */}
       {isExpanded && (
-        <div className="p-4 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10">
+        <div className="p-4">
           <div
             className={`grid gap-4 ${
               batch.generations.length === 1

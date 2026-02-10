@@ -132,6 +132,8 @@ export const UploadForm: React.FC<UploadFormProps> = ({
   const assetsInputRef = useRef<HTMLInputElement>(null);
   const modelSelectorRef = useRef<HTMLDivElement>(null);
   const toneSelectorRef = useRef<HTMLDivElement>(null);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const toneDropdownRef = useRef<HTMLDivElement>(null);
   const favoritesPanelRef = useRef<HTMLDivElement>(null);
   const modelButtonRef = useRef<HTMLButtonElement>(null);
   const toneButtonRef = useRef<HTMLButtonElement>(null);
@@ -141,17 +143,23 @@ export const UploadForm: React.FC<UploadFormProps> = ({
   // Close selectors when clicking outside or scrolling
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        modelSelectorRef.current &&
-        !modelSelectorRef.current.contains(e.target as Node)
-      ) {
+      const target = e.target as Node;
+
+      // Check if click is outside both the button container AND the dropdown
+      const isOutsideModelSelector =
+        modelSelectorRef.current && !modelSelectorRef.current.contains(target) &&
+        (!modelDropdownRef.current || !modelDropdownRef.current.contains(target));
+
+      if (isOutsideModelSelector) {
         setIsModelSelectorOpen(false);
       }
 
-      if (
-        toneSelectorRef.current &&
-        !toneSelectorRef.current.contains(e.target as Node)
-      ) {
+      // Check if click is outside both the button container AND the dropdown
+      const isOutsideToneSelector =
+        toneSelectorRef.current && !toneSelectorRef.current.contains(target) &&
+        (!toneDropdownRef.current || !toneDropdownRef.current.contains(target));
+
+      if (isOutsideToneSelector) {
         setIsToneSelectorOpen(false);
       }
     };
@@ -802,6 +810,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       {/* Model Selector Dropdown - Fixed Position */}
       {isModelSelectorOpen && (
         <div
+          ref={modelDropdownRef}
           className="fixed w-56 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 z-[300]"
           style={{ top: `${modelDropdownPosition.top}px`, left: `${modelDropdownPosition.left}px` }}
         >
@@ -823,6 +832,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       {/* Tone Selector Dropdown - Fixed Position */}
       {isToneSelectorOpen && (
         <div
+          ref={toneDropdownRef}
           className="fixed w-48 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 z-[300]"
           style={{ top: `${toneDropdownPosition.top}px`, left: `${toneDropdownPosition.left}px` }}
         >
