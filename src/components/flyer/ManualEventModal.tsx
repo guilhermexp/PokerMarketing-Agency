@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import type { TournamentEvent } from "@/types";
 import { Button } from "../common/Button";
 import { Icon } from "../common/Icon";
-import { Card } from "../common/Card";
+import { Card } from "@/components/ui/card";
 
 export const ManualEventModal: React.FC<{
     isOpen: boolean;

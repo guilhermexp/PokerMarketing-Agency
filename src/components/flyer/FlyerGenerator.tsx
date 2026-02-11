@@ -9,7 +9,7 @@ import type {
   StyleReference,
 } from "../../types";
 import type { InstagramContext } from "../../services/rubeService";
-import { Card } from "../common/Card";
+import { Card } from "@/components/ui/card";
 import { Button } from "../common/Button";
 import { Icon } from "../common/Icon";
 import { EmptyState } from "../common/EmptyState";

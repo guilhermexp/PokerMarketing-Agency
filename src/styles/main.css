@@ -1,49 +1,227 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-@theme {
-    --font-sans: "Inter", sans-serif;
+/* ── Step 1: CSS Variables (dark-only app) ──────────────────────────── */
+:root {
+  --radius: 0.625rem;
 
-    /* Amber/Gold primary */
-    --color-primary: #f59e0b;
-    --color-primary-hover: #d97706;
+  /* Core */
+  --background: oklch(0.00 0 0);
+  --foreground: oklch(1.00 0 0);
 
-    /* Focus ring */
-    --color-ring: #f59e0b;
+  /* Card */
+  --card: oklch(0.15 0 0);
+  --card-foreground: oklch(1.00 0 0);
 
-    /* Dark theme */
-    --color-background: #000000;
-    --color-surface: #121212;
-    --color-muted: #181818;
-    --color-subtle: #303030;
-    --color-text-main: #ffffff;
-    --color-text-muted: #646464;
+  /* Popover */
+  --popover: oklch(0.15 0 0);
+  --popover-foreground: oklch(1.00 0 0);
+
+  /* Primary (amber-500) */
+  --primary: oklch(0.77 0.15 75);
+  --primary-foreground: oklch(0.15 0 0);
+
+  /* Secondary */
+  --secondary: oklch(0.20 0 0);
+  --secondary-foreground: oklch(1.00 0 0);
+
+  /* Muted */
+  --muted: oklch(0.18 0 0);
+  --muted-foreground: oklch(0.55 0 0);
+
+  /* Accent */
+  --accent: oklch(0.25 0 0);
+  --accent-foreground: oklch(1.00 0 0);
+
+  /* Destructive */
+  --destructive: oklch(0.55 0.22 27);
+  --destructive-foreground: oklch(1.00 0 0);
+
+  /* Border / Input / Ring */
+  --border: oklch(0.22 0 0);
+  --input: oklch(0.22 0 0);
+  --ring: oklch(0.77 0.15 75);
+
+  /* Sidebar */
+  --sidebar: oklch(0.10 0 0);
+  --sidebar-foreground: oklch(1.00 0 0);
+  --sidebar-primary: oklch(0.77 0.15 75);
+  --sidebar-primary-foreground: oklch(0.15 0 0);
+  --sidebar-accent: oklch(0.20 0 0);
+  --sidebar-accent-foreground: oklch(1.00 0 0);
+  --sidebar-border: oklch(0.20 0 0);
+  --sidebar-ring: oklch(0.77 0.15 75);
+
+  /* Chart palette */
+  --chart-1: oklch(0.77 0.15 75);
+  --chart-2: oklch(0.65 0.15 160);
+  --chart-3: oklch(0.55 0.15 250);
+  --chart-4: oklch(0.70 0.15 310);
+  --chart-5: oklch(0.60 0.20 30);
 }
 
-html,
-body,
-#root {
+/* ── Step 2: @theme inline → maps variables to Tailwind utilities ──── */
+@theme inline {
+  --font-sans: "Inter", sans-serif;
+  --radius: var(--radius);
+
+  /* Core */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  /* Card */
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  /* Popover */
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  /* Primary */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: oklch(0.68 0.15 75);
+
+  /* Secondary */
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  /* Muted */
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  /* Accent */
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  /* Destructive */
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  /* Border / Input / Ring */
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Chart */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Backward-compatible aliases */
+  --color-surface: var(--card);
+  --color-subtle: var(--accent);
+  --color-text-main: var(--foreground);
+  --color-text-muted: var(--muted-foreground);
+}
+
+/* ── Step 3: Base styles ───────────────────────────────────────────── */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+
+  html,
+  body,
+  #root {
     height: 100%;
+  }
+}
+
+/* ── Step 4: Component classes & utilities ─────────────────────────── */
+
+/* Aura card (migrated from index.html inline styles) */
+.aura-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 2.5rem;
+  transition:
+    border-color 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+/* Aura input (migrated from index.html inline styles) */
+.aura-input {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.aura-input:focus {
+  border-color: var(--primary);
+  background: var(--muted);
+  box-shadow: 0 0 30px oklch(0.77 0.15 75 / 0.05);
+}
+
+/* Minimal scrollbar */
+::-webkit-scrollbar {
+  width: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+/* Glow spot animation */
+@keyframes slow-glow {
+  0%,
+  100% {
+    opacity: 0.1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(1.1);
+  }
+}
+.glow-spot {
+  position: absolute;
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+  filter: blur(80px);
+  animation: slow-glow 15s infinite ease-in-out;
 }
 
 /* Standard focus ring for interactive elements */
 .focus-ring-standard {
-    outline: 2px solid transparent;
-    outline-offset: 2px;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
 }
 
 .focus-ring-standard:focus-visible {
-    outline: 2px solid var(--color-ring);
-    outline-offset: 2px;
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
 }
-
-/* Generating Loader - styles now in component via Tailwind + Framer Motion */
 
 /* Gallery image shimmer effect */
 @keyframes shimmer {
-    0% {
-        background-position: -200% 0;
-    }
-    100% {
-        background-position: 200% 0;
-    }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }

@@ -1,5 +1,5 @@
-import { Drawer } from 'antd';
-import { useResponsive } from 'antd-style';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import type { GalleryImage } from '../types';
 
 interface ChatPanelSlideInProps {
@@ -15,47 +15,20 @@ export const ChatPanelSlideIn = ({
   onClose,
   chatComponent,
 }: ChatPanelSlideInProps) => {
-  const { mobile } = useResponsive();
+  const isMobile = useIsMobile();
 
-  // Debug: Log rendering state
-  console.debug('[ChatPanel] Rendering:', {
-    open,
-    chatComponent: !!chatComponent,
-    mobile,
-    imageId: image?.id
-  });
-
-  if (mobile) {
-    // Mobile: Bottom Sheet - Renderizar chat diretamente
+  if (isMobile) {
+    // Mobile: Bottom Sheet
     return (
-      <Drawer
-        placement="bottom"
-        open={open}
-        onClose={onClose}
-        height="90%"
-        styles={{
-          header: {
-            display: 'none',
-          },
-          body: {
-            padding: 0,
-            height: '100%',
-            background: '#000000',
-          },
-          wrapper: {
-            background: '#000000',
-            borderTopLeftRadius: '16px',
-            borderTopRightRadius: '16px',
-          },
-          mask: {
-            background: 'rgba(0, 0, 0, 0.6)',
-            backdropFilter: 'blur(8px)',
-          },
-        }}
-        closeIcon={null}
-      >
-        {chatComponent}
-      </Drawer>
+      <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
+        <SheetContent
+          side="bottom"
+          showCloseButton={false}
+          className="h-[90vh] rounded-t-2xl bg-black p-0 border-0"
+        >
+          {chatComponent}
+        </SheetContent>
+      </Sheet>
     );
   }
 

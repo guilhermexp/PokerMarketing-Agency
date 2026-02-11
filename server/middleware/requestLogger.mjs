@@ -52,14 +52,10 @@ function customRequestSerializer(req) {
     id: req.id,
     method: req.method,
     url: req.url,
-    path: req.path,
     query: req.query,
-    // Include auth context if available
     userId: req.authUserId || req.internalAuth?.userId,
     organizationId: req.authOrgId || req.internalAuth?.orgId || null,
-    // Include IP for security auditing
     ip: req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress,
-    // Include user agent for debugging
     userAgent: req.headers["user-agent"],
   };
 }
@@ -71,18 +67,8 @@ function customRequestSerializer(req) {
  * @returns {Object}
  */
 function customResponseSerializer(res) {
-  // pino-http may pass a serialized object without getHeader method
-  const hasGetHeader = typeof res.getHeader === "function";
-
   return {
     statusCode: res.statusCode,
-    // Response headers can be useful for debugging (only if available)
-    headers: hasGetHeader
-      ? {
-          "content-type": res.getHeader("content-type"),
-          "content-length": res.getHeader("content-length"),
-        }
-      : undefined,
   };
 }
 
@@ -121,8 +107,8 @@ export const requestLogger = pinoHttp({
     if (res.statusCode >= 400) {
       return "warn";
     }
-    if (res.statusCode >= 300) {
-      return "info";
+    if (res.statusCode === 304) {
+      return "debug";
     }
     return "info";
   },
@@ -141,10 +127,7 @@ export const requestLogger = pinoHttp({
     responseTime: "duration",
   },
 
-  // Reduce log level for specific routes in production
-  customReceivedMessage: (req) => {
-    return `Incoming request: ${req.method} ${req.url}`;
-  },
+  // No customReceivedMessage — only log on response completion (cuts 50% of log noise)
 });
 
 /**

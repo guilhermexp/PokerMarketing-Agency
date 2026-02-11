@@ -1,4 +1,3 @@
-import { Typography } from 'antd';
 import {
   ZoomIn,
   ZoomOut,
@@ -135,15 +134,9 @@ export const ImagePreviewToolbar = ({
       {imageDimensions && (
         <>
           <div className="toolbar-separator" />
-          <Typography.Text
-            style={{
-              color: 'rgba(255,255,255,0.6)',
-              fontSize: '11px',
-              whiteSpace: 'nowrap',
-            }}
-          >
+          <span className="text-white/60 text-[11px] whitespace-nowrap">
             {imageDimensions.width} × {imageDimensions.height}
-          </Typography.Text>
+          </span>
         </>
       )}
 

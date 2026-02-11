@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card } from '@/components/common/Card';
+import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/common/Icon';
 import { Loader } from '@/components/common/Loader';
 import { FlyerThumbStrip } from './FlyerThumbStrip';

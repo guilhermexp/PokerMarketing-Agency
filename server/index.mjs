@@ -429,29 +429,10 @@ function requireAuthWithAiRateLimit(req, res, next) {
 }
 
 // ============================================================================
-// LOGGING: Clean, organized request tracking
-// ============================================================================
-let requestCounter = 0;
-const requestLog = new Map();
-
-// ANSI colors for terminal
-const colors = {
-  reset: "\x1b[0m",
-  dim: "\x1b[2m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  cyan: "\x1b[36m",
-  red: "\x1b[31m",
-  magenta: "\x1b[35m",
-};
-
-// ============================================================================
 // LOGGING HELPERS
 // ============================================================================
 
 function logExternalAPI(service, action, details = "") {
-  const timestamp = new Date().toLocaleTimeString("pt-BR");
   logger.debug(
     { service, action, details: details || undefined },
     `[${service}] ${action}${details ? ` ${details}` : ""}`,
@@ -459,9 +440,6 @@ function logExternalAPI(service, action, details = "") {
 }
 
 function logExternalAPIResult(service, action, duration, success = true) {
-  const status = success
-    ? `${colors.green}✓${colors.reset}`
-    : `${colors.red}✗${colors.reset}`;
   logger.debug(
     { service, action, durationMs: duration, success },
     `[${service}] ${success ? "✓" : "✗"} ${action}`,
@@ -479,17 +457,6 @@ function logError(context, error) {
   }
 }
 
-function logQuery(requestId, _endpoint, _queryName) {
-  if (!requestLog.has(requestId)) {
-    requestLog.set(requestId, 0);
-  }
-  requestLog.set(requestId, requestLog.get(requestId) + 1);
-}
-
-function logRequestSummary(requestId, _endpoint) {
-  requestLog.delete(requestId);
-}
-
 // Cache for resolved user IDs (5 minute TTL)
 const userIdCache = new Map();
 const USER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -504,38 +471,6 @@ function getCachedUserId(clerkId) {
 
 function setCachedUserId(clerkId, userId) {
   userIdCache.set(clerkId, { userId, timestamp: Date.now() });
-}
-
-// Sanitize error messages from external APIs (Gemini, etc.) for client responses
-function sanitizeErrorForClient(error) {
-  const msg = error?.message || "Unknown error";
-
-  // Detect known API error patterns and return friendly messages
-  if (msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota") || msg.includes("429")) {
-    return "Cota da API de IA esgotada. Tente novamente em alguns minutos.";
-  }
-  if (msg.includes("PERMISSION_DENIED") || msg.includes("403")) {
-    return "Sem permissão para acessar a API de IA. Verifique as credenciais.";
-  }
-  if (msg.includes("INVALID_ARGUMENT") || msg.includes("400")) {
-    return "Requisição inválida para a API de IA. Tente com parâmetros diferentes.";
-  }
-  if (msg.includes("UNAVAILABLE") || msg.includes("503")) {
-    return "Serviço de IA temporariamente indisponível. Tente novamente em instantes.";
-  }
-  if (msg.includes("DEADLINE_EXCEEDED") || msg.includes("timeout") || msg.includes("504")) {
-    return "A requisição de IA demorou demais. Tente novamente.";
-  }
-  if (msg.includes("SAFETY") || msg.includes("safety") || msg.includes("blocked")) {
-    return "O conteúdo foi bloqueado pelo filtro de segurança. Tente um prompt diferente.";
-  }
-
-  // If the message is too long (likely raw API JSON), truncate it
-  if (msg.length > 200) {
-    return "Erro ao processar a requisição de IA. Tente novamente.";
-  }
-
-  return msg;
 }
 
 // SINGLETON: Reuse connection to avoid cold start on every request
@@ -621,7 +556,7 @@ function isUndefinedColumnError(error, columnName) {
 // Clerk IDs look like: user_2qyqJjnqMXEGJWJNf9jx86C0oQT
 // UUIDs look like: 550e8400-e29b-41d4-a716-446655440000
 // NOW WITH CACHING to avoid repeated DB lookups!
-async function resolveUserId(sql, userId, requestId = 0) {
+async function resolveUserId(sql, userId) {
   if (!userId) return null;
   const normalizedUserId = String(userId).trim();
   if (!normalizedUserId) return null;
@@ -640,7 +575,6 @@ async function resolveUserId(sql, userId, requestId = 0) {
   }
 
   // It's a Clerk ID - look up the user by auth_provider_id
-  logQuery(requestId, "resolveUserId", "users.auth_provider_id lookup");
   let result;
   try {
     result = await sql`
@@ -764,7 +698,7 @@ app.use("/api/db", async (req, res, next) => {
     }
 
     const sql = getSql();
-    const resolvedUserId = await resolveUserId(sql, req.authUserId, req.requestId || 0);
+    const resolvedUserId = await resolveUserId(sql, req.authUserId);
     if (!resolvedUserId) {
       return res.status(401).json({ error: "Authenticated user not found in database" });
     }
@@ -808,35 +742,6 @@ async function setRLSContext(sql, userId, organizationId = null) {
     logger.warn({ errorMessage: error.message }, "[RLS] Failed to set context");
   }
 }
-
-// ============================================================================
-// Request logging middleware - clean, organized output
-// ============================================================================
-app.use("/api/db", (req, res, next) => {
-  const reqId = ++requestCounter;
-  req.requestId = reqId;
-  const start = Date.now();
-
-  // Extract clean endpoint name
-  const endpoint = req.originalUrl.split("?")[0].replace("/api/db/", "");
-  const method = req.method.padEnd(4);
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    const status = res.statusCode;
-    const statusColor = status < 400 ? colors.green : colors.red;
-    const durationColor = duration > 500 ? colors.yellow : colors.dim;
-
-    logger.info(
-      { method, endpoint, status, durationMs: duration },
-      `${method} /${endpoint} ${status}`,
-    );
-
-    logRequestSummary(reqId, req.originalUrl);
-  });
-
-  next();
-});
 
 // ============================================================================
 // SERVE STATIC FILES (PRODUCTION)
@@ -1579,22 +1484,15 @@ Formate em markdown claro com seções.`;
 // ============================================================================
 app.get("/api/db/stats", (req, res) => {
   res.json({
-    totalRequests: requestCounter,
-    totalQueries: queryCounter,
-    avgQueriesPerRequest:
-      requestCounter > 0 ? (queryCounter / requestCounter).toFixed(2) : 0,
     cachedUserIds: userIdCache.size,
     timestamp: new Date().toISOString(),
-    message: "Check server console for detailed per-request logging",
   });
 });
 
 // Reset stats (useful for testing)
 app.post("/api/db/stats/reset", (req, res) => {
-  requestCounter = 0;
-  queryCounter = 0;
   userIdCache.clear();
-  logger.info({}, "[STATS] Counters reset");
+  logger.info({}, "[STATS] Cache reset");
   res.json({ success: true, message: "Stats reset" });
 });
 
@@ -1604,7 +1502,6 @@ app.post("/api/db/stats/reset", (req, res) => {
 // This dramatically reduces network transfer and connection overhead
 // ============================================================================
 app.get("/api/db/init", async (req, res) => {
-  const reqId = req.requestId || ++requestCounter;
   const start = Date.now();
 
   try {
@@ -1627,7 +1524,7 @@ app.get("/api/db/init", async (req, res) => {
         resolvedUserId = clerk_user_id;
       } else {
         // It's a Clerk ID - look up or create the user
-        resolvedUserId = await resolveUserId(sql, clerk_user_id, reqId);
+        resolvedUserId = await resolveUserId(sql, clerk_user_id);
         if (!resolvedUserId) {
           // User doesn't exist yet - this happens during parallel loading
           // Return empty data - the frontend will retry after user sync completes
@@ -1654,7 +1551,7 @@ app.get("/api/db/init", async (req, res) => {
       }
     } else if (user_id) {
       // Original behavior: resolve user_id
-      resolvedUserId = await resolveUserId(sql, user_id, reqId);
+      resolvedUserId = await resolveUserId(sql, user_id);
       if (!resolvedUserId) {
         logger.debug({}, "[Init API] User not found, returning empty data");
         return res.json({
@@ -3990,7 +3887,7 @@ app.get("/api/generate/status", async (req, res) => {
     // List jobs for user
     if (userId) {
       let jobs;
-      const resolvedUserId = await resolveUserId(sql, userId, req.requestId || 0);
+      const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
         return res.json({ jobs: [], total: 0 });
       }
@@ -7665,7 +7562,7 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
       return res.status(400).json({ error: "user_id is required" });
     }
 
-    const resolvedUserId = await resolveUserId(sql, String(user_id), req.requestId || 0);
+    const resolvedUserId = await resolveUserId(sql, String(user_id));
     if (!resolvedUserId) {
       logger.debug({ user_id }, "[Instagram] User not found");
       return res.json([]);
@@ -7712,7 +7609,7 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
         .json({ error: "user_id and rube_token are required" });
     }
 
-    const resolvedUserId = await resolveUserId(sql, String(user_id), req.requestId || 0);
+    const resolvedUserId = await resolveUserId(sql, String(user_id));
     if (!resolvedUserId) {
       logger.debug({ user_id }, "[Instagram] User not found");
       return res.status(400).json({ error: "User not found" });

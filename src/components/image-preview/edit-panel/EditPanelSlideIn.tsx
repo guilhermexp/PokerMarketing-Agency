@@ -1,5 +1,5 @@
-import { Drawer } from 'antd';
-import { useResponsive } from 'antd-style';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { X } from 'lucide-react';
 import { AiEditSection } from './sections/AiEditSection';
 import { FilterSection } from './sections/CropAndFilterSection';
@@ -205,41 +205,25 @@ const EditPanelContent = (props: Omit<EditPanelSlideInProps, 'open' | 'onClose'>
 
 export const EditPanelSlideIn = (props: EditPanelSlideInProps) => {
   const { open, onClose } = props;
-  const { mobile } = useResponsive();
+  const isMobile = useIsMobile();
 
-  if (mobile) {
+  if (isMobile) {
     // Mobile: Bottom Sheet
     return (
-      <Drawer
-        placement="bottom"
-        open={open}
-        onClose={onClose}
-        height="60%"
-        styles={{
-          header: {
-            background: '#000000',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-            padding: '16px 20px',
-          },
-          body: {
-            padding: '16px',
-            background: '#000000',
-          },
-          wrapper: {
-            background: '#000000',
-            borderTopLeftRadius: '16px',
-            borderTopRightRadius: '16px',
-          },
-          mask: {
-            background: 'rgba(0, 0, 0, 0.6)',
-            backdropFilter: 'blur(8px)',
-          },
-        }}
-        closeIcon={<X size={20} className="text-white/40 hover:text-white transition-colors" />}
-        title={<span className="text-white font-semibold">Editar Imagem</span>}
-      >
-        <EditPanelContent {...props} />
-      </Drawer>
+      <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
+        <SheetContent
+          side="bottom"
+          showCloseButton={true}
+          className="h-[60vh] rounded-t-2xl bg-black border-white/[0.06] p-0"
+        >
+          <SheetHeader className="px-5 py-4 border-b border-white/[0.06]">
+            <SheetTitle className="text-white font-semibold">Editar Imagem</SheetTitle>
+          </SheetHeader>
+          <div className="p-4 overflow-y-auto flex-1">
+            <EditPanelContent {...props} />
+          </div>
+        </SheetContent>
+      </Sheet>
     );
   }
 

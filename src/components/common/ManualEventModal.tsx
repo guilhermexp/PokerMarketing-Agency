@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import type { TournamentEvent } from "../../types";
-import { Card } from "./Card";
+import { Card } from "@/components/ui/card";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
 
@@ -73,7 +73,7 @@ export const ManualEventModal: React.FC<ManualEventModalProps> = ({
   if (!isOpen) return null;
 
   const inputClass =
-    "w-full bg-transparent border border-white/[0.06] rounded-md px-3 py-2 text-xs text-white outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive placeholder:text-white/20";
+    "w-full bg-transparent border border-white/[0.06] rounded-md px-3 py-2 text-xs text-white outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/40 aria-invalid:border-destructive placeholder:text-white/20";
   const labelClass = "text-[9px] text-white/30";
 
   return (

@@ -1,5 +1,5 @@
-
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 interface CardProps {
   children: React.ReactNode;
@@ -8,7 +8,7 @@ interface CardProps {
 
 export const Card: React.FC<CardProps> = ({ children, className = '' }) => {
   return (
-    <div className={`aura-glass rounded-3xl ${className}`}>
+    <div className={cn('bg-card border border-border rounded-3xl', className)}>
       {children}
     </div>
   );

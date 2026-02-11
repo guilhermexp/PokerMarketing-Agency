@@ -20,70 +20,12 @@
             rel="stylesheet"
         />
         <style>
+            /* Critical: prevent FOUC before CSS loads */
             body {
-                background-color: var(--color-background);
-                color: var(--color-text-main);
+                background-color: #000000;
+                color: #ffffff;
                 -webkit-font-smoothing: antialiased;
                 overflow-x: hidden;
-            }
-
-            .aura-card {
-                background: #111111;
-                border: 1px solid #222222;
-                border-radius: 2.5rem;
-                transition:
-                    border-color 0.4s ease,
-                    box-shadow 0.4s ease;
-            }
-
-            .aura-input {
-                background: #111111;
-                border: 1px solid #222222;
-                border-radius: 1.5rem;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-
-            .aura-input:focus {
-                border-color: #f59e0b;
-                background: #161616;
-                box-shadow: 0 0 30px rgba(245, 158, 11, 0.05);
-            }
-
-            /* Scrollbar Minimalista */
-            ::-webkit-scrollbar {
-                width: 3px;
-            }
-            ::-webkit-scrollbar-track {
-                background: transparent;
-            }
-            ::-webkit-scrollbar-thumb {
-                background: #222;
-                border-radius: 10px;
-            }
-
-            @keyframes slow-glow {
-                0%,
-                100% {
-                    opacity: 0.1;
-                    transform: scale(1);
-                }
-                50% {
-                    opacity: 0.3;
-                    transform: scale(1.1);
-                }
-            }
-            .glow-spot {
-                position: absolute;
-                width: 60vw;
-                height: 60vw;
-                background: radial-gradient(
-                    circle,
-                    rgba(255, 255, 255, 0.08) 0%,
-                    transparent 70%
-                );
-                pointer-events: none;
-                filter: blur(80px);
-                animation: slow-glow 15s infinite ease-in-out;
             }
         </style>
     </head>
