@@ -8,7 +8,7 @@ import { markGalleryImagePublished } from '../../services/apiClient';
 import { Button } from './Button';
 import { Icon } from './Icon';
 import { Loader } from './Loader';
-import { Card } from './Card';
+import { Card } from '../ui/card';
 
 // Convert URL (HTTP or data URL) to data URL for Gemini API
 const urlToDataUrl = async (src: string): Promise<string | null> => {

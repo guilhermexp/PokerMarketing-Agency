@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import type {
   Post,
   BrandProfile,
@@ -10,7 +10,6 @@ import type {
 } from "../../types";
 import { Button } from "../common/Button";
 import { Icon } from "../common/Icon";
-import { Loader } from "../common/Loader";
 import { ImageGenerationLoader } from "../ui/ai-chat-image-generation-1";
 import { generateImage } from "../../services/geminiService";
 import { uploadImageToBlob } from "../../services/blobService";
@@ -25,6 +24,9 @@ import {
   useBackgroundJobs,
   type ActiveJob,
 } from "../../hooks/useBackgroundJobs";
+import { useFavoriteToggle } from "../../hooks/useFavoriteToggle";
+import { useGenerationState } from "../../hooks/useGenerationState";
+import { useImageRecoveryEffect } from "../../hooks/useImageRecovery";
 import { updatePostImage } from "../../services/apiClient";
 
 interface PostsTabProps {
@@ -101,33 +103,11 @@ const PostCard: React.FC<{
       );
     };
 
-    // Check if image is already in favorites
-    const isFavorite = (img: GalleryImage) => {
-      return styleReferences?.some((ref) => ref.src === img.src) || false;
-    };
-
-    // Get the favorite reference for an image
-    const getFavoriteRef = (img: GalleryImage) => {
-      return styleReferences?.find((ref) => ref.src === img.src);
-    };
-
-    const handleToggleFavorite = (img: GalleryImage) => {
-      if (!onAddStyleReference || !onRemoveStyleReference) return;
-
-      const existingRef = getFavoriteRef(img);
-      if (existingRef) {
-        // Remove from favorites
-        onRemoveStyleReference(existingRef.id);
-      } else {
-        // Add to favorites
-        onAddStyleReference({
-          src: img.src,
-          name:
-            img.prompt.substring(0, 50) ||
-            `Favorito ${new Date().toLocaleDateString("pt-BR")}`,
-        });
-      }
-    };
+    const { isFavorite, toggleFavorite } = useFavoriteToggle({
+      styleReferences,
+      onAddStyleReference,
+      onRemoveStyleReference,
+    });
 
 
 
@@ -157,7 +137,7 @@ const PostCard: React.FC<{
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleToggleFavorite(image);
+                        toggleFavorite(image);
                       }}
                       className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isFavorite(image) ? "bg-primary text-black" : "bg-white/10 text-white/70 hover:text-primary"}`}
                       title={
@@ -268,14 +248,18 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
   onSchedulePost,
 }) {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
-  const [generationState, setGenerationState] = useState<{
-    isGenerating: boolean[];
-    errors: (string | null)[];
-  }>({
-    isGenerating: [],
-    errors: [],
-  });
-  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const {
+    isGenerating,
+    errors,
+    isGeneratingAll,
+    setIsGeneratingAll,
+    reset: resetGenerationState,
+    startGenerating,
+    completeGenerating,
+    failGenerating,
+    isActivelyGenerating,
+    hasAnyGenerating,
+  } = useGenerationState();
   const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>(
     "gemini-3-pro-image-preview",
   );
@@ -295,15 +279,6 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
     image: GalleryImage;
     index: number;
   } | null>(null);
-  const galleryImagesRef = useRef(galleryImages);
-  // Track which indices are actively generating to prevent useEffect from overwriting them
-  const generatingIndicesRef = useRef<Set<number>>(new Set());
-
-  // Keep ref updated
-  useEffect(() => {
-    galleryImagesRef.current = galleryImages;
-  }, [galleryImages]);
-
   const { onJobComplete, onJobFailed } = useBackgroundJobs();
 
   // Helper to generate unique source for a post
@@ -312,108 +287,18 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
     return campaignId ? `Post ${index + 1} (${platform}) - ${campaignId}` : `Post ${index + 1} (${platform})`;
   }, [campaignId]);
 
-  // Legacy source format (for backward compatibility)
-  const getLegacyPostSource = (index: number, platform: string) =>
-    `Post-${platform}-${index}`;
-
-  // ============================================================================
-  // IMAGE RECOVERY LOGIC - DO NOT REMOVE THIS FALLBACK!
-  // ============================================================================
-  // Problem: When images are generated, they are saved to:
-  //   1. Gallery (galleryImages) - via onAddImageToGallery()
-  //   2. Database (post.image_url) - via updatePostImage()
-  //
-  // Sometimes the database save fails silently, leaving image_url = null.
-  // But the image still exists in the gallery with post_id or source reference.
-  //
-  // Solution: Use 3-tier priority system:
-  //   Priority 1: post.image_url from database (most reliable)
-  //   Priority 2: galleryImages filtered by post_id (safe, tied to specific post)
-  //   Priority 3: galleryImages filtered by source + campaignId (legacy fallback)
-  //
-  // WARNING: Do NOT remove the gallery fallback! Users lose their generated
-  // images when navigating away and back if this fallback is missing.
-  //
-  // IMPORTANT: Priority 3 now includes campaignId filtering to prevent
-  // images from one campaign appearing in another campaign.
-  // ============================================================================
-  useEffect(() => {
-    const length = posts.length;
-    const initialImages = posts.map((post, index) => {
-      // Priority 1: Use saved image_url from database (most reliable)
-      if (post.image_url) {
-        return {
-          id: `saved-${post.id || Date.now()}`,
-          src: post.image_url,
-          prompt: post.image_prompt || "",
-          source: getPostSource(index, post.platform) as string,
-          model: "gemini-3-pro-image-preview" as const,
-        };
-      }
-
-      // Priority 2: Recover from gallery using post_id (safe - tied to specific post)
-      if (post.id && galleryImages && galleryImages.length > 0) {
-        const galleryImage = galleryImages.find(img => img.post_id === post.id);
-        if (galleryImage) {
-          console.debug(`[PostsTab] Recovered image from gallery for post: ${post.id}`);
-          // Also sync to database so previews work in campaign list
-          updatePostImage(post.id, galleryImage.src).catch(err =>
-            console.error("[PostsTab] Failed to sync recovered image to database:", err)
-          );
-          return galleryImage;
-        }
-      }
-
-      // Priority 3: Fallback to source matching (for legacy data)
-      // IMPORTANT: Filter by campaignId to prevent cross-campaign image leakage
-      if (galleryImages && galleryImages.length > 0) {
-        // Try new source format first (includes campaignId)
-        const newSource = getPostSource(index, post.platform);
-        let galleryImage = galleryImages.find(img => img.source === newSource);
-
-        // Fallback to legacy source format, but ONLY if the image belongs to this campaign
-        if (!galleryImage) {
-          const legacySource = getLegacyPostSource(index, post.platform);
-          galleryImage = galleryImages.find(img =>
-            img.source === legacySource &&
-            // STRICT: Only accept if no campaignId context OR image explicitly matches this campaign
-            // Images without campaign_id are NOT accepted when we have a campaignId context
-            (!campaignId || img.campaign_id === campaignId)
-          );
-        }
-
-        if (galleryImage && post.id) {
-          console.debug(`[PostsTab] Recovered image from gallery by source for campaign: ${campaignId}`);
-          // Also sync to database so previews work in campaign list
-          updatePostImage(post.id, galleryImage.src).catch(err =>
-            console.error("[PostsTab] Failed to sync recovered image to database:", err)
-          );
-          return galleryImage;
-        }
-      }
-
-      return null;
-    });
-    // Preserve images that are currently being generated
-    setImages((prevImages) => {
-      return initialImages.map((img, idx) => {
-        if (generatingIndicesRef.current.has(idx)) {
-          // Keep null for generating indices to show loader
-          return prevImages[idx] ?? null;
-        }
-        return img;
-      });
-    });
-    // Only reset generation state for indices that aren't actively generating
-    setGenerationState((prev) => ({
-      isGenerating: Array(length).fill(false).map((_, idx) =>
-        generatingIndicesRef.current.has(idx) ? (prev.isGenerating[idx] ?? false) : false
-      ),
-      errors: Array(length).fill(null).map((_, idx) =>
-        generatingIndicesRef.current.has(idx) ? (prev.errors[idx] ?? null) : null
-      ),
-    }));
-  }, [posts, galleryImages, campaignId, getPostSource]);
+  useImageRecoveryEffect({
+    items: posts,
+    galleryImages,
+    campaignId,
+    getItemIdFromGallery: (img) => img.post_id,
+    getSource: (index, post) => getPostSource(index, post.platform),
+    getLegacySource: (index, post) => `Post-${post.platform}-${index}`,
+    syncToDatabase: async (postId, imageUrl) => { await updatePostImage(postId, imageUrl); },
+    isActivelyGenerating,
+    setImages,
+    resetGenerationState,
+  });
 
   // Listen for job completions
   useEffect(() => {
@@ -436,13 +321,7 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
             newImages[index] = galleryImage;
             return newImages;
           });
-          // Clear from generating indices
-          generatingIndicesRef.current.delete(index);
-          setGenerationState((prev) => {
-            const newGenerating = [...prev.isGenerating];
-            newGenerating[index] = false;
-            return { ...prev, isGenerating: newGenerating };
-          });
+          completeGenerating(index);
           // Update post image_url in database
           if (post?.id) {
             try {
@@ -463,15 +342,8 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
         const indexMatch = job.context.match(/post-(\d+)/);
         if (indexMatch) {
           const index = parseInt(indexMatch[1]);
-          // Clear from generating indices
-          generatingIndicesRef.current.delete(index);
-          setGenerationState((prev) => {
-            const newErrors = [...prev.errors];
-            const newGenerating = [...prev.isGenerating];
-            newErrors[index] = getErrorMessage(job.error_message) || "Falha ao gerar imagem.";
-            newGenerating[index] = false;
-            return { isGenerating: newGenerating, errors: newErrors };
-          });
+          const errorMsg = getErrorMessage(job.error_message) || "Falha ao gerar imagem.";
+          failGenerating(index, errorMsg);
         }
       }
     });
@@ -505,9 +377,6 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
     const post = posts[index];
     if (!post.image_prompt) return;
 
-    // Mark this index as generating to prevent useEffect from overwriting it
-    generatingIndicesRef.current.add(index);
-
     // Clear the current image to show loading state during regeneration
     setImages((prev) => {
       const newImages = [...prev];
@@ -515,13 +384,7 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
       return newImages;
     });
 
-    setGenerationState((prev) => {
-      const newGenerating = [...prev.isGenerating];
-      const newErrors = [...prev.errors];
-      newGenerating[index] = true;
-      newErrors[index] = null;
-      return { isGenerating: newGenerating, errors: newErrors };
-    });
+    startGenerating(index);
 
     // Synchronous generation (background jobs were removed)
     try {
@@ -529,29 +392,8 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
 
       // Use chatReferenceImage if available (takes priority), otherwise use referenceImage
       if (chatReferenceImage) {
-        // Convert ChatReferenceImage to ImageFile
-        const src = chatReferenceImage.src;
-        if (src.startsWith('data:')) {
-          const matches = src.match(/^data:([^;]+);base64,(.+)$/);
-          if (matches) {
-            productImages.push({ base64: matches[2], mimeType: matches[1] });
-          }
-        } else {
-          // Fetch HTTP URL and convert to base64
-          try {
-            const response = await fetch(src);
-            const blob = await response.blob();
-            const base64 = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(blob);
-            });
-            const base64Data = base64.split(',')[1];
-            productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
-          } catch (err) {
-            console.error("[PostsTab] Failed to fetch chat reference image:", err);
-          }
-        }
+        const data = await urlToBase64(chatReferenceImage.src);
+        if (data) productImages.push(data);
       } else if (referenceImage) {
         productImages.push(referenceImage);
       }
@@ -565,27 +407,8 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
 
       // Use selected style reference (favoritos) if available
       if (selectedStyleReference?.src) {
-        const src = selectedStyleReference.src;
-        if (src.startsWith('data:')) {
-          const matches = src.match(/^data:([^;]+);base64,(.+)$/);
-          if (matches) {
-            productImages.push({ base64: matches[2], mimeType: matches[1] });
-          }
-        } else {
-          try {
-            const response = await fetch(src);
-            const blob = await response.blob();
-            const base64 = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(blob);
-            });
-            const base64Data = base64.split(',')[1];
-            productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
-          } catch (err) {
-            console.error("[PostsTab] Failed to fetch style reference image:", err);
-          }
-        }
+        const data = await urlToBase64(selectedStyleReference.src);
+        if (data) productImages.push(data);
       }
 
       const generatedImageDataUrl = await generateImage(
@@ -646,19 +469,9 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
         console.warn("[PostsTab] Post has no ID, cannot save image to database. Image saved to gallery only.");
       }
     } catch (err: unknown) {
-      setGenerationState((prev) => {
-        const newErrors = [...prev.errors];
-        newErrors[index] = getErrorMessage(err);
-        return { ...prev, errors: newErrors };
-      });
+      failGenerating(index, getErrorMessage(err));
     } finally {
-      // Remove from generating indices so useEffect can update this index again
-      generatingIndicesRef.current.delete(index);
-      setGenerationState((prev) => {
-        const newGenerating = [...prev.isGenerating];
-        newGenerating[index] = false;
-        return { ...prev, isGenerating: newGenerating };
-      });
+      completeGenerating(index);
     }
   };
 
@@ -705,7 +518,7 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
         <button
           onClick={handleGenerateAll}
           disabled={
-            isGeneratingAll || generationState.isGenerating.some(Boolean)
+            isGeneratingAll || hasAnyGenerating
           }
           className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-muted-foreground hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-30 disabled:cursor-not-allowed"
         >
@@ -738,12 +551,12 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
                 caption={post.content}
                 hashtags={post.hashtags}
                 username={brandProfile.name}
-                isGenerating={generationState.isGenerating[index]}
+                isGenerating={isGenerating[index]}
                 onGenerate={() => handleGenerate(index)}
                 onRegenerate={() => handleGenerate(index)}
                 onImageClick={image ? () => setEditingInstagramImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
-                error={generationState.errors[index]}
+                error={errors[index]}
                 galleryImage={image}
               />
             );
@@ -759,12 +572,12 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
                 content={post.content}
                 hashtags={post.hashtags}
                 username={brandProfile.name}
-                isGenerating={generationState.isGenerating[index]}
+                isGenerating={isGenerating[index]}
                 onGenerate={() => handleGenerate(index)}
                 onRegenerate={() => handleGenerate(index)}
                 onImageClick={image ? () => setEditingFacebookImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
-                error={generationState.errors[index]}
+                error={errors[index]}
                 galleryImage={image}
               />
             );
@@ -780,12 +593,12 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
                 content={post.content}
                 hashtags={post.hashtags}
                 username={brandProfile.name}
-                isGenerating={generationState.isGenerating[index]}
+                isGenerating={isGenerating[index]}
                 onGenerate={() => handleGenerate(index)}
                 onRegenerate={() => handleGenerate(index)}
                 onImageClick={image ? () => setEditingTwitterImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
-                error={generationState.errors[index]}
+                error={errors[index]}
                 galleryImage={image}
               />
             );
@@ -802,12 +615,12 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
                 hashtags={post.hashtags}
                 username={brandProfile.name}
                 headline={brandProfile.industry || "Empresa"}
-                isGenerating={generationState.isGenerating[index]}
+                isGenerating={isGenerating[index]}
                 onGenerate={() => handleGenerate(index)}
                 onRegenerate={() => handleGenerate(index)}
                 onImageClick={image ? () => setEditingLinkedInImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
-                error={generationState.errors[index]}
+                error={errors[index]}
                 galleryImage={image}
               />
             );
@@ -819,8 +632,8 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
               key={index}
               post={post}
               image={images[index]}
-              isGenerating={generationState.isGenerating[index]}
-              error={generationState.errors[index]}
+              isGenerating={isGenerating[index]}
+              error={errors[index]}
               onGenerate={() => handleGenerate(index)}
               onImageUpdate={(newSrc) => handleImageUpdate(index, newSrc)}
               onSetChatReference={onSetChatReference}

@@ -184,7 +184,7 @@ const ClipsTab = lazy(() =>
   import("../tabs/ClipsTab").then((m) => ({ default: m.ClipsTab })),
 );
 const CarrosselTab = lazy(() =>
-  import("../tabs/CarrosselTab").then((m) => ({ default: m.CarrosselTab })),
+  import("../carousel/CarouselTab").then((m) => ({ default: m.CarouselTab })),
 );
 const PostsTab = lazy(() =>
   import("../tabs/PostsTab").then((m) => ({ default: m.PostsTab })),
