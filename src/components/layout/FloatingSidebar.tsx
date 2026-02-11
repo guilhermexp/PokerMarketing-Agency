@@ -62,7 +62,7 @@ export const FloatingSidebar: React.FC<FloatingSidebarProps> = ({
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1], delay: 0.1 }}
-        className="fixed left-4 top-4 z-[10000] pointer-events-auto hidden lg:flex items-center justify-center rounded-2xl bg-black/40 backdrop-blur-2xl border border-white/10 p-2.5 shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
+        className="fixed left-4 top-4 z-[10000] pointer-events-auto hidden lg:flex items-center justify-center rounded-2xl bg-black/40 backdrop-blur-2xl border border-border p-2.5 shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
       >
         <img
           src="/logo-socialab.png"
@@ -76,7 +76,7 @@ export const FloatingSidebar: React.FC<FloatingSidebarProps> = ({
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-        className="fixed left-4 top-1/2 -translate-y-1/2 z-[10000] pointer-events-auto hidden lg:flex flex-col items-center gap-1 rounded-2xl bg-black/40 backdrop-blur-2xl border border-white/10 py-2 px-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
+        className="fixed left-4 top-1/2 -translate-y-1/2 z-[10000] pointer-events-auto hidden lg:flex flex-col items-center gap-1 rounded-2xl bg-black/40 backdrop-blur-2xl border border-border py-2 px-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
       >
         {menuItems.map((item) => (
           <Tooltip key={item.key} content={item.label} side="right" sideOffset={12}>
@@ -105,7 +105,7 @@ export const FloatingSidebar: React.FC<FloatingSidebarProps> = ({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 20, opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-            className="fixed right-4 bottom-16 z-[10000] pointer-events-auto lg:hidden flex flex-col-reverse items-center gap-1 rounded-2xl bg-black/40 backdrop-blur-2xl border border-white/10 py-2 px-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
+            className="fixed right-4 bottom-16 z-[10000] pointer-events-auto lg:hidden flex flex-col-reverse items-center gap-1 rounded-2xl bg-black/40 backdrop-blur-2xl border border-border py-2 px-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
           >
             {menuItems.map((item) => (
               <button

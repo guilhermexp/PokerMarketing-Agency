@@ -90,9 +90,9 @@ export const requestLogger = pinoHttp({
   },
 
   // Customize log message format
-  customSuccessMessage: (req, res) => {
-    const responseTime = res.responseTime ? `${res.responseTime.toFixed(2)}ms` : "";
-    return `${req.method} ${req.url} ${res.statusCode} ${responseTime}`;
+  customSuccessMessage: (req, res, responseTime) => {
+    const time = responseTime != null ? ` ${Math.round(responseTime)}ms` : "";
+    return `${req.method} ${req.url} ${res.statusCode}${time}`;
   },
 
   customErrorMessage: (req, res, err) => {

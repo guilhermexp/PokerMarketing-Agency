@@ -10,7 +10,7 @@ export const PreviewReadyNote: React.FC<PreviewReadyNoteProps> = ({ visible }) =
 
   return (
     <div className="px-4 pb-4">
-      <p className="text-[9px] text-white/30">Pré-visualização pronta.</p>
+      <p className="text-[9px] text-muted-foreground">Pré-visualização pronta.</p>
     </div>
   );
 };

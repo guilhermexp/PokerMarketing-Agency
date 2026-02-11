@@ -37,8 +37,8 @@ export const MinimalImageUploader: React.FC<MinimalImageUploaderProps> = ({
     <div
       {...getRootProps()}
       className={`inline-flex items-center gap-1.5 px-2 py-1 border border-dashed rounded-md cursor-pointer transition-all ${isDragActive
-          ? 'border-white/20 bg-white/[0.02]'
-          : 'border-white/[0.08] hover:border-white/15'
+          ? 'border-border bg-white/[0.02]'
+          : 'border-border hover:border-white/15'
         }`}
     >
       <input {...getInputProps()} />

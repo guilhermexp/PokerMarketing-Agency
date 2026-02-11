@@ -136,11 +136,11 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Day Headers */}
-      <div className="grid grid-cols-7 border-b border-white/10 bg-black/20">
+      <div className="grid grid-cols-7 border-b border-border bg-black/20">
         {dayNames.map(day => (
           <div
             key={day}
-            className="py-3 text-center text-[10px] font-medium text-white/40"
+            className="py-3 text-center text-[10px] font-medium text-muted-foreground"
           >
             {day}
           </div>
@@ -163,10 +163,10 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
               key={index}
               onClick={() => onDayClick(day.date)}
               className={`
-                min-h-[120px] p-3 border-b border-r border-white/5 cursor-pointer
+                min-h-[120px] p-3 border-b border-r border-border cursor-pointer
                 transition-all hover:bg-white/[0.02]
                 ${!day.isCurrentMonth ? 'bg-black/10' : ''}
-                ${day.isToday ? 'border-2 border-white/20' : ''}
+                ${day.isToday ? 'border-2 border-border' : ''}
               `}
             >
               {/* Day Number */}
@@ -178,7 +178,7 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
                       ? 'text-white'
                       : day.isCurrentMonth
                         ? 'text-white/80'
-                        : 'text-white/20'
+                        : 'text-muted-foreground'
                     }
                   `}
                 >
@@ -209,7 +209,7 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
                   />
                 ))}
                 {posts.length > 3 && (
-                  <div className="text-[9px] font-medium text-white/30 pl-1">
+                  <div className="text-[9px] font-medium text-muted-foreground pl-1">
                     +{posts.length - 3} mais
                   </div>
                 )}

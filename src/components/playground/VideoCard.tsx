@@ -103,12 +103,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
 
             <div className="relative z-10 flex flex-col items-center gap-4">
               <div className="relative">
-                <div className="w-12 h-12 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                <div className="w-12 h-12 border-2 border-border border-t-white rounded-full animate-spin"></div>
                 <VeoLogo className="w-5 h-5 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
               </div>
               <div>
                 <p className="text-sm font-bold uppercase tracking-widest text-white mb-1 animate-pulse">Gerando Cena</p>
-                <p className="text-xs text-white/60 line-clamp-2 px-2 max-w-[200px] mx-auto">"{post.description}"</p>
+                <p className="text-xs text-muted-foreground line-clamp-2 px-2 max-w-[200px] mx-auto">"{post.description}"</p>
               </div>
             </div>
             <div className="absolute inset-0 bg-[#000000]/30 pointer-events-none" />
@@ -150,7 +150,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
 
   return (
     <motion.div
-      className={`relative w-full h-full rounded-2xl overflow-hidden bg-[#000000]/95 border border-white/10 ${aspectClass} group shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex flex-col backdrop-blur-2xl`}
+      className={`relative w-full h-full rounded-2xl overflow-hidden bg-[#000000]/95 border border-border ${aspectClass} group shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex flex-col backdrop-blur-2xl`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -173,7 +173,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
         <div className="absolute inset-0 bg-gradient-to-b from-[#000000]/20 via-transparent to-[#000000]/90 pointer-events-none transition-opacity duration-300 group-hover:opacity-90" />
       )}
 
-      <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-black/40 border border-white/10 backdrop-blur-2xl px-2.5 py-1.5 rounded-full text-xs font-medium text-white/90 pointer-events-none shadow-[0_8px_30px_rgba(0,0,0,0.5)] z-20">
+      <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-black/40 border border-border backdrop-blur-2xl px-2.5 py-1.5 rounded-full text-xs font-medium text-white/90 pointer-events-none shadow-[0_8px_30px_rgba(0,0,0,0.5)] z-20">
         {post.mediaType === MediaType.IMAGE ? (
           <ImageIcon className="w-3 h-3 opacity-80" />
         ) : (
@@ -185,7 +185,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
       <div className={`absolute bottom-0 left-0 w-full p-5 flex items-end justify-between z-20 pt-16 bg-gradient-to-t from-[#000000] via-[#000000]/60 to-transparent transition-opacity duration-300 ${status !== PostStatus.SUCCESS ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="flex-1 mr-4 pointer-events-none">
           <div className="flex items-center gap-2.5 mb-2">
-            <img src={post.avatarUrl} alt={post.username} className="w-8 h-8 rounded-full border border-white/20 shadow-md" />
+            <img src={post.avatarUrl} alt={post.username} className="w-8 h-8 rounded-full border border-border shadow-md" />
             <span className="font-semibold text-sm text-white drop-shadow-md backdrop-blur-[1px]">{post.username}</span>
           </div>
           <p className="text-sm text-white/80 line-clamp-2 drop-shadow-md font-light leading-snug opacity-90 group-hover:opacity-100 transition-opacity">{post.description}</p>
@@ -197,8 +197,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
               <button
                 onClick={handleToggleMute}
                 className={`p-3 rounded-full border backdrop-blur-2xl transition-all text-white shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:scale-105 ${isMuted
-                    ? 'bg-white/10 border-white/10 hover:bg-white/20 hover:border-white/20'
-                    : 'bg-white/30 border-white/20 hover:bg-white/40'
+                    ? 'bg-white/10 border-border hover:bg-white/20'
+                    : 'bg-white/30 border-border hover:bg-white/40'
                   }`}
                 title={isMuted ? "Ativar audio" : "Desativar audio"}
               >
@@ -217,7 +217,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
             )}
             <button
               onClick={handleDownload}
-              className="p-3 rounded-full bg-white/10 border border-white/10 backdrop-blur-2xl hover:bg-white/20 transition-all text-white shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:scale-105 hover:border-white/20"
+              className="p-3 rounded-full bg-white/10 border border-border backdrop-blur-2xl hover:bg-white/20 transition-all text-white shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:scale-105"
               title={post.mediaType === MediaType.IMAGE ? "Download Imagem" : "Download Video"}
             >
               <Download className="w-5 h-5" />

@@ -10,7 +10,7 @@ export const ImagePreviewHint: React.FC<ImagePreviewHintProps> = ({
   useProtectionMask,
   drawMode,
 }) => (
-  <div className="mt-4 flex items-center gap-2 text-white/30">
+  <div className="mt-4 flex items-center gap-2 text-muted-foreground">
     <Icon
       name={useProtectionMask ? 'shield' : 'edit'}
       className="w-3.5 h-3.5 flex-shrink-0"

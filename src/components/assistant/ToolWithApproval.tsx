@@ -83,7 +83,7 @@ export function ToolWithApproval({
 
       {/* Status indicators */}
       {state === 'executing' && (
-        <div className="flex items-center gap-2 text-[11px] text-white/50 px-3 py-2 bg-black/40 rounded-lg border border-white/10">
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground px-3 py-2 bg-black/40 rounded-lg border border-border">
           <Icon name="loader" className="w-3 h-3 animate-spin" />
           <span>Executando...</span>
         </div>

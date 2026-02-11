@@ -53,7 +53,7 @@ export const LinkedInPostPreview: React.FC<LinkedInPostPreviewProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* LinkedIn Card */}
-      <div className="w-full bg-black rounded-xl border border-white/20 overflow-hidden flex-1 flex flex-col">
+      <div className="w-full bg-black rounded-xl border border-border overflow-hidden flex-1 flex flex-col">
         {/* Header */}
         <div className="p-3 pb-2 flex items-start gap-2.5">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center flex-shrink-0">
@@ -67,10 +67,10 @@ export const LinkedInPostPreview: React.FC<LinkedInPostPreviewProps> = ({
                 <span className="text-[11px] font-semibold text-white block truncate">
                   {username}
                 </span>
-                <span className="text-[9px] text-white/50 block truncate">
+                <span className="text-[9px] text-muted-foreground block truncate">
                   {headline}
                 </span>
-                <span className="text-[9px] text-white/40">3h · 🌐</span>
+                <span className="text-[9px] text-muted-foreground">3h · 🌐</span>
               </div>
               <button className="px-2.5 py-1 text-[10px] font-semibold text-blue-400 hover:bg-blue-400/10 rounded transition-colors flex-shrink-0">
                 + Seguir
@@ -121,9 +121,9 @@ export const LinkedInPostPreview: React.FC<LinkedInPostPreviewProps> = ({
             </div>
           ) : !isGenerating ? (
             <div className="w-full h-full flex flex-col items-center justify-center p-3">
-              <Icon name="image" className="w-8 h-8 text-white/10 mb-2" />
+              <Icon name="image" className="w-8 h-8 text-muted-foreground mb-2" />
               {imagePrompt && (
-                <p className="text-[8px] text-white/20 italic text-center line-clamp-2">
+                <p className="text-[8px] text-muted-foreground italic text-center line-clamp-2">
                   "{imagePrompt}"
                 </p>
               )}
@@ -133,7 +133,7 @@ export const LinkedInPostPreview: React.FC<LinkedInPostPreviewProps> = ({
                     e.stopPropagation();
                     onGenerate();
                   }}
-                  className="mt-2 px-3 py-1 text-[9px] font-medium rounded-md bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors flex items-center gap-1 border border-white/5"
+                  className="mt-2 px-3 py-1 text-[9px] font-medium rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white/80 transition-colors flex items-center gap-1 border border-border"
                 >
                   <Icon name="zap" className="w-3 h-3" />
                   Gerar
@@ -145,14 +145,14 @@ export const LinkedInPostPreview: React.FC<LinkedInPostPreviewProps> = ({
 
         {/* Regenerate button - integrated in mockup when image exists */}
         {image && !isGenerating && onRegenerate && (
-          <div className="px-3 py-2 border-t border-white/5">
+          <div className="px-3 py-2 border-t border-border">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onRegenerate();
               }}
               disabled={isGenerating}
-              className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 border border-white/5"
+              className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 border border-border"
             >
               <Icon name="refresh" className="w-3 h-3" />
               Regenerar imagem
@@ -161,7 +161,7 @@ export const LinkedInPostPreview: React.FC<LinkedInPostPreviewProps> = ({
         )}
 
         {/* Engagement stats */}
-        <div className="px-3 py-1.5 flex items-center justify-between text-[9px] text-white/40 border-b border-white/5">
+        <div className="px-3 py-1.5 flex items-center justify-between text-[9px] text-muted-foreground border-b border-border">
           <div className="flex items-center gap-1">
             <div className="flex -space-x-1">
               <span className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-[8px]">👍</span>
@@ -174,15 +174,15 @@ export const LinkedInPostPreview: React.FC<LinkedInPostPreviewProps> = ({
 
         {/* Action Bar */}
         <div className="px-2 py-1.5 flex items-center justify-between">
-          <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded hover:bg-white/5 transition-colors text-white/50 hover:text-white/70">
+          <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded hover:bg-white/5 transition-colors text-muted-foreground hover:text-white/70">
             <Icon name="thumbs-up" className="w-4 h-4" />
             <span className="text-[10px] font-medium">Gostei</span>
           </button>
-          <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded hover:bg-white/5 transition-colors text-white/50 hover:text-white/70">
+          <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded hover:bg-white/5 transition-colors text-muted-foreground hover:text-white/70">
             <Icon name="message-circle" className="w-4 h-4" />
             <span className="text-[10px] font-medium">Comentar</span>
           </button>
-          <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded hover:bg-white/5 transition-colors text-white/50 hover:text-white/70">
+          <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded hover:bg-white/5 transition-colors text-muted-foreground hover:text-white/70">
             <Icon name="share" className="w-4 h-4" />
             <span className="text-[10px] font-medium">Enviar</span>
           </button>

@@ -111,7 +111,7 @@ const AssistantPanelNew = lazy(() =>
 
 const LazyFallback = () => (
   <div className="w-full h-full min-h-[220px] flex items-center justify-center">
-    <span className="text-xs text-white/50">Carregando...</span>
+    <span className="text-xs text-muted-foreground">Carregando...</span>
   </div>
 );
 
@@ -2275,7 +2275,7 @@ function AppContent() {
   )
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader size={64} className="text-white/60" />
+        <Loader size={64} className="text-muted-foreground" />
       </div>
     );
 

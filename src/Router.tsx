@@ -55,8 +55,8 @@ function AdminLoadingFallback() {
   return (
     <div className="min-h-screen bg-[var(--color-bg-primary)] flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
-        <Loader size={20} className="text-white/60" />
-        <span className="text-sm text-white/60">Loading admin panel...</span>
+        <Loader size={20} className="text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">Loading admin panel...</span>
       </div>
     </div>
   );

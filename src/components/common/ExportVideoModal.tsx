@@ -48,9 +48,9 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm">
-      <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 w-full max-w-md mx-4 overflow-hidden">
+      <div className="bg-background rounded-2xl border border-border w-full max-w-md mx-4 overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-[#0d0d0d]">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-card">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center ${getPhaseColor()}`}>
               <Icon name={getPhaseIcon()} className="w-5 h-5" />
@@ -59,7 +59,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
               <h3 className="text-sm font-black text-white uppercase tracking-wide">
                 Exportar Video
               </h3>
-              <p className="text-[10px] text-white/40">
+              <p className="text-[10px] text-muted-foreground">
                 {progress?.phase === 'loading' ? 'Carregando FFmpeg' :
                  progress?.phase === 'complete' ? 'Concluido' :
                  progress?.phase === 'error' ? 'Erro' : 'Processando'}
@@ -67,7 +67,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
             </div>
           </div>
           {canClose && (
-            <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
+            <button onClick={onClose} className="text-muted-foreground hover:text-white transition-colors">
               <Icon name="x" className="w-5 h-5" />
             </button>
           )}
@@ -82,7 +82,7 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
 
           {/* File counter */}
           {progress?.currentFile && progress?.totalFiles && !isComplete && !isError && (
-            <p className="text-center text-xs text-white/40 mb-4">
+            <p className="text-center text-xs text-muted-foreground mb-4">
               Cena {progress.currentFile} de {progress.totalFiles}
             </p>
           )}
@@ -96,20 +96,20 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
           </div>
 
           {/* Percentage */}
-          <p className="text-center text-xs text-white/40 mt-2">
+          <p className="text-center text-xs text-muted-foreground mt-2">
             {progress?.progress || 0}%
           </p>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-white/5 bg-[#0d0d0d] flex justify-end">
+        <div className="px-6 py-4 border-t border-border bg-card flex justify-end">
           {canClose && (
             <Button variant={isComplete ? 'primary' : 'secondary'} size="small" onClick={onClose}>
               {isComplete ? 'Fechar' : 'OK'}
             </Button>
           )}
           {!canClose && (
-            <p className="text-[9px] text-white/20 uppercase tracking-wider">Aguarde...</p>
+            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Aguarde...</p>
           )}
         </div>
       </div>

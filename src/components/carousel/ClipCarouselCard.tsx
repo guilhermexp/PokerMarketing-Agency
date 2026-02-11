@@ -61,13 +61,13 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
   isGeneratingCaption,
   onDownloadAll,
 }) => (
-  <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
+  <div className="bg-white/[0.02] border border-border rounded-xl overflow-hidden">
     <div
-      className="px-3 sm:px-4 py-3 border-b border-white/[0.06] flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+      className="px-3 sm:px-4 py-3 border-b border-border flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
       onClick={onToggle}
     >
       <div className="flex items-center gap-3 min-w-0 flex-1">
-        <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white/60 flex-shrink-0">
+        <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-muted-foreground flex-shrink-0">
           {index + 1}
         </div>
         <h3 className="text-sm font-medium text-white/90 truncate flex-1">
@@ -75,7 +75,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
         </h3>
         <Icon
           name={isExpanded ? 'chevron-up' : 'chevron-down'}
-          className="w-4 h-4 text-white/40 sm:hidden flex-shrink-0"
+          className="w-4 h-4 text-muted-foreground sm:hidden flex-shrink-0"
         />
       </div>
 
@@ -86,7 +86,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               {carrosselCount} slides
             </span>
           )}
-          <span className="text-[10px] sm:text-xs text-white/40 whitespace-nowrap">
+          <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
             {carrosselCount}/{totalScenes} em 4:5
           </span>
         </div>
@@ -98,7 +98,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               onGenerateAll();
             }}
             disabled={isGeneratingAny}
-            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-border text-muted-foreground hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {isGeneratingAny
               ? 'Gerando...'
@@ -114,7 +114,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               e.stopPropagation();
               onTogglePause();
             }}
-            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] whitespace-nowrap"
+            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-border text-muted-foreground hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] whitespace-nowrap"
           >
             {isPaused ? 'Retomar' : 'Pausar'}
           </button>
@@ -126,7 +126,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               e.stopPropagation();
               onSchedule();
             }}
-            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex items-center gap-1.5 whitespace-nowrap"
+            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-border text-muted-foreground hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex items-center gap-1.5 whitespace-nowrap"
           >
             <Icon name="calendar" className="w-3.5 h-3.5" />
             Agendar
@@ -140,11 +140,11 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               onPublish();
             }}
             disabled={publishing}
-            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
+            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-border text-muted-foreground hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
           >
             {publishing ? (
               <>
-                <Loader size={12} className="text-white/60" />
+                <Loader size={12} className="text-muted-foreground" />
                 Publicando...
               </>
             ) : (
@@ -162,7 +162,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
               e.stopPropagation();
               onDownloadAll();
             }}
-            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-white/10 text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex items-center gap-1.5 whitespace-nowrap"
+            className="px-3 py-1.5 text-xs font-medium rounded-full bg-black/40 backdrop-blur-2xl border border-border text-muted-foreground hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex items-center gap-1.5 whitespace-nowrap"
           >
             <Icon name="download" className="w-3.5 h-3.5" />
             Baixar Todas
@@ -171,7 +171,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
 
         <Icon
           name={isExpanded ? 'chevron-up' : 'chevron-down'}
-          className="w-4 h-4 text-white/40 hidden sm:block"
+          className="w-4 h-4 text-muted-foreground hidden sm:block"
         />
       </div>
     </div>
@@ -191,8 +191,8 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
           />
         ) : hasAnyOriginal ? (
           <div className="text-center py-8">
-            <Icon name="image" className="w-10 h-10 text-white/20 mx-auto mb-3" />
-            <p className="text-sm text-white/50 mb-4">
+            <Icon name="image" className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground mb-4">
               Gere as imagens 4:5 para visualizar o carrossel
             </p>
             <button
@@ -205,8 +205,8 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
           </div>
         ) : (
           <div className="text-center py-8">
-            <Icon name="image" className="w-10 h-10 text-white/20 mx-auto mb-3" />
-            <p className="text-sm text-white/50">
+            <Icon name="image" className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">
               Gere as capas na aba Clips primeiro
             </p>
           </div>
@@ -219,7 +219,7 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
         {orderedImages.slice(0, 8).map((img, idx) => (
           <div
             key={img.id || idx}
-            className="relative w-20 h-25 flex-shrink-0 rounded-lg overflow-hidden border-2 border-white/10 hover:border-white/30 hover:scale-105 transition-all shadow-lg group"
+            className="relative w-20 h-25 flex-shrink-0 rounded-lg overflow-hidden border-2 border-border hover:border-white/20 hover:scale-105 transition-all shadow-lg group"
           >
             <img
               src={img.src}
@@ -238,8 +238,8 @@ export const ClipCarouselCard: React.FC<ClipCarouselCardProps> = ({
           </div>
         ))}
         {orderedImages.length > 8 && (
-          <div className="w-20 h-25 flex-shrink-0 rounded-lg bg-white/5 border-2 border-white/10 flex items-center justify-center">
-            <span className="text-sm font-medium text-white/50">
+          <div className="w-20 h-25 flex-shrink-0 rounded-lg bg-white/5 border-2 border-border flex items-center justify-center">
+            <span className="text-sm font-medium text-muted-foreground">
               +{orderedImages.length - 8}
             </span>
           </div>

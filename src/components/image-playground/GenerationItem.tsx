@@ -162,7 +162,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
   // Loading State
   if (!generation.asset) {
     return (
-      <div className="aspect-square rounded-xl border border-white/10 overflow-hidden relative">
+      <div className="aspect-square rounded-xl border border-border overflow-hidden relative">
         {status === 'error' ? (
           <div className="w-full h-full bg-white/5 flex flex-col items-center justify-center gap-3">
             <GenerationError error={pollingError} onDelete={handleDelete} />
@@ -175,7 +175,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
             />
             {/* Time elapsed overlay */}
             <div className="absolute bottom-3 left-0 right-0 flex flex-col items-center gap-2 z-30">
-              <span className="text-[10px] text-white/50 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full">
+              <span className="text-[10px] text-muted-foreground bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full">
                 {formatTime(elapsedTime)}
               </span>
               {needsPolling && (
@@ -204,9 +204,9 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
     >
       {/* Image */}
       {imageError ? (
-        <div className="w-full h-full bg-white/5 border border-white/10 flex flex-col items-center justify-center gap-3">
-          <AlertCircle className="w-8 h-8 text-white/40" />
-          <p className="text-xs text-white/40 font-medium">Imagem indisponível</p>
+        <div className="w-full h-full bg-white/5 border border-border flex flex-col items-center justify-center gap-3">
+          <AlertCircle className="w-8 h-8 text-muted-foreground" />
+          <p className="text-xs text-muted-foreground font-medium">Imagem indisponível</p>
           <button
             onClick={handleDelete}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-xs hover:bg-red-500/20 transition-colors"
@@ -364,12 +364,12 @@ function GenerationError({ error, onDelete }: GenerationErrorProps) {
       <p className={`text-xs ${colors.text} text-center font-medium`}>
         {title}
       </p>
-      <p className="text-[11px] text-white/50 text-center leading-snug max-w-[200px]">
+      <p className="text-[11px] text-muted-foreground text-center leading-snug max-w-[200px]">
         {description}
       </p>
       <button
         onClick={onDelete}
-        className="flex items-center gap-1.5 px-3 py-1.5 mt-1 rounded-lg bg-white/5 text-white/50 text-xs hover:bg-white/10 transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 mt-1 rounded-lg bg-white/5 text-muted-foreground text-xs hover:bg-white/10 transition-colors"
       >
         <Trash2 className="w-3 h-3" />
         Remover

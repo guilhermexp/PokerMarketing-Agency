@@ -61,7 +61,7 @@ export function ToolDisplay({
     state === 'approval-requested' ? 'input-available' : 'output-available';
 
   return (
-    <Tool className="bg-black/70 border-white/10">
+    <Tool className="bg-black/70 border-border">
       <ToolHeader
         title={title}
         type={`tool-${toolName}`}
@@ -73,7 +73,7 @@ export function ToolDisplay({
         {/* Descrição */}
         {description && (
           <div className="px-4 pt-2">
-            <p className="text-[11px] text-white/50">{description}</p>
+            <p className="text-[11px] text-muted-foreground">{description}</p>
           </div>
         )}
 
@@ -83,16 +83,16 @@ export function ToolDisplay({
         {/* O que a tool vai fazer */}
         {metadata?.willDo && metadata.willDo.length > 0 && (
           <div className="px-4 pb-2">
-            <h4 className="text-[10px] text-white/40 mb-1 uppercase tracking-wide font-medium">
+            <h4 className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide font-medium">
               Ações
             </h4>
             <ul className="space-y-0.5">
               {metadata.willDo.map((item, index) => (
                 <li
                   key={index}
-                  className="text-[10px] text-white/60 flex items-start gap-1.5"
+                  className="text-[10px] text-muted-foreground flex items-start gap-1.5"
                 >
-                  <Icon name="check" className="w-3 h-3 text-white/40 mt-0.5 flex-shrink-0" />
+                  <Icon name="check" className="w-3 h-3 text-muted-foreground mt-0.5 flex-shrink-0" />
                   <span>{item}</span>
                 </li>
               ))}
@@ -102,16 +102,16 @@ export function ToolDisplay({
 
         {/* Estimativas (tempo e custo) */}
         {(metadata?.estimatedTime || metadata?.cost) && (
-          <div className="px-4 pb-3 flex gap-2 text-[10px] text-white/40">
+          <div className="px-4 pb-3 flex gap-2 text-[10px] text-muted-foreground">
             {metadata.estimatedTime && (
               <div className="flex items-center gap-1">
-                <Icon name="clock" className="w-3 h-3 text-white/30" />
+                <Icon name="clock" className="w-3 h-3 text-muted-foreground" />
                 <span>{metadata.estimatedTime}</span>
               </div>
             )}
             {metadata.cost && (
               <div className="flex items-center gap-1">
-                <Icon name="dollar-sign" className="w-3 h-3 text-white/30" />
+                <Icon name="dollar-sign" className="w-3 h-3 text-muted-foreground" />
                 <span>{metadata.cost}</span>
               </div>
             )}

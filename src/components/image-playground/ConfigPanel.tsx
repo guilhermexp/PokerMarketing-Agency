@@ -256,9 +256,9 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
   return (
     <div className="h-full flex flex-col bg-black/40 backdrop-blur-xl">
       {/* Header */}
-      <div className="px-4 py-5 border-b border-white/10">
+      <div className="px-4 py-5 border-b border-border">
         <h1 className="text-2xl font-bold text-white">Image Studio</h1>
-        <p className="text-xs text-white/50 mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           Descrição simples, crie imediatamente
         </p>
       </div>
@@ -270,7 +270,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
           <select
             value={model}
             onChange={handleModelChange}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white focus:outline-none focus:border-white/20 transition-colors appearance-none cursor-pointer"
+            className="w-full bg-white/5 border border-border rounded-xl px-4 py-3 pl-10 text-sm text-white focus:outline-none focus:border-white/20 transition-colors appearance-none cursor-pointer"
           >
             {MODEL_OPTIONS.map((option) => (
               <option key={option.model} value={option.model} className="bg-black">
@@ -284,7 +284,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
             style={{ backgroundColor: selectedModel?.color || '#4285F4' }}
           />
           <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-            <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </div>
@@ -301,7 +301,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all duration-200 ${
                 useBrandProfile
                   ? 'bg-white text-black shadow-md'
-                  : 'bg-white/5 text-white/60 border border-white/10 hover:text-white hover:border-white/20'
+                  : 'bg-white/5 text-muted-foreground border border-border hover:text-white'
               }`}
               title={useBrandProfile ? "Usando cores e tom da marca" : "Sem personalização de marca"}
             >
@@ -313,7 +313,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all duration-200 ${
                 useInstagramMode
                   ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-md'
-                  : 'bg-white/5 text-white/60 border border-white/10 hover:text-white hover:border-white/20'
+                  : 'bg-white/5 text-muted-foreground border border-border hover:text-white'
               }`}
               title={useInstagramMode ? "Modo Instagram ativo (1:1 + marca)" : "Ativar modo Instagram Post"}
             >
@@ -330,17 +330,17 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
               Tom da geração
             </label>
             {!useBrandProfile && (
-              <span className="text-[10px] text-white/40">Ative perfil da marca</span>
+              <span className="text-[10px] text-muted-foreground">Ative perfil da marca</span>
             )}
           </div>
           <select
             value={typeof parameters.toneOfVoiceOverride === 'string' ? parameters.toneOfVoiceOverride : ''}
             onChange={handleToneChange}
             disabled={!useBrandProfile}
-            className={`w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm transition-colors appearance-none ${
+            className={`w-full bg-white/5 border border-border rounded-xl px-4 py-2.5 text-sm transition-colors appearance-none ${
               useBrandProfile
                 ? 'text-white focus:outline-none focus:border-white/20 cursor-pointer'
-                : 'text-white/40 cursor-not-allowed opacity-60'
+                : 'text-muted-foreground cursor-not-allowed opacity-60'
             }`}
           >
             <option value="" className="bg-black">
@@ -361,7 +361,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
               Fonte da geração
             </label>
             {!useBrandProfile && (
-              <span className="text-[10px] text-white/40">Ative perfil da marca</span>
+              <span className="text-[10px] text-muted-foreground">Ative perfil da marca</span>
             )}
           </div>
           <div ref={fontDropdownRef} className="relative">
@@ -369,10 +369,10 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
               type="button"
               disabled={!useBrandProfile}
               onClick={() => useBrandProfile && setIsFontDropdownOpen((prev) => !prev)}
-              className={`w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
+              className={`w-full bg-white/5 border border-border rounded-xl px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
                 useBrandProfile
                   ? 'text-white hover:border-white/20'
-                  : 'text-white/40 cursor-not-allowed opacity-60'
+                  : 'text-muted-foreground cursor-not-allowed opacity-60'
               }`}
             >
               <span className="truncate">
@@ -380,11 +380,11 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
                   ? parameters.fontStyleOverride
                   : 'Padrão (bold condensed sans-serif)'}
               </span>
-              <ChevronDown className={`w-4 h-4 text-white/50 transition-transform ${isFontDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isFontDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {useBrandProfile && isFontDropdownOpen && (
-              <div className="absolute z-30 mt-2 w-full bg-[#0a0a0a]/95 border border-white/10 rounded-xl shadow-2xl backdrop-blur-xl overflow-hidden">
+              <div className="absolute z-30 mt-2 w-full bg-background/95 border border-border rounded-xl shadow-2xl backdrop-blur-xl overflow-hidden">
                 <button
                   type="button"
                   onClick={() => handleFontChange('')}
@@ -392,7 +392,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
                 >
                   <div className="min-w-0">
                     <p className="text-sm text-white/90 truncate">Padrão</p>
-                    <p className="text-[11px] text-white/50 truncate" style={{ fontFamily: '"Oswald", "Arial Narrow", sans-serif' }}>
+                    <p className="text-[11px] text-muted-foreground truncate" style={{ fontFamily: '"Oswald", "Arial Narrow", sans-serif' }}>
                       ABC 123 Exemplo
                     </p>
                   </div>
@@ -400,7 +400,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
                     <Check className="w-4 h-4 text-white/70 shrink-0" />
                   )}
                 </button>
-                <div className="h-px bg-white/10" />
+                <div className="h-px bg-border" />
                 {FONT_OPTIONS.map((font) => (
                   <button
                     key={font}
@@ -436,7 +436,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
             <label className="text-sm font-medium text-white/80">
               Imagens de Referência
             </label>
-            <span className="text-xs text-white/50">
+            <span className="text-xs text-muted-foreground">
               {referenceImages.length}/{MAX_REFERENCE_IMAGES}
             </span>
           </div>
@@ -458,7 +458,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
                   return (
                     <div
                       key={img.id}
-                      className="relative aspect-square rounded-lg overflow-hidden border border-white/10 group"
+                      className="relative aspect-square rounded-lg overflow-hidden border border-border group"
                     >
                       <img
                         src={img.dataUrl}
@@ -484,9 +484,9 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
                 {referenceImages.length < MAX_REFERENCE_IMAGES && (
                   <div
                     onClick={handleReferenceImageClick}
-                    className="aspect-square rounded-lg border-2 border-dashed border-white/10 flex items-center justify-center cursor-pointer hover:border-white/20 hover:bg-white/5 transition-colors"
+                    className="aspect-square rounded-lg border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-white/5 transition-colors"
                   >
-                    <Plus className="w-5 h-5 text-white/40" />
+                    <Plus className="w-5 h-5 text-muted-foreground" />
                   </div>
                 )}
               </div>
@@ -495,9 +495,9 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
               <div
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
-                className="border border-dashed border-white/10 rounded-lg p-2 text-center"
+                className="border border-dashed border-border rounded-lg p-2 text-center"
               >
-                <p className="text-[10px] text-white/30">
+                <p className="text-[10px] text-muted-foreground">
                   Arraste mais imagens aqui
                 </p>
               </div>
@@ -507,13 +507,13 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
               onClick={handleReferenceImageClick}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
-              className="border-2 border-dashed border-white/10 rounded-xl p-4 min-h-[140px] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-white/20 hover:bg-white/5 transition-colors"
+              className="border-2 border-dashed border-border rounded-xl p-4 min-h-[140px] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:bg-white/5 transition-colors"
             >
-              <ImagePlus className="w-8 h-8 text-white/30" />
-              <p className="text-[11px] text-white/40 text-center">
+              <ImagePlus className="w-8 h-8 text-muted-foreground" />
+              <p className="text-[11px] text-muted-foreground text-center">
                 Clique ou arraste para enviar imagens
               </p>
-              <p className="text-[9px] text-white/30">
+              <p className="text-[9px] text-muted-foreground">
                 Suporta até {MAX_REFERENCE_IMAGES} imagens
               </p>
             </div>
@@ -532,8 +532,8 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
                 onClick={() => handleResolutionChange(res.value)}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   activeImageSize === res.value
-                    ? 'bg-white/15 border border-white/20 text-white'
-                    : 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white/15 border border-border text-white'
+                    : 'bg-white/5 border border-border text-muted-foreground hover:bg-white/10 hover:text-white'
                 }`}
               >
                 {res.label}
@@ -560,7 +560,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
                   onClick={() => handleAspectRatioChange(ratio.value)}
                   className={`flex flex-col items-center gap-1 py-2 rounded-xl transition-all ${
                     activeAspectRatio === ratio.value
-                      ? 'bg-white/15 border border-white/20'
+                      ? 'bg-white/15 border border-border'
                       : 'bg-white/5 border border-transparent hover:bg-white/10'
                   }`}
                   title={ratio.label}
@@ -576,7 +576,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
                     }}
                   />
                   <span className={`text-[10px] ${
-                    activeAspectRatio === ratio.value ? 'text-white' : 'text-white/50'
+                    activeAspectRatio === ratio.value ? 'text-white' : 'text-muted-foreground'
                   }`}>
                     {ratio.label}
                   </span>
@@ -598,8 +598,8 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
                 onClick={() => handleImageNumChange(num)}
                 className={`w-10 h-10 rounded-xl text-sm font-medium transition-all ${
                   imageNum === num
-                    ? 'bg-white/15 border border-white/20 text-white'
-                    : 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white/15 border border-border text-white'
+                    : 'bg-white/5 border border-border text-muted-foreground hover:bg-white/10 hover:text-white'
                 }`}
               >
                 {num}
@@ -615,7 +615,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
                   }
                 }
               }}
-              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white transition-all flex items-center justify-center"
+              className="w-10 h-10 rounded-xl bg-white/5 border border-border text-muted-foreground hover:bg-white/10 hover:text-white transition-all flex items-center justify-center"
               title="Quantidade personalizada"
             >
               <Plus className="w-4 h-4" />

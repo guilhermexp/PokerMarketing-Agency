@@ -233,7 +233,7 @@ const AssistantPanelNew = lazy(() =>
 
 const ViewLoadingFallback = () => (
   <div className="w-full h-full min-h-[220px] flex items-center justify-center">
-    <span className="text-xs text-white/50">Carregando...</span>
+    <span className="text-xs text-muted-foreground">Carregando...</span>
   </div>
 );
 
@@ -545,7 +545,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     <h2 className="text-3xl font-semibold text-white tracking-tight">
                       Campanha Gerada
                     </h2>
-                    <p className="text-sm text-white/50 mt-2">
+                    <p className="text-sm text-muted-foreground mt-2">
                       {campaign.videoClipScripts?.length || 0} clips •{" "}
                       {campaign.posts?.length || 0} posts •{" "}
                       {campaign.adCreatives?.length || 0} anúncios
@@ -568,8 +568,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                         key={tab.id}
                         onClick={() => startTabTransition(() => setActiveTab(tab.id))}
                         className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 backdrop-blur-2xl border shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${activeTab === tab.id
-                          ? "bg-black/40 border-white/10 text-white/90"
-                          : "bg-black/40 border-white/10 text-white/60 hover:text-white/90 hover:border-white/30"
+                          ? "bg-black/40 border-border text-white/90"
+                          : "bg-black/40 border-border text-muted-foreground hover:text-white/90"
                           }`}
                       >
                         {tab.label}
@@ -577,7 +577,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     ))}
                     <button
                       onClick={onResetCampaign}
-                      className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                      className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-muted-foreground hover:text-white/90 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
                     >
                       <Icon name="zap" className="w-4 h-4" />
                       Nova Campanha
@@ -735,10 +735,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         {activeView === "flyer" && isInsideSchedule && (
           <div className="flex flex-col h-full">
             {/* Back button header */}
-            <div className="flex items-center gap-3 px-4 py-3 sm:px-6 border-b border-white/5 flex-shrink-0 bg-[#070707]">
+            <div className="flex items-center gap-3 px-4 py-3 sm:px-6 border-b border-border flex-shrink-0 bg-[#070707]">
               <button
                 onClick={handleBackToSchedulesList}
-                className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors"
+                className="flex items-center gap-2 text-muted-foreground hover:text-white/70 transition-colors"
               >
                 <Icon name="arrow-left" className="w-4 h-4" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">
@@ -958,7 +958,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
       )}
 
       {/* Footer - Desktop only */}
-      <footer className="fixed bottom-4 left-4 z-[10000] pointer-events-auto hidden lg:flex flex-col items-center gap-2 rounded-2xl bg-black/40 backdrop-blur-2xl border border-white/10 p-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
+      <footer className="fixed bottom-4 left-4 z-[10000] pointer-events-auto hidden lg:flex flex-col items-center gap-2 rounded-2xl bg-black/40 backdrop-blur-2xl border border-border p-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
         <button
           onClick={onEditProfile}
           className="flex items-center justify-center cursor-pointer active:scale-95 transition-transform"

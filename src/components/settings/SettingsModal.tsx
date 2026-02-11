@@ -61,8 +61,8 @@ const ColorWidget: React.FC<{
   isAnalyzing: boolean;
 }> = ({ label, color, onChange, name, isAnalyzing }) => (
   <div className="relative w-full">
-    <label className="text-xs font-medium text-white/60 mb-2 block">{label}</label>
-    <div className="bg-[#0a0a0a]/60 border border-white/[0.08] rounded-xl h-[52px] px-3 flex items-center gap-3 group transition-all hover:border-white/20 backdrop-blur-xl">
+    <label className="text-xs font-medium text-muted-foreground mb-2 block">{label}</label>
+    <div className="bg-[#0a0a0a]/60 border border-border rounded-xl h-[52px] px-3 flex items-center gap-3 group transition-all hover:border-white/20 backdrop-blur-xl">
       <div className="relative w-7 h-7 flex items-center justify-center flex-shrink-0">
         <input
           type="color"
@@ -72,11 +72,11 @@ const ColorWidget: React.FC<{
           className="w-full h-full rounded-lg cursor-pointer bg-transparent border-none p-0 overflow-hidden relative z-10 opacity-0"
         />
         <div
-          className="absolute w-7 h-7 rounded-lg pointer-events-none z-0 ring-1 ring-white/20 transition-all"
+          className="absolute w-7 h-7 rounded-lg pointer-events-none z-0 ring-1 ring-ring transition-all"
           style={{ backgroundColor: color }}
         />
       </div>
-      <span className={`text-xs font-mono text-white/40 group-hover:text-white transition-colors ${isAnalyzing ? 'animate-pulse' : ''}`}>
+      <span className={`text-xs font-mono text-muted-foreground group-hover:text-white transition-colors ${isAnalyzing ? 'animate-pulse' : ''}`}>
         {isAnalyzing ? '...' : color.toUpperCase()}
       </span>
     </div>
@@ -265,13 +265,13 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
 
       {/* Modal */}
       <div className="relative w-full max-w-5xl max-h-[90vh] overflow-hidden">
-        <div className="rounded-2xl p-6 sm:p-8 shadow-2xl border border-white/[0.08] bg-[#0a0a0a]/95 backdrop-blur-xl relative overflow-hidden">
+        <div className="rounded-2xl p-6 sm:p-8 shadow-2xl border border-border bg-[#0a0a0a]/95 backdrop-blur-xl relative overflow-hidden">
           {/* Close Button */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/10 transition-colors z-10"
           >
-            <Icon name="x" className="w-5 h-5 text-white/60 hover:text-white" />
+            <Icon name="x" className="w-5 h-5 text-muted-foreground hover:text-white" />
           </button>
 
           {/* Header */}
@@ -282,14 +282,14 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-white/[0.08] mb-8">
+          <div className="flex border-b border-border mb-8">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-6 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${activeTab === tab.id
                   ? 'text-white border-white'
-                  : 'text-white/40 border-transparent hover:text-white/60'
+                  : 'text-muted-foreground border-transparent hover:text-foreground'
                   }`}
               >
                 <Icon name={tab.icon as Parameters<typeof Icon>[0]['name']} className="w-4 h-4" />
@@ -306,7 +306,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                   {/* Left Column - Inputs */}
                   <div className="space-y-6">
                     <div className="group">
-                      <label className="block text-xs font-medium text-white/60 mb-2 group-focus-within:text-white transition-colors">
+                      <label className="block text-xs font-medium text-muted-foreground mb-2 group-focus-within:text-white transition-colors">
                         Nome da Marca
                       </label>
                       <input
@@ -316,11 +316,11 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                         onChange={handleChange}
                         required
                         placeholder="Ex: Nome da Sua Marca"
-                        className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-xl p-3 text-white text-sm font-medium focus:outline-none focus:border-white/30 transition-all placeholder:text-white/20 backdrop-blur-xl"
+                        className="w-full bg-[#0a0a0a]/60 border border-border rounded-xl p-3 text-white text-sm font-medium focus:outline-none focus:border-white/30 transition-all placeholder:text-muted-foreground backdrop-blur-xl"
                       />
                     </div>
                     <div className="group">
-                      <label className="block text-xs font-medium text-white/60 mb-2 group-focus-within:text-white transition-colors">
+                      <label className="block text-xs font-medium text-muted-foreground mb-2 group-focus-within:text-white transition-colors">
                         Descrição
                       </label>
                       <textarea
@@ -330,7 +330,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                         required
                         rows={4}
                         placeholder="Descreva sua marca..."
-                        className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-xl p-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all resize-none placeholder:text-white/20 backdrop-blur-xl"
+                        className="w-full bg-[#0a0a0a]/60 border border-border rounded-xl p-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all resize-none placeholder:text-muted-foreground backdrop-blur-xl"
                       />
                     </div>
                   </div>
@@ -338,12 +338,12 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                   {/* Right Column - Assets */}
                   <div className="space-y-6">
                     <div>
-                      <label className="block text-xs font-medium text-white/60 mb-2">
+                      <label className="block text-xs font-medium text-muted-foreground mb-2">
                         Logo
                       </label>
                       <div
                         {...getRootProps()}
-                        className={`group relative cursor-pointer border border-white/[0.08] rounded-xl h-[160px] flex flex-col items-center justify-center transition-all overflow-hidden backdrop-blur-xl ${isDragActive ? 'border-white/30' : 'hover:border-white/20'
+                        className={`group relative cursor-pointer border border-border rounded-xl h-[160px] flex flex-col items-center justify-center transition-all overflow-hidden backdrop-blur-xl ${isDragActive ? 'border-white/30' : 'hover:border-white/20'
                           }`}
                         style={{
                           background: logoPreview
@@ -354,8 +354,8 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                         <input {...getInputProps()} />
                         {isAnalyzingLogo && (
                           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#0a0a0a]/95 rounded-xl backdrop-blur-xl">
-                            <Loader size={24} className="mb-3 text-white/60" />
-                            <span className="text-xs font-medium text-white/60 animate-pulse">
+                            <Loader size={24} className="mb-3 text-muted-foreground" />
+                            <span className="text-xs font-medium text-muted-foreground animate-pulse">
                               Analisando...
                             </span>
                           </div>
@@ -385,10 +385,10 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                           </>
                         ) : (
                           <div className="text-center">
-                            <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center mx-auto mb-3 border border-white/[0.08] group-hover:bg-white/10 transition-all">
-                              <Icon name="upload" className="w-5 h-5 text-white/40 group-hover:text-white" />
+                            <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center mx-auto mb-3 border border-border group-hover:bg-white/10 transition-all">
+                              <Icon name="upload" className="w-5 h-5 text-muted-foreground group-hover:text-white" />
                             </div>
-                            <p className="text-xs font-medium text-white/40">Arraste ou clique para enviar</p>
+                            <p className="text-xs font-medium text-muted-foreground">Arraste ou clique para enviar</p>
                           </div>
                         )}
                       </div>
@@ -431,7 +431,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
               <div className="space-y-6 py-2">
                 {/* Tom de Voz */}
                 <div>
-                  <label className="block text-xs font-medium text-white/60 mb-3">
+                  <label className="block text-xs font-medium text-muted-foreground mb-3">
                     Tom de Voz
                   </label>
                   <div className="grid grid-cols-4 gap-2">
@@ -444,7 +444,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                           onClick={() => setProfile(p => ({ ...p, toneOfVoice: tone as ToneOfVoice }))}
                           className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${isActive
                             ? 'bg-white text-black'
-                            : 'bg-[#0a0a0a]/60 text-white/60 hover:bg-white/10 hover:text-white border border-white/[0.08] backdrop-blur-xl'
+                            : 'bg-[#0a0a0a]/60 text-muted-foreground hover:bg-white/10 hover:text-white border border-border backdrop-blur-xl'
                             }`}
                         >
                           {tone}
@@ -456,7 +456,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
 
                 {/* Aplicar Tom em */}
                 <div>
-                  <label className="block text-xs font-medium text-white/60 mb-3">
+                  <label className="block text-xs font-medium text-muted-foreground mb-3">
                     Aplicar Tom em
                   </label>
                   <div className="flex flex-wrap gap-1.5">
@@ -469,7 +469,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                           onClick={() => handleToneTargetToggle(target)}
                           className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${isActive
                             ? 'bg-white text-black'
-                            : 'bg-[#0a0a0a]/60 text-white/60 hover:text-white hover:bg-white/10 border border-white/[0.08] backdrop-blur-xl'
+                            : 'bg-[#0a0a0a]/60 text-muted-foreground hover:text-white hover:bg-white/10 border border-border backdrop-blur-xl'
                             }`}
                         >
                           {toneTargetLabels[target]}
@@ -481,7 +481,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
 
                 {/* Modelo Criativo */}
                 <div>
-                  <label className="block text-xs font-medium text-white/60 mb-3">
+                  <label className="block text-xs font-medium text-muted-foreground mb-3">
                     Modelo Criativo
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -493,21 +493,21 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                           type="button"
                           onClick={() => setProfile(p => ({ ...p, creativeModel: model.id }))}
                           className={`px-4 py-3 rounded-lg text-left transition-all backdrop-blur-xl ${isActive
-                            ? 'bg-white/10 border border-white/20'
-                            : 'bg-[#0a0a0a]/60 border border-white/[0.08] hover:bg-white/5'
+                            ? 'bg-white/10 border border-border'
+                            : 'bg-[#0a0a0a]/60 border border-border hover:bg-white/5'
                             }`}
                         >
-                          <span className={`block text-xs font-semibold ${isActive ? 'text-white' : 'text-white/60'}`}>
+                          <span className={`block text-xs font-semibold ${isActive ? 'text-white' : 'text-muted-foreground'}`}>
                             {model.label}
                           </span>
-                          <span className={`block text-[10px] mt-0.5 ${isActive ? 'text-white/60' : 'text-white/40'}`}>
+                          <span className={`block text-[10px] mt-0.5 ${isActive ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                             {model.provider}
                           </span>
                         </button>
                       );
                     })}
                   </div>
-                  <p className="text-xs text-white/40 mt-3">
+                  <p className="text-xs text-muted-foreground mt-3">
                     Modelo usado para gerar campanhas, posts e prompts de vídeo.
                   </p>
                 </div>
@@ -529,7 +529,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
             {activeTab === 'integrations' && (
               <div className="space-y-6 py-2">
                 {/* Instagram Integration */}
-                <div className="border border-white/10 rounded-xl p-5 bg-white/[0.02]">
+                <div className="border border-border rounded-xl p-5 bg-white/[0.02]">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 rounded-xl flex items-center justify-center">
@@ -537,7 +537,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-white">Instagram</h3>
-                        <p className="text-[10px] text-white/40">Publicar fotos e vídeos automaticamente</p>
+                        <p className="text-[10px] text-muted-foreground">Publicar fotos e vídeos automaticamente</p>
                       </div>
                     </div>
                     <Button
@@ -553,14 +553,14 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                   {/* Connected Accounts */}
                   {loadingAccounts ? (
                     <div className="flex items-center justify-center py-8">
-                      <Loader size={20} className="text-white/60" />
+                      <Loader size={20} className="text-muted-foreground" />
                     </div>
                   ) : instagramAccounts.length > 0 ? (
                     <div className="space-y-2">
                       {instagramAccounts.map((account) => (
                         <div
                           key={account.id}
-                          className="flex items-center justify-between p-3 bg-white/[0.03] rounded-lg border border-white/5"
+                          className="flex items-center justify-between p-3 bg-white/[0.03] rounded-lg border border-border"
                         >
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-gradient-to-br from-purple-500/20 via-pink-500/20 to-orange-500/20 rounded-full flex items-center justify-center">
@@ -570,7 +570,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                               <p className="text-xs font-medium text-white">
                                 @{account.instagram_username}
                               </p>
-                              <p className="text-[9px] text-white/30">
+                              <p className="text-[9px] text-muted-foreground">
                                 Conectado {new Date(account.connected_at).toLocaleDateString('pt-BR')}
                               </p>
                             </div>
@@ -588,7 +588,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                               className="p-1.5 hover:bg-white/5 rounded-lg transition-colors"
                               title="Desconectar"
                             >
-                              <Icon name="trash" className="w-3.5 h-3.5 text-white/30 hover:text-red-400" />
+                              <Icon name="trash" className="w-3.5 h-3.5 text-muted-foreground hover:text-red-400" />
                             </button>
                           </div>
                         </div>
@@ -597,23 +597,23 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                   ) : (
                     <div className="text-center py-8">
                       <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <Icon name="instagram" className="w-6 h-6 text-white/20" />
+                        <Icon name="instagram" className="w-6 h-6 text-muted-foreground" />
                       </div>
-                      <p className="text-xs text-white/40 mb-1">Nenhuma conta conectada</p>
-                      <p className="text-[10px] text-white/20">Clique em "Conectar" para adicionar uma conta</p>
+                      <p className="text-xs text-muted-foreground mb-1">Nenhuma conta conectada</p>
+                      <p className="text-[10px] text-muted-foreground">Clique em "Conectar" para adicionar uma conta</p>
                     </div>
                   )}
                 </div>
 
                 {/* Future Integrations Placeholder */}
-                <div className="border border-white/5 border-dashed rounded-xl p-5 opacity-50">
+                <div className="border border-border border-dashed rounded-xl p-5 opacity-50">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center">
-                      <Icon name="facebook" className="w-5 h-5 text-white/30" />
+                      <Icon name="facebook" className="w-5 h-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-medium text-white/30">Facebook</h3>
-                      <p className="text-[10px] text-white/20">Em breve</p>
+                      <h3 className="text-sm font-medium text-muted-foreground">Facebook</h3>
+                      <p className="text-[10px] text-muted-foreground">Em breve</p>
                     </div>
                   </div>
                 </div>
@@ -628,14 +628,14 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                     card: 'bg-transparent shadow-none border-none',
                     navbar: 'hidden',
                     pageScrollBox: 'p-0',
-                    profileSection: 'border-white/10',
-                    profileSectionTitle: 'text-white/60',
+                    profileSection: 'border-border',
+                    profileSectionTitle: 'text-muted-foreground',
                     profileSectionContent: 'text-white',
-                    formFieldLabel: 'text-white/60',
-                    formFieldInput: 'bg-white/5 border-white/10 text-white',
+                    formFieldLabel: 'text-muted-foreground',
+                    formFieldInput: 'bg-white/5 border-border text-white',
                     formButtonPrimary: 'bg-primary text-black hover:bg-primary/90',
                     membersPageInviteButton: 'bg-primary text-black hover:bg-primary/90',
-                    tableHead: 'text-white/40',
+                    tableHead: 'text-muted-foreground',
                     tableCell: 'text-white/80',
                   }
                 }}

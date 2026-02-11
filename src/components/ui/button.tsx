@@ -25,11 +25,11 @@ const buttonVariants = cva(
         solid:
           "bg-white text-black shadow-xs hover:bg-white/90 active:scale-95",
         glass:
-          "bg-white/10 text-white shadow-xs hover:bg-white/20 active:scale-95 border border-white/20",
+          "bg-white/10 text-white shadow-xs hover:bg-white/20 active:scale-95 border border-border",
         "glass-subtle":
-          "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white active:scale-95 border border-white/10",
+          "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white active:scale-95 border border-border",
         "outline-subtle":
-          "bg-transparent text-white border border-white/20 hover:bg-white/5 hover:border-white/30 active:scale-95",
+          "bg-transparent text-white border border-border hover:bg-white/5 hover:border-white/30 active:scale-95",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",

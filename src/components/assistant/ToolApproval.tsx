@@ -75,7 +75,7 @@ export function ToolApproval({
     <Confirmation
       approval={approval}
       state={aiElementsState}
-      className="bg-black/40 border-white/10 mt-2"
+      className="bg-black/40 border-border mt-2"
     >
       {/* Solicitação de aprovação */}
       <ConfirmationRequest>
@@ -96,7 +96,7 @@ export function ToolApproval({
         <ConfirmationAction
           onClick={() => onDeny(approvalId)}
           variant="outline"
-          className="h-8 px-3 border-white/10 hover:border-white/20 text-white/60 text-[11px]"
+          className="h-8 px-3 border-border text-muted-foreground text-[11px]"
         >
           Negar
         </ConfirmationAction>
@@ -105,7 +105,7 @@ export function ToolApproval({
           <ConfirmationAction
             onClick={() => onAlwaysAllow(toolName)}
             variant="ghost"
-            className="h-8 px-3 bg-white/5 hover:bg-white/10 text-white/50 text-[10px]"
+            className="h-8 px-3 bg-white/5 hover:bg-white/10 text-muted-foreground text-[10px]"
             title="Sempre permitir esta ferramenta sem pedir aprovação"
           >
             Sempre permitir

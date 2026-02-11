@@ -50,7 +50,7 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Facebook Ad Card */}
-      <div className="w-full bg-black rounded-xl border border-white/20 overflow-hidden flex-1 flex flex-col">
+      <div className="w-full bg-black rounded-xl border border-border overflow-hidden flex-1 flex flex-col">
         {/* Header */}
         <div className="p-3 pb-1 flex items-start gap-2.5">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0">
@@ -64,11 +64,11 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
                 {username}
               </span>
             </div>
-            <div className="flex items-center gap-1 text-[9px] text-white/50">
+            <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
               <span>Patrocinado</span>
             </div>
           </div>
-          <Icon name="more-horizontal" className="w-5 h-5 text-white/40 flex-shrink-0" />
+          <Icon name="more-horizontal" className="w-5 h-5 text-muted-foreground flex-shrink-0" />
         </div>
 
         {/* Body text */}
@@ -99,9 +99,9 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
             />
           ) : !isGenerating ? (
             <div className="w-full flex flex-col items-center justify-center p-3">
-              <Icon name="image" className="w-8 h-8 text-white/10 mb-2" />
+              <Icon name="image" className="w-8 h-8 text-muted-foreground mb-2" />
               {imagePrompt && (
-                <p className="text-[8px] text-white/20 italic text-center leading-relaxed">
+                <p className="text-[8px] text-muted-foreground italic text-center leading-relaxed">
                   "{imagePrompt}"
                 </p>
               )}
@@ -110,20 +110,20 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
         </div>
 
         {/* Ad Info */}
-        <div className="px-3 py-2 bg-white/5 border-t border-white/10 flex-1 overflow-y-auto">
-          <p className="text-[9px] text-white/50 uppercase tracking-wide mb-1">
+        <div className="px-3 py-2 bg-white/5 border-t border-border flex-1 overflow-y-auto">
+          <p className="text-[9px] text-muted-foreground uppercase tracking-wide mb-1">
             {username.toLowerCase().replace(/\s+/g, '')}.com
           </p>
           <p className="text-[11px] font-semibold text-white">
             {headline}
           </p>
-          <p className="text-[9px] text-white/50 mt-0.5 leading-relaxed">
+          <p className="text-[9px] text-muted-foreground mt-0.5 leading-relaxed">
             {body}
           </p>
         </div>
 
         {/* CTA Button */}
-        <div className="px-3 py-2 border-t border-white/10">
+        <div className="px-3 py-2 border-t border-border">
           <button className="w-full py-2 bg-white/10 hover:bg-white/15 rounded text-[11px] font-semibold text-white/90 transition-colors mb-2">
             {cta}
           </button>
@@ -137,7 +137,7 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
                     e.stopPropagation();
                     onGenerate();
                   }}
-                  className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors flex items-center justify-center gap-1.5 border border-white/5"
+                  className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white/80 transition-colors flex items-center justify-center gap-1.5 border border-border"
                 >
                   <Icon name="zap" className="w-3 h-3" />
                   Gerar
@@ -149,7 +149,7 @@ export const FacebookAdPreview: React.FC<FacebookAdPreviewProps> = ({
                     e.stopPropagation();
                     onImageClick();
                   }}
-                  className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors flex items-center justify-center gap-1.5 border border-white/5"
+                  className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white/80 transition-colors flex items-center justify-center gap-1.5 border border-border"
                 >
                   <Icon name="edit" className="w-3 h-3" />
                   Editar

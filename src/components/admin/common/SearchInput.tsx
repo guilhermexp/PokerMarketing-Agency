@@ -36,7 +36,7 @@ export function SearchInput({
   return (
     <div className="relative">
       <svg
-        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30"
+        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -53,7 +53,7 @@ export function SearchInput({
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         placeholder={placeholder}
-        className="w-full pl-9 pr-9 py-2 bg-white/[0.03] border border-white/[0.08] rounded-md text-[13px] text-white/80 placeholder-white/30 focus:outline-none focus:border-amber-500/50 transition-colors"
+        className="w-full pl-9 pr-9 py-2 bg-white/[0.03] border border-border rounded-md text-[13px] text-white/80 placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/50 transition-colors"
       />
       {localValue && (
         <button
@@ -61,7 +61,7 @@ export function SearchInput({
             setLocalValue('');
             onChange('');
           }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded text-white/30 hover:text-white/60 transition-colors"
+          className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:text-white/60 transition-colors"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

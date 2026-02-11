@@ -14,22 +14,22 @@ export const ImagePreviewCompare: React.FC<ImagePreviewCompareProps> = ({
 }) => (
   <div className="flex gap-4 items-center justify-center w-full h-full">
     <div className="flex flex-col items-center flex-1 max-w-[45%]">
-      <span className="text-[10px] text-white/40 mb-2 uppercase tracking-wider">
+      <span className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider">
         Original
       </span>
       <div className="w-full h-[60vh] flex items-center justify-center">
         <img
           src={src}
           alt="Original"
-          className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg shadow-2xl border border-white/10"
+          className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg shadow-2xl border border-border"
         />
       </div>
-      <span className="text-[9px] text-white/30 mt-2">
+      <span className="text-[9px] text-muted-foreground mt-2">
         {originalDimensions.width} × {originalDimensions.height}
       </span>
     </div>
 
-    <div className="flex-shrink-0 text-white/20">
+    <div className="flex-shrink-0 text-muted-foreground">
       <Icon name="arrow-right" className="w-6 h-6" />
     </div>
 

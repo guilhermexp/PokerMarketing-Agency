@@ -36,14 +36,14 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Phone Frame */}
-      <div className="w-full max-w-[320px] mx-auto bg-black rounded-[32px] p-2 shadow-2xl border border-white/10 flex-1 flex flex-col">
+      <div className="w-full max-w-[320px] mx-auto bg-black rounded-[32px] p-2 shadow-2xl border border-border flex-1 flex flex-col">
         {/* Phone notch */}
         <div className="w-20 h-5 bg-black rounded-full mx-auto mb-0.5" />
 
         {/* Screen */}
-        <div className="relative bg-[#0a0a0a] rounded-[20px] overflow-hidden flex-1 flex flex-col">
+        <div className="relative bg-background rounded-[20px] overflow-hidden flex-1 flex flex-col">
           {/* Instagram Header */}
-          <div className="px-2.5 py-1.5 flex items-center gap-2 border-b border-white/5">
+          <div className="px-2.5 py-1.5 flex items-center gap-2 border-b border-border">
             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center flex-shrink-0">
               <span className="text-[7px] font-bold text-white">CPC</span>
             </div>
@@ -51,9 +51,9 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
               <p className="text-[9px] font-semibold text-white truncate">
                 {username}
               </p>
-              <p className="text-[7px] text-white/40">Patrocinado</p>
+              <p className="text-[7px] text-muted-foreground">Patrocinado</p>
             </div>
-            <Icon name="more-horizontal" className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />
+            <Icon name="more-horizontal" className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
           </div>
 
           {/* Post Image */}
@@ -69,9 +69,9 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center p-3">
-                <Icon name="image" className="w-8 h-8 text-white/10 mb-2" />
+                <Icon name="image" className="w-8 h-8 text-muted-foreground mb-2" />
                 {imagePrompt && (
-                  <p className="text-[8px] text-white/20 italic text-center line-clamp-3">
+                  <p className="text-[8px] text-muted-foreground italic text-center line-clamp-3">
                     "{imagePrompt}"
                   </p>
                 )}
@@ -81,7 +81,7 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
                       e.stopPropagation();
                       onGenerate();
                     }}
-                    className="mt-2 px-3 py-1.5 text-[9px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors flex items-center gap-1 border border-white/5"
+                    className="mt-2 px-3 py-1.5 text-[9px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white/80 transition-colors flex items-center gap-1 border border-border"
                   >
                     <Icon name="zap" className="w-3 h-3" />
                     Gerar
@@ -124,7 +124,7 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
                     onRegenerate();
                   }}
                   disabled={isGenerating}
-                  className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 border border-white/5"
+                  className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 border border-border"
                 >
                   <Icon name="refresh" className="w-3 h-3" />
                   Regenerar imagem
@@ -136,7 +136,7 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
                     e.stopPropagation();
                     onImageClick();
                   }}
-                  className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors flex items-center justify-center gap-1.5 border border-white/5"
+                  className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white/80 transition-colors flex items-center justify-center gap-1.5 border border-border"
                 >
                   <Icon name="edit" className="w-3 h-3" />
                   Editar

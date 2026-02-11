@@ -356,7 +356,7 @@ export const CarouselTab = React.memo<CarrosselTabProps>(function CarouselTab({
 
   if (!hasClipCarousels && !hasCampaignCarousels) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-white/40">
+      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
         <Icon name="image" className="w-12 h-12 mb-4" />
         <p className="text-sm">Nenhum carrossel disponível</p>
         <p className="text-xs mt-1">Gere uma campanha ou crie cenas nos clips</p>
@@ -370,7 +370,7 @@ export const CarouselTab = React.memo<CarrosselTabProps>(function CarouselTab({
       {hasCampaignCarousels && (
         <>
           <div className="flex items-center gap-2 mb-2">
-            <span className="px-2 py-0.5 rounded-full bg-white/10 text-white/60 text-xs font-medium">
+            <span className="px-2 py-0.5 rounded-full bg-white/10 text-muted-foreground text-xs font-medium">
               Carrosséis da Campanha
             </span>
           </div>
@@ -454,7 +454,7 @@ export const CarouselTab = React.memo<CarrosselTabProps>(function CarouselTab({
         <>
           {hasCampaignCarousels && (
             <div className="flex items-center gap-2 mb-2 mt-6">
-              <span className="px-2 py-0.5 rounded-full bg-white/10 text-white/60 text-xs font-medium">
+              <span className="px-2 py-0.5 rounded-full bg-white/10 text-muted-foreground text-xs font-medium">
                 Carrosséis dos Clips
               </span>
             </div>

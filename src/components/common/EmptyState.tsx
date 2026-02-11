@@ -56,7 +56,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       className={`
         relative overflow-hidden
         bg-gradient-to-b from-[#0d0d0d] to-[#080808]
-        rounded-3xl border border-white/[0.04]
+        rounded-3xl border border-border
         ${classes.container}
         text-center
         ${className}
@@ -68,7 +68,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         {title}
       </h3>
       <p
-        className={`relative ${classes.description} text-white/30 max-w-sm mx-auto mb-8 leading-relaxed`}
+        className={`relative ${classes.description} text-muted-foreground max-w-sm mx-auto mb-8 leading-relaxed`}
       >
         {description}
       </p>
@@ -107,7 +107,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 
       {/* Subtitle */}
       {subtitle && (
-        <p className="relative text-[10px] text-white/20 uppercase tracking-wider mt-6">
+        <p className="relative text-[10px] text-muted-foreground uppercase tracking-wider mt-6">
           {subtitle}
         </p>
       )}

@@ -11,7 +11,7 @@ export const ImagePreviewLoadingOverlay: React.FC<ImagePreviewLoadingOverlayProp
   resizeProgress,
 }) => (
   <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-20 rounded-lg">
-    <Loader size={40} className="mb-4 text-white/60" />
+    <Loader size={40} className="mb-4 text-muted-foreground" />
     <p className="text-sm font-medium text-white/80">
       {isResizing ? `Redimensionando... ${resizeProgress}%` : 'Processando...'}
     </p>

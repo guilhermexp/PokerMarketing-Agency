@@ -75,7 +75,7 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
           <button
             type="button"
             onClick={() => scrollStrip('prev')}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/[0.06] flex items-center justify-center text-white hover:bg-white/20 hover:text-white transition-all"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-border flex items-center justify-center text-white hover:bg-white/20 hover:text-white transition-all"
             aria-label="Anterior"
           >
             <Icon name="chevron-up" className="w-3.5 h-3.5 -rotate-90" />
@@ -83,7 +83,7 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
           <button
             type="button"
             onClick={() => scrollStrip('next')}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/[0.06] flex items-center justify-center text-white hover:bg-white/20 hover:text-white transition-all"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/60 border border-border flex items-center justify-center text-white hover:bg-white/20 hover:text-white transition-all"
             aria-label="Próximo"
           >
             <Icon name="chevron-up" className="w-3.5 h-3.5 rotate-90" />
@@ -106,12 +106,12 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
               <div className={`aspect-[9/16] bg-black/80 rounded-xl overflow-hidden border-2 transition-all relative ${
                 isSelected
                   ? 'border-white/60 shadow-[0_0_15px_rgba(255,255,255,0.3)]'
-                  : 'border-white/5 hover:border-white/20'
+                  : 'border-border hover:border-white/20'
               }`}>
                 {flyer === 'loading' ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
-                    <Loader size={24} className="mb-2 text-white/60" />
-                    <p className="text-[8px] font-black text-white/40 uppercase tracking-widest animate-pulse">
+                    <Loader size={24} className="mb-2 text-muted-foreground" />
+                    <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest animate-pulse">
                       Gerando...
                     </p>
                   </div>

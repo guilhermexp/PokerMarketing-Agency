@@ -248,7 +248,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
   return (
     <div className="min-h-screen flex flex-col">
       {/* Sticky Header */}
-      <header className="sticky top-0 bg-black border-b border-white/10 z-50">
+      <header className="sticky top-0 bg-black border-b border-border z-50">
         <div className="px-4 md:px-6 py-3 md:py-4">
           <div className="flex flex-col gap-3 md:gap-4">
             {/* Row 1: Title + Add Button */}
@@ -258,7 +258,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
             >
               <div>
                 <h1 className="text-3xl font-semibold text-white tracking-tight">Agenda</h1>
-                <p className="text-[11px] text-white/30 uppercase tracking-wider mt-1">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider mt-1">
                   {scheduledPosts.length} post{scheduledPosts.length !== 1 ? "s" : ""} agendado{scheduledPosts.length !== 1 ? "s" : ""}
                 </p>
               </div>
@@ -268,7 +268,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                   setSelectedDate(null);
                   setIsScheduleModalOpen(true);
                 }}
-                className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
+                className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-border rounded-lg text-[10px] font-bold text-muted-foreground uppercase tracking-wide hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
               >
                 <Icon name="plus" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                 <span className="hidden sm:inline">Agendar</span>
@@ -281,13 +281,13 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
               <div className="flex items-center gap-1 md:gap-2">
                 <button
                   onClick={goToPreviousMonth}
-                  className="p-1.5 md:p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  className="p-1.5 md:p-2 text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                 >
                   <Icon name="chevron-left" className="w-4 h-4" />
                 </button>
                 <button
                   onClick={goToNextMonth}
-                  className="p-1.5 md:p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  className="p-1.5 md:p-2 text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                 >
                   <Icon name="chevron-right" className="w-4 h-4" />
                 </button>
@@ -307,17 +307,17 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
               </div>
 
               {/* Stats - hidden on small mobile */}
-              <div className="hidden sm:flex items-center gap-2 md:gap-3 px-2 md:px-4 py-1.5 md:py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+              <div className="hidden sm:flex items-center gap-2 md:gap-3 px-2 md:px-4 py-1.5 md:py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
                 <div className="flex items-center gap-1 md:gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span className="text-[9px] md:text-[10px] font-medium text-white/60">
+                  <span className="text-[9px] md:text-[10px] font-medium text-muted-foreground">
                     {stats.scheduled}
                   </span>
                 </div>
-                <div className="h-3 w-px bg-white/10" />
+                <div className="h-3 w-px bg-border" />
                 <div className="flex items-center gap-1 md:gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <span className="text-[9px] md:text-[10px] font-medium text-white/60">
+                  <span className="text-[9px] md:text-[10px] font-medium text-muted-foreground">
                     {stats.published}
                   </span>
                 </div>
@@ -329,7 +329,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
           <div className="flex mt-3 md:mt-4">
             <div className="flex-1 grid grid-cols-7">
               {dayNamesShort.map((day, idx) => (
-                <div key={day} className="p-1 md:p-2 text-center font-medium text-[10px] md:text-sm text-white/40">
+                <div key={day} className="p-1 md:p-2 text-center font-medium text-[10px] md:text-sm text-muted-foreground">
                   <span className="md:hidden">{day}</span>
                   <span className="hidden md:inline">{dayNames[idx]}</span>
                 </div>
@@ -352,7 +352,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
             {isRubeConfigured() && (
               <button
                 onClick={handlePublishAll}
-                className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 bg-black/40 border border-white/10 rounded-full text-[10px] md:text-xs font-medium text-white/90 hover:border-white/30 transition-all"
+                className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 bg-black/40 border border-border rounded-full text-[10px] md:text-xs font-medium text-white/90 hover:border-white/20 transition-all"
               >
                 <Icon name="send" className="w-3 h-3" />
                 <span className="hidden sm:inline">Publicar</span>
@@ -376,19 +376,19 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
           onClick={() => setPostDialogOpen(false)}
         >
           <div
-            className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)] flex flex-col"
+            className="bg-black/60 backdrop-blur-2xl border border-border rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-6 py-4 border-b border-white/10">
+            <div className="px-6 py-4 border-b border-border">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <h3 className="text-base font-semibold text-white">{formatDateRange(selectedPost)}</h3>
-                  <p className="text-sm text-white/50 mt-1">{selectedPost.scheduledTime}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{selectedPost.scheduledTime}</p>
                 </div>
                 <button
                   onClick={() => setPostDialogOpen(false)}
-                  className="p-2 text-white/40 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+                  className="p-2 text-muted-foreground hover:text-white rounded-lg hover:bg-white/10 transition-colors"
                 >
                   <Icon name="x" className="w-4 h-4" />
                 </button>
@@ -403,7 +403,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                   <img
                     src={selectedPost.imageUrl}
                     alt=""
-                    className="w-full h-auto rounded-lg border border-white/10"
+                    className="w-full h-auto rounded-lg border border-border"
                   />
                 </div>
               )}
@@ -412,23 +412,23 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
               <div className="px-6 py-4 space-y-4">
               {/* Caption */}
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-white/40 font-medium mb-2">Legenda</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">Legenda</p>
                 <p className="text-sm text-white/80 leading-relaxed">
-                  {selectedPost.caption || <span className="italic text-white/40">Sem legenda</span>}
+                  {selectedPost.caption || <span className="italic text-muted-foreground">Sem legenda</span>}
                 </p>
               </div>
 
               {/* Hashtags */}
               {selectedPost.hashtags && selectedPost.hashtags.length > 0 && (
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-white/40 font-medium mb-2">Hashtags</p>
-                  <p className="text-sm text-white/60">{selectedPost.hashtags.join(" ")}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">Hashtags</p>
+                  <p className="text-sm text-muted-foreground">{selectedPost.hashtags.join(" ")}</p>
                 </div>
               )}
 
               {/* Status & Platform */}
               <div className="flex items-center gap-2 pt-2">
-                <span className="text-[9px] font-medium text-white/60 px-2 py-1 bg-white/5 border border-white/10 rounded-full">
+                <span className="text-[9px] font-medium text-muted-foreground px-2 py-1 bg-white/5 border border-border rounded-full">
                   {selectedPost.status === "scheduled"
                     ? "Agendado"
                     : selectedPost.status === "published"
@@ -436,7 +436,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                       : "Falhou"}
                 </span>
                 {selectedPost.instagramContentType && (
-                  <span className="text-[9px] font-medium text-white/50 px-2 py-1 bg-black/40 border border-white/10 rounded-full">
+                  <span className="text-[9px] font-medium text-muted-foreground px-2 py-1 bg-black/40 border border-border rounded-full">
                     {selectedPost.instagramContentType === "story"
                       ? "Story"
                       : selectedPost.instagramContentType === "carousel"
@@ -446,7 +446,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                           : "Photo"}
                   </span>
                 )}
-                <span className="text-[9px] font-medium text-white/50 px-2 py-1 bg-black/40 border border-white/10 rounded-full uppercase">
+                <span className="text-[9px] font-medium text-muted-foreground px-2 py-1 bg-black/40 border border-border rounded-full uppercase">
                   {selectedPost.platforms}
                 </span>
               </div>
@@ -454,7 +454,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
             </div>
 
             {/* Actions Footer */}
-            <div className="px-6 py-4 border-t border-white/10 flex gap-2 flex-shrink-0">
+            <div className="px-6 py-4 border-t border-border flex gap-2 flex-shrink-0">
               {selectedPost.status === "scheduled" && (
                 <>
                   {isRubeConfigured() && (
@@ -463,7 +463,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                         onPublishToInstagram(selectedPost);
                         setPostDialogOpen(false);
                       }}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-white/90 hover:border-white/20 transition-all"
                     >
                       <Icon name="send" className="w-4 h-4" />
                       Publicar Agora
@@ -477,7 +477,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                       setPostDialogOpen(false);
                       setIsScheduleModalOpen(true);
                     }}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-white/90 hover:border-white/20 transition-all"
                   >
                     <Icon name="edit" className="w-4 h-4" />
                     Editar
@@ -489,7 +489,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                   onDeleteScheduledPost(selectedPost.id);
                   setPostDialogOpen(false);
                 }}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/40 hover:text-white hover:border-white/30 transition-all"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-muted-foreground hover:text-white transition-all"
               >
                 <Icon name="trash" className="w-4 h-4" />
                 Excluir
@@ -506,18 +506,18 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
           onClick={() => setDayViewDialogOpen(false)}
         >
           <div
-            className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
+            className="bg-black/60 backdrop-blur-2xl border border-border rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header - Minimalist */}
-            <div className="px-6 py-4 border-b border-white/10">
+            <div className="px-6 py-4 border-b border-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 flex flex-col items-center justify-center">
+                  <div className="w-12 h-12 rounded-xl bg-black/40 border border-border flex flex-col items-center justify-center">
                     <span className="text-xl font-light text-white">
                       {new Date(selectedDayDate).getDate()}
                     </span>
-                    <span className="text-[9px] text-white/40 uppercase">
+                    <span className="text-[9px] text-muted-foreground uppercase">
                       {new Date(selectedDayDate).toLocaleDateString("pt-BR", { month: "short" })}
                     </span>
                   </div>
@@ -525,7 +525,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                     <h3 className="text-base font-semibold text-white capitalize">
                       {new Date(selectedDayDate).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
                     </h3>
-                    <p className="text-xs text-white/50 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {(() => {
                         const dayPosts = scheduledPosts.filter((p) => p.scheduledDate === selectedDayDate);
                         const published = dayPosts.filter((p) => p.status === "published").length;
@@ -540,7 +540,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                 </div>
                 <button
                   onClick={() => setDayViewDialogOpen(false)}
-                  className="p-2 text-white/40 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+                  className="p-2 text-muted-foreground hover:text-white transition-colors rounded-lg hover:bg-white/10"
                 >
                   <Icon name="x" className="w-4 h-4" />
                 </button>
@@ -567,7 +567,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                     return (
                       <div
                         key={post.id}
-                        className="group flex items-center gap-4 p-3 rounded-xl bg-black/20 border border-white/10 hover:bg-black/30 hover:border-white/20 transition-all"
+                        className="group flex items-center gap-4 p-3 rounded-xl bg-black/20 border border-border hover:bg-black/30 transition-all"
                       >
                         {/* Thumbnail */}
                         <div
@@ -578,7 +578,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                           className="cursor-pointer"
                         >
                           {post.imageUrl ? (
-                            <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-black/40 border border-white/10 hover:border-white/30 transition-colors">
+                            <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-black/40 border border-border transition-colors">
                               <img
                                 src={post.imageUrl}
                                 alt=""
@@ -586,8 +586,8 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                               />
                             </div>
                           ) : (
-                            <div className="w-20 h-20 rounded-lg bg-black/40 flex items-center justify-center flex-shrink-0 border border-white/10 hover:border-white/30 transition-colors">
-                              <Icon name="image" className="w-6 h-6 text-white/20" />
+                            <div className="w-20 h-20 rounded-lg bg-black/40 flex items-center justify-center flex-shrink-0 border border-border transition-colors">
+                              <Icon name="image" className="w-6 h-6 text-muted-foreground" />
                             </div>
                           )}
                         </div>
@@ -599,27 +599,27 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                               {post.scheduledTime}
                             </span>
                             {typeLabel && (
-                              <span className="text-[9px] font-medium text-white/50 px-2 py-0.5 bg-black/40 border border-white/10 rounded-full">
+                              <span className="text-[9px] font-medium text-muted-foreground px-2 py-0.5 bg-black/40 border border-border rounded-full">
                                 {typeLabel}
                               </span>
                             )}
                             {post.status === "published" && (
-                              <span className="text-[9px] font-medium text-white/60 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
+                              <span className="text-[9px] font-medium text-muted-foreground px-2 py-0.5 bg-white/5 border border-border rounded-full">
                                 Publicado
                               </span>
                             )}
                             {post.status === "failed" && (
-                              <span className="text-[9px] font-medium text-white/60 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
+                              <span className="text-[9px] font-medium text-muted-foreground px-2 py-0.5 bg-white/5 border border-border rounded-full">
                                 Falhou
                               </span>
                             )}
                             {post.status === "scheduled" && (
-                              <span className="text-[9px] font-medium text-white/60 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full">
+                              <span className="text-[9px] font-medium text-muted-foreground px-2 py-0.5 bg-white/5 border border-border rounded-full">
                                 Agendado
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-white/50 line-clamp-2">
+                          <p className="text-xs text-muted-foreground line-clamp-2">
                             {post.caption || "Sem legenda"}
                           </p>
                         </div>
@@ -634,7 +634,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                                     onPublishToInstagram(post);
                                     setDayViewDialogOpen(false);
                                   }}
-                                  className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                  className="p-2 text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                                   title="Publicar agora"
                                 >
                                   <Icon name="send" className="w-4 h-4" />
@@ -648,7 +648,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                                   setDayViewDialogOpen(false);
                                   setIsScheduleModalOpen(true);
                                 }}
-                                className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                className="p-2 text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                                 title="Editar"
                               >
                                 <Icon name="edit" className="w-4 h-4" />
@@ -660,7 +660,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                                     publishedAt: Date.now(),
                                   });
                                 }}
-                                className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                className="p-2 text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                                 title="Marcar como publicado"
                               >
                                 <Icon name="check" className="w-4 h-4" />
@@ -669,7 +669,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                           )}
                           <button
                             onClick={() => onDeleteScheduledPost(post.id)}
-                            className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                            className="p-2 text-muted-foreground hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                             title="Excluir"
                           >
                             <Icon name="trash" className="w-4 h-4" />
@@ -682,13 +682,13 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
             </div>
 
             {/* Modal Footer */}
-            <div className="px-5 pb-4 pt-3 border-t border-white/10">
+            <div className="px-5 pb-4 pt-3 border-t border-border">
               <button
                 onClick={() => {
                   setDayViewDialogOpen(false);
                   handleDayClick(selectedDayDate);
                 }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white/90 bg-black/40 backdrop-blur-2xl border border-white/10 hover:border-white/30 rounded-full transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white/90 bg-black/40 backdrop-blur-2xl border border-border hover:border-white/20 rounded-full transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
               >
                 <Icon name="plus" className="w-4 h-4" />
                 Novo Agendamento
@@ -711,7 +711,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
             <div className="flex items-center justify-between mb-4">
               <button
                 onClick={() => setShowTodayView(false)}
-                className="flex items-center gap-2 px-3 md:px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-xs md:text-sm font-medium text-white/60 hover:text-white hover:border-white/30 transition-all"
+                className="flex items-center gap-2 px-3 md:px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-xs md:text-sm font-medium text-muted-foreground hover:text-white transition-all"
               >
                 <Icon name="chevron-left" className="w-4 h-4" />
                 <span>Voltar</span>
@@ -720,7 +720,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                 <h2 className="text-lg md:text-2xl font-semibold text-white">
                   {today.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }).toUpperCase()}
                 </h2>
-                <p className="text-xs md:text-sm text-white/50 mt-1">
+                <p className="text-xs md:text-sm text-muted-foreground mt-1">
                   {todayPosts.length === 0 ? "Nenhum post" : (
                     <>
                       {scheduledCount > 0 && <span>{scheduledCount} agendado{scheduledCount !== 1 ? "s" : ""}</span>}
@@ -737,10 +737,10 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
               {todayPosts.length === 0 ? (
                 <div className="col-span-full flex flex-col items-center justify-center py-16">
                   <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-                    <Icon name="calendar" className="w-8 h-8 text-white/20" />
+                    <Icon name="calendar" className="w-8 h-8 text-muted-foreground" />
                   </div>
-                  <p className="text-base font-medium text-white/40">Nenhum post para hoje</p>
-                  <p className="text-sm text-white/20 mt-2 text-center">Clique em "Agendar" para criar o primeiro</p>
+                  <p className="text-base font-medium text-muted-foreground">Nenhum post para hoje</p>
+                  <p className="text-sm text-muted-foreground mt-2 text-center">Clique em "Agendar" para criar o primeiro</p>
                 </div>
               ) : (
                 todayPosts.map((post) => {
@@ -757,7 +757,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                   return (
                     <div
                       key={post.id}
-                      className="group bg-black/40 border border-white/10 rounded-lg overflow-hidden hover:border-white/30 transition-all flex flex-col hover:bg-black/50"
+                      className="group bg-black/40 border border-border rounded-lg overflow-hidden transition-all flex flex-col hover:bg-black/50"
                     >
                       {/* Post Image */}
                       <div
@@ -772,23 +772,23 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <Icon name="image" className="w-8 h-8 text-white/20" />
+                            <Icon name="image" className="w-8 h-8 text-muted-foreground" />
                           </div>
                         )}
                         {/* Status Badge */}
                         <div className="absolute top-2 right-2">
                           {post.status === "published" && (
-                            <span className="text-[9px] font-medium text-white/60 px-2 py-1 bg-white/5 border border-white/10 rounded-full">
+                            <span className="text-[9px] font-medium text-muted-foreground px-2 py-1 bg-white/5 border border-border rounded-full">
                               Publicado
                             </span>
                           )}
                           {post.status === "failed" && (
-                            <span className="text-[9px] font-medium text-white/60 px-2 py-1 bg-white/5 border border-white/10 rounded-full">
+                            <span className="text-[9px] font-medium text-muted-foreground px-2 py-1 bg-white/5 border border-border rounded-full">
                               Falhou
                             </span>
                           )}
                           {post.status === "scheduled" && (
-                            <span className="text-[9px] font-medium text-white/60 px-2 py-1 bg-white/5 border border-white/10 rounded-full">
+                            <span className="text-[9px] font-medium text-muted-foreground px-2 py-1 bg-white/5 border border-border rounded-full">
                               Agendado
                             </span>
                           )}
@@ -802,12 +802,12 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                             {post.scheduledTime}
                           </span>
                           {typeLabel && (
-                            <span className="text-[8px] md:text-[9px] font-medium text-white/50 px-2 py-0.5 bg-black/40 border border-white/10 rounded-full">
+                            <span className="text-[8px] md:text-[9px] font-medium text-muted-foreground px-2 py-0.5 bg-black/40 border border-border rounded-full">
                               {typeLabel}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs md:text-sm text-white/50 line-clamp-2 flex-1 mb-3">
+                        <p className="text-xs md:text-sm text-muted-foreground line-clamp-2 flex-1 mb-3">
                           {post.caption || "Sem legenda"}
                         </p>
 
@@ -816,7 +816,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                           {post.status === "scheduled" && onPublishToInstagram && (
                             <button
                               onClick={() => onPublishToInstagram(post)}
-                              className="flex-1 p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded text-[10px] font-medium transition-colors"
+                              className="flex-1 p-1.5 text-muted-foreground hover:text-white hover:bg-white/10 rounded text-[10px] font-medium transition-colors"
                               title="Publicar agora"
                             >
                               <Icon name="send" className="w-3.5 h-3.5" />
@@ -830,7 +830,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                                 setSelectedTime(post.scheduledTime);
                                 setIsScheduleModalOpen(true);
                               }}
-                              className="flex-1 p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded text-[10px] font-medium transition-colors"
+                              className="flex-1 p-1.5 text-muted-foreground hover:text-white hover:bg-white/10 rounded text-[10px] font-medium transition-colors"
                               title="Editar"
                             >
                               <Icon name="edit" className="w-3.5 h-3.5" />
@@ -838,7 +838,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                           )}
                           <button
                             onClick={() => onDeleteScheduledPost(post.id)}
-                            className="flex-1 p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded text-[10px] font-medium transition-colors"
+                            className="flex-1 p-1.5 text-muted-foreground hover:text-white hover:bg-white/10 rounded text-[10px] font-medium transition-colors"
                             title="Excluir"
                           >
                             <Icon name="trash" className="w-3.5 h-3.5" />
@@ -857,7 +857,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
       {/* Regular Calendar View */}
       {!showTodayView && (
       <main className="flex-1 px-2 md:px-6 py-3 md:py-6 flex flex-col">
-        <div className="grid grid-cols-7 gap-px bg-white/5 border border-white/10 rounded-lg overflow-hidden flex-1">
+        <div className="grid grid-cols-7 gap-px bg-white/5 border border-border rounded-lg overflow-hidden flex-1">
           {monthCalendar.map((day, index) => (
             <div
               key={index}
@@ -897,7 +897,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                       />
                     ))}
                     {day.posts.length > 4 && (
-                      <span className="text-[8px] text-white/40">+{day.posts.length - 4}</span>
+                      <span className="text-[8px] text-muted-foreground">+{day.posts.length - 4}</span>
                     )}
                   </div>
                   {/* Desktop: show post cards */}
@@ -912,7 +912,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                         className="text-xs p-2 border-l-2 border-primary bg-white/5 hover:bg-white/10 transition-all hover:pl-3 cursor-pointer group relative"
                       >
                         <div className="font-medium text-white/90 truncate">{post.scheduledTime}</div>
-                        <div className="text-white/50 text-[10px] truncate mt-1">
+                        <div className="text-muted-foreground text-[10px] truncate mt-1">
                           {post.caption?.substring(0, 40)}...
                         </div>
                         {post.status === "published" && (
@@ -929,7 +929,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                           e.stopPropagation();
                           if (day.dateStr) handleDayViewClick(day.dateStr);
                         }}
-                        className="text-[10px] text-white/40 hover:text-white/70 pl-2 cursor-pointer transition-colors"
+                        className="text-[10px] text-muted-foreground hover:text-white/70 pl-2 cursor-pointer transition-colors"
                       >
                         +{day.posts.length - 3} mais
                       </div>

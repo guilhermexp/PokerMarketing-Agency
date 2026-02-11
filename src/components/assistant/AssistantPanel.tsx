@@ -81,10 +81,10 @@ const ChatBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
       className={`flex flex-col ${isModel ? "items-start" : "items-end"} space-y-2 animate-fade-in-up`}
     >
       <div
-        className={`max-w-[90%] rounded-3xl px-5 py-4 shadow-xl ${isModel ? "bg-[#121212] border border-white/5 rounded-bl-none text-white/90" : "bg-primary text-black font-bold rounded-br-none"}`}
+        className={`max-w-[90%] rounded-3xl px-5 py-4 shadow-xl ${isModel ? "bg-card border border-border rounded-bl-none text-white/90" : "bg-primary text-black font-bold rounded-br-none"}`}
       >
         {imagePart && (
-          <div className="mb-3 rounded-2xl overflow-hidden border border-white/10 group relative">
+          <div className="mb-3 rounded-2xl overflow-hidden border border-border group relative">
             <img
               src={`data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`}
               alt="Anexo"
@@ -149,20 +149,20 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   if (!isOpen) return null;
 
   return (
-    <aside className="assistant-panel w-full sm:w-[380px] h-full bg-[#080808] border-l border-white/10 flex flex-col flex-shrink-0">
+    <aside className="assistant-panel w-full sm:w-[380px] h-full bg-background border-l border-border flex flex-col flex-shrink-0">
       {/* Header minimalista */}
       <div className="flex-shrink-0 h-14 flex items-center justify-between px-4">
         <img src="/icon.png" alt="Socialab" className="w-9 h-9 rounded-xl" />
         <div className="flex items-center gap-1">
-          <button className="p-2 text-white/40 hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
+          <button className="p-2 text-muted-foreground hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
             <Icon name="clock" className="w-4 h-4" />
           </button>
-          <button className="p-2 text-white/40 hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
+          <button className="p-2 text-muted-foreground hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
             <Icon name="plus" className="w-4 h-4" />
           </button>
           <button
             onClick={onClose}
-            className="p-2 text-white/40 hover:text-white/80 transition-colors rounded-lg hover:bg-white/5"
+            className="p-2 text-muted-foreground hover:text-white/80 transition-colors rounded-lg hover:bg-white/5"
           >
             <Icon name="x" className="w-4 h-4" />
           </button>
@@ -179,8 +179,8 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
           (history[history.length - 1].parts[0]?.text === "" ||
             !history[history.length - 1].parts[0].text) && (
             <div className="flex justify-start">
-              <div className="rounded-2xl px-6 py-4 bg-[#121212] border border-white/5">
-                <Loader size={20} className="text-white/60" />
+              <div className="rounded-2xl px-6 py-4 bg-card border border-border">
+                <Loader size={20} className="text-muted-foreground" />
               </div>
             </div>
           )}
@@ -194,19 +194,19 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
             <img
               src={referenceImage.src}
               alt="Reference"
-              className="w-10 h-10 object-cover rounded-md border border-white/10"
+              className="w-10 h-10 object-cover rounded-md border border-border"
             />
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-medium text-primary">
                 Referência anexada
               </p>
-              <p className="text-[10px] text-white/40 truncate">
+              <p className="text-[10px] text-muted-foreground truncate">
                 {referenceImage.id.substring(0, 8)}
               </p>
             </div>
             <button
               onClick={onClearReference}
-              className="w-6 h-6 rounded-md bg-black/40 text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-all flex items-center justify-center"
+              className="w-6 h-6 rounded-md bg-black/40 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-all flex items-center justify-center"
             >
               <Icon name="x" className="w-3 h-3" />
             </button>
@@ -222,7 +222,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
             accept="image/*"
           />
 
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden focus-within:border-white/20 transition-colors">
+          <div className="bg-muted border border-border rounded-xl overflow-hidden focus-within:border-white/20 transition-colors">
             <textarea
               ref={inputRef}
               value={input}
@@ -234,7 +234,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
                 }
               }}
               placeholder="Pergunte, pesquise ou converse..."
-              className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-white placeholder:text-white/30 outline-none resize-none min-h-[80px] max-h-[200px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-white placeholder:text-muted-foreground outline-none resize-none min-h-[80px] max-h-[200px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               disabled={isLoading}
               rows={2}
             />
@@ -242,13 +242,13 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-7 h-7 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all flex items-center justify-center"
+                className="w-7 h-7 rounded-lg text-muted-foreground hover:text-white/60 hover:bg-white/5 transition-all flex items-center justify-center"
               >
                 <Icon name="plus" className="w-4 h-4" />
               </button>
               <button
                 type="submit"
-                className="w-7 h-7 rounded-lg text-white/30 hover:text-white/60 disabled:text-white/10 transition-all flex items-center justify-center"
+                className="w-7 h-7 rounded-lg text-muted-foreground hover:text-white/60 disabled:text-white/10 transition-all flex items-center justify-center"
                 disabled={isLoading || (!input.trim() && !referenceImage)}
               >
                 <Icon name="arrow-up" className="w-4 h-4" />

@@ -106,23 +106,23 @@ export function ConnectInstagramModal({
       className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={(e) => e.target === e.currentTarget && handleClose()}
     >
-      <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div className="bg-background border border-border rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 rounded-xl flex items-center justify-center">
               <Icon name="instagram" className="w-5 h-5 text-white" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-white">Conectar Instagram</h2>
-              <p className="text-[10px] text-white/40">Via Rube MCP</p>
+              <p className="text-[10px] text-muted-foreground">Via Rube MCP</p>
             </div>
           </div>
           <button
             onClick={handleClose}
             className="p-2 hover:bg-white/5 rounded-lg transition-colors"
           >
-            <Icon name="x" className="w-4 h-4 text-white/40" />
+            <Icon name="x" className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
 
@@ -136,7 +136,7 @@ export function ConnectInstagramModal({
               </div>
               <div>
                 <p className="text-xs font-medium text-white">Conecte o Instagram no Rube</p>
-                <p className="text-[10px] text-white/40 mt-1">
+                <p className="text-[10px] text-muted-foreground mt-1">
                   Crie uma conta no Rube (grátis), conecte seu Instagram e gere o token na página API Keys
                 </p>
                 <Button
@@ -160,7 +160,7 @@ export function ConnectInstagramModal({
               </div>
               <div className="flex-1">
                 <p className="text-xs font-medium text-white">Copie o token e cole aqui</p>
-                <p className="text-[10px] text-white/40 mt-1">
+                <p className="text-[10px] text-muted-foreground mt-1">
                   Clique em "Copy" no passo 2 da página API Keys do Rube
                 </p>
                 <div className="mt-2">
@@ -171,7 +171,7 @@ export function ConnectInstagramModal({
                       setError(null);
                     }}
                     placeholder="eyJhbGciOiJIUzI1NiIs..."
-                    className="w-full h-24 bg-[#111111] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder:text-white/20 resize-none focus:outline-none focus:border-white/20 transition-colors"
+                    className="w-full h-24 bg-card border border-border rounded-xl px-3 py-2 text-xs font-mono text-white placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
                     disabled={isConnecting}
                   />
                 </div>
@@ -198,7 +198,7 @@ export function ConnectInstagramModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 p-4 border-t border-white/10 bg-white/[0.02]">
+        <div className="flex items-center justify-end gap-2 p-4 border-t border-border bg-white/[0.02]">
           <Button
             variant="ghost"
             size="sm"
@@ -215,7 +215,7 @@ export function ConnectInstagramModal({
           >
             {isConnecting ? (
               <>
-                <Loader size={12} className="mr-1.5 text-white/60" />
+                <Loader size={12} className="mr-1.5 text-muted-foreground" />
                 Conectando...
               </>
             ) : (

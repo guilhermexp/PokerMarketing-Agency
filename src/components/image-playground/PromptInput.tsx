@@ -47,7 +47,7 @@ export const PromptInput: React.FC = () => {
   }, [canGenerate, createImage]);
 
   return (
-    <div className="relative bg-white/5 border border-white/10 rounded-2xl overflow-hidden focus-within:border-white/20 transition-colors">
+    <div className="relative bg-white/5 border border-border rounded-2xl overflow-hidden focus-within:border-white/20 transition-colors">
       <textarea
         ref={textareaRef}
         value={prompt}
@@ -56,7 +56,7 @@ export const PromptInput: React.FC = () => {
         placeholder="Descreva o conteúdo que deseja gerar"
         rows={1}
         disabled={isCreating}
-        className="w-full bg-transparent px-5 py-4 pr-16 text-sm text-white placeholder:text-white/40 resize-none focus:outline-none disabled:opacity-50"
+        className="w-full bg-transparent px-5 py-4 pr-16 text-sm text-white placeholder:text-muted-foreground resize-none focus:outline-none disabled:opacity-50"
         style={{ minHeight: '56px', maxHeight: '200px' }}
       />
 
@@ -67,7 +67,7 @@ export const PromptInput: React.FC = () => {
         className={`absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
           canGenerate
             ? 'bg-white/10 text-white hover:bg-white/20 active:scale-95'
-            : 'bg-white/5 text-white/30 cursor-not-allowed'
+            : 'bg-white/5 text-muted-foreground cursor-not-allowed'
         }`}
         title={canGenerate ? 'Gerar imagem (⌘ Enter)' : 'Digite um prompt para gerar'}
       >

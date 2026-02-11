@@ -146,7 +146,7 @@ export function csrfProtection(req, res, next) {
       if (!token) {
         // Generate new token
         token = generateCsrfToken();
-        logger.debug(
+        logger.trace(
           { requestId: req.id, method, url: req.url },
           "Generated new CSRF token"
         );
@@ -193,11 +193,6 @@ export function csrfProtection(req, res, next) {
 
     // Token is valid, store on request and continue
     req.csrfToken = cookieToken;
-
-    logger.debug(
-      { requestId: req.id, method, url: req.url },
-      "CSRF token validated successfully"
-    );
 
     next();
   } catch (error) {

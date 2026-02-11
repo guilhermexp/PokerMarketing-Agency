@@ -47,19 +47,19 @@ export const ManualEventModal: React.FC<{
     if (!isOpen) return null;
 
     const inputClass =
-        "w-full bg-transparent border border-white/[0.06] rounded-md px-3 py-2 text-xs text-white outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive placeholder:text-white/20";
-    const labelClass = "text-[9px] text-white/30";
+        "w-full bg-transparent border border-border rounded-md px-3 py-2 text-xs text-white outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive placeholder:text-muted-foreground";
+    const labelClass = "text-[9px] text-muted-foreground";
 
     return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
-            <Card className="w-full max-w-2xl border-white/[0.05] bg-[#0a0a0a] overflow-hidden max-h-[90vh] flex flex-col">
+            <Card className="w-full max-w-2xl border-border bg-background overflow-hidden max-h-[90vh] flex flex-col">
                 <div className="px-4 py-3 flex justify-between items-center">
                     <h3 className="text-[13px] font-semibold text-white">
                         Adicionar Torneio
                     </h3>
                     <button
                         onClick={onClose}
-                        className="text-white/20 hover:text-white transition-colors"
+                        className="text-muted-foreground hover:text-white transition-colors"
                     >
                         <Icon name="x" className="w-4 h-4" />
                     </button>

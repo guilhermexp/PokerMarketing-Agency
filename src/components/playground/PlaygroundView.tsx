@@ -118,9 +118,9 @@ const ConfigPanel: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-black/40 backdrop-blur-xl">
-      <div className="px-4 py-5 border-b border-white/10">
+      <div className="px-4 py-5 border-b border-border">
         <h1 className="text-2xl font-bold text-white">Studio Video</h1>
-        <p className="text-xs text-white/50 mt-1">Defina parametros e gere videos em segundos</p>
+        <p className="text-xs text-muted-foreground mt-1">Defina parametros e gere videos em segundos</p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -130,7 +130,7 @@ const ConfigPanel: React.FC = () => {
           <select
             value={model}
             onChange={(e) => setModel(e.target.value as VideoModel)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white focus:outline-none focus:border-white/20 transition-colors appearance-none cursor-pointer"
+            className="w-full bg-white/5 border border-border rounded-xl px-4 py-3 pl-10 text-sm text-white focus:outline-none focus:border-white/20 transition-colors appearance-none cursor-pointer"
           >
             {MODEL_OPTIONS.map((option) => (
               <option key={option.value} value={option.value} className="bg-black">
@@ -154,7 +154,7 @@ const ConfigPanel: React.FC = () => {
             className={`flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200 ${
               useBrandProfile
                 ? 'bg-white text-black shadow-md'
-                : 'bg-white/5 text-white/60 border border-white/10 hover:text-white hover:border-white/20'
+                : 'bg-white/5 text-muted-foreground border border-border hover:text-white'
             }`}
             title={useBrandProfile ? 'Diretrizes da marca ativas' : 'Diretrizes da marca desativadas'}
           >
@@ -169,7 +169,7 @@ const ConfigPanel: React.FC = () => {
             {referenceImage && (
               <button
                 onClick={clearReferenceImage}
-                className="text-xs text-white/50 hover:text-white transition-colors"
+                className="text-xs text-muted-foreground hover:text-white transition-colors"
               >
                 Remover
               </button>
@@ -185,7 +185,7 @@ const ConfigPanel: React.FC = () => {
           />
 
           {referenceImage ? (
-            <div className="relative rounded-xl overflow-hidden border border-white/10 bg-white/5">
+            <div className="relative rounded-xl overflow-hidden border border-border bg-white/5">
               <img
                 src={`data:${referenceImage.mimeType};base64,${referenceImage.dataUrl}`}
                 alt="Referência"
@@ -202,7 +202,7 @@ const ConfigPanel: React.FC = () => {
           ) : (
             <button
               onClick={() => referenceInputRef.current?.click()}
-              className="w-full border-2 border-dashed border-white/10 rounded-xl p-6 flex flex-col items-center justify-center gap-2 hover:border-white/20 hover:bg-white/5 transition-colors"
+              className="w-full border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center gap-2 hover:border-white/20 hover:bg-white/5 transition-colors"
             >
               <Upload className="w-6 h-6 text-white/35" />
               <span className="text-xs text-white/45">Adicionar imagem para guiar o video</span>
@@ -220,8 +220,8 @@ const ConfigPanel: React.FC = () => {
                 onClick={() => setAspectRatio(ratio.value)}
                 className={`py-2.5 rounded-xl text-sm font-medium transition-all ${
                   aspectRatio === ratio.value
-                    ? 'bg-white/15 border border-white/20 text-white'
-                    : 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white/15 border border-border text-white'
+                    : 'bg-white/5 border border-border text-muted-foreground hover:bg-white/10 hover:text-white'
                 }`}
               >
                 {ratio.label}
@@ -240,8 +240,8 @@ const ConfigPanel: React.FC = () => {
                 onClick={() => setResolution(item.value)}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   resolution === item.value
-                    ? 'bg-white/15 border border-white/20 text-white'
-                    : 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white/15 border border-border text-white'
+                    : 'bg-white/5 border border-border text-muted-foreground hover:bg-white/10 hover:text-white'
                 }`}
               >
                 {item.label}
@@ -302,7 +302,7 @@ const TopicItem: React.FC<TopicItemProps> = ({
 
   if (isEditing) {
     return (
-      <div className="p-2 bg-white/5 rounded-xl border border-white/10">
+      <div className="p-2 bg-white/5 rounded-xl border border-border">
         <input
           type="text"
           value={editTitle}
@@ -320,7 +320,7 @@ const TopicItem: React.FC<TopicItemProps> = ({
             onClick={handleCancelEdit}
             className="p-1 rounded hover:bg-white/10 transition-colors"
           >
-            <X className="w-3.5 h-3.5 text-white/40" />
+            <X className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
           <button
             onClick={handleSaveEdit}
@@ -336,7 +336,7 @@ const TopicItem: React.FC<TopicItemProps> = ({
   return (
     <div
       className={`relative group rounded-xl transition-colors cursor-pointer overflow-hidden ${
-        isActive ? 'ring-2 ring-primary/50' : 'hover:ring-1 hover:ring-white/20'
+        isActive ? 'ring-2 ring-primary/50' : 'hover:ring-1 hover:ring-ring'
       }`}
     >
       <button
@@ -352,7 +352,7 @@ const TopicItem: React.FC<TopicItemProps> = ({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Video className="w-8 h-8 text-white/20" />
+            <Video className="w-8 h-8 text-muted-foreground" />
           </div>
         )}
       </button>
@@ -408,7 +408,7 @@ const TopicsSidebar: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-black/40 backdrop-blur-xl">
-      <div className="px-3 py-3 border-b border-white/10 flex items-center justify-center">
+      <div className="px-3 py-3 border-b border-border flex items-center justify-center">
         <button
           onClick={handleCreateTopic}
           disabled={isCreating}
@@ -416,9 +416,9 @@ const TopicsSidebar: React.FC = () => {
           title="Novo projeto"
         >
           {isCreating ? (
-            <Loader2 className="w-5 h-5 text-white/60 animate-spin shrink-0" />
+            <Loader2 className="w-5 h-5 text-muted-foreground animate-spin shrink-0" />
           ) : (
-            <Plus className="w-5 h-5 text-white/60 shrink-0" />
+            <Plus className="w-5 h-5 text-muted-foreground shrink-0" />
           )}
         </button>
       </div>
@@ -426,12 +426,12 @@ const TopicsSidebar: React.FC = () => {
       <div className="flex-1 overflow-y-auto py-3 px-3">
         {topicsLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-5 h-5 text-white/40 animate-spin" />
+            <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
           </div>
         ) : topics.length === 0 ? (
           <div className="text-center py-8">
             <div className="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center mx-auto">
-              <Film className="w-7 h-7 text-white/30" />
+              <Film className="w-7 h-7 text-muted-foreground" />
             </div>
           </div>
         ) : (
@@ -525,7 +525,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ brandProfile, onAddImageToGallery
               animate={{ opacity: 1, y: 24, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="fixed top-0 left-1/2 -translate-x-1/2 z-[2147483645] bg-[#000000]/95 border border-white/10 text-white px-5 py-3 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] backdrop-blur-2xl max-w-md text-center text-sm font-medium flex items-center gap-3"
+              className="fixed top-0 left-1/2 -translate-x-1/2 z-[2147483645] bg-[#000000]/95 border border-border text-white px-5 py-3 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] backdrop-blur-2xl max-w-md text-center text-sm font-medium flex items-center gap-3"
             >
               <div className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
               {errorToast}
@@ -534,11 +534,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ brandProfile, onAddImageToGallery
         </AnimatePresence>
       </OverlayPortal>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#0a0a0a]">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background">
         {!showEmptyState && (
-          <div className="px-6 py-4 border-b border-white/10">
+          <div className="px-6 py-4 border-b border-border">
             <h1 className="text-xl font-semibold text-white">Studio Video</h1>
-            <p className="text-xs text-white/50 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Gerencie suas geracoes de video
             </p>
           </div>
@@ -547,14 +547,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ brandProfile, onAddImageToGallery
         {showEmptyState ? (
           <div className="flex-1 flex flex-col items-center justify-center px-6">
             <div className="flex items-center gap-4 mb-8">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-border flex items-center justify-center">
                 <Video className="w-8 h-8 text-white/75" />
               </div>
               <h1 className="text-4xl font-semibold text-white">Studio Video</h1>
             </div>
 
             <div className="w-full max-w-2xl">
-              <div className="relative bg-white/5 border border-white/10 rounded-2xl overflow-hidden focus-within:border-white/20 transition-colors">
+              <div className="relative bg-white/5 border border-border rounded-2xl overflow-hidden focus-within:border-white/20 transition-colors">
                 <textarea
                   ref={promptRef}
                   value={prompt}
@@ -565,7 +565,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ brandProfile, onAddImageToGallery
                   }}
                   onKeyDown={handlePromptKeyDown}
                   rows={1}
-                  className="w-full bg-transparent px-5 py-4 pr-16 text-sm text-white placeholder:text-white/40 resize-none focus:outline-none"
+                  className="w-full bg-transparent px-5 py-4 pr-16 text-sm text-white placeholder:text-muted-foreground resize-none focus:outline-none"
                   placeholder="Descreva a cena do video que deseja gerar"
                   style={{ minHeight: '56px', maxHeight: '180px' }}
                 />
@@ -576,7 +576,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ brandProfile, onAddImageToGallery
                   className={`absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
                     canGenerate
                       ? 'bg-white/10 text-white hover:bg-white/20 active:scale-95'
-                      : 'bg-white/5 text-white/30 cursor-not-allowed'
+                      : 'bg-white/5 text-muted-foreground cursor-not-allowed'
                   }`}
                   title="Gerar video (Ctrl/Cmd + Enter)"
                 >
@@ -590,7 +590,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ brandProfile, onAddImageToGallery
             <div className="flex-1 overflow-y-auto no-scrollbar">
               {sessionsLoading ? (
                 <div className="flex items-center justify-center py-20">
-                  <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
                 </div>
               ) : (
                 <div className="p-6 grid grid-cols-[repeat(auto-fill,minmax(240px,340px))] gap-6 justify-center xl:justify-start">
@@ -609,8 +609,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ brandProfile, onAddImageToGallery
               )}
             </div>
 
-            <div className="border-t border-white/10 p-4 bg-black/40 backdrop-blur-xl">
-              <div className="relative bg-white/5 border border-white/10 rounded-2xl overflow-hidden focus-within:border-white/20 transition-colors">
+            <div className="border-t border-border p-4 bg-black/40 backdrop-blur-xl">
+              <div className="relative bg-white/5 border border-border rounded-2xl overflow-hidden focus-within:border-white/20 transition-colors">
                 <textarea
                   ref={promptRef}
                   value={prompt}
@@ -621,7 +621,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ brandProfile, onAddImageToGallery
                   }}
                   onKeyDown={handlePromptKeyDown}
                   rows={1}
-                  className="w-full bg-transparent px-5 py-4 pr-16 text-sm text-white placeholder:text-white/40 resize-none focus:outline-none"
+                  className="w-full bg-transparent px-5 py-4 pr-16 text-sm text-white placeholder:text-muted-foreground resize-none focus:outline-none"
                   placeholder="Descreva o proximo video"
                   style={{ minHeight: '56px', maxHeight: '180px' }}
                 />
@@ -632,7 +632,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ brandProfile, onAddImageToGallery
                   className={`absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
                     canGenerate
                       ? 'bg-white/10 text-white hover:bg-white/20 active:scale-95'
-                      : 'bg-white/5 text-white/30 cursor-not-allowed'
+                      : 'bg-white/5 text-muted-foreground cursor-not-allowed'
                   }`}
                   title="Gerar video (Ctrl/Cmd + Enter)"
                 >
@@ -659,9 +659,9 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({
   useVideoPlaygroundTopics();
 
   return (
-    <div className="h-full w-full bg-[#0a0a0a] text-white flex overflow-hidden">
+    <div className="h-full w-full bg-background text-white flex overflow-hidden">
       {/* Left Panel: Config */}
-      <div className="w-80 shrink-0 border-r border-white/10 overflow-y-auto no-scrollbar">
+      <div className="w-80 shrink-0 border-r border-border overflow-y-auto no-scrollbar">
         <ConfigPanel />
       </div>
 
@@ -669,7 +669,7 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({
       <Workspace brandProfile={brandProfile} onAddImageToGallery={onAddImageToGallery} />
 
       {/* Right Panel: Topics Sidebar */}
-      <div className="w-20 shrink-0 border-l border-white/10 overflow-y-auto no-scrollbar">
+      <div className="w-20 shrink-0 border-l border-border overflow-y-auto no-scrollbar">
         <TopicsSidebar />
       </div>
     </div>

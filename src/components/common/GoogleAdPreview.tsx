@@ -51,7 +51,7 @@ export const GoogleAdPreview: React.FC<GoogleAdPreviewProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Google Display Ad Card */}
-      <div className="w-full bg-black rounded-xl border border-white/10 overflow-hidden flex-1 flex flex-col shadow-sm">
+      <div className="w-full bg-black rounded-xl border border-border overflow-hidden flex-1 flex flex-col shadow-sm">
         {/* Image - main focus */}
         <div
           className={`flex-1 bg-black overflow-hidden min-h-[120px] relative ${onImageClick ? "cursor-pointer" : ""}`}
@@ -92,9 +92,9 @@ export const GoogleAdPreview: React.FC<GoogleAdPreviewProps> = ({
             </div>
           ) : !isGenerating ? (
             <div className="w-full h-full flex flex-col items-center justify-center p-3">
-              <Icon name="image" className="w-8 h-8 text-white/20 mb-2" />
+              <Icon name="image" className="w-8 h-8 text-muted-foreground mb-2" />
               {imagePrompt && (
-                <p className="text-[8px] text-white/30 italic text-center line-clamp-2">
+                <p className="text-[8px] text-muted-foreground italic text-center line-clamp-2">
                   "{imagePrompt}"
                 </p>
               )}
@@ -104,7 +104,7 @@ export const GoogleAdPreview: React.FC<GoogleAdPreviewProps> = ({
                     e.stopPropagation();
                     onGenerate();
                   }}
-                  className="mt-2 px-3 py-1 text-[9px] font-medium rounded-md bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors flex items-center gap-1 border border-white/5"
+                  className="mt-2 px-3 py-1 text-[9px] font-medium rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white/80 transition-colors flex items-center gap-1 border border-border"
                 >
                   <Icon name="zap" className="w-3 h-3" />
                   Gerar
@@ -127,7 +127,7 @@ export const GoogleAdPreview: React.FC<GoogleAdPreviewProps> = ({
           </div>
 
           {/* Description */}
-          <p className="text-[10px] text-white/60 leading-relaxed mt-1 line-clamp-2">
+          <p className="text-[10px] text-muted-foreground leading-relaxed mt-1 line-clamp-2">
             {body}
           </p>
 
@@ -138,7 +138,7 @@ export const GoogleAdPreview: React.FC<GoogleAdPreviewProps> = ({
         </div>
 
         {/* Google branding */}
-        <div className="px-3 py-1.5 bg-white/5 border-t border-white/10 flex items-center justify-between">
+        <div className="px-3 py-1.5 bg-white/5 border-t border-border flex items-center justify-between">
           <div className="flex items-center gap-1">
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -146,9 +146,9 @@ export const GoogleAdPreview: React.FC<GoogleAdPreviewProps> = ({
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-            <span className="text-[9px] text-white/40">Google Ads</span>
+            <span className="text-[9px] text-muted-foreground">Google Ads</span>
           </div>
-          <Icon name="info" className="w-3.5 h-3.5 text-white/40" />
+          <Icon name="info" className="w-3.5 h-3.5 text-muted-foreground" />
         </div>
       </div>
       {error && (

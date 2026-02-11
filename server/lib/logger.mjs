@@ -61,8 +61,8 @@ const logger = pino({
           options: {
             colorize: true,
             translateTime: 'HH:MM:ss Z',
-            ignore: 'pid,hostname',
-            singleLine: false,
+            ignore: 'pid,hostname,request,response,duration',
+            singleLine: true,
             messageFormat: '{msg}',
             errorLikeObjectKeys: ['err', 'error'],
           },

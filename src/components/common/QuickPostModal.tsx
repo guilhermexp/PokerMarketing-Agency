@@ -196,34 +196,34 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
 
     return createPortal(
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl z-[300] flex items-center justify-center p-3 sm:p-4 md:p-6">
-            <Card className="w-full max-w-[95vw] md:max-w-4xl lg:max-w-5xl border-white/10 bg-[#080808] overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
+            <Card className="w-full max-w-[95vw] md:max-w-4xl lg:max-w-5xl border-border bg-background overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
                 {/* Header */}
-                <div className="px-4 sm:px-5 py-3 border-b border-white/5 flex justify-between items-center bg-[#0d0d0d] shrink-0">
+                <div className="px-4 sm:px-5 py-3 border-b border-border flex justify-between items-center bg-card shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
                             <Icon name="instagram" className="w-4 h-4 text-white/70" />
                         </div>
                         <div>
                             <h3 className="text-xs sm:text-sm font-bold text-white/90 uppercase tracking-wide">QuickPost</h3>
-                            <p className="text-[9px] text-white/40">Publicar no Instagram</p>
+                            <p className="text-[9px] text-muted-foreground">Publicar no Instagram</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all"
+                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-muted-foreground hover:text-white transition-all"
                     >
                         <Icon name="x" className="w-4 h-4" />
                     </button>
                 </div>
 
                 {/* Content Type Selector - Fixed at top */}
-                <div className="px-4 sm:px-5 py-3 border-b border-white/5 bg-[#0a0a0a] shrink-0">
+                <div className="px-4 sm:px-5 py-3 border-b border-border bg-background shrink-0">
                     <div className="flex gap-2 justify-center">
                         <button
                             onClick={() => setContentType('photo')}
                             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wide transition-all ${contentType === 'photo'
                                     ? 'bg-primary text-black shadow-lg shadow-primary/30'
-                                    : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/70'
+                                    : 'bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white/70'
                                 }`}
                         >
                             <Icon name="image" className="w-4 h-4" />
@@ -232,8 +232,8 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                         <button
                             onClick={() => setContentType('story')}
                             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wide transition-all ${contentType === 'story'
-                                    ? 'bg-white/15 text-white border border-white/20'
-                                    : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/70'
+                                    ? 'bg-white/15 text-white border border-border'
+                                    : 'bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white/70'
                                 }`}
                         >
                             <Icon name="stories" className="w-4 h-4" />
@@ -247,7 +247,7 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 p-4 sm:p-5 md:p-6 min-h-full">
                         {/* Left: Image Preview */}
                         <div className="flex flex-col items-center justify-center">
-                            <div className={`relative w-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black ${contentType === 'story' ? 'aspect-[9/16] max-w-[280px]' : 'aspect-square max-w-[320px]'
+                            <div className={`relative w-full rounded-2xl overflow-hidden border border-border shadow-2xl bg-black ${contentType === 'story' ? 'aspect-[9/16] max-w-[280px]' : 'aspect-square max-w-[320px]'
                                 } mx-auto`}>
                                 {isVideo ? (
                                     <video
@@ -274,7 +274,7 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                                     <Icon name="bookmark" className="w-5 h-5 text-white/80" />
                                 </div>
                             </div>
-                            <p className="text-[9px] text-white/30 mt-3 text-center font-medium">
+                            <p className="text-[9px] text-muted-foreground mt-3 text-center font-medium">
                                 Preview {contentType === 'story' ? '9:16 Stories' : '1:1 Feed'}
                             </p>
                         </div>
@@ -283,7 +283,7 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                         <div className="flex flex-col space-y-4">
                             {/* Publishing Progress */}
                             {isPublishing && publishProgress && (
-                                <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 space-y-3">
+                                <div className="bg-background border border-border rounded-xl p-4 space-y-3">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-bold text-white/70 uppercase tracking-wide">
                                             {publishProgress.message}
@@ -325,50 +325,50 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
 
                             {/* Content Area */}
                             {isGenerating ? (
-                                <div className="flex-1 flex flex-col items-center justify-center py-8 space-y-4 bg-white/[0.02] rounded-xl border border-white/5">
+                                <div className="flex-1 flex flex-col items-center justify-center py-8 space-y-4 bg-white/[0.02] rounded-xl border border-border">
                                     <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                                        <Loader size={24} className="text-white/60" />
+                                        <Loader size={24} className="text-muted-foreground" />
                                     </div>
                                     <div className="text-center">
-                                        <p className="text-xs font-bold text-white/50 uppercase tracking-wide">Gerando Copy</p>
-                                        <p className="text-[10px] text-white/30 mt-1">Criando legenda otimizada...</p>
+                                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Gerando Copy</p>
+                                        <p className="text-[10px] text-muted-foreground mt-1">Criando legenda otimizada...</p>
                                     </div>
                                 </div>
                             ) : post && contentType === 'photo' ? (
                                 <div className="flex-1 flex flex-col space-y-4">
                                     <div className="flex-1 space-y-2">
-                                        <label className="text-[10px] font-bold text-white/50 uppercase tracking-wide flex items-center gap-2">
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
                                             <Icon name="edit-3" className="w-3 h-3" />
                                             Legenda
                                         </label>
                                         <textarea
                                             value={editedContent}
                                             onChange={(e) => setEditedContent(e.target.value)}
-                                            className="w-full flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm leading-relaxed text-white/90 resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-[140px]"
+                                            className="w-full flex-1 bg-background border border-border rounded-xl px-4 py-3 text-sm leading-relaxed text-white/90 resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-[140px]"
                                             placeholder="Escreva sua legenda..."
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-white/50 uppercase tracking-wide flex items-center gap-2">
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
                                             <Icon name="hash" className="w-3 h-3" />
                                             Hashtags
                                         </label>
                                         <textarea
                                             value={editedHashtags}
                                             onChange={(e) => setEditedHashtags(e.target.value)}
-                                            className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm leading-relaxed text-primary/80 resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-[80px]"
+                                            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm leading-relaxed text-primary/80 resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-[80px]"
                                             placeholder="#hashtag1 #hashtag2..."
                                         />
                                     </div>
                                 </div>
                             ) : contentType === 'story' ? (
                                 <div className="flex-1 flex items-center justify-center">
-                                    <div className="bg-white/[0.03] border border-white/10 rounded-xl p-5 text-center max-w-xs">
+                                    <div className="bg-white/[0.03] border border-border rounded-xl p-5 text-center max-w-xs">
                                         <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-3">
-                                            <Icon name="stories" className="w-5 h-5 text-white/60" />
+                                            <Icon name="stories" className="w-5 h-5 text-muted-foreground" />
                                         </div>
                                         <h4 className="text-xs font-bold text-white/70 mb-1.5">Publicação Direta</h4>
-                                        <p className="text-[10px] text-white/40 leading-relaxed">
+                                        <p className="text-[10px] text-muted-foreground leading-relaxed">
                                             Stories não suportam legendas. A imagem será publicada no formato 9:16.
                                         </p>
                                     </div>
@@ -379,7 +379,7 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-4 sm:p-5 border-t border-white/5 bg-[#0d0d0d] shrink-0">
+                <div className="p-4 sm:p-5 border-t border-border bg-card shrink-0">
                     <div className="flex flex-col sm:flex-row gap-3">
                         <Button
                             onClick={handlePublishNow}

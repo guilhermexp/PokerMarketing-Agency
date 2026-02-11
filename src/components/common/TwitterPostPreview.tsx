@@ -54,7 +54,7 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Twitter Card */}
-      <div className="w-full bg-black rounded-2xl border border-white/20 overflow-hidden flex-1 flex flex-col">
+      <div className="w-full bg-black rounded-2xl border border-border overflow-hidden flex-1 flex flex-col">
         {/* Header */}
         <div className="p-3 pb-2 flex items-start gap-2.5">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
@@ -70,7 +70,7 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
               <svg className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .494.083.964.237 1.4-1.272.65-2.147 2.018-2.147 3.6 0 1.495.782 2.798 1.942 3.486-.02.17-.032.34-.032.514 0 2.21 1.708 4 3.818 4 .47 0 .92-.086 1.335-.25.62 1.334 1.926 2.25 3.437 2.25 1.512 0 2.818-.916 3.437-2.25.415.163.865.248 1.336.248 2.11 0 3.818-1.79 3.818-4 0-.174-.012-.344-.033-.513 1.158-.687 1.943-1.99 1.943-3.484zm-6.616-3.334l-4.334 6.5c-.145.217-.382.334-.625.334-.143 0-.288-.04-.416-.126l-.115-.094-2.415-2.415c-.293-.293-.293-.768 0-1.06s.768-.294 1.06 0l1.77 1.767 3.825-5.74c.23-.345.696-.436 1.04-.207.346.23.44.696.21 1.04z" />
               </svg>
-              <span className="text-[10px] text-white/50">
+              <span className="text-[10px] text-muted-foreground">
                 {displayHandle} · 2h
               </span>
             </div>
@@ -110,9 +110,9 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
             </div>
           ) : !isGenerating ? (
             <div className="w-full h-full flex flex-col items-center justify-center p-3">
-              <Icon name="image" className="w-8 h-8 text-white/10 mb-2" />
+              <Icon name="image" className="w-8 h-8 text-muted-foreground mb-2" />
               {imagePrompt && (
-                <p className="text-[8px] text-white/20 italic text-center line-clamp-2">
+                <p className="text-[8px] text-muted-foreground italic text-center line-clamp-2">
                   "{imagePrompt}"
                 </p>
               )}
@@ -122,7 +122,7 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
                     e.stopPropagation();
                     onGenerate();
                   }}
-                  className="mt-2 px-3 py-1 text-[9px] font-medium rounded-md bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors flex items-center gap-1 border border-white/5"
+                  className="mt-2 px-3 py-1 text-[9px] font-medium rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white/80 transition-colors flex items-center gap-1 border border-border"
                 >
                   <Icon name="zap" className="w-3 h-3" />
                   Gerar
@@ -134,14 +134,14 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
 
         {/* Regenerate button - integrated in mockup when image exists */}
         {image && !isGenerating && onRegenerate && (
-          <div className="px-3 py-2 border-t border-white/5">
+          <div className="px-3 py-2 border-t border-border">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onRegenerate();
               }}
               disabled={isGenerating}
-              className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 border border-white/5"
+              className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 border border-border"
             >
               <Icon name="refresh" className="w-3 h-3" />
               Regenerar imagem
@@ -156,7 +156,7 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
               {cleanHashtags.slice(0, 4).join(' ')}
             </p>
           )}
-          <div className="flex items-center justify-between text-white/40">
+          <div className="flex items-center justify-between text-muted-foreground">
             <div className="flex items-center gap-1 hover:text-blue-400 transition-colors cursor-pointer">
               <Icon name="message-circle" className="w-4 h-4" />
               <span className="text-[10px]">24</span>

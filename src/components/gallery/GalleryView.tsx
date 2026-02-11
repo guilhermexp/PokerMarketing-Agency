@@ -107,14 +107,14 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
   return (
     <div
       onClick={handleClick}
-      className={`group relative overflow-hidden rounded-xl border transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 ${
+      className={`group relative overflow-hidden rounded-xl border transition-all hover:shadow-lg hover:shadow-black/20 ${
         isAudio(image) && !isSelectMode ? "" : "cursor-pointer"
       } ${
         isSelected
-          ? "border-primary/60 ring-2 ring-primary/40 bg-[#111111]"
+          ? "border-primary/60 ring-2 ring-primary/40 bg-card"
           : showHighlight
-          ? "border-primary/60 shadow-lg shadow-primary/30 animate-[pulse_2s_ease-in-out] bg-[#111111]"
-          : "border-white/5 bg-[#111111]"
+          ? "border-primary/60 shadow-lg shadow-primary/30 animate-[pulse_2s_ease-in-out] bg-card"
+          : "border-border bg-card"
       } ${className}`}
     >
       {isAudio(image) ? (
@@ -122,11 +122,11 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
           <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-2">
             <Icon name="volume-2" className="w-6 h-6 text-primary" />
           </div>
-          <p className="text-[9px] text-white/60 font-bold uppercase tracking-wide mb-1">
+          <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-wide mb-1">
             Narração
           </p>
           {image.duration && (
-            <span className="text-[10px] text-white/40 font-mono mb-2">
+            <span className="text-[10px] text-muted-foreground font-mono mb-2">
               {formatDuration(image.duration)}
             </span>
           )}
@@ -153,10 +153,10 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
             <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mb-2">
               <Icon name="alert-triangle" className="w-6 h-6 text-red-400" />
             </div>
-            <p className="text-[10px] text-white/60 font-bold uppercase tracking-wide text-center">
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wide text-center">
               Vídeo indisponível
             </p>
-            <p className="text-[8px] text-white/40 mt-1 text-center">
+            <p className="text-[8px] text-muted-foreground mt-1 text-center">
               O arquivo pode ter expirado
             </p>
           </div>
@@ -180,9 +180,9 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
         // Fallback when image fails to load
         <div className="w-full aspect-square bg-gradient-to-br from-white/[0.02] via-[#1a1a1a] to-[#111] flex flex-col items-center justify-center p-4">
           <div className="w-10 h-10 rounded-full bg-white/[0.06] flex items-center justify-center mb-2">
-            <Icon name="image" className="w-5 h-5 text-white/20" />
+            <Icon name="image" className="w-5 h-5 text-muted-foreground" />
           </div>
-          <p className="text-[9px] text-white/30 font-medium text-center">
+          <p className="text-[9px] text-muted-foreground font-medium text-center">
             Imagem indisponível
           </p>
         </div>
@@ -190,7 +190,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
         <div className="relative w-full min-h-[120px]">
           {/* Shimmer placeholder */}
           {!isLoaded && (
-            <div className="absolute inset-0 bg-[#1a1a1a] rounded-xl overflow-hidden">
+            <div className="absolute inset-0 bg-muted rounded-xl overflow-hidden">
               <div
                 className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
                 style={{
@@ -654,7 +654,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
 
       <div className="min-h-screen flex flex-col">
         {/* Sticky Header */}
-        <header className="sticky top-0 bg-black border-b border-white/10 z-50 -mx-4 sm:-mx-6 px-4 sm:px-6">
+        <header className="sticky top-0 bg-black border-b border-border z-50 -mx-4 sm:-mx-6 px-4 sm:px-6">
           <div className="py-4">
             <div
               className="flex justify-between items-start gap-3 mb-6"
@@ -664,7 +664,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                 <h1 className="text-3xl font-semibold text-white tracking-tight">
                   {viewMode === "gallery" ? "Galeria" : "Favoritos"}
                 </h1>
-                <p className="text-[11px] text-white/30 uppercase tracking-wider mt-1">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider mt-1">
                   {stats.total} {stats.total === 1 ? "item" : "itens"}
                   {" • "}
                   {stats.favorites} favorito{stats.favorites !== 1 ? "s" : ""}
@@ -679,13 +679,13 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
 
               <div className="flex items-center gap-2">
                 {/* View mode toggles */}
-                <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full">
+                <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 backdrop-blur-2xl border border-border rounded-full">
                   <button
                     onClick={() => setViewMode("gallery")}
                     className={`px-2.5 py-1 rounded-full text-[9px] font-medium uppercase tracking-wide transition-all ${
                       viewMode === "gallery"
                         ? "bg-white/10 text-white"
-                        : "text-white/40 hover:text-white/60"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     Todas
@@ -695,7 +695,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                     className={`px-2.5 py-1 rounded-full text-[9px] font-medium uppercase tracking-wide transition-all ${
                       viewMode === "references"
                         ? "bg-white/10 text-white"
-                        : "text-white/40 hover:text-white/60"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     Favoritos
@@ -709,7 +709,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                     className={`flex items-center justify-center w-9 h-9 border rounded-lg transition-all active:scale-95 flex-shrink-0 ${
                       isSelectMode
                         ? "bg-primary/20 border-primary/40 text-primary"
-                        : "bg-transparent border-white/[0.06] text-white/50 hover:border-white/[0.1] hover:text-white/70"
+                        : "bg-transparent border-border text-muted-foreground hover:text-white/70"
                     }`}
                     title={isSelectMode ? "Cancelar seleção" : "Selecionar múltiplos"}
                   >
@@ -722,7 +722,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                   <button
                     onClick={handleRefresh}
                     disabled={isRefreshing}
-                    className="flex items-center justify-center w-9 h-9 bg-transparent border border-white/[0.06] rounded-lg text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center w-9 h-9 bg-transparent border border-border rounded-lg text-muted-foreground hover:text-white/70 transition-all active:scale-95 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Atualizar galeria"
                   >
                     <Icon
@@ -736,7 +736,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                 {viewMode === "references" && (
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
+                    className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-border rounded-lg text-[10px] font-bold text-muted-foreground uppercase tracking-wide hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
                   >
                     <Icon name="plus" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                     <span className="hidden sm:inline">Adicionar</span>
@@ -767,12 +767,12 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                         onClick={() => setSourceFilter(filter.value)}
                         className={`px-4 py-2 rounded-full text-sm font-medium backdrop-blur-2xl border shadow-[0_8px_30px_rgba(0,0,0,0.5)] whitespace-nowrap transition-all ${
                           sourceFilter === filter.value
-                            ? "bg-black/40 border-white/10 text-white/90"
-                            : "bg-black/40 border-white/10 text-white/60 hover:text-white/90 hover:border-white/30"
+                            ? "bg-black/40 border-border text-white/90"
+                            : "bg-black/40 border-border text-muted-foreground hover:text-white/90"
                         }`}
                       >
                         {filter.label}
-                        <span className="ml-1.5 text-white/40">{count}</span>
+                        <span className="ml-1.5 text-muted-foreground">{count}</span>
                       </button>
                     );
                   })}
@@ -784,7 +784,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
 
         {/* Selection Action Bar */}
         {isSelectMode && (
-          <div className="sticky top-[88px] z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 bg-black/90 backdrop-blur-xl border-b border-white/10">
+          <div className="sticky top-[88px] z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 bg-black/90 backdrop-blur-xl border-b border-border">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <span className="text-sm text-white/70">
@@ -799,7 +799,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                 {selectedIds.size > 0 && (
                   <button
                     onClick={clearSelection}
-                    className="text-xs text-white/50 hover:text-white/70 transition-colors"
+                    className="text-xs text-muted-foreground hover:text-white/70 transition-colors"
                   >
                     Limpar
                   </button>
@@ -816,7 +816,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                 </button>
                 <button
                   onClick={toggleSelectMode}
-                  className="px-3 py-1.5 text-xs text-white/50 hover:text-white/70 transition-colors"
+                  className="px-3 py-1.5 text-xs text-muted-foreground hover:text-white/70 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -836,7 +836,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
               <div className="w-12 h-12 mb-4">
                 <Icon name="refresh" className="w-12 h-12 text-primary animate-spin" />
               </div>
-              <p className="text-white/50 text-sm font-medium">
+              <p className="text-muted-foreground text-sm font-medium">
                 Carregando galeria...
               </p>
             </div>
@@ -870,7 +870,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
             </div>
           ) : (
             <div className="flex items-center justify-center w-full min-h-[60vh]">
-              <p className="text-white/30 text-sm">
+              <p className="text-muted-foreground text-sm">
                 Galeria vazia
               </p>
             </div>
@@ -885,7 +885,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                 <div className="w-12 h-12 mb-4">
                   <Icon name="refresh" className="w-12 h-12 text-primary animate-spin" />
                 </div>
-                <p className="text-white/50 text-sm font-medium">
+                <p className="text-muted-foreground text-sm font-medium">
                   Carregando favoritos...
                 </p>
               </div>
@@ -894,7 +894,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                 {[...styleReferences].reverse().map((ref) => (
                   <div
                     key={ref.id}
-                    className="group relative aspect-square overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-primary/30"
+                    className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-primary/30"
                   >
                     <img
                       src={ref.src}
@@ -910,7 +910,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                       <div className="flex gap-2">
                         <button
                           onClick={() => onSelectStyleReference(ref)}
-                          className="flex-1 px-3 py-1.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-xs font-medium text-white hover:bg-white/20 transition-all"
+                          className="flex-1 px-3 py-1.5 bg-white/10 backdrop-blur-sm border border-border rounded-lg text-xs font-medium text-white hover:bg-white/20 transition-all"
                         >
                           Usar
                         </button>
@@ -927,7 +927,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center w-full min-h-[60vh]">
-                <p className="text-white/30 text-sm">Nenhum favorito ainda</p>
+                <p className="text-muted-foreground text-sm">Nenhum favorito ainda</p>
               </div>
             )}
           </div>
@@ -936,23 +936,23 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
 
         {/* Fixed Pagination Footer */}
         {viewMode === "gallery" && totalPages > 1 && (
-          <footer className="sticky bottom-0 bg-black/80 backdrop-blur-xl border-t border-white/10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 z-40">
+          <footer className="sticky bottom-0 bg-black/80 backdrop-blur-xl border-t border-border -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 z-40">
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-white/90 hover:border-white/20 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Icon name="chevron-left" className="w-4 h-4" />
                 Anterior
               </button>
-              <span className="text-sm text-white/50 font-medium px-4">
+              <span className="text-sm text-muted-foreground font-medium px-4">
                 Página {currentPage} de {totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-white/90 hover:border-white/20 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Próxima
                 <Icon name="chevron-right" className="w-4 h-4" />

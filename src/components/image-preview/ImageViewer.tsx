@@ -134,7 +134,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = (props) => {
           <button
             onClick={onNavigatePrev}
             disabled={!onNavigatePrev || !hasPrev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-black/60 border border-white/10 text-white/60 hover:text-white hover:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-black/60 border border-border text-muted-foreground hover:text-white hover:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Anterior"
           >
             <Icon name="chevron-left" className="w-4 h-4" />
@@ -142,7 +142,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = (props) => {
           <button
             onClick={onNavigateNext}
             disabled={!onNavigateNext || !hasNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-black/60 border border-white/10 text-white/60 hover:text-white hover:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-black/60 border border-border text-muted-foreground hover:text-white hover:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Próximo"
           >
             <Icon name="chevron-right" className="w-4 h-4" />
@@ -150,30 +150,30 @@ export const ImageViewer: React.FC<ImageViewerProps> = (props) => {
         </>
       )}
 
-      <div className="absolute top-4 right-4 flex items-center gap-1 rounded-lg bg-black/60 border border-white/10 p-1">
+      <div className="absolute top-4 right-4 flex items-center gap-1 rounded-lg bg-black/60 border border-border p-1">
         <button
           onClick={handleZoomOut}
-          className="w-7 h-7 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/5 rounded-md text-[12px]"
+          className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/5 rounded-md text-[12px]"
           aria-label="Zoom out"
         >
           -
         </button>
         <button
           onClick={handleZoomIn}
-          className="w-7 h-7 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/5 rounded-md"
+          className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/5 rounded-md"
           aria-label="Zoom in"
         >
           <Icon name="plus" className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={handleReset}
-          className="px-2 h-7 text-[10px] text-white/50 hover:text-white hover:bg-white/5 rounded-md"
+          className="px-2 h-7 text-[10px] text-muted-foreground hover:text-white hover:bg-white/5 rounded-md"
         >
           Reset
         </button>
       </div>
 
-      <div className="absolute bottom-4 right-4 text-[9px] text-white/30 bg-black/50 rounded-md px-2 py-1">
+      <div className="absolute bottom-4 right-4 text-[9px] text-muted-foreground bg-black/50 rounded-md px-2 py-1">
         Ctrl/Cmd + scroll para zoom • Espaço + arraste para mover
       </div>
     </div>

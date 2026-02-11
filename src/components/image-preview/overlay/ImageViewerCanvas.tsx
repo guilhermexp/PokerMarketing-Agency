@@ -148,7 +148,7 @@ export const ImageViewerCanvas: React.FC<ImageViewerCanvasProps> = ({
           <button
             onClick={onNavigatePrev}
             disabled={!onNavigatePrev || !hasPrev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-black/60 border border-white/10 text-white/60 hover:text-white hover:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-black/60 border border-border text-muted-foreground hover:text-white hover:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Anterior"
           >
             <Icon name="chevron-left" className="w-4 h-4" />
@@ -156,7 +156,7 @@ export const ImageViewerCanvas: React.FC<ImageViewerCanvasProps> = ({
           <button
             onClick={onNavigateNext}
             disabled={!onNavigateNext || !hasNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-black/60 border border-white/10 text-white/60 hover:text-white hover:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-black/60 border border-border text-muted-foreground hover:text-white hover:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Próximo"
           >
             <Icon name="chevron-right" className="w-4 h-4" />
@@ -165,7 +165,7 @@ export const ImageViewerCanvas: React.FC<ImageViewerCanvasProps> = ({
       )}
 
       {/* Hint para controles - movido para canto superior esquerdo */}
-      <div className="absolute top-4 left-4 text-[9px] text-white/30 bg-black/50 rounded-md px-2 py-1">
+      <div className="absolute top-4 left-4 text-[9px] text-muted-foreground bg-black/50 rounded-md px-2 py-1">
         Espaço + arraste para mover
       </div>
     </div>

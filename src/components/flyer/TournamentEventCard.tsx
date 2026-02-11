@@ -215,21 +215,21 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
 
   return (
     <>
-      <Card className="overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+      <Card className="overflow-hidden bg-black/40 backdrop-blur-2xl border border-border shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
       {/* Header */}
       <div
-        className="flex items-center justify-between p-3 bg-black/20 border-b border-white/10 cursor-pointer hover:bg-white/5 transition-all"
+        className="flex items-center justify-between p-3 bg-black/20 border-b border-border cursor-pointer hover:bg-white/5 transition-all"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-3">
           <div className="flex flex-col">
-            <span className="text-xs text-white/40 font-mono uppercase">{event.day}</span>
+            <span className="text-xs text-muted-foreground font-mono uppercase">{event.day}</span>
             <span className="text-sm font-bold text-white">{event.times?.['-3']}</span>
           </div>
           <div className="w-px h-10 bg-white/10" />
           <div className="flex flex-col">
             <span className="text-sm font-bold text-white line-clamp-1">{event.name}</span>
-            <div className="flex items-center gap-2 text-xs text-white/60">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="text-white/90 font-mono">{biVal}</span>
               <span>|</span>
               <span className="font-mono">{event.structure}</span>
@@ -241,13 +241,13 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
         <div className="flex items-center gap-3">
           {gtdVal !== '---' && (
             <div className="flex flex-col items-end">
-              <span className="text-[10px] text-white/40 uppercase tracking-wider">GTD</span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">GTD</span>
               <span className="text-base font-black text-white/90 font-mono">{gtdVal}</span>
             </div>
           )}
           <Icon
             name="chevron-up"
-            className={`w-4 h-4 text-white/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
           />
         </div>
       </div>
@@ -260,10 +260,10 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
             <button
               onClick={handleGenerate}
               disabled={isGenerating}
-              className="flex items-center gap-2 px-4 py-2 bg-white/[0.08] backdrop-blur-2xl border border-white/20 rounded-full text-sm font-medium text-white hover:bg-white/[0.12] hover:border-white/30 transition-all active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 bg-white/[0.08] backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-white hover:bg-white/[0.12] hover:border-white/30 transition-all active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isGenerating ? (
-                <Loader size={16} className="text-white/60" />
+                <Loader size={16} className="text-muted-foreground" />
               ) : (
                 <Icon name="sparkles" className="w-4 h-4" />
               )}
@@ -271,7 +271,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
             </button>
             <button
               onClick={() => onSetChatReference(null)}
-              className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-muted-foreground hover:text-white/90 hover:border-white/30 transition-all active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
               <Icon name="eraser" className="w-4 h-4" />
               Limpar Referência

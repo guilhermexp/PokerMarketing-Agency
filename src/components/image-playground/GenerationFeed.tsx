@@ -44,7 +44,7 @@ export const GenerationFeed: React.FC<GenerationFeedProps> = ({ topicId }) => {
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
-        <div className="flex flex-col items-center gap-3 text-white/40">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
           <Loader size={24} />
           <span className="text-sm">Carregando gerações...</span>
         </div>

@@ -18,20 +18,20 @@ interface StatsCardProps {
 
 export function StatsCard({ title, value, icon, subtitle, change, color = 'default' }: StatsCardProps) {
   const iconColors = {
-    default: 'text-white/40',
+    default: 'text-muted-foreground',
     amber: 'text-amber-500',
     green: 'text-emerald-500',
     red: 'text-red-400',
   };
 
   return (
-    <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
+    <div className="bg-white/[0.02] border border-border rounded-lg p-4">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-white/40 mb-1">{title}</p>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">{title}</p>
           <p className="text-2xl font-semibold text-white/90 tabular-nums">{value}</p>
           {subtitle && (
-            <p className="text-[11px] text-white/40 mt-0.5">{subtitle}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>
           )}
           {change && (
             <div className="flex items-center gap-1.5 mt-2">
@@ -47,7 +47,7 @@ export function StatsCard({ title, value, icon, subtitle, change, color = 'defau
               <span className={`text-[11px] font-medium ${change.value >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
                 {change.value >= 0 ? '+' : ''}{change.value}%
               </span>
-              <span className="text-[11px] text-white/30">{change.label}</span>
+              <span className="text-[11px] text-muted-foreground">{change.label}</span>
             </div>
           )}
         </div>

@@ -292,12 +292,12 @@ export const PeriodCard: React.FC<{
         return (
             <>
                 <div
-                    className={`bg-[#0a0a0a] border rounded-xl overflow-hidden flex flex-col h-full transition-all ${styleReference ? "border-white/10" : "border-white/[0.05]"}`}
+                    className={`bg-background border rounded-xl overflow-hidden flex flex-col h-full transition-all ${styleReference ? "border-border" : "border-border"}`}
                 >
                 <div className="px-4 py-2.5 flex justify-between items-center">
                     <div className="text-left flex items-center gap-2">
                         {styleReference && (
-                            <div className="w-6 h-6 rounded overflow-hidden border border-white/10 flex-shrink-0">
+                            <div className="w-6 h-6 rounded overflow-hidden border border-border flex-shrink-0">
                                 <img
                                     src={styleReference.src}
                                     className="w-full h-full object-cover"
@@ -307,7 +307,7 @@ export const PeriodCard: React.FC<{
                         <div>
                             <h4 className="text-[11px] font-semibold text-white">{label}</h4>
                             <p
-                                className={`text-[9px] ${events.length > 0 ? "text-white/40" : "text-white/20"}`}
+                                className={`text-[9px] ${events.length > 0 ? "text-muted-foreground" : "text-muted-foreground"}`}
                             >
                                 {events.length} torneios
                             </p>
@@ -336,7 +336,7 @@ export const PeriodCard: React.FC<{
                                         className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
                                         title="Agendar publicação"
                                     >
-                                        <Icon name="calendar" className="w-4 h-4 text-white/60" />
+                                        <Icon name="calendar" className="w-4 h-4 text-muted-foreground" />
                                     </button>
                                 );
                             })()}

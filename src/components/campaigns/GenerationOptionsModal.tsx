@@ -113,8 +113,8 @@ const CountSelector: React.FC<{
         className={`
           w-7 h-7 rounded-md text-xs font-semibold transition-all
           ${count === num
-            ? 'bg-white/15 text-white border border-white/20'
-            : 'bg-white/5 text-white/40 hover:text-white/70 hover:bg-white/10'
+            ? 'bg-white/15 text-white border border-border'
+            : 'bg-white/5 text-muted-foreground hover:text-white/70 hover:bg-white/10'
           }
         `}
       >
@@ -148,17 +148,17 @@ const SectionCard: React.FC<{
     whileTap={{ scale: 0.99 }}
     className={`rounded-lg border p-4 transition-colors cursor-pointer flex flex-col h-full ${
       enabled
-        ? 'border-white/20 bg-white/[0.04]'
-        : 'border-white/10 bg-white/[0.02] hover:border-white/15'
+        ? 'border-border bg-white/[0.04]'
+        : 'border-border bg-white/[0.02] hover:border-white/15'
     }`}
   >
     <div className="flex items-start justify-between gap-3 mb-3">
       <div className="flex items-center gap-3 flex-1">
         <div className="flex-1">
-          <h3 className={`text-sm font-semibold ${enabled ? 'text-white' : 'text-white/60'}`}>
+          <h3 className={`text-sm font-semibold ${enabled ? 'text-white' : 'text-muted-foreground'}`}>
             {title}
           </h3>
-          <p className="text-xs text-white/40 mt-0.5">{description}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
         </div>
       </div>
 
@@ -166,7 +166,7 @@ const SectionCard: React.FC<{
         className={`px-2.5 py-1 rounded-md text-[10px] font-medium uppercase ${
           enabled
             ? 'bg-white/10 text-white'
-            : 'bg-white/5 text-white/30'
+            : 'bg-white/5 text-muted-foreground'
         }`}
       >
         {enabled ? 'Ativo' : 'Off'}
@@ -175,8 +175,8 @@ const SectionCard: React.FC<{
 
     {enabled && children && <div className="mt-3 flex-1" onClick={(e) => e.stopPropagation()}>{children}</div>}
 
-    <div className="flex items-center justify-between pt-3 border-t border-white/10 mt-auto">
-      <span className="text-xs text-white/40">Quantidade:</span>
+    <div className="flex items-center justify-between pt-3 border-t border-border mt-auto">
+      <span className="text-xs text-muted-foreground">Quantidade:</span>
       <div onClick={(e) => e.stopPropagation()}>
         <CountSelector count={count} disabled={!enabled} onChange={onCountChange} />
       </div>
@@ -195,13 +195,13 @@ const SubOption: React.FC<{
     className={`
       px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2
       ${enabled
-        ? 'bg-white/10 text-white border border-white/20'
-        : 'text-white/40 hover:text-white/60 border border-white/10 hover:border-white/15 bg-white/5'
+        ? 'bg-white/10 text-white border border-border'
+        : 'text-muted-foreground hover:text-foreground border border-border hover:border-white/15 bg-white/5'
       }
     `}
   >
     {icon && (
-      <span className={enabled ? 'text-white' : 'text-white/40'}>
+      <span className={enabled ? 'text-white' : 'text-muted-foreground'}>
         {icon}
       </span>
     )}
@@ -314,10 +314,10 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="bg-[#0a0a0a] rounded-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto border border-white/10"
+            className="bg-background rounded-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto border border-border"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-white/10">
+            <div className="p-4 border-b border-border">
               <motion.h2
                 variants={itemVariants}
                 className="text-lg font-semibold text-white mb-1"
@@ -326,7 +326,7 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
               </motion.h2>
               <motion.p
                 variants={itemVariants}
-                className="text-xs text-white/50"
+                className="text-xs text-muted-foreground"
               >
                 Escolha os tipos de conteúdo e quantos você quer gerar
               </motion.p>
@@ -371,8 +371,8 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
               onToggle={togglePosts}
               onCountChange={setPostsCount}
             >
-              <div className="bg-black/20 border border-white/10 rounded-lg p-2">
-                <p className="text-[10px] text-white/50 mb-2">
+              <div className="bg-black/20 border border-border rounded-lg p-2">
+                <p className="text-[10px] text-muted-foreground mb-2">
                   Plataformas:
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -412,8 +412,8 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
               onToggle={toggleAds}
               onCountChange={setAdsCount}
             >
-              <div className="bg-black/20 border border-white/10 rounded-lg p-2">
-                <p className="text-[10px] text-white/50 mb-2">
+              <div className="bg-black/20 border border-border rounded-lg p-2">
+                <p className="text-[10px] text-muted-foreground mb-2">
                   Canais:
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -437,9 +437,9 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
 
           <motion.div
             variants={itemVariants}
-            className="p-4 flex items-center justify-between border-t border-white/10"
+            className="p-4 flex items-center justify-between border-t border-border"
           >
-            <span className="text-xs text-white/40">
+            <span className="text-xs text-muted-foreground">
               {totalCount > 0 ? `${totalCount} ${totalCount === 1 ? 'item' : 'itens'}` : 'Selecione uma opção'}
             </span>
             <div className="flex gap-2">

@@ -195,12 +195,12 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
     return (
       <div className="flex flex-col items-center justify-center py-12 px-6">
         <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-          <Icon name="image" className="w-8 h-8 text-white/20" />
+          <Icon name="image" className="w-8 h-8 text-muted-foreground" />
         </div>
-        <p className="text-sm font-semibold text-white/40 text-center">
+        <p className="text-sm font-semibold text-muted-foreground text-center">
           Nenhum flyer gerado ainda
         </p>
-        <p className="text-xs text-white/20 text-center mt-1">
+        <p className="text-xs text-muted-foreground text-center mt-1">
           Gere seus primeiros flyers para vê-los aqui
         </p>
       </div>
@@ -210,13 +210,13 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/10 bg-black/40">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border bg-black/40">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-3">
           <div>
             <h3 className="text-sm font-semibold text-white">
               Galeria de Flyers
             </h3>
-            <p className="text-xs text-white/40 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {displayedFlyers.length} {displayedFlyers.length === 1 ? 'flyer' : 'flyers'}
             </p>
           </div>
@@ -225,7 +225,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
               <button
                 onClick={handleShareDayWhatsApp}
                 disabled={selectedDayFlyers.length === 0 || isSharing}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-[10px] sm:text-xs font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-[10px] sm:text-xs font-medium text-muted-foreground hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed "
               >
                 <Icon name="send" className="w-3 h-3" />
                 <span className="hidden sm:inline">{isSharing ? "Enviando..." : `WhatsApp (${DAY_TRANSLATIONS[selectedDay] || selectedDay})`}</span>
@@ -233,7 +233,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
               </button>
               <button
                 onClick={handleDownloadAll}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-[10px] sm:text-xs font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-[10px] sm:text-xs font-medium text-muted-foreground hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
               >
                 <Icon name="download" className="w-3 h-3" />
                 <span className="hidden sm:inline">Baixar Todos</span>
@@ -249,8 +249,8 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
             onClick={() => setFilter("all")}
             className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all backdrop-blur-2xl border ${
               filter === "all"
-                ? "bg-black/40 border-white/10 text-white/90"
-                : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+                ? "bg-black/40 border-border text-white/90"
+                : "bg-black/20 border-border text-muted-foreground hover:text-foreground hover:border-white/20"
             }`}
           >
             Todos ({allFlyers.length})
@@ -259,8 +259,8 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
             onClick={() => setFilter("selectedDay")}
             className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all backdrop-blur-2xl border ${
               filter === "selectedDay"
-                ? "bg-black/40 border-white/10 text-white/90"
-                : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+                ? "bg-black/40 border-border text-white/90"
+                : "bg-black/20 border-border text-muted-foreground hover:text-foreground hover:border-white/20"
             }`}
           >
             {DAY_TRANSLATIONS[selectedDay] || selectedDay} ({selectedDayFlyers.length})
@@ -269,8 +269,8 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
             onClick={() => setFilter("daily")}
             className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all backdrop-blur-2xl border ${
               filter === "daily"
-                ? "bg-black/40 border-white/10 text-white/90"
-                : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+                ? "bg-black/40 border-border text-white/90"
+                : "bg-black/20 border-border text-muted-foreground hover:text-foreground hover:border-white/20"
             }`}
           >
             Grades ({dailyFlyers.length})
@@ -279,8 +279,8 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
             onClick={() => setFilter("individual")}
             className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all backdrop-blur-2xl border ${
               filter === "individual"
-                ? "bg-black/40 border-white/10 text-white/90"
-                : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+                ? "bg-black/40 border-border text-white/90"
+                : "bg-black/20 border-border text-muted-foreground hover:text-foreground hover:border-white/20"
             }`}
           >
             <span className="hidden sm:inline">Individuais</span>
@@ -296,7 +296,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
             <div
               key={flyer.id}
               onClick={() => setSelectedImage(flyer)}
-              className="group relative aspect-[9/16] rounded-xl border border-white/[0.06] hover:border-white/10 hover:scale-[1.02] transition-all cursor-pointer"
+              className="group relative aspect-[9/16] rounded-xl border border-border hover:scale-[1.02] transition-all cursor-pointer"
             >
               {/* Image container with overflow hidden */}
               <div className="absolute inset-0 rounded-xl overflow-hidden">

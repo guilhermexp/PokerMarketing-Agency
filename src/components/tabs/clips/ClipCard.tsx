@@ -3557,21 +3557,21 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
   return (
     <>
-      <div className="bg-[#0a0a0a] rounded-xl border border-white/[0.05] overflow-hidden">
+      <div className="bg-background rounded-xl border border-border overflow-hidden">
         {/* Header - Minimal */}
         <div className="px-3 sm:px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div className="min-w-0 flex-shrink-0">
             <h3 className="text-[13px] font-semibold text-white truncate">
               {clip.title}
             </h3>
-            <p className="text-[10px] text-white/30 mt-0.5">
+            <p className="text-[10px] text-muted-foreground mt-0.5">
               {scenes.length} cenas • {totalDuration}s
             </p>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-1 sm:pb-0 -mx-3 px-3 sm:mx-0 sm:px-0 [&>*]:flex-shrink-0">
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className="p-1.5 rounded-md text-white/30 hover:text-white/60 hover:bg-white/5 transition-all"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-white/60 hover:bg-white/5 transition-all"
               title="Configurações"
             >
               <Icon name="settings" className="w-4 h-4" />
@@ -3590,9 +3590,9 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               </Button>
             )}
             {audioState.isLoading && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-white/[0.06]">
-                <Loader className="text-white/60" />
-                <span className="text-[9px] text-white/40">Áudio...</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border">
+                <Loader className="text-muted-foreground" />
+                <span className="text-[9px] text-muted-foreground">Áudio...</span>
               </div>
             )}
             {/* Action Buttons */}
@@ -3710,15 +3710,15 @@ export const ClipCard: React.FC<ClipCardProps> = ({
         {isEditing && editorState ? (
           <div className="flex flex-col min-h-[500px]">
             {/* Editor Header */}
-            <div className="px-4 py-3 border-t border-white/[0.05] flex items-center justify-between">
+            <div className="px-4 py-3 border-t border-border flex items-center justify-between">
               <button
                 onClick={handleExitEditMode}
-                className="flex items-center gap-1.5 text-white/40 hover:text-white/70 transition-colors"
+                className="flex items-center gap-1.5 text-muted-foreground hover:text-white/70 transition-colors"
               >
                 <Icon name="arrow-left" className="w-3.5 h-3.5" />
                 <span className="text-[11px] font-medium">Voltar</span>
               </button>
-              <span className="text-[11px] font-medium text-white/50">
+              <span className="text-[11px] font-medium text-muted-foreground">
                 Editando Timeline
               </span>
               <Button
@@ -3735,7 +3735,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             <div className="flex-1 flex items-center justify-center p-6 bg-black/50 relative">
               {isMerging ? (
                 <div className="flex flex-col items-center justify-center">
-                  <Loader className="text-white/60" />
+                  <Loader className="text-muted-foreground" />
                   <p className="text-sm text-white/70 mt-4">
                     {exportProgress?.message || "Processando..."}
                   </p>
@@ -3747,7 +3747,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="aspect-[9/16] h-full max-h-[400px] bg-[#0a0a0a] rounded-xl overflow-hidden border border-white/10 relative">
+                <div className="aspect-[9/16] h-full max-h-[400px] bg-background rounded-xl overflow-hidden border border-border relative">
                   {editorState.clips.length > 0 && (
                     <>
                       {/* Primary video - outgoing during transition */}
@@ -3826,8 +3826,8 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               )}
               {/* Selected clip info */}
               {editorState.selectedClipId && (
-                <div className="absolute top-4 right-4 bg-black/80 rounded-lg px-3 py-2 border border-white/10">
-                  <p className="text-[10px] text-white/50">Clip Selecionado</p>
+                <div className="absolute top-4 right-4 bg-black/80 rounded-lg px-3 py-2 border border-border">
+                  <p className="text-[10px] text-muted-foreground">Clip Selecionado</p>
                   <p className="text-sm font-bold text-white">
                     Cena{" "}
                     {
@@ -3841,7 +3841,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             </div>
 
             {/* Unified Timeline Section */}
-            <div className="bg-[#0d0d0d] border-t border-white/5">
+            <div className="bg-background border-t border-border">
               <div className="flex px-4 py-4 gap-4">
                 {/* Left Column - Control Buttons */}
                 <div className="flex flex-col gap-2 flex-shrink-0">
@@ -3955,14 +3955,14 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                 >
                   {editorState.clips.length === 0 ? (
                     /* Empty state */
-                    <div className="flex items-center border-2 border-dashed border-white/20 rounded-lg h-16">
-                      <p className="text-white/30 text-sm px-4 flex-1">
+                    <div className="flex items-center border-2 border-dashed border-border rounded-lg h-16">
+                      <p className="text-muted-foreground text-sm px-4 flex-1">
                         Clique em + para adicionar vídeos
                       </p>
                       {/* Add video button */}
                       <button
                         onClick={() => setShowAddClipModal(true)}
-                        className="mr-2 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/50 hover:text-white transition-colors flex-shrink-0"
+                        className="mr-2 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-muted-foreground hover:text-white transition-colors flex-shrink-0"
                         title="Adicionar vídeo"
                       >
                         <Icon name="plus" className="w-3 h-3" />
@@ -3983,17 +3983,17 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                         }).map((_, i) => (
                           <div
                             key={i}
-                            className="absolute top-0 bottom-0 border-l border-white/20"
+                            className="absolute top-0 bottom-0 border-l border-border"
                             style={{ left: `${i * TIMELINE_PX_PER_SEC}px` }}
                           >
-                            <span className="absolute -top-1 left-1 text-[8px] text-white/40">
+                            <span className="absolute -top-1 left-1 text-[8px] text-muted-foreground">
                               {i}s
                             </span>
                             {/* Minor ticks */}
                             {Array.from({ length: 4 }).map((_, j) => (
                               <div
                                 key={j}
-                                className="absolute bottom-0 h-1 border-l border-white/10"
+                                className="absolute bottom-0 h-1 border-l border-border"
                                 style={{
                                   left: `${(j + 1) * (TIMELINE_PX_PER_SEC / 5)}px`,
                                 }}
@@ -4004,7 +4004,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                       </div>
 
                       {/* Clips Strip */}
-                      <div className="flex relative border-2 border-white/20 rounded-lg overflow-hidden h-16">
+                      <div className="flex relative border-2 border-border rounded-lg overflow-hidden h-16">
                         {editorState.clips.map((clip, idx) => {
                           const isSelected =
                             editorState.selectedClipId === clip.id;
@@ -4082,7 +4082,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                                     className={`relative w-5 h-5 rounded-full flex items-center justify-center transition-all ${clip.transitionOut?.type &&
                                       clip.transitionOut.type !== "none"
                                       ? "bg-green-500 text-black"
-                                      : "bg-white/10 text-white/50 opacity-0 group-hover:opacity-100"
+                                      : "bg-white/10 text-muted-foreground opacity-0 group-hover:opacity-100"
                                       }`}
                                   >
                                     {clip.transitionOut?.type &&
@@ -4150,7 +4150,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                       {/* Add clip button inline */}
                       <button
                         onClick={() => setShowAddClipModal(true)}
-                        className="ml-2 w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/50 hover:text-white transition-colors flex-shrink-0"
+                        className="ml-2 w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-muted-foreground hover:text-white transition-colors flex-shrink-0"
                         title="Adicionar vídeo"
                       >
                         <Icon name="plus" className="w-4 h-4" />
@@ -4162,7 +4162,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                   <div className="mt-3">
                     {editorState.audioTracks.length === 0 ? (
                       <div className="flex items-center border-2 border-dashed border-green-500/20 rounded-lg h-12">
-                        <p className="text-white/30 text-xs px-4">
+                        <p className="text-muted-foreground text-xs px-4">
                           {audioState.url
                             ? "Clique em + para adicionar o áudio"
                             : "Gere o áudio primeiro"}
@@ -4346,7 +4346,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
                 {/* Right Column - Time & Controls */}
                 <div className="flex flex-col gap-2 flex-shrink-0 items-end">
-                  <span className="text-sm text-white/60 font-mono tabular-nums">
+                  <span className="text-sm text-muted-foreground font-mono tabular-nums">
                     {formatTime(editorState.currentTime)} /{" "}
                     {formatTime(editorState.totalDuration)}
                   </span>
@@ -4365,13 +4365,13 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               {editorState.selectedAudioId && (
                 <div className="mt-3 mx-4 p-3 rounded-lg bg-white/5 border border-green-500/20">
                   <div className="flex items-center gap-4">
-                    <span className="text-[10px] text-white/50 uppercase tracking-wider flex-shrink-0">
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider flex-shrink-0">
                       Volume
                     </span>
 
                     {/* Volume control */}
                     <div className="flex-1 flex items-center gap-2">
-                      <Icon name="audio" className="w-3 h-3 text-white/40" />
+                      <Icon name="audio" className="w-3 h-3 text-muted-foreground" />
                       <input
                         type="range"
                         min="0"
@@ -4400,7 +4400,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                     </div>
 
                     {/* Position info */}
-                    <div className="flex items-center gap-2 text-[10px] text-white/50">
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                       <span>Início:</span>
                       <span className="text-green-400 font-mono">
                         {(
@@ -4420,7 +4420,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
           /* Normal View */
           <div className="flex flex-col lg:flex-row">
             {/* Preview Carousel - Instagram Reels Style */}
-            <div className="flex-shrink-0 p-4 lg:pt-14 bg-[#0d0d0d] border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col">
+            <div className="flex-shrink-0 p-4 lg:pt-14 bg-background border-b lg:border-b-0 lg:border-r border-border flex flex-col">
               <div className="w-72 aspect-[9/16] bg-black rounded-3xl overflow-hidden relative border-[3px] border-zinc-800 shadow-2xl">
                 {/* Instagram Reels UI Overlay */}
                 <div className="absolute inset-0 pointer-events-none z-10">
@@ -4474,7 +4474,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                     {isMerging ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
                         <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-3">
-                          <Loader className="text-white/60" />
+                          <Loader className="text-muted-foreground" />
                         </div>
                         <p className="text-[10px] text-white/70 text-center mb-3">
                           {exportProgress?.message || "Processando..."}
@@ -4488,7 +4488,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                               }}
                             />
                           </div>
-                          <p className="text-[9px] text-white/40 text-center mt-1">
+                          <p className="text-[9px] text-muted-foreground text-center mt-1">
                             {exportProgress?.progress || 0}%
                           </p>
                         </div>
@@ -4570,14 +4570,14 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                           name="image"
                           className="w-6 h-6 text-white/15 mb-1"
                         />
-                        <span className="text-[8px] text-white/20 uppercase tracking-wide font-medium">
+                        <span className="text-[8px] text-muted-foreground uppercase tracking-wide font-medium">
                           Capa
                         </span>
                         <span className="text-[7px] text-white/15 mb-2">
                           Conteúdo ainda não gerado
                         </span>
                         <div className="w-full px-2">
-                          <p className="text-[7px] text-white/30 text-center leading-relaxed line-clamp-4 italic">
+                          <p className="text-[7px] text-muted-foreground text-center leading-relaxed line-clamp-4 italic">
                             Prompt: "{clip.image_prompt}"
                           </p>
                         </div>
@@ -4632,7 +4632,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                   onClick={onGenerateThumbnail}
                   isLoading={isGeneratingThumbnail}
                   size="small"
-                  className="w-full mt-3 !rounded-lg !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white"
+                  className="w-full mt-3 !rounded-lg !bg-background !text-white/70 !border !border-border hover:!bg-card hover:!text-white"
                   icon="image"
                 >
                   Gerar Capa
@@ -4646,18 +4646,18 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                       value={extraInstruction}
                       onChange={(e) => onExtraInstructionChange(e.target.value)}
                       placeholder="Instrucao extra (opcional)"
-                      className="flex-1 bg-[#080808] border border-white/10 rounded-lg px-2 py-1.5 text-[9px] text-white/70 focus:border-primary/50 outline-none transition-all"
+                      className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-[9px] text-white/70 focus:border-primary/50 outline-none transition-all"
                     />
                     <button
                       onClick={onRegenerateThumbnail}
                       disabled={isGeneratingThumbnail}
-                      className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                      className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
                       title="Regenerar capa com instrucao extra"
                     >
                       <Icon name="refresh" className="w-3 h-3" />
                     </button>
                   </div>
-                  <p className="text-[8px] text-white/30 mt-1">
+                  <p className="text-[8px] text-muted-foreground mt-1">
                     Adiciona texto ao prompt da capa e regenera.
                   </p>
                 </div>
@@ -4665,8 +4665,8 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
               {/* Audio Player - only show when audio exists */}
               {audioState.url && (
-                <div className="mt-4 pt-4 border-t border-white/5">
-                  <h4 className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2">
+                <div className="mt-4 pt-4 border-t border-border">
+                  <h4 className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2">
                     Narração
                   </h4>
                   <audio controls src={audioState.url} className="w-full h-8" />
@@ -4676,7 +4676,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
             {/* Scenes Horizontal Carousel */}
             <div className="flex-1 p-4 overflow-hidden relative">
-              <h4 className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-3">
+              <h4 className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-3">
                 Cenas do Roteiro
               </h4>
 
@@ -4691,7 +4691,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                       if (container)
                         container.scrollBy({ left: -280, behavior: "smooth" });
                     }}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-xl bg-black/80 hover:bg-primary/20 border border-white/10 hover:border-primary/20 flex items-center justify-center text-white/50 hover:text-primary transition-all shadow-lg"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-xl bg-black/80 hover:bg-primary/20 border border-border hover:border-primary/20 flex items-center justify-center text-muted-foreground hover:text-primary transition-all shadow-lg"
                   >
                     <Icon name="chevron-left" className="w-4 h-4" />
                   </button>
@@ -4703,7 +4703,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                       if (container)
                         container.scrollBy({ left: 280, behavior: "smooth" });
                     }}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-xl bg-black/80 hover:bg-primary/20 border border-white/10 hover:border-primary/20 flex items-center justify-center text-white/50 hover:text-primary transition-all shadow-lg"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-xl bg-black/80 hover:bg-primary/20 border border-border hover:border-primary/20 flex items-center justify-center text-muted-foreground hover:text-primary transition-all shadow-lg"
                   >
                     <Icon name="chevron-right" className="w-4 h-4" />
                   </button>
@@ -4765,8 +4765,8 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                         {/* Loading States */}
                         {isLoadingVideo ? (
                           <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <Loader className="text-white/60" />
-                            <p className="text-[7px] text-white/40 mt-2">
+                            <Loader className="text-muted-foreground" />
+                            <p className="text-[7px] text-muted-foreground mt-2">
                               Gerando vídeo...
                             </p>
                           </div>
@@ -4876,14 +4876,14 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                                   name="image"
                                   className="w-6 h-6 text-white/15 mb-1"
                                 />
-                                <span className="text-[8px] text-white/20 uppercase tracking-wide font-medium">
+                                <span className="text-[8px] text-muted-foreground uppercase tracking-wide font-medium">
                                   Cena {scene.sceneNumber}
                                 </span>
                                 <span className="text-[7px] text-white/15 mb-2">
                                   Conteúdo ainda não gerado
                                 </span>
                                 <div className="w-full px-2">
-                                  <p className="text-[7px] text-white/30 text-center leading-relaxed line-clamp-4 italic">
+                                  <p className="text-[7px] text-muted-foreground text-center leading-relaxed line-clamp-4 italic">
                                     Prompt: "{scene.visual}"
                                   </p>
                                 </div>
@@ -5000,7 +5000,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                               onClick={() =>
                                 handleShowPrompt(scene.sceneNumber)
                               }
-                              className="w-5 h-5 rounded-md bg-black/50 backdrop-blur-sm flex items-center justify-center text-white/40 hover:text-white hover:bg-black/70 transition-colors"
+                              className="w-5 h-5 rounded-md bg-black/50 backdrop-blur-sm flex items-center justify-center text-muted-foreground hover:text-white hover:bg-black/70 transition-colors"
                               title="Ver prompt"
                             >
                               <Icon name="eye" className="w-2.5 h-2.5" />
@@ -5011,7 +5011,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
                       {/* Scene Action */}
                       <div className="p-2 flex flex-col">
-                        <p className="text-[8px] text-white/40 line-clamp-2 min-h-[28px] mb-2">
+                        <p className="text-[8px] text-muted-foreground line-clamp-2 min-h-[28px] mb-2">
                           {scene.narration}
                         </p>
                         <div className="flex gap-1 mt-auto">
@@ -5024,7 +5024,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                                 )
                               }
                               size="small"
-                              className="flex-1 !text-[8px] !rounded-lg !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white !px-2 !py-1.5"
+                              className="flex-1 !text-[8px] !rounded-lg !bg-background !text-white/70 !border !border-border hover:!bg-card hover:!text-white !px-2 !py-1.5"
                               icon="image"
                               disabled={!thumbnail || isLoadingImage}
                               title={
@@ -5045,7 +5045,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                                 )
                               }
                               size="small"
-                              className="!text-[8px] !rounded-lg !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white !px-2 !py-1.5"
+                              className="!text-[8px] !rounded-lg !bg-background !text-white/70 !border !border-border hover:!bg-card hover:!text-white !px-2 !py-1.5"
                               icon="refresh"
                             >
                               Regenerar
@@ -5058,7 +5058,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                                 handleGenerateVideo(scene.sceneNumber)
                               }
                               size="small"
-                              className="flex-1 !text-[8px] !rounded-lg !bg-[#0a0a0a] !text-white/70 !border !border-white/10 hover:!bg-[#111] hover:!text-white !px-2 !py-1.5"
+                              className="flex-1 !text-[8px] !rounded-lg !bg-background !text-white/70 !border !border-border hover:!bg-card hover:!text-white !px-2 !py-1.5"
                               icon="play"
                             >
                               Gerar
@@ -5120,10 +5120,10 @@ export const ClipCard: React.FC<ClipCardProps> = ({
           onClick={() => setPromptPreview(null)}
         >
           <div
-            className="bg-[#0a0a0a] border border-white/10 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden"
+            className="bg-background border border-border rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center">
                   <Icon name="eye" className="w-3 h-3 text-primary" />
@@ -5134,7 +5134,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               </div>
               <button
                 onClick={() => setPromptPreview(null)}
-                className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
               >
                 <Icon name="x" className="w-3 h-3" />
               </button>
@@ -5142,17 +5142,17 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             <div className="p-4 overflow-y-auto max-h-[60vh] space-y-4">
               {/* Prompt original - READ ONLY */}
               <div>
-                <label className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2 block">
+                <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2 block">
                   Prompt Original
                 </label>
-                <pre className="text-[11px] text-white/70 whitespace-pre-wrap font-mono bg-black/30 rounded-xl p-4 border border-white/5">
+                <pre className="text-[11px] text-white/70 whitespace-pre-wrap font-mono bg-black/30 rounded-xl p-4 border border-border">
                   {promptPreview.prompt}
                 </pre>
               </div>
 
               {/* Campo de instruções extras */}
               <div>
-                <label className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2 block">
+                <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2 block">
                   Instruções Extras (opcional)
                 </label>
                 <textarea
@@ -5168,15 +5168,15 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                     )
                   }
                   placeholder="Adicione detalhes extras para a regeneração... Ex: 'mais vibrante', 'adicionar texto X', 'mudar cor para azul'"
-                  className="w-full h-24 text-[11px] text-white/80 bg-black/30 rounded-xl p-4 border border-white/10 focus:border-primary/50 focus:outline-none resize-none placeholder:text-white/20"
+                  className="w-full h-24 text-[11px] text-white/80 bg-black/30 rounded-xl p-4 border border-border focus:border-primary/50 focus:outline-none resize-none placeholder:text-muted-foreground"
                 />
-                <p className="text-[9px] text-white/30 mt-1">
+                <p className="text-[9px] text-muted-foreground mt-1">
                   As instruções extras serão anexadas ao prompt original na
                   regeneração.
                 </p>
               </div>
             </div>
-            <div className="px-4 py-3 border-t border-white/5 flex justify-between">
+            <div className="px-4 py-3 border-t border-border flex justify-between">
               <Button
                 size="small"
                 variant="secondary"
@@ -5231,10 +5231,10 @@ export const ClipCard: React.FC<ClipCardProps> = ({
           onClick={() => setShowAddClipModal(false)}
         >
           <div
-            className="bg-[#0a0a0a] border border-white/10 rounded-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden"
+            className="bg-background border border-border rounded-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center">
                   <Icon name="video" className="w-3 h-3 text-primary" />
@@ -5245,13 +5245,13 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               </div>
               <button
                 onClick={() => setShowAddClipModal(false)}
-                className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
               >
                 <Icon name="x" className="w-3 h-3" />
               </button>
             </div>
             <div className="p-4 overflow-y-auto max-h-[60vh]">
-              <p className="text-xs text-white/50 mb-4">
+              <p className="text-xs text-muted-foreground mb-4">
                 Clique em um vídeo para adicioná-lo à timeline
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
@@ -5265,7 +5265,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                         item.duration,
                       );
                     }}
-                    className="group relative aspect-[9/16] bg-[#080808] rounded-lg overflow-hidden border border-white/10 hover:border-primary/50 transition-all hover:scale-105"
+                    className="group relative aspect-[9/16] bg-background rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-all hover:scale-105"
                   >
                     <video
                       src={
@@ -5321,16 +5321,16 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                     name="video"
                     className="w-12 h-12 text-white/10 mx-auto mb-3"
                   />
-                  <p className="text-white/40 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     Nenhum vídeo disponível
                   </p>
-                  <p className="text-white/30 text-xs mt-1">
+                  <p className="text-muted-foreground text-xs mt-1">
                     Gere vídeos nas cenas primeiro
                   </p>
                 </div>
               )}
             </div>
-            <div className="px-4 py-3 border-t border-white/5 flex justify-end">
+            <div className="px-4 py-3 border-t border-border flex justify-end">
               <Button size="small" onClick={() => setShowAddClipModal(false)}>
                 Fechar
               </Button>
@@ -5346,10 +5346,10 @@ export const ClipCard: React.FC<ClipCardProps> = ({
           onClick={() => setEditingTransitionIndex(null)}
         >
           <div
-            className="bg-[#0a0a0a] border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden"
+            className="bg-background border border-border rounded-2xl w-full max-w-sm overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-green-500/20 flex items-center justify-center">
                   <span className="text-xs">↔</span>
@@ -5360,14 +5360,14 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               </div>
               <button
                 onClick={() => setEditingTransitionIndex(null)}
-                className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
               >
                 <Icon name="x" className="w-3 h-3" />
               </button>
             </div>
             <div className="p-4">
               {/* Current clip info */}
-              <p className="text-xs text-white/50 mb-4">
+              <p className="text-xs text-muted-foreground mb-4">
                 Entre cena{" "}
                 {editorState.clips[editingTransitionIndex]?.sceneNumber} e cena{" "}
                 {editorState.clips[editingTransitionIndex + 1]?.sceneNumber}
@@ -5438,7 +5438,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                 editorState.clips[editingTransitionIndex]?.transitionOut
                   ?.type !== "none" && (
                   <div className="mb-4">
-                    <p className="text-xs text-white/50 mb-2">Duração</p>
+                    <p className="text-xs text-muted-foreground mb-2">Duração</p>
                     <div className="flex gap-2">
                       {DURATION_OPTIONS.map((duration) => {
                         const isSelected =
@@ -5486,7 +5486,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                   </div>
                 )}
             </div>
-            <div className="px-4 py-3 border-t border-white/5 flex justify-end">
+            <div className="px-4 py-3 border-t border-border flex justify-end">
               <Button
                 size="small"
                 onClick={() => setEditingTransitionIndex(null)}

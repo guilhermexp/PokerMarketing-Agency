@@ -38,7 +38,7 @@ export const TopicsSidebar: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-black/40 backdrop-blur-xl">
       {/* Header - Just the + button */}
-      <div className="px-3 py-3 border-b border-white/10 flex items-center justify-center">
+      <div className="px-3 py-3 border-b border-border flex items-center justify-center">
         <button
           onClick={handleCreateTopic}
           disabled={isCreating}
@@ -46,9 +46,9 @@ export const TopicsSidebar: React.FC = () => {
           title="Novo projeto"
         >
           {isCreating ? (
-            <Loader2 className="w-5 h-5 text-white/60 animate-spin shrink-0" />
+            <Loader2 className="w-5 h-5 text-muted-foreground animate-spin shrink-0" />
           ) : (
-            <Plus className="w-5 h-5 text-white/60 shrink-0" />
+            <Plus className="w-5 h-5 text-muted-foreground shrink-0" />
           )}
         </button>
       </div>
@@ -57,12 +57,12 @@ export const TopicsSidebar: React.FC = () => {
       <div className="flex-1 overflow-y-auto py-3 px-3">
         {topicsLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-5 h-5 text-white/40 animate-spin" />
+            <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
           </div>
         ) : topics.length === 0 ? (
           <div className="text-center py-8">
             <div className="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center mx-auto">
-              <Image className="w-7 h-7 text-white/30" />
+              <Image className="w-7 h-7 text-muted-foreground" />
             </div>
           </div>
         ) : (
@@ -135,7 +135,7 @@ const TopicItem: React.FC<TopicItemProps> = ({
 
   if (isEditing) {
     return (
-      <div className="p-2 bg-white/5 rounded-xl border border-white/10">
+      <div className="p-2 bg-white/5 rounded-xl border border-border">
         <input
           type="text"
           value={editTitle}
@@ -153,7 +153,7 @@ const TopicItem: React.FC<TopicItemProps> = ({
             onClick={handleCancelEdit}
             className="p-1 rounded hover:bg-white/10 transition-colors"
           >
-            <X className="w-3.5 h-3.5 text-white/40" />
+            <X className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
           <button
             onClick={handleSaveEdit}
@@ -171,7 +171,7 @@ const TopicItem: React.FC<TopicItemProps> = ({
       className={`relative group rounded-xl transition-colors cursor-pointer overflow-hidden ${
         isActive
           ? 'ring-2 ring-primary/50'
-          : 'hover:ring-1 hover:ring-white/20'
+          : 'hover:ring-1 hover:ring-ring'
       }`}
     >
       {/* Thumbnail */}
@@ -188,7 +188,7 @@ const TopicItem: React.FC<TopicItemProps> = ({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Image className="w-8 h-8 text-white/20" />
+            <Image className="w-8 h-8 text-muted-foreground" />
           </div>
         )}
       </button>

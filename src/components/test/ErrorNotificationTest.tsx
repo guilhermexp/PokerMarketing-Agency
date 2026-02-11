@@ -157,7 +157,7 @@ export const ErrorNotificationTest: React.FC = () => {
   return (
     <>
       <ToastContainer />
-      <div className="min-h-screen bg-[#0f0f23] p-8">
+      <div className="min-h-screen bg-background p-8">
         <div className="max-w-4xl mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white mb-2">

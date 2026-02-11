@@ -18,10 +18,10 @@ export const Workspace: React.FC = () => {
   const showEmptyState = !activeTopicId || batches.length === 0;
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#0a0a0a]">
+    <div className="flex-1 flex flex-col h-full bg-background">
       {/* Header - only show when there are generations */}
       {!showEmptyState && (
-        <div className="px-6 py-4 border-b border-white/10">
+        <div className="px-6 py-4 border-b border-border">
           <h1 className="text-xl font-semibold text-white">
             {activeTopic?.title || 'Novo projeto'}
           </h1>
@@ -34,7 +34,7 @@ export const Workspace: React.FC = () => {
         <div className="flex-1 flex flex-col items-center justify-center px-6">
           {/* Centered Icon & Title */}
           <div className="flex items-center gap-4 mb-8">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-border flex items-center justify-center">
               <svg
                 className="w-9 h-9 text-white/80"
                 viewBox="0 0 24 24"
@@ -67,7 +67,7 @@ export const Workspace: React.FC = () => {
           </div>
 
           {/* Prompt Input - Fixed at bottom */}
-          <div className="border-t border-white/10 p-4 bg-black/40 backdrop-blur-xl">
+          <div className="border-t border-border p-4 bg-black/40 backdrop-blur-xl">
             <PromptInput />
           </div>
         </>

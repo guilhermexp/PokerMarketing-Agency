@@ -7567,7 +7567,7 @@ app.get("/api/db/instagram-accounts", async (req, res) => {
       logger.debug({ user_id }, "[Instagram] User not found");
       return res.json([]);
     }
-    logger.debug({ resolvedUserId }, "[Instagram] Resolved user ID");
+    logger.trace({ resolvedUserId }, "[Instagram] Resolved user ID");
 
     const result = organization_id
       ? await sql`
@@ -7614,7 +7614,7 @@ app.post("/api/db/instagram-accounts", async (req, res) => {
       logger.debug({ user_id }, "[Instagram] User not found");
       return res.status(400).json({ error: "User not found" });
     }
-    logger.debug({ resolvedUserId }, "[Instagram] Resolved user ID");
+    logger.trace({ resolvedUserId }, "[Instagram] Resolved user ID");
 
     // Validate the Rube token
     const validation = await validateRubeToken(rube_token);

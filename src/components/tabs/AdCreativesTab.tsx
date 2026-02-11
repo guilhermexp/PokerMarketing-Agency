@@ -126,7 +126,7 @@ const AdCard: React.FC<{
 
     return (
       <>
-        <div className="bg-[#0a0a0a] rounded-xl border border-white/[0.05] overflow-hidden h-full flex flex-col">
+        <div className="bg-background rounded-xl border border-border overflow-hidden h-full flex flex-col">
           {/* Header - Minimal */}
           <div className="px-4 py-2.5 flex items-center justify-between">
             <span className="text-[11px] font-medium text-white/70">
@@ -138,7 +138,7 @@ const AdCard: React.FC<{
             {/* Image */}
             <div className="aspect-[1.91/1] bg-black/30 rounded-lg flex items-center justify-center relative overflow-hidden">
               {isGenerating ? (
-                <Loader className="text-white/60" />
+                <Loader className="text-muted-foreground" />
               ) : image ? (
                 <>
                   <img
@@ -172,7 +172,7 @@ const AdCard: React.FC<{
                     name="image"
                     className="w-8 h-8 text-white/10 mx-auto mb-2"
                   />
-                  <p className="text-[9px] text-white/20 italic line-clamp-3">
+                  <p className="text-[9px] text-muted-foreground italic line-clamp-3">
                     "{ad.image_prompt}"
                   </p>
                 </div>
@@ -185,7 +185,7 @@ const AdCard: React.FC<{
             </p>
 
             {/* Body */}
-            <p className="text-[11px] text-white/60 leading-relaxed line-clamp-3">
+            <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3">
               {ad.body}
             </p>
 
@@ -204,7 +204,7 @@ const AdCard: React.FC<{
                 onClick={onGenerate}
                 isLoading={isGenerating}
                 size="small"
-                className="flex-1 !rounded-md !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
+                className="flex-1 !rounded-md !bg-transparent !text-muted-foreground !border !border-border hover:!bg-white/[0.03] hover:!text-white/70"
                 icon="image"
               >
                 Gerar
@@ -214,7 +214,7 @@ const AdCard: React.FC<{
               <Button
                 onClick={handleShare}
                 size="small"
-                className="flex-1 !rounded-md !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
+                className="flex-1 !rounded-md !bg-transparent !text-muted-foreground !border !border-border hover:!bg-white/[0.03] hover:!text-white/70"
                 icon="share-alt"
               >
                 {isCopied ? "Copiado!" : "Copiar"}
@@ -649,20 +649,20 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
           disabled={
             isGeneratingAll || generationState.isGenerating.some(Boolean)
           }
-          className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-30 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-muted-foreground hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <Icon name="zap" className="w-4 h-4" />
           Gerar Todos
         </button>
         <div className="flex items-center gap-2">
-          <span className="text-[9px] text-white/30">Modelo:</span>
+          <span className="text-[9px] text-muted-foreground">Modelo:</span>
           <select
             id="model-select-ads"
             value={selectedImageModel}
             onChange={(e) =>
               setSelectedImageModel(e.target.value as ImageModel)
             }
-            className="bg-transparent border border-white/[0.06] rounded-md px-2.5 py-1.5 text-[10px] text-white/60 focus:ring-1 focus:ring-primary/30 focus:border-primary/30 outline-none transition-all"
+            className="bg-transparent border border-border rounded-md px-2.5 py-1.5 text-[10px] text-muted-foreground focus:ring-1 focus:ring-primary/30 focus:border-primary/30 outline-none transition-all"
           >
             <option value="gemini-3-pro-image-preview">Gemini 3 Pro</option>
           </select>

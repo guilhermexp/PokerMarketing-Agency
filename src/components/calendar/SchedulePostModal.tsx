@@ -384,7 +384,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       onClick={() => setShowImageSelector(false)}
     >
       <div
-        className={`w-full h-full sm:h-auto max-w-5xl sm:max-h-[90vh] bg-[#0a0a0a]/95 sm:rounded-2xl border-0 sm:border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl transition-transform duration-200 ${
+        className={`w-full h-full sm:h-auto max-w-5xl sm:max-h-[90vh] bg-background/95 sm:rounded-2xl border-0 sm:border border-border shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl transition-transform duration-200 ${
           showImageSelector ? 'scale-100' : 'scale-95'
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -395,7 +395,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
               <h2 className="text-sm sm:text-base font-medium text-white/90">
                 Selecionar Imagem
               </h2>
-              <p className="text-[10px] sm:text-[11px] text-white/40 mt-0.5">
+              <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5">
                 {isCarousel
                   ? `Selecione até 10 imagens (${selectedImages.length}/10)`
                   : 'Selecione uma imagem da galeria'
@@ -404,7 +404,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 text-white/40 hover:text-white rounded-full hover:bg-white/5 transition-colors"
+              className="p-1.5 text-muted-foreground hover:text-white rounded-full hover:bg-white/5 transition-colors"
             >
               <Icon name="x" className="w-4 h-4" />
             </button>
@@ -426,10 +426,10 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             ) : eligibleImages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-                  <Icon name="image" className="w-8 h-8 text-white/20" />
+                  <Icon name="image" className="w-8 h-8 text-muted-foreground" />
                 </div>
-                <p className="text-sm font-bold text-white/40">Galeria Vazia</p>
-                <p className="text-xs text-white/20 mt-1">
+                <p className="text-sm font-bold text-muted-foreground">Galeria Vazia</p>
+                <p className="text-xs text-muted-foreground mt-1">
                   Gere imagens em Campanhas ou Flyers para aparecerem aqui
                 </p>
               </div>
@@ -440,7 +440,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   <div>
                     <div className="flex items-center gap-3 py-1 mb-3">
                       <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-                      <span className="text-[8px] text-white/30 font-bold uppercase tracking-wider">
+                      <span className="text-[8px] text-muted-foreground font-bold uppercase tracking-wider">
                         Gerados Hoje
                       </span>
                       <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
@@ -454,10 +454,10 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                         <div
                           key={image.id}
                           onClick={() => handleSelectImage(image)}
-                          className={`group relative overflow-hidden rounded-xl border-2 bg-[#111111] transition-all cursor-pointer flex-shrink-0 w-28 h-28 sm:w-36 sm:h-36 ${
+                          className={`group relative overflow-hidden rounded-xl border-2 bg-card transition-all cursor-pointer flex-shrink-0 w-28 h-28 sm:w-36 sm:h-36 ${
                             isSelected
                               ? 'border-primary shadow-lg shadow-primary/20'
-                              : 'border-white/5 hover:border-white/20'
+                              : 'border-border hover:border-white/20'
                           }`}
                         >
                           {itemIsVideo ? (
@@ -507,7 +507,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 {todayEligibleImages.length > 0 && olderEligibleImages.length > 0 && (
                   <div className="flex items-center gap-3 py-1">
                     <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-                    <span className="text-[8px] text-white/30 font-bold uppercase tracking-wider">
+                    <span className="text-[8px] text-muted-foreground font-bold uppercase tracking-wider">
                       Anteriores
                     </span>
                     <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
@@ -525,10 +525,10 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                         <div
                           key={image.id}
                           onClick={() => handleSelectImage(image)}
-                          className={`group relative overflow-hidden rounded-xl border-2 bg-[#111111] transition-all cursor-pointer aspect-square ${
+                          className={`group relative overflow-hidden rounded-xl border-2 bg-card transition-all cursor-pointer aspect-square ${
                             isSelected
                               ? 'border-primary shadow-lg shadow-primary/20'
-                              : 'border-white/5 hover:border-white/20'
+                              : 'border-border hover:border-white/20'
                           }`}
                         >
                           {itemIsVideo ? (
@@ -591,7 +591,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   <div className="flex items-center justify-center py-6">
                     <button
                       onClick={() => setOlderImagesLimit((prev) => prev + 12)}
-                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-full text-xs font-medium text-white/60 hover:text-white/90 transition-all"
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-border rounded-full text-xs font-medium text-muted-foreground hover:text-white/90 transition-all"
                     >
                       Carregar mais ({olderEligibleImages.length - olderImagesLimit} restantes)
                     </button>
@@ -603,10 +603,10 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="px-3 sm:px-4 py-3 border-t border-white/[0.08] flex gap-2 shrink-0">
+          <div className="px-3 sm:px-4 py-3 border-t border-border flex gap-2 shrink-0">
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 text-[11px] sm:text-xs font-medium text-white/60 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+              className="flex-1 py-2.5 text-[11px] sm:text-xs font-medium text-muted-foreground hover:text-white transition-colors rounded-lg hover:bg-white/5"
             >
               Cancelar
             </button>
@@ -633,11 +633,11 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full h-screen sm:h-[600px] sm:max-w-5xl bg-[#0a0a0a]/95 sm:rounded-3xl border-0 sm:border border-white/[0.08] shadow-2xl flex flex-col sm:flex-row overflow-hidden backdrop-blur-xl"
+        className="w-full h-screen sm:h-[600px] sm:max-w-5xl bg-background/95 sm:rounded-3xl border-0 sm:border border-border shadow-2xl flex flex-col sm:flex-row overflow-hidden backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left Column - Image Preview & Info */}
-        <div className="w-full sm:w-80 bg-[#070707] border-b sm:border-b-0 sm:border-r border-white/[0.08] flex flex-col max-h-[50vh] sm:max-h-none overflow-y-auto">
+        <div className="w-full sm:w-80 bg-[#070707] border-b sm:border-b-0 sm:border-r border-border flex flex-col max-h-[50vh] sm:max-h-none overflow-y-auto">
           {/* Image Preview */}
           <div className="h-72 sm:h-96 bg-black flex items-center justify-center relative shrink-0">
             {selectedImage ? (
@@ -660,7 +660,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 {/* Change Image Button */}
                 <button
                   onClick={() => setShowImageSelector(true)}
-                  className="absolute bottom-3 right-3 px-3 py-1.5 bg-[#0a0a0a]/90 backdrop-blur-xl border border-white/[0.08] rounded-lg text-xs font-medium text-white hover:bg-white/5 hover:border-white/20 transition-all"
+                  className="absolute bottom-3 right-3 px-3 py-1.5 bg-background/90 backdrop-blur-xl border border-border rounded-lg text-xs font-medium text-white hover:bg-white/5 transition-all"
                 >
                   Trocar Imagem
                 </button>
@@ -668,14 +668,14 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             ) : (
               <button
                 onClick={() => setShowImageSelector(true)}
-                className="w-full h-full flex flex-col items-center justify-center gap-3 text-white/40 hover:text-white/60 hover:bg-white/5 transition-all cursor-pointer border-2 border-dashed border-white/10 hover:border-white/20"
+                className="w-full h-full flex flex-col items-center justify-center gap-3 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all cursor-pointer border-2 border-dashed border-border hover:border-white/20"
               >
-                <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                <div className="w-14 h-14 rounded-2xl bg-white/5 border border-border flex items-center justify-center">
                   <Icon name="image" className="w-7 h-7" />
                 </div>
                 <div className="text-center">
                   <span className="text-sm font-medium block">Selecionar Imagem</span>
-                  <span className="text-[10px] text-white/30">Clique para abrir a galeria</span>
+                  <span className="text-[10px] text-muted-foreground">Clique para abrir a galeria</span>
                 </div>
               </button>
             )}
@@ -693,7 +693,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 onChange={(e) => setCaption(e.target.value)}
                 placeholder="Escreva a legenda..."
                 rows={2}
-                className="w-full bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30 resize-none transition-all"
+                className="w-full bg-background/60 backdrop-blur-xl border border-border rounded-xl px-3 py-2 text-sm text-white placeholder:text-muted-foreground outline-none focus:border-white/30 resize-none transition-all"
               />
             </div>
 
@@ -707,7 +707,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                 value={hashtags}
                 onChange={(e) => setHashtags(e.target.value)}
                 placeholder="#poker #torneio"
-                className="w-full bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30 transition-all"
+                className="w-full bg-background/60 backdrop-blur-xl border border-border rounded-xl px-3 py-2 text-sm text-white placeholder:text-muted-foreground outline-none focus:border-white/30 transition-all"
               />
             </div>
 
@@ -729,7 +729,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                     className={`px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2 ${
                       contentType === t.id
                         ? 'bg-white text-black shadow-lg'
-                        : 'text-white/60 bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] hover:bg-white/5 hover:text-white hover:border-white/20'
+                        : 'text-muted-foreground bg-background/60 backdrop-blur-xl border border-border hover:bg-white/5 hover:text-white'
                     }`}
                   >
                     <Icon name={t.icon as IconName} className="w-3.5 h-3.5" />
@@ -751,13 +751,13 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
             <div className="flex gap-2">
               <button
                 onClick={handlePreviousMonth}
-                className="w-9 h-9 rounded-lg bg-[#070707] backdrop-blur-xl border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/5 hover:border-white/20 transition-all flex items-center justify-center"
+                className="w-9 h-9 rounded-lg bg-[#070707] backdrop-blur-xl border border-border text-white/70 hover:text-white hover:bg-white/5 transition-all flex items-center justify-center"
               >
                 <Icon name="chevron-left" className="w-4 h-4" />
               </button>
               <button
                 onClick={handleNextMonth}
-                className="w-9 h-9 rounded-lg bg-[#070707] backdrop-blur-xl border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/5 hover:border-white/20 transition-all flex items-center justify-center"
+                className="w-9 h-9 rounded-lg bg-[#070707] backdrop-blur-xl border border-border text-white/70 hover:text-white hover:bg-white/5 transition-all flex items-center justify-center"
               >
                 <Icon name="chevron-right" className="w-4 h-4" />
               </button>
@@ -771,7 +771,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
                 <div
                   key={day}
-                  className="text-center text-[10px] sm:text-xs font-semibold text-white/40 py-1 sm:py-2"
+                  className="text-center text-[10px] sm:text-xs font-semibold text-muted-foreground py-1 sm:py-2"
                 >
                   {day}
                 </div>
@@ -802,9 +802,9 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                       isSelected
                         ? 'bg-white text-black shadow-lg'
                         : isPast
-                          ? 'text-white/20 cursor-not-allowed'
+                          ? 'text-muted-foreground cursor-not-allowed'
                           : isCurrentDay
-                            ? 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
+                            ? 'bg-white/10 text-white border border-border hover:bg-white/20'
                             : 'text-white/70 hover:bg-white/10 hover:text-white'
                     }`}
                   >
@@ -818,16 +818,16 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           {/* Close Button at bottom */}
           <button
             onClick={onClose}
-            className="mt-4 sm:mt-6 w-full py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium text-white/60 hover:text-white hover:bg-white/5 transition-all"
+            className="mt-4 sm:mt-6 w-full py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium text-muted-foreground hover:text-white hover:bg-white/5 transition-all"
           >
             Cancelar
           </button>
         </div>
 
         {/* Right Column - Time Slots */}
-        <div className="w-full sm:w-72 bg-[#070707] border-t sm:border-t-0 sm:border-l border-white/[0.08] flex flex-col overflow-y-auto">
+        <div className="w-full sm:w-72 bg-[#070707] border-t sm:border-t-0 sm:border-l border-border flex flex-col overflow-y-auto">
           {/* Header */}
-          <div className="p-3 sm:p-4 border-b border-white/[0.08]">
+          <div className="p-3 sm:p-4 border-b border-border">
             <div className="flex items-center justify-between mb-2 sm:mb-3">
               <h3 className="text-xs sm:text-sm font-semibold text-white">Horário</h3>
               <div className="flex gap-1">
@@ -835,8 +835,8 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   onClick={() => setTimeFormat('12h')}
                   className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                     timeFormat === '12h'
-                      ? 'bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] text-white'
-                      : 'text-white/40 hover:text-white/60 border border-transparent'
+                      ? 'bg-background/60 backdrop-blur-xl border border-border text-white'
+                      : 'text-muted-foreground hover:text-foreground border border-transparent'
                   }`}
                 >
                   12h
@@ -845,15 +845,15 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                   onClick={() => setTimeFormat('24h')}
                   className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                     timeFormat === '24h'
-                      ? 'bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] text-white'
-                      : 'text-white/40 hover:text-white/60 border border-transparent'
+                      ? 'bg-background/60 backdrop-blur-xl border border-border text-white'
+                      : 'text-muted-foreground hover:text-foreground border border-transparent'
                   }`}
                 >
                   24h
                 </button>
               </div>
             </div>
-            <p className="text-xs text-white/50">
+            <p className="text-xs text-muted-foreground">
               {new Date(`${scheduledDate}T${scheduledTime}`).toLocaleDateString('pt-BR', {
                 weekday: 'short',
                 month: 'short',
@@ -877,8 +877,8 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
                     isSelected
                       ? 'bg-white text-black shadow-lg'
                       : isPast
-                        ? 'bg-[#0a0a0a]/30 text-white/20 cursor-not-allowed border border-white/[0.03]'
-                        : 'bg-[#0a0a0a]/60 backdrop-blur-xl text-white/70 hover:bg-white/5 hover:text-white border border-white/[0.08] hover:border-white/20'
+                        ? 'bg-background/30 text-muted-foreground cursor-not-allowed border border-border'
+                        : 'bg-background/60 backdrop-blur-xl text-white/70 hover:bg-white/5 hover:text-white border border-border'
                   }`}
                 >
                   {timeFormat === '12h' ? formatTime12h(time) : time}
@@ -888,7 +888,7 @@ export const SchedulePostModal: React.FC<SchedulePostModalProps> = ({
           </div>
 
           {/* Continue Button */}
-          <div className="p-3 sm:p-4 border-t border-white/[0.08]">
+          <div className="p-3 sm:p-4 border-t border-border">
             <button
               onClick={handleSubmit}
               disabled={selectedImages.length === 0 || isTimeInPast}

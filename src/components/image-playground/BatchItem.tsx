@@ -128,7 +128,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
     : null;
 
   return (
-    <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl">
+    <div className="bg-zinc-900/80 backdrop-blur-xl border border-border rounded-2xl">
       {/* Header */}
       <div className="px-4 py-3 flex items-start gap-3 relative">
         <button
@@ -136,15 +136,15 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
           className="mt-0.5 p-1 -ml-1 rounded-lg hover:bg-white/10 transition-colors"
         >
           {isExpanded ? (
-            <ChevronUp className="w-4 h-4 text-white/40" />
+            <ChevronUp className="w-4 h-4 text-muted-foreground" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-white/40" />
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
           )}
         </button>
 
         <div className="flex-1 min-w-0">
           <p className="text-sm text-white/90 line-clamp-2">{displayPrompt}</p>
-          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-white/40 flex-wrap">
+          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground flex-wrap">
             <span className="px-1.5 py-0.5 bg-white/5 rounded">
               {batch.model.split('/').pop() || batch.model}
             </span>
@@ -208,7 +208,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
             onClick={() => setShowMenu(!showMenu)}
             className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
           >
-            <MoreHorizontal className="w-4 h-4 text-white/40" />
+            <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
           </button>
 
           {showMenu && (
@@ -217,7 +217,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
                 className="fixed inset-0 z-40"
                 onClick={() => setShowMenu(false)}
               />
-              <div className="absolute right-0 top-full mt-1 w-48 bg-zinc-900 border border-white/20 rounded-xl shadow-2xl z-50 py-1">
+              <div className="absolute right-0 top-full mt-1 w-48 bg-zinc-900 border border-border rounded-xl shadow-2xl z-50 py-1">
                 <button
                   onClick={handleReuseSettings}
                   className="w-full px-3 py-2.5 text-left text-sm text-white hover:bg-white/10 flex items-center gap-2.5"
@@ -234,7 +234,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
                     Baixar {successCount > 1 ? 'todas' : 'imagem'}
                   </button>
                 )}
-                <div className="border-t border-white/10 my-1" />
+                <div className="border-t border-border my-1" />
                 <button
                   onClick={handleDelete}
                   className="w-full px-3 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2.5"

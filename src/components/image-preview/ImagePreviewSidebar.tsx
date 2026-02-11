@@ -16,13 +16,13 @@ const SidebarSection: React.FC<{ title: string; hint?: string; children: React.R
   hint,
   children,
 }) => (
-  <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 space-y-3">
+  <div className="rounded-xl border border-border bg-white/[0.02] p-3 space-y-3">
     <div className="flex items-center justify-between gap-3">
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
           {title}
         </p>
-        {hint && <p className="text-[10px] text-white/30">{hint}</p>}
+        {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
       </div>
     </div>
     {children}
@@ -72,7 +72,7 @@ export const ImagePreviewSidebar: React.FC<ImagePreviewSidebarProps> = React.mem
   handleResetFilter,
 }) => {
   return (
-    <div className="w-full lg:w-[300px] flex-shrink-0 bg-[#0a0a0a] flex flex-col border-t lg:border-t-0 lg:border-l border-white/[0.06] h-full overflow-hidden">
+    <div className="w-full lg:w-[300px] flex-shrink-0 bg-background flex flex-col border-t lg:border-t-0 lg:border-l border-border h-full overflow-hidden">
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         {isVideo ? (
           <SidebarSection title="Info do Video">

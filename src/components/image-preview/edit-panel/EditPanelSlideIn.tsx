@@ -214,9 +214,9 @@ export const EditPanelSlideIn = (props: EditPanelSlideInProps) => {
         <SheetContent
           side="bottom"
           showCloseButton={true}
-          className="h-[60vh] rounded-t-2xl bg-black border-white/[0.06] p-0"
+          className="h-[60vh] rounded-t-2xl bg-black border-border p-0"
         >
-          <SheetHeader className="px-5 py-4 border-b border-white/[0.06]">
+          <SheetHeader className="px-5 py-4 border-b border-border">
             <SheetTitle className="text-white font-semibold">Editar Imagem</SheetTitle>
           </SheetHeader>
           <div className="p-4 overflow-y-auto flex-1">
