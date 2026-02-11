@@ -111,7 +111,7 @@ const CountSelector: React.FC<{
         onClick={() => onChange(num)}
         disabled={disabled}
         className={`
-          w-7 h-7 rounded-md text-xs font-semibold transition-all
+          w-7 h-7 rounded-lg text-xs font-semibold transition-all
           ${count === num
             ? 'bg-white/15 text-white border border-border'
             : 'bg-white/5 text-muted-foreground hover:text-white/70 hover:bg-white/10'

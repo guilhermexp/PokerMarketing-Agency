@@ -54,7 +54,7 @@ const CustomSelect: React.FC<{
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-[#0a0a0a]/60 border border-border rounded-lg p-2.5 flex items-center justify-between text-left transition-all active:scale-[0.98] backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-ring focus-visible:ring-[3px]"
+        className="w-full bg-[#0a0a0a]/60 border border-border rounded-xl p-2.5 flex items-center justify-between text-left transition-all active:scale-[0.98] backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-ring focus-visible:ring-[3px]"
       >
         <span className="text-xs font-medium text-white truncate">{value}</span>
         <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} className="w-3 h-3 text-muted-foreground flex-shrink-0 ml-1.5" />

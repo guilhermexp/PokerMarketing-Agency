@@ -268,7 +268,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                   setSelectedDate(null);
                   setIsScheduleModalOpen(true);
                 }}
-                className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-border rounded-lg text-[10px] font-bold text-muted-foreground uppercase tracking-wide hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
+                className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-border rounded-full text-[10px] font-bold text-muted-foreground uppercase tracking-wide hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
               >
                 <Icon name="plus" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                 <span className="hidden sm:inline">Agendar</span>
@@ -757,7 +757,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                   return (
                     <div
                       key={post.id}
-                      className="group bg-black/40 border border-border rounded-lg overflow-hidden transition-all flex flex-col hover:bg-black/50"
+                      className="group bg-black/40 border border-border rounded-xl overflow-hidden transition-all flex flex-col hover:bg-black/50"
                     >
                       {/* Post Image */}
                       <div
@@ -857,7 +857,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
       {/* Regular Calendar View */}
       {!showTodayView && (
       <main className="flex-1 px-2 md:px-6 py-3 md:py-6 flex flex-col">
-        <div className="grid grid-cols-7 gap-px bg-white/5 border border-border rounded-lg overflow-hidden flex-1">
+        <div className="grid grid-cols-7 gap-px bg-white/5 border border-border rounded-xl overflow-hidden flex-1">
           {monthCalendar.map((day, index) => (
             <div
               key={index}

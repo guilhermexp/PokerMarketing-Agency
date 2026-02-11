@@ -442,7 +442,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
                           key={tone}
                           type="button"
                           onClick={() => setProfile(p => ({ ...p, toneOfVoice: tone as ToneOfVoice }))}
-                          className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${isActive
+                          className={`px-3 py-2.5 rounded-full text-xs font-medium transition-all ${isActive
                             ? 'bg-white text-black'
                             : 'bg-[#0a0a0a]/60 text-muted-foreground hover:bg-white/10 hover:text-white border border-border backdrop-blur-xl'
                             }`}

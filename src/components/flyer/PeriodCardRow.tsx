@@ -440,7 +440,7 @@ export const PeriodCardRow: React.FC<{
 
         return (
             <div
-                className={`bg-black/40 backdrop-blur-2xl border rounded-2xl overflow-hidden transition-all mb-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isGenerating ? "border-border animate-pulse" : "border-border hover:border-white/20"}`}
+                className={`bg-black/40 backdrop-blur-2xl border rounded-xl overflow-hidden transition-all mb-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isGenerating ? "border-border animate-pulse" : "border-border hover:border-white/20"}`}
             >
                 <div
                     className="px-5 py-4 flex items-center justify-between cursor-pointer"

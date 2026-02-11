@@ -747,7 +747,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
               </div>
               <button
                 onClick={onClearReference}
-                className="w-6 h-6 rounded-md bg-black/40 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-all flex items-center justify-center"
+                className="w-6 h-6 rounded-lg bg-black/40 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-all flex items-center justify-center"
                 title="Remover anexo"
               >
                 <Icon name="x" className="w-3 h-3" />

@@ -182,7 +182,7 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
               role="button"
               tabIndex={0}
               onKeyDown={(e) => e.key === "Enter" && onSelectSchedule(schedule)}
-              className={`w-full flex items-center justify-between gap-4 p-4 rounded-2xl border transition-all active:scale-[0.99] text-left cursor-pointer backdrop-blur-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isSelected
+              className={`w-full flex items-center justify-between gap-4 p-4 rounded-xl border transition-all active:scale-[0.99] text-left cursor-pointer backdrop-blur-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isSelected
                 ? "bg-black/40 border-border"
                 : "bg-black/40 border-border hover:border-white/20"
                 }`}

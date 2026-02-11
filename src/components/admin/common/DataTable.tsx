@@ -28,7 +28,7 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
-      <div className="bg-white/[0.02] border border-border rounded-lg">
+      <div className="bg-white/[0.02] border border-border rounded-xl">
         <div className="p-8 text-center">
           <div className="inline-flex items-center gap-2 text-muted-foreground">
             <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -44,7 +44,7 @@ export function DataTable<T>({
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-white/[0.02] border border-border rounded-lg">
+      <div className="bg-white/[0.02] border border-border rounded-xl">
         <div className="p-8 text-center text-muted-foreground text-[13px]">
           {emptyMessage}
         </div>
@@ -53,7 +53,7 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="bg-white/[0.02] border border-border rounded-lg overflow-hidden">
+    <div className="bg-white/[0.02] border border-border rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>

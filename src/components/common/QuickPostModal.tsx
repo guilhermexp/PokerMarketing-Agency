@@ -247,7 +247,7 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 p-4 sm:p-5 md:p-6 min-h-full">
                         {/* Left: Image Preview */}
                         <div className="flex flex-col items-center justify-center">
-                            <div className={`relative w-full rounded-2xl overflow-hidden border border-border shadow-2xl bg-black ${contentType === 'story' ? 'aspect-[9/16] max-w-[280px]' : 'aspect-square max-w-[320px]'
+                            <div className={`relative w-full rounded-xl overflow-hidden border border-border shadow-2xl bg-black ${contentType === 'story' ? 'aspect-[9/16] max-w-[280px]' : 'aspect-square max-w-[320px]'
                                 } mx-auto`}>
                                 {isVideo ? (
                                     <video

@@ -3571,7 +3571,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-1 sm:pb-0 -mx-3 px-3 sm:mx-0 sm:px-0 [&>*]:flex-shrink-0">
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-white/60 hover:bg-white/5 transition-all"
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-white/60 hover:bg-white/5 transition-all"
               title="Configurações"
             >
               <Icon name="settings" className="w-4 h-4" />
@@ -3685,7 +3685,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               disabled={
                 isGeneratingAll || (!mergedVideoUrl && !hasGeneratedVideos)
               }
-              className="p-1.5 rounded-md bg-primary/80 text-black hover:bg-primary transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1.5 rounded-lg bg-primary/80 text-black hover:bg-primary transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               title="Exportar"
             >
               <Icon name="download" className="w-3.5 h-3.5" />
@@ -4691,7 +4691,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                       if (container)
                         container.scrollBy({ left: -280, behavior: "smooth" });
                     }}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-xl bg-black/80 hover:bg-primary/20 border border-border hover:border-primary/20 flex items-center justify-center text-muted-foreground hover:text-primary transition-all shadow-lg"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-lg bg-black/80 hover:bg-primary/20 border border-border hover:border-primary/20 flex items-center justify-center text-muted-foreground hover:text-primary transition-all shadow-lg"
                   >
                     <Icon name="chevron-left" className="w-4 h-4" />
                   </button>
@@ -4703,7 +4703,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                       if (container)
                         container.scrollBy({ left: 280, behavior: "smooth" });
                     }}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-xl bg-black/80 hover:bg-primary/20 border border-border hover:border-primary/20 flex items-center justify-center text-muted-foreground hover:text-primary transition-all shadow-lg"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-lg bg-black/80 hover:bg-primary/20 border border-border hover:border-primary/20 flex items-center justify-center text-muted-foreground hover:text-primary transition-all shadow-lg"
                   >
                     <Icon name="chevron-right" className="w-4 h-4" />
                   </button>
@@ -5000,7 +5000,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                               onClick={() =>
                                 handleShowPrompt(scene.sceneNumber)
                               }
-                              className="w-5 h-5 rounded-md bg-black/50 backdrop-blur-sm flex items-center justify-center text-muted-foreground hover:text-white hover:bg-black/70 transition-colors"
+                              className="w-5 h-5 rounded-lg bg-black/50 backdrop-blur-sm flex items-center justify-center text-muted-foreground hover:text-white hover:bg-black/70 transition-colors"
                               title="Ver prompt"
                             >
                               <Icon name="eye" className="w-2.5 h-2.5" />

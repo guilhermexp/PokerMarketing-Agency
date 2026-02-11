@@ -153,21 +153,21 @@ export const ImageViewer: React.FC<ImageViewerProps> = (props) => {
       <div className="absolute top-4 right-4 flex items-center gap-1 rounded-lg bg-black/60 border border-border p-1">
         <button
           onClick={handleZoomOut}
-          className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/5 rounded-md text-[12px]"
+          className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/5 rounded-lg text-[12px]"
           aria-label="Zoom out"
         >
           -
         </button>
         <button
           onClick={handleZoomIn}
-          className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/5 rounded-md"
+          className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/5 rounded-lg"
           aria-label="Zoom in"
         >
           <Icon name="plus" className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={handleReset}
-          className="px-2 h-7 text-[10px] text-muted-foreground hover:text-white hover:bg-white/5 rounded-md"
+          className="px-2 h-7 text-[10px] text-muted-foreground hover:text-white hover:bg-white/5 rounded-lg"
         >
           Reset
         </button>

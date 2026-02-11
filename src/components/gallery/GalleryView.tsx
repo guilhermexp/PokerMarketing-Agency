@@ -296,7 +296,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
       {/* Selection checkbox */}
       {isSelectMode && (
         <div
-          className={`absolute top-2 left-2 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
+          className={`absolute top-2 left-2 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
             isSelected
               ? "bg-primary border-primary"
               : "bg-black/60 border-white/30 group-hover:border-white/50"
@@ -736,7 +736,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                 {viewMode === "references" && (
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-border rounded-lg text-[10px] font-bold text-muted-foreground uppercase tracking-wide hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
+                    className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-border rounded-full text-[10px] font-bold text-muted-foreground uppercase tracking-wide hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
                   >
                     <Icon name="plus" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                     <span className="hidden sm:inline">Adicionar</span>

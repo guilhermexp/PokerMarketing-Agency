@@ -25,7 +25,7 @@ export function StatsCard({ title, value, icon, subtitle, change, color = 'defau
   };
 
   return (
-    <div className="bg-white/[0.02] border border-border rounded-lg p-4">
+    <div className="bg-white/[0.02] border border-border rounded-xl p-4">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">{title}</p>
@@ -51,7 +51,7 @@ export function StatsCard({ title, value, icon, subtitle, change, color = 'defau
             </div>
           )}
         </div>
-        <div className={`w-9 h-9 rounded-md bg-white/[0.04] flex items-center justify-center ${iconColors[color]}`}>
+        <div className={`w-9 h-9 rounded-lg bg-white/[0.04] flex items-center justify-center ${iconColors[color]}`}>
           {icon}
         </div>
       </div>

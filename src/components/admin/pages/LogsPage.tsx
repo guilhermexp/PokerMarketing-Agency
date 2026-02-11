@@ -343,7 +343,7 @@ export function LogsPage() {
                 <button
                   key={cat}
                   onClick={() => handleCategoryChange(cat)}
-                  className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                  className={`px-2 py-1 text-[10px] font-medium rounded-full transition-colors ${
                     filters.category === cat
                       ? 'bg-amber-500/15 text-amber-500'
                       : 'text-muted-foreground hover:text-foreground bg-white/[0.03]'
@@ -364,7 +364,7 @@ export function LogsPage() {
               <button
                 key={sev}
                 onClick={() => handleSeverityChange(sev)}
-                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                className={`px-2 py-1 text-[10px] font-medium rounded-full transition-colors ${
                   filters.severity === sev
                     ? 'bg-amber-500/15 text-amber-500'
                     : `${severityColors[sev]} bg-white/[0.03] hover:bg-white/[0.05]`

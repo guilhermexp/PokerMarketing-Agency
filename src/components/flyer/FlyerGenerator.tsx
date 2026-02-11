@@ -438,7 +438,7 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
                     onChange={(e) =>
                       setSortBy(e.target.value as "time" | "gtd")
                     }
-                    className="px-3 py-2 rounded-full text-xs bg-black/40 backdrop-blur-2xl border border-border text-muted-foreground hover:text-white/90 hover:border-white/30 outline-none cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.5)] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                    className="px-3 py-2 rounded-xl text-xs bg-black/40 backdrop-blur-2xl border border-border text-muted-foreground hover:text-white/90 hover:border-white/30 outline-none cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.5)] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                   >
                     <option value="time">Horário</option>
                     <option value="gtd">GTD ↓</option>
@@ -1161,7 +1161,7 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsStylePanelOpen(true)}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-full text-xs font-medium transition-all outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
                 isStylePanelOpen
                   ? "bg-white/10 text-white/90"
                   : "text-muted-foreground hover:text-foreground hover:bg-white/5"
@@ -1172,7 +1172,7 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
             </button>
             <button
               onClick={() => setIsStylePanelOpen(false)}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-full text-xs font-medium transition-all outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
                 !isStylePanelOpen
                   ? "bg-white/10 text-white/90"
                   : "text-muted-foreground hover:text-foreground hover:bg-white/5"

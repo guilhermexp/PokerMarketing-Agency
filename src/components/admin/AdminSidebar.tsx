@@ -75,7 +75,7 @@ export function AdminSidebar() {
       {/* Logo */}
       <div className="h-14 flex items-center px-5 border-b border-border">
         <a href="/" className="flex items-center gap-2.5 group">
-          <div className="w-7 h-7 rounded-md bg-amber-500 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center">
             <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>

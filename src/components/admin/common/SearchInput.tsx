@@ -53,7 +53,7 @@ export function SearchInput({
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         placeholder={placeholder}
-        className="w-full pl-9 pr-9 py-2 bg-white/[0.03] border border-border rounded-md text-[13px] text-white/80 placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/50 transition-colors"
+        className="w-full pl-9 pr-9 py-2 bg-white/[0.03] border border-border rounded-xl text-[13px] text-white/80 placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/50 transition-colors"
       />
       {localValue && (
         <button

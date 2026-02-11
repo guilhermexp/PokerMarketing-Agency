@@ -150,7 +150,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
 
   return (
     <motion.div
-      className={`relative w-full h-full rounded-2xl overflow-hidden bg-[#000000]/95 border border-border ${aspectClass} group shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex flex-col backdrop-blur-2xl`}
+      className={`relative w-full h-full rounded-xl overflow-hidden bg-[#000000]/95 border border-border ${aspectClass} group shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex flex-col backdrop-blur-2xl`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       initial={{ opacity: 0, scale: 0.95, y: 20 }}

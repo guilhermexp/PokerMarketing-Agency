@@ -54,7 +54,7 @@ export const TwitterPostPreview: React.FC<TwitterPostPreviewProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Twitter Card */}
-      <div className="w-full bg-black rounded-2xl border border-border overflow-hidden flex-1 flex flex-col">
+      <div className="w-full bg-black rounded-xl border border-border overflow-hidden flex-1 flex flex-col">
         {/* Header */}
         <div className="p-3 pb-2 flex items-start gap-2.5">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">

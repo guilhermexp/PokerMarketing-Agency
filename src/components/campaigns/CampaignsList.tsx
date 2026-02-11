@@ -91,7 +91,7 @@ const CampaignCard: React.FC<{
         onClick={onSelect}
         className={`
         group relative cursor-pointer
-        bg-background rounded-lg overflow-hidden
+        bg-background rounded-xl overflow-hidden
         border transition-all duration-300
         ${isSelected
             ? "border-primary/30 ring-1 ring-primary/20"
@@ -292,7 +292,7 @@ const LoadingSkeleton: React.FC = () => (
     {[0, 1, 2].map((i) => (
       <div
         key={i}
-        className="bg-background rounded-lg border border-border overflow-hidden"
+        className="bg-background rounded-xl border border-border overflow-hidden"
         style={{
           animationDelay: `${i * 80}ms`,
           animation: "pulse 1.5s ease-in-out infinite",
@@ -465,7 +465,7 @@ export function CampaignsList({
         </div>
         <button
           onClick={onNewCampaign}
-          className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-border rounded-lg text-[10px] font-bold text-muted-foreground uppercase tracking-wide hover:border-white/20 hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
+          className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-border rounded-full text-[10px] font-bold text-muted-foreground uppercase tracking-wide hover:border-white/20 hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
         >
           <Icon name="plus" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
           <span className="hidden sm:inline">Nova Campanha</span>

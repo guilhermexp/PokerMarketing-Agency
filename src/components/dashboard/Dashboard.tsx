@@ -486,7 +486,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       <div
                         key={camp.id}
                         onClick={() => onLoadCampaign(camp.id)}
-                        className="group cursor-pointer rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
+                        className="group cursor-pointer rounded-xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
                       >
                         {/* Preview Images with Overlay Text */}
                         {totalAssets > 0 && previewItems.length > 0 ? (

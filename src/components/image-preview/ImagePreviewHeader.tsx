@@ -18,7 +18,7 @@ export const ImagePreviewHeader: React.FC<ImagePreviewHeaderProps> = ({
 }) => (
   <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-[#0b0b0b]/80 backdrop-blur">
     <div className="flex items-center gap-3">
-      <div className="w-7 h-7 rounded-md bg-white/5 border border-border flex items-center justify-center">
+      <div className="w-7 h-7 rounded-lg bg-white/5 border border-border flex items-center justify-center">
         <Icon name="zap" className="w-3.5 h-3.5 text-muted-foreground" />
       </div>
       <div>

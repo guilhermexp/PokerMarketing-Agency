@@ -307,14 +307,14 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => scrollThumbnails('left')}
-              className="w-7 h-7 flex items-center justify-center rounded-md bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white/80 transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white/80 transition-colors"
               aria-label="Scroll para esquerda"
             >
               <Icon name="chevron-left" className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => scrollThumbnails('right')}
-              className="w-7 h-7 flex items-center justify-center rounded-md bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white/80 transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white/80 transition-colors"
               aria-label="Scroll para direita"
             >
               <Icon name="chevron-right" className="w-3.5 h-3.5" />

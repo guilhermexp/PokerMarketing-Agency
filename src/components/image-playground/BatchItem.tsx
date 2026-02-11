@@ -128,7 +128,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
     : null;
 
   return (
-    <div className="bg-zinc-900/80 backdrop-blur-xl border border-border rounded-2xl">
+    <div className="bg-zinc-900/80 backdrop-blur-xl border border-border rounded-xl">
       {/* Header */}
       <div className="px-4 py-3 flex items-start gap-3 relative">
         <button
