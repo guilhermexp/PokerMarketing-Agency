@@ -126,6 +126,7 @@ app.use(
           "blob:",
           "https://*.blob.vercel-storage.com",
           "https://*.public.blob.vercel-storage.com",
+          "https://img.clerk.com",
         ],
         connectSrc: [
           "'self'",
