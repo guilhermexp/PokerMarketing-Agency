@@ -1,13 +1,11 @@
 import { getSql } from "../lib/db.mjs";
 import { resolveUserId } from "../lib/user-resolver.mjs";
+import { RUBE_MCP_URL, RUBE_TIMEOUT_MS } from "../lib/constants.mjs";
 import logger from "../lib/logger.mjs";
 
 // ============================================================================
 // INSTAGRAM ACCOUNTS API (Multi-tenant Rube MCP)
 // ============================================================================
-
-export const RUBE_MCP_URL = "https://rube.app/mcp";
-export const RUBE_TIMEOUT_MS = 15_000; // 15s timeout for Rube MCP calls
 
 // Validate Rube token by calling Instagram API
 export async function validateRubeToken(rubeToken) {

@@ -25,7 +25,7 @@ import logger from "./lib/logger.mjs";
 
 // Lib imports (used in middleware/startup only)
 import { DATABASE_URL, getSql, warmupDatabase, ensureGallerySourceType } from "./lib/db.mjs";
-import { requireAuthenticatedRequest, enforceAuthenticatedIdentity, getRequestAuthContext } from "./lib/auth.mjs";
+import { requireAuthenticatedRequest, enforceAuthenticatedIdentity, getRequestAuthContext, createRateLimitMiddleware } from "./lib/auth.mjs";
 import { resourceAccessMiddleware } from "./lib/resource-access.mjs";
 import { resolveUserId } from "./lib/user-resolver.mjs";
 import { convertImagePromptToJson, buildImagePrompt } from "./lib/ai/prompt-builders.mjs";
@@ -197,6 +197,17 @@ const PROTECTED_API_PREFIXES = [
 for (const prefix of PROTECTED_API_PREFIXES) {
   app.use(prefix, requireAuthenticatedRequest, enforceAuthenticatedIdentity, csrfProtection);
 }
+
+// Rate limiting for AI endpoints (applied after auth so identifier is available)
+const aiRateLimit = createRateLimitMiddleware(30, 60_000);     // 30 req/min
+const videoRateLimit = createRateLimitMiddleware(5, 60_000);   // 5 req/min (expensive)
+
+app.use("/api/ai", aiRateLimit);
+app.use("/api/chat", aiRateLimit);
+
+// Stricter limits for expensive endpoints (video/campaign generation)
+app.use("/api/ai/video", videoRateLimit);
+app.use("/api/ai/campaign", videoRateLimit);
 
 // Resource access middleware for DB routes
 app.use("/api/db", resourceAccessMiddleware);

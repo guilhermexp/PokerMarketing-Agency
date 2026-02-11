@@ -4,7 +4,8 @@
  * Owns: rateLimitStore, SUPER_ADMIN_EMAILS
  * Exports: getRequestAuthContext, requireAuthenticatedRequest,
  *          enforceAuthenticatedIdentity, requireAuthWithAiRateLimit,
- *          checkAiRateLimit, requireSuperAdmin,
+ *          checkAiRateLimit, createRateLimitMiddleware, stopRateLimitCleanup,
+ *          requireSuperAdmin,
  *          getClerkOrgContext, resolveOrganizationContext
  */
 
@@ -16,28 +17,69 @@ import logger from "./logger.mjs";
 // RATE LIMITING FOR AI ENDPOINTS
 // ============================================================================
 const rateLimitStore = new Map();
-const AI_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const AI_RATE_LIMIT_MAX_REQUESTS = 30; // max AI requests per window
 
-export function checkAiRateLimit(identifier) {
+export function checkAiRateLimit(identifier, maxRequests = 30, windowMs = 60_000) {
   const key = `ai:${identifier}`;
   const now = Date.now();
   const record = rateLimitStore.get(key);
 
-  if (!record || now - record.windowStart > AI_RATE_LIMIT_WINDOW_MS) {
+  if (!record || now - record.windowStart > windowMs) {
     rateLimitStore.set(key, { windowStart: now, count: 1 });
-    return { allowed: true, remaining: AI_RATE_LIMIT_MAX_REQUESTS - 1 };
+    return { allowed: true, remaining: maxRequests - 1 };
   }
 
-  if (record.count >= AI_RATE_LIMIT_MAX_REQUESTS) {
+  if (record.count >= maxRequests) {
     return { allowed: false, remaining: 0 };
   }
 
   record.count++;
   return {
     allowed: true,
-    remaining: AI_RATE_LIMIT_MAX_REQUESTS - record.count,
+    remaining: maxRequests - record.count,
   };
+}
+
+/**
+ * Factory for rate-limit middleware. Returns Express middleware that limits
+ * requests per identifier (orgId > userId > IP) within a sliding window.
+ */
+let maxWindowMs = 60_000;
+
+export function createRateLimitMiddleware(maxRequests = 30, windowMs = 60_000) {
+  maxWindowMs = Math.max(maxWindowMs, windowMs);
+  return (req, res, next) => {
+    const authContext = getRequestAuthContext(req);
+    const identifier = authContext?.orgId || authContext?.userId || req.ip;
+    if (!identifier) {
+      logger.warn({ requestId: req.id }, "Rate limit identifier unavailable");
+      return res.status(400).json({ error: "Unable to identify request for rate limiting" });
+    }
+
+    const result = checkAiRateLimit(identifier, maxRequests, windowMs);
+    res.setHeader("X-RateLimit-Limit", maxRequests);
+    res.setHeader("X-RateLimit-Remaining", result.remaining);
+
+    if (!result.allowed) {
+      return res.status(429).json({
+        error: "Rate limit exceeded. Please wait before making more requests.",
+        retryAfter: Math.ceil(windowMs / 1000),
+      });
+    }
+    next();
+  };
+}
+
+// Periodic cleanup to prevent memory leaks in long-running servers
+const cleanupInterval = setInterval(() => {
+  const now = Date.now();
+  const cleanupThreshold = maxWindowMs * 2;
+  for (const [key, entry] of rateLimitStore) {
+    if (now - entry.windowStart > cleanupThreshold) rateLimitStore.delete(key);
+  }
+}, 300_000);
+
+export function stopRateLimitCleanup() {
+  clearInterval(cleanupInterval);
 }
 
 export function getRequestAuthContext(req) {

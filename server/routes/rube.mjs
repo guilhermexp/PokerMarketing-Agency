@@ -1,6 +1,6 @@
 import { getSql } from "../lib/db.mjs";
 import logger from "../lib/logger.mjs";
-import { RUBE_MCP_URL, RUBE_TIMEOUT_MS } from "./db-instagram.mjs";
+import { RUBE_MCP_URL, RUBE_TIMEOUT_MS } from "../lib/constants.mjs";
 
 // ============================================================================
 // RUBE MCP PROXY - For Instagram Publishing (multi-tenant)
