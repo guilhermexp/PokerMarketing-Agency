@@ -115,32 +115,44 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   };
 
   const signInAppearance = {
+    variables: {
+      colorBackground: "transparent",
+      colorText: "white",
+      colorTextSecondary: "rgba(255,255,255,0.55)",
+      colorPrimary: "#f59e0b",
+      colorInputBackground: "rgba(0,0,0,0.4)",
+      colorInputText: "white",
+      colorNeutral: "white",
+      borderRadius: "0.75rem",
+    },
     elements: {
       rootBox: "mx-auto flex w-full justify-center",
       cardBox: "w-full max-w-[430px]",
-      card: "w-full border-0 bg-transparent p-0 shadow-none",
-      headerTitle: "text-2xl font-semibold tracking-tight text-white",
-      headerSubtitle: "text-sm text-muted-foreground",
+      card: "!w-full !border-0 !bg-transparent !p-0 !shadow-none",
+      headerTitle: "!text-2xl !font-semibold !tracking-tight !text-white",
+      headerSubtitle: "!text-sm !text-white/55",
       socialButtonsBlockButton:
-        "h-11 rounded-xl border border-white/15 bg-white/5 text-white transition-colors hover:bg-white/10",
-      socialButtonsBlockButtonText: "text-sm font-medium text-white",
-      dividerLine: "bg-white/10",
-      dividerText: "text-xs uppercase tracking-[0.2em] text-muted-foreground",
-      formFieldLabel: "text-sm font-medium text-white/75",
+        "!h-11 !rounded-xl !border !border-white/15 !bg-white/5 !text-white transition-colors hover:!bg-white/10",
+      socialButtonsBlockButtonText: "!text-sm !font-medium !text-white",
+      dividerLine: "!bg-white/10",
+      dividerText: "!text-xs !uppercase !tracking-[0.2em] !text-white/45",
+      formFieldLabel: "!text-sm !font-medium !text-white/75",
       formFieldInput:
-        "h-11 rounded-xl border border-white/15 bg-black/40 text-white placeholder:text-white/35 transition-colors focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20",
-      formFieldAction: "text-amber-400 transition-colors hover:text-amber-300",
+        "!h-11 !rounded-xl !border !border-white/15 !bg-black/40 !text-white placeholder:!text-white/35 transition-colors focus:!border-amber-400 focus:!ring-2 focus:!ring-amber-400/20",
+      formFieldAction: "!text-amber-400 transition-colors hover:!text-amber-300",
       formButtonPrimary:
-        "h-11 rounded-xl border border-neutral-700 bg-gradient-to-r from-neutral-900 to-neutral-700 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all hover:from-neutral-800 hover:to-neutral-600",
-      footerActionText: "text-muted-foreground",
-      footerActionLink: "font-medium text-amber-400 transition-colors hover:text-amber-300",
-      formResendCodeLink: "text-amber-400 transition-colors hover:text-amber-300",
-      identityPreviewText: "text-white/80",
-      identityPreviewEditButton: "text-amber-400 transition-colors hover:text-amber-300",
+        "!h-11 !rounded-xl !border !border-neutral-700 !bg-gradient-to-r !from-neutral-900 !to-neutral-700 !text-sm !font-semibold !text-white !shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all hover:!from-neutral-800 hover:!to-neutral-600",
+      footerActionText: "!text-white/45",
+      footerActionLink: "!font-medium !text-amber-400 transition-colors hover:!text-amber-300",
+      formResendCodeLink: "!text-amber-400 transition-colors hover:!text-amber-300",
+      identityPreviewText: "!text-white/80",
+      identityPreviewEditButton: "!text-amber-400 transition-colors hover:!text-amber-300",
       otpCodeFieldInput:
-        "rounded-xl border border-white/15 bg-black/40 text-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20",
-      alert: "rounded-xl border border-amber-300/20 bg-amber-500/10 text-amber-100",
-      formFieldSuccessText: "text-emerald-300",
+        "!rounded-xl !border !border-white/15 !bg-black/40 !text-white focus:!border-amber-400 focus:!ring-2 focus:!ring-amber-400/20",
+      alert: "!rounded-xl !border !border-amber-300/20 !bg-amber-500/10 !text-amber-100",
+      formFieldSuccessText: "!text-emerald-300",
+      footer: "!bg-transparent",
+      footerAction: "!bg-transparent",
     },
   } as const;
 
