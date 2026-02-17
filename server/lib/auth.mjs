@@ -15,10 +15,32 @@ import logger from "./logger.mjs";
 
 // ============================================================================
 // RATE LIMITING FOR AI ENDPOINTS
+// Upstash Redis when UPSTASH_REDIS_REST_URL is set, in-memory fallback otherwise
 // ============================================================================
-const rateLimitStore = new Map();
 
-export function checkAiRateLimit(identifier, maxRequests = 30, windowMs = 60_000) {
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+let upstashRedis = null;
+let RatelimitClass = null;
+
+if (UPSTASH_URL && UPSTASH_TOKEN) {
+  try {
+    const { Redis } = await import("@upstash/redis");
+    const { Ratelimit } = await import("@upstash/ratelimit");
+    upstashRedis = new Redis({ url: UPSTASH_URL, token: UPSTASH_TOKEN });
+    RatelimitClass = Ratelimit;
+    logger.info("[RateLimit] Using Upstash Redis");
+  } catch (err) {
+    logger.warn({ err }, "[RateLimit] Failed to load Upstash, falling back to in-memory");
+  }
+}
+
+// In-memory fallback (dev / environments without Upstash)
+const rateLimitStore = new Map();
+let maxWindowMs = 60_000;
+
+function checkAiRateLimitInMemory(identifier, maxRequests = 30, windowMs = 60_000) {
   const key = `ai:${identifier}`;
   const now = Date.now();
   const record = rateLimitStore.get(key);
@@ -39,15 +61,40 @@ export function checkAiRateLimit(identifier, maxRequests = 30, windowMs = 60_000
   };
 }
 
+export async function checkAiRateLimit(identifier, maxRequests = 30, windowMs = 60_000) {
+  if (!upstashRedis) {
+    return checkAiRateLimitInMemory(identifier, maxRequests, windowMs);
+  }
+
+  // Upstash path — create a limiter scoped to (maxRequests, windowMs)
+  const limiter = new RatelimitClass({
+    redis: upstashRedis,
+    limiter: RatelimitClass.slidingWindow(maxRequests, `${Math.ceil(windowMs / 1000)} s`),
+    prefix: "rl",
+  });
+
+  const { success, remaining } = await limiter.limit(`ai:${identifier}`);
+  return { allowed: success, remaining };
+}
+
 /**
  * Factory for rate-limit middleware. Returns Express middleware that limits
  * requests per identifier (orgId > userId > IP) within a sliding window.
  */
-let maxWindowMs = 60_000;
-
 export function createRateLimitMiddleware(maxRequests = 30, windowMs = 60_000) {
   maxWindowMs = Math.max(maxWindowMs, windowMs);
-  return (req, res, next) => {
+
+  // Pre-build an Upstash limiter if available (avoids creating one per request)
+  let upstashLimiter = null;
+  if (upstashRedis && RatelimitClass) {
+    upstashLimiter = new RatelimitClass({
+      redis: upstashRedis,
+      limiter: RatelimitClass.slidingWindow(maxRequests, `${Math.ceil(windowMs / 1000)} s`),
+      prefix: "rl",
+    });
+  }
+
+  return async (req, res, next) => {
     const authContext = getRequestAuthContext(req);
     const identifier = authContext?.orgId || authContext?.userId || req.ip;
     if (!identifier) {
@@ -55,32 +102,48 @@ export function createRateLimitMiddleware(maxRequests = 30, windowMs = 60_000) {
       return res.status(400).json({ error: "Unable to identify request for rate limiting" });
     }
 
-    const result = checkAiRateLimit(identifier, maxRequests, windowMs);
-    res.setHeader("X-RateLimit-Limit", maxRequests);
-    res.setHeader("X-RateLimit-Remaining", result.remaining);
+    try {
+      let result;
+      if (upstashLimiter) {
+        const { success, remaining } = await upstashLimiter.limit(`ai:${identifier}`);
+        result = { allowed: success, remaining };
+      } else {
+        result = checkAiRateLimitInMemory(identifier, maxRequests, windowMs);
+      }
 
-    if (!result.allowed) {
-      return res.status(429).json({
-        error: "Rate limit exceeded. Please wait before making more requests.",
-        retryAfter: Math.ceil(windowMs / 1000),
-      });
+      res.setHeader("X-RateLimit-Limit", maxRequests);
+      res.setHeader("X-RateLimit-Remaining", result.remaining);
+
+      if (!result.allowed) {
+        return res.status(429).json({
+          error: "Rate limit exceeded. Please wait before making more requests.",
+          retryAfter: Math.ceil(windowMs / 1000),
+        });
+      }
+      next();
+    } catch (err) {
+      // If Upstash fails, allow the request (fail-open)
+      logger.warn({ err, identifier }, "[RateLimit] Upstash error, allowing request");
+      next();
     }
-    next();
   };
 }
 
-// Periodic cleanup to prevent memory leaks in long-running servers
-const cleanupInterval = setInterval(() => {
-  const now = Date.now();
-  const cleanupThreshold = maxWindowMs * 2;
-  for (const [key, entry] of rateLimitStore) {
-    if (now - entry.windowStart > cleanupThreshold) rateLimitStore.delete(key);
-  }
-}, 300_000);
-
-export function stopRateLimitCleanup() {
-  clearInterval(cleanupInterval);
+// Periodic cleanup for in-memory store (only runs if Upstash is not used)
+if (!upstashRedis) {
+  const cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    const cleanupThreshold = maxWindowMs * 2;
+    for (const [key, entry] of rateLimitStore) {
+      if (now - entry.windowStart > cleanupThreshold) rateLimitStore.delete(key);
+    }
+  }, 300_000);
+  // Allow process to exit without waiting for this timer
+  cleanupInterval.unref?.();
 }
+
+/** @deprecated No longer needed — cleanup is self-managing */
+export function stopRateLimitCleanup() {}
 
 export function getRequestAuthContext(req) {
   if (req.internalAuth?.userId) {
@@ -202,7 +265,7 @@ export function enforceAuthenticatedIdentity(req, res, next) {
 }
 
 // Middleware for AI endpoints with stricter rate limiting
-export function requireAuthWithAiRateLimit(req, res, next) {
+export async function requireAuthWithAiRateLimit(req, res, next) {
   const auth = getRequestAuthContext(req);
 
   if (!auth?.userId) {
@@ -212,15 +275,20 @@ export function requireAuthWithAiRateLimit(req, res, next) {
     });
   }
 
-  // Apply stricter AI rate limiting
-  const rateLimit = checkAiRateLimit(auth.userId);
-  res.setHeader("X-RateLimit-Remaining", rateLimit.remaining);
+  try {
+    // Apply stricter AI rate limiting
+    const rateLimit = await checkAiRateLimit(auth.userId);
+    res.setHeader("X-RateLimit-Remaining", rateLimit.remaining);
 
-  if (!rateLimit.allowed) {
-    return res.status(429).json({
-      error: "AI rate limit exceeded. Please try again later.",
-      code: "AI_RATE_LIMIT_EXCEEDED",
-    });
+    if (!rateLimit.allowed) {
+      return res.status(429).json({
+        error: "AI rate limit exceeded. Please try again later.",
+        code: "AI_RATE_LIMIT_EXCEEDED",
+      });
+    }
+  } catch (err) {
+    // Fail-open: allow request if rate limiting errors
+    logger.warn({ err, userId: auth.userId }, "[RateLimit] Error in requireAuthWithAiRateLimit");
   }
 
   req.authUserId = auth.userId;

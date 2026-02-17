@@ -127,8 +127,8 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
     },
     elements: {
       rootBox: "mx-auto flex w-full justify-center",
-      cardBox: "w-full max-w-[430px]",
-      card: "!w-full !border-0 !bg-transparent !p-0 !shadow-none",
+      cardBox: "w-full max-w-[430px] mx-auto",
+      card: "!w-full !border-0 !bg-transparent !px-2 !py-0 !shadow-none",
       headerTitle: "!text-2xl !font-semibold !tracking-tight !text-white",
       headerSubtitle: "!text-sm !text-white/55",
       socialButtonsBlockButton:
