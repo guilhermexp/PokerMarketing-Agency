@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/ensure-sharp-libvips-link.mjs",
     "dev": "concurrently -n api,vite -c cyan,green \"bun run dev:api:debug\" \"sleep 3 && vite\"",
     "bun:dev": "bun run dev",
     "dev:local": "bun run dev:redis && concurrently -n redis,api,vite -c red,cyan,green \"docker compose logs -f redis\" \"bun run dev:api\" \"bun run dev:vite\"",
@@ -26,6 +27,8 @@
   "dependencies": {
     "@ai-sdk/google": "^3.0.22",
     "@ai-sdk/react": "^3.0.79",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.44",
+    "@anthropic-ai/claude-code": "^2.1.44",
     "@clerk/backend": "^2.30.1",
     "@clerk/clerk-react": "^5.60.0",
     "@clerk/express": "^1.7.69",

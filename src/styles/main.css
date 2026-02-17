@@ -220,6 +220,129 @@
   outline-offset: 2px;
 }
 
+/* Studio Agent markdown rendering (1code-like) */
+.studio-agent-markdown {
+  color: rgb(229 229 229);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.studio-agent-markdown > *:first-child {
+  margin-top: 0;
+}
+
+.studio-agent-markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.studio-agent-markdown h1,
+.studio-agent-markdown h2,
+.studio-agent-markdown h3,
+.studio-agent-markdown h4,
+.studio-agent-markdown h5,
+.studio-agent-markdown h6 {
+  font-weight: 700;
+  color: rgb(245 245 245);
+  line-height: 1.3;
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.studio-agent-markdown h1 {
+  font-size: 1.4em;
+}
+
+.studio-agent-markdown h2 {
+  font-size: 1.25em;
+}
+
+.studio-agent-markdown h3 {
+  font-size: 1.12em;
+}
+
+.studio-agent-markdown p {
+  margin: 0.2rem 0;
+}
+
+.studio-agent-markdown ul,
+.studio-agent-markdown ol {
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+}
+
+.studio-agent-markdown li {
+  margin: 0.15rem 0;
+}
+
+.studio-agent-markdown li > p {
+  margin: 0;
+  display: inline;
+}
+
+.studio-agent-markdown code {
+  background: rgb(38 38 38 / 0.95);
+  border: 1px solid rgb(64 64 64);
+  border-radius: 0.35rem;
+  padding: 0.05rem 0.35rem;
+  font-family: "Monaco", "Menlo", "Consolas", monospace;
+  font-size: 0.92em;
+  color: rgb(212 212 212);
+}
+
+.studio-agent-markdown pre {
+  margin: 0.45rem 0;
+  background: rgb(17 17 17 / 0.95);
+  border: 1px solid rgb(53 53 53);
+  border-radius: 0.75rem;
+  overflow-x: auto;
+  padding: 0.75rem 0.9rem;
+}
+
+.studio-agent-markdown pre code {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  color: rgb(230 230 230);
+  font-size: 0.9em;
+}
+
+.studio-agent-markdown hr {
+  border: none;
+  border-top: 1px solid rgb(52 52 52);
+  margin: 0.9rem 0;
+}
+
+.studio-agent-markdown blockquote {
+  margin: 0.45rem 0;
+  padding: 0.3rem 0.75rem;
+  border-left: 2px solid rgb(84 84 84);
+  color: rgb(186 186 186);
+}
+
+.studio-agent-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.45rem 0;
+  border: 1px solid rgb(56 56 56);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.studio-agent-markdown th,
+.studio-agent-markdown td {
+  border: 1px solid rgb(56 56 56);
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.studio-agent-markdown th {
+  font-weight: 600;
+  color: rgb(240 240 240);
+  background: rgb(20 20 20 / 0.95);
+}
+
 /* Gallery image shimmer effect */
 @keyframes shimmer {
   0% {

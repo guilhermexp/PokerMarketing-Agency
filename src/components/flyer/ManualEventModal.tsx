@@ -47,19 +47,19 @@ export const ManualEventModal: React.FC<{
     if (!isOpen) return null;
 
     const inputClass =
-        "w-full bg-transparent border border-border rounded-md px-3 py-2 text-xs text-white outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive placeholder:text-muted-foreground";
-    const labelClass = "text-[9px] text-muted-foreground";
+        "w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2.5 text-xs text-white outline-none focus:border-white/[0.15] focus:bg-white/[0.04] placeholder:text-white/30 transition-all";
+    const labelClass = "text-[10px] text-white/40 uppercase tracking-wider font-medium";
 
     return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
-            <Card className="w-full max-w-2xl border-border bg-background overflow-hidden max-h-[90vh] flex flex-col">
-                <div className="px-4 py-3 flex justify-between items-center">
-                    <h3 className="text-[13px] font-semibold text-white">
+            <Card className="w-full max-w-2xl border border-white/[0.08] bg-[#0a0a0a] rounded-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                <div className="px-5 py-4 flex justify-between items-center border-b border-white/[0.06]">
+                    <h3 className="text-sm font-medium text-white">
                         Adicionar Torneio
                     </h3>
                     <button
                         onClick={onClose}
-                        className="text-muted-foreground hover:text-white transition-colors"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/[0.06] transition-all"
                     >
                         <Icon name="x" className="w-4 h-4" />
                     </button>
@@ -227,7 +227,7 @@ export const ManualEventModal: React.FC<{
                         </div>
                     </div>
                 </div>
-                <div className="px-4 py-3 flex gap-2">
+                <div className="px-5 py-4 flex gap-2 border-t border-white/[0.06]">
                     <Button
                         onClick={() => {
                             resetForm();
@@ -235,7 +235,7 @@ export const ManualEventModal: React.FC<{
                         }}
                         variant="secondary"
                         size="small"
-                        className="flex-1"
+                        className="flex-1 bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.12]"
                     >
                         Cancelar
                     </Button>
@@ -251,7 +251,7 @@ export const ManualEventModal: React.FC<{
                         }}
                         variant="primary"
                         size="small"
-                        className="flex-1"
+                        className="flex-1 bg-white/[0.1] border-white/[0.15] hover:bg-white/[0.15] hover:border-white/[0.2]"
                         disabled={!formData.name?.trim()}
                     >
                         Salvar Torneio

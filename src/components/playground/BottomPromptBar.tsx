@@ -474,7 +474,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                   {editingImage && (
                     <div className="flex flex-col gap-1 w-full">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-purple-400 uppercase tracking-wide flex items-center gap-1">
+                        <span className="text-[10px] text-white/40 uppercase tracking-wide flex items-center gap-1">
                           <Edit3 className="w-3 h-3" />
                           Editando Imagem
                         </span>
@@ -485,7 +485,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                           Cancelar
                         </button>
                       </div>
-                      <div className="flex items-center gap-2 mt-1 p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                        <div className="flex items-center gap-2 mt-1 p-2 bg-white/[0.06] border border-white/[0.1] rounded-lg">
                         <img
                           src={editingImage.url}
                           alt="Editando"
@@ -593,7 +593,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
                 setTimeout(() => inputRef.current?.focus(), 100);
               }
             }}
-            className={`w-11 h-11 flex items-center justify-center rounded-full transition-all duration-300 shrink-0 shadow-lg backdrop-blur-2xl ${isExpanded ? 'bg-white/10 text-white hover:bg-white/20 border border-border rotate-45' : 'text-white bg-gradient-to-br from-indigo-500 to-purple-600 hover:scale-105 shadow-[0_0_15px_rgba(99,102,241,0.5)]'}`}
+            className={`w-11 h-11 flex items-center justify-center rounded-full transition-all duration-300 shrink-0 shadow-lg backdrop-blur-2xl ${isExpanded ? 'bg-white/10 text-white hover:bg-white/20 border border-border rotate-45' : 'text-white bg-white/[0.1] border border-white/[0.15] hover:bg-white/[0.2] hover:scale-105 shadow-[0_0_15px_rgba(255,255,255,0.1)]'}`}
           >
             <Plus className="w-5 h-5" />
           </button>

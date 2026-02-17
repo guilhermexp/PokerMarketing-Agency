@@ -1,6 +1,7 @@
 /**
  * GenerationItem
  * Displays a single generation with loading/success/error states
+ * Professional design matching Video Studio
  */
 
 import React, { useCallback, useState, useEffect } from 'react';
@@ -40,13 +41,10 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
   const { deleteGeneration } = useImagePlaygroundBatches(topicId);
   const { updateGeneration, topics, updateTopic: updateTopicStore } = useImagePlaygroundStore();
 
-  // Get current topic to check if it needs a coverUrl
   const currentTopic = topics.find(t => t.id === topicId);
 
-  // Determine if we need to poll
   const needsPolling = !generation.asset && !!generation.asyncTaskId;
 
-  // Polling for generation status
   const { status, generation: _updatedGen, error: pollingError } = useGenerationPolling(
     generation.id,
     generation.asyncTaskId,
@@ -57,7 +55,6 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
         if (gen) {
           updateGeneration(topicId, generation.id, gen);
 
-          // Update topic coverUrl if this is the first successful image
           if (gen.asset?.url && currentTopic && !currentTopic.coverUrl) {
             try {
               await api.updateTopic(topicId, { coverUrl: gen.asset.url });
@@ -71,7 +68,6 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
     }
   );
 
-  // Elapsed time counter for loading state
   useEffect(() => {
     if (!needsPolling) return;
 
@@ -88,11 +84,8 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
     if (!generation.asset?.url) return;
 
     try {
-      // Fetch the image as blob to bypass cross-origin download restrictions
       const response = await fetch(generation.asset.url);
       const blob = await response.blob();
-
-      // Create a blob URL and trigger download
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
@@ -100,12 +93,9 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
-      // Clean up the blob URL
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('Failed to download image:', error);
-      // Fallback: open in new tab
       window.open(generation.asset.url, '_blank');
     }
   }, [generation]);
@@ -114,7 +104,6 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
     if (!generation.asset?.url) return;
 
     try {
-      // Fetch the image and convert to base64 data URL
       const response = await fetch(generation.asset.url);
       const blob = await response.blob();
       const mimeType = blob.type || 'image/png';
@@ -138,11 +127,10 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
   const handleOpenPreview = useCallback(() => {
     if (!generation.asset?.url) return;
 
-    // Convert generation to GalleryImage format for the preview modal
     const galleryImage: GalleryImage = {
       id: generation.id,
       src: generation.asset.url,
-      prompt: '', // We don't have prompt at generation level, it's at batch level
+      prompt: '',
       source: 'playground',
       model: 'gemini-3-pro-image-preview' as any,
       aspectRatio: undefined,
@@ -162,9 +150,9 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
   // Loading State
   if (!generation.asset) {
     return (
-      <div className="aspect-square rounded-xl border border-border overflow-hidden relative">
+      <div className="aspect-square rounded-xl border border-white/[0.06] overflow-hidden relative bg-white/[0.02]">
         {status === 'error' ? (
-          <div className="w-full h-full bg-white/5 flex flex-col items-center justify-center gap-3">
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3">
             <GenerationError error={pollingError} onDelete={handleDelete} />
           </div>
         ) : (
@@ -173,16 +161,15 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
               isGenerating={!isPollingPaused}
               showLabel={true}
             />
-            {/* Time elapsed overlay */}
             <div className="absolute bottom-3 left-0 right-0 flex flex-col items-center gap-2 z-30">
-              <span className="text-[10px] text-muted-foreground bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full">
+              <span className="text-[10px] text-white/30 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full">
                 {formatTime(elapsedTime)}
               </span>
               {needsPolling && (
                 <button
                   onClick={() => setIsPollingPaused((prev) => !prev)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/40 backdrop-blur-sm text-white/80 text-xs hover:bg-black/60 transition-colors"
-                  title={isPollingPaused ? 'Retomar atualização do status' : 'Pausar atualização do status'}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/40 backdrop-blur-sm text-white/60 text-xs hover:bg-black/60 transition-colors"
+                  title={isPollingPaused ? 'Retomar atualizacao do status' : 'Pausar atualizacao do status'}
                 >
                   {isPollingPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
                   {isPollingPaused ? 'Retomar' : 'Pausar'}
@@ -198,18 +185,18 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
   // Success State
   return (
     <div
-      className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer"
+      className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer border border-white/[0.06]"
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
       {/* Image */}
       {imageError ? (
-        <div className="w-full h-full bg-white/5 border border-border flex flex-col items-center justify-center gap-3">
-          <AlertCircle className="w-8 h-8 text-muted-foreground" />
-          <p className="text-xs text-muted-foreground font-medium">Imagem indisponível</p>
+        <div className="w-full h-full bg-white/[0.03] flex flex-col items-center justify-center gap-3">
+          <AlertCircle className="w-8 h-8 text-white/20" />
+          <p className="text-xs text-white/30 font-medium">Imagem indisponivel</p>
           <button
             onClick={handleDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-xs hover:bg-red-500/20 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400/80 text-xs hover:bg-red-500/20 transition-colors"
           >
             <Trash2 className="w-3 h-3" />
             Remover
@@ -227,7 +214,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
 
       {/* Seed Badge */}
       {generation.seed && (
-        <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 backdrop-blur rounded-lg text-[10px] text-white/80 flex items-center gap-1">
+        <div className="absolute top-2 left-2 px-2 py-1 bg-black/50 backdrop-blur-sm rounded-lg text-[10px] text-white/60 flex items-center gap-1">
           <Hash className="w-3 h-3" />
           {generation.seed}
         </div>
@@ -235,7 +222,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
 
       {/* Hover Overlay */}
       <div
-        className={`absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity ${
+        className={`absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent transition-opacity duration-200 ${
           showActions ? 'opacity-100' : 'opacity-0'
         }`}
       >
@@ -244,8 +231,8 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
           <div className="flex items-center gap-1.5">
             <button
               onClick={handleUseAsReference}
-              className="p-2 bg-white/10 backdrop-blur-xl rounded-lg hover:bg-primary/30 transition-colors"
-              title="Usar como referência"
+              className="p-2 bg-white/10 backdrop-blur-xl rounded-lg hover:bg-white/20 transition-colors"
+              title="Usar como referencia"
             >
               <ImagePlus className="w-4 h-4 text-white" />
             </button>
@@ -256,7 +243,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
             >
               <Download className="w-4 h-4 text-white" />
             </button>
-                        <button
+            <button
               onClick={handleDelete}
               className="p-2 bg-white/10 backdrop-blur-xl rounded-lg hover:bg-red-500/30 transition-colors"
               title="Excluir"
@@ -265,7 +252,6 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
             </button>
           </div>
 
-          {/* View Full Size */}
           <button
             onClick={handleOpenPreview}
             className="p-2 bg-white/10 backdrop-blur-xl rounded-lg hover:bg-white/20 transition-colors"
@@ -282,7 +268,6 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
           image={previewImage}
           onClose={() => setPreviewImage(null)}
           onImageUpdate={(newUrl) => {
-            // Update the generation asset with the edited image
             updateGeneration(topicId, generation.id, {
               asset: { ...generation.asset!, url: newUrl },
             });
@@ -321,9 +306,8 @@ function GenerationError({ error, onDelete }: GenerationErrorProps) {
     || (message?.toLowerCase().includes('segurança') ?? false)
     || (message?.toLowerCase().includes('safety') ?? false);
 
-  // Pick icon, title and description based on error type
   let Icon = AlertCircle;
-  let title = 'Falha na geração';
+  let title = 'Falha na geracao';
   let description = (message && message.length < 200 && !message.startsWith('{'))
     ? message
     : 'Erro desconhecido. Tente novamente.';
@@ -332,25 +316,23 @@ function GenerationError({ error, onDelete }: GenerationErrorProps) {
   if (isQuota) {
     Icon = AlertTriangle;
     title = 'Limite de uso atingido';
-    description = 'O limite de geração de imagens foi excedido. Tente novamente mais tarde.';
+    description = 'O limite de geracao de imagens foi excedido. Tente novamente mais tarde.';
     accentColor = 'amber';
   } else if (isSafety) {
-    title = 'Conteúdo bloqueado';
-    description = 'O prompt foi bloqueado por políticas de segurança. Tente reformular.';
+    title = 'Conteudo bloqueado';
+    description = 'O prompt foi bloqueado por politicas de seguranca. Tente reformular.';
   }
 
-  const colorMap: Record<string, { icon: string; text: string; bg: string; border: string }> = {
+  const colorMap: Record<string, { icon: string; text: string; bg: string }> = {
     red: {
-      icon: 'text-red-400',
-      text: 'text-red-400',
+      icon: 'text-red-400/80',
+      text: 'text-red-400/80',
       bg: 'bg-red-500/10',
-      border: 'border-red-500/20',
     },
     amber: {
-      icon: 'text-amber-400',
-      text: 'text-amber-400',
+      icon: 'text-amber-400/80',
+      text: 'text-amber-400/80',
       bg: 'bg-amber-500/10',
-      border: 'border-amber-500/20',
     },
   };
 
@@ -364,12 +346,12 @@ function GenerationError({ error, onDelete }: GenerationErrorProps) {
       <p className={`text-xs ${colors.text} text-center font-medium`}>
         {title}
       </p>
-      <p className="text-[11px] text-muted-foreground text-center leading-snug max-w-[200px]">
+      <p className="text-[11px] text-white/30 text-center leading-snug max-w-[200px]">
         {description}
       </p>
       <button
         onClick={onDelete}
-        className="flex items-center gap-1.5 px-3 py-1.5 mt-1 rounded-lg bg-white/5 text-muted-foreground text-xs hover:bg-white/10 transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 mt-1 rounded-lg bg-white/[0.04] text-white/40 text-xs hover:bg-white/[0.08] transition-colors"
       >
         <Trash2 className="w-3 h-3" />
         Remover
@@ -378,7 +360,6 @@ function GenerationError({ error, onDelete }: GenerationErrorProps) {
   );
 }
 
-// Helper function to format time
 function formatTime(seconds: number): string {
   if (seconds < 60) {
     return `${seconds}s`;

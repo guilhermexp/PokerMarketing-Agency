@@ -29,6 +29,7 @@ export async function getCsrfToken(): Promise<string | null> {
   try {
     const response = await fetch("/api/csrf-token", {
       method: "GET",
+      cache: "no-store",
       credentials: "include", // Include cookies for CSRF token generation
     });
 

@@ -24,6 +24,9 @@ export function registerHealthRoutes(app) {
   // Returns the CSRF token for client-side usage
   // The csrfProtection middleware automatically generates and sets the token
   app.get("/api/csrf-token", csrfProtection, (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.json({ csrfToken: req.csrfToken });
   });
 

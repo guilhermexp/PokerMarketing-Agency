@@ -56,6 +56,7 @@ import { registerInstagramRoutes } from "./routes/db-instagram.mjs";
 import { registerRubeRoutes } from "./routes/rube.mjs";
 import { registerImagePlaygroundRoutes } from "./routes/image-playground.mjs";
 import { registerVideoPlaygroundRoutes } from "./routes/video-playground.mjs";
+import { registerAgentStudioRoutes } from "./routes/agent-studio.mjs";
 
 // ---------------------------------------------------------------------------
 // App creation
@@ -175,6 +176,7 @@ const PROTECTED_API_PREFIXES = [
   "/api/rube",
   "/api/image-playground",
   "/api/video-playground",
+  "/api/agent",
   "/api/admin",
 ];
 
@@ -188,6 +190,7 @@ const videoRateLimit = createRateLimitMiddleware(5, 60_000);   // 5 req/min (exp
 
 app.use("/api/ai", aiRateLimit);
 app.use("/api/chat", aiRateLimit);
+app.use("/api/agent", aiRateLimit);
 
 // Stricter limits for expensive endpoints (video/campaign generation)
 app.use("/api/ai/video", videoRateLimit);
@@ -236,6 +239,7 @@ registerVideoPlaygroundRoutes(app, {
   resolveUserId,
   logger,
 });
+registerAgentStudioRoutes(app);
 
 // ---------------------------------------------------------------------------
 // NOTE: notFoundHandler & errorHandler are NOT registered here.
