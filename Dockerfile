@@ -1,19 +1,19 @@
 # Build stage - Bun for deps, Node for Vite build
-FROM oven/bun:1-alpine AS builder
+FROM oven/bun:1-debian AS builder
 
 WORKDIR /app
 
 # Node.js is needed for Vite build (vite uses node APIs internally)
-RUN apk add --no-cache nodejs
+RUN apt-get update && apt-get install -y --no-install-recommends nodejs && rm -rf /var/lib/apt/lists/*
 
 # Increase memory limits for build
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 
-# Copy package files and postinstall script
-COPY package.json bun.lockb* ./
+# Copy only package.json (NOT bun.lockb — it locks macOS-only native deps)
+COPY package.json ./
 COPY scripts/ensure-sharp-libvips-link.mjs scripts/
 
-# Install all dependencies with Bun
+# Fresh install resolves correct platform-specific binaries (linux-x64)
 RUN bun install
 
 # Copy source code
@@ -54,16 +54,16 @@ RUN bun run build && \
     echo "=== Build complete ===" && \
     ls -la dist/
 
-# Runtime stage - Debian for better native module compatibility (sharp/libvips)
+# Runtime stage
 FROM oven/bun:1-debian
 
 WORKDIR /app
 
-# Copy package files and postinstall script
-COPY package.json bun.lockb* ./
+# Copy only package.json (NOT bun.lockb — it locks macOS-only native deps)
+COPY package.json ./
 COPY scripts/ensure-sharp-libvips-link.mjs scripts/
 
-# Install production dependencies only
+# Fresh install resolves correct platform-specific binaries (linux-x64)
 RUN bun install --production
 
 # Copy built files from builder

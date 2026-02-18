@@ -5,6 +5,9 @@ dist-ssr
 # Dependencies are installed during build
 node_modules
 
+# bun.lockb locks macOS-only native deps — must resolve fresh on Linux
+bun.lockb
+
 # Development files
 .env
 .env.local
