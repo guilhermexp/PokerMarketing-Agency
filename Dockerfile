@@ -6,8 +6,9 @@ WORKDIR /app
 # Increase memory limits for build
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 
-# Copy package files
+# Copy package files and postinstall script
 COPY package.json package-lock.json* ./
+COPY scripts/ensure-sharp-libvips-link.mjs scripts/
 
 # Force cache invalidation for fresh dependency install
 ARG CACHEBUST=1
