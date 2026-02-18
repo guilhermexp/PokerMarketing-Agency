@@ -63,8 +63,9 @@ WORKDIR /app
 COPY package.json ./
 COPY scripts/ensure-sharp-libvips-link.mjs scripts/
 
-# Fresh install resolves correct platform-specific binaries (linux-x64)
-RUN bun install --production
+# Fresh install + explicit sharp linux bindings (bun skips optional platform deps)
+RUN bun install --production && \
+    bun add @img/sharp-linux-x64@0.34.5 @img/sharp-libvips-linux-x64@1.2.4 --no-save
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
