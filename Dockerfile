@@ -61,12 +61,12 @@ FROM oven/bun:1-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files and postinstall script (no-op on Linux, but must exist)
 COPY package.json bun.lockb* ./
+COPY scripts/ensure-sharp-libvips-link.mjs scripts/
 
-# Install production dependencies only with Bun (ignore-scripts avoids
-# postinstall that requires scripts/ dir not present in the runtime stage)
-RUN bun install --production --ignore-scripts
+# Install production dependencies (sharp needs its postinstall to download native bindings)
+RUN bun install --production
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
