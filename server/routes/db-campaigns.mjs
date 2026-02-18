@@ -667,7 +667,6 @@ export function registerCampaignRoutes(app) {
           FROM carousel_scripts cs
           LEFT JOIN campaigns c ON c.id = cs.campaign_id
           WHERE cs.organization_id = ${organization_id}
-            AND cs.deleted_at IS NULL
             AND c.deleted_at IS NULL
           ORDER BY cs.created_at DESC
         `;
@@ -699,7 +698,6 @@ export function registerCampaignRoutes(app) {
           LEFT JOIN campaigns c ON c.id = cs.campaign_id
           WHERE cs.user_id = ${resolvedUserId}
             AND cs.organization_id IS NULL
-            AND cs.deleted_at IS NULL
             AND c.deleted_at IS NULL
           ORDER BY cs.created_at DESC
         `;
