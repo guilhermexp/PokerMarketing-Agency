@@ -54,13 +54,10 @@ RUN bun run build && \
     echo "=== Build complete ===" && \
     ls -la dist/
 
-# Runtime stage
-FROM oven/bun:1-alpine
+# Runtime stage - Debian for better native module compatibility (sharp/libvips)
+FROM oven/bun:1-debian
 
 WORKDIR /app
-
-# Install system libvips (sharp's native addon dynamically links to it on Alpine)
-RUN apk add --no-cache vips
 
 # Copy package files and postinstall script
 COPY package.json bun.lockb* ./
