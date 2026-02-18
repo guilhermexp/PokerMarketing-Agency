@@ -1,21 +1,20 @@
-# Build stage - use Node for Vite build
-FROM node:20-alpine AS builder
+# Build stage - Bun for deps, Node for Vite build
+FROM oven/bun:1-alpine AS builder
 
 WORKDIR /app
+
+# Node.js is needed for Vite build (vite uses node APIs internally)
+RUN apk add --no-cache nodejs
 
 # Increase memory limits for build
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 
 # Copy package files and postinstall script
-COPY package.json package-lock.json* ./
+COPY package.json bun.lockb* ./
 COPY scripts/ensure-sharp-libvips-link.mjs scripts/
 
-# Force cache invalidation for fresh dependency install
-ARG CACHEBUST=1
-
-# Install dependencies with npm (more stable for build)
-# Use --legacy-peer-deps to resolve the ai@6.x vs @openrouter/ai-sdk-provider peer dependency conflict
-RUN npm cache clean --force && npm install --legacy-peer-deps
+# Install all dependencies with Bun
+RUN bun install
 
 # Copy source code
 COPY . .
@@ -51,21 +50,23 @@ RUN echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env && \
     echo "FAL_KEY=$FAL_KEY" >> .env
 
 # Build the app
-# Cache bust: 2026-02-08-force-fresh-build-v2
-RUN npm run build && \
+RUN bun run build && \
     echo "=== Build complete ===" && \
     ls -la dist/
 
-# Runtime stage - use Bun for the server
+# Runtime stage
 FROM oven/bun:1-alpine
 
 WORKDIR /app
 
-# Copy package files and postinstall script (no-op on Linux, but must exist)
+# Install system libvips (sharp's native addon dynamically links to it on Alpine)
+RUN apk add --no-cache vips
+
+# Copy package files and postinstall script
 COPY package.json bun.lockb* ./
 COPY scripts/ensure-sharp-libvips-link.mjs scripts/
 
-# Install production dependencies (sharp needs its postinstall to download native bindings)
+# Install production dependencies only
 RUN bun install --production
 
 # Copy built files from builder
@@ -98,5 +99,5 @@ ENV NODE_ENV=production
 # Expose port
 EXPOSE 8080
 
-# Start the server with Bun (faster and fully Node.js compatible)
+# Start the server
 CMD ["bun", "run", "server/index.mjs"]
