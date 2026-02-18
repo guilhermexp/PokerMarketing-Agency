@@ -32,7 +32,7 @@ import { GeneratingLoader } from "../ui/quantum-pulse-loade";
 import { PublishedStoriesWidget } from "../ui/published-stories-widget";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";
 
-type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar" | "playground" | "image-playground";
+type View = "campaign" | "campaigns" | "carousels" | "flyer" | "gallery" | "calendar" | "playground" | "image-playground";
 
 const DOT_GRID_STYLE_40 = {
   backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)',
@@ -140,6 +140,10 @@ interface DashboardProps {
   // Campaigns List
   campaignsList: CampaignSummary[];
   onLoadCampaign: (campaignId: string) => void;
+  onCreateCarouselFromPrompt?: (
+    prompt: string,
+    slidesPerCarousel: number,
+  ) => Promise<void>;
   userId?: string;
   organizationId?: string | null;
   // Week Schedule
@@ -208,6 +212,9 @@ const CalendarView = lazy(() =>
 );
 const CampaignsList = lazy(() =>
   import("../campaigns/CampaignsList").then((m) => ({ default: m.CampaignsList })),
+);
+const CarouselsList = lazy(() =>
+  import("../campaigns/CarouselsList").then((m) => ({ default: m.CarouselsList })),
 );
 const PlaygroundView = lazy(() =>
   import("../playground").then((m) => ({ default: m.PlaygroundView })),
@@ -286,6 +293,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     publishingStates,
     campaignsList: _campaignsList,
     onLoadCampaign,
+    onCreateCarouselFromPrompt,
     userId,
     organizationId,
     isWeekExpired,
@@ -842,6 +850,23 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 onSelectCampaign={onLoadCampaign}
                 onNewCampaign={() => onViewChange("campaign")}
                 currentCampaignId={campaign?.id}
+              />
+            </Suspense>
+          </div>
+        )}
+        {activeView === "carousels" && userId && (
+          <div className="px-4 py-4 sm:px-6 sm:py-5">
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <CarouselsList
+                userId={userId}
+                organizationId={organizationId}
+                brandProfile={brandProfile}
+                galleryImages={galleryImages}
+                onCreateCarouselFromPrompt={onCreateCarouselFromPrompt}
+                onSelectCampaign={(campaignId) => {
+                  onLoadCampaign(campaignId);
+                  onViewChange("campaign");
+                }}
               />
             </Suspense>
           </div>

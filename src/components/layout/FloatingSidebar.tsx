@@ -5,7 +5,7 @@ import { Tooltip, TooltipProvider } from "../common/Tooltip";
 import { Menu, X } from "lucide-react";
 import type { IconName } from "../../types";
 
-type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar" | "playground" | "image-playground";
+type View = "campaign" | "campaigns" | "carousels" | "flyer" | "gallery" | "calendar" | "playground" | "image-playground";
 
 interface MenuItem {
   icon: IconName;
@@ -16,6 +16,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { icon: "palette", label: "Dashboard", key: "campaign" },
   { icon: "kanban", label: "Campanhas", key: "campaigns" },
+  { icon: "layers", label: "Carrosséis", key: "carousels" },
   { icon: "poker-chip", label: "Tournament Flyers", key: "flyer" },
   { icon: "calendar", label: "Agenda", key: "calendar" },
   { icon: "folder-open", label: "Galeria", key: "gallery" },

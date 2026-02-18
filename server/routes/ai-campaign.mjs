@@ -28,6 +28,44 @@ import {
 } from "../helpers/usage-tracking.mjs";
 import logger from "../lib/logger.mjs";
 
+function normalizeCarouselSlides(carousels, expectedSlides) {
+  if (!Array.isArray(carousels)) return [];
+
+  return carousels
+    .filter((carousel) => carousel && typeof carousel === "object")
+    .map((carousel) => {
+      const rawSlides = Array.isArray(carousel.slides) ? carousel.slides : [];
+      const sanitized = rawSlides
+        .filter((slide) => slide && typeof slide === "object")
+        .map((slide) => ({
+          visual: String(slide.visual || "").trim(),
+          text: String(slide.text || "").trim(),
+        }));
+
+      const normalized = sanitized.slice(0, expectedSlides).map((slide, index) => ({
+        slide: index + 1,
+        visual:
+          slide.visual ||
+          `Composição premium com cores da marca para o slide ${index + 1}`,
+        text: slide.text || `MENSAGEM ${index + 1}`,
+      }));
+
+      while (normalized.length < expectedSlides) {
+        const slideNumber = normalized.length + 1;
+        normalized.push({
+          slide: slideNumber,
+          visual: `Composição premium com cores da marca para o slide ${slideNumber}`,
+          text: `MENSAGEM ${slideNumber}`,
+        });
+      }
+
+      return {
+        ...carousel,
+        slides: normalized,
+      };
+    });
+}
+
 export function registerAiCampaignRoutes(app) {
   app.post("/api/ai/campaign", async (req, res) => {
     const timer = createTimer();
@@ -77,6 +115,10 @@ export function registerAiCampaignRoutes(app) {
       const isOpenRouter = model.includes("/");
 
       const quantityInstructions = buildQuantityInstructions(options, "dev");
+      const slidesPerCarousel = Math.max(
+        1,
+        Math.min(8, Number(options?.carousels?.slidesPerCarousel || 5)),
+      );
       const effectiveBrandProfile = toneOfVoiceOverride
         ? { ...brandProfile, toneOfVoice: toneOfVoiceOverride }
         : brandProfile;
@@ -85,11 +127,25 @@ export function registerAiCampaignRoutes(app) {
         transcript,
         quantityInstructions,
         getToneText(effectiveBrandProfile, "campaigns"),
+        slidesPerCarousel,
       );
 
       let result;
 
       if (isOpenRouter) {
+        const slideExamples = Array.from({ length: slidesPerCarousel })
+          .map((_, idx) => {
+            const slideNumber = idx + 1;
+            const role =
+              slideNumber === 1
+                ? "capa/título"
+                : slideNumber === slidesPerCarousel
+                  ? "CTA/final"
+                  : "conteúdo";
+            return `        {"slide": ${slideNumber}, "visual": "descrição visual detalhada do slide ${slideNumber} - ${role}", "text": "TEXTO CURTO EM MAIÚSCULAS"}`;
+          })
+          .join(",\n");
+
         // Add explicit JSON schema for OpenRouter models
         const jsonSchemaPrompt = `${prompt}
 
@@ -134,11 +190,7 @@ O campo "carousels" é OBRIGATÓRIO e NÃO pode ser omitido.
       "hook": "Gancho/abertura impactante do carrossel",
       "cover_prompt": "Imagem de capa cinematográfica com cores da marca, título em fonte bold condensed sans-serif, estilo luxuoso e premium, composição visual impactante",
       "slides": [
-        {"slide": 1, "visual": "descrição visual detalhada do slide 1 - capa/título", "text": "TEXTO CURTO EM MAIÚSCULAS"},
-        {"slide": 2, "visual": "descrição visual detalhada do slide 2 - conteúdo", "text": "TEXTO CURTO EM MAIÚSCULAS"},
-        {"slide": 3, "visual": "descrição visual detalhada do slide 3 - conteúdo", "text": "TEXTO CURTO EM MAIÚSCULAS"},
-        {"slide": 4, "visual": "descrição visual detalhada do slide 4 - conteúdo", "text": "TEXTO CURTO EM MAIÚSCULAS"},
-        {"slide": 5, "visual": "descrição visual detalhada do slide 5 - CTA", "text": "TEXTO CURTO EM MAIÚSCULAS"}
+${slideExamples}
       ]
     }
   ]
@@ -147,7 +199,7 @@ O campo "carousels" é OBRIGATÓRIO e NÃO pode ser omitido.
 
 REGRAS CRÍTICAS:
 1. O JSON DEVE conter EXATAMENTE os 4 arrays: videoClipScripts, posts, adCreatives, carousels
-2. O array "carousels" NUNCA pode estar vazio - gere pelo menos 1 carrossel com 5 slides
+2. O array "carousels" NUNCA pode estar vazio - gere pelo menos 1 carrossel com EXATAMENTE ${slidesPerCarousel} slides
 3. Responda APENAS com o JSON válido, sem texto adicional.`;
 
         const textParts = [jsonSchemaPrompt];
@@ -219,6 +271,11 @@ REGRAS CRÍTICAS:
           image_prompt: script.image_prompt || "",
           audio_script: script.audio_script || "",
         }));
+
+      campaign.carousels = normalizeCarouselSlides(
+        campaign.carousels,
+        slidesPerCarousel,
+      );
 
       // Debug: log structure for troubleshooting (v2 - with carousels)
       logger.debug(

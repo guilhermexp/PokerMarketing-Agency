@@ -65,6 +65,7 @@ export function useStudioAgent(studioType: StudioType, topicId: string | null) {
   const [messages, setMessages] = useState<StudioAgentChatMessage[]>([]);
   const [toolEvents, setToolEvents] = useState<StudioAgentEvent[]>([]);
   const [pendingInteraction, setPendingInteraction] = useState<StudioAgentInteraction | null>(null);
+  const [isAnsweringInteraction, setIsAnsweringInteraction] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,18 +107,55 @@ export function useStudioAgent(studioType: StudioType, topicId: string | null) {
     }
 
     if (event.type === 'ask_user') {
+      const rawQuestions = Array.isArray(event.questions) ? event.questions : [];
+      const firstQuestion = rawQuestions[0];
+      const rawOptions = Array.isArray(firstQuestion?.options)
+        ? firstQuestion.options
+        : Array.isArray(event.options)
+          ? event.options
+          : [];
+
       setPendingInteraction({
         interactionId: String(event.interactionId || ''),
-        header: typeof event.header === 'string' ? event.header : 'Confirmação',
-        question: String(event.question || ''),
-        options: Array.isArray(event.options)
-          ? event.options.map((opt, index) => ({
+        header: typeof firstQuestion?.header === 'string'
+          ? firstQuestion.header
+          : typeof event.header === 'string'
+            ? event.header
+            : 'Confirmação',
+        question: String(firstQuestion?.question || event.question || ''),
+        options: rawOptions.map((opt, index) => ({
               id: String(opt?.id || `opt_${index + 1}`),
               label: String(opt?.label || `Opção ${index + 1}`),
               description: opt?.description ? String(opt.description) : '',
-            }))
-          : [],
+            })),
+        questions: rawQuestions.map((question, qIndex) => ({
+          id: String(question?.id || `q_${qIndex + 1}`),
+          header: String(question?.header || 'Pergunta'),
+          question: String(question?.question || ''),
+          multiSelect: Boolean(question?.multiSelect),
+          options: Array.isArray(question?.options)
+            ? question.options.map((opt, index) => ({
+                id: String(opt?.id || `opt_${index + 1}`),
+                label: String(opt?.label || `Opção ${index + 1}`),
+                description: opt?.description ? String(opt.description) : '',
+              }))
+            : [],
+        })),
+        expired: false,
       });
+      return;
+    }
+
+    if (event.type === 'ask_user_timeout') {
+      setPendingInteraction((current) => {
+        if (!current) return null;
+        return { ...current, expired: true };
+      });
+      return;
+    }
+
+    if (event.type === 'ask_user_result') {
+      setPendingInteraction(null);
       return;
     }
 
@@ -183,28 +221,32 @@ export function useStudioAgent(studioType: StudioType, topicId: string | null) {
     }
   }, [applyEvent, isStreaming, studioType, threadId, topicId]);
 
-  const answerInteraction = useCallback(async (answer: string | { optionId?: string; text?: string }) => {
-    if (!threadId || !pendingInteraction || isStreaming) return;
+  const answerInteraction = useCallback(async (
+    answer: string | { optionId?: string; text?: string; approved?: boolean; answers?: Record<string, string> },
+  ) => {
+    if (!threadId || !pendingInteraction || isAnsweringInteraction) return;
 
-    setIsStreaming(true);
+    setIsAnsweringInteraction(true);
     setError(null);
 
     try {
-      await answerStudioAgent(
-        {
-          threadId,
-          interactionId: pendingInteraction.interactionId,
-          answer,
-        },
-        applyEvent,
-      );
+      await answerStudioAgent({
+        threadId,
+        interactionId: pendingInteraction.interactionId,
+        answer,
+      });
       setPendingInteraction(null);
     } catch (answerError) {
       setError(answerError instanceof Error ? answerError.message : 'Falha ao responder interação.');
     } finally {
-      setIsStreaming(false);
+      setIsAnsweringInteraction(false);
     }
-  }, [applyEvent, isStreaming, pendingInteraction, threadId]);
+  }, [isAnsweringInteraction, pendingInteraction, threadId]);
+
+  const dismissInteraction = useCallback(() => {
+    setPendingInteraction(null);
+    setIsAnsweringInteraction(false);
+  }, []);
 
   const reset = useCallback(async () => {
     setError(null);
@@ -281,9 +323,11 @@ export function useStudioAgent(studioType: StudioType, topicId: string | null) {
     toolEvents,
     pendingInteraction,
     isStreaming,
+    isAnsweringInteraction,
     error,
     sendMessage,
     answerInteraction,
+    dismissInteraction,
     reset,
   }), [
     threadId,
@@ -291,9 +335,11 @@ export function useStudioAgent(studioType: StudioType, topicId: string | null) {
     toolEvents,
     pendingInteraction,
     isStreaming,
+    isAnsweringInteraction,
     error,
     sendMessage,
     answerInteraction,
+    dismissInteraction,
     reset,
   ]);
 }

@@ -33,6 +33,14 @@ export interface StudioAgentInteraction {
   header?: string;
   question: string;
   options: Array<{ id: string; label: string; description?: string }>;
+  expired?: boolean;
+  questions?: Array<{
+    id?: string;
+    header?: string;
+    question: string;
+    options: Array<{ id: string; label: string; description?: string }>;
+    multiSelect?: boolean;
+  }>;
 }
 
 async function buildHeaders(method: string): Promise<Record<string, string>> {
@@ -168,11 +176,10 @@ export async function answerStudioAgent(
   payload: {
     threadId: string;
     interactionId: string;
-    answer: string | { optionId?: string; text?: string };
+    answer: string | { optionId?: string; text?: string; approved?: boolean; answers?: Record<string, string> };
   },
-  onEvent: (event: StudioAgentEvent) => void,
   signal?: AbortSignal,
-): Promise<void> {
+): Promise<{ ok: boolean }> {
   let headers = await buildHeaders('POST');
   let response = await fetch(`${API_BASE}/answer`, {
     method: 'POST',
@@ -200,7 +207,7 @@ export async function answerStudioAgent(
     throw new Error((data as { error?: string }).error || `Answer failed: ${response.status}`);
   }
 
-  await consumeSseResponse(response, onEvent);
+  return parseJsonResponse(response);
 }
 
 export async function getStudioAgentHistory(
@@ -228,6 +235,34 @@ export async function searchStudioAgentFiles(
     limit: String(limit),
   }).toString();
   const response = await fetch(`${API_BASE}/files?${qs}`, {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+  return parseJsonResponse(response);
+}
+
+export type ContentMentionType = 'gallery' | 'campaign' | 'post' | 'clip' | 'carousel';
+
+export interface ContentSearchResult {
+  id: string;
+  label: string;
+  thumbnailUrl?: string;
+  type: string;
+}
+
+export async function searchStudioAgentContent(
+  type: ContentMentionType,
+  query: string,
+  limit = 10,
+): Promise<{ results: ContentSearchResult[] }> {
+  const headers = await buildHeaders('GET');
+  const qs = new URLSearchParams({
+    type,
+    query,
+    limit: String(limit),
+  }).toString();
+  const response = await fetch(`${API_BASE}/content-search?${qs}`, {
     method: 'GET',
     headers,
     credentials: 'include',

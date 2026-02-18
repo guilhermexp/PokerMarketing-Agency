@@ -623,6 +623,95 @@ export function registerCampaignRoutes(app) {
     }
   });
 
+  // Carousels API - List all user carousels
+  app.get("/api/db/carousels", async (req, res) => {
+    try {
+      const sql = getSql();
+      const { user_id, organization_id } = req.query;
+
+      if (!user_id) {
+        return res.status(400).json({ error: "user_id is required" });
+      }
+
+      const resolvedUserId = await resolveUserId(sql, user_id);
+      if (!resolvedUserId) {
+        return res.status(200).json([]);
+      }
+
+      let result;
+      if (organization_id) {
+        await resolveOrganizationContext(sql, resolvedUserId, organization_id);
+        result = await sql`
+          SELECT
+            cs.id,
+            cs.campaign_id,
+            c.name AS campaign_name,
+            cs.title,
+            cs.hook,
+            cs.cover_prompt,
+            cs.cover_url,
+            cs.caption,
+            cs.slides,
+            (
+              SELECT COALESCE(
+                json_agg(gi.src_url ORDER BY gi.created_at ASC),
+                '[]'::json
+              )
+              FROM gallery_images gi
+              WHERE gi.carousel_script_id = cs.id
+                AND gi.deleted_at IS NULL
+            ) AS gallery_images,
+            jsonb_array_length(COALESCE(cs.slides, '[]'::jsonb))::int AS slides_count,
+            cs.created_at,
+            cs.updated_at
+          FROM carousel_scripts cs
+          LEFT JOIN campaigns c ON c.id = cs.campaign_id
+          WHERE cs.organization_id = ${organization_id}
+            AND cs.deleted_at IS NULL
+            AND c.deleted_at IS NULL
+          ORDER BY cs.created_at DESC
+        `;
+      } else {
+        result = await sql`
+          SELECT
+            cs.id,
+            cs.campaign_id,
+            c.name AS campaign_name,
+            cs.title,
+            cs.hook,
+            cs.cover_prompt,
+            cs.cover_url,
+            cs.caption,
+            cs.slides,
+            (
+              SELECT COALESCE(
+                json_agg(gi.src_url ORDER BY gi.created_at ASC),
+                '[]'::json
+              )
+              FROM gallery_images gi
+              WHERE gi.carousel_script_id = cs.id
+                AND gi.deleted_at IS NULL
+            ) AS gallery_images,
+            jsonb_array_length(COALESCE(cs.slides, '[]'::jsonb))::int AS slides_count,
+            cs.created_at,
+            cs.updated_at
+          FROM carousel_scripts cs
+          LEFT JOIN campaigns c ON c.id = cs.campaign_id
+          WHERE cs.user_id = ${resolvedUserId}
+            AND cs.organization_id IS NULL
+            AND cs.deleted_at IS NULL
+            AND c.deleted_at IS NULL
+          ORDER BY cs.created_at DESC
+        `;
+      }
+
+      res.json(result);
+    } catch (error) {
+      logError("Carousels API (GET)", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Carousels API - Update carousel (cover_url, caption)
   app.patch("/api/db/carousels", async (req, res) => {
     try {

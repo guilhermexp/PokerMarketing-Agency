@@ -11,6 +11,7 @@ interface CarouselPreviewProps {
   images: GalleryImage[];
   onReorder: (newOrder: GalleryImage[]) => void;
   clipTitle: string;
+  fitToContainer?: boolean;
   onOpenEditor?: (image: GalleryImage) => void;
   caption?: string;
   onCaptionChange?: (caption: string) => void;
@@ -25,6 +26,7 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
   images,
   onReorder,
   clipTitle,
+  fitToContainer = false,
   onOpenEditor,
   caption = "",
   onCaptionChange,
@@ -44,6 +46,9 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
   const [panStartOffset, setPanStartOffset] = useState(0);
   // Caption editor toggle
   const [showCaptionEditor, setShowCaptionEditor] = useState(false);
+  const phoneWidth = fitToContainer ? 280 : 320;
+  const thumbnailWidth = fitToContainer ? 256 : 320;
+  const thumbnailHeight = fitToContainer ? 358 : 448;
 
 
   const goToSlide = (index: number) => {
@@ -107,7 +112,7 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
   const scrollThumbnails = (direction: 'left' | 'right') => {
     const container = thumbnailsRef.current;
     if (!container) return;
-    const delta = direction === 'left' ? -320 : 320;
+    const delta = direction === 'left' ? -(thumbnailWidth + 16) : thumbnailWidth + 16;
     container.scrollBy({ left: delta, behavior: 'smooth' });
   };
 
@@ -123,7 +128,10 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
             Feed Instagram 4:5
           </span>
         </div>
-        <div className="w-[320px] bg-black rounded-[32px] p-2 shadow-2xl border border-border">
+        <div
+          className="bg-black rounded-[32px] p-2 shadow-2xl border border-border"
+          style={{ width: `${phoneWidth}px` }}
+        >
           {/* Phone notch */}
           <div className="w-24 h-6 bg-black rounded-full mx-auto mb-1" />
 
@@ -343,8 +351,8 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
                 hover:border-white/20
               `}
               style={{
-                width: "20rem",
-                height: "28rem",
+                width: `${thumbnailWidth}px`,
+                height: `${thumbnailHeight}px`,
               }}
             >
               <img
@@ -380,8 +388,8 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               key="skeleton-loading"
               className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-border shadow-lg bg-black"
               style={{
-                width: "20rem",
-                height: "28rem",
+                width: `${thumbnailWidth}px`,
+                height: `${thumbnailHeight}px`,
               }}
             >
               <ImageGenerationLoader isGenerating={true} />

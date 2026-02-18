@@ -89,6 +89,7 @@ export type TimePeriod =
 export type ViewType =
   | "campaign"
   | "campaigns"
+  | "carousels"
   | "flyer"
   | "gallery"
   | "calendar"
@@ -1425,6 +1426,92 @@ function AppContent() {
     }
   };
 
+  const handleCreateCarouselFromPrompt = async (
+    prompt: string,
+    requestedImages: number,
+  ) => {
+    if (!brandProfile) {
+      throw new Error("Perfil da marca não configurado");
+    }
+    if (!userId) {
+      throw new Error("Usuário não autenticado");
+    }
+
+    const input: ContentInput = {
+      transcript: prompt,
+      productImages: null,
+      inspirationImages: null,
+      collabLogo: null,
+      compositionAssets: null,
+      toneOfVoiceOverride: null,
+    };
+
+    const options: GenerationOptions = {
+      videoClipScripts: { generate: false, count: 0 },
+      carousels: { generate: true, count: 1 },
+      posts: {
+        instagram: { generate: false, count: 0 },
+        facebook: { generate: false, count: 0 },
+        twitter: { generate: false, count: 0 },
+        linkedin: { generate: false, count: 0 },
+      },
+      adCreatives: {
+        facebook: { generate: false, count: 0 },
+        google: { generate: false, count: 0 },
+      },
+    };
+    // No standalone "Carrosséis" page, o usuário escolhe TOTAL de imagens.
+    // O pipeline interno usa "capa + slides", então convertemos para slides internos.
+    const totalImages = Math.max(2, Math.min(8, requestedImages));
+    const internalSlides = Math.max(1, totalImages - 1);
+    options.carousels.slidesPerCarousel = internalSlides;
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const generated = await generateCampaign(brandProfile, input, options);
+      const validCarousels = (generated.carousels || []).filter(
+        (c) => c && c.title && c.hook && c.cover_prompt,
+      );
+
+      if (validCarousels.length === 0) {
+        throw new Error("Nenhum carrossel foi gerado");
+      }
+
+      const campaignName = prompt.substring(0, 50) + (prompt.length > 50 ? "..." : "");
+      const savedCampaign = await createCampaignApi(userId, {
+        name: campaignName,
+        input_transcript: prompt,
+        generation_options: {
+          ...options,
+          toneOfVoiceOverride: null,
+          toneOfVoiceUsed: brandProfile.toneOfVoice,
+          source: "carousels-page",
+        } as unknown as Record<string, unknown>,
+        status: "completed",
+        organization_id: organizationId,
+        video_clip_scripts: [],
+        posts: [],
+        ad_creatives: [],
+        carousel_scripts: validCarousels.map((c) => ({
+          title: c.title,
+          hook: c.hook,
+          cover_prompt: c.cover_prompt,
+          caption: c.caption || null,
+          slides: c.slides || [],
+        })),
+      });
+
+      swrAddCampaign(savedCampaign);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleLoadCampaign = async (campaignId: string) => {
     if (!userId) {
       console.error("Cannot load campaign: user not authenticated");
@@ -2465,6 +2552,7 @@ function AppContent() {
                 publishingStates={publishingStates}
                 campaignsList={campaignsList}
                 onLoadCampaign={handleLoadCampaign}
+                onCreateCarouselFromPrompt={handleCreateCarouselFromPrompt}
                 userId={userId}
                 organizationId={organizationId}
                 isWeekExpired={isWeekExpired}

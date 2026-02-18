@@ -16,12 +16,16 @@ import { nanoid } from 'nanoid';
 import { useStudioAgent } from '../../hooks/useStudioAgent';
 import {
   searchStudioAgentFiles,
+  searchStudioAgentContent,
   type StudioAgentAttachment,
   type StudioAgentMention,
   type StudioType,
+  type ContentMentionType,
+  type ContentSearchResult,
 } from '../../services/api/studioAgent';
 import { MessageResponse } from '../assistant/MessageResponse';
 import { uploadToBlob } from '../../services/api/uploadApi';
+import { StudioAgentQuestionCard } from './StudioAgentQuestionCard';
 
 interface StudioAgentPanelProps {
   studioType: StudioType;
@@ -63,11 +67,12 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
   const [input, setInput] = useState('');
   const [draftAttachments, setDraftAttachments] = useState<Array<StudioAgentAttachment & { id: string }>>([]);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
-  const [mentionSuggestions, setMentionSuggestions] = useState<string[]>([]);
+  const [mentionSuggestions, setMentionSuggestions] = useState<Array<string | ContentSearchResult>>([]);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
+  const [mentionMode, setMentionMode] = useState<'file' | ContentMentionType>('file');
+  const [answerDraft, setAnswerDraft] = useState('');
 
-  const answerInputRef = useRef<HTMLInputElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -75,14 +80,24 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
     toolEvents,
     pendingInteraction,
     isStreaming,
+    isAnsweringInteraction,
     error,
     sendMessage,
     answerInteraction,
+    dismissInteraction,
     reset,
   } = useStudioAgent(studioType, topicId);
 
-  const disabled = !topicId || isStreaming || isUploadingAttachment;
+  const isBlockedByStreaming = isStreaming && !pendingInteraction;
+  const isGenerating = isStreaming && !pendingInteraction;
+  const disabled = !topicId || isUploadingAttachment || isBlockedByStreaming || isAnsweringInteraction;
   const mentionRegex = /(?:^|\s)@([^\s@]*)$/;
+  const contentMentionPrefixes: { prefix: string; type: ContentMentionType }[] = [
+    { prefix: 'gallery:', type: 'gallery' },
+    { prefix: 'campaign:', type: 'campaign' },
+    { prefix: 'clip:', type: 'clip' },
+    { prefix: 'carousel:', type: 'carousel' },
+  ];
 
   const subtitle = useMemo(() => {
     if (!topicId) {
@@ -99,16 +114,43 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
       setMentionOpen(false);
       setMentionSuggestions([]);
       setMentionSelectedIndex(0);
+      setMentionMode('file');
       return;
     }
 
-    const nextQuery = match[1] || '';
+    const raw = match[1] || '';
     setMentionOpen(true);
+
+    // Check for content prefixes (e.g. @gallery:query, @campaign:query)
+    const contentPrefix = contentMentionPrefixes.find((p) => raw.startsWith(p.prefix));
+
+    // When user types just "@" or partial prefix, show available content categories
+    if (!raw || (!contentPrefix && contentMentionPrefixes.some((p) => p.prefix.startsWith(raw)))) {
+      setMentionMode('file');
+      const prefixHints: ContentSearchResult[] = contentMentionPrefixes
+        .filter((p) => !raw || p.prefix.startsWith(raw))
+        .map((p) => ({
+          id: p.prefix,
+          label: p.type === 'gallery' ? 'Buscar na Galeria' : p.type === 'campaign' ? 'Buscar Campanhas' : p.type === 'clip' ? 'Buscar Clips' : 'Buscar Carrosséis',
+          type: p.type,
+        }));
+      setMentionSuggestions(prefixHints);
+      setMentionSelectedIndex(0);
+      return;
+    }
 
     const timer = setTimeout(async () => {
       try {
-        const result = await searchStudioAgentFiles(nextQuery, 10);
-        setMentionSuggestions(result.files || []);
+        if (contentPrefix) {
+          const query = raw.slice(contentPrefix.prefix.length);
+          setMentionMode(contentPrefix.type);
+          const result = await searchStudioAgentContent(contentPrefix.type, query, 10);
+          setMentionSuggestions(result.results || []);
+        } else {
+          setMentionMode('file');
+          const result = await searchStudioAgentFiles(raw, 10);
+          setMentionSuggestions(result.files || []);
+        }
         setMentionSelectedIndex(0);
       } catch {
         setMentionSuggestions([]);
@@ -118,11 +160,24 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
     return () => clearTimeout(timer);
   }, [input]);
 
-  const insertMention = (path: string) => {
-    setInput((prev) => prev.replace(mentionRegex, (m) => m.replace(/@([^\s@]*)$/, `@${path} `)));
+  const insertMention = (item: string | ContentSearchResult) => {
+    if (typeof item !== 'string') {
+      const content = item as ContentSearchResult;
+      // If it's a prefix hint (id ends with ':'), insert prefix and keep dropdown open
+      if (content.id.endsWith(':')) {
+        setInput((prev) => prev.replace(mentionRegex, (m) => m.replace(/@([^\s@]*)$/, `@${content.id}`)));
+        return;
+      }
+      // Otherwise insert the full content reference
+      const replacement = `${content.type}:${content.id}`;
+      setInput((prev) => prev.replace(mentionRegex, (m) => m.replace(/@([^\s@]*)$/, `@${replacement} `)));
+    } else {
+      setInput((prev) => prev.replace(mentionRegex, (m) => m.replace(/@([^\s@]*)$/, `@${item} `)));
+    }
     setMentionOpen(false);
     setMentionSuggestions([]);
     setMentionSelectedIndex(0);
+    setMentionMode('file');
   };
 
   const removeDraftAttachment = (id: string) => {
@@ -176,12 +231,72 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
     if (!text && attachments.length === 0) return;
 
     const mentions = extractMentions(text);
-    await sendMessage(text, { attachments, mentions });
 
+    if (pendingInteraction && attachments.length === 0 && text) {
+      if (pendingInteraction.expired) {
+        dismissInteraction();
+        setInput('');
+        setMentionOpen(false);
+        setMentionSuggestions([]);
+        await sendMessage(text, { attachments: [], mentions });
+        return;
+      }
+
+      const lastQuestion = pendingInteraction.questions?.[pendingInteraction.questions.length - 1]?.question
+        || pendingInteraction.question;
+      await answerInteraction({
+        answers: { [lastQuestion]: `Other: ${text}` },
+      });
+      setInput('');
+      setMentionOpen(false);
+      setMentionSuggestions([]);
+      return;
+    }
+
+    // Clear input immediately before awaiting the stream
     setInput('');
     setDraftAttachments([]);
     setMentionOpen(false);
     setMentionSuggestions([]);
+
+    await sendMessage(text, { attachments, mentions });
+  };
+
+  const submitQuestionAnswers = async (answers: Record<string, string>) => {
+    if (!pendingInteraction) return;
+
+    const customText = answerDraft.trim();
+    const payloadAnswers = { ...answers };
+
+    if (customText) {
+      const lastQuestion = pendingInteraction.questions?.[pendingInteraction.questions.length - 1]?.question
+        || pendingInteraction.question;
+      const previous = payloadAnswers[lastQuestion];
+      payloadAnswers[lastQuestion] = previous
+        ? `${previous}, Other: ${customText}`
+        : `Other: ${customText}`;
+    }
+
+    if (pendingInteraction.expired) {
+      const lines = Object.entries(payloadAnswers).map(([question, answer]) => `${question}: ${answer}`);
+      dismissInteraction();
+      await sendMessage(lines.join('\n'));
+      setAnswerDraft('');
+      return;
+    }
+
+    await answerInteraction({ answers: payloadAnswers });
+    setAnswerDraft('');
+  };
+
+  const skipQuestionAnswers = async () => {
+    if (pendingInteraction?.expired) {
+      dismissInteraction();
+      setAnswerDraft('');
+      return;
+    }
+    await answerInteraction({ approved: false });
+    setAnswerDraft('');
   };
 
   const renderMessageAttachments = (attachments?: StudioAgentAttachment[]) => {
@@ -255,29 +370,52 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
     );
   };
 
+  const getMentionTypeIcon = (type: string) => {
+    if (type === 'gallery') return <ImageIcon className="w-3.5 h-3.5 text-blue-400" />;
+    if (type === 'clip') return <FileVideo className="w-3.5 h-3.5 text-purple-400" />;
+    if (type === 'carousel') return <ImageIcon className="w-3.5 h-3.5 text-green-400" />;
+    if (type === 'campaign') return <FileText className="w-3.5 h-3.5 text-amber-400" />;
+    return <AtSign className="w-3.5 h-3.5 text-primary" />;
+  };
+
   const renderMentionSuggestions = () => {
     if (!mentionOpen || mentionSuggestions.length === 0) return null;
 
     return (
       <div className="absolute left-0 right-0 bottom-[calc(100%+8px)] rounded-xl border border-border bg-[#0b0b0b] shadow-2xl overflow-hidden z-30 max-h-52 overflow-y-auto">
-        {mentionSuggestions.map((path, index) => (
-          <button
-            key={path}
-            type="button"
-            className={`w-full text-left px-3 py-2 text-xs border-b border-border/60 last:border-b-0 flex items-center gap-2 ${
-              index === mentionSelectedIndex
-                ? 'bg-white/10 text-white'
-                : 'text-white/85 hover:bg-white/5'
-            }`}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              insertMention(path);
-            }}
-          >
-            <AtSign className="w-3.5 h-3.5 text-primary" />
-            <span className="truncate">{path}</span>
-          </button>
-        ))}
+        {mentionMode !== 'file' && (
+          <div className="px-3 py-1.5 text-[10px] text-muted-foreground border-b border-border/60 bg-black/40 uppercase tracking-wide">
+            {mentionMode === 'gallery' ? 'Galeria' : mentionMode === 'campaign' ? 'Campanhas' : mentionMode === 'clip' ? 'Clips' : 'Carrosséis'}
+          </div>
+        )}
+        {mentionSuggestions.map((item, index) => {
+          const isContent = typeof item !== 'string';
+          const key = isContent ? (item as ContentSearchResult).id : (item as string);
+          const label = isContent ? (item as ContentSearchResult).label : (item as string);
+          const thumbnail = isContent ? (item as ContentSearchResult).thumbnailUrl : undefined;
+          const icon = isContent ? getMentionTypeIcon((item as ContentSearchResult).type) : <AtSign className="w-3.5 h-3.5 text-primary" />;
+
+          return (
+            <button
+              key={key}
+              type="button"
+              className={`w-full text-left px-3 py-2 text-xs border-b border-border/60 last:border-b-0 flex items-center gap-2 ${
+                index === mentionSelectedIndex
+                  ? 'bg-white/10 text-white'
+                  : 'text-white/85 hover:bg-white/5'
+              }`}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                insertMention(item);
+              }}
+            >
+              {thumbnail ? (
+                <img src={thumbnail} alt="" className="w-6 h-6 rounded object-cover border border-border/40 flex-shrink-0" />
+              ) : icon}
+              <span className="truncate">{label}</span>
+            </button>
+          );
+        })}
       </div>
     );
   };
@@ -349,7 +487,7 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
               </button>
 
               <span className="text-[11px] text-muted-foreground hidden sm:inline-flex">
-                Use @ para mencionar arquivos
+                @ arquivos · @gallery: @campaign: @clip: @carousel:
               </span>
             </div>
 
@@ -359,7 +497,7 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
               className="w-9 h-9 rounded-xl bg-primary/90 text-primary-foreground hover:bg-primary disabled:opacity-40 flex items-center justify-center transition-colors"
               type="button"
             >
-              {isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {isGenerating || isAnsweringInteraction ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
           </div>
         </div>
@@ -397,7 +535,7 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
               onClick={() => reset().catch(() => {})}
               className="w-8 h-8 rounded-lg text-muted-foreground hover:text-white hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-40"
               title="Limpar conversa"
-              disabled={isStreaming}
+              disabled={isGenerating || isAnsweringInteraction}
               type="button"
             >
               <RotateCcw className="w-4 h-4" />
@@ -462,36 +600,36 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
 
         <div className="p-3 border-t border-border">
           {pendingInteraction && (
-            <div className="mb-3 p-3 rounded-xl border border-border bg-black/40 space-y-2">
-              <p className="text-xs font-medium text-white">{pendingInteraction.header || 'Pergunta'}</p>
-              <p className="text-xs text-white/90">{pendingInteraction.question}</p>
-              <div className="flex flex-wrap gap-2">
-                {pendingInteraction.options.map((opt) => (
-                  <button
-                    key={opt.id}
-                    onClick={() => answerInteraction({ optionId: opt.id }).catch(() => {})}
-                    disabled={isStreaming}
-                    className="px-2.5 py-1.5 rounded-lg border border-border bg-white/10 text-xs text-white hover:bg-white/20 disabled:opacity-50"
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
+            <div className="mb-2 space-y-2">
+              <StudioAgentQuestionCard
+                interaction={pendingInteraction}
+                isBusy={isAnsweringInteraction}
+                hasCustomText={Boolean(answerDraft.trim())}
+                expired={Boolean(pendingInteraction.expired)}
+                onSubmit={(answers) => {
+                  submitQuestionAnswers(answers).catch(() => {});
+                }}
+                onSkip={() => {
+                  skipQuestionAnswers().catch(() => {});
+                }}
+              />
+              <div className="flex items-center gap-2 px-2 pb-1.5">
                 <input
-                  ref={answerInputRef}
                   type="text"
+                  value={answerDraft}
+                  onChange={(e) => setAnswerDraft(e.target.value)}
                   className="flex-1 h-8 px-2.5 rounded-lg bg-white/5 border border-border text-xs text-white placeholder:text-muted-foreground outline-none"
-                  placeholder="Complemento opcional"
-                  disabled={isStreaming}
+                  placeholder="Complemento opcional (Other)"
+                  disabled={isAnsweringInteraction}
                 />
                 <button
                   onClick={() => {
-                    const text = answerInputRef.current?.value?.trim() || '';
-                    answerInteraction({ text }).catch(() => {});
-                    if (answerInputRef.current) answerInputRef.current.value = '';
+                    const text = answerDraft.trim();
+                    if (!text) return;
+                    submitQuestionAnswers({ [pendingInteraction.question]: text }).catch(() => {});
+                    setAnswerDraft('');
                   }}
-                  disabled={isStreaming}
+                  disabled={!answerDraft.trim() || isAnsweringInteraction}
                   className="h-8 px-3 rounded-lg bg-white/15 text-xs text-white hover:bg-white/25 disabled:opacity-50"
                 >
                   Enviar
@@ -524,7 +662,7 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
           onClick={() => reset().catch(() => {})}
           className="w-8 h-8 rounded-lg border border-border text-muted-foreground hover:text-white hover:bg-white/5 transition-colors flex items-center justify-center"
           title="Limpar conversa"
-          disabled={isStreaming}
+          disabled={isGenerating || isAnsweringInteraction}
         >
           <RotateCcw className="w-4 h-4" />
         </button>
@@ -586,36 +724,36 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
       </div>
 
       {pendingInteraction && (
-        <div className="px-4 py-3 border-t border-border bg-black/50 space-y-2">
-          <p className="text-xs font-medium text-white">{pendingInteraction.header || 'Pergunta'}</p>
-          <p className="text-xs text-white/90">{pendingInteraction.question}</p>
-          <div className="flex flex-wrap gap-2">
-            {pendingInteraction.options.map((opt) => (
-              <button
-                key={opt.id}
-                onClick={() => answerInteraction({ optionId: opt.id }).catch(() => {})}
-                disabled={isStreaming}
-                className="px-2.5 py-1.5 rounded-lg border border-border bg-white/10 text-xs text-white hover:bg-white/20 disabled:opacity-50"
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="px-4 py-2 border-t border-border bg-black/50 space-y-2">
+          <StudioAgentQuestionCard
+            interaction={pendingInteraction}
+            isBusy={isAnsweringInteraction}
+            hasCustomText={Boolean(answerDraft.trim())}
+            expired={Boolean(pendingInteraction.expired)}
+            onSubmit={(answers) => {
+              submitQuestionAnswers(answers).catch(() => {});
+            }}
+            onSkip={() => {
+              skipQuestionAnswers().catch(() => {});
+            }}
+          />
+          <div className="flex items-center gap-2 px-2 pb-1">
             <input
-              ref={answerInputRef}
               type="text"
+              value={answerDraft}
+              onChange={(e) => setAnswerDraft(e.target.value)}
               className="flex-1 h-8 px-2.5 rounded-lg bg-white/5 border border-border text-xs text-white placeholder:text-muted-foreground outline-none"
-              placeholder="Complemento opcional"
-              disabled={isStreaming}
+              placeholder="Complemento opcional (Other)"
+              disabled={isAnsweringInteraction}
             />
             <button
               onClick={() => {
-                const text = answerInputRef.current?.value?.trim() || '';
-                answerInteraction({ text }).catch(() => {});
-                if (answerInputRef.current) answerInputRef.current.value = '';
+                const text = answerDraft.trim();
+                if (!text) return;
+                submitQuestionAnswers({ [pendingInteraction.question]: text }).catch(() => {});
+                setAnswerDraft('');
               }}
-              disabled={isStreaming}
+              disabled={!answerDraft.trim() || isAnsweringInteraction}
               className="h-8 px-3 rounded-lg bg-white/15 text-xs text-white hover:bg-white/25 disabled:opacity-50"
             >
               Enviar

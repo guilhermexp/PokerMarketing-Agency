@@ -260,6 +260,7 @@ export interface ChatMessage {
 export interface GenerationSetting {
   generate: boolean;
   count: number;
+  slidesPerCarousel?: number;
 }
 
 export interface GenerationOptions {

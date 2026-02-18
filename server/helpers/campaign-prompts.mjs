@@ -3,7 +3,18 @@ export function buildCampaignPrompt(
   transcript,
   quantityInstructions,
   toneText,
+  carouselSlidesPerCarousel = 5,
 ) {
+  const narrativeStructure =
+    carouselSlidesPerCarousel <= 1
+      ? `5. Estrutura narrativa obrigatória:
+   - Slide único (1) = gancho + mensagem principal + CTA em uma peça só`
+      : `5. Estrutura narrativa obrigatória:
+   - Slide 1 = título/gancho
+   - Slides intermediários = conteúdo principal
+   - Último slide (${carouselSlidesPerCarousel}) = CTA
+   - Se o usuário pedir menos slides (ex: 3), compacte o conteúdo para manter clareza e impacto`;
+
   return `
 **PERFIL DA MARCA:**
 - Nome: ${brandProfile.name}
@@ -34,7 +45,7 @@ ${quantityInstructions}
    - Textos em fonte bold condensed sans-serif
 
 **REGRAS PARA CARROSSÉIS (carousels):**
-1. Cada carrossel deve ter 5 slides
+1. Cada carrossel deve ter EXATAMENTE ${carouselSlidesPerCarousel} slides
 2. O cover_prompt DEVE seguir AS MESMAS REGRAS do image_prompt:
    - Cores da marca (${brandProfile.primaryColor}, ${brandProfile.secondaryColor})
    - Estilo cinematográfico, luxuoso e premium
@@ -43,7 +54,7 @@ ${quantityInstructions}
    - Em PORTUGUÊS
 3. Cada slide tem: slide (número), visual (descrição detalhada para gerar imagem), text (texto CURTO em MAIÚSCULAS, máx 10 palavras)
 4. O campo "visual" de cada slide DEVE ser uma descrição completa para geração de imagem (estilo, cores, composição)
-5. Slide 1 = título/gancho, slides 2-4 = conteúdo principal, slide 5 = CTA
+${narrativeStructure}
 6. A tipografia e estilo visual DEVEM ser consistentes em todos os slides
 7. Todos os textos em PORTUGUÊS
 
@@ -53,6 +64,10 @@ ${quantityInstructions}
 export function buildQuantityInstructions(options, mode = "prod") {
   const quantities = [];
   const isProd = mode === "prod";
+  const slidesPerCarousel = Math.max(
+    1,
+    Math.min(8, Number(options?.carousels?.slidesPerCarousel || 5)),
+  );
 
   if (options.videoClipScripts.generate && options.videoClipScripts.count > 0) {
     quantities.push(
@@ -135,8 +150,8 @@ export function buildQuantityInstructions(options, mode = "prod") {
   if (options.carousels?.generate && options.carousels.count > 0) {
     quantities.push(
       isProd
-        ? `- Carrosséis Instagram (carousels): EXATAMENTE ${options.carousels.count} carrossel(éis) com 5 slides cada`
-        : `- Carrosséis (carousels): ${options.carousels.count} carrossel(éis) com 5 slides cada`,
+        ? `- Carrosséis Instagram (carousels): EXATAMENTE ${options.carousels.count} carrossel(éis) com EXATAMENTE ${slidesPerCarousel} slides cada`
+        : `- Carrosséis (carousels): ${options.carousels.count} carrossel(éis) com ${slidesPerCarousel} slides cada`,
     );
   } else {
     quantities.push(`- Carrosséis (carousels): 0 (array vazio)`);

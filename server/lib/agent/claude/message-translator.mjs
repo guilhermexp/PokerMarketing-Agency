@@ -13,29 +13,6 @@ function safeString(value) {
   }
 }
 
-function extractAskUserPayload(toolUseBlock) {
-  const input = toolUseBlock?.input || {};
-  const options = Array.isArray(input.options)
-    ? input.options.map((opt, idx) => {
-        if (typeof opt === 'string') {
-          return { id: `opt_${idx + 1}`, label: opt, description: '' };
-        }
-        return {
-          id: String(opt?.id || `opt_${idx + 1}`),
-          label: String(opt?.label || opt?.title || `Opção ${idx + 1}`),
-          description: String(opt?.description || ''),
-        };
-      })
-    : [];
-
-  return {
-    interactionId: toolUseBlock.id,
-    question: String(input.question || input.prompt || 'Preciso de uma confirmação para continuar.'),
-    header: input.header ? String(input.header) : 'Confirmação',
-    options,
-  };
-}
-
 export function translateSdkMessage(message) {
   const events = [];
 
@@ -63,13 +40,6 @@ export function translateSdkMessage(message) {
         sessionId,
       });
 
-      if (toolName === 'AskUserQuestion') {
-        events.push({
-          type: 'ask_user',
-          ...extractAskUserPayload(evt.content_block),
-          sessionId,
-        });
-      }
     }
 
     return events;
@@ -91,13 +61,6 @@ export function translateSdkMessage(message) {
           sessionId,
         });
 
-        if (toolName === 'AskUserQuestion') {
-          events.push({
-            type: 'ask_user',
-            ...extractAskUserPayload(block),
-            sessionId,
-          });
-        }
       }
 
       if (block?.type === 'tool_result') {
