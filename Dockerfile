@@ -3,7 +3,7 @@ FROM oven/bun:1-debian AS builder
 
 WORKDIR /app
 
-# Node.js is needed for Vite build (vite uses node APIs internally)
+# Node.js is needed for Vite build
 RUN apt-get update && apt-get install -y --no-install-recommends nodejs && rm -rf /var/lib/apt/lists/*
 
 # Increase memory limits for build
@@ -54,23 +54,22 @@ RUN bun run build && \
     echo "=== Build complete ===" && \
     ls -la dist/
 
+# Prune dev dependencies after build, keeping only production deps
+RUN rm -rf node_modules && bun install --production
+
 # Runtime stage
 FROM oven/bun:1-debian
 
 WORKDIR /app
 
-# Copy only package.json (NOT bun.lockb — it locks macOS-only native deps)
-COPY package.json ./
-COPY scripts/ensure-sharp-libvips-link.mjs scripts/
-
-# Fresh install + explicit sharp linux bindings (bun skips optional platform deps)
-RUN bun install --production && \
-    bun add @img/sharp-linux-x64@0.34.5 @img/sharp-libvips-linux-x64@1.2.4 --no-save
+# Copy production node_modules from builder (already has correct linux-x64 binaries)
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 
-# Copy server code
+# Copy server code and package.json
+COPY package.json ./
 COPY server ./server
 
 # Get runtime args from Railway
