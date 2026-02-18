@@ -63,8 +63,9 @@ WORKDIR /app
 # Copy package files
 COPY package.json bun.lockb* ./
 
-# Install production dependencies only with Bun
-RUN bun install --production
+# Install production dependencies only with Bun (ignore-scripts avoids
+# postinstall that requires scripts/ dir not present in the runtime stage)
+RUN bun install --production --ignore-scripts
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
