@@ -74,11 +74,11 @@ export default defineConfig(({ mode }) => {
           // Avoid terser hook race when generating very large precache manifests.
           mode: "development",
           sourcemap: false,
-          navigateFallback: "/index.html",
-          // Allow SPA fallback for authenticated Clerk handshake routes (/?__clerk_handshake=...)
-          navigateFallbackAllowlist: [/^(?!\/api\/).*/],
-          navigateFallbackDenylist: [/^\/api\//],
-          globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff2}"],
+          // Do NOT precache index.html — it must always come from the network
+          // so the browser receives fresh CSP headers from Express/helmet.
+          // Precaching HTML bakes stale response headers into the SW cache.
+          navigateFallback: null,
+          globPatterns: ["**/*.{js,css,ico,png,svg,webp,woff2}"],
           // Force immediate update - don't wait for user to close all tabs
           skipWaiting: true,
           clientsClaim: true,
@@ -87,10 +87,13 @@ export default defineConfig(({ mode }) => {
           // Allow larger files to be cached (default is 2MB)
           maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10MB
           // Runtime caching strategies for better cache invalidation
+          // SPA navigation: always fetch HTML from network so CSP headers are fresh.
+          // Falls back to cache only when offline (NetworkFirst strategy).
+          navigationPreload: true,
           runtimeCaching: [
             {
-              // Network-first for HTML - always try to get fresh version
-              urlPattern: /^https:\/\/.*\/$/,
+              // Network-first for all navigation requests (HTML pages)
+              urlPattern: ({ request }) => request.mode === "navigate",
               handler: "NetworkFirst",
               options: {
                 cacheName: "html-cache",
@@ -98,15 +101,6 @@ export default defineConfig(({ mode }) => {
                   maxEntries: 10,
                   maxAgeSeconds: 60 * 60, // 1 hour
                 },
-                networkTimeoutSeconds: 3,
-              },
-            },
-            {
-              // Network-first for index.html specifically
-              urlPattern: /\/index\.html$/,
-              handler: "NetworkFirst",
-              options: {
-                cacheName: "html-cache",
                 networkTimeoutSeconds: 3,
               },
             },
