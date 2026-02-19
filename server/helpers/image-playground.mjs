@@ -853,6 +853,9 @@ async function processImageGeneration(
   params,
   genai,
 ) {
+  let usedProvider = "google";
+  let usedModel = "gemini-3-pro-image-preview";
+
   try {
     // Update task to processing
     await sql`
@@ -878,8 +881,6 @@ async function processImageGeneration(
     // Try Gemini first, fallback to Replicate on quota errors
     let imageBase64;
     let mimeType;
-    let usedProvider = "google";
-    let usedModel = "gemini-3-pro-image-preview";
     let inputTokens = 0;
     let outputTokens = 0;
 
