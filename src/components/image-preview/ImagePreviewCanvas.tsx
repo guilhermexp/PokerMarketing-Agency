@@ -84,14 +84,14 @@ export const ImagePreviewCanvas: React.FC<ImagePreviewCanvasProps> = ({
       {!isVideo && !editPreview && !resizedPreview && (isLoadingImage || imageLoadError) && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
           <div className="flex flex-col items-center gap-2 text-center px-4">
-            <div className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/60 text-xs">
+            <div className="w-10 h-10 rounded-full border border-border bg-white/5 flex items-center justify-center text-muted-foreground text-xs">
               {imageLoadError ? '!' : '...'}
             </div>
             <p className="text-xs text-white/70">
               {imageLoadError || 'Carregando imagem...'}
             </p>
             {imageLoadError && (
-              <p className="text-[10px] text-white/40">
+              <p className="text-[10px] text-muted-foreground">
                 Tente novamente ou verifique a URL da imagem.
               </p>
             )}

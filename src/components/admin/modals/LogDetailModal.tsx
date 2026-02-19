@@ -89,7 +89,7 @@ export function LogDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#0a0a0a] border-white/[0.06] text-white">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-background border-border text-white">
         <DialogHeader className="pr-8">
           <DialogTitle className="text-white/90 text-[16px] font-medium">
             Detalhes do Log
@@ -98,10 +98,10 @@ export function LogDetailModal({
 
         <div className="space-y-6 mt-4">
           {/* Header Section */}
-          <div className="flex items-start justify-between pb-4 border-b border-white/[0.06]">
+          <div className="flex items-start justify-between pb-4 border-b border-border">
             <div className="space-y-1">
               <div className="flex items-center gap-3">
-                <span className="text-[11px] text-white/40 font-mono">ID: {log.id}</span>
+                <span className="text-[11px] text-muted-foreground font-mono">ID: {log.id}</span>
                 <span
                   className={`px-2 py-0.5 text-[10px] font-medium rounded ${
                     log.status === 'failed'
@@ -112,14 +112,14 @@ export function LogDetailModal({
                   {log.status === 'failed' ? 'ERRO' : 'SUCESSO'}
                 </span>
               </div>
-              <div className="text-[11px] text-white/40">{formatDate(log.created_at)}</div>
+              <div className="text-[11px] text-muted-foreground">{formatDate(log.created_at)}</div>
             </div>
           </div>
 
           {/* Request Details */}
           <div className="space-y-3">
             <h3 className="text-[13px] font-medium text-white/70">Detalhes da Request</h3>
-            <div className="grid grid-cols-2 gap-3 bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
+            <div className="grid grid-cols-2 gap-3 bg-white/[0.02] border border-border rounded-lg p-4">
               <DetailItem label="Endpoint" value={log.endpoint || 'N/A'} />
               <DetailItem label="Operação" value={log.operation || 'N/A'} />
               <DetailItem label="Provider" value={log.provider || 'N/A'} />
@@ -133,7 +133,7 @@ export function LogDetailModal({
           {(log.input_tokens || log.output_tokens || log.total_tokens) && (
             <div className="space-y-3">
               <h3 className="text-[13px] font-medium text-white/70">Uso de Tokens</h3>
-              <div className="grid grid-cols-3 gap-3 bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
+              <div className="grid grid-cols-3 gap-3 bg-white/[0.02] border border-border rounded-lg p-4">
                 <DetailItem label="Input" value={log.input_tokens?.toLocaleString() || '0'} />
                 <DetailItem label="Output" value={log.output_tokens?.toLocaleString() || '0'} />
                 <DetailItem label="Total" value={log.total_tokens?.toLocaleString() || '0'} />
@@ -165,8 +165,8 @@ export function LogDetailModal({
           {log.metadata && Object.keys(log.metadata).length > 0 && (
             <div className="space-y-3">
               <h3 className="text-[13px] font-medium text-white/70">Metadata</h3>
-              <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
-                <pre className="text-[11px] text-white/50 font-mono whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
+              <div className="bg-white/[0.02] border border-border rounded-lg p-4">
+                <pre className="text-[11px] text-muted-foreground font-mono whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
                   {JSON.stringify(log.metadata, null, 2)}
                 </pre>
               </div>
@@ -195,10 +195,10 @@ export function LogDetailModal({
               )}
 
               {isLoadingSuggestions && (
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-6">
+                <div className="bg-white/[0.02] border border-border rounded-lg p-6">
                   <div className="flex flex-col items-center justify-center space-y-3">
                     <div className="w-8 h-8 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
-                    <span className="text-[11px] text-white/40">Gerando sugestões...</span>
+                    <span className="text-[11px] text-muted-foreground">Gerando sugestões...</span>
                   </div>
                 </div>
               )}
@@ -230,8 +230,8 @@ export function LogDetailModal({
 
           {/* No Error Message */}
           {!log.error_message && log.status !== 'failed' && (
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-6 text-center">
-              <span className="text-[12px] text-white/40">Nenhum erro registrado</span>
+            <div className="bg-white/[0.02] border border-border rounded-lg p-6 text-center">
+              <span className="text-[12px] text-muted-foreground">Nenhum erro registrado</span>
             </div>
           )}
         </div>
@@ -244,7 +244,7 @@ export function LogDetailModal({
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[10px] text-white/40 mb-1">{label}</div>
+      <div className="text-[10px] text-muted-foreground mb-1">{label}</div>
       <div className="text-[11px] text-white/70 font-mono break-all">{value}</div>
     </div>
   );

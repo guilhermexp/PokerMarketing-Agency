@@ -1,76 +1,118 @@
 /**
  * Workspace
  * Center panel with prompt input and generation feed
- * Design based on LobeChat reference
+ * Professional design matching Video Studio
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { PromptInput } from './PromptInput';
 import { GenerationFeed } from './GenerationFeed';
 import { useImagePlaygroundStore, imagePlaygroundSelectors } from '../../stores/imagePlaygroundStore';
+import { StudioAgentToggle } from '../studio-agent/StudioAgentToggle';
+import { StudioAgentPanel } from '../studio-agent/StudioAgentPanel';
+import { useImagePlaygroundTopics } from '../../hooks/useImagePlayground';
+import { Image } from 'lucide-react';
 
 export const Workspace: React.FC = () => {
+  const [mode, setMode] = useState<'direct' | 'agent'>('direct');
   const activeTopicId = useImagePlaygroundStore(imagePlaygroundSelectors.activeTopicId);
   const activeTopic = useImagePlaygroundStore(imagePlaygroundSelectors.activeTopic);
   const batches = useImagePlaygroundStore(imagePlaygroundSelectors.currentBatches);
+  const { createTopic } = useImagePlaygroundTopics();
 
   // Check if we should show the empty state (large centered view)
   const showEmptyState = !activeTopicId || batches.length === 0;
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function ensureTopicForAgent() {
+      if (mode !== 'agent' || activeTopicId) return;
+      try {
+        await createTopic();
+      } catch {
+        if (!cancelled) {
+          // noop: painel já mostra estado de indisponível sem quebrar UI
+        }
+      }
+    }
+
+    ensureTopicForAgent();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTopicId, createTopic, mode]);
+
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#0a0a0a]">
-      {/* Header - only show when there are generations */}
-      {!showEmptyState && (
-        <div className="px-6 py-4 border-b border-white/10">
-          <h1 className="text-xl font-semibold text-white">
-            {activeTopic?.title || 'Novo projeto'}
-          </h1>
-        </div>
-      )}
-
-      {/* Main Content Area */}
-      {showEmptyState ? (
-        // Empty State - Centered layout like LobeChat
-        <div className="flex-1 flex flex-col items-center justify-center px-6">
-          {/* Centered Icon & Title */}
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
-              <svg
-                className="w-9 h-9 text-white/80"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="13.5" cy="6.5" r="0.5" fill="currentColor" />
-                <circle cx="17.5" cy="10.5" r="0.5" fill="currentColor" />
-                <circle cx="8.5" cy="7.5" r="0.5" fill="currentColor" />
-                <circle cx="6.5" cy="12.5" r="0.5" fill="currentColor" />
-                <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 6.012 17.461 2 12 2z" />
-              </svg>
+    <div className="flex-1 min-h-0 flex bg-background">
+      <div className="flex-1 flex flex-col h-full min-w-0">
+        {/* Header - only show when there are generations */}
+        {!showEmptyState && (
+          <div className="px-6 py-4 border-b border-white/[0.06]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h1 className="text-lg font-semibold text-white tracking-tight">
+                  {activeTopic?.title || 'Novo projeto'}
+                </h1>
+                <p className="text-[11px] text-white/35 mt-0.5">
+                  {batches.length} {batches.length === 1 ? 'batch' : 'batches'} gerados
+                </p>
+              </div>
+              <StudioAgentToggle mode={mode} onChange={setMode} />
             </div>
-            <h1 className="text-4xl font-semibold text-white">Image Studio</h1>
           </div>
+        )}
 
-          {/* Prompt Input - Centered */}
-          <div className="w-full max-w-2xl">
-            <PromptInput />
-          </div>
-        </div>
-      ) : (
-        // Generation Feed with Prompt at bottom
-        <>
-          <div className="flex-1 overflow-y-auto no-scrollbar">
-            <GenerationFeed topicId={activeTopicId} />
-          </div>
+        {/* Main Content Area */}
+        {showEmptyState ? (
+          // Empty State - Centered layout matching Video Studio
+          <div className="flex-1 flex flex-col items-center justify-center px-6">
+            {/* Hero empty state */}
+            <div className="flex flex-col items-center mb-10">
+                <div className="w-20 h-20 rounded-3xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-5">
+                  <Image className="w-9 h-9 text-white/40" />
+              </div>
+              <h1 className="text-3xl font-semibold text-white tracking-tight mb-2">Image Studio</h1>
+              <p className="text-sm text-white/35 max-w-sm text-center">
+                Gere imagens com IA a partir de prompts de texto ou imagens de referencia
+              </p>
+            </div>
 
-          {/* Prompt Input - Fixed at bottom */}
-          <div className="border-t border-white/10 p-4 bg-black/40 backdrop-blur-xl">
-            <PromptInput />
+            {/* Prompt Input - Centered */}
+            <div className="w-full max-w-xl">
+              <div className="mb-4 flex justify-center">
+                <StudioAgentToggle mode={mode} onChange={setMode} />
+              </div>
+              {mode === 'direct' ? (
+                <PromptInput />
+              ) : (
+                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-6 text-sm text-white/35 text-center">
+                  Use o painel lateral do agente para conversar e disparar as geracoes.
+                </div>
+              )}
+            </div>
           </div>
-        </>
+        ) : (
+          // Generation Feed with Prompt at bottom
+          <>
+            <div className="flex-1 overflow-y-auto no-scrollbar">
+              <GenerationFeed topicId={activeTopicId} />
+            </div>
+
+            {/* Prompt Input - Fixed at bottom */}
+            {mode === 'direct' && (
+              <div className="border-t border-white/[0.06] p-4 bg-black/30 backdrop-blur-2xl">
+                <div className="max-w-3xl mx-auto">
+                  <PromptInput />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {mode === 'agent' && (
+        <StudioAgentPanel studioType="image" topicId={activeTopicId} layout="sidebar" />
       )}
     </div>
   );

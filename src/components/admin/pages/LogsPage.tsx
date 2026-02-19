@@ -70,7 +70,7 @@ interface LogDetail {
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const severityColors = {
-  info: 'text-white/50',
+  info: 'text-muted-foreground',
   warning: 'text-amber-500',
   error: 'text-red-400',
   critical: 'text-red-500 font-medium',
@@ -214,10 +214,10 @@ export function LogsPage() {
         const date = new Date(row.timestamp || row.created_at);
         return (
           <div className="text-[11px]">
-            <div className="text-white/60">
+            <div className="text-muted-foreground">
               {date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
             </div>
-            <div className="text-white/40">
+            <div className="text-muted-foreground">
               {date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </div>
           </div>
@@ -239,7 +239,7 @@ export function LogsPage() {
       header: 'Categoria',
       className: 'w-28',
       render: (row) => (
-        <span className="text-[11px] text-white/50">
+        <span className="text-[11px] text-muted-foreground">
           {row.category}
         </span>
       ),
@@ -251,7 +251,7 @@ export function LogsPage() {
         <div>
           <div className="text-[12px] font-medium text-white/70">{row.action || row.category}</div>
           {row.model && (
-            <div className="text-[10px] text-white/40 mt-0.5 font-mono">
+            <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">
               {row.model}
             </div>
           )}
@@ -263,10 +263,10 @@ export function LogsPage() {
       header: 'Ator',
       render: (row) => (
         <div className="text-[11px]">
-          <div className="text-white/60">
+          <div className="text-muted-foreground">
             {row.actor_name || row.user_name || 'Sistema'}
           </div>
-          <div className="text-white/40">
+          <div className="text-muted-foreground">
             {row.actor_email || row.user_email || '-'}
           </div>
         </div>
@@ -293,7 +293,7 @@ export function LogsPage() {
       header: 'Tempo',
       className: 'w-20 text-right',
       render: (row) => (
-        <span className="text-[11px] text-white/40 tabular-nums">
+        <span className="text-[11px] text-muted-foreground tabular-nums">
           {row.duration_ms ? `${row.duration_ms}ms` : '-'}
         </span>
       ),
@@ -313,7 +313,7 @@ export function LogsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-[15px] font-medium text-white/90">Logs de Atividade</h2>
-          <p className="text-[12px] text-white/40 mt-0.5">
+          <p className="text-[12px] text-muted-foreground mt-0.5">
             {pagination.total} logs registrados
             {recentErrorCount > 0 && (
               <span className="ml-2 text-red-400">
@@ -337,16 +337,16 @@ export function LogsPage() {
         {/* Category Filter */}
         {categories.length > 0 && (
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-white/40">Categoria:</span>
+            <span className="text-[11px] text-muted-foreground">Categoria:</span>
             <div className="flex gap-1">
               {categories.slice(0, 5).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => handleCategoryChange(cat)}
-                  className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                  className={`px-2 py-1 text-[10px] font-medium rounded-full transition-colors ${
                     filters.category === cat
                       ? 'bg-amber-500/15 text-amber-500'
-                      : 'text-white/40 hover:text-white/60 bg-white/[0.03]'
+                      : 'text-muted-foreground hover:text-foreground bg-white/[0.03]'
                   }`}
                 >
                   {cat}
@@ -358,13 +358,13 @@ export function LogsPage() {
 
         {/* Severity Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-white/40">Nível:</span>
+          <span className="text-[11px] text-muted-foreground">Nível:</span>
           <div className="flex gap-1">
             {(['info', 'warning', 'error', 'critical'] as const).map((sev) => (
               <button
                 key={sev}
                 onClick={() => handleSeverityChange(sev)}
-                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                className={`px-2 py-1 text-[10px] font-medium rounded-full transition-colors ${
                   filters.severity === sev
                     ? 'bg-amber-500/15 text-amber-500'
                     : `${severityColors[sev]} bg-white/[0.03] hover:bg-white/[0.05]`
@@ -408,7 +408,7 @@ export function LogsPage() {
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg overflow-hidden">
+        <div className="bg-white/[0.02] border border-border rounded-lg overflow-hidden">
           <Pagination
             currentPage={pagination.page}
             totalPages={pagination.totalPages}
@@ -421,7 +421,7 @@ export function LogsPage() {
 
       {/* Loading Details Indicator */}
       {isLoadingDetails && (
-        <div className="fixed bottom-4 right-4 bg-white/[0.05] border border-white/[0.1] rounded-lg px-4 py-3 flex items-center gap-3 shadow-xl backdrop-blur-sm z-50">
+        <div className="fixed bottom-4 right-4 bg-white/[0.05] border border-border rounded-lg px-4 py-3 flex items-center gap-3 shadow-xl backdrop-blur-sm z-50">
           <div className="w-4 h-4 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
           <span className="text-[12px] text-white/70">Carregando detalhes...</span>
         </div>

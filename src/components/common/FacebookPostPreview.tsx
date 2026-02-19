@@ -51,7 +51,7 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Facebook Card */}
-      <div className="w-full bg-black rounded-xl border border-white/20 overflow-hidden flex-1 flex flex-col">
+      <div className="w-full bg-black rounded-xl border border-border overflow-hidden flex-1 flex flex-col">
         {/* Header */}
         <div className="p-3 pb-1 flex items-start gap-2.5">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0">
@@ -70,7 +70,7 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
               </svg>
               <span className="text-[10px] text-blue-400 hover:underline cursor-pointer">Seguir</span>
             </div>
-            <div className="flex items-center gap-1 text-[9px] text-white/50">
+            <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
               <span>6 de janeiro às 05:09</span>
               <span>·</span>
               <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
@@ -78,7 +78,7 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
               </svg>
             </div>
           </div>
-          <Icon name="more-horizontal" className="w-5 h-5 text-white/40 flex-shrink-0" />
+          <Icon name="more-horizontal" className="w-5 h-5 text-muted-foreground flex-shrink-0" />
         </div>
 
         {/* Content text */}
@@ -93,7 +93,7 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
 
         {/* Image - fills remaining space */}
         <div
-          className={`flex-1 bg-white/5 overflow-hidden min-h-[120px] relative ${onImageClick ? "cursor-pointer" : ""}`}
+          className={`flex-1 bg-black overflow-hidden min-h-[120px] relative ${onImageClick ? "cursor-pointer" : ""}`}
           onClick={onImageClick}
         >
           {showLoader && (
@@ -121,9 +121,9 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
             </div>
           ) : !isGenerating ? (
             <div className="w-full h-full flex flex-col items-center justify-center p-3">
-              <Icon name="image" className="w-8 h-8 text-white/10 mb-2" />
+              <Icon name="image" className="w-8 h-8 text-muted-foreground mb-2" />
               {imagePrompt && (
-                <p className="text-[8px] text-white/20 italic text-center line-clamp-2">
+                <p className="text-[8px] text-muted-foreground italic text-center line-clamp-2">
                   "{imagePrompt}"
                 </p>
               )}
@@ -133,7 +133,7 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
                     e.stopPropagation();
                     onGenerate();
                   }}
-                  className="mt-2 px-3 py-1 text-[9px] font-medium rounded-md bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors flex items-center gap-1"
+                  className="mt-2 px-3 py-1 text-[9px] font-medium rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white/80 transition-colors flex items-center gap-1 border border-border"
                 >
                   <Icon name="zap" className="w-3 h-3" />
                   Gerar
@@ -145,14 +145,14 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
 
         {/* Regenerate button - integrated in mockup when image exists */}
         {image && !isGenerating && onRegenerate && (
-          <div className="px-3 py-2 border-t border-white/5">
+          <div className="px-3 py-2 border-t border-border">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onRegenerate();
               }}
               disabled={isGenerating}
-              className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 border border-white/5"
+              className="w-full px-3 py-1.5 text-[8px] font-medium rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 border border-border"
             >
               <Icon name="refresh" className="w-3 h-3" />
               Regenerar imagem
@@ -161,7 +161,7 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
         )}
 
         {/* Engagement stats */}
-        <div className="px-3 py-1.5 flex items-center justify-between text-[9px] text-white/40">
+        <div className="px-3 py-1.5 flex items-center justify-between text-[9px] text-muted-foreground">
           <div className="flex items-center gap-1">
             <div className="flex -space-x-1">
               <span className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center text-[7px]">👍</span>
@@ -177,16 +177,16 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
         </div>
 
         {/* Action Bar */}
-        <div className="px-2 py-1 flex items-center justify-around border-t border-white/10">
-          <button className="flex items-center justify-center gap-1.5 py-2 flex-1 rounded-md hover:bg-white/5 transition-colors text-white/60 hover:text-white/80">
+        <div className="px-2 py-1 flex items-center justify-around border-t border-border">
+          <button className="flex items-center justify-center gap-1.5 py-2 flex-1 rounded-md hover:bg-white/5 transition-colors text-muted-foreground hover:text-white/80">
             <Icon name="thumbs-up" className="w-4 h-4" />
             <span className="text-[10px] font-medium">Curtir</span>
           </button>
-          <button className="flex items-center justify-center gap-1.5 py-2 flex-1 rounded-md hover:bg-white/5 transition-colors text-white/60 hover:text-white/80">
+          <button className="flex items-center justify-center gap-1.5 py-2 flex-1 rounded-md hover:bg-white/5 transition-colors text-muted-foreground hover:text-white/80">
             <Icon name="message-circle" className="w-4 h-4" />
             <span className="text-[10px] font-medium">Comentar</span>
           </button>
-          <button className="flex items-center justify-center gap-1.5 py-2 flex-1 rounded-md hover:bg-white/5 transition-colors text-white/60 hover:text-white/80">
+          <button className="flex items-center justify-center gap-1.5 py-2 flex-1 rounded-md hover:bg-white/5 transition-colors text-muted-foreground hover:text-white/80">
             <Icon name="share" className="w-4 h-4" />
             <span className="text-[10px] font-medium">Compartilhar</span>
           </button>

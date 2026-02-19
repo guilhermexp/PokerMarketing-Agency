@@ -1,7 +1,7 @@
 /**
  * TopicsSidebar
  * Right sidebar with list of topics (projects)
- * Design based on LobeChat reference - minimal with thumbnails
+ * Professional design matching Video Studio
  */
 
 import React, { useCallback, useState } from 'react';
@@ -13,6 +13,7 @@ import {
   Check,
   X,
   Loader2,
+  Film,
 } from 'lucide-react';
 import { useImagePlaygroundTopics } from '../../hooks/useImagePlayground';
 import { useImagePlaygroundStore } from '../../stores/imagePlaygroundStore';
@@ -36,33 +37,33 @@ export const TopicsSidebar: React.FC = () => {
   }, [createTopic]);
 
   return (
-    <div className="h-full flex flex-col bg-black/40 backdrop-blur-xl">
+    <div className="h-full flex flex-col bg-black/30 backdrop-blur-2xl">
       {/* Header - Just the + button */}
-      <div className="px-3 py-3 border-b border-white/10 flex items-center justify-center">
+      <div className="px-2.5 py-3 border-b border-white/[0.06] flex items-center justify-center">
         <button
           onClick={handleCreateTopic}
           disabled={isCreating}
-          className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 inline-flex items-center justify-center"
+          className="w-[52px] h-8 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] transition-all disabled:opacity-50 inline-flex items-center justify-center group/add"
           title="Novo projeto"
         >
           {isCreating ? (
-            <Loader2 className="w-5 h-5 text-white/60 animate-spin shrink-0" />
+            <Loader2 className="w-4 h-4 text-white/40 animate-spin shrink-0" />
           ) : (
-            <Plus className="w-5 h-5 text-white/60 shrink-0" />
+            <Plus className="w-4 h-4 text-white/40 group-hover/add:text-white/70 transition-colors shrink-0" />
           )}
         </button>
       </div>
 
-      {/* Topics List - Grid of thumbnails */}
-      <div className="flex-1 overflow-y-auto py-3 px-3">
+      {/* Topics List */}
+      <div className="flex-1 overflow-y-auto py-2.5 px-2.5">
         {topicsLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-5 h-5 text-white/40 animate-spin" />
+            <Loader2 className="w-4 h-4 text-white/30 animate-spin" />
           </div>
         ) : topics.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center mx-auto">
-              <Image className="w-7 h-7 text-white/30" />
+          <div className="flex flex-col items-center justify-center py-6 gap-2">
+            <div className="w-10 h-10 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center">
+              <Image className="w-4 h-4 text-white/15" />
             </div>
           </div>
         ) : (
@@ -105,13 +106,11 @@ const TopicItem: React.FC<TopicItemProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(topic.title || '');
-  const [showMenu, setShowMenu] = useState(false);
   const [coverError, setCoverError] = useState(false);
 
   const handleStartEdit = useCallback(() => {
     setEditTitle(topic.title || '');
     setIsEditing(true);
-    setShowMenu(false);
   }, [topic.title]);
 
   const handleSaveEdit = useCallback(() => {
@@ -130,12 +129,11 @@ const TopicItem: React.FC<TopicItemProps> = ({
     if (confirm(`Excluir "${topic.title || 'Novo projeto'}" e todas as suas imagens?`)) {
       onDelete();
     }
-    setShowMenu(false);
   }, [topic.title, onDelete]);
 
   if (isEditing) {
     return (
-      <div className="p-2 bg-white/5 rounded-xl border border-white/10">
+      <div className="p-2 bg-white/[0.06] rounded-xl border border-white/[0.1]">
         <input
           type="text"
           value={editTitle}
@@ -145,21 +143,21 @@ const TopicItem: React.FC<TopicItemProps> = ({
             if (e.key === 'Escape') handleCancelEdit();
           }}
           autoFocus
-          className="w-full bg-transparent text-sm text-white focus:outline-none"
+          className="w-full bg-transparent text-[11px] text-white focus:outline-none"
           placeholder="Nome do projeto"
         />
-        <div className="flex items-center justify-end gap-1 mt-2">
+        <div className="flex items-center justify-end gap-1 mt-1.5">
           <button
             onClick={handleCancelEdit}
-            className="p-1 rounded hover:bg-white/10 transition-colors"
+            className="p-1 rounded-md hover:bg-white/10 transition-colors"
           >
-            <X className="w-3.5 h-3.5 text-white/40" />
+            <X className="w-3 h-3 text-white/40" />
           </button>
           <button
             onClick={handleSaveEdit}
-            className="p-1 rounded hover:bg-white/10 transition-colors"
+            className="p-1 rounded-md hover:bg-white/10 transition-colors"
           >
-            <Check className="w-3.5 h-3.5 text-primary" />
+            <Check className="w-3 h-3 text-white" />
           </button>
         </div>
       </div>
@@ -168,63 +166,59 @@ const TopicItem: React.FC<TopicItemProps> = ({
 
   return (
     <div
-      className={`relative group rounded-xl transition-colors cursor-pointer overflow-hidden ${
+      className={`relative group rounded-xl transition-all duration-200 cursor-pointer overflow-hidden ${
         isActive
-          ? 'ring-2 ring-primary/50'
-          : 'hover:ring-1 hover:ring-white/20'
+            ? 'ring-2 ring-white/40 shadow-[0_0_12px_rgba(255,255,255,0.08)]'
+          : 'hover:ring-1 hover:ring-white/[0.15]'
       }`}
     >
       {/* Thumbnail */}
       <button
         onClick={onSelect}
-        className="w-full aspect-square bg-white/5 overflow-hidden"
+        className="w-full aspect-square bg-white/[0.03] overflow-hidden"
       >
         {topic.coverUrl && !coverError ? (
           <img
             src={topic.coverUrl}
             alt={topic.title || 'Projeto'}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             onError={() => setCoverError(true)}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Image className="w-8 h-8 text-white/20" />
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/[0.04] to-white/[0.01]">
+            <Image className="w-5 h-5 text-white/20" />
           </div>
         )}
       </button>
 
       {/* Hover Overlay with Actions */}
-      <div
-        className={`absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent transition-opacity flex flex-col justify-end p-2 pointer-events-none ${
-          showMenu ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-        }`}
-      >
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-200 flex flex-col justify-end p-1.5 pointer-events-none opacity-0 group-hover:opacity-100">
         {/* Title */}
-        <p className="text-xs text-white font-medium truncate mb-1">
+        <p className="text-[9px] text-white font-medium truncate mb-1 px-0.5">
           {topic.title || 'Novo projeto'}
         </p>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-1 pointer-events-auto">
+        <div className="flex items-center gap-0.5 pointer-events-auto">
           <button
             onClick={(e) => {
               e.stopPropagation();
               handleStartEdit();
             }}
-            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+            className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
             title="Renomear"
           >
-            <Edit3 className="w-3 h-3 text-white" />
+            <Edit3 className="w-2.5 h-2.5 text-white" />
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
               handleDelete();
             }}
-            className="p-1.5 rounded-lg bg-white/10 hover:bg-red-500/30 transition-colors"
+            className="p-1 rounded-md bg-white/10 hover:bg-red-500/40 transition-colors"
             title="Excluir"
           >
-            <Trash2 className="w-3 h-3 text-white" />
+            <Trash2 className="w-2.5 h-2.5 text-white" />
           </button>
         </div>
       </div>

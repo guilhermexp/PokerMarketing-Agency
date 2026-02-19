@@ -3,7 +3,11 @@
  * Automatic text detection using Tesseract.js
  */
 
-import Tesseract from "tesseract.js";
+let TesseractModule: typeof import("tesseract.js") | null = null;
+async function getTesseract() {
+  if (!TesseractModule) TesseractModule = await import("tesseract.js");
+  return TesseractModule;
+}
 
 export interface TextRegion {
   left: number;
@@ -23,8 +27,9 @@ export async function detectTextRegions(
   onProgress?: (progress: number) => void
 ): Promise<TextRegion[]> {
   // Create worker with Portuguese and English support
+  const Tesseract = await getTesseract();
   const worker = await Tesseract.createWorker("por+eng", Tesseract.OEM.DEFAULT, {
-    logger: (m: Tesseract.LoggerMessage) => {
+    logger: (m: { status: string; progress: number }) => {
       if (m.status === "recognizing text" && onProgress) {
         onProgress(Math.round(m.progress * 100));
       }

@@ -5,6 +5,9 @@ dist-ssr
 # Dependencies are installed during build
 node_modules
 
+# Docker build uses npm (package-lock.json) — bun.lockb is unused
+bun.lockb
+
 # Development files
 .env
 .env.local

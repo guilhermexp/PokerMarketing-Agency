@@ -42,7 +42,7 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
           <h4 className="section-title mb-0">Filtro</h4>
           <button
             onClick={handleResetFilter}
-            className="text-[8px] text-white/25 hover:text-white/40 transition-colors"
+            className="text-[8px] text-white/25 hover:text-muted-foreground transition-colors"
           >
             Reset
           </button>
@@ -55,8 +55,8 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
               onClick={() => setFilterPreset(option.value)}
               className={`px-2 py-0.5 text-[8px] font-medium rounded border transition-all ${
                 filterPreset === option.value
-                  ? 'bg-white/10 text-white border-white/10'
-                  : 'bg-white/[0.03] text-white/40 hover:bg-white/[0.06] hover:text-white/60 border-white/[0.04]'
+                  ? 'bg-white/10 text-white border-border'
+                  : 'bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06] border-white/[0.04]'
               }`}
             >
               {option.label}
@@ -68,7 +68,7 @@ export const FilterSection: React.FC<FilterSectionProps> = ({
         <button
           onClick={handleApplyFilter}
           disabled={isApplyingFilter || !isFilterActive}
-          className="w-full h-7 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded text-[9px] font-medium text-white/50 hover:text-white/70 transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
+          className="w-full h-7 bg-white/[0.03] hover:bg-white/[0.06] border border-border rounded text-[9px] font-medium text-muted-foreground hover:text-white/70 transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
         >
           {isApplyingFilter ? (
             '...'

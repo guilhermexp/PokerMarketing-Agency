@@ -116,7 +116,7 @@ export function UsagePage() {
   if (isLoading && !totals) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="flex items-center gap-2 text-white/40">
+        <div className="flex items-center gap-2 text-muted-foreground">
           <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -184,7 +184,7 @@ export function UsagePage() {
 
       {/* Group By Selector */}
       <div className="flex items-center gap-3">
-        <span className="text-[12px] text-white/40">Agrupar por:</span>
+        <span className="text-[12px] text-muted-foreground">Agrupar por:</span>
         <div className="flex gap-1 p-1 bg-white/[0.03] rounded-md">
           {(['day', 'provider', 'model', 'operation'] as GroupBy[]).map((group) => (
             <button
@@ -193,7 +193,7 @@ export function UsagePage() {
               className={`px-3 py-1.5 text-[12px] font-medium rounded transition-colors ${
                 groupBy === group
                   ? 'bg-amber-500/15 text-amber-500'
-                  : 'text-white/50 hover:text-white/80'
+                  : 'text-muted-foreground hover:text-white/80'
               }`}
             >
               {groupByLabels[group]}
@@ -205,7 +205,7 @@ export function UsagePage() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Timeline/Bar Chart */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-5">
+        <div className="bg-white/[0.02] border border-border rounded-lg p-5">
           <h3 className="text-[13px] font-medium text-white/70 mb-4">
             {groupBy === 'day' ? 'Uso ao Longo do Tempo' : `Uso por ${groupByLabels[groupBy]}`}
           </h3>
@@ -247,7 +247,7 @@ export function UsagePage() {
         </div>
 
         {/* Cost Chart */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-5">
+        <div className="bg-white/[0.02] border border-border rounded-lg p-5">
           <h3 className="text-[13px] font-medium text-white/70 mb-4">
             Custo por {groupByLabels[groupBy]}
           </h3>
@@ -276,13 +276,13 @@ export function UsagePage() {
       {/* Top Users & Organizations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Top Users */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-5">
+        <div className="bg-white/[0.02] border border-border rounded-lg p-5">
           <h3 className="text-[13px] font-medium text-white/70 mb-4">
             Top Usuários por Custo
           </h3>
           <div className="space-y-3">
             {topUsers.length === 0 ? (
-              <p className="text-white/40 text-[12px]">Sem dados disponíveis</p>
+              <p className="text-muted-foreground text-[12px]">Sem dados disponíveis</p>
             ) : (
               topUsers.map((user, index) => (
                 <div key={user.user_id} className="flex items-center justify-between">
@@ -294,7 +294,7 @@ export function UsagePage() {
                       <div className="text-[12px] font-medium text-white/70">
                         {user.name || user.email}
                       </div>
-                      <div className="text-[10px] text-white/40">
+                      <div className="text-[10px] text-muted-foreground">
                         {parseInt(user.total_requests).toLocaleString('pt-BR')} req.
                       </div>
                     </div>
@@ -303,7 +303,7 @@ export function UsagePage() {
                     <span className="text-[12px] font-medium text-amber-500 tabular-nums">
                       ${user.totalCostUsd.toFixed(2)}
                     </span>
-                    <div className="text-[10px] text-white/30">
+                    <div className="text-[10px] text-muted-foreground">
                       R$ {(user.totalCostUsd * 6.0).toFixed(2).replace('.', ',')}
                     </div>
                   </div>
@@ -314,25 +314,25 @@ export function UsagePage() {
         </div>
 
         {/* Top Organizations */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-5">
+        <div className="bg-white/[0.02] border border-border rounded-lg p-5">
           <h3 className="text-[13px] font-medium text-white/70 mb-4">
             Top Organizações por Custo
           </h3>
           <div className="space-y-3">
             {topOrganizations.length === 0 ? (
-              <p className="text-white/40 text-[12px]">Sem dados disponíveis</p>
+              <p className="text-muted-foreground text-[12px]">Sem dados disponíveis</p>
             ) : (
               topOrganizations.map((org, index) => (
                 <div key={org.organization_id} className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-white/60 text-[10px] font-medium">
+                    <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-muted-foreground text-[10px] font-medium">
                       {index + 1}
                     </span>
                     <div>
                       <div className="text-[12px] font-medium text-white/70 font-mono">
                         {org.organization_id.slice(0, 16)}...
                       </div>
-                      <div className="text-[10px] text-white/40">
+                      <div className="text-[10px] text-muted-foreground">
                         {parseInt(org.total_requests).toLocaleString('pt-BR')} req.
                       </div>
                     </div>
@@ -341,7 +341,7 @@ export function UsagePage() {
                     <span className="text-[12px] font-medium text-amber-500 tabular-nums">
                       ${org.totalCostUsd.toFixed(2)}
                     </span>
-                    <div className="text-[10px] text-white/30">
+                    <div className="text-[10px] text-muted-foreground">
                       R$ {(org.totalCostUsd * 6.0).toFixed(2).replace('.', ',')}
                     </div>
                   </div>
@@ -354,7 +354,7 @@ export function UsagePage() {
 
       {/* Token Usage Stats */}
       {totals && (totals.totalInputTokens > 0 || totals.totalOutputTokens > 0) && (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-5">
+        <div className="bg-white/[0.02] border border-border rounded-lg p-5">
           <h3 className="text-[13px] font-medium text-white/70 mb-4">
             Uso de Tokens
           </h3>
@@ -363,19 +363,19 @@ export function UsagePage() {
               <div className="text-2xl font-semibold text-white/80 tabular-nums">
                 {totals.totalInputTokens.toLocaleString('pt-BR')}
               </div>
-              <div className="text-[11px] text-white/40 mt-1">Tokens de Entrada</div>
+              <div className="text-[11px] text-muted-foreground mt-1">Tokens de Entrada</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-semibold text-white/80 tabular-nums">
                 {totals.totalOutputTokens.toLocaleString('pt-BR')}
               </div>
-              <div className="text-[11px] text-white/40 mt-1">Tokens de Saída</div>
+              <div className="text-[11px] text-muted-foreground mt-1">Tokens de Saída</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-semibold text-amber-500 tabular-nums">
                 {(totals.totalInputTokens + totals.totalOutputTokens).toLocaleString('pt-BR')}
               </div>
-              <div className="text-[11px] text-white/40 mt-1">Total de Tokens</div>
+              <div className="text-[11px] text-muted-foreground mt-1">Total de Tokens</div>
             </div>
           </div>
         </div>

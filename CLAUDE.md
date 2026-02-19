@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-DirectorAi is an AI-powered growth toolkit for poker marketing agencies. It transforms content (transcripts, videos, posts) into complete marketing campaigns including video clips, social media posts, ad creatives, and tournament flyers.
+Socialab is an AI-powered growth toolkit for poker marketing agencies. It transforms content (transcripts, videos, posts) into complete marketing campaigns including video clips, social media posts, ad creatives, and tournament flyers.
 
 ## Commands
 
@@ -45,13 +45,13 @@ node scripts/check-all-data-urls.mjs  # Diagnose remaining data URLs
 ## Architecture
 
 ### Stack
-- **Frontend**: React 19 + TypeScript + Vite + TailwindCSS 4
-- **Backend**: Express 5 (Node.js) - unified server in `server/index.mjs` (dev entrypoint `server/dev-api.mjs` just re-exports it)
+- **Frontend**: React 19 + TypeScript + Vite 7 + TailwindCSS 4
+- **Backend**: Express 5 (Node.js) - modular server with `server/index.mjs` orchestrator (308 LOC) + 57 modules across lib/, routes/, middleware/, helpers/
 - **Database**: Neon Serverless Postgres via `@neondatabase/serverless`
 - **Storage**: Vercel Blob for images
 - **Queue**: Redis + BullMQ (for scheduled posts only; image jobs removed)
 - **Auth**: Clerk (multi-tenant with organizations)
-- **AI**: Google Gemini (`@google/genai`) for text/image generation
+- **AI**: Google Gemini via `@google/genai` (sync operations) + Vercel AI SDK `ai` + `@ai-sdk/google` (streaming chat)
 
 ### Data Flow
 ```
@@ -75,10 +75,14 @@ Frontend (React) → Express API → Neon Postgres
 
 ## Key Files
 
-### Server (Express API)
-- `server/index.mjs` - Unified API server (~7K lines, monolithic)
-- `server/dev-api.mjs` - Development entrypoint (1-line, imports index.mjs)
-- `server/helpers/job-queue.mjs` - BullMQ setup for scheduled posts
+### Server (Express API) — Modular Architecture
+- `server/index.mjs` - Orchestrator (308 LOC): setup, middleware, route registration, startup
+- `server/lib/` - Core libraries (db, auth, user-resolver, resource-access, logging-helpers, csrf, errors, validation)
+- `server/lib/ai/` - AI providers (clients, retry, image-generation, video-generation, prompt-builders, providers, tools)
+- `server/routes/` - 23 route modules (health, admin, init, db-*, ai-*, upload, generation-jobs, *-playground, rube)
+- `server/middleware/` - CSRF protection, error handler, request logger
+- `server/helpers/` - Job queue, scheduled publisher, usage tracking, campaign prompts
+- `server/api/chat/` - Vercel AI SDK chat handler with tool support
 
 ### Frontend Entry Points
 - `src/App.tsx` - Main app component (~91K chars, handles all state)
@@ -134,6 +138,7 @@ CSRF validation is enforced on **all state-changing operations** (POST, PUT, DEL
 - `/api/proxy-video/*` - Video proxy
 - `/api/rube/*` - Rube Goldberg
 - `/api/image-playground/*` - Image operations
+- `/api/video-playground/*` - Video playground operations
 - `/api/admin/*` - Admin operations
 
 **Note:** GET, HEAD, and OPTIONS requests do NOT require CSRF tokens.
@@ -182,7 +187,9 @@ CSRF validation is enforced on **all state-changing operations** (POST, PUT, DEL
 
 ## Known Technical Debt
 
-- Server file is monolithic (~7K lines) - see `docs/REFACTORING_PLAN.md`
+- `src/App.tsx` is ~2,571 lines — central orchestrator, needs decomposition
 - `src/components/tabs/clips/ClipCard.tsx` is ~5,500 lines
-- Many `console.log` statements need structured logging
+- `src/services/apiClient.ts` is ~1,726 lines — should split by domain
+- In-memory rate limiter (lost on restart, not shared across instances)
 - 66+ uses of TypeScript `any` type
+- See `docs/ARCHITECTURE-REVIEW-2026-02-11.md` for full review

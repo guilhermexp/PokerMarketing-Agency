@@ -21,7 +21,7 @@ interface GalleryViewProps {
 
 type ViewMode = "gallery" | "references";
 type SourceFilter = "all" | "flyer" | "campaign" | "post" | "video";
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 30;
 
 const SOURCE_FILTERS: {
   value: SourceFilter;
@@ -55,6 +55,9 @@ interface GalleryItemProps {
   onDelete?: (id: string) => void;
   className?: string;
   isNew?: boolean;
+  isSelectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelection?: (id: string) => void;
 }
 
 const GalleryItem: React.FC<GalleryItemProps> = ({
@@ -69,10 +72,16 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
   onDelete,
   className = "",
   isNew = false,
+  isSelectMode = false,
+  isSelected = false,
+  onToggleSelection,
 }) => {
   const [videoError, setVideoError] = React.useState(false);
+  const [imageError, setImageError] = React.useState(false);
   const [showHighlight, setShowHighlight] = React.useState(isNew);
+  const [isLoaded, setIsLoaded] = React.useState(false);
   const poster = getVideoPoster(image);
+  const imagePreviewSrc = image.thumbnailSrc || image.src;
 
   useEffect(() => {
     if (isNew) {
@@ -82,15 +91,30 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
     }
   }, [isNew]);
 
+  useEffect(() => {
+    setIsLoaded(false);
+    setImageError(false);
+  }, [imagePreviewSrc]);
+
+  const handleClick = () => {
+    if (isSelectMode && onToggleSelection) {
+      onToggleSelection(image.id);
+    } else if (!isAudio(image)) {
+      onSelect(image);
+    }
+  };
+
   return (
     <div
-      onClick={() => !isAudio(image) && onSelect(image)}
-      className={`group relative overflow-hidden rounded-xl border transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/20 ${
-        isAudio(image) ? "" : "cursor-pointer"
+      onClick={handleClick}
+      className={`group relative overflow-hidden rounded-xl border transition-all hover:shadow-lg hover:shadow-black/20 ${
+        isAudio(image) && !isSelectMode ? "" : "cursor-pointer"
       } ${
-        showHighlight
-          ? "border-primary/60 shadow-lg shadow-primary/30 animate-[pulse_2s_ease-in-out] bg-[#111111]"
-          : "border-white/5 bg-[#111111]"
+        isSelected
+          ? "border-primary/60 ring-2 ring-primary/40 bg-card"
+          : showHighlight
+          ? "border-primary/60 shadow-lg shadow-primary/30 animate-[pulse_2s_ease-in-out] bg-card"
+          : "border-border bg-card"
       } ${className}`}
     >
       {isAudio(image) ? (
@@ -98,11 +122,11 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
           <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-2">
             <Icon name="volume-2" className="w-6 h-6 text-primary" />
           </div>
-          <p className="text-[9px] text-white/60 font-bold uppercase tracking-wide mb-1">
+          <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-wide mb-1">
             Narração
           </p>
           {image.duration && (
-            <span className="text-[10px] text-white/40 font-mono mb-2">
+            <span className="text-[10px] text-muted-foreground font-mono mb-2">
               {formatDuration(image.duration)}
             </span>
           )}
@@ -129,10 +153,10 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
             <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mb-2">
               <Icon name="alert-triangle" className="w-6 h-6 text-red-400" />
             </div>
-            <p className="text-[10px] text-white/60 font-bold uppercase tracking-wide text-center">
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wide text-center">
               Vídeo indisponível
             </p>
-            <p className="text-[8px] text-white/40 mt-1 text-center">
+            <p className="text-[8px] text-muted-foreground mt-1 text-center">
               O arquivo pode ter expirado
             </p>
           </div>
@@ -152,15 +176,43 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
             onError={() => setVideoError(true)}
           />
         )
+      ) : imageError ? (
+        // Fallback when image fails to load
+        <div className="w-full aspect-square bg-gradient-to-br from-white/[0.02] via-[#1a1a1a] to-[#111] flex flex-col items-center justify-center p-4">
+          <div className="w-10 h-10 rounded-full bg-white/[0.06] flex items-center justify-center mb-2">
+            <Icon name="image" className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <p className="text-[9px] text-muted-foreground font-medium text-center">
+            Imagem indisponível
+          </p>
+        </div>
       ) : (
-        <img
-          src={image.src}
-          alt={image.prompt}
-          className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-          loading="lazy"
-          decoding="async"
-          fetchPriority="low"
-        />
+        <div className="relative w-full min-h-[120px]">
+          {/* Shimmer placeholder */}
+          {!isLoaded && (
+            <div className="absolute inset-0 bg-muted rounded-xl overflow-hidden">
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                style={{
+                  animation: 'shimmer 1.5s infinite',
+                  backgroundSize: '200% 100%',
+                }}
+              />
+            </div>
+          )}
+          <img
+            src={imagePreviewSrc}
+            alt={image.prompt}
+            className={`w-full h-auto object-cover transition-all duration-500 group-hover:scale-[1.02] ${
+              isLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
+            onLoad={() => setIsLoaded(true)}
+            onError={() => setImageError(true)}
+          />
+        </div>
       )}
 
       {/* Overlay */}
@@ -188,7 +240,8 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
         </div>
       )}
 
-      {/* Actions */}
+      {/* Actions - hide in select mode */}
+      {!isSelectMode && (
       <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
         {!isAudio(image) && (
           <>
@@ -238,9 +291,23 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
           </button>
         )}
       </div>
+      )}
+
+      {/* Selection checkbox */}
+      {isSelectMode && (
+        <div
+          className={`absolute top-2 left-2 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+            isSelected
+              ? "bg-primary border-primary"
+              : "bg-black/60 border-white/30 group-hover:border-white/50"
+          }`}
+        >
+          {isSelected && <Icon name="check" className="w-3.5 h-3.5 text-black" />}
+        </div>
+      )}
 
       {/* Favorite indicator */}
-      {!isAudio(image) && isFavorite(image) && (
+      {!isSelectMode && !isAudio(image) && isFavorite(image) && (
         <div className="absolute top-2 left-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
           <Icon name="heart" className="w-3 h-3 text-black" />
         </div>
@@ -257,7 +324,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({
   );
 };
 
-export const GalleryView: React.FC<GalleryViewProps> = ({
+export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
   images,
   isLoading = false,
   onUpdateImage,
@@ -271,7 +338,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   onQuickPost,
   onPublishToCampaign,
   onSchedulePost,
-}) => {
+}) {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("gallery");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
@@ -281,6 +348,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const previousImageIdsRef = React.useRef<Set<string>>(new Set());
   const isInitialLoadRef = React.useRef(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const handleImageUpdate = (newSrc: string) => {
     if (selectedImage) {
@@ -311,6 +380,43 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  const toggleSelectMode = () => {
+    setIsSelectMode((prev) => !prev);
+    setSelectedIds(new Set());
+  };
+
+  const toggleImageSelection = (imageId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(imageId)) {
+        next.delete(imageId);
+      } else {
+        next.add(imageId);
+      }
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(sortedImages.map((img) => img.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0 || !onDeleteImage) return;
+    const count = selectedIds.size;
+    if (!confirm(`Tem certeza que deseja excluir ${count} ${count === 1 ? "item" : "itens"}?`)) return;
+
+    for (const id of selectedIds) {
+      onDeleteImage(id);
+    }
+    setSelectedIds(new Set());
+    setIsSelectMode(false);
   };
 
   // Check if image is already in favorites
@@ -460,6 +566,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedIds(new Set());
+    setIsSelectMode(false);
   }, [viewMode, sourceFilter, images.length]);
 
   const totalPages = Math.max(1, Math.ceil(filteredImages.length / PAGE_SIZE));
@@ -546,7 +654,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
       <div className="min-h-screen flex flex-col">
         {/* Sticky Header */}
-        <header className="sticky top-0 bg-black border-b border-white/10 z-50 -mx-4 sm:-mx-6 px-4 sm:px-6">
+        <header className="sticky top-0 bg-black border-b border-border z-50 -mx-4 sm:-mx-6 px-4 sm:px-6">
           <div className="py-4">
             <div
               className="flex justify-between items-start gap-3 mb-6"
@@ -556,7 +664,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 <h1 className="text-3xl font-semibold text-white tracking-tight">
                   {viewMode === "gallery" ? "Galeria" : "Favoritos"}
                 </h1>
-                <p className="text-[11px] text-white/30 uppercase tracking-wider mt-1">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider mt-1">
                   {stats.total} {stats.total === 1 ? "item" : "itens"}
                   {" • "}
                   {stats.favorites} favorito{stats.favorites !== 1 ? "s" : ""}
@@ -571,13 +679,13 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
               <div className="flex items-center gap-2">
                 {/* View mode toggles */}
-                <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full">
+                <div className="flex items-center gap-1 px-2 py-1.5 bg-black/40 backdrop-blur-2xl border border-border rounded-full">
                   <button
                     onClick={() => setViewMode("gallery")}
                     className={`px-2.5 py-1 rounded-full text-[9px] font-medium uppercase tracking-wide transition-all ${
                       viewMode === "gallery"
                         ? "bg-white/10 text-white"
-                        : "text-white/40 hover:text-white/60"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     Todas
@@ -587,19 +695,34 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     className={`px-2.5 py-1 rounded-full text-[9px] font-medium uppercase tracking-wide transition-all ${
                       viewMode === "references"
                         ? "bg-white/10 text-white"
-                        : "text-white/40 hover:text-white/60"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     Favoritos
                   </button>
                 </div>
 
+                {/* Select mode button - only in gallery mode */}
+                {viewMode === "gallery" && onDeleteImage && (
+                  <button
+                    onClick={toggleSelectMode}
+                    className={`flex items-center justify-center w-9 h-9 border rounded-lg transition-all active:scale-95 flex-shrink-0 ${
+                      isSelectMode
+                        ? "bg-primary/20 border-primary/40 text-primary"
+                        : "bg-transparent border-border text-muted-foreground hover:text-white/70"
+                    }`}
+                    title={isSelectMode ? "Cancelar seleção" : "Selecionar múltiplos"}
+                  >
+                    <Icon name="check-square" className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
                 {/* Refresh button */}
                 {onRefresh && (
                   <button
                     onClick={handleRefresh}
                     disabled={isRefreshing}
-                    className="flex items-center justify-center w-9 h-9 bg-transparent border border-white/[0.06] rounded-lg text-white/50 hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center w-9 h-9 bg-transparent border border-border rounded-lg text-muted-foreground hover:text-white/70 transition-all active:scale-95 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Atualizar galeria"
                   >
                     <Icon
@@ -613,7 +736,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 {viewMode === "references" && (
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
+                    className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-border rounded-full text-[10px] font-bold text-muted-foreground uppercase tracking-wide hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
                   >
                     <Icon name="plus" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                     <span className="hidden sm:inline">Adicionar</span>
@@ -644,12 +767,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                         onClick={() => setSourceFilter(filter.value)}
                         className={`px-4 py-2 rounded-full text-sm font-medium backdrop-blur-2xl border shadow-[0_8px_30px_rgba(0,0,0,0.5)] whitespace-nowrap transition-all ${
                           sourceFilter === filter.value
-                            ? "bg-black/40 border-white/10 text-white/90"
-                            : "bg-black/40 border-white/10 text-white/60 hover:text-white/90 hover:border-white/30"
+                            ? "bg-black/40 border-border text-white/90"
+                            : "bg-black/40 border-border text-muted-foreground hover:text-white/90"
                         }`}
                       >
                         {filter.label}
-                        <span className="ml-1.5 text-white/40">{count}</span>
+                        <span className="ml-1.5 text-muted-foreground">{count}</span>
                       </button>
                     );
                   })}
@@ -658,6 +781,49 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             </div>
           </div>
         </header>
+
+        {/* Selection Action Bar */}
+        {isSelectMode && (
+          <div className="sticky top-[88px] z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 bg-black/90 backdrop-blur-xl border-b border-border">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-white/70">
+                  {selectedIds.size} {selectedIds.size === 1 ? "selecionado" : "selecionados"}
+                </span>
+                <button
+                  onClick={selectAllVisible}
+                  className="text-xs text-primary hover:text-primary/80 transition-colors"
+                >
+                  Selecionar todos
+                </button>
+                {selectedIds.size > 0 && (
+                  <button
+                    onClick={clearSelection}
+                    className="text-xs text-muted-foreground hover:text-white/70 transition-colors"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={selectedIds.size === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 border border-red-500/30 rounded-lg text-xs font-medium text-red-400 hover:bg-red-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Icon name="trash" className="w-3.5 h-3.5" />
+                  Excluir
+                </button>
+                <button
+                  onClick={toggleSelectMode}
+                  className="px-3 py-1.5 text-xs text-muted-foreground hover:text-white/70 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Main Content */}
         <main className={`flex-1 py-6 ${viewMode === "gallery" && totalPages > 1 ? "pb-20" : ""}`}>
@@ -670,7 +836,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               <div className="w-12 h-12 mb-4">
                 <Icon name="refresh" className="w-12 h-12 text-primary animate-spin" />
               </div>
-              <p className="text-white/50 text-sm font-medium">
+              <p className="text-muted-foreground text-sm font-medium">
                 Carregando galeria...
               </p>
             </div>
@@ -678,7 +844,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             <div className="space-y-6">
               {/* Gallery Grid */}
               {sortedImages.length > 0 && (
-                <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3">
+                <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-3">
                   {sortedImages.map((image) => (
                     <GalleryItem
                       key={image.id}
@@ -693,6 +859,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       onDelete={onDeleteImage}
                       className="break-inside-avoid mb-3"
                       isNew={newImageIds.has(image.id)}
+                      isSelectMode={isSelectMode}
+                      isSelected={selectedIds.has(image.id)}
+                      onToggleSelection={toggleImageSelection}
                     />
                   ))}
                 </div>
@@ -701,7 +870,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             </div>
           ) : (
             <div className="flex items-center justify-center w-full min-h-[60vh]">
-              <p className="text-white/30 text-sm">
+              <p className="text-muted-foreground text-sm">
                 Galeria vazia
               </p>
             </div>
@@ -716,7 +885,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 <div className="w-12 h-12 mb-4">
                   <Icon name="refresh" className="w-12 h-12 text-primary animate-spin" />
                 </div>
-                <p className="text-white/50 text-sm font-medium">
+                <p className="text-muted-foreground text-sm font-medium">
                   Carregando favoritos...
                 </p>
               </div>
@@ -725,7 +894,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 {[...styleReferences].reverse().map((ref) => (
                   <div
                     key={ref.id}
-                    className="group relative aspect-square overflow-hidden rounded-xl border border-white/5 bg-[#111111] transition-all hover:border-primary/30"
+                    className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-primary/30"
                   >
                     <img
                       src={ref.src}
@@ -741,7 +910,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       <div className="flex gap-2">
                         <button
                           onClick={() => onSelectStyleReference(ref)}
-                          className="flex-1 px-3 py-1.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-xs font-medium text-white hover:bg-white/20 transition-all"
+                          className="flex-1 px-3 py-1.5 bg-white/10 backdrop-blur-sm border border-border rounded-lg text-xs font-medium text-white hover:bg-white/20 transition-all"
                         >
                           Usar
                         </button>
@@ -758,7 +927,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center w-full min-h-[60vh]">
-                <p className="text-white/30 text-sm">Nenhum favorito ainda</p>
+                <p className="text-muted-foreground text-sm">Nenhum favorito ainda</p>
               </div>
             )}
           </div>
@@ -767,23 +936,23 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
         {/* Fixed Pagination Footer */}
         {viewMode === "gallery" && totalPages > 1 && (
-          <footer className="sticky bottom-0 bg-black/80 backdrop-blur-xl border-t border-white/10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 z-40">
+          <footer className="sticky bottom-0 bg-black/80 backdrop-blur-xl border-t border-border -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 z-40">
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-white/90 hover:border-white/20 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Icon name="chevron-left" className="w-4 h-4" />
                 Anterior
               </button>
-              <span className="text-sm text-white/50 font-medium px-4">
+              <span className="text-sm text-muted-foreground font-medium px-4">
                 Página {currentPage} de {totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-white/90 hover:border-white/20 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Próxima
                 <Icon name="chevron-right" className="w-4 h-4" />
@@ -824,4 +993,4 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
       </div>
     </>
   );
-};
+});

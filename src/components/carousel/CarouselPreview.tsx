@@ -11,6 +11,7 @@ interface CarouselPreviewProps {
   images: GalleryImage[];
   onReorder: (newOrder: GalleryImage[]) => void;
   clipTitle: string;
+  fitToContainer?: boolean;
   onOpenEditor?: (image: GalleryImage) => void;
   caption?: string;
   onCaptionChange?: (caption: string) => void;
@@ -25,6 +26,7 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
   images,
   onReorder,
   clipTitle,
+  fitToContainer = false,
   onOpenEditor,
   caption = "",
   onCaptionChange,
@@ -44,6 +46,9 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
   const [panStartOffset, setPanStartOffset] = useState(0);
   // Caption editor toggle
   const [showCaptionEditor, setShowCaptionEditor] = useState(false);
+  const phoneWidth = fitToContainer ? 280 : 320;
+  const thumbnailWidth = fitToContainer ? 256 : 320;
+  const thumbnailHeight = fitToContainer ? 358 : 448;
 
 
   const goToSlide = (index: number) => {
@@ -107,7 +112,7 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
   const scrollThumbnails = (direction: 'left' | 'right') => {
     const container = thumbnailsRef.current;
     if (!container) return;
-    const delta = direction === 'left' ? -320 : 320;
+    const delta = direction === 'left' ? -(thumbnailWidth + 16) : thumbnailWidth + 16;
     container.scrollBy({ left: delta, behavior: 'smooth' });
   };
 
@@ -119,18 +124,21 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
       <div className="flex-shrink-0">
         {/* Format label */}
         <div className="flex items-center justify-center gap-2 mb-2">
-          <span className="px-2 py-0.5 rounded bg-white/10 text-[10px] font-medium text-white/60 border border-white/10">
+          <span className="px-2 py-0.5 rounded bg-white/10 text-[10px] font-medium text-muted-foreground border border-border">
             Feed Instagram 4:5
           </span>
         </div>
-        <div className="w-[320px] bg-black rounded-[32px] p-2 shadow-2xl border border-white/10">
+        <div
+          className="bg-black rounded-[32px] p-2 shadow-2xl border border-border"
+          style={{ width: `${phoneWidth}px` }}
+        >
           {/* Phone notch */}
           <div className="w-24 h-6 bg-black rounded-full mx-auto mb-1" />
 
           {/* Screen */}
-          <div className="relative bg-[#0a0a0a] rounded-[24px] overflow-hidden">
+          <div className="relative bg-background rounded-[24px] overflow-hidden">
             {/* Instagram Header */}
-            <div className="px-3 py-2 flex items-center gap-2 border-b border-white/5">
+            <div className="px-3 py-2 flex items-center gap-2 border-b border-border">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
                 <span className="text-[8px] font-bold text-white">CPC</span>
               </div>
@@ -138,9 +146,9 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
                 <p className="text-[10px] font-semibold text-white">
                   cpc_poker
                 </p>
-                <p className="text-[8px] text-white/40">Patrocinado</p>
+                <p className="text-[8px] text-muted-foreground">Patrocinado</p>
               </div>
-              <Icon name="more-horizontal" className="w-4 h-4 text-white/60" />
+              <Icon name="more-horizontal" className="w-4 h-4 text-muted-foreground" />
             </div>
 
             {/* Carousel Image - Draggable for positioning */}
@@ -162,7 +170,7 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
                 draggable={false}
               />
               {/* Pan hint */}
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-full bg-black/60 backdrop-blur-sm text-[8px] text-white/60 flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-full bg-black/60 backdrop-blur-sm text-[8px] text-muted-foreground flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
                 <Icon name="move" className="w-2.5 h-2.5" />
                 Arraste para ajustar
               </div>
@@ -238,7 +246,7 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
                 <p className="text-[10px] text-white/90 line-clamp-2">
                   <span className="font-semibold">cpc_poker</span> {caption || clipTitle}
                 </p>
-                <span className="text-[8px] text-white/40 mt-1 flex items-center gap-1">
+                <span className="text-[8px] text-muted-foreground mt-1 flex items-center gap-1">
                   <Icon name="edit-2" className="w-2.5 h-2.5" />
                   Clique para editar legenda
                 </span>
@@ -254,14 +262,14 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
                     onClick={() => setShowCaptionEditor(false)}
                     className="p-1 rounded-full hover:bg-white/10 transition-colors"
                   >
-                    <Icon name="x" className="w-4 h-4 text-white/60" />
+                    <Icon name="x" className="w-4 h-4 text-muted-foreground" />
                   </button>
                 </div>
                 <textarea
                   value={caption}
                   onChange={(e) => onCaptionChange?.(e.target.value)}
                   placeholder="Escreva a legenda do carrossel..."
-                  className="flex-1 w-full px-3 py-2 text-xs text-white/90 bg-white/[0.05] border border-white/[0.1] rounded-lg resize-none focus:outline-none focus:border-amber-500/50 placeholder:text-white/30"
+                  className="flex-1 w-full px-3 py-2 text-xs text-white/90 bg-white/[0.05] border border-border rounded-lg resize-none focus:outline-none focus:border-amber-500/50 placeholder:text-muted-foreground"
                   autoFocus
                 />
                 <div className="flex items-center justify-between mt-3">
@@ -301,20 +309,20 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
       <div className="flex-1 min-w-0 -mt-4">
         <div className="flex items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
-            <Icon name="move" className="w-4 h-4 text-white/40" />
-            <span className="text-xs text-white/50">Arraste para reordenar</span>
+            <Icon name="move" className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Arraste para reordenar</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => scrollThumbnails('left')}
-              className="w-7 h-7 flex items-center justify-center rounded-md bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80 transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white/80 transition-colors"
               aria-label="Scroll para esquerda"
             >
               <Icon name="chevron-left" className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => scrollThumbnails('right')}
-              className="w-7 h-7 flex items-center justify-center rounded-md bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80 transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white/80 transition-colors"
               aria-label="Scroll para direita"
             >
               <Icon name="chevron-right" className="w-3.5 h-3.5" />
@@ -337,14 +345,14 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
               className={`
                 relative flex-shrink-0 rounded-xl overflow-hidden cursor-move group
                 border-2 transition-all duration-500 ease-in-out shadow-lg
-                ${idx === currentIndex ? "border-white/30 ring-2 ring-white/10" : "border-white/10"}
+                ${idx === currentIndex ? "border-white/30 ring-2 ring-ring" : "border-border"}
                 ${dragOverIndex === idx ? "scale-105 border-blue-500" : ""}
                 ${draggedIndex === idx ? "opacity-50 scale-95" : ""}
-                hover:border-white/30
+                hover:border-white/20
               `}
               style={{
-                width: "20rem",
-                height: "28rem",
+                width: `${thumbnailWidth}px`,
+                height: `${thumbnailHeight}px`,
               }}
             >
               <img
@@ -378,14 +386,14 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
           {totalExpectedSlides > images.length && Object.values(generatingSlides).some(v => v) && (
             <div
               key="skeleton-loading"
-              className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-white/10 shadow-lg bg-black"
+              className="relative flex-shrink-0 rounded-xl overflow-hidden border-2 border-border shadow-lg bg-black"
               style={{
-                width: "20rem",
-                height: "28rem",
+                width: `${thumbnailWidth}px`,
+                height: `${thumbnailHeight}px`,
               }}
             >
               <ImageGenerationLoader isGenerating={true} />
-              <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/50 text-sm text-white/40 font-medium">
+              <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/50 text-sm text-muted-foreground font-medium">
                 {images.length + 1}
               </div>
             </div>

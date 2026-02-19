@@ -78,7 +78,7 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
           <h1 className="text-3xl font-semibold text-white tracking-tight">
             Lista de Torneios
           </h1>
-          <p className="text-sm text-white/50 mt-2">
+          <p className="text-sm text-muted-foreground mt-2">
             0 semanas salvas
           </p>
         </div>
@@ -89,7 +89,7 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
             {onAddEvent && (
               <button
                 onClick={() => setIsManualModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-muted-foreground hover:text-white/90 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
               >
                 <Icon name="edit" className="w-4 h-4" />
                 Torneio Manual
@@ -98,7 +98,7 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
             <label
               className={`cursor-pointer ${isUploading ? "pointer-events-none opacity-70" : ""}`}
             >
-              <span className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+              <span className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-muted-foreground hover:text-white/90 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
                 <Icon name="upload" className="w-4 h-4" />
                 {isUploading ? "Carregando..." : "Nova Planilha"}
               </span>
@@ -136,7 +136,7 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
           <h2 className="text-3xl font-semibold text-white tracking-tight">
             Lista de Torneios
           </h2>
-          <p className="text-sm text-white/50 mt-2">
+          <p className="text-sm text-muted-foreground mt-2">
             {schedules.length} semana{schedules.length !== 1 ? "s" : ""} salva
             {schedules.length !== 1 ? "s" : ""}
           </p>
@@ -145,7 +145,7 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
           {onAddEvent && (
             <button
               onClick={() => setIsManualModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-muted-foreground hover:text-white/90 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
             >
               <Icon name="edit" className="w-4 h-4" />
               Torneio Manual
@@ -154,7 +154,7 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
           <label
             className={`cursor-pointer ${isUploading ? "pointer-events-none opacity-70" : ""}`}
           >
-            <span className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+            <span className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-muted-foreground hover:text-white/90 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
               <Icon name="upload" className="w-4 h-4" />
               {isUploading ? "Carregando..." : "Nova Planilha"}
             </span>
@@ -182,14 +182,14 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
               role="button"
               tabIndex={0}
               onKeyDown={(e) => e.key === "Enter" && onSelectSchedule(schedule)}
-              className={`w-full flex items-center justify-between gap-4 p-4 rounded-2xl border transition-all active:scale-[0.99] text-left cursor-pointer backdrop-blur-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isSelected
-                ? "bg-black/40 border-white/10"
-                : "bg-black/40 border-white/10 hover:border-white/30"
+              className={`w-full flex items-center justify-between gap-4 p-4 rounded-xl border transition-all active:scale-[0.99] text-left cursor-pointer backdrop-blur-2xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isSelected
+                ? "bg-black/40 border-border"
+                : "bg-black/40 border-border hover:border-white/20"
                 }`}
             >
               <div className="flex items-center gap-4 min-w-0">
                 <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
-                  <Icon name="calendar" className="w-5 h-5 text-white/30" />
+                  <Icon name="calendar" className="w-5 h-5 text-muted-foreground" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -198,17 +198,17 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
                       {formatDate(schedule.end_date)}
                     </p>
                     {status === "current" && (
-                      <span className="text-[8px] font-bold text-white/40 bg-white/10 px-1.5 py-0.5 rounded uppercase">
+                      <span className="text-[8px] font-bold text-muted-foreground bg-white/10 px-1.5 py-0.5 rounded uppercase">
                         Atual
                       </span>
                     )}
                     {status === "expired" && (
-                      <span className="text-[8px] font-bold text-white/20 bg-white/5 px-1.5 py-0.5 rounded uppercase">
+                      <span className="text-[8px] font-bold text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded uppercase">
                         Expirada
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-white/30 truncate">
+                  <p className="text-[10px] text-muted-foreground truncate">
                     {schedule.filename || "Planilha sem nome"}
                   </p>
                 </div>
@@ -219,7 +219,7 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
                   <p className="text-xs font-bold text-white">
                     {schedule.event_count}
                   </p>
-                  <p className="text-[8px] text-white/30 uppercase">Torneios</p>
+                  <p className="text-[8px] text-muted-foreground uppercase">Torneios</p>
                 </div>
                 {onDeleteSchedule && (
                   <button
@@ -231,13 +231,13 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
                         onDeleteSchedule(schedule.id);
                       }
                     }}
-                    className="w-8 h-8 rounded-xl bg-white/5 hover:bg-red-500/20 flex items-center justify-center text-white/40 hover:text-red-400 transition-all"
+                    className="w-8 h-8 rounded-xl bg-white/5 hover:bg-red-500/20 flex items-center justify-center text-muted-foreground hover:text-red-400 transition-all"
                     title="Excluir planilha"
                   >
                     <Icon name="trash" className="w-4 h-4" />
                   </button>
                 )}
-                <Icon name="chevron-right" className="w-4 h-4 text-white/20" />
+                <Icon name="chevron-right" className="w-4 h-4 text-muted-foreground" />
               </div>
             </div>
           );

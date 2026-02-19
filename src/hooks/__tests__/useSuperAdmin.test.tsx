@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useSuperAdmin } from '../useSuperAdmin';
 
 const mockUseUser = vi.fn();
@@ -36,7 +36,7 @@ describe('useSuperAdmin', () => {
     });
 
     const { result } = renderHook(() => useSuperAdmin());
-    await waitFor(() => {
+    await act(async () => {
       expect(result.current.isLoading).toBe(false);
     });
     expect(result.current.isSuperAdmin).toBe(true);
@@ -57,7 +57,7 @@ describe('useSuperAdmin', () => {
     });
 
     const { result } = renderHook(() => useSuperAdmin());
-    await waitFor(() => {
+    await act(async () => {
       expect(result.current.isLoading).toBe(false);
     });
     expect(result.current.isSuperAdmin).toBe(false);

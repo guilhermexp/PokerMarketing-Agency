@@ -5,6 +5,6 @@ dockerfilePath = "Dockerfile"
 [deploy]
 healthcheckPath = "/health"
 healthcheckTimeout = 120
-startCommand = "node server/index.mjs"
+startCommand = "bun run server/index.mjs"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3

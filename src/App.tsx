@@ -1,5 +1,5 @@
-import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback } from "react";
-import * as XLSX from "xlsx";
+import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback, useTransition } from "react";
+
 import { BrandProfileSetup } from "./components/brand/BrandProfileSetup";
 import { SettingsModal } from "./components/settings/SettingsModal";
 import { useInstagramAccounts } from "./components/settings/ConnectInstagramModal";
@@ -89,6 +89,7 @@ export type TimePeriod =
 export type ViewType =
   | "campaign"
   | "campaigns"
+  | "carousels"
   | "flyer"
   | "gallery"
   | "calendar"
@@ -111,7 +112,7 @@ const AssistantPanelNew = lazy(() =>
 
 const LazyFallback = () => (
   <div className="w-full h-full min-h-[220px] flex items-center justify-center">
-    <span className="text-xs text-white/50">Carregando...</span>
+    <span className="text-xs text-muted-foreground">Carregando...</span>
   </div>
 );
 
@@ -294,6 +295,10 @@ function AppContent() {
   const [error, setError] = useState<string | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [activeView, setActiveView] = useState<ViewType>("campaign");
+  const [, startViewTransition] = useTransition();
+  const handleViewChange = useCallback((view: ViewType) => {
+    startViewTransition(() => setActiveView(view));
+  }, []);
 
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -435,6 +440,7 @@ function AppContent() {
     .map((img) => ({
       id: img.id,
       src: img.src_url,
+      thumbnailSrc: img.thumbnail_url || undefined,
       prompt: img.prompt || undefined,
       source: img.source as GalleryImage["source"],
       model: img.model as GalleryImage["model"],
@@ -680,6 +686,7 @@ function AppContent() {
             const galleryImagesForPeriod: GalleryImage[] = dbImages.map((dbImg) => ({
               id: dbImg.id,
               src: dbImg.src_url,
+              thumbnailSrc: dbImg.thumbnail_url || undefined,
               prompt: dbImg.prompt || undefined,
               source: dbImg.source,
               model: dbImg.model as GalleryImage['model'],
@@ -1011,7 +1018,7 @@ function AppContent() {
 
   const handleSelectStyleReference = (ref: StyleReference) => {
     setSelectedStyleReference(ref);
-    setActiveView("flyer");
+    handleViewChange("flyer");
   };
 
   // Scheduled Posts Handlers
@@ -1279,7 +1286,7 @@ function AppContent() {
   ) => {
     setIsGenerating(true);
     setError(null);
-    setActiveView("campaign");
+    handleViewChange("campaign");
     // Store product images for use in PostsTab and AdCreativesTab
     console.debug("[App] Storing productImages:", input.productImages ? `${input.productImages.length} image(s)` : "null");
     setCampaignProductImages(input.productImages);
@@ -1410,8 +1417,96 @@ function AppContent() {
       }
 
       setCampaign(r);
+      // Keep loader visible for a minimum time to allow content to load
+      await new Promise(resolve => setTimeout(resolve, 1500));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCreateCarouselFromPrompt = async (
+    prompt: string,
+    requestedImages: number,
+  ) => {
+    if (!brandProfile) {
+      throw new Error("Perfil da marca não configurado");
+    }
+    if (!userId) {
+      throw new Error("Usuário não autenticado");
+    }
+
+    const input: ContentInput = {
+      transcript: prompt,
+      productImages: null,
+      inspirationImages: null,
+      collabLogo: null,
+      compositionAssets: null,
+      toneOfVoiceOverride: null,
+    };
+
+    const options: GenerationOptions = {
+      videoClipScripts: { generate: false, count: 0 },
+      carousels: { generate: true, count: 1 },
+      posts: {
+        instagram: { generate: false, count: 0 },
+        facebook: { generate: false, count: 0 },
+        twitter: { generate: false, count: 0 },
+        linkedin: { generate: false, count: 0 },
+      },
+      adCreatives: {
+        facebook: { generate: false, count: 0 },
+        google: { generate: false, count: 0 },
+      },
+    };
+    // No standalone "Carrosséis" page, o usuário escolhe TOTAL de imagens.
+    // O pipeline interno usa "capa + slides", então convertemos para slides internos.
+    const totalImages = Math.max(2, Math.min(8, requestedImages));
+    const internalSlides = Math.max(1, totalImages - 1);
+    options.carousels.slidesPerCarousel = internalSlides;
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const generated = await generateCampaign(brandProfile, input, options);
+      const validCarousels = (generated.carousels || []).filter(
+        (c) => c && c.title && c.hook && c.cover_prompt,
+      );
+
+      if (validCarousels.length === 0) {
+        throw new Error("Nenhum carrossel foi gerado");
+      }
+
+      const campaignName = prompt.substring(0, 50) + (prompt.length > 50 ? "..." : "");
+      const savedCampaign = await createCampaignApi(userId, {
+        name: campaignName,
+        input_transcript: prompt,
+        generation_options: {
+          ...options,
+          toneOfVoiceOverride: null,
+          toneOfVoiceUsed: brandProfile.toneOfVoice,
+          source: "carousels-page",
+        } as unknown as Record<string, unknown>,
+        status: "completed",
+        organization_id: organizationId,
+        video_clip_scripts: [],
+        posts: [],
+        ad_creatives: [],
+        carousel_scripts: validCarousels.map((c) => ({
+          title: c.title,
+          hook: c.hook,
+          cover_prompt: c.cover_prompt,
+          caption: c.caption || null,
+          slides: c.slides || [],
+        })),
+      });
+
+      swrAddCampaign(savedCampaign);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
     } finally {
       setIsGenerating(false);
     }
@@ -1498,7 +1593,7 @@ function AppContent() {
           "carousels",
         );
         setCampaign(loadedCampaign);
-        setActiveView("campaign");
+        handleViewChange("campaign");
 
         // Restore productImages from localStorage for this campaign
         const storedProductImages = loadProductImagesFromStorage(campaignId);
@@ -1893,6 +1988,7 @@ function AppContent() {
         try {
           console.debug("[Upload] File read complete, parsing...");
           const data = new Uint8Array(e.target!.result as ArrayBuffer);
+          const XLSX = await import("xlsx");
           const wb = XLSX.read(data, { type: "array" });
           const sheet = wb.Sheets[wb.SheetNames[0]];
           const json = XLSX.utils.sheet_to_json(sheet, {
@@ -2266,7 +2362,7 @@ function AppContent() {
   )
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader size={64} className="text-white/60" />
+        <Loader size={64} className="text-muted-foreground" />
       </div>
     );
 
@@ -2438,7 +2534,7 @@ function AppContent() {
                 selectedDailyFlyerIds={selectedDailyFlyerIds}
                 setSelectedDailyFlyerIds={setSelectedDailyFlyerIds}
                 activeView={activeView}
-                onViewChange={setActiveView}
+                onViewChange={handleViewChange}
                 onPublishToCampaign={handlePublishFlyerToCampaign}
                 styleReferences={styleReferences}
                 onAddStyleReference={handleAddStyleReference}
@@ -2456,6 +2552,7 @@ function AppContent() {
                 publishingStates={publishingStates}
                 campaignsList={campaignsList}
                 onLoadCampaign={handleLoadCampaign}
+                onCreateCarouselFromPrompt={handleCreateCarouselFromPrompt}
                 userId={userId}
                 organizationId={organizationId}
                 isWeekExpired={isWeekExpired}

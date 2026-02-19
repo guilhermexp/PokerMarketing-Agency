@@ -31,7 +31,7 @@ export const ImagePreviewMobileActions: React.FC<ImagePreviewMobileActionsProps>
           onSchedulePost(image);
           onClose();
         }}
-        className="flex-1 h-7 bg-white/[0.03] hover:bg-white/[0.06] rounded-md text-[9px] font-medium text-white/40 transition-all flex items-center justify-center gap-1"
+        className="flex-1 h-7 bg-white/[0.03] hover:bg-white/[0.06] rounded-md text-[9px] font-medium text-muted-foreground transition-all flex items-center justify-center gap-1"
       >
         <Icon name="calendar" className="w-2.5 h-2.5" />
         Agendar

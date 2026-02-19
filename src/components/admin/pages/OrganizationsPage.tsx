@@ -85,7 +85,7 @@ export function OrganizationsPage() {
           <div className="text-[13px] font-medium text-white/80">
             {row.primary_brand_name || 'Sem nome'}
           </div>
-          <div className="text-[10px] text-white/30 font-mono mt-0.5">
+          <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
             {row.organization_id?.slice(0, 20)}...
           </div>
         </div>
@@ -95,7 +95,7 @@ export function OrganizationsPage() {
       key: 'brands',
       header: 'Marcas',
       render: (row) => (
-        <span className="text-[12px] text-white/60 tabular-nums">
+        <span className="text-[12px] text-muted-foreground tabular-nums">
           {row.brand_count}
         </span>
       ),
@@ -104,7 +104,7 @@ export function OrganizationsPage() {
       key: 'campaigns',
       header: 'Campanhas',
       render: (row) => (
-        <span className="text-[12px] text-white/60 tabular-nums">
+        <span className="text-[12px] text-muted-foreground tabular-nums">
           {row.campaign_count}
         </span>
       ),
@@ -113,7 +113,7 @@ export function OrganizationsPage() {
       key: 'images',
       header: 'Imagens',
       render: (row) => (
-        <span className="text-[12px] text-white/60 tabular-nums">
+        <span className="text-[12px] text-muted-foreground tabular-nums">
           {row.gallery_image_count}
         </span>
       ),
@@ -122,7 +122,7 @@ export function OrganizationsPage() {
       key: 'posts',
       header: 'Posts',
       render: (row) => (
-        <span className="text-[12px] text-white/60 tabular-nums">
+        <span className="text-[12px] text-muted-foreground tabular-nums">
           {row.scheduled_post_count}
         </span>
       ),
@@ -135,7 +135,7 @@ export function OrganizationsPage() {
           <div className="text-[12px] font-medium text-amber-500 tabular-nums">
             ${row.aiUsageThisMonth?.costUsd?.toFixed(2) || '0.00'}
           </div>
-          <div className="text-[10px] text-white/40">
+          <div className="text-[10px] text-muted-foreground">
             {row.aiUsageThisMonth?.requests || 0} req.
           </div>
         </div>
@@ -145,7 +145,7 @@ export function OrganizationsPage() {
       key: 'last_activity',
       header: 'Última Atividade',
       render: (row) => (
-        <span className="text-[12px] text-white/50">
+        <span className="text-[12px] text-muted-foreground">
           {row.last_activity
             ? new Date(row.last_activity).toLocaleDateString('pt-BR', {
                 day: '2-digit',
@@ -164,7 +164,7 @@ export function OrganizationsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-[15px] font-medium text-white/90">Todas as Organizações</h2>
-          <p className="text-[12px] text-white/40 mt-0.5">
+          <p className="text-[12px] text-muted-foreground mt-0.5">
             {pagination.total} organizações cadastradas
           </p>
         </div>
@@ -187,7 +187,7 @@ export function OrganizationsPage() {
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg overflow-hidden">
+        <div className="bg-white/[0.02] border border-border rounded-lg overflow-hidden">
           <Pagination
             currentPage={pagination.page}
             totalPages={pagination.totalPages}

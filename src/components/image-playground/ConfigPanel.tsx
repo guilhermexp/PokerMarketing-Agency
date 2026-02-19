@@ -1,19 +1,25 @@
 /**
  * ConfigPanel
  * Left sidebar with model selection, reference images (up to 14), resolution, proportions, and quantity
- * Design based on LobeChat reference
+ * Professional design matching Video Studio
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Lock,
-  Unlock,
   ImagePlus,
   Plus,
   X,
   Palette,
+  Instagram,
+  Loader2,
+  Check,
+  ChevronDown,
+  Upload,
+  Image,
 } from 'lucide-react';
 import { useImagePlaygroundStore, type ReferenceImage } from '../../stores/imagePlaygroundStore';
+import { uploadDataUrlToBlob } from '../../services/blobService';
+import type { ToneOfVoice } from '../../types';
 
 // =============================================================================
 // Model Options - Only Gemini 3 Pro Image Preview
@@ -25,13 +31,14 @@ const MODEL_OPTIONS = [
     model: 'gemini-3-pro-image-preview',
     label: 'Gemini Pro Image',
     color: '#4285F4',
+    desc: 'Google DeepMind',
   },
 ];
 
-const RESOLUTION_OPTIONS: Array<{ label: string; value: '1K' | '2K' | '4K' }> = [
-  { label: '1K', value: '1K' },
-  { label: '2K', value: '2K' },
-  { label: '4K', value: '4K' },
+const RESOLUTION_OPTIONS: Array<{ label: string; value: '1K' | '2K' | '4K'; desc: string }> = [
+  { label: '1K', value: '1K', desc: 'Standard' },
+  { label: '2K', value: '2K', desc: 'Alta' },
+  { label: '4K', value: '4K', desc: 'Ultra' },
 ];
 
 const ASPECT_RATIOS = [
@@ -49,42 +56,71 @@ const ASPECT_RATIOS = [
 
 const IMAGE_NUM_OPTIONS = [1, 2, 4, 8];
 const MAX_REFERENCE_IMAGES = 14;
+const TONE_OPTIONS: ToneOfVoice[] = ['Profissional', 'Espirituoso', 'Casual', 'Inspirador', 'Técnico'];
+const FONT_OPTIONS = ['Bebas Neue', 'Oswald', 'Anton', 'Impact', 'Montserrat ExtraBold', 'Gilroy'] as const;
+const FONT_PREVIEW_FAMILIES: Record<(typeof FONT_OPTIONS)[number], string> = {
+  'Bebas Neue': '"Bebas Neue", "Oswald", "Arial Narrow", sans-serif',
+  Oswald: '"Oswald", "Arial Narrow", sans-serif',
+  Anton: '"Anton", "Impact", "Arial Black", sans-serif',
+  Impact: 'Impact, "Arial Black", sans-serif',
+  'Montserrat ExtraBold': '"Montserrat", "Helvetica Neue", Arial, sans-serif',
+  Gilroy: '"Gilroy", "Avenir Next", "Nunito Sans", sans-serif',
+};
+
+// =============================================================================
+// Section wrapper for config panel (matching Video Studio)
+// =============================================================================
+
+const ConfigSection: React.FC<{ label: string; children: React.ReactNode; action?: React.ReactNode }> = ({ label, children, action }) => (
+  <div className="space-y-2.5">
+    <div className="flex items-center justify-between">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-white/40">{label}</span>
+      {action}
+    </div>
+    {children}
+  </div>
+);
 
 // =============================================================================
 // Component
 // =============================================================================
 
-export const ConfigPanel: React.FC = () => {
+interface ConfigPanelProps {
+  defaultBrandTone?: string | null;
+}
+
+export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fontDropdownRef = useRef<HTMLDivElement>(null);
+  const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
 
   const {
     model,
     parameters,
     imageNum,
-    isAspectRatioLocked,
     activeAspectRatio,
     activeImageSize,
     useBrandProfile,
+    useInstagramMode,
     setModelAndProvider,
     setImageNum,
-    toggleAspectRatioLock,
     setAspectRatio,
     setImageSize,
+    setParam,
     toggleBrandProfile,
+    toggleInstagramMode,
     addReferenceImage,
     removeReferenceImage,
+    updateReferenceImageBlobUrl,
+    uploadingImageIds,
+    setUploadingImageIds,
   } = useImagePlaygroundStore();
 
   const referenceImages = parameters.referenceImages || [];
 
-  const selectedModel = MODEL_OPTIONS.find((m) => m.model === model);
-
   const handleModelChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const selected = MODEL_OPTIONS.find((m) => m.model === e.target.value);
-      if (selected) {
-        setModelAndProvider(selected.model, selected.provider);
-      }
+    (modelValue: string, provider: string) => {
+      setModelAndProvider(modelValue, provider);
     },
     [setModelAndProvider]
   );
@@ -123,16 +159,33 @@ export const ConfigPanel: React.FC = () => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const dataUrl = event.target?.result as string;
+        const imageId = crypto.randomUUID();
         const newImage: ReferenceImage = {
-          id: crypto.randomUUID(),
+          id: imageId,
           dataUrl,
           mimeType: file.type || 'image/png',
         };
         addReferenceImage(newImage);
+
+        // Upload to Vercel Blob in background
+        setUploadingImageIds([...useImagePlaygroundStore.getState().uploadingImageIds, imageId]);
+        uploadDataUrlToBlob(dataUrl)
+          .then((blobUrl) => {
+            updateReferenceImageBlobUrl(imageId, blobUrl);
+            setUploadingImageIds(
+              useImagePlaygroundStore.getState().uploadingImageIds.filter((id) => id !== imageId)
+            );
+          })
+          .catch((err) => {
+            console.error('[ConfigPanel] Blob upload failed, will use base64 fallback:', err);
+            setUploadingImageIds(
+              useImagePlaygroundStore.getState().uploadingImageIds.filter((id) => id !== imageId)
+            );
+          });
       };
       reader.readAsDataURL(file);
     },
-    [referenceImages.length, addReferenceImage]
+    [referenceImages.length, addReferenceImage, updateReferenceImageBlobUrl, setUploadingImageIds]
   );
 
   const handleFileChange = useCallback(
@@ -140,7 +193,6 @@ export const ConfigPanel: React.FC = () => {
       const files = e.target.files;
       if (!files) return;
 
-      // Process multiple files
       const remainingSlots = MAX_REFERENCE_IMAGES - referenceImages.length;
       const filesToProcess = Math.min(files.length, remainingSlots);
 
@@ -148,7 +200,6 @@ export const ConfigPanel: React.FC = () => {
         processFile(files[i]);
       }
 
-      // Reset input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -162,6 +213,32 @@ export const ConfigPanel: React.FC = () => {
     },
     [removeReferenceImage]
   );
+
+  const handleToneChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value;
+      setParam('toneOfVoiceOverride', value || undefined);
+    },
+    [setParam]
+  );
+
+  const handleFontChange = useCallback(
+    (value: string) => {
+      setParam('fontStyleOverride', value || undefined);
+      setIsFontDropdownOpen(false);
+    },
+    [setParam]
+  );
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (fontDropdownRef.current && !fontDropdownRef.current.contains(event.target as Node)) {
+        setIsFontDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -187,70 +264,255 @@ export const ConfigPanel: React.FC = () => {
   }, []);
 
   return (
-    <div className="h-full flex flex-col bg-black/40 backdrop-blur-xl">
+    <div className="h-full flex flex-col bg-black/30 backdrop-blur-2xl">
       {/* Header */}
-      <div className="px-4 py-5 border-b border-white/10">
-        <h1 className="text-2xl font-bold text-white">Image Studio</h1>
-        <p className="text-xs text-white/50 mt-1">
-          Descrição simples, crie imediatamente
-        </p>
+      <div className="px-5 pt-6 pb-5 border-b border-white/[0.06]">
+        <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center">
+              <Image className="w-4 h-4 text-white/50" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-white tracking-tight">Image Studio</h1>
+            <p className="text-[11px] text-white/35 mt-0.5">Configuracoes de geracao</p>
+          </div>
+        </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-5 space-y-6">
         {/* Model Selection */}
-        <div className="relative">
-          <select
-            value={model}
-            onChange={handleModelChange}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white focus:outline-none focus:border-white/20 transition-colors appearance-none cursor-pointer"
-          >
+        <ConfigSection label="Modelo">
+          <div className="space-y-1.5">
             {MODEL_OPTIONS.map((option) => (
-              <option key={option.model} value={option.model} className="bg-black">
-                {option.label}
-              </option>
+              <button
+                key={option.model}
+                onClick={() => handleModelChange(option.model, option.provider)}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all duration-200 ${
+                  model === option.model
+                    ? 'bg-white/[0.08] border border-white/[0.12] shadow-sm'
+                    : 'bg-transparent border border-transparent hover:bg-white/[0.04]'
+                }`}
+              >
+                <div
+                  className={`w-2.5 h-2.5 rounded-full shrink-0 transition-all ${
+                    model === option.model ? 'scale-110 shadow-lg' : 'opacity-50'
+                  }`}
+                  style={{
+                    backgroundColor: option.color,
+                    boxShadow: model === option.model ? `0 0 12px ${option.color}50` : 'none',
+                  }}
+                />
+                <div className="flex-1 text-left">
+                  <span className={`text-sm font-medium ${model === option.model ? 'text-white' : 'text-white/60'}`}>
+                    {option.label}
+                  </span>
+                  <span className={`text-[10px] ml-2 ${model === option.model ? 'text-white/40' : 'text-white/25'}`}>
+                    {option.desc}
+                  </span>
+                </div>
+                {model === option.model && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-white/60" />
+                )}
+              </button>
             ))}
-          </select>
-          {/* Model color indicator */}
-          <div
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full"
-            style={{ backgroundColor: selectedModel?.color || '#4285F4' }}
-          />
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-            <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
           </div>
-        </div>
+        </ConfigSection>
 
-        {/* Brand Profile Toggle */}
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-white/80">
-            Usar perfil da marca
-          </label>
-          <button
-            onClick={toggleBrandProfile}
-            className={`flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200 ${
-              useBrandProfile
-                ? 'bg-white text-black shadow-md'
-                : 'bg-white/5 text-white/60 border border-white/10 hover:text-white hover:border-white/20'
-            }`}
-            title={useBrandProfile ? "Usando cores e tom da marca" : "Sem personalização de marca"}
-          >
-            <Palette className="w-4 h-4" />
-          </button>
-        </div>
+        {/* Divider */}
+        <div className="h-px bg-white/[0.06]" />
+
+        {/* Modes: Brand + Instagram */}
+        <ConfigSection label="Modos">
+          <div className="space-y-1.5">
+            {/* Brand Profile Toggle */}
+            <button
+              onClick={toggleBrandProfile}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all duration-200 ${
+                useBrandProfile
+                  ? 'bg-white/[0.08] border border-white/[0.12]'
+                  : 'bg-transparent border border-white/[0.06] hover:bg-white/[0.04]'
+              }`}
+              title={useBrandProfile ? 'Diretrizes da marca ativas' : 'Diretrizes da marca desativadas'}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                useBrandProfile
+                  ? 'bg-white text-black'
+                  : 'bg-white/[0.06] text-white/40'
+              }`}>
+                <Palette className="w-4 h-4" />
+              </div>
+              <div className="flex-1 text-left">
+                <span className={`text-sm font-medium ${useBrandProfile ? 'text-white' : 'text-white/60'}`}>
+                  Perfil da marca
+                </span>
+                <p className="text-[10px] text-white/25 mt-0.5">
+                  {useBrandProfile ? 'Ativo - cores e tom aplicados' : 'Desativado'}
+                </p>
+              </div>
+              <div className={`w-8 h-[18px] rounded-full transition-all duration-200 relative ${
+                useBrandProfile ? 'bg-white/20' : 'bg-white/[0.06]'
+              }`}>
+                <div className={`absolute top-[3px] w-3 h-3 rounded-full transition-all duration-200 ${
+                  useBrandProfile ? 'left-[17px] bg-white' : 'left-[3px] bg-white/30'
+                }`} />
+              </div>
+            </button>
+
+            {/* Instagram Mode Toggle */}
+            <button
+              onClick={toggleInstagramMode}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all duration-200 ${
+                useInstagramMode
+                  ? 'bg-white/[0.08] border border-white/[0.12]'
+                    : 'bg-transparent border border-white/[0.06] hover:bg-white/[0.04]'
+                }`}
+                title={useInstagramMode ? 'Modo Instagram ativo (1:1 + marca)' : 'Ativar modo Instagram Post'}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                  useInstagramMode
+                    ? 'bg-white text-black'
+                    : 'bg-white/[0.06] text-white/40'
+              }`}>
+                <Instagram className="w-4 h-4" />
+              </div>
+              <div className="flex-1 text-left">
+                <span className={`text-sm font-medium ${useInstagramMode ? 'text-white' : 'text-white/60'}`}>
+                  Modo Instagram
+                </span>
+                <p className="text-[10px] text-white/25 mt-0.5">
+                  {useInstagramMode ? 'Ativo - 1:1 + marca' : 'Desativado'}
+                </p>
+              </div>
+              <div className={`w-8 h-[18px] rounded-full transition-all duration-200 relative ${
+                useInstagramMode ? 'bg-white/20' : 'bg-white/[0.06]'
+                }`}>
+                  <div className={`absolute top-[3px] w-3 h-3 rounded-full transition-all duration-200 ${
+                    useInstagramMode ? 'left-[17px] bg-white' : 'left-[3px] bg-white/30'
+                }`} />
+              </div>
+            </button>
+          </div>
+        </ConfigSection>
+
+        {/* Divider */}
+        <div className="h-px bg-white/[0.06]" />
+
+        {/* Tone Override */}
+        <ConfigSection
+          label="Tom da geracao"
+          action={!useBrandProfile ? (
+            <span className="text-[10px] text-white/25">Ative perfil da marca</span>
+          ) : undefined}
+        >
+          <div className="relative">
+            <select
+              value={typeof parameters.toneOfVoiceOverride === 'string' ? parameters.toneOfVoiceOverride : ''}
+              onChange={handleToneChange}
+              disabled={!useBrandProfile}
+              className={`w-full bg-white/[0.04] border rounded-xl px-4 py-2.5 text-sm transition-all appearance-none ${
+                useBrandProfile
+                  ? 'border-white/[0.08] text-white focus:outline-none focus:border-white/[0.15] cursor-pointer'
+                  : 'border-white/[0.04] text-white/30 cursor-not-allowed opacity-60'
+              }`}
+            >
+              <option value="" className="bg-zinc-900">
+                {defaultBrandTone ? `Padrao da marca (${defaultBrandTone})` : 'Padrao da marca'}
+              </option>
+              {TONE_OPTIONS.map((tone) => (
+                <option key={tone} value={tone} className="bg-zinc-900">
+                  {tone}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 pointer-events-none" />
+          </div>
+        </ConfigSection>
+
+        {/* Font Override */}
+        <ConfigSection
+          label="Fonte da geracao"
+          action={!useBrandProfile ? (
+            <span className="text-[10px] text-white/25">Ative perfil da marca</span>
+          ) : undefined}
+        >
+          <div ref={fontDropdownRef} className="relative">
+            <button
+              type="button"
+              disabled={!useBrandProfile}
+              onClick={() => useBrandProfile && setIsFontDropdownOpen((prev) => !prev)}
+              className={`w-full bg-white/[0.04] border rounded-xl px-4 py-2.5 text-sm transition-all flex items-center justify-between ${
+                useBrandProfile
+                  ? 'border-white/[0.08] text-white hover:border-white/[0.15]'
+                  : 'border-white/[0.04] text-white/30 cursor-not-allowed opacity-60'
+              }`}
+            >
+              <span className="truncate">
+                {typeof parameters.fontStyleOverride === 'string' && parameters.fontStyleOverride
+                  ? parameters.fontStyleOverride
+                  : 'Padrao (bold condensed sans-serif)'}
+              </span>
+              <ChevronDown className={`w-4 h-4 text-white/20 transition-transform ${isFontDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {useBrandProfile && isFontDropdownOpen && (
+              <div className="absolute z-30 mt-2 w-full bg-zinc-900/95 border border-white/[0.1] rounded-xl shadow-2xl backdrop-blur-xl overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => handleFontChange('')}
+                  className="w-full px-3 py-2.5 hover:bg-white/[0.06] text-left flex items-center justify-between gap-3 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm text-white/90 truncate">Padrao</p>
+                    <p className="text-[11px] text-white/30 truncate" style={{ fontFamily: '"Oswald", "Arial Narrow", sans-serif' }}>
+                      ABC 123 Exemplo
+                    </p>
+                  </div>
+                  {(!parameters.fontStyleOverride || parameters.fontStyleOverride === '') && (
+                    <Check className="w-4 h-4 text-white/60 shrink-0" />
+                  )}
+                </button>
+                <div className="h-px bg-white/[0.06]" />
+                {FONT_OPTIONS.map((font) => (
+                  <button
+                    key={font}
+                    type="button"
+                    onClick={() => handleFontChange(font)}
+                    className="w-full px-3 py-2.5 hover:bg-white/[0.06] text-left flex items-center justify-between gap-3 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm text-white/90 truncate">{font}</p>
+                      <p
+                        className="text-[11px] text-white/30 truncate tracking-[0.02em]"
+                        style={{
+                          fontFamily: FONT_PREVIEW_FAMILIES[font],
+                          fontWeight: font === 'Montserrat ExtraBold' ? 800 : 700,
+                        }}
+                      >
+                        ABC 123 Exemplo
+                      </p>
+                    </div>
+                    {parameters.fontStyleOverride === font && (
+                      <Check className="w-4 h-4 text-white/60 shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </ConfigSection>
+
+        {/* Divider */}
+        <div className="h-px bg-white/[0.06]" />
 
         {/* Reference Images (Multiple) */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-white/80">
-              Imagens de Referência
-            </label>
-            <span className="text-xs text-white/50">
+        <ConfigSection
+          label="Referencia"
+          action={referenceImages.length > 0 ? (
+            <span className="text-[10px] font-medium text-white/30">
               {referenceImages.length}/{MAX_REFERENCE_IMAGES}
             </span>
-          </div>
+          ) : undefined}
+        >
           <input
             ref={fileInputRef}
             type="file"
@@ -260,36 +522,43 @@ export const ConfigPanel: React.FC = () => {
             className="hidden"
           />
 
-          {/* Grid of reference images */}
           {referenceImages.length > 0 ? (
             <div className="space-y-2">
-              <div className="grid grid-cols-4 gap-2">
-                {referenceImages.map((img) => (
-                  <div
-                    key={img.id}
-                    className="relative aspect-square rounded-lg overflow-hidden border border-white/10 group"
-                  >
-                    <img
-                      src={img.dataUrl}
-                      alt="Reference"
-                      className="w-full h-full object-cover"
-                    />
-                    <button
-                      onClick={() => handleRemoveReferenceImage(img.id)}
-                      className="absolute top-1 right-1 p-1 bg-black/60 rounded-md hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100"
+              <div className="grid grid-cols-4 gap-1.5">
+                {referenceImages.map((img) => {
+                  const isUploading = uploadingImageIds.includes(img.id);
+                  return (
+                    <div
+                      key={img.id}
+                      className="relative aspect-square rounded-lg overflow-hidden border border-white/[0.08] group/img"
                     >
-                      <X className="w-3 h-3 text-white" />
-                    </button>
-                  </div>
-                ))}
+                      <img
+                        src={img.dataUrl}
+                        alt="Reference"
+                        className="w-full h-full object-cover"
+                      />
+                      {isUploading && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => handleRemoveReferenceImage(img.id)}
+                        className="absolute top-0.5 right-0.5 p-0.5 bg-black/60 rounded-md hover:bg-black/80 transition-colors opacity-0 group-hover/img:opacity-100"
+                      >
+                        <X className="w-2.5 h-2.5 text-white" />
+                      </button>
+                    </div>
+                  );
+                })}
 
                 {/* Add button when under limit */}
                 {referenceImages.length < MAX_REFERENCE_IMAGES && (
                   <div
                     onClick={handleReferenceImageClick}
-                    className="aspect-square rounded-lg border-2 border-dashed border-white/10 flex items-center justify-center cursor-pointer hover:border-white/20 hover:bg-white/5 transition-colors"
+                    className="aspect-square rounded-lg border border-dashed border-white/[0.1] flex items-center justify-center cursor-pointer hover:bg-white/[0.04] hover:border-white/[0.2] transition-all"
                   >
-                    <Plus className="w-5 h-5 text-white/40" />
+                    <Plus className="w-4 h-4 text-white/30" />
                   </div>
                 )}
               </div>
@@ -298,76 +567,63 @@ export const ConfigPanel: React.FC = () => {
               <div
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
-                className="border border-dashed border-white/10 rounded-lg p-2 text-center"
+                className="border border-dashed border-white/[0.08] rounded-lg p-2 text-center hover:border-white/[0.15] transition-colors"
               >
-                <p className="text-[10px] text-white/30">
+                <p className="text-[10px] text-white/25">
                   Arraste mais imagens aqui
                 </p>
               </div>
             </div>
           ) : (
-            <div
+            <button
               onClick={handleReferenceImageClick}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
-              className="border-2 border-dashed border-white/10 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-white/20 hover:bg-white/5 transition-colors"
+              className="w-full border border-dashed border-white/[0.1] rounded-xl p-5 flex flex-col items-center justify-center gap-2.5 hover:border-white/[0.2] hover:bg-white/[0.02] transition-all group/upload"
             >
-              <ImagePlus className="w-10 h-10 text-white/30" />
-              <p className="text-xs text-white/40 text-center">
-                Clique ou arraste para enviar imagens
-              </p>
-              <p className="text-[10px] text-white/30">
-                Suporta até {MAX_REFERENCE_IMAGES} imagens
-              </p>
-            </div>
+              <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover/upload:bg-white/[0.08] transition-colors">
+                <Upload className="w-4 h-4 text-white/30 group-hover/upload:text-white/50 transition-colors" />
+              </div>
+              <div className="text-center">
+                <p className="text-[11px] text-white/30 group-hover/upload:text-white/50 transition-colors">
+                  Clique ou arraste para enviar
+                </p>
+                <p className="text-[9px] text-white/20 mt-0.5">
+                  Suporta ate {MAX_REFERENCE_IMAGES} imagens
+                </p>
+              </div>
+            </button>
           )}
-        </div>
+        </ConfigSection>
+
+        {/* Divider */}
+        <div className="h-px bg-white/[0.06]" />
 
         {/* Resolution */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-white/80">
-            Resolução
-          </label>
-          <div className="flex gap-2">
+        <ConfigSection label="Resolucao">
+          <div className="grid grid-cols-3 gap-2">
             {RESOLUTION_OPTIONS.map((res) => (
               <button
                 key={res.value}
                 onClick={() => handleResolutionChange(res.value)}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                className={`flex flex-col items-center py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                   activeImageSize === res.value
-                    ? 'bg-white/15 border border-white/20 text-white'
-                    : 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white/[0.1] border border-white/[0.15] text-white shadow-sm'
+                    : 'bg-white/[0.03] border border-white/[0.06] text-white/40 hover:bg-white/[0.06] hover:text-white/60'
                 }`}
               >
                 {res.label}
+                <span className={`text-[10px] mt-0.5 ${activeImageSize === res.value ? 'text-white/40' : 'text-white/20'}`}>
+                  {res.desc}
+                </span>
               </button>
             ))}
           </div>
-        </div>
+        </ConfigSection>
 
         {/* Aspect Ratio / Proporção */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-white/80">
-              Proporção
-            </label>
-            <button
-              onClick={toggleAspectRatioLock}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isAspectRatioLocked
-                  ? 'bg-white/15 text-white'
-                  : 'bg-white/5 text-white/40 hover:text-white/60'
-              }`}
-              title={isAspectRatioLocked ? 'Proporção travada' : 'Travar proporção'}
-            >
-              {isAspectRatioLocked ? (
-                <Lock className="w-4 h-4" />
-              ) : (
-                <Unlock className="w-4 h-4" />
-              )}
-            </button>
-          </div>
-          <div className="grid grid-cols-5 gap-2">
+        <ConfigSection label="Proporcao">
+          <div className="grid grid-cols-5 gap-1.5">
             {ASPECT_RATIOS.map((ratio) => {
               const [w, h] = ratio.value.split(':').map(Number);
               const isVertical = h > w;
@@ -378,25 +634,26 @@ export const ConfigPanel: React.FC = () => {
                 <button
                   key={ratio.value}
                   onClick={() => handleAspectRatioChange(ratio.value)}
-                  className={`flex flex-col items-center gap-1 py-2 rounded-xl transition-all ${
+                  className={`flex flex-col items-center gap-1 py-2 rounded-xl transition-all duration-200 ${
                     activeAspectRatio === ratio.value
-                      ? 'bg-white/15 border border-white/20'
-                      : 'bg-white/5 border border-transparent hover:bg-white/10'
+                      ? 'bg-white/[0.1] border border-white/[0.15] shadow-sm'
+                      : 'bg-white/[0.03] border border-transparent hover:bg-white/[0.06]'
                   }`}
                   title={ratio.label}
                 >
                   {/* Aspect ratio visual indicator */}
                   <div
-                    className={`border border-white/40 rounded-sm ${
-                      activeAspectRatio === ratio.value ? 'border-white' : ''
+                    className={`rounded-sm transition-colors ${
+                      activeAspectRatio === ratio.value ? 'border-white/60' : 'border-white/25'
                     }`}
                     style={{
                       width: isVertical ? 10 : isWide ? 20 : isSquare ? 14 : 16,
                       height: isVertical ? (isWide ? 20 : 16) : isSquare ? 14 : 10,
+                      borderWidth: 1,
                     }}
                   />
                   <span className={`text-[10px] ${
-                    activeAspectRatio === ratio.value ? 'text-white' : 'text-white/50'
+                    activeAspectRatio === ratio.value ? 'text-white' : 'text-white/30'
                   }`}>
                     {ratio.label}
                   </span>
@@ -404,22 +661,19 @@ export const ConfigPanel: React.FC = () => {
               );
             })}
           </div>
-        </div>
+        </ConfigSection>
 
         {/* Number of Images */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-white/80">
-            Quantidade de Imagens
-          </label>
+        <ConfigSection label="Quantidade">
           <div className="flex gap-2">
             {IMAGE_NUM_OPTIONS.map((num) => (
               <button
                 key={num}
                 onClick={() => handleImageNumChange(num)}
-                className={`w-10 h-10 rounded-xl text-sm font-medium transition-all ${
+                className={`w-10 h-10 rounded-xl text-sm font-medium transition-all duration-200 ${
                   imageNum === num
-                    ? 'bg-white/15 border border-white/20 text-white'
-                    : 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white/[0.1] border border-white/[0.15] text-white shadow-sm'
+                    : 'bg-white/[0.03] border border-white/[0.06] text-white/40 hover:bg-white/[0.06] hover:text-white/60'
                 }`}
               >
                 {num}
@@ -435,13 +689,13 @@ export const ConfigPanel: React.FC = () => {
                   }
                 }
               }}
-              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white transition-all flex items-center justify-center"
+              className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/30 hover:bg-white/[0.06] hover:text-white/50 transition-all duration-200 flex items-center justify-center"
               title="Quantidade personalizada"
             >
               <Plus className="w-4 h-4" />
             </button>
           </div>
-        </div>
+        </ConfigSection>
       </div>
     </div>
   );

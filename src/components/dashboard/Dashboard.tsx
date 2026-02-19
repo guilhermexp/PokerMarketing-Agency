@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import React, { Suspense, lazy, useEffect, useMemo, useState, useTransition } from "react";
+import { AnimatePresence } from "framer-motion";
 import { useClerk } from "@clerk/clerk-react";
 import type {
   BrandProfile,
@@ -31,7 +32,35 @@ import { GeneratingLoader } from "../ui/quantum-pulse-loade";
 import { PublishedStoriesWidget } from "../ui/published-stories-widget";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";
 
-type View = "campaign" | "campaigns" | "flyer" | "gallery" | "calendar" | "playground" | "image-playground";
+type View = "campaign" | "campaigns" | "carousels" | "flyer" | "gallery" | "calendar" | "playground" | "image-playground";
+
+const DOT_GRID_STYLE_40 = {
+  backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)',
+  backgroundSize: '40px 40px',
+  backgroundPosition: '10px 10px',
+} as const;
+
+const DOT_GRID_STYLE_20 = {
+  backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)',
+  backgroundSize: '20px 20px',
+  backgroundPosition: '10px 10px',
+} as const;
+
+const DOT_GRID_STYLE_50 = {
+  backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)',
+  backgroundSize: '50px 50px',
+  backgroundPosition: '15px 15px',
+} as const;
+
+const DOT_GRID_STYLE_30 = {
+  backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)',
+  backgroundSize: '30px 30px',
+  backgroundPosition: '15px 15px',
+} as const;
+
+const VIGNETTE_STYLE = {
+  background: 'radial-gradient(80% 70%, transparent 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.9) 75%, black 100%)',
+} as const;
 
 interface DashboardProps {
   brandProfile: BrandProfile;
@@ -111,6 +140,10 @@ interface DashboardProps {
   // Campaigns List
   campaignsList: CampaignSummary[];
   onLoadCampaign: (campaignId: string) => void;
+  onCreateCarouselFromPrompt?: (
+    prompt: string,
+    slidesPerCarousel: number,
+  ) => Promise<void>;
   userId?: string;
   organizationId?: string | null;
   // Week Schedule
@@ -155,7 +188,7 @@ const ClipsTab = lazy(() =>
   import("../tabs/ClipsTab").then((m) => ({ default: m.ClipsTab })),
 );
 const CarrosselTab = lazy(() =>
-  import("../tabs/CarrosselTab").then((m) => ({ default: m.CarrosselTab })),
+  import("../carousel/CarouselTab").then((m) => ({ default: m.CarouselTab })),
 );
 const PostsTab = lazy(() =>
   import("../tabs/PostsTab").then((m) => ({ default: m.PostsTab })),
@@ -179,6 +212,9 @@ const CalendarView = lazy(() =>
 );
 const CampaignsList = lazy(() =>
   import("../campaigns/CampaignsList").then((m) => ({ default: m.CampaignsList })),
+);
+const CarouselsList = lazy(() =>
+  import("../campaigns/CarouselsList").then((m) => ({ default: m.CarouselsList })),
 );
 const PlaygroundView = lazy(() =>
   import("../playground").then((m) => ({ default: m.PlaygroundView })),
@@ -204,7 +240,7 @@ const AssistantPanelNew = lazy(() =>
 
 const ViewLoadingFallback = () => (
   <div className="w-full h-full min-h-[220px] flex items-center justify-center">
-    <span className="text-xs text-white/50">Carregando...</span>
+    <span className="text-xs text-muted-foreground">Carregando...</span>
   </div>
 );
 
@@ -257,6 +293,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     publishingStates,
     campaignsList: _campaignsList,
     onLoadCampaign,
+    onCreateCarouselFromPrompt,
     userId,
     organizationId,
     isWeekExpired,
@@ -285,6 +322,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
   const { signOut } = useClerk();
   const { campaigns } = useCampaigns(userId || null, organizationId);
   const [activeTab, setActiveTab] = useState<Tab>("clips");
+  const [isTabPending, startTabTransition] = useTransition();
   const [isInsideSchedule, setIsInsideSchedule] = useState(false);
   const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(
     null,
@@ -384,11 +422,11 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
           <>
             {/* Dot Grid Background - only on upload form */}
             <div className="fixed inset-0 pointer-events-none z-0">
-              <div className="absolute inset-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)', backgroundSize: '40px 40px', backgroundPosition: '10px 10px' }} />
-              <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)', backgroundSize: '20px 20px', backgroundPosition: '10px 10px' }} />
-              <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)', backgroundSize: '50px 50px', backgroundPosition: '15px 15px' }} />
-              <div className="absolute inset-0 opacity-25" style={{ backgroundImage: 'radial-gradient(circle, rgb(170, 170, 170) 1px, transparent 1px)', backgroundSize: '30px 30px', backgroundPosition: '15px 15px' }} />
-              <div className="absolute inset-0" style={{ background: 'radial-gradient(80% 70%, transparent 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.9) 75%, black 100%)' }} />
+              <div className="absolute inset-0 opacity-50" style={DOT_GRID_STYLE_40} />
+              <div className="absolute inset-0 opacity-30" style={DOT_GRID_STYLE_20} />
+              <div className="absolute inset-0 opacity-40" style={DOT_GRID_STYLE_50} />
+              <div className="absolute inset-0 opacity-25" style={DOT_GRID_STYLE_30} />
+              <div className="absolute inset-0" style={VIGNETTE_STYLE} />
             </div>
           </>
         )}
@@ -456,7 +494,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       <div
                         key={camp.id}
                         onClick={() => onLoadCampaign(camp.id)}
-                        className="group cursor-pointer rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
+                        className="group cursor-pointer rounded-xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
                       >
                         {/* Preview Images with Overlay Text */}
                         {totalAssets > 0 && previewItems.length > 0 ? (
@@ -504,7 +542,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 </div>
               </div>
             )}
-            {isGenerating && <GeneratingLoader />}
+            <AnimatePresence>
+              {isGenerating && <GeneratingLoader />}
+            </AnimatePresence>
             {campaign && (
               <div className="animate-fade-in-up space-y-8">
                 {/* Header Section */}
@@ -513,7 +553,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     <h2 className="text-3xl font-semibold text-white tracking-tight">
                       Campanha Gerada
                     </h2>
-                    <p className="text-sm text-white/50 mt-2">
+                    <p className="text-sm text-muted-foreground mt-2">
                       {campaign.videoClipScripts?.length || 0} clips •{" "}
                       {campaign.posts?.length || 0} posts •{" "}
                       {campaign.adCreatives?.length || 0} anúncios
@@ -534,10 +574,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     {availableTabs.map((tab) => (
                       <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
+                        onClick={() => startTabTransition(() => setActiveTab(tab.id))}
                         className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 backdrop-blur-2xl border shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${activeTab === tab.id
-                          ? "bg-black/40 border-white/10 text-white/90"
-                          : "bg-black/40 border-white/10 text-white/60 hover:text-white/90 hover:border-white/30"
+                          ? "bg-black/40 border-border text-white/90"
+                          : "bg-black/40 border-border text-muted-foreground hover:text-white/90"
                           }`}
                       >
                         {tab.label}
@@ -545,7 +585,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     ))}
                     <button
                       onClick={onResetCampaign}
-                      className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                      className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-muted-foreground hover:text-white/90 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
                     >
                       <Icon name="zap" className="w-4 h-4" />
                       Nova Campanha
@@ -554,7 +594,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 </div>
 
                 {/* Content */}
-                <div className="space-y-4">
+                <div className={`space-y-4 ${isTabPending ? 'opacity-70 transition-opacity duration-150' : ''}`}>
                   {activeTab === "clips" && (
                     <Suspense fallback={<ViewLoadingFallback />}>
                       <ClipsTab
@@ -703,10 +743,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         {activeView === "flyer" && isInsideSchedule && (
           <div className="flex flex-col h-full">
             {/* Back button header */}
-            <div className="flex items-center gap-3 px-4 py-3 sm:px-6 border-b border-white/5 flex-shrink-0 bg-[#070707]">
+            <div className="flex items-center gap-3 px-4 py-3 sm:px-6 border-b border-border flex-shrink-0 bg-[#070707]">
               <button
                 onClick={handleBackToSchedulesList}
-                className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors"
+                className="flex items-center gap-2 text-muted-foreground hover:text-white/70 transition-colors"
               >
                 <Icon name="arrow-left" className="w-4 h-4" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">
@@ -810,6 +850,23 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 onSelectCampaign={onLoadCampaign}
                 onNewCampaign={() => onViewChange("campaign")}
                 currentCampaignId={campaign?.id}
+              />
+            </Suspense>
+          </div>
+        )}
+        {activeView === "carousels" && userId && (
+          <div className="px-4 py-4 sm:px-6 sm:py-5">
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <CarouselsList
+                userId={userId}
+                organizationId={organizationId}
+                brandProfile={brandProfile}
+                galleryImages={galleryImages}
+                onCreateCarouselFromPrompt={onCreateCarouselFromPrompt}
+                onSelectCampaign={(campaignId) => {
+                  onLoadCampaign(campaignId);
+                  onViewChange("campaign");
+                }}
               />
             </Suspense>
           </div>
@@ -926,7 +983,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
       )}
 
       {/* Footer - Desktop only */}
-      <footer className="fixed bottom-4 left-4 z-[10000] pointer-events-auto hidden lg:flex flex-col items-center gap-2 rounded-2xl bg-black/40 backdrop-blur-2xl border border-white/10 p-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
+      <footer className="fixed bottom-4 left-4 z-[10000] pointer-events-auto hidden lg:flex flex-col items-center gap-2 rounded-2xl bg-black/40 backdrop-blur-2xl border border-border p-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
         <button
           onClick={onEditProfile}
           className="flex items-center justify-center cursor-pointer active:scale-95 transition-transform"

@@ -194,13 +194,13 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
   if (allFlyers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-6">
-        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-          <Icon name="image" className="w-8 h-8 text-white/20" />
-        </div>
-        <p className="text-sm font-semibold text-white/40 text-center">
-          Nenhum flyer gerado ainda
-        </p>
-        <p className="text-xs text-white/20 text-center mt-1">
+<div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-4">
+            <Icon name="image" className="w-8 h-8 text-white/35" />
+          </div>
+          <p className="text-sm font-semibold text-white/70 text-center">
+            Nenhum flyer gerado ainda
+          </p>
+          <p className="text-xs text-white/40 text-center mt-1">
           Gere seus primeiros flyers para vê-los aqui
         </p>
       </div>
@@ -210,10 +210,10 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/10 bg-black/40">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/[0.06] bg-white/[0.02]">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-3">
           <div>
-            <h3 className="text-sm font-semibold text-white">
+            <h3 className="text-sm font-medium text-white">
               Galeria de Flyers
             </h3>
             <p className="text-xs text-white/40 mt-0.5">
@@ -225,7 +225,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
               <button
                 onClick={handleShareDayWhatsApp}
                 disabled={selectedDayFlyers.length === 0 || isSharing}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-[10px] sm:text-xs font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-[10px] sm:text-xs font-medium text-white/60 hover:text-white hover:bg-white/[0.08] hover:border-white/[0.12] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Icon name="send" className="w-3 h-3" />
                 <span className="hidden sm:inline">{isSharing ? "Enviando..." : `WhatsApp (${DAY_TRANSLATIONS[selectedDay] || selectedDay})`}</span>
@@ -233,7 +233,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
               </button>
               <button
                 onClick={handleDownloadAll}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-[10px] sm:text-xs font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-[10px] sm:text-xs font-medium text-white/60 hover:text-white hover:bg-white/[0.08] hover:border-white/[0.12] transition-all"
               >
                 <Icon name="download" className="w-3 h-3" />
                 <span className="hidden sm:inline">Baixar Todos</span>
@@ -247,40 +247,40 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => setFilter("all")}
-            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all backdrop-blur-2xl border ${
+            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-medium transition-all border ${
               filter === "all"
-                ? "bg-black/40 border-white/10 text-white/90"
-                : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+                ? "bg-white/[0.08] border-white/[0.12] text-white"
+                : "bg-transparent border-white/[0.06] text-white/50 hover:text-white/80 hover:border-white/[0.1]"
             }`}
           >
             Todos ({allFlyers.length})
           </button>
           <button
             onClick={() => setFilter("selectedDay")}
-            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all backdrop-blur-2xl border ${
+            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-medium transition-all border ${
               filter === "selectedDay"
-                ? "bg-black/40 border-white/10 text-white/90"
-                : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+                ? "bg-white/[0.08] border-white/[0.12] text-white"
+                : "bg-transparent border-white/[0.06] text-white/50 hover:text-white/80 hover:border-white/[0.1]"
             }`}
           >
             {DAY_TRANSLATIONS[selectedDay] || selectedDay} ({selectedDayFlyers.length})
           </button>
           <button
             onClick={() => setFilter("daily")}
-            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all backdrop-blur-2xl border ${
+            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-medium transition-all border ${
               filter === "daily"
-                ? "bg-black/40 border-white/10 text-white/90"
-                : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+                ? "bg-white/[0.08] border-white/[0.12] text-white"
+                : "bg-transparent border-white/[0.06] text-white/50 hover:text-white/80 hover:border-white/[0.1]"
             }`}
           >
             Grades ({dailyFlyers.length})
           </button>
           <button
             onClick={() => setFilter("individual")}
-            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-all backdrop-blur-2xl border ${
+            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-medium transition-all border ${
               filter === "individual"
-                ? "bg-black/40 border-white/10 text-white/90"
-                : "bg-black/20 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+                ? "bg-white/[0.08] border-white/[0.12] text-white"
+                : "bg-transparent border-white/[0.06] text-white/50 hover:text-white/80 hover:border-white/[0.1]"
             }`}
           >
             <span className="hidden sm:inline">Individuais</span>
@@ -293,13 +293,11 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4">
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
           {displayedFlyers.map((flyer) => (
-            <div
-              key={flyer.id}
-              onClick={() => setSelectedImage(flyer)}
-              className="group relative aspect-[9/16] rounded-xl border border-white/[0.06] hover:border-white/10 hover:scale-[1.02] transition-all cursor-pointer"
-            >
-              {/* Image container with overflow hidden */}
-              <div className="absolute inset-0 rounded-xl overflow-hidden">
+              <div
+                key={flyer.id}
+                onClick={() => setSelectedImage(flyer)}
+                className="group relative aspect-[9/16] rounded-xl border border-white/[0.06] hover:border-white/[0.12] transition-all cursor-pointer overflow-hidden"
+              >
                 <img
                   src={flyer.src}
                   className="w-full h-full object-cover"
@@ -317,7 +315,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
                         e.stopPropagation();
                         downloadImage(flyer.src, `flyer-${flyer.id}.png`);
                       }}
-                      className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 bg-white/10 backdrop-blur-xl rounded-md text-[10px] font-medium text-white hover:bg-white/20 transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 bg-white/10 border border-white/[0.1] rounded-md text-[10px] font-medium text-white hover:bg-white/20 transition-colors"
                     >
                       <Icon name="download" className="w-2.5 h-2.5" />
                       Baixar
@@ -327,7 +325,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
                         e.stopPropagation();
                         setSelectedImage(flyer);
                       }}
-                      className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 bg-white/10 backdrop-blur-xl rounded-md text-[10px] font-medium text-white hover:bg-white/20 transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1 px-1.5 py-1 bg-white/10 border border-white/[0.1] rounded-md text-[10px] font-medium text-white hover:bg-white/20 transition-colors"
                     >
                       <Icon name="eye" className="w-2.5 h-2.5" />
                       Ver
@@ -337,13 +335,12 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
 
                 {/* Type Badge */}
                 <div className="absolute top-1.5 left-1.5">
-                  <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-black/60 backdrop-blur-xl text-white/70 uppercase tracking-wider">
+                  <span className="text-[8px] font-medium px-1.5 py-0.5 rounded-full bg-black/60 border border-white/[0.1] text-white/70 uppercase tracking-wider">
                     {flyer.source === "Flyer Diário" ? "Grade" : "Individual"}
                   </span>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       </div>
 

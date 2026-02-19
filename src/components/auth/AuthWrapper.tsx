@@ -115,39 +115,51 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   };
 
   const signInAppearance = {
+    variables: {
+      colorBackground: "transparent",
+      colorText: "white",
+      colorTextSecondary: "rgba(255,255,255,0.55)",
+      colorPrimary: "#f59e0b",
+      colorInputBackground: "rgba(0,0,0,0.4)",
+      colorInputText: "white",
+      colorNeutral: "white",
+      borderRadius: "0.75rem",
+    },
     elements: {
       rootBox: "mx-auto flex w-full justify-center",
-      cardBox: "w-full max-w-[430px]",
-      card: "w-full border-0 bg-transparent p-0 shadow-none",
-      headerTitle: "text-2xl font-semibold tracking-tight text-white",
-      headerSubtitle: "text-sm text-white/60",
+      cardBox: "w-full max-w-[430px] mx-auto",
+      card: "!w-full !border-0 !bg-transparent !px-2 !py-0 !shadow-none",
+      headerTitle: "!text-2xl !font-semibold !tracking-tight !text-white",
+      headerSubtitle: "!text-sm !text-white/55",
       socialButtonsBlockButton:
-        "h-11 rounded-xl border border-white/15 bg-white/5 text-white transition-colors hover:bg-white/10",
-      socialButtonsBlockButtonText: "text-sm font-medium text-white",
-      dividerLine: "bg-white/10",
-      dividerText: "text-xs uppercase tracking-[0.2em] text-white/40",
-      formFieldLabel: "text-sm font-medium text-white/75",
+        "!h-11 !rounded-xl !border !border-white/15 !bg-white/5 !text-white transition-colors hover:!bg-white/10",
+      socialButtonsBlockButtonText: "!text-sm !font-medium !text-white",
+      dividerLine: "!bg-white/10",
+      dividerText: "!text-xs !uppercase !tracking-[0.2em] !text-white/45",
+      formFieldLabel: "!text-sm !font-medium !text-white/75",
       formFieldInput:
-        "h-11 rounded-xl border border-white/15 bg-black/40 text-white placeholder:text-white/35 transition-colors focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20",
-      formFieldAction: "text-amber-400 transition-colors hover:text-amber-300",
+        "!h-11 !rounded-xl !border !border-white/15 !bg-black/40 !text-white placeholder:!text-white/35 transition-colors focus:!border-amber-400 focus:!ring-2 focus:!ring-amber-400/20",
+      formFieldAction: "!text-amber-400 transition-colors hover:!text-amber-300",
       formButtonPrimary:
-        "h-11 rounded-xl border border-neutral-700 bg-gradient-to-r from-neutral-900 to-neutral-700 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all hover:from-neutral-800 hover:to-neutral-600",
-      footerActionText: "text-white/60",
-      footerActionLink: "font-medium text-amber-400 transition-colors hover:text-amber-300",
-      formResendCodeLink: "text-amber-400 transition-colors hover:text-amber-300",
-      identityPreviewText: "text-white/80",
-      identityPreviewEditButton: "text-amber-400 transition-colors hover:text-amber-300",
+        "!h-11 !rounded-xl !border !border-neutral-700 !bg-gradient-to-r !from-neutral-900 !to-neutral-700 !text-sm !font-semibold !text-white !shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all hover:!from-neutral-800 hover:!to-neutral-600",
+      footerActionText: "!text-white/45",
+      footerActionLink: "!font-medium !text-amber-400 transition-colors hover:!text-amber-300",
+      formResendCodeLink: "!text-amber-400 transition-colors hover:!text-amber-300",
+      identityPreviewText: "!text-white/80",
+      identityPreviewEditButton: "!text-amber-400 transition-colors hover:!text-amber-300",
       otpCodeFieldInput:
-        "rounded-xl border border-white/15 bg-black/40 text-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20",
-      alert: "rounded-xl border border-amber-300/20 bg-amber-500/10 text-amber-100",
-      formFieldSuccessText: "text-emerald-300",
+        "!rounded-xl !border !border-white/15 !bg-black/40 !text-white focus:!border-amber-400 focus:!ring-2 focus:!ring-amber-400/20",
+      alert: "!rounded-xl !border !border-amber-300/20 !bg-amber-500/10 !text-amber-100",
+      formFieldSuccessText: "!text-emerald-300",
+      footer: "!bg-transparent",
+      footerAction: "!bg-transparent",
     },
   } as const;
 
   return (
     <AuthContext.Provider value={contextValue}>
       <SignedOut>
-        <div className="relative min-h-screen overflow-hidden bg-[#040404] text-white">
+        <div className="relative min-h-screen overflow-hidden bg-background text-white">
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-amber-500/20 blur-3xl" />
             <div className="absolute right-[-8rem] top-[20%] h-96 w-96 rounded-full bg-white/[0.08] blur-3xl" />
@@ -163,7 +175,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
           </div>
 
           <div className="relative mx-auto grid min-h-screen w-full max-w-[1360px] lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="relative hidden border-r border-white/[0.08] px-10 py-16 lg:flex lg:flex-col">
+            <div className="relative hidden border-r border-border px-10 py-16 lg:flex lg:flex-col">
               <img src="/logo-socialab.png" alt="Social Lab" className="h-12 w-12" />
               <div className="mt-auto">
                 <p className="max-w-md text-4xl font-semibold leading-tight tracking-tight text-white">
@@ -195,13 +207,13 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
             </div>
 
             <div className="relative flex items-center justify-center px-4 py-8 sm:px-8 sm:py-12">
-              <div className="w-full max-w-[520px] rounded-[28px] border border-white/[0.12] bg-black/[0.45] p-6 shadow-[0_22px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-8">
+              <div className="w-full max-w-[520px] rounded-[28px] border border-border bg-black/[0.45] p-6 shadow-[0_22px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-8">
                 <div className="mb-8 text-center">
                   <img src="/logo-socialab.png" alt="Social Lab" className="mx-auto h-14 w-14 sm:h-16 sm:w-16" />
                   <h1 className="mt-5 text-2xl font-semibold tracking-tight text-white sm:text-[1.85rem]">
                     Bem-vindo ao Social Lab
                   </h1>
-                  <p className="mt-2 text-sm text-white/60">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     Entre para continuar com sua operacao de marketing.
                   </p>
                 </div>

@@ -440,7 +440,7 @@ export const PeriodCardRow: React.FC<{
 
         return (
             <div
-                className={`bg-black/40 backdrop-blur-2xl border rounded-2xl overflow-hidden transition-all mb-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)] ${isGenerating ? "border-white/20 animate-pulse" : "border-white/10 hover:border-white/20"}`}
+                className={`bg-white/[0.02] border rounded-2xl overflow-hidden transition-all mb-3 ${isGenerating ? "border-white/[0.08] animate-pulse" : "border-white/[0.06] hover:border-white/[0.12]"}`}
             >
                 <div
                     className="px-5 py-4 flex items-center justify-between cursor-pointer"
@@ -460,8 +460,8 @@ export const PeriodCardRow: React.FC<{
                             </div>
                         </div>
                         <div>
-                            <span className="text-[9px] font-semibold text-white/40 uppercase tracking-wider block mb-1">
-                                Período • <span className="text-white/50">{dayInfo}</span>
+                            <span className="text-[9px] font-semibold text-white/30 uppercase tracking-wider block mb-1">
+                                Período · <span className="text-white/30">{dayInfo}</span>
                             </span>
                             <span className="text-sm font-semibold text-white/90">
                                 {period === "ALL"
@@ -476,15 +476,15 @@ export const PeriodCardRow: React.FC<{
                             </span>
                         </div>
                         <div>
-                            <span className="text-[9px] font-semibold text-white/40 uppercase tracking-wider block mb-1">
+                            <span className="text-[9px] font-semibold text-white/30 uppercase tracking-wider block mb-1">
                                 GTD Total
                             </span>
-                            <span className="text-sm font-bold text-white/90/90">
+                            <span className="text-sm font-bold text-white/90">
                                 {formatCurrencyValue(String(totalGtd), currency)}
                             </span>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 ml-4">
+                    <div className="flex items-center gap-2 ml-4 flex-wrap justify-end">
                         {/* Schedule button - only show if there are generated flyers */}
                         {onSchedulePost &&
                             generatedFlyers.some((f) => f !== "loading") &&
@@ -495,8 +495,8 @@ export const PeriodCardRow: React.FC<{
                                 const isScheduled =
                                     firstFlyer && scheduledUrls.has(firstFlyer.src);
                                 return isScheduled ? (
-                                    <span className="px-2 py-1 text-[9px] font-bold text-green-400 bg-green-500/10 rounded-lg">
-                                        Agendado
+                                    <span className="px-2 py-1 text-[9px] font-semibold text-emerald-400 bg-emerald-500/[0.1] rounded-md border border-emerald-500/[0.2]">
+                                          Agendado
                                     </span>
                                 ) : (
                                     <button
@@ -504,16 +504,16 @@ export const PeriodCardRow: React.FC<{
                                             e.stopPropagation();
                                             if (firstFlyer) setScheduleFlyer(firstFlyer);
                                         }}
-                                        className="p-2 bg-black/40 backdrop-blur-sm hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20"
+                                        className="p-2 bg-white/[0.04] hover:bg-white/10 rounded-lg transition-all border border-white/[0.06]"
                                         title="Agendar publicação"
                                     >
-                                        <Icon name="calendar" className="w-4 h-4 text-white/60" />
+                                        <Icon name="calendar" className="w-4 h-4 text-white/40" />
                                     </button>
                                 );
                             })()}
                         {/* Show reference badge if this period's image is being used as reference */}
                         {isUsingAsReference && (
-                            <span className="px-2 py-1 text-[9px] font-bold text-white/60 bg-white/10 rounded-lg flex items-center gap-1">
+                            <span className="px-2 py-1 text-[9px] font-semibold text-white/50 bg-white/[0.08] rounded-md border border-white/[0.12] flex items-center gap-1">
                                 <Icon name="heart" className="w-3 h-3" />
                                 Referência
                             </span>
@@ -526,30 +526,30 @@ export const PeriodCardRow: React.FC<{
                                         e.stopPropagation();
                                         setEditingFlyer(selectedFlyer);
                                     }}
-                                    className="p-2 bg-black/40 backdrop-blur-sm hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20"
+                                    className="p-2 bg-white/[0.04] hover:bg-white/10 rounded-lg transition-all border border-white/[0.06]"
                                     title="Visualizar"
                                 >
-                                    <Icon name="eye" className="w-4 h-4 text-white/60" />
+                                    <Icon name="eye" className="w-4 h-4 text-white/40" />
                                 </button>
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setQuickPostFlyer(selectedFlyer);
                                     }}
-                                    className="p-2 bg-black/40 backdrop-blur-sm hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20"
+                                    className="p-2 bg-white/[0.04] hover:bg-white/10 rounded-lg transition-all border border-white/[0.06]"
                                     title="Publicar agora"
                                 >
-                                    <Icon name="zap" className="w-4 h-4 text-white/60" />
+                                    <Icon name="zap" className="w-4 h-4 text-white/40" />
                                 </button>
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         onPublishToCampaign(`Campanha para grade ${label}`, selectedFlyer);
                                     }}
-                                    className="p-2 bg-black/40 backdrop-blur-sm hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20"
+                                    className="p-2 bg-white/[0.04] hover:bg-white/10 rounded-lg transition-all border border-white/[0.06]"
                                     title="Adicionar à campanha"
                                 >
-                                    <Icon name="users" className="w-4 h-4 text-white/60" />
+                                    <Icon name="users" className="w-4 h-4 text-white/40" />
                                 </button>
                                 {onCloneStyle && (
                                     <button
@@ -557,10 +557,10 @@ export const PeriodCardRow: React.FC<{
                                             e.stopPropagation();
                                             onCloneStyle(selectedFlyer);
                                         }}
-                                        className="p-2 bg-black/40 backdrop-blur-sm hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20"
+                                        className="p-2 bg-white/[0.04] hover:bg-white/10 rounded-lg transition-all border border-white/[0.06]"
                                         title="Usar como referência de estilo"
                                     >
-                                        <Icon name="copy" className="w-4 h-4 text-white/60" />
+                                        <Icon name="copy" className="w-4 h-4 text-white/40" />
                                     </button>
                                 )}
                             </>
@@ -572,7 +572,7 @@ export const PeriodCardRow: React.FC<{
                             }}
                             disabled={events.length === 0 || isUsingAsReference || isGenerating}
                             title={isUsingAsReference ? "Esta imagem está sendo usada como referência e não pode ser regenerada" : undefined}
-                            className="px-3 py-1.5 text-[10px] font-medium text-white/70 hover:text-white/90 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"
+                            className="px-3 py-1.5 text-[10px] font-medium text-white/70 hover:text-white/90 bg-white/5 hover:bg-white/10 border border-white/[0.06] rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"
                         >
                             {isGenerating ? (
                                 <>
@@ -599,21 +599,21 @@ export const PeriodCardRow: React.FC<{
                                             e.stopPropagation();
                                             onDownloadAll(flyerImages, `${label}-${dayInfo}`);
                                         }}
-                                        className="p-2 bg-black/40 backdrop-blur-sm hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20"
+                                        className="p-2 bg-white/[0.04] hover:bg-white/10 rounded-lg transition-all border border-white/[0.06]"
                                         title="Baixar todas as imagens"
                                     >
-                                        <Icon name="download" className="w-4 h-4 text-white/60" />
+                                        <Icon name="download" className="w-4 h-4 text-white/40" />
                                     </button>
                                 );
                             })()}
                         <Icon
                             name={isExpanded ? "chevron-up" : "chevron-down"}
-                            className="w-4 h-4 text-white/30"
+                            className="w-4 h-4 text-white/40"
                         />
                     </div>
                 </div>
                 {isExpanded && (
-                    <div className="px-4 pb-4 pt-3 border-t border-white/10 animate-fade-in-up">
+                    <div className="px-4 pb-4 pt-3 border-t border-white/[0.06] animate-fade-in-up">
                         <FlyerThumbStrip
                             images={generatedFlyers}
                             onEdit={setEditingFlyer}

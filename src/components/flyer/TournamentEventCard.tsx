@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card } from '@/components/common/Card';
+import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/common/Icon';
 import { Loader } from '@/components/common/Loader';
 import { FlyerThumbStrip } from './FlyerThumbStrip';
@@ -215,40 +215,40 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
 
   return (
     <>
-      <Card className="overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-      {/* Header */}
-      <div
-        className="flex items-center justify-between p-3 bg-black/20 border-b border-white/10 cursor-pointer hover:bg-white/5 transition-all"
+      <Card className="overflow-hidden bg-white/[0.02] border border-white/[0.06] rounded-2xl">
+        {/* Header */}
+        <div
+          className="flex items-center justify-between p-3 bg-white/[0.02] border-b border-white/[0.06] cursor-pointer hover:bg-white/[0.04] transition-all"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-3">
-          <div className="flex flex-col">
-            <span className="text-xs text-white/40 font-mono uppercase">{event.day}</span>
-            <span className="text-sm font-bold text-white">{event.times?.['-3']}</span>
-          </div>
-          <div className="w-px h-10 bg-white/10" />
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-white line-clamp-1">{event.name}</span>
-            <div className="flex items-center gap-2 text-xs text-white/60">
-              <span className="text-white/90 font-mono">{biVal}</span>
-              <span>|</span>
-              <span className="font-mono">{event.structure}</span>
-              <span>|</span>
-              <span className="font-mono">{event.stack}</span>
+            <div className="flex flex-col min-w-[52px]">
+              <span className="text-[10px] text-white/35 font-semibold uppercase tracking-wider">{event.day}</span>
+              <span className="text-sm font-semibold text-white">{event.times?.['-3']}</span>
             </div>
-          </div>
+          <div className="w-px h-10 bg-white/10" />
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-semibold text-white line-clamp-1">{event.name}</span>
+              <div className="flex items-center gap-2 text-[11px] text-white/35">
+                <span className="text-white/80 font-mono">{biVal}</span>
+                <span>|</span>
+                <span className="font-mono truncate max-w-[90px]">{event.structure}</span>
+                <span>|</span>
+                <span className="font-mono truncate max-w-[70px]">{event.stack}</span>
+              </div>
+            </div>
         </div>
         <div className="flex items-center gap-3">
           {gtdVal !== '---' && (
             <div className="flex flex-col items-end">
-              <span className="text-[10px] text-white/40 uppercase tracking-wider">GTD</span>
-              <span className="text-base font-black text-white/90 font-mono">{gtdVal}</span>
+              <span className="text-[10px] text-white/35 uppercase tracking-wider font-semibold">GTD</span>
+                <span className="text-base font-bold text-white/90 font-mono">{gtdVal}</span>
             </div>
           )}
-          <Icon
-            name="chevron-up"
-            className={`w-4 h-4 text-white/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-          />
+            <Icon
+              name="chevron-up"
+              className={`w-4 h-4 text-white/35 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            />
         </div>
       </div>
 
@@ -257,25 +257,25 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
         <div className="p-4">
           {/* Actions */}
           <div className="flex items-center gap-2 mb-4">
-            <button
-              onClick={handleGenerate}
-              disabled={isGenerating}
-              className="flex items-center gap-2 px-4 py-2 bg-white/[0.08] backdrop-blur-2xl border border-white/20 rounded-full text-sm font-medium text-white hover:bg-white/[0.12] hover:border-white/30 transition-all active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isGenerating ? (
-                <Loader size={16} className="text-white/60" />
-              ) : (
-                <Icon name="sparkles" className="w-4 h-4" />
-              )}
-              {isGenerating ? 'Gerando...' : 'Gerar Flyer'}
-            </button>
-            <button
-              onClick={() => onSetChatReference(null)}
-              className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all active:scale-95 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
-            >
-              <Icon name="eraser" className="w-4 h-4" />
-              Limpar Referência
-            </button>
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] border border-white/[0.08] rounded-xl text-sm font-medium text-white hover:bg-white/[0.1] hover:border-white/[0.15] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGenerating ? (
+                  <Loader size={16} className="text-white/40" />
+                ) : (
+                  <Icon name="sparkles" className="w-4 h-4" />
+                )}
+                {isGenerating ? 'Gerando...' : 'Gerar Flyer'}
+              </button>
+              <button
+                onClick={() => onSetChatReference(null)}
+                className="flex items-center gap-2 px-4 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl text-sm font-medium text-white/50 hover:text-white hover:bg-white/[0.06] hover:border-white/[0.12] transition-all"
+              >
+                <Icon name="eraser" className="w-4 h-4" />
+                Limpar Referência
+              </button>
           </div>
 
           {/* Flyers Strip */}

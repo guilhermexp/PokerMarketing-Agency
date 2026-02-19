@@ -13,8 +13,9 @@ import { devtools, persist, createJSONStorage, type StateStorage } from 'zustand
 
 export interface ReferenceImage {
   id: string;        // UUID for unique identification
-  dataUrl: string;   // data:image/...;base64,...
+  dataUrl: string;   // data:image/...;base64,... (kept for local preview)
   mimeType: string;  // image/png, image/jpeg, etc.
+  blobUrl?: string;  // Vercel Blob URL after upload (preferred over dataUrl for API calls)
 }
 
 export interface ImageGenerationTopic {
@@ -32,6 +33,10 @@ export interface GenerationAsset {
   thumbnailUrl?: string;
   width?: number;
   height?: number;
+  provider?: string;
+  model?: string;
+  inputTokens?: number;
+  outputTokens?: number;
 }
 
 export interface Generation {
@@ -56,6 +61,7 @@ export interface GenerationBatch {
   width: number | null;
   height: number | null;
   createdAt: string;
+  userEmail?: string | null;
   generations: Generation[];
 }
 
@@ -93,6 +99,8 @@ interface GenerationConfigState {
   activeAspectRatio: string | null;
   activeImageSize: '1K' | '2K' | '4K';
   useBrandProfile: boolean;
+  useInstagramMode: boolean;
+  uploadingImageIds: string[];
 }
 
 interface GenerationTopicState {
@@ -127,10 +135,13 @@ interface GenerationConfigActions {
   reuseSettings: (model: string, provider: string, settings: Record<string, unknown>) => void;
   reuseSeed: (seed: number) => void;
   toggleBrandProfile: () => void;
+  toggleInstagramMode: () => void;
   // Reference images actions
   addReferenceImage: (image: ReferenceImage) => void;
   removeReferenceImage: (id: string) => void;
   clearReferenceImages: () => void;
+  updateReferenceImageBlobUrl: (id: string, blobUrl: string) => void;
+  setUploadingImageIds: (ids: string[]) => void;
 }
 
 interface GenerationTopicActions {
@@ -177,7 +188,7 @@ export interface ImagePlaygroundStore extends
 const DEFAULT_MODEL = 'gemini-3-pro-image-preview';
 const DEFAULT_PROVIDER = 'google';
 const DEFAULT_ASPECT_RATIO = '1:1';
-const DEFAULT_IMAGE_SIZE: '1K' | '2K' | '4K' = '1K';
+const DEFAULT_IMAGE_SIZE: '1K' | '2K' | '4K' = '2K';
 const MAX_PERSISTED_STATE_SIZE_BYTES = 400_000;
 const MAX_PERSISTED_PARAM_STRING_LENGTH = 4_000;
 const NON_PERSISTED_PARAM_KEYS = new Set([
@@ -185,6 +196,8 @@ const NON_PERSISTED_PARAM_KEYS = new Set([
   'imageUrl',
   'productImages',
   'brandProfile',
+  'aspectRatio',
+  'imageSize',
 ]);
 
 const defaultParameters: RuntimeImageGenParams = {
@@ -306,6 +319,8 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
         activeAspectRatio: DEFAULT_ASPECT_RATIO,
         activeImageSize: DEFAULT_IMAGE_SIZE,
         useBrandProfile: false,
+        useInstagramMode: false,
+        uploadingImageIds: [],
 
         // =============================================================================
         // Generation Topic State
@@ -433,7 +448,45 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
         },
 
         toggleBrandProfile: () => {
-          set({ useBrandProfile: !get().useBrandProfile });
+          const newBrandState = !get().useBrandProfile;
+          if (!newBrandState && get().useInstagramMode) {
+            set({
+              useBrandProfile: false,
+              useInstagramMode: false,
+              parameters: {
+                ...get().parameters,
+                toneOfVoiceOverride: undefined,
+                fontStyleOverride: undefined,
+              },
+            });
+          } else {
+            set(
+              newBrandState
+                ? { useBrandProfile: true }
+                : {
+                    useBrandProfile: false,
+                    parameters: {
+                      ...get().parameters,
+                      toneOfVoiceOverride: undefined,
+                      fontStyleOverride: undefined,
+                    },
+                  }
+            );
+          }
+        },
+
+        toggleInstagramMode: () => {
+          const newValue = !get().useInstagramMode;
+          if (newValue) {
+            set({
+              useInstagramMode: true,
+              useBrandProfile: true,
+              activeAspectRatio: '1:1',
+              parameters: { ...get().parameters, aspectRatio: '1:1' },
+            });
+          } else {
+            set({ useInstagramMode: false });
+          }
         },
 
         // Reference images actions
@@ -455,6 +508,7 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
               ...get().parameters,
               referenceImages: current.filter((img) => img.id !== id),
             },
+            uploadingImageIds: get().uploadingImageIds.filter((uid) => uid !== id),
           });
         },
 
@@ -464,7 +518,24 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
               ...get().parameters,
               referenceImages: [],
             },
+            uploadingImageIds: [],
           });
+        },
+
+        updateReferenceImageBlobUrl: (id, blobUrl) => {
+          const current = get().parameters.referenceImages || [];
+          set({
+            parameters: {
+              ...get().parameters,
+              referenceImages: current.map((img) =>
+                img.id === id ? { ...img, blobUrl } : img
+              ),
+            },
+          });
+        },
+
+        setUploadingImageIds: (ids) => {
+          set({ uploadingImageIds: ids });
         },
 
         // =============================================================================
@@ -610,7 +681,7 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
       }),
       {
         name: 'IMAGE_PLAYGROUND_STORE',
-        version: 2,
+        version: 3,
         storage: safePersistStorage,
         migrate: (persistedState) => {
           if (!persistedState || typeof persistedState !== 'object') {
@@ -625,21 +696,35 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
 
           return {
             ...typedState,
-            parameters: safeParams,
+            parameters: {
+              ...defaultParameters,
+              ...safeParams,
+            },
+            imageNum: 1,
+            isAspectRatioLocked: false,
+            activeAspectRatio: DEFAULT_ASPECT_RATIO,
+            activeImageSize: DEFAULT_IMAGE_SIZE,
+            useBrandProfile: false,
+            useInstagramMode: false,
           };
         },
         partialize: (state) => ({
           // Only persist config, not topics/batches (those come from server)
           // IMPORTANT: Do NOT persist base64 reference images to avoid localStorage quota errors.
           // They stay only in-memory for the current session.
-          parameters: sanitizeParametersForPersistence(state.parameters),
+          parameters: {
+            ...sanitizeParametersForPersistence(state.parameters),
+            aspectRatio: DEFAULT_ASPECT_RATIO,
+            imageSize: DEFAULT_IMAGE_SIZE,
+          },
           model: state.model,
           provider: state.provider,
-          imageNum: state.imageNum,
-          isAspectRatioLocked: state.isAspectRatioLocked,
-          activeAspectRatio: state.activeAspectRatio,
-          activeImageSize: state.activeImageSize,
-          useBrandProfile: state.useBrandProfile,
+          imageNum: 1,
+          isAspectRatioLocked: false,
+          activeAspectRatio: DEFAULT_ASPECT_RATIO,
+          activeImageSize: DEFAULT_IMAGE_SIZE,
+          useBrandProfile: false,
+          useInstagramMode: false,
         }),
       }
     )

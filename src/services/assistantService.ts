@@ -5,6 +5,7 @@
 
 import type { BrandProfile, ChatMessage, AssistantFunctionCall } from '../types';
 import { getAuthToken } from './authService';
+import { getCsrfToken, getCurrentCsrfToken } from './apiClient';
 
 /**
  * Run assistant conversation with streaming via server-side endpoint
@@ -25,12 +26,19 @@ export async function* runAssistantConversationStream(
     toneOfVoice: brandProfile.toneOfVoice,
   } : null;
 
+  if (!getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+  const csrfToken = getCurrentCsrfToken();
+
   const response = await fetch('/api/ai/assistant', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
+    credentials: 'include',
     body: JSON.stringify({
       history,
       brandProfile: brandInfo,

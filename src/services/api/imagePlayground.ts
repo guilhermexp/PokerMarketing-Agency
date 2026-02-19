@@ -4,6 +4,7 @@
  */
 
 import { getAuthToken } from '../authService';
+import { getCsrfToken, getCurrentCsrfToken, clearCsrfToken } from '../apiClient';
 import type {
   ImageGenerationTopic,
   GenerationBatch,
@@ -72,6 +73,13 @@ export interface GenerationStatusResponse {
 
 async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   const token = await getAuthToken();
+  const method = (options.method || 'GET').toUpperCase();
+  const requiresCsrf = method !== 'GET' && method !== 'HEAD';
+
+  if (requiresCsrf && !getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
@@ -86,7 +94,16 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  const csrfToken = getCurrentCsrfToken();
+  if (requiresCsrf && csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
+  }
+
   const response = await fetch(url, { ...options, headers });
+
+  if (response.status === 403 && requiresCsrf) {
+    clearCsrfToken();
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));

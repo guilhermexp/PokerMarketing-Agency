@@ -91,11 +91,11 @@ const CampaignCard: React.FC<{
         onClick={onSelect}
         className={`
         group relative cursor-pointer
-        bg-[#0a0a0a] rounded-lg overflow-hidden
+        bg-background rounded-xl overflow-hidden
         border transition-all duration-300
         ${isSelected
             ? "border-primary/30 ring-1 ring-primary/20"
-            : "border-white/[0.05] hover:border-white/[0.1]"
+            : "border-border hover:border-white/20"
           }
       `}
         style={{
@@ -130,7 +130,7 @@ const CampaignCard: React.FC<{
                   e.stopPropagation();
                   setShowPrompt(true);
                 }}
-                className="p-1 rounded-md text-white/30 hover:text-white/60 hover:bg-white/5 transition-all"
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
                 title="Ver prompt"
               >
                 <Icon name="eye" className="w-3 h-3" />
@@ -139,11 +139,11 @@ const CampaignCard: React.FC<{
             <button
               onClick={onDelete}
               disabled={isDeleting}
-              className="p-1 rounded-md text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
+              className="p-1 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
               title="Excluir"
             >
               {isDeleting ? (
-                <Loader size={12} className="text-white/60" />
+                <Loader size={12} className="text-muted-foreground" />
               ) : (
                 <Icon name="trash-2" className="w-3 h-3" />
               )}
@@ -158,41 +158,41 @@ const CampaignCard: React.FC<{
                 className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
                 onClick={() => setShowPrompt(false)}
               >
-                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                <div className="absolute inset-0 bg-black/90 backdrop-blur-md" />
                 <div
-                  className="relative w-full max-w-lg bg-[#0d0d0d] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+                  className="relative w-full max-w-lg bg-black border border-border rounded-2xl shadow-2xl overflow-hidden"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-border">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Icon name="eye" className="w-4 h-4 text-primary" />
+                      <div className="w-9 h-9 rounded-xl bg-white/[0.06] flex items-center justify-center">
+                        <Icon name="file-text" className="w-4 h-4 text-muted-foreground" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-white">Requisição Original</h4>
-                        <p className="text-[10px] text-white/40">Prompt usado para criar esta campanha</p>
+                        <h4 className="text-sm font-semibold text-white">Prompt Original</h4>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Requisição usada para criar esta campanha</p>
                       </div>
                     </div>
                     <button
                       onClick={() => setShowPrompt(false)}
-                      className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.06] transition-all"
+                      className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all"
                     >
                       <Icon name="x" className="w-4 h-4" />
                     </button>
                   </div>
                   <div className="p-5 max-h-[60vh] overflow-y-auto">
-                    <p className="text-sm text-white/70 whitespace-pre-wrap leading-relaxed">
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
                       {campaign.inputTranscript}
                     </p>
                   </div>
-                  <div className="px-5 py-3 border-t border-white/[0.06] flex justify-end">
+                  <div className="px-5 py-3 border-t border-border flex justify-end">
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(campaign.inputTranscript || "");
                       }}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] text-[10px] font-bold text-white/50 hover:text-white hover:bg-white/[0.08] transition-all"
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.06] border border-border text-xs font-medium text-white/70 hover:text-white hover:bg-white/[0.1] transition-all"
                     >
-                      <Icon name="copy" className="w-3 h-3" />
+                      <Icon name="copy" className="w-3.5 h-3.5" />
                       Copiar
                     </button>
                   </div>
@@ -232,7 +232,7 @@ const CampaignCard: React.FC<{
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-2">
                         <Icon name={item.icon} className="w-4 h-4 text-white/15" />
                         <div className="text-center">
-                          <span className="text-[8px] text-white/20 uppercase tracking-wide block">
+                          <span className="text-[8px] text-muted-foreground uppercase tracking-wide block">
                             {item.label}
                           </span>
                           <span className="text-[7px] text-white/15 block mt-1 leading-tight">
@@ -269,7 +269,7 @@ const CampaignCard: React.FC<{
         ) : (
           <div className="px-3 pb-3">
             <div className="text-center py-5 rounded-lg bg-white/[0.01]">
-              <p className="text-[9px] text-white/20">Campanha vazia</p>
+              <p className="text-[9px] text-muted-foreground">Campanha vazia</p>
             </div>
           </div>
         )}
@@ -280,7 +280,7 @@ const CampaignCard: React.FC<{
 // Empty state component - minimal version
 const CampaignsEmptyState: React.FC = () => (
   <div className="flex items-center justify-center w-full min-h-[60vh]">
-    <p className="text-white/30 text-sm">
+    <p className="text-muted-foreground text-sm">
       Nenhuma campanha ainda
     </p>
   </div>
@@ -292,7 +292,7 @@ const LoadingSkeleton: React.FC = () => (
     {[0, 1, 2].map((i) => (
       <div
         key={i}
-        className="bg-[#0a0a0a] rounded-lg border border-white/[0.05] overflow-hidden"
+        className="bg-background rounded-xl border border-border overflow-hidden"
         style={{
           animationDelay: `${i * 80}ms`,
           animation: "pulse 1.5s ease-in-out infinite",
@@ -440,7 +440,7 @@ export function CampaignsList({
       `}</style>
 
       {/* Content wrapper */}
-      <div className="px-4 sm:px-6 lg:px-8">
+      <div className={`px-4 sm:px-6 lg:px-8 ${totalPages > 1 ? "pb-20" : ""}`}>
       {/* Header */}
       <div
         className="flex justify-between items-start gap-3 mb-6"
@@ -451,11 +451,11 @@ export function CampaignsList({
             Campanhas
           </h1>
           {!isLoading && (
-            <p className="text-[11px] text-white/30 uppercase tracking-wider mt-1">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mt-1">
               {allCampaigns.length} campanha{allCampaigns.length !== 1 ? "s" : ""}{" "}
               salva{allCampaigns.length !== 1 ? "s" : ""}
               {totalPages > 1 && (
-                <span className="text-white/20">
+                <span className="text-muted-foreground">
                   {" "}
                   • Página {currentPage} de {totalPagesLabel}
                 </span>
@@ -465,7 +465,7 @@ export function CampaignsList({
         </div>
         <button
           onClick={onNewCampaign}
-          className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-white/[0.06] rounded-lg text-[10px] font-bold text-white/50 uppercase tracking-wide hover:border-white/[0.1] hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
+          className="flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-transparent border border-border rounded-full text-[10px] font-bold text-muted-foreground uppercase tracking-wide hover:border-white/20 hover:text-white/70 transition-all active:scale-95 flex-shrink-0"
         >
           <Icon name="plus" className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
           <span className="hidden sm:inline">Nova Campanha</span>
@@ -499,29 +499,31 @@ export function CampaignsList({
       </div>
       {/* End content wrapper */}
 
-      {/* Pagination Controls - Fixed at bottom */}
+      {/* Fixed Pagination Footer */}
       {totalPages > 1 && !isLoading && allCampaigns.length > 0 && (
-        <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3 mt-6 sm:mt-12 px-4 sm:px-6 lg:px-8 pt-3 sm:pt-6 pb-2 border-t border-white/5">
-          <button
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="flex items-center justify-center gap-1 px-2 sm:px-4 py-1 sm:py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-[10px] sm:text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
-          >
-            <Icon name="chevron-left" className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span className="hidden sm:inline">Anterior</span>
-          </button>
-          <span className="text-[10px] sm:text-sm text-white/50 font-medium px-1 sm:px-4 whitespace-nowrap">
-            {currentPage} de {totalPagesLabel}
-          </span>
-          <button
-            onClick={handleNextPage}
-            disabled={!canGoNext}
-            className="flex items-center justify-center gap-1 px-2 sm:px-4 py-1 sm:py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-[10px] sm:text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
-          >
-            <span className="hidden sm:inline">{isLoadingMore ? "Carregando..." : "Próxima"}</span>
-            <Icon name="chevron-right" className="w-3 h-3 sm:w-4 sm:h-4" />
-          </button>
-        </div>
+        <footer className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-xl border-t border-white/10 px-4 sm:px-6 py-3 z-40">
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+            >
+              <Icon name="chevron-left" className="w-4 h-4" />
+              Anterior
+            </button>
+            <span className="text-sm text-muted-foreground font-medium px-4">
+              Página {currentPage} de {totalPagesLabel}
+            </span>
+            <button
+              onClick={handleNextPage}
+              disabled={!canGoNext}
+              className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+            >
+              {isLoadingMore ? "Carregando..." : "Próxima"}
+              <Icon name="chevron-right" className="w-4 h-4" />
+            </button>
+          </div>
+        </footer>
       )}
     </div>
   );

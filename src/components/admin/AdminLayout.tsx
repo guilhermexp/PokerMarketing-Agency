@@ -13,7 +13,7 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   return (
-    <div className="min-h-screen bg-[#000000]">
+    <div className="min-h-screen bg-background">
       <AdminSidebar />
       <AdminHeader />
       <main className="ml-56 pt-14 min-h-screen">

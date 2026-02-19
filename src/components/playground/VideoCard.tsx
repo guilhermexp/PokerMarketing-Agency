@@ -103,12 +103,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
 
             <div className="relative z-10 flex flex-col items-center gap-4">
               <div className="relative">
-                <div className="w-12 h-12 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                <div className="w-12 h-12 border-2 border-border border-t-white rounded-full animate-spin"></div>
                 <VeoLogo className="w-5 h-5 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
               </div>
               <div>
                 <p className="text-sm font-bold uppercase tracking-widest text-white mb-1 animate-pulse">Gerando Cena</p>
-                <p className="text-xs text-white/60 line-clamp-2 px-2 max-w-[200px] mx-auto">"{post.description}"</p>
+                <p className="text-xs text-muted-foreground line-clamp-2 px-2 max-w-[200px] mx-auto">"{post.description}"</p>
               </div>
             </div>
             <div className="absolute inset-0 bg-[#000000]/30 pointer-events-none" />
@@ -148,84 +148,84 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
     }
   };
 
-  return (
-    <motion.div
-      className={`relative w-full h-full rounded-2xl overflow-hidden bg-[#000000]/95 border border-white/10 ${aspectClass} group shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex flex-col backdrop-blur-2xl`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      initial={{ opacity: 0, scale: 0.95, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.4, type: 'spring' }}
-      layout
-    >
-      {status === PostStatus.SUCCESS && post.status && (
-        <div className="absolute top-4 left-4 z-20 bg-primary/20 border border-primary/40 backdrop-blur-2xl px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-          <Sparkles className="w-3 h-3 text-primary" />
-          Novo
-        </div>
-      )}
-
-      <div className="flex-1 relative w-full h-full">
-        {renderContent()}
-      </div>
-
-      {status === PostStatus.SUCCESS && (
-        <div className="absolute inset-0 bg-gradient-to-b from-[#000000]/20 via-transparent to-[#000000]/90 pointer-events-none transition-opacity duration-300 group-hover:opacity-90" />
-      )}
-
-      <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-black/40 border border-white/10 backdrop-blur-2xl px-2.5 py-1.5 rounded-full text-xs font-medium text-white/90 pointer-events-none shadow-[0_8px_30px_rgba(0,0,0,0.5)] z-20">
-        {post.mediaType === MediaType.IMAGE ? (
-          <ImageIcon className="w-3 h-3 opacity-80" />
-        ) : (
-          <VeoLogo className="w-3 h-3 opacity-80" />
-        )}
-        {post.modelTag}
-      </div>
-
-      <div className={`absolute bottom-0 left-0 w-full p-5 flex items-end justify-between z-20 pt-16 bg-gradient-to-t from-[#000000] via-[#000000]/60 to-transparent transition-opacity duration-300 ${status !== PostStatus.SUCCESS ? 'opacity-50 pointer-events-none' : ''}`}>
-        <div className="flex-1 mr-4 pointer-events-none">
-          <div className="flex items-center gap-2.5 mb-2">
-            <img src={post.avatarUrl} alt={post.username} className="w-8 h-8 rounded-full border border-white/20 shadow-md" />
-            <span className="font-semibold text-sm text-white drop-shadow-md backdrop-blur-[1px]">{post.username}</span>
+    return (
+      <motion.div
+        className={`relative w-full h-full rounded-2xl overflow-hidden bg-black/95 border border-white/[0.08] ${aspectClass} group shadow-[0_4px_24px_rgba(0,0,0,0.4)] flex flex-col`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        initial={{ opacity: 0, scale: 0.97, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.35, type: 'spring', damping: 25 }}
+        layout
+      >
+        {status === PostStatus.SUCCESS && post.status && (
+            <div className="absolute top-3 left-3 z-20 bg-white/[0.08] border border-white/[0.12] backdrop-blur-2xl px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider text-white/70 flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3" />
+            Novo
           </div>
-          <p className="text-sm text-white/80 line-clamp-2 drop-shadow-md font-light leading-snug opacity-90 group-hover:opacity-100 transition-opacity">{post.description}</p>
+        )}
+
+        <div className="flex-1 relative w-full h-full">
+          {renderContent()}
         </div>
 
         {status === PostStatus.SUCCESS && (
-          <div className="flex flex-col gap-3 items-center shrink-0 pointer-events-auto">
-            {post.mediaType === MediaType.VIDEO && post.videoUrl && (
-              <button
-                onClick={handleToggleMute}
-                className={`p-3 rounded-full border backdrop-blur-2xl transition-all text-white shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:scale-105 ${isMuted
-                    ? 'bg-white/10 border-white/10 hover:bg-white/20 hover:border-white/20'
-                    : 'bg-white/30 border-white/20 hover:bg-white/40'
-                  }`}
-                title={isMuted ? "Ativar audio" : "Desativar audio"}
-              >
-                {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-              </button>
-            )}
-            {/* Add to Prompt button - only for images */}
-            {post.mediaType === MediaType.IMAGE && post.imageUrl && onAddToPrompt && (
-              <button
-                onClick={() => onAddToPrompt(post.imageUrl!)}
-                className="p-3 rounded-full bg-purple-500/20 border border-purple-500/40 backdrop-blur-2xl hover:bg-purple-500/40 transition-all text-purple-300 shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:scale-105"
-                title="Adicionar ao prompt para editar"
-              >
-                <Wand2 className="w-5 h-5" />
-              </button>
-            )}
-            <button
-              onClick={handleDownload}
-              className="p-3 rounded-full bg-white/10 border border-white/10 backdrop-blur-2xl hover:bg-white/20 transition-all text-white shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:scale-105 hover:border-white/20"
-              title={post.mediaType === MediaType.IMAGE ? "Download Imagem" : "Download Video"}
-            >
-              <Download className="w-5 h-5" />
-            </button>
-          </div>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/85 pointer-events-none transition-opacity duration-300 group-hover:opacity-95" />
         )}
-      </div>
-    </motion.div>
+
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-black/50 border border-white/[0.1] backdrop-blur-2xl px-2.5 py-1.5 rounded-full text-[11px] font-medium text-white/80 pointer-events-none z-20">
+          {post.mediaType === MediaType.IMAGE ? (
+            <ImageIcon className="w-3 h-3 opacity-60" />
+          ) : (
+            <VeoLogo className="w-3 h-3 opacity-60" />
+          )}
+          {post.modelTag}
+        </div>
+
+        <div className={`absolute bottom-0 left-0 w-full p-4 flex items-end justify-between z-20 pt-14 bg-gradient-to-t from-black via-black/50 to-transparent transition-opacity duration-300 ${status !== PostStatus.SUCCESS ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div className="flex-1 mr-3 pointer-events-none">
+            <div className="flex items-center gap-2 mb-1.5">
+              <img src={post.avatarUrl} alt={post.username} className="w-7 h-7 rounded-full border border-white/[0.1]" />
+              <span className="font-medium text-[13px] text-white">{post.username}</span>
+            </div>
+            <p className="text-[13px] text-white/70 line-clamp-2 font-light leading-snug">{post.description}</p>
+          </div>
+
+          {status === PostStatus.SUCCESS && (
+            <div className="flex flex-col gap-2.5 items-center shrink-0 pointer-events-auto">
+              {post.mediaType === MediaType.VIDEO && post.videoUrl && (
+                <button
+                  onClick={handleToggleMute}
+                  className={`p-2.5 rounded-full border backdrop-blur-2xl transition-all text-white hover:scale-105 ${isMuted
+                      ? 'bg-white/10 border-white/[0.1] hover:bg-white/20'
+                      : 'bg-white/25 border-white/[0.15] hover:bg-white/35'
+                    }`}
+                  title={isMuted ? "Ativar audio" : "Desativar audio"}
+                >
+                  {isMuted ? <VolumeX className="w-4.5 h-4.5" /> : <Volume2 className="w-4.5 h-4.5" />}
+                </button>
+              )}
+              {/* Add to Prompt button - only for images */}
+              {post.mediaType === MediaType.IMAGE && post.imageUrl && onAddToPrompt && (
+                <button
+                  onClick={() => onAddToPrompt(post.imageUrl!)}
+                    className="p-2.5 rounded-full bg-white/[0.08] border border-white/[0.12] backdrop-blur-2xl hover:bg-white/[0.15] transition-all text-white/70 hover:scale-105"
+                  title="Adicionar ao prompt para editar"
+                >
+                  <Wand2 className="w-4.5 h-4.5" />
+                </button>
+              )}
+              <button
+                onClick={handleDownload}
+                className="p-2.5 rounded-full bg-white/10 border border-white/[0.1] backdrop-blur-2xl hover:bg-white/20 transition-all text-white hover:scale-105"
+                title={post.mediaType === MediaType.IMAGE ? "Download Imagem" : "Download Video"}
+              >
+                <Download className="w-4.5 h-4.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      </motion.div>
   );
 };
 

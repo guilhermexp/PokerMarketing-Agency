@@ -104,7 +104,7 @@ const ChatBubble: React.FC<{ message: UIMessage }> = ({ message }) => {
             {fileParts.map((file, idx) => (
               <div
                 key={idx}
-                className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/20 animate-fade-in-up"
+                className="relative rounded-xl overflow-hidden border border-border bg-black/20 animate-fade-in-up"
               >
                 <img
                   src={file.url}
@@ -128,7 +128,7 @@ const ChatBubble: React.FC<{ message: UIMessage }> = ({ message }) => {
             className={`${
               isAssistant
                 ? 'px-1 text-white/90'
-                : 'bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] rounded-2xl px-5 py-3.5 text-white/95'
+                : 'bg-[#0a0a0a]/60 backdrop-blur-xl border border-border rounded-2xl px-5 py-3.5 text-white/95'
             }`}
           >
             <MessageResponse className="text-[13px] leading-relaxed prose prose-invert">
@@ -644,20 +644,20 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     <DataStreamProvider dataStream={dataStream} setDataStream={setDataStream}>
       <DataStreamHandler />
 
-      <aside className="assistant-panel w-full h-full bg-[#0a0a0a]/95 backdrop-blur-xl border-l border-white/[0.08] flex flex-col flex-shrink-0">
+      <aside className="assistant-panel w-full h-full bg-[#0a0a0a]/95 backdrop-blur-xl border-l border-border flex flex-col flex-shrink-0">
         {/* Header minimalista */}
         <div className="flex-shrink-0 h-14 flex items-center justify-between px-4">
           <img src="/icon.png" alt="Socialab" className="w-9 h-9 rounded-xl" />
           <div className="flex items-center gap-1">
-            <button className="p-2 text-white/40 hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
+            <button className="p-2 text-muted-foreground hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
               <Icon name="clock" className="w-4 h-4" />
             </button>
-            <button className="p-2 text-white/40 hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
+            <button className="p-2 text-muted-foreground hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
               <Icon name="plus" className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-white/40 hover:text-white/80 transition-colors rounded-lg hover:bg-white/5"
+              className="p-2 text-muted-foreground hover:text-white/80 transition-colors rounded-lg hover:bg-white/5"
             >
               <Icon name="x" className="w-4 h-4" />
             </button>
@@ -735,19 +735,19 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
               <img
                 src={referenceImage.src}
                 alt="Reference"
-                className="w-10 h-10 object-cover rounded-md border border-white/[0.08]"
+                className="w-10 h-10 object-cover rounded-md border border-border"
               />
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-medium text-primary">
                   📎 Imagem anexada
                 </p>
-                <p className="text-[9px] text-white/40">
+                <p className="text-[9px] text-muted-foreground">
                   Será enviada junto com a mensagem
                 </p>
               </div>
               <button
                 onClick={onClearReference}
-                className="w-6 h-6 rounded-md bg-black/40 text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-all flex items-center justify-center"
+                className="w-6 h-6 rounded-lg bg-black/40 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-all flex items-center justify-center"
                 title="Remover anexo"
               >
                 <Icon name="x" className="w-3 h-3" />
@@ -765,7 +765,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
             />
 
             <div
-              className="bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/[0.08] rounded-xl overflow-hidden focus-within:border-white/30 transition-colors relative"
+              className="bg-[#0a0a0a]/60 backdrop-blur-xl border border-border rounded-xl overflow-hidden focus-within:border-white/30 transition-colors relative"
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
@@ -791,7 +791,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
                   }
                 }}
                 placeholder="Pergunte, pesquise ou converse..."
-                className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-white placeholder:text-white/30 outline-none resize-none min-h-[80px] max-h-[200px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-white placeholder:text-muted-foreground outline-none resize-none min-h-[80px] max-h-[200px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 disabled={isLoading || isSending}
                 rows={2}
               />
@@ -800,7 +800,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-7 h-7 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all flex items-center justify-center"
+                    className="w-7 h-7 rounded-lg text-muted-foreground hover:text-white/60 hover:bg-white/5 transition-all flex items-center justify-center"
                   >
                     <Icon name="plus" className="w-4 h-4" />
                   </button>
@@ -811,7 +811,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
                       className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all flex items-center gap-1 ${
                         includeBrandLogo
                           ? 'bg-primary/20 text-primary border border-primary/30'
-                          : 'bg-white/5 text-white/40 border border-white/10'
+                          : 'bg-white/5 text-muted-foreground border border-border'
                       }`}
                       title={includeBrandLogo ? 'Logo será incluído nas imagens' : 'Logo não será incluído'}
                     >
@@ -827,13 +827,13 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
                       ? 'bg-primary/20 text-primary/60 cursor-not-allowed'
                       : input.trim() || referenceImage
                       ? 'bg-primary text-white hover:bg-primary/90'
-                      : 'text-white/30 hover:text-white/60 disabled:text-white/10'
+                      : 'text-muted-foreground hover:text-white/60 disabled:text-white/10'
                   }`}
                   disabled={(isLoading || isSending) || (!input.trim() && !referenceImage)}
                   title={(isLoading || isSending) ? 'Aguardando resposta...' : 'Enviar mensagem'}
                 >
                   {(isLoading || isSending) ? (
-                    <Loader size={16} className="text-white/60" />
+                    <Loader size={16} className="text-muted-foreground" />
                   ) : (
                     <Icon name="arrow-up" className="w-4 h-4" />
                   )}

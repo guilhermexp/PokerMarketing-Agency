@@ -40,8 +40,8 @@ export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = 
     <section className="space-y-3">
       {/* Controles de redimensionamento */}
       <div className="flex items-center gap-1.5">
-        <div className="flex-1 flex items-center gap-1 bg-white/[0.03] rounded px-2 py-1 border border-white/[0.06]">
-          <span className="text-[8px] text-white/30 uppercase">L</span>
+        <div className="flex-1 flex items-center gap-1 bg-white/[0.03] rounded px-2 py-1 border border-border">
+          <span className="text-[8px] text-muted-foreground uppercase">L</span>
           <input
             type="number"
             min={10}
@@ -51,11 +51,11 @@ export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = 
             disabled={isResizing}
             className="w-full bg-transparent text-[10px] text-white/80 focus:outline-none tabular-nums disabled:opacity-50"
           />
-          <span className="text-[8px] text-white/20">%</span>
+          <span className="text-[8px] text-muted-foreground">%</span>
         </div>
         <Icon name="x" className="w-2 h-2 text-white/15 flex-shrink-0" />
-        <div className="flex-1 flex items-center gap-1 bg-white/[0.03] rounded px-2 py-1 border border-white/[0.06]">
-          <span className="text-[8px] text-white/30 uppercase">A</span>
+        <div className="flex-1 flex items-center gap-1 bg-white/[0.03] rounded px-2 py-1 border border-border">
+          <span className="text-[8px] text-muted-foreground uppercase">A</span>
           <input
             type="number"
             min={10}
@@ -65,7 +65,7 @@ export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = 
             disabled={isResizing}
             className="w-full bg-transparent text-[10px] text-white/80 focus:outline-none tabular-nums disabled:opacity-50"
           />
-          <span className="text-[8px] text-white/20">%</span>
+          <span className="text-[8px] text-muted-foreground">%</span>
         </div>
       </div>
 
@@ -76,7 +76,7 @@ export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = 
             key={preset.label}
             onClick={() => handleResize(preset.w, preset.h)}
             disabled={isResizing}
-            className="px-2 py-0.5 text-[8px] font-medium rounded bg-white/[0.03] text-white/40 hover:bg-white/[0.06] hover:text-white/60 border border-white/[0.04] transition-all disabled:opacity-40"
+            className="px-2 py-0.5 text-[8px] font-medium rounded bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06] border border-white/[0.04] transition-all disabled:opacity-40"
           >
             {preset.label}
           </button>
@@ -84,7 +84,7 @@ export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = 
         <button
           onClick={() => handleResize(100, 100)}
           disabled={isResizing || (widthPercent === 100 && heightPercent === 100)}
-          className="px-2 py-0.5 text-[8px] font-medium rounded bg-white/[0.03] text-white/40 hover:bg-white/[0.06] hover:text-white/60 border border-white/[0.04] transition-all disabled:opacity-40"
+          className="px-2 py-0.5 text-[8px] font-medium rounded bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06] border border-white/[0.04] transition-all disabled:opacity-40"
         >
           Reset
         </button>
@@ -99,22 +99,22 @@ export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = 
               style={{ width: `${resizeProgress}%` }}
             />
           </div>
-          <span className="text-[8px] text-white/30 tabular-nums">
+          <span className="text-[8px] text-muted-foreground tabular-nums">
             {resizeProgress}%
           </span>
         </div>
       )}
 
       {/* Área de proteção */}
-      <div className="pt-2 border-t border-white/[0.06]">
+      <div className="pt-2 border-t border-border">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[8px] font-medium text-white/40 uppercase tracking-wider">
+          <span className="text-[8px] font-medium text-muted-foreground uppercase tracking-wider">
             Proteger
           </span>
           {useProtectionMask && hasProtectionDrawing() && (
             <button
               onClick={clearProtectionMask}
-              className="text-[8px] text-white/25 hover:text-white/40 transition-colors"
+              className="text-[8px] text-white/25 hover:text-muted-foreground transition-colors"
             >
               Limpar
             </button>
@@ -132,7 +132,7 @@ export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = 
             title="Retângulo"
             className={`w-6 h-6 rounded flex items-center justify-center transition-all ${useProtectionMask && drawMode === 'rectangle'
               ? 'bg-white/10 text-white'
-              : 'bg-white/[0.03] text-white/30 hover:text-white/50 hover:bg-white/[0.05]'
+              : 'bg-white/[0.03] text-muted-foreground hover:text-white/50 hover:bg-white/[0.05]'
               }`}
           >
             <Icon name="square" className="w-3 h-3" />
@@ -146,7 +146,7 @@ export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = 
             title="Pincel"
             className={`w-6 h-6 rounded flex items-center justify-center transition-all ${useProtectionMask && drawMode === 'brush'
               ? 'bg-white/10 text-white'
-              : 'bg-white/[0.03] text-white/30 hover:text-white/50 hover:bg-white/[0.05]'
+              : 'bg-white/[0.03] text-muted-foreground hover:text-white/50 hover:bg-white/[0.05]'
               }`}
           >
             <Icon name="edit" className="w-3 h-3" />
@@ -157,11 +157,11 @@ export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = 
             title="Detectar texto automaticamente"
             className={`w-6 h-6 rounded flex items-center justify-center transition-all ${isDetectingText
               ? 'bg-white/10 text-white'
-              : 'bg-white/[0.03] text-white/30 hover:text-white/50 hover:bg-white/[0.05]'
+              : 'bg-white/[0.03] text-muted-foreground hover:text-white/50 hover:bg-white/[0.05]'
               }`}
           >
             {isDetectingText ? (
-              <Loader size={12} className="text-white/60" />
+              <Loader size={12} className="text-muted-foreground" />
             ) : (
               <Icon name="eye" className="w-3 h-3" />
             )}
@@ -177,7 +177,7 @@ export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = 
                 style={{ width: `${detectProgress}%` }}
               />
             </div>
-            <span className="text-[8px] text-white/30">Detectando...</span>
+            <span className="text-[8px] text-muted-foreground">Detectando...</span>
           </div>
         )}
       </div>
@@ -187,7 +187,7 @@ export const ResizeWithProtectionSection: React.FC<ResizeWithProtectionProps> = 
         <div className="flex gap-1 pt-1">
           <button
             onClick={handleDiscardResize}
-            className="flex-1 h-6 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded text-[8px] font-medium text-white/40 hover:text-white/60 transition-all"
+            className="flex-1 h-6 bg-white/[0.03] hover:bg-white/[0.06] border border-border rounded text-[8px] font-medium text-muted-foreground transition-all"
           >
             Cancelar
           </button>

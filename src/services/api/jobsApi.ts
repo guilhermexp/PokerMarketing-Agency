@@ -6,6 +6,7 @@
  */
 
 import { getAuthToken } from '../authService';
+import { getCsrfToken, getCurrentCsrfToken, clearCsrfToken } from '../apiClient';
 
 // =============================================================================
 // Types
@@ -80,13 +81,31 @@ export type JobType = 'flyer' | 'flyer_daily' | 'post' | 'ad' | 'clip' | 'video'
 
 async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   const token = await getAuthToken();
+  const method = (options.method || 'GET').toUpperCase();
+  const requiresCsrf = method !== 'GET' && method !== 'HEAD';
+
+  if (requiresCsrf && !getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+
   const headers = new Headers(options.headers);
 
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  return fetch(url, { ...options, headers });
+  const csrfToken = getCurrentCsrfToken();
+  if (requiresCsrf && csrfToken) {
+    headers.set('X-CSRF-Token', csrfToken);
+  }
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (response.status === 403 && requiresCsrf) {
+    clearCsrfToken();
+  }
+
+  return response;
 }
 
 // =============================================================================

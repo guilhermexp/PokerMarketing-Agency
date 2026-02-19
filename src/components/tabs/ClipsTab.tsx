@@ -34,7 +34,7 @@ export interface ClipsTabProps {
   productImages?: ImageFile[] | null;
 }
 
-export const ClipsTab: React.FC<ClipsTabProps> = ({
+export const ClipsTab = React.memo<ClipsTabProps>(function ClipsTab({
   videoClipScripts,
   brandProfile,
   onAddImageToGallery,
@@ -49,7 +49,7 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
   instagramContext,
   onSchedulePost,
   productImages,
-}) => {
+}) {
   // QuickPost and Schedule modals
   const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(
     null,
@@ -144,4 +144,4 @@ export const ClipsTab: React.FC<ClipsTabProps> = ({
       )}
     </div>
   );
-};
+});

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import type {
   AdCreative,
   BrandProfile,
@@ -23,6 +23,9 @@ import {
   type ActiveJob,
 } from "../../hooks/useBackgroundJobs";
 import { updateAdCreativeImage } from "../../services/apiClient";
+import { useFavoriteToggle } from "../../hooks/useFavoriteToggle";
+import { useGenerationState } from "../../hooks/useGenerationState";
+import { useImageRecoveryEffect } from "../../hooks/useImageRecovery";
 
 interface AdCreativesTabProps {
   adCreatives: AdCreative[];
@@ -96,37 +99,15 @@ const AdCard: React.FC<{
       );
     };
 
-    // Check if image is already in favorites
-    const isFavorite = (img: GalleryImage) => {
-      return styleReferences?.some((ref) => ref.src === img.src) || false;
-    };
-
-    // Get the favorite reference for an image
-    const getFavoriteRef = (img: GalleryImage) => {
-      return styleReferences?.find((ref) => ref.src === img.src);
-    };
-
-    const handleToggleFavorite = (img: GalleryImage) => {
-      if (!onAddStyleReference || !onRemoveStyleReference) return;
-
-      const existingRef = getFavoriteRef(img);
-      if (existingRef) {
-        // Remove from favorites
-        onRemoveStyleReference(existingRef.id);
-      } else {
-        // Add to favorites
-        onAddStyleReference({
-          src: img.src,
-          name:
-            img.prompt.substring(0, 50) ||
-            `Favorito ${new Date().toLocaleDateString("pt-BR")} `,
-        });
-      }
-    };
+    const { isFavorite, toggleFavorite } = useFavoriteToggle({
+      styleReferences,
+      onAddStyleReference,
+      onRemoveStyleReference,
+    });
 
     return (
       <>
-        <div className="bg-[#0a0a0a] rounded-xl border border-white/[0.05] overflow-hidden h-full flex flex-col">
+        <div className="bg-background rounded-xl border border-border overflow-hidden h-full flex flex-col">
           {/* Header - Minimal */}
           <div className="px-4 py-2.5 flex items-center justify-between">
             <span className="text-[11px] font-medium text-white/70">
@@ -138,7 +119,7 @@ const AdCard: React.FC<{
             {/* Image */}
             <div className="aspect-[1.91/1] bg-black/30 rounded-lg flex items-center justify-center relative overflow-hidden">
               {isGenerating ? (
-                <Loader className="text-white/60" />
+                <Loader className="text-muted-foreground" />
               ) : image ? (
                 <>
                   <img
@@ -150,7 +131,7 @@ const AdCard: React.FC<{
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleToggleFavorite(image);
+                        toggleFavorite(image);
                       }}
                       className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isFavorite(image) ? "bg-primary text-black" : "bg-white/10 text-white/70 hover:text-primary"}`}
                       title={
@@ -172,7 +153,7 @@ const AdCard: React.FC<{
                     name="image"
                     className="w-8 h-8 text-white/10 mx-auto mb-2"
                   />
-                  <p className="text-[9px] text-white/20 italic line-clamp-3">
+                  <p className="text-[9px] text-muted-foreground italic line-clamp-3">
                     "{ad.image_prompt}"
                   </p>
                 </div>
@@ -185,7 +166,7 @@ const AdCard: React.FC<{
             </p>
 
             {/* Body */}
-            <p className="text-[11px] text-white/60 leading-relaxed line-clamp-3">
+            <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3">
               {ad.body}
             </p>
 
@@ -204,7 +185,7 @@ const AdCard: React.FC<{
                 onClick={onGenerate}
                 isLoading={isGenerating}
                 size="small"
-                className="flex-1 !rounded-md !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
+                className="flex-1 !rounded-md !bg-transparent !text-muted-foreground !border !border-border hover:!bg-white/[0.03] hover:!text-white/70"
                 icon="image"
               >
                 Gerar
@@ -214,7 +195,7 @@ const AdCard: React.FC<{
               <Button
                 onClick={handleShare}
                 size="small"
-                className="flex-1 !rounded-md !bg-transparent !text-white/40 !border !border-white/[0.06] hover:!bg-white/[0.03] hover:!text-white/70"
+                className="flex-1 !rounded-md !bg-transparent !text-muted-foreground !border !border-border hover:!bg-white/[0.03] hover:!text-white/70"
                 icon="share-alt"
               >
                 {isCopied ? "Copiado!" : "Copiar"}
@@ -236,7 +217,7 @@ const AdCard: React.FC<{
     );
   };
 
-export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
+export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativesTab({
   adCreatives,
   brandProfile,
   referenceImage,
@@ -254,16 +235,19 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
   campaignId,
   onQuickPost,
   onSchedulePost,
-}) => {
+}) {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
-  const [generationState, setGenerationState] = useState<{
-    isGenerating: boolean[];
-    errors: (string | null)[];
-  }>({
-    isGenerating: [],
-    errors: [],
-  });
-  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const {
+    isGenerating,
+    errors,
+    isGeneratingAll,
+    setIsGeneratingAll,
+    reset: resetGenerationState,
+    startGenerating,
+    completeGenerating,
+    failGenerating,
+    hasAnyGenerating,
+  } = useGenerationState();
   const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>(
     "gemini-3-pro-image-preview",
   );
@@ -272,13 +256,6 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
     index: number;
     platform: string;
   } | null>(null);
-  const galleryImagesRef = useRef(galleryImages);
-
-  // Keep ref updated
-  useEffect(() => {
-    galleryImagesRef.current = galleryImages;
-  }, [galleryImages]);
-
   const { onJobComplete, onJobFailed } = useBackgroundJobs();
 
   // Helper to generate unique source for an ad
@@ -287,94 +264,17 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
     return campaignId ? `Ad ${index + 1} (${platform}) - ${campaignId}` : `Ad ${index + 1} (${platform})`;
   }, [campaignId]);
 
-  // Legacy source format (for backward compatibility)
-  const getLegacyAdSource = (index: number, platform: string) =>
-    `Ad - ${platform} -${index}`;
-
-  // ============================================================================
-  // IMAGE RECOVERY LOGIC - DO NOT REMOVE THIS FALLBACK!
-  // ============================================================================
-  // Problem: When images are generated, they are saved to:
-  //   1. Gallery (galleryImages) - via onAddImageToGallery()
-  //   2. Database (ad.image_url) - via updateAdCreativeImage()
-  //
-  // Sometimes the database save fails silently, leaving image_url = null.
-  // But the image still exists in the gallery with ad_id or source reference.
-  //
-  // Solution: Use 3-tier priority system:
-  //   Priority 1: ad.image_url from database (most reliable)
-  //   Priority 2: galleryImages filtered by ad_id (safe, tied to specific ad)
-  //   Priority 3: galleryImages filtered by source + campaignId (legacy fallback)
-  //
-  // WARNING: Do NOT remove the gallery fallback! Users lose their generated
-  // images when navigating away and back if this fallback is missing.
-  //
-  // IMPORTANT: Priority 3 now includes campaignId filtering to prevent
-  // images from one campaign appearing in another campaign.
-  // ============================================================================
-  useEffect(() => {
-    const length = adCreatives.length;
-    const initialImages = adCreatives.map((ad, index) => {
-      // Priority 1: Use saved image_url from database (most reliable)
-      if (ad.image_url) {
-        return {
-          id: `saved-${ad.id || Date.now()}`,
-          src: ad.image_url,
-          prompt: ad.image_prompt || "",
-          source: getAdSource(index, ad.platform) as string,
-          model: "gemini-3-pro-image-preview" as const,
-        };
-      }
-
-      // Priority 2: Recover from gallery using ad_id (safe - tied to specific ad)
-      if (ad.id && galleryImages && galleryImages.length > 0) {
-        const galleryImage = galleryImages.find(img => img.ad_creative_id === ad.id);
-        if (galleryImage) {
-          console.debug(`[AdCreativesTab] Recovered image from gallery for ad: ${ad.id} `);
-          // Also sync to database so previews work in campaign list
-          updateAdCreativeImage(ad.id, galleryImage.src).catch(err =>
-            console.error("[AdCreativesTab] Failed to sync recovered image to database:", err)
-          );
-          return galleryImage;
-        }
-      }
-
-      // Priority 3: Fallback to source matching (for legacy data)
-      // IMPORTANT: Filter by campaignId to prevent cross-campaign image leakage
-      if (galleryImages && galleryImages.length > 0) {
-        // Try new source format first (includes campaignId)
-        const newSource = getAdSource(index, ad.platform);
-        let galleryImage = galleryImages.find(img => img.source === newSource);
-
-        // Fallback to legacy source format, but ONLY if the image belongs to this campaign
-        if (!galleryImage) {
-          const legacySource = getLegacyAdSource(index, ad.platform);
-          galleryImage = galleryImages.find(img =>
-            img.source === legacySource &&
-            // STRICT: Only accept if no campaignId context OR image explicitly matches this campaign
-            // Images without campaign_id are NOT accepted when we have a campaignId context
-            (!campaignId || img.campaign_id === campaignId)
-          );
-        }
-
-        if (galleryImage && ad.id) {
-          console.debug(`[AdCreativesTab] Recovered image from gallery by source for campaign: ${campaignId} `);
-          // Also sync to database so previews work in campaign list
-          updateAdCreativeImage(ad.id, galleryImage.src).catch(err =>
-            console.error("[AdCreativesTab] Failed to sync recovered image to database:", err)
-          );
-          return galleryImage;
-        }
-      }
-
-      return null;
-    });
-    setImages(initialImages);
-    setGenerationState({
-      isGenerating: Array(length).fill(false),
-      errors: Array(length).fill(null),
-    });
-  }, [adCreatives, galleryImages, campaignId, getAdSource]);
+  useImageRecoveryEffect({
+    items: adCreatives,
+    galleryImages,
+    campaignId,
+    getItemIdFromGallery: (img) => img.ad_creative_id,
+    getSource: (index, ad) => getAdSource(index, ad.platform),
+    getLegacySource: (index, ad) => `Ad - ${ad.platform} -${index}`,
+    syncToDatabase: async (adId, imageUrl) => { await updateAdCreativeImage(adId, imageUrl); },
+    setImages,
+    resetGenerationState,
+  });
 
   // Listen for job completions
   useEffect(() => {
@@ -397,11 +297,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
             newImages[index] = galleryImage;
             return newImages;
           });
-          setGenerationState((prev) => {
-            const newGenerating = [...prev.isGenerating];
-            newGenerating[index] = false;
-            return { ...prev, isGenerating: newGenerating };
-          });
+          completeGenerating(index);
           // Update ad creative image_url in database
           if (ad?.id) {
             try {
@@ -422,13 +318,8 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
         const indexMatch = job.context.match(/ad-(\d+)/);
         if (indexMatch) {
           const index = parseInt(indexMatch[1]);
-          setGenerationState((prev) => {
-            const newErrors = [...prev.errors];
-            const newGenerating = [...prev.isGenerating];
-            newErrors[index] = getErrorMessage(job.error_message) || "Falha ao gerar imagem.";
-            newGenerating[index] = false;
-            return { isGenerating: newGenerating, errors: newErrors };
-          });
+          const errorMsg = getErrorMessage(job.error_message) || "Falha ao gerar imagem.";
+          failGenerating(index, errorMsg);
         }
       }
     });
@@ -461,13 +352,7 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
     }
 
     const ad = adCreatives[index];
-    setGenerationState((prev) => {
-      const newGenerating = [...prev.isGenerating];
-      const newErrors = [...prev.errors];
-      newGenerating[index] = true;
-      newErrors[index] = null;
-      return { isGenerating: newGenerating, errors: newErrors };
-    });
+    startGenerating(index);
 
     // Synchronous generation (background jobs were removed)
     try {
@@ -475,29 +360,8 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
 
       // Use chatReferenceImage if available (takes priority), otherwise use referenceImage
       if (chatReferenceImage) {
-        // Convert ChatReferenceImage to ImageFile
-        const src = chatReferenceImage.src;
-        if (src.startsWith('data:')) {
-          const matches = src.match(/^data:([^;]+);base64,(.+)$/);
-          if (matches) {
-            productImages.push({ base64: matches[2], mimeType: matches[1] });
-          }
-        } else {
-          // Fetch HTTP URL and convert to base64
-          try {
-            const response = await fetch(src);
-            const blob = await response.blob();
-            const base64 = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(blob);
-            });
-            const base64Data = base64.split(',')[1];
-            productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
-          } catch (err) {
-            console.error("[AdCreativesTab] Failed to fetch chat reference image:", err);
-          }
-        }
+        const data = await urlToBase64(chatReferenceImage.src);
+        if (data) productImages.push(data);
       } else if (referenceImage) {
         productImages.push(referenceImage);
       }
@@ -511,27 +375,8 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
 
       // Use selected style reference (favoritos) if available
       if (selectedStyleReference?.src) {
-        const src = selectedStyleReference.src;
-        if (src.startsWith('data:')) {
-          const matches = src.match(/^data:([^;]+);base64,(.+)$/);
-          if (matches) {
-            productImages.push({ base64: matches[2], mimeType: matches[1] });
-          }
-        } else {
-          try {
-            const response = await fetch(src);
-            const blob = await response.blob();
-            const base64 = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(blob);
-            });
-            const base64Data = base64.split(',')[1];
-            productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
-          } catch (err) {
-            console.error("[AdCreativesTab] Failed to fetch style reference image:", err);
-          }
-        }
+        const data = await urlToBase64(selectedStyleReference.src);
+        if (data) productImages.push(data);
       }
 
       const generatedImageDataUrl = await generateImage(
@@ -590,17 +435,9 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
         console.warn("[AdCreativesTab] Ad has no ID, cannot save image to database. Image saved to gallery only.");
       }
     } catch (err: unknown) {
-      setGenerationState((prev) => {
-        const newErrors = [...prev.errors];
-        newErrors[index] = (err as Error).message || "Falha ao gerar imagem do anúncio.";
-        return { ...prev, errors: newErrors };
-      });
+      failGenerating(index, getErrorMessage(err));
     } finally {
-      setGenerationState((prev) => {
-        const newGenerating = [...prev.isGenerating];
-        newGenerating[index] = false;
-        return { ...prev, isGenerating: newGenerating };
-      });
+      completeGenerating(index);
     }
   };
 
@@ -647,22 +484,22 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
         <button
           onClick={handleGenerateAll}
           disabled={
-            isGeneratingAll || generationState.isGenerating.some(Boolean)
+            isGeneratingAll || hasAnyGenerating
           }
-          className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full text-sm font-medium text-white/60 hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-30 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-2 bg-black/40 backdrop-blur-2xl border border-border rounded-full text-sm font-medium text-muted-foreground hover:text-white/90 hover:border-white/30 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <Icon name="zap" className="w-4 h-4" />
           Gerar Todos
         </button>
         <div className="flex items-center gap-2">
-          <span className="text-[9px] text-white/30">Modelo:</span>
+          <span className="text-[9px] text-muted-foreground">Modelo:</span>
           <select
             id="model-select-ads"
             value={selectedImageModel}
             onChange={(e) =>
               setSelectedImageModel(e.target.value as ImageModel)
             }
-            className="bg-transparent border border-white/[0.06] rounded-md px-2.5 py-1.5 text-[10px] text-white/60 focus:ring-1 focus:ring-primary/30 focus:border-primary/30 outline-none transition-all"
+            className="bg-transparent border border-border rounded-md px-2.5 py-1.5 text-[10px] text-muted-foreground focus:ring-1 focus:ring-primary/30 focus:border-primary/30 outline-none transition-all"
           >
             <option value="gemini-3-pro-image-preview">Gemini 3 Pro</option>
           </select>
@@ -682,11 +519,11 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
                 body={ad.body}
                 cta={ad.cta}
                 username={brandProfile.name}
-                isGenerating={generationState.isGenerating[index]}
+                isGenerating={isGenerating[index]}
                 onGenerate={() => handleGenerate(index)}
                 onImageClick={image ? () => setEditingAdImage({ image, index, platform: ad.platform }) : undefined}
                 imagePrompt={ad.image_prompt}
-                error={generationState.errors[index]}
+                error={errors[index]}
                 galleryImage={image}
               />
             );
@@ -702,11 +539,11 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
                 body={ad.body}
                 cta={ad.cta}
                 username={brandProfile.name}
-                isGenerating={generationState.isGenerating[index]}
+                isGenerating={isGenerating[index]}
                 onGenerate={() => handleGenerate(index)}
                 onImageClick={image ? () => setEditingAdImage({ image, index, platform: ad.platform }) : undefined}
                 imagePrompt={ad.image_prompt}
-                error={generationState.errors[index]}
+                error={errors[index]}
                 galleryImage={image}
               />
             );
@@ -718,8 +555,8 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
               key={index}
               ad={ad}
               image={images[index]}
-              isGenerating={generationState.isGenerating[index]}
-              error={generationState.errors[index]}
+              isGenerating={isGenerating[index]}
+              error={errors[index]}
               onGenerate={() => handleGenerate(index)}
               onImageUpdate={(newSrc) => handleImageUpdate(index, newSrc)}
               onSetChatReference={onSetChatReference}
@@ -750,4 +587,4 @@ export const AdCreativesTab: React.FC<AdCreativesTabProps> = ({
       )}
     </div>
   );
-};
+});

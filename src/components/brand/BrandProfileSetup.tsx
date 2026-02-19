@@ -50,26 +50,26 @@ const CustomSelect: React.FC<{
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      <label className="block text-[10px] font-medium text-white/60 mb-1.5">{label}</label>
+      <label className="block text-[10px] font-medium text-muted-foreground mb-1.5">{label}</label>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-lg p-2.5 flex items-center justify-between text-left transition-all hover:border-white/20 active:scale-[0.98] backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-white/20 focus-visible:ring-[3px]"
+        className="w-full bg-[#0a0a0a]/60 border border-border rounded-xl p-2.5 flex items-center justify-between text-left transition-all active:scale-[0.98] backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-ring focus-visible:ring-[3px]"
       >
         <span className="text-xs font-medium text-white truncate">{value}</span>
-        <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} className="w-3 h-3 text-white/40 flex-shrink-0 ml-1.5" />
+        <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} className="w-3 h-3 text-muted-foreground flex-shrink-0 ml-1.5" />
       </button>
 
       {isOpen && (
-        <div className="absolute z-[100] bottom-full mb-2 w-full bg-[#0a0a0a]/95 border border-white/[0.08] rounded-xl overflow-hidden shadow-2xl backdrop-blur-xl">
+        <div className="absolute z-[100] bottom-full mb-2 w-full bg-[#0a0a0a]/95 border border-border rounded-xl overflow-hidden shadow-2xl backdrop-blur-xl">
           {options.map((opt) => (
             <button
               key={opt}
               type="button"
               onClick={() => { onChange(opt); setIsOpen(false); }}
-              className={`w-full px-3 py-2 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-white/20 focus-visible:ring-[3px] focus-visible:ring-inset ${value === opt
+              className={`w-full px-3 py-2 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-[3px] focus-visible:ring-inset ${value === opt
                 ? 'bg-white text-black'
-                : 'text-white/60 hover:bg-white/5 hover:text-white'
+                : 'text-muted-foreground hover:bg-white/5 hover:text-white'
                 }`}
             >
               {opt}
@@ -89,10 +89,10 @@ const ColorWidget: React.FC<{
   name: string;
   isAnalyzing: boolean;
 }> = ({ label, color, onChange, name, isAnalyzing }) => (
-  <div className="bg-[#0a0a0a]/60 border border-white/[0.08] p-2.5 rounded-lg flex items-center justify-between group transition-all hover:border-white/20 w-full overflow-hidden backdrop-blur-xl focus-within:border-white/30 focus-within:ring-white/20 focus-within:ring-[3px]">
+  <div className="bg-[#0a0a0a]/60 border border-border p-2.5 rounded-lg flex items-center justify-between group transition-all w-full overflow-hidden backdrop-blur-xl focus-within:border-white/30 focus-within:ring-ring focus-within:ring-[3px]">
     <div className="flex flex-col min-w-0 flex-1 pr-1.5">
-      <label className="text-[10px] font-medium text-white/60 mb-0.5 truncate">{label}</label>
-      <span className={`text-[10px] font-mono text-white/40 group-hover:text-white transition-colors truncate ${isAnalyzing ? 'animate-pulse' : ''}`}>
+      <label className="text-[10px] font-medium text-muted-foreground mb-0.5 truncate">{label}</label>
+      <span className={`text-[10px] font-mono text-muted-foreground group-hover:text-white transition-colors truncate ${isAnalyzing ? 'animate-pulse' : ''}`}>
         {isAnalyzing ? 'Sync...' : color.toUpperCase()}
       </span>
     </div>
@@ -106,7 +106,7 @@ const ColorWidget: React.FC<{
       />
 
       <div
-        className="absolute w-5 h-5 rounded-md pointer-events-none z-0 border border-white/20 shadow-md transition-all duration-500"
+        className="absolute w-5 h-5 rounded-md pointer-events-none z-0 border border-border shadow-md transition-all duration-500"
         style={{ backgroundColor: color }}
       ></div>
     </div>
@@ -216,22 +216,22 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
   const isFormValid = profile.name && profile.description;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4 sm:p-6 relative overflow-hidden font-sans selection:bg-white/20 selection:text-white">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 sm:p-6 relative overflow-hidden font-sans selection:bg-white/20 selection:text-white">
       <div className="max-w-[1280px] w-full z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center px-2">
 
         {/* Left Side Info */}
         <div className="lg:col-span-4 flex flex-col justify-center">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/[0.08] flex items-center justify-center backdrop-blur-xl">
+              <div className="w-10 h-10 rounded-xl bg-white/5 border border-border flex items-center justify-center backdrop-blur-xl">
                 <Icon name="logo" className="w-5 h-5 text-white" />
               </div>
-              <span className="text-sm font-semibold text-white/60">CPC Agency</span>
+              <span className="text-sm font-semibold text-muted-foreground">CPC Agency</span>
             </div>
             <button
               type="button"
               onClick={() => signOut()}
-              className="flex items-center space-x-2 px-3 py-2 bg-white/5 border border-white/[0.08] rounded-lg text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all text-xs font-medium backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-white/20 focus-visible:ring-[3px]"
+              className="flex items-center space-x-2 px-3 py-2 bg-white/5 border border-border rounded-lg text-muted-foreground hover:text-white hover:bg-white/10 transition-all text-xs font-medium backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-ring focus-visible:ring-[3px]"
             >
               <Icon name="log-out" className="w-3.5 h-3.5" />
               <span>Sair</span>
@@ -245,27 +245,27 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
             </h1>
           </div>
 
-          <p className="text-sm text-white/60 font-normal max-w-sm mb-10 leading-relaxed">
+          <p className="text-sm text-muted-foreground font-normal max-w-sm mb-10 leading-relaxed">
             Defina a identidade visual e o tom de voz da sua marca para personalizar todo o conteúdo gerado.
           </p>
 
           <div className="hidden lg:block space-y-4">
-            <div className="rounded-xl p-4 flex items-center justify-between border border-white/[0.08] bg-[#0a0a0a]/80 backdrop-blur-xl">
+            <div className="rounded-xl p-4 flex items-center justify-between border border-border bg-[#0a0a0a]/80 backdrop-blur-xl">
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
                 <div>
                   <p className="text-xs font-medium text-white">Extração de cores</p>
-                  <p className="text-xs text-white/40">{isAnalyzingLogo ? 'Analisando...' : 'Pronto'}</p>
+                  <p className="text-xs text-muted-foreground">{isAnalyzingLogo ? 'Analisando...' : 'Pronto'}</p>
                 </div>
               </div>
-              {isAnalyzingLogo && <Loader size={16} className="text-white/60" />}
+              {isAnalyzingLogo && <Loader size={16} className="text-muted-foreground" />}
             </div>
           </div>
         </div>
 
         {/* Main Configuration Panel */}
         <div className="lg:col-span-8 w-full">
-          <div className="rounded-2xl p-6 sm:p-8 md:p-10 shadow-2xl border border-white/[0.08] bg-[#0a0a0a]/95 backdrop-blur-xl relative overflow-hidden">
+          <div className="rounded-2xl p-6 sm:p-8 md:p-10 shadow-2xl border border-border bg-[#0a0a0a]/95 backdrop-blur-xl relative overflow-hidden">
             <div className="flex items-center space-x-3 mb-8">
               <h2 className="text-xl font-semibold text-white">Perfil da Marca</h2>
             </div>
@@ -275,7 +275,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                 {/* Inputs */}
                 <div className="space-y-6">
                   <div className="group">
-                    <label className="block text-xs font-medium text-white/60 mb-2 group-focus-within:text-white transition-colors">Nome da Marca</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-2 group-focus-within:text-white transition-colors">Nome da Marca</label>
                     <input
                       type="text"
                       name="name"
@@ -283,11 +283,11 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                       onChange={handleChange}
                       required
                       placeholder="CPC POKER"
-                      className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-xl p-3 text-white text-sm font-medium transition-all placeholder:text-white/20 backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-white/20 focus-visible:ring-[3px]"
+                      className="w-full bg-[#0a0a0a]/60 border border-border rounded-xl p-3 text-white text-sm font-medium transition-all placeholder:text-muted-foreground backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-ring focus-visible:ring-[3px]"
                     />
                   </div>
                   <div className="group">
-                    <label className="block text-xs font-medium text-white/60 mb-2 group-focus-within:text-white transition-colors">Descrição</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-2 group-focus-within:text-white transition-colors">Descrição</label>
                     <textarea
                       name="description"
                       value={profile.description}
@@ -295,7 +295,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                       required
                       rows={4}
                       placeholder="Clube de Poker"
-                      className="w-full bg-[#0a0a0a]/60 border border-white/[0.08] rounded-xl p-3 text-white text-sm transition-all resize-none placeholder:text-white/20 backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-white/20 focus-visible:ring-[3px]"
+                      className="w-full bg-[#0a0a0a]/60 border border-border rounded-xl p-3 text-white text-sm transition-all resize-none placeholder:text-muted-foreground backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-ring focus-visible:ring-[3px]"
                     />
                   </div>
                 </div>
@@ -303,33 +303,33 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                 {/* Assets */}
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-xs font-medium text-white/60 mb-2">Logo</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-2">Logo</label>
                     <div
                       {...getRootProps()}
-                      className={`group relative cursor-pointer bg-[#0a0a0a]/60 border border-white/[0.08] rounded-2xl p-6 h-[200px] flex flex-col items-center justify-center transition-all backdrop-blur-xl ${isDragActive ? 'border-white/30' : 'hover:border-white/20'}`}
+                      className={`group relative cursor-pointer bg-[#0a0a0a]/60 border border-border rounded-2xl p-6 h-[200px] flex flex-col items-center justify-center transition-all backdrop-blur-xl ${isDragActive ? 'border-white/30' : 'hover:border-white/20'}`}
                     >
                       <input {...getInputProps()} />
                       {isAnalyzingLogo && (
                         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#0a0a0a]/95 rounded-2xl backdrop-blur-xl">
-                          <Loader size={32} className="mb-4 text-white/60" />
-                          <span className="text-xs font-medium text-white/60 animate-pulse">Analisando...</span>
+                          <Loader size={32} className="mb-4 text-muted-foreground" />
+                          <span className="text-xs font-medium text-muted-foreground animate-pulse">Analisando...</span>
                         </div>
                       )}
                       {logoPreview ? (
                         <img src={logoPreview} alt="Logo" className="max-h-32 max-w-full object-contain filter group-hover:scale-105 transition-transform duration-500" />
                       ) : (
                         <div className="text-center">
-                          <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center mx-auto mb-3 border border-white/[0.08] group-hover:bg-white/10 transition-all">
-                            <Icon name="upload" className="w-5 h-5 text-white/40 group-hover:text-white" />
+                          <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center mx-auto mb-3 border border-border group-hover:bg-white/10 transition-all">
+                            <Icon name="upload" className="w-5 h-5 text-muted-foreground group-hover:text-white" />
                           </div>
-                          <p className="text-xs font-medium text-white/40">Arraste ou clique para fazer upload</p>
+                          <p className="text-xs font-medium text-muted-foreground">Arraste ou clique para fazer upload</p>
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* Technical Grid */}
-                  <div className={`grid grid-cols-2 gap-2.5 ${profile.tertiaryColor ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                     <CustomSelect
                       label="Tone"
                       value={profile.toneOfVoice}
@@ -350,20 +350,11 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                       onChange={handleChange}
                       isAnalyzing={isAnalyzingLogo}
                     />
-                    {profile.tertiaryColor && (
-                      <ColorWidget
-                        label="Tertiary"
-                        name="tertiaryColor"
-                        color={profile.tertiaryColor}
-                        onChange={handleChange}
-                        isAnalyzing={isAnalyzingLogo}
-                      />
-                    )}
                   </div>
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-white/[0.08]">
+              <div className="pt-6 border-t border-border">
                 <Button
                   type="submit"
                   disabled={!isFormValid || isAnalyzingLogo}
@@ -377,7 +368,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
             </form>
           </div>
 
-          <p className="text-center text-white/20 text-xs font-medium mt-6">
+          <p className="text-center text-muted-foreground text-xs font-medium mt-6">
             CPC Agency
           </p>
         </div>

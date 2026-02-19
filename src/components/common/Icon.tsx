@@ -481,15 +481,11 @@ const iconPaths: Record<string, React.ReactNode> = {
   ),
   'wand-2': (
     <>
-      <path d="M15 4V2"></path>
-      <path d="M15 16v-2"></path>
-      <path d="M8 9h2"></path>
-      <path d="M20 9h2"></path>
-      <path d="M17.8 11.8L19 13"></path>
-      <path d="M15 9h.01"></path>
-      <path d="M17.8 6.2L19 5"></path>
-      <path d="m3 21 9-9"></path>
-      <path d="M12.2 6.2L11 5"></path>
+      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path>
+      <path d="M5 3v4"></path>
+      <path d="M19 17v4"></path>
+      <path d="M3 5h4"></path>
+      <path d="M17 19h4"></path>
     </>
   ),
   'edit-2': (
@@ -501,6 +497,33 @@ const iconPaths: Record<string, React.ReactNode> = {
     <>
       <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
       <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+    </>
+  ),
+  'check-square': (
+    <>
+      <polyline points="9 11 12 14 22 4"></polyline>
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+    </>
+  ),
+  'refresh-cw': (
+    <>
+      <polyline points="23 4 23 10 17 10"></polyline>
+      <polyline points="1 20 1 14 7 14"></polyline>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+    </>
+  ),
+  'volume-2': (
+    <>
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+    </>
+  ),
+  'alert-triangle': (
+    <>
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+      <line x1="12" y1="9" x2="12" y2="13"></line>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
     </>
   ),
 };

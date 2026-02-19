@@ -1,4 +1,4 @@
-const parseDataUrl = (
+export const parseDataUrl = (
   dataUrl: string,
 ): { base64: string; mimeType: string } | null => {
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);

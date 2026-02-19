@@ -139,6 +139,7 @@ interface UseGenerationPollingOptions {
   onSuccess?: (generation: api.GenerationStatusResponse['generation']) => void;
   onError?: (error: api.GenerationStatusResponse['error']) => void;
   enabled?: boolean;
+  paused?: boolean;
 }
 
 export function useGenerationPolling(
@@ -146,7 +147,7 @@ export function useGenerationPolling(
   asyncTaskId: string | null,
   options: UseGenerationPollingOptions = {}
 ) {
-  const { onSuccess, onError, enabled = true } = options;
+  const { onSuccess, onError, enabled = true, paused = false } = options;
 
   const [status, setStatus] = useState<AsyncTaskStatus>('pending');
   const [pollInterval, setPollInterval] = useState(1000); // Start at 1s
@@ -157,7 +158,7 @@ export function useGenerationPolling(
   const MAX_INTERVAL = 30000; // 30s
 
   const { data, error } = useSWR(
-    enabled && asyncTaskId && !isCompleteRef.current
+    enabled && !paused && asyncTaskId && !isCompleteRef.current
       ? ['generation-status', generationId, asyncTaskId]
       : null,
     () => api.getGenerationStatus(generationId, asyncTaskId!),
@@ -214,6 +215,7 @@ export function useCreateImage() {
     imageNum,
     activeTopicId,
     useBrandProfile,
+    useInstagramMode,
     setIsCreating,
     setIsCreatingWithNewTopic,
     addBatch,
@@ -251,16 +253,24 @@ export function useCreateImage() {
         imageNum,
         params: {
           prompt,
+          userPrompt: prompt,
           width: parameters.width,
           height: parameters.height,
           seed: parameters.seed,
           quality: parameters.quality,
           aspectRatio: parameters.aspectRatio,
           imageSize: parameters.imageSize,
-          // Send referenceImages array (new approach), fallback to imageUrl for compatibility
-          referenceImages: parameters.referenceImages,
+          // Send referenceImages with blobUrl preferred over dataUrl to keep payload small
+          referenceImages: parameters.referenceImages?.map((img) => ({
+            id: img.id,
+            dataUrl: img.blobUrl || img.dataUrl,
+            mimeType: img.mimeType,
+          })),
           imageUrl: parameters.imageUrl,
+          toneOfVoiceOverride: useBrandProfile ? parameters.toneOfVoiceOverride : undefined,
+          fontStyleOverride: useBrandProfile ? parameters.fontStyleOverride : undefined,
           useBrandProfile,
+          useInstagramMode,
         },
       });
 
@@ -303,6 +313,7 @@ export function useCreateImage() {
     model,
     imageNum,
     useBrandProfile,
+    useInstagramMode,
     topics,
     setIsCreating,
     setIsCreatingWithNewTopic,

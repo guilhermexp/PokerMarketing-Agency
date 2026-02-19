@@ -538,8 +538,15 @@ function isWithinPublishingHours() {
 }
 
 /**
+ * Maximum age (ms) for a scheduled post to still be eligible for publishing.
+ * Posts older than this are marked as 'failed' instead of being published,
+ * preventing a flood of stale posts on every server restart.
+ */
+const MAX_POST_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+/**
  * Check and publish due posts
- * Called every minute by the BullMQ scheduler
+ * Called every 5 min by the BullMQ scheduler / Vercel cron
  * Only runs between 7:00 and 23:59 Brasilia time
  */
 export async function checkAndPublishScheduledPosts() {
@@ -560,19 +567,42 @@ export async function checkAndPublishScheduledPosts() {
 
   try {
     const sql = getSql();
-    const nowMs = Date.now(); // scheduled_timestamp is BIGINT (milliseconds)
+    const nowMs = Date.now();
+    const cutoffMs = nowMs - MAX_POST_AGE_MS;
 
-    // Get posts due for publishing
-    const duePosts = await sql`
-      SELECT * FROM scheduled_posts
+    // Expire stale posts (scheduled > 24h ago) so they don't pile up
+    const expired = await sql`
+      UPDATE scheduled_posts
+      SET status = 'failed',
+          error_message = 'Missed scheduling window (> 24 h)'
       WHERE status = 'scheduled'
-        AND scheduled_timestamp <= ${nowMs}
-      ORDER BY scheduled_timestamp ASC
-      LIMIT 5
+        AND scheduled_timestamp <= ${cutoffMs}
+      RETURNING id
+    `;
+    if (expired.length > 0) {
+      console.log(`[Publisher] Expired ${expired.length} stale post(s)`);
+    }
+
+    // Atomic claim: only grab posts still in 'scheduled' status
+    // The WHERE status='scheduled' + UPDATE status='publishing' acts as a lock
+    const duePosts = await sql`
+      UPDATE scheduled_posts
+      SET status = 'publishing',
+          publish_attempts = COALESCE(publish_attempts, 0) + 1,
+          last_publish_attempt = NOW()
+      WHERE id IN (
+        SELECT id FROM scheduled_posts
+        WHERE status = 'scheduled'
+          AND scheduled_timestamp <= ${nowMs}
+          AND scheduled_timestamp > ${cutoffMs}
+        ORDER BY scheduled_timestamp ASC
+        LIMIT 5
+      )
+      RETURNING *
     `;
 
     if (duePosts.length === 0) {
-      return { published: 0, failed: 0 };
+      return { published: 0, failed: 0, expired: expired.length };
     }
 
     console.log(`[Publisher] Found ${duePosts.length} posts to publish`);
@@ -581,16 +611,6 @@ export async function checkAndPublishScheduledPosts() {
     let failed = 0;
 
     for (const post of duePosts) {
-      // Mark as publishing
-      await sql`
-        UPDATE scheduled_posts
-        SET status = 'publishing',
-            publish_attempts = COALESCE(publish_attempts, 0) + 1,
-            last_publish_attempt = NOW()
-        WHERE id = ${post.id}
-      `;
-
-      // Publish
       const result = await publishPost(post);
 
       if (result.success) {
@@ -603,8 +623,7 @@ export async function checkAndPublishScheduledPosts() {
         `;
         published++;
       } else {
-        // If failed 3+ times, mark as failed permanently
-        const attempts = (post.publish_attempts || 0) + 1;
+        const attempts = post.publish_attempts || 1;
         const newStatus = attempts >= 3 ? 'failed' : 'scheduled';
 
         await sql`
@@ -623,7 +642,7 @@ export async function checkAndPublishScheduledPosts() {
     }
 
     console.log(`[Publisher] Done: ${published} published, ${failed} failed`);
-    return { published, failed };
+    return { published, failed, expired: expired.length };
 
   } catch (error) {
     console.error('[Publisher] Error:', error);

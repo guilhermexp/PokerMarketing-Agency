@@ -24,6 +24,21 @@ export function registerImagePlaygroundRoutes(
     buildImagePrompt,
   },
 ) {
+  const ALLOWED_TONES = new Set([
+    "Profissional",
+    "Espirituoso",
+    "Casual",
+    "Inspirador",
+    "Técnico",
+  ]);
+  const ALLOWED_FONT_STYLES = new Set([
+    "Bebas Neue",
+    "Oswald",
+    "Anton",
+    "Impact",
+    "Montserrat ExtraBold",
+    "Gilroy",
+  ]);
   const inferMimeTypeFromSource = (source) => {
     if (!source || typeof source !== "string") return "image/png";
     const cleanSource = source.split("?")[0].toLowerCase();
@@ -92,7 +107,39 @@ REGRAS OBRIGATÓRIAS:
 3. Preserve consistência de identidade visual (cores, tom e linguagem da marca).
 4. Se houver texto na peça, ele deve estar em PORTUGUÊS e com alta legibilidade.
 5. Evite visual genérico; entregue resultado autoral e sofisticado.
-6. Priorize hierarquia visual forte, contraste e clareza da mensagem.`;
+6. Priorize hierarquia visual forte, contraste e clareza da mensagem.
+7. A identidade da marca deve aparecer de forma ORGÂNICA e envolvente na cena, não como elementos soltos.
+8. Integre paleta, iluminação, textura e direção de arte para que a marca faça parte natural da composição.
+9. O resultado final deve ser HIPER-REALISTA, com materiais, iluminação, profundidade e texturas fisicamente plausíveis, mantendo padrão profissional de campanha.`;
+  };
+
+  const buildInstagramPostPrompt = (userPrompt) => {
+    return `CONTEXTO DE COMPOSIÇÃO — POST PARA INSTAGRAM (FEED):
+- Formato: quadrado (1:1), otimizado para feed do Instagram
+- A imagem deve funcionar como um POST PROFISSIONAL de Instagram para uma marca/agência
+- Composição impactante mesmo em tamanho pequeno (visualização mobile)
+- Hierarquia visual forte: um elemento principal que capture atenção imediatamente
+- Se houver texto, deve ser grande, legível e em PORTUGUÊS
+- Estilo: editorial/publicitário de alto nível, pronto para publicação
+- Cores vibrantes e contraste alto para se destacar no feed
+- Evite excesso de elementos — simplicidade premium
+- O resultado deve parecer peça criada por agência de marketing digital profissional
+- O branding da marca deve estar integrado de forma orgânica e envolvente na composição
+- Evite aparência de "logo colado"; integre marca com harmonia de luz, cor, textura e layout
+
+PROMPT DO USUÁRIO:
+${userPrompt}`;
+  };
+
+  const enforcePortugueseBrPrompt = (prompt) => {
+    if (typeof prompt !== "string" || !prompt.trim()) return prompt;
+    if (prompt.includes("IDIOMA OBRIGATÓRIO (pt-BR):")) return prompt;
+    return `${prompt}
+
+IDIOMA OBRIGATÓRIO (pt-BR):
+- Responda e componha a direção criativa em PORTUGUÊS DO BRASIL.
+- Se houver qualquer texto na imagem (título, CTA, preço, legenda, selo), ele DEVE estar em português do Brasil.
+- Nunca use inglês ou outro idioma nos textos visíveis da arte.`;
   };
 
   // Get all topics
@@ -267,8 +314,16 @@ REGRAS OBRIGATÓRIAS:
       // Enhanced params to pass to helper
       let enhancedParams = { ...params };
 
+      // Instagram Post Mode: apply composition context + force brand + 1:1
+      if (params.useInstagramMode) {
+        enhancedParams.useBrandProfile = true;
+        enhancedParams.aspectRatio = '1:1';
+        enhancedParams.prompt = buildInstagramPostPrompt(params.prompt);
+        logger.info({}, "[ImagePlayground] Instagram Post mode enabled");
+      }
+
       // If useBrandProfile is enabled, use SAME logic as /api/ai/image
-      if (params.useBrandProfile) {
+      if (enhancedParams.useBrandProfile) {
         const isOrgContext = !!orgId;
         const brandProfileResult = isOrgContext
           ? await sql`SELECT * FROM brand_profiles WHERE organization_id = ${orgId} AND deleted_at IS NULL LIMIT 1`
@@ -292,9 +347,23 @@ REGRAS OBRIGATÓRIAS:
             ],
           };
 
+          const toneOverride =
+            typeof enhancedParams.toneOfVoiceOverride === "string" &&
+            ALLOWED_TONES.has(enhancedParams.toneOfVoiceOverride)
+              ? enhancedParams.toneOfVoiceOverride
+              : null;
+          const fontStyleOverride =
+            typeof enhancedParams.fontStyleOverride === "string" &&
+            ALLOWED_FONT_STYLES.has(enhancedParams.fontStyleOverride)
+              ? enhancedParams.fontStyleOverride
+              : null;
+          if (toneOverride) {
+            mappedBrandProfile.toneOfVoice = toneOverride;
+          }
+
           // 1. Prepare productImages with logo + optional client images
-          const clientProductImages = Array.isArray(params.productImages)
-            ? params.productImages.filter((img) => img?.base64 && img?.mimeType)
+          const clientProductImages = Array.isArray(enhancedParams.productImages)
+            ? enhancedParams.productImages.filter((img) => img?.base64 && img?.mimeType)
             : [];
           const productImages = [...clientProductImages];
           let hasLogo = false;
@@ -313,23 +382,44 @@ REGRAS OBRIGATÓRIAS:
           }
 
           const hasStyleReference =
-            (Array.isArray(params.referenceImages) &&
-              params.referenceImages.length > 0) ||
-            !!params.imageUrl;
-          const hasPersonReference = !!params.personReferenceImage;
+            (Array.isArray(enhancedParams.referenceImages) &&
+              enhancedParams.referenceImages.length > 0) ||
+            !!enhancedParams.imageUrl;
+          const hasPersonReference = !!enhancedParams.personReferenceImage;
           const hasProductImagesBeyondLogo =
             productImages.length > (hasLogo ? 1 : 0);
 
           // Optional safety valve for future UI toggle; defaults to enabled.
-          const useCampaignGradePrompt = params.useCampaignGradePrompt !== false;
-          const basePrompt = useCampaignGradePrompt
-            ? buildCampaignGradeImagePrompt(params.prompt, mappedBrandProfile)
-            : params.prompt;
+          const useCampaignGradePrompt = enhancedParams.useCampaignGradePrompt !== false;
+          const basePromptCore = useCampaignGradePrompt
+            ? buildCampaignGradeImagePrompt(enhancedParams.prompt, mappedBrandProfile)
+            : enhancedParams.prompt;
+          const brandIntegrationDirectives = hasLogo
+            ? `
+
+INTEGRAÇÃO DE MARCA (OBRIGATÓRIO):
+- Use o logo/anexos da marca com fidelidade visual, mas integrado de forma natural ao layout.
+- Evite aparência de "adesivo colado" ou elemento deslocado.
+- O branding deve parecer parte nativa da arte, com harmonia de luz, cor e composição.
+- Priorize acabamento premium/editorial com consistência visual entre todos os elementos.`
+            : `
+
+INTEGRAÇÃO DE MARCA (OBRIGATÓRIO):
+- Reforce a presença da marca por direção de arte (paleta, contraste, textura e composição).
+- O resultado deve parecer peça de campanha profissional de agência, com branding envolvente e coeso.`;
+          const fontDirectives = fontStyleOverride
+            ? `
+
+TIPOGRAFIA PREFERENCIAL (OBRIGATÓRIO):
+- Use prioritariamente a fonte "${fontStyleOverride}" para títulos e textos principais.
+- Mantenha estilo bold/condensed com alta legibilidade e consistência visual.`
+            : "";
+          const basePrompt = `${basePromptCore}${brandIntegrationDirectives}${fontDirectives}`;
 
           // 2. Convert prompt to JSON structured format (same as /api/ai/image)
           const jsonPrompt = await convertImagePromptToJson(
             basePrompt,
-            params.aspectRatio || "1:1",
+            enhancedParams.aspectRatio || "1:1",
             orgId,
             sql,
           );
@@ -339,7 +429,7 @@ REGRAS OBRIGATÓRIAS:
             basePrompt,
             mappedBrandProfile,
             hasStyleReference,
-            hasLogo,
+            false,
             hasPersonReference,
             hasProductImagesBeyondLogo,
             jsonPrompt,
@@ -349,7 +439,7 @@ REGRAS OBRIGATÓRIAS:
 
           // 4. Update enhanced params with full prompt and product images
           enhancedParams = {
-            ...params,
+            ...enhancedParams,
             prompt: fullPrompt,
             productImages: productImages.length > 0 ? productImages : undefined,
             brandProfile: mappedBrandProfile,
@@ -362,11 +452,16 @@ REGRAS OBRIGATÓRIAS:
               hasStyleReference,
               hasProductImagesBeyondLogo,
               useCampaignGradePrompt,
+              toneOverride,
+              fontStyleOverride,
             },
             "[ImagePlayground] Brand profile applied",
           );
         }
       }
+
+      // Enforce pt-BR in all image playground generations (with or without brand/instagram modes)
+      enhancedParams.prompt = enforcePortugueseBrPrompt(enhancedParams.prompt);
 
       // Initialize Gemini
       const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });

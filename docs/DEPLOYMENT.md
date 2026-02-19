@@ -51,6 +51,8 @@ railway variables set GEMINI_API_KEY="sua-chave-gemini"
 railway variables set BLOB_READ_WRITE_TOKEN="vercel_blob_xxxxx"
 
 # Clerk Authentication
+# IMPORTANTE: Use chaves de teste (pk_test_/sk_test_) em desenvolvimento.
+# Configure chaves live (pk_live_/sk_live_) apenas no Railway Dashboard, nunca no codigo.
 railway variables set VITE_CLERK_PUBLISHABLE_KEY="pk_test_xxxxx"
 railway variables set CLERK_SECRET_KEY="sk_test_xxxxx"
 ```
@@ -58,6 +60,10 @@ railway variables set CLERK_SECRET_KEY="sk_test_xxxxx"
 ### 2.2 Variaveis Opcionais
 
 ```bash
+# Admin panel access (comma-separated emails)
+# Se nao configurado, nenhum usuario tera acesso ao painel admin.
+railway variables set SUPER_ADMIN_EMAILS="admin@yourdomain.com,admin2@yourdomain.com"
+
 # Fal.ai para Sora 2 (video fallback)
 railway variables set FAL_KEY="sua-chave-fal"
 

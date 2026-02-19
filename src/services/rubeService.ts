@@ -17,10 +17,14 @@
 import { uploadDataUrlToBlob } from './blobService';
 import type { InstagramPublishState } from '../types';
 import { getEnv } from "../utils/env";
+import { getCsrfToken, getCurrentCsrfToken } from "./apiClient";
 
 // MCP Configuration
 // Use proxy to avoid CORS - proxy handles token from database
 const MCP_URL = '/api/rube';
+
+// Timeout for Rube MCP calls (15 seconds)
+const RUBE_TIMEOUT_MS = 15_000;
 
 // Generate unique JSON-RPC ID
 const generateId = () => `rube_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -143,14 +147,36 @@ export const callRubeMCP = async (
     organization_id: context.organizationId || undefined
   };
 
-  // Uses proxy which handles token from database
-  const response = await fetch(MCP_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestBody)
-  });
+  // Ensure CSRF token is available
+  if (!getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+  const csrfToken = getCurrentCsrfToken();
+
+  // Timeout to prevent hanging when Rube service is down
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), RUBE_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    // Uses proxy which handles token from database
+    response = await fetch(MCP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('Serviço Rube não respondeu (timeout). Tente novamente mais tarde.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     if (response.status === 400) {
@@ -164,6 +190,9 @@ export const callRubeMCP = async (
     }
     if (response.status === 429) {
       throw new Error('Limite de publicações atingido (25/dia). Tente novamente mais tarde.');
+    }
+    if (response.status === 504) {
+      throw new Error('Serviço Rube não respondeu (timeout). Tente novamente mais tarde.');
     }
     throw new Error(`Erro Rube MCP: ${response.status} ${response.statusText}`);
   }

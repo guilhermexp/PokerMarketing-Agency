@@ -1,7 +1,30 @@
 import React from "react";
+import { Button as ShadcnButton } from "@/components/ui/button";
 import { Icon } from "./Icon";
 import type { IconName } from "./Icon";
 import { Loader } from "./Loader";
+import { cn } from "@/lib/utils";
+
+const variantMap = {
+  primary: "glass",
+  secondary: "solid",
+  ghost: "glass-subtle",
+  outline: "outline-subtle",
+} as const;
+
+const sizeClasses = {
+  normal: "h-auto px-5 py-2.5 text-[10px]",
+  large: "h-auto px-6 py-3 text-sm",
+  small: "h-auto px-4 py-2.5 text-[10px]",
+  sm: "h-auto px-3 py-1.5 text-[10px]",
+};
+
+const iconSizeClasses = {
+  normal: "w-4 h-4",
+  large: "w-5 h-5",
+  small: "w-3.5 h-3.5",
+  sm: "w-3 h-3",
+};
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
@@ -17,42 +40,44 @@ export const Button: React.FC<ButtonProps> = ({
   variant = "secondary",
   size = "normal",
   icon,
-  className = "",
+  className,
   isLoading = false,
-  as = "button",
+  as,
   ...props
 }) => {
-  const baseClasses =
-    "font-black rounded-xl transition-all outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex items-center justify-center space-x-2 disabled:opacity-30 disabled:cursor-not-allowed uppercase tracking-wide antialiased";
+  const disabled = props.disabled || isLoading;
 
-  const variantClasses = {
-    primary: "bg-white/10 text-white hover:bg-white/20 active:scale-95 border border-white/20",
-    secondary: "bg-white text-black hover:bg-white/90 active:scale-95",
-    ghost: "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white active:scale-95 border border-white/10",
-    outline: "bg-transparent text-white border border-white/20 hover:bg-white/5 hover:border-white/30 active:scale-95",
-  };
-
-  const sizeClasses = {
-    normal: "px-5 py-2.5 text-[10px]",
-    large: "px-6 py-3 text-sm",
-    small: "px-4 py-2.5 text-[10px]",
-    sm: "px-3 py-1.5 text-[10px]",
-  };
-
-  const iconSizeClasses = {
-    normal: "w-4 h-4",
-    large: "w-5 h-5",
-    small: "w-3.5 h-3.5",
-    sm: "w-3 h-3",
-  };
-
-  const finalProps = { ...props, disabled: props.disabled || isLoading };
-  const Component = as as React.ElementType;
+  // For non-button elements, render directly (asChild doesn't work with arbitrary elements)
+  if (as && as !== "button") {
+    const Component = as as React.ElementType;
+    return (
+      <Component
+        className={cn(
+          "font-black rounded-xl uppercase tracking-wide antialiased inline-flex items-center justify-center gap-2 space-x-2 disabled:opacity-30 disabled:cursor-not-allowed",
+          sizeClasses[size],
+          className
+        )}
+      >
+        {isLoading ? (
+          <Loader className={iconSizeClasses[size]} />
+        ) : (
+          icon && <Icon name={icon} className={iconSizeClasses[size]} />
+        )}
+        <span>{children}</span>
+      </Component>
+    );
+  }
 
   return (
-    <Component
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
-      {...(as === "button" ? finalProps : {})}
+    <ShadcnButton
+      variant={variantMap[variant]}
+      className={cn(
+        "font-black rounded-xl uppercase tracking-wide antialiased space-x-2 disabled:opacity-30 disabled:cursor-not-allowed",
+        sizeClasses[size],
+        className
+      )}
+      disabled={disabled}
+      {...props}
     >
       {isLoading ? (
         <Loader className={iconSizeClasses[size]} />
@@ -60,6 +85,6 @@ export const Button: React.FC<ButtonProps> = ({
         icon && <Icon name={icon} className={iconSizeClasses[size]} />
       )}
       <span>{children}</span>
-    </Component>
+    </ShadcnButton>
   );
 };

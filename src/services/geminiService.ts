@@ -14,7 +14,7 @@ import type {
   ImageSize,
   Post,
 } from "../types";
-import { generateVideo as generateServerVideo, type ApiVideoModel } from "./apiClient";
+import { generateVideo as generateServerVideo, type ApiVideoModel, getCsrfToken, getCurrentCsrfToken } from "./apiClient";
 import { uploadImageToBlob } from "./blobService";
 import { buildLogoPrompt } from "@/ai-prompts";
 
@@ -32,12 +32,20 @@ const API_BASE = "";
 const apiCall = async (endpoint: string, body: unknown) => {
   const token = await getAuthToken();
 
+  // Ensure CSRF token is available for state-changing requests
+  if (!getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+  const csrfToken = getCurrentCsrfToken();
+
   const response = await fetch(`${API_BASE}${endpoint}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
     },
+    credentials: "include",
     body: JSON.stringify(body),
   });
 

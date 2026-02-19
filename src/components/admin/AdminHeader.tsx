@@ -29,7 +29,7 @@ export function AdminHeader() {
   };
 
   return (
-    <header className="h-14 bg-[#000000] border-b border-white/[0.06] fixed top-0 left-56 right-0 z-10">
+    <header className="h-14 bg-[#000000] border-b border-border fixed top-0 left-56 right-0 z-10">
       <div className="h-full px-6 flex items-center justify-between">
         {/* Page Title */}
         <div className="flex items-center gap-3">
@@ -45,8 +45,8 @@ export function AdminHeader() {
         <div className="flex items-center gap-3">
           {/* User info */}
           <div className="hidden md:block text-right mr-1">
-            <p className="text-[11px] text-white/30 leading-tight">Logado como</p>
-            <p className="text-[12px] font-medium text-white/60 leading-tight">
+            <p className="text-[11px] text-muted-foreground leading-tight">Logado como</p>
+            <p className="text-[12px] font-medium text-muted-foreground leading-tight">
               {user?.primaryEmailAddress?.emailAddress || 'Admin'}
             </p>
           </div>
@@ -54,7 +54,7 @@ export function AdminHeader() {
           {/* Refresh */}
           <button
             onClick={() => window.location.reload()}
-            className="w-8 h-8 flex items-center justify-center rounded-md text-white/40 hover:text-white/70 hover:bg-white/[0.04] transition-all"
+            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-white/70 hover:bg-white/[0.04] transition-all"
             title="Atualizar"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

@@ -132,6 +132,8 @@ export const UploadForm: React.FC<UploadFormProps> = ({
   const assetsInputRef = useRef<HTMLInputElement>(null);
   const modelSelectorRef = useRef<HTMLDivElement>(null);
   const toneSelectorRef = useRef<HTMLDivElement>(null);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const toneDropdownRef = useRef<HTMLDivElement>(null);
   const favoritesPanelRef = useRef<HTMLDivElement>(null);
   const modelButtonRef = useRef<HTMLButtonElement>(null);
   const toneButtonRef = useRef<HTMLButtonElement>(null);
@@ -141,17 +143,23 @@ export const UploadForm: React.FC<UploadFormProps> = ({
   // Close selectors when clicking outside or scrolling
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        modelSelectorRef.current &&
-        !modelSelectorRef.current.contains(e.target as Node)
-      ) {
+      const target = e.target as Node;
+
+      // Check if click is outside both the button container AND the dropdown
+      const isOutsideModelSelector =
+        modelSelectorRef.current && !modelSelectorRef.current.contains(target) &&
+        (!modelDropdownRef.current || !modelDropdownRef.current.contains(target));
+
+      if (isOutsideModelSelector) {
         setIsModelSelectorOpen(false);
       }
 
-      if (
-        toneSelectorRef.current &&
-        !toneSelectorRef.current.contains(e.target as Node)
-      ) {
+      // Check if click is outside both the button container AND the dropdown
+      const isOutsideToneSelector =
+        toneSelectorRef.current && !toneSelectorRef.current.contains(target) &&
+        (!toneDropdownRef.current || !toneDropdownRef.current.contains(target));
+
+      if (isOutsideToneSelector) {
         setIsToneSelectorOpen(false);
       }
     };
@@ -193,8 +201,10 @@ export const UploadForm: React.FC<UploadFormProps> = ({
     // Get the scroll height (content height)
     const scrollHeight = textarea.scrollHeight;
 
-    // Set new height between min (60px) and max (200px)
-    const newHeight = Math.max(60, Math.min(scrollHeight, 200));
+    // Set new height between min (60px) and max (200px on desktop, 150px on mobile)
+    const maxHeight = window.innerWidth >= 640 ? 200 : 150;
+    const minHeight = window.innerWidth >= 640 ? 80 : 60;
+    const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
     textarea.style.height = `${newHeight}px`;
   }, [transcript]);
 
@@ -467,7 +477,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                   onChange={(e) => setTranscript(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Descreva sua ideia..."
-                  className="hide-scrollbar w-full rounded-[18px] sm:rounded-[22px] rounded-b-none text-xs sm:text-sm leading-relaxed text-white/90 placeholder:text-white/50 !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-3 sm:!px-4 !py-2 sm:!py-2.5 touch-manipulation resize-none outline-none overflow-hidden min-h-[36px] sm:min-h-[42px] max-h-[80px] sm:max-h-[120px]"
+                  className="hide-scrollbar w-full rounded-[18px] sm:rounded-[22px] rounded-b-none text-xs sm:text-sm leading-relaxed text-white/90 placeholder:text-muted-foreground !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-3 sm:!px-4 !py-2 sm:!py-2.5 touch-manipulation resize-none outline-none overflow-y-auto min-h-[60px] sm:min-h-[80px] max-h-[150px] sm:max-h-[200px]"
                   style={{
                     WebkitUserSelect: 'text',
                     WebkitTouchCallout: 'none',
@@ -484,7 +494,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                         ref={modelButtonRef}
                         type="button"
                         onClick={handleOpenModelSelector}
-                        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:text-white/90 transition-all text-[10px] sm:text-xs whitespace-nowrap font-medium"
+                        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg bg-white/5 border border-border text-white hover:bg-white/10 hover:text-white/90 transition-all text-[10px] sm:text-xs whitespace-nowrap font-medium"
                       >
                         <span>{creativeModelLabels[selectedModel].label}</span>
                         <Icon name="chevron-down" className={`w-2.5 h-2.5 sm:w-3 sm:h-3 transition-transform ${isModelSelectorOpen ? 'rotate-180' : ''}`} />
@@ -497,7 +507,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                         ref={toneButtonRef}
                         type="button"
                         onClick={handleOpenToneSelector}
-                        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:text-white/90 transition-all text-[10px] sm:text-xs whitespace-nowrap font-medium"
+                        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg bg-white/5 border border-border text-white hover:bg-white/10 hover:text-white/90 transition-all text-[10px] sm:text-xs whitespace-nowrap font-medium"
                       >
                         <span>{toneOverride || brandProfile.toneOfVoice}</span>
                         <Icon name="chevron-down" className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-transform ${isToneSelectorOpen ? 'rotate-180' : ''}`} />
@@ -512,7 +522,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                       type="button"
                       onClick={handleEnhancePrompt}
                       disabled={!transcript.trim() || isEnhancing}
-                      className="flex items-center justify-center size-6 sm:size-7 rounded-md text-white/60 hover:text-white/90 hover:bg-white/5 transition-all disabled:opacity-30"
+                      className="flex items-center justify-center size-6 sm:size-7 rounded-md text-muted-foreground hover:text-white/90 hover:bg-white/5 transition-all disabled:opacity-30"
                     >
                       {isEnhancing ? (
                         <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
@@ -527,7 +537,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                       className={`size-6 sm:size-7 flex items-center justify-center transition-all ${
                         canGenerate
                           ? 'text-white hover:text-white/80 hover:scale-105'
-                          : 'text-white/30 cursor-not-allowed'
+                          : 'text-muted-foreground cursor-not-allowed'
                       }`}
                     >
                       {isGenerating ? (
@@ -665,7 +675,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
 
           {/* Attachments Panel */}
           {hasAttachments && (
-            <div className="mt-4 bg-[#0a0a0a] border border-white/10 rounded-xl p-3 sm:p-4 max-w-sm sm:max-w-2xl mx-auto">
+            <div className="mt-4 bg-background border border-border rounded-xl p-3 sm:p-4 max-w-sm sm:max-w-2xl mx-auto">
               <div className="flex items-center justify-between mb-2 sm:mb-3">
                 <h4 className="text-[10px] sm:text-xs font-bold text-white/70">
                   Anexos
@@ -676,7 +686,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                   <button
                     key={`product-${i}`}
                     onClick={() => handleRemoveImage(i, "product")}
-                    className="relative aspect-square rounded-lg overflow-hidden border-2 border-white/10 hover:border-red-500/50 transition-all group"
+                    className="relative aspect-square rounded-lg overflow-hidden border-2 border-border hover:border-red-500/50 transition-all group"
                   >
                     <img
                       src={img.preview}
@@ -755,7 +765,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
           {isFavoritesOpen && styleReferences.length > 0 && (
             <div
               ref={favoritesPanelRef}
-              className="mt-4 bg-[#0a0a0a] border border-white/10 rounded-xl p-3 sm:p-4 max-w-sm sm:max-w-2xl mx-auto"
+              className="mt-4 bg-background border border-border rounded-xl p-3 sm:p-4 max-w-sm sm:max-w-2xl mx-auto"
             >
               <div className="flex items-center justify-between mb-2 sm:mb-3">
                 <h4 className="text-[10px] sm:text-xs font-bold text-white/70">
@@ -763,7 +773,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                 </h4>
                 <button
                   onClick={() => setIsFavoritesOpen(false)}
-                  className="text-white/30 hover:text-white/50"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   <Icon name="x" className="w-3 sm:w-4 h-3 sm:h-4" />
                 </button>
@@ -775,7 +785,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
                     onClick={() => handleSelectFavorite(ref)}
                     className={`aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${selectedStyleReference?.id === ref.id
                       ? "border-primary ring-2 ring-primary/30"
-                      : "border-white/10 hover:border-primary/50"
+                      : "border-border hover:border-primary/50"
                       }`}
                   >
                     <img
@@ -800,6 +810,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       {/* Model Selector Dropdown - Fixed Position */}
       {isModelSelectorOpen && (
         <div
+          ref={modelDropdownRef}
           className="fixed w-56 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 z-[300]"
           style={{ top: `${modelDropdownPosition.top}px`, left: `${modelDropdownPosition.left}px` }}
         >
@@ -808,11 +819,11 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               key={model.id}
               onClick={() => handleModelSelect(model.id)}
               className={`w-full px-3 py-2 text-left transition-colors ${
-                selectedModel === model.id ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+                selectedModel === model.id ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5 hover:text-white'
               }`}
             >
               <div className="text-xs font-medium">{model.label}</div>
-              <div className="text-[10px] text-white/40">{model.provider}</div>
+              <div className="text-[10px] text-muted-foreground">{model.provider}</div>
             </button>
           ))}
         </div>
@@ -821,13 +832,14 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       {/* Tone Selector Dropdown - Fixed Position */}
       {isToneSelectorOpen && (
         <div
+          ref={toneDropdownRef}
           className="fixed w-48 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 z-[300]"
           style={{ top: `${toneDropdownPosition.top}px`, left: `${toneDropdownPosition.left}px` }}
         >
           <button
             onClick={() => handleToneSelect(null)}
             className={`w-full px-3 py-2 text-left text-xs transition-colors ${
-              !toneOverride ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+              !toneOverride ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5 hover:text-white'
             }`}
           >
             Padrão ({brandProfile.toneOfVoice})
@@ -837,7 +849,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               key={tone}
               onClick={() => handleToneSelect(tone)}
               className={`w-full px-3 py-2 text-left text-xs transition-colors ${
-                toneOverride === tone ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+                toneOverride === tone ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5 hover:text-white'
               }`}
             >
               {tone}
@@ -854,13 +866,13 @@ export const UploadForm: React.FC<UploadFormProps> = ({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs sm:text-sm font-medium text-white/90">{toneToast.title}</p>
-              <p className="text-[10px] sm:text-xs text-white/50 line-clamp-2">{toneToast.description}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-2">{toneToast.description}</p>
             </div>
             <button
               onClick={() => setToneToast(null)}
               className="p-1 rounded-full hover:bg-white/10 transition-colors ml-1 flex-shrink-0"
             >
-              <Icon name="x" className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-white/50" />
+              <Icon name="x" className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-muted-foreground" />
             </button>
           </div>
         </div>

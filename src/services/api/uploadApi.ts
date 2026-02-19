@@ -5,6 +5,7 @@
  */
 
 import { getAuthToken } from '../authService';
+import { getCsrfToken, getCurrentCsrfToken } from '../apiClient';
 
 // =============================================================================
 // Types
@@ -50,13 +51,19 @@ export async function uploadToBlob(
     ),
   );
   const token = await getAuthToken();
+  if (!getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+  const csrfToken = getCurrentCsrfToken();
 
   const response = await fetch('/api/upload', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
+    credentials: 'include',
     body: JSON.stringify({
       filename,
       contentType,

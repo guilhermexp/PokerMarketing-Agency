@@ -188,7 +188,7 @@ export function SocialStories({
             whileTap={{ scale: 0.95 }}
           >
             {/* Avatar Image */}
-            <div className="absolute inset-0 rounded-full overflow-hidden bg-zinc-800 ring-1 ring-white/10">
+            <div className="absolute inset-0 rounded-full overflow-hidden bg-zinc-800 ring-1 ring-ring">
               <img
                 src={profile.avatarUrl}
                 alt={profile.name}
@@ -232,7 +232,7 @@ export function SocialStories({
                   rounded-[20px] md:rounded-[30px]
                   overflow-hidden
                   shadow-2xl
-                  border border-white/10
+                  border border-border
                   flex flex-col
                 "
               >
@@ -248,7 +248,7 @@ export function SocialStories({
                   {/* Loading State */}
                   {!isMediaReady && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-zinc-900">
-                      <Loader2 className="w-8 h-8 animate-spin text-white/50" />
+                      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                     </div>
                   )}
 
@@ -298,7 +298,7 @@ export function SocialStories({
                   {/* Header: User Info */}
                   <div className="absolute top-8 left-4 right-4 flex justify-between items-center z-20">
                     <div className="flex items-center gap-2.5">
-                      <div className="relative w-9 h-9 rounded-full overflow-hidden border border-white/20">
+                      <div className="relative w-9 h-9 rounded-full overflow-hidden border border-border">
                         <img
                           src={profile.avatarUrl}
                           alt={profile.name}
@@ -339,7 +339,7 @@ export function SocialStories({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/10 transition-all hover:scale-105"
+                        className="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md border border-border transition-all hover:scale-105"
                       >
                         <ArrowUpRight className="w-5 h-5 text-white" />
                       </a>

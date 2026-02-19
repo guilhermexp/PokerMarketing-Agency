@@ -1,6 +1,7 @@
 /**
  * BatchItem
  * Displays a single generation batch with its generations
+ * Professional design matching Video Studio
  */
 
 import React, { useCallback, useState } from 'react';
@@ -20,6 +21,36 @@ import type { GenerationBatch } from '../../stores/imagePlaygroundStore';
 interface BatchItemProps {
   batch: GenerationBatch;
   topicId: string;
+}
+
+function getStringConfig(config: Record<string, unknown>, key: string): string | null {
+  const value = config[key];
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function getBooleanConfig(config: Record<string, unknown>, key: string): boolean {
+  return config[key] === true;
+}
+
+function extractUserPrompt(batchPrompt: string, config: Record<string, unknown>): string {
+  const configPrompt = getStringConfig(config, 'userPrompt');
+  if (configPrompt) return configPrompt;
+
+  if (batchPrompt.includes('PROMPT DO USUÁRIO:')) {
+    return batchPrompt.split('PROMPT DO USUÁRIO:').pop()?.trim() || batchPrompt;
+  }
+
+  const technicalPromptMatch = batchPrompt.match(/^PROMPT TÉCNICO:\s*(.+?)\s*ESTILO VISUAL:/s);
+  if (technicalPromptMatch?.[1]) {
+    return technicalPromptMatch[1].trim();
+  }
+
+  const campaignGradePromptMatch = batchPrompt.match(/- Prompt base:\s*(.+)/);
+  if (campaignGradePromptMatch?.[1]) {
+    return campaignGradePromptMatch[1].trim();
+  }
+
+  return batchPrompt;
 }
 
 export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
@@ -44,7 +75,6 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
     const successGenerations = batch.generations.filter((g) => g.asset?.url);
     if (successGenerations.length === 0) return;
 
-    // Simple download for single image
     if (successGenerations.length === 1) {
       const url = successGenerations[0].asset!.url;
       const link = document.createElement('a');
@@ -54,13 +84,12 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
       return;
     }
 
-    // For multiple images, download individually
     for (const gen of successGenerations) {
       const link = document.createElement('a');
       link.href = gen.asset!.url;
       link.download = `generation_${gen.id}.png`;
       link.click();
-      await new Promise((r) => setTimeout(r, 500)); // Small delay between downloads
+      await new Promise((r) => setTimeout(r, 500));
     }
 
     setShowMenu(false);
@@ -68,73 +97,144 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
 
   const successCount = batch.generations.filter((g) => g.asset?.url).length;
   const totalCount = batch.generations.length;
+  const config = batch.config || {};
+  const displayPrompt = extractUserPrompt(batch.prompt, config);
+  const imageSize = getStringConfig(config, 'imageSize');
+  const aspectRatio = getStringConfig(config, 'aspectRatio');
+  const toneOverride = getStringConfig(config, 'toneOfVoiceOverride');
+  const fontStyleOverride = getStringConfig(config, 'fontStyleOverride');
+  const useBrandProfile = getBooleanConfig(config, 'useBrandProfile');
+  const useInstagramMode = getBooleanConfig(config, 'useInstagramMode');
+
+  const totalTokens = batch.generations.reduce(
+    (acc, g) => {
+      if (g.asset?.inputTokens) acc.input += g.asset.inputTokens;
+      if (g.asset?.outputTokens) acc.output += g.asset.outputTokens;
+      return acc;
+    },
+    { input: 0, output: 0 },
+  );
+  const hasTokens = totalTokens.input > 0 || totalTokens.output > 0;
+
+  const createdDate = batch.createdAt ? new Date(batch.createdAt) : null;
+  const formattedDate = createdDate
+    ? createdDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+    : null;
+  const formattedTime = createdDate
+    ? createdDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : null;
 
   return (
-    <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden">
+    <div className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 flex items-start gap-3">
+      <div className="px-4 py-3.5 flex items-start gap-3 relative">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="mt-0.5 p-1 -ml-1 rounded-lg hover:bg-white/10 transition-colors"
+          className="mt-0.5 p-1 -ml-1 rounded-lg hover:bg-white/[0.08] transition-colors"
         >
           {isExpanded ? (
-            <ChevronUp className="w-4 h-4 text-white/40" />
+            <ChevronUp className="w-4 h-4 text-white/30" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-white/40" />
+            <ChevronDown className="w-4 h-4 text-white/30" />
           )}
         </button>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-white/90 line-clamp-2">{batch.prompt}</p>
-          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-white/40">
-            <span className="px-1.5 py-0.5 bg-white/5 rounded">
+          <p className="text-sm text-white/90 line-clamp-2 leading-relaxed">{displayPrompt}</p>
+          <div className="flex items-center gap-1.5 mt-2 text-[10px] text-white/30 flex-wrap">
+            <span className="px-1.5 py-0.5 bg-white/[0.06] rounded-md">
               {batch.model.split('/').pop() || batch.model}
             </span>
-            <span>
-              {batch.width}×{batch.height}
+            {useInstagramMode && (
+              <span className="px-1.5 py-0.5 bg-pink-500/15 text-pink-300/80 rounded-md">
+                Instagram
+              </span>
+            )}
+            {useBrandProfile && (
+              <span className="px-1.5 py-0.5 bg-white/[0.06] text-white/50 rounded-md">
+                Perfil da marca
+              </span>
+            )}
+            {toneOverride && (
+              <span className="px-1.5 py-0.5 bg-white/[0.06] text-white/50 rounded-md">
+                Tom: {toneOverride}
+              </span>
+            )}
+            {fontStyleOverride && (
+              <span className="px-1.5 py-0.5 bg-white/[0.06] text-white/50 rounded-md">
+                Fonte: {fontStyleOverride}
+              </span>
+            )}
+            {imageSize && (
+              <span className="px-1.5 py-0.5 bg-white/[0.06] text-white/50 rounded-md">
+                {imageSize}
+              </span>
+            )}
+            {aspectRatio && (
+              <span className="px-1.5 py-0.5 bg-white/[0.06] text-white/50 rounded-md">
+                {aspectRatio}
+              </span>
+            )}
+            <span className="text-white/25">
+              {batch.width}x{batch.height}
             </span>
-            <span>
+            <span className="text-white/25">
               {successCount}/{totalCount} imagens
             </span>
+            {hasTokens && (
+              <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-300/70 rounded-md" title={`Input: ${totalTokens.input.toLocaleString()} · Output: ${totalTokens.output.toLocaleString()}`}>
+                {(totalTokens.input + totalTokens.output).toLocaleString()} tokens
+              </span>
+            )}
+            {formattedDate && (
+              <span className="text-white/20" title={createdDate?.toLocaleString('pt-BR')}>
+                {formattedDate} {formattedTime}
+              </span>
+            )}
+            {batch.userEmail && (
+              <span className="truncate max-w-[140px] text-white/20" title={batch.userEmail}>
+                {batch.userEmail}
+              </span>
+            )}
           </div>
         </div>
 
         {/* Menu */}
-        <div className="relative">
+        <div className="relative z-50">
           <button
             onClick={() => setShowMenu(!showMenu)}
-            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-white/[0.08] transition-colors"
           >
-            <MoreHorizontal className="w-4 h-4 text-white/40" />
+            <MoreHorizontal className="w-4 h-4 text-white/30" />
           </button>
 
           {showMenu && (
             <>
               <div
-                className="fixed inset-0 z-10"
+                className="fixed inset-0 z-40"
                 onClick={() => setShowMenu(false)}
               />
-              <div className="absolute right-0 top-full mt-1 w-48 bg-black/95 border border-white/10 rounded-xl shadow-2xl z-20 py-1 overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 w-48 bg-zinc-900/95 border border-white/[0.1] rounded-xl shadow-2xl backdrop-blur-xl z-50 py-1">
                 <button
                   onClick={handleReuseSettings}
-                  className="w-full px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10 flex items-center gap-2"
+                  className="w-full px-3 py-2.5 text-left text-sm text-white/80 hover:bg-white/[0.06] flex items-center gap-2.5 transition-colors"
                 >
-                  <Settings2 className="w-4 h-4" />
-                  Reusar configurações
+                  <Settings2 className="w-4 h-4 text-white/40" />
+                  Reusar configuracoes
                 </button>
                 {successCount > 0 && (
                   <button
                     onClick={handleDownloadAll}
-                    className="w-full px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10 flex items-center gap-2"
+                    className="w-full px-3 py-2.5 text-left text-sm text-white/80 hover:bg-white/[0.06] flex items-center gap-2.5 transition-colors"
                   >
-                    <Download className="w-4 h-4" />
+                    <Download className="w-4 h-4 text-white/40" />
                     Baixar {successCount > 1 ? 'todas' : 'imagem'}
                   </button>
                 )}
-                <div className="border-t border-white/10 my-1" />
+                <div className="h-px bg-white/[0.06] my-1" />
                 <button
                   onClick={handleDelete}
-                  className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2"
+                  className="w-full px-3 py-2.5 text-left text-sm text-red-400/80 hover:bg-red-500/10 flex items-center gap-2.5 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                   Excluir batch
@@ -147,9 +247,9 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
 
       {/* Generations Grid */}
       {isExpanded && (
-        <div className="p-4 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10">
+        <div className="p-4 pt-0">
           <div
-            className={`grid gap-4 ${
+            className={`grid gap-3 ${
               batch.generations.length === 1
                 ? 'grid-cols-1 max-w-md'
                 : batch.generations.length === 2

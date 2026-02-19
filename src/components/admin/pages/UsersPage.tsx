@@ -110,7 +110,7 @@ export function UsersPage() {
             <div className="text-[13px] font-medium text-white/80">
               {row.name || 'Sem nome'}
             </div>
-            <div className="text-[11px] text-white/40">{row.email}</div>
+            <div className="text-[11px] text-muted-foreground">{row.email}</div>
           </div>
         </div>
       ),
@@ -119,7 +119,7 @@ export function UsersPage() {
       key: 'campaigns',
       header: 'Campanhas',
       render: (row) => (
-        <span className="text-[12px] text-white/60 tabular-nums">
+        <span className="text-[12px] text-muted-foreground tabular-nums">
           {row.campaign_count}
         </span>
       ),
@@ -128,7 +128,7 @@ export function UsersPage() {
       key: 'brands',
       header: 'Marcas',
       render: (row) => (
-        <span className="text-[12px] text-white/60 tabular-nums">
+        <span className="text-[12px] text-muted-foreground tabular-nums">
           {row.brand_count}
         </span>
       ),
@@ -137,7 +137,7 @@ export function UsersPage() {
       key: 'posts',
       header: 'Posts',
       render: (row) => (
-        <span className="text-[12px] text-white/60 tabular-nums">
+        <span className="text-[12px] text-muted-foreground tabular-nums">
           {row.scheduled_post_count}
         </span>
       ),
@@ -146,7 +146,7 @@ export function UsersPage() {
       key: 'last_login',
       header: 'Último Login',
       render: (row) => (
-        <span className="text-[12px] text-white/50">
+        <span className="text-[12px] text-muted-foreground">
           {row.last_login
             ? new Date(row.last_login).toLocaleDateString('pt-BR', {
                 day: '2-digit',
@@ -161,7 +161,7 @@ export function UsersPage() {
       key: 'created_at',
       header: 'Cadastro',
       render: (row) => (
-        <span className="text-[12px] text-white/50">
+        <span className="text-[12px] text-muted-foreground">
           {new Date(row.created_at).toLocaleDateString('pt-BR', {
             day: '2-digit',
             month: 'short',
@@ -178,7 +178,7 @@ export function UsersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-[15px] font-medium text-white/90">Todos os Usuários</h2>
-          <p className="text-[12px] text-white/40 mt-0.5">
+          <p className="text-[12px] text-muted-foreground mt-0.5">
             {pagination.total} usuários cadastrados
           </p>
         </div>
@@ -210,7 +210,7 @@ export function UsersPage() {
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg overflow-hidden">
+        <div className="bg-white/[0.02] border border-border rounded-lg overflow-hidden">
           <Pagination
             currentPage={pagination.page}
             totalPages={pagination.totalPages}

@@ -26,7 +26,7 @@ export const ImagePreviewFooter: React.FC<ImagePreviewFooterProps> = ({
   if (isVideo) return null;
 
   return (
-    <div className="p-4 border-t border-white/[0.06] space-y-2">
+    <div className="p-4 border-t border-border space-y-2">
       {/* Botões de aprovação agora estão no overlay, não aqui */}
       {/* Mostrar apenas botões normais de edição quando NÃO estiver em modo de aprovação */}
       {editPreview && !isToolApprovalMode ? (
@@ -34,7 +34,7 @@ export const ImagePreviewFooter: React.FC<ImagePreviewFooterProps> = ({
           <button
             onClick={handleDiscardEdit}
             disabled={isEditing}
-            className="flex-1 h-9 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
+            className="flex-1 h-9 bg-white/[0.03] hover:bg-white/[0.06] border border-border rounded-lg text-[10px] font-medium text-muted-foreground transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
           >
             <Icon name="x" className="w-3.5 h-3.5" />
             Descartar
@@ -46,7 +46,7 @@ export const ImagePreviewFooter: React.FC<ImagePreviewFooterProps> = ({
           >
             {isEditing ? (
               <>
-                <Loader size={14} className="text-white/60" />
+                <Loader size={14} className="text-muted-foreground" />
                 Salvando...
               </>
             ) : (
@@ -64,17 +64,17 @@ export const ImagePreviewFooter: React.FC<ImagePreviewFooterProps> = ({
               onClick={clearMask}
               disabled={isActionRunning}
               title="Limpar máscara"
-              className="w-8 h-8 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-white/30 hover:text-white/50 transition-all disabled:opacity-30 flex items-center justify-center"
+              className="w-8 h-8 bg-white/[0.03] hover:bg-white/[0.06] border border-border rounded-lg text-muted-foreground hover:text-white/50 transition-all disabled:opacity-30 flex items-center justify-center"
             >
               <Icon name="eraser" className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={handleRemoveBackground}
               disabled={isActionRunning}
-              className="flex-1 h-8 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg text-[10px] font-medium text-white/40 hover:text-white/60 transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
+              className="flex-1 h-8 bg-white/[0.03] hover:bg-white/[0.06] border border-border rounded-lg text-[10px] font-medium text-muted-foreground transition-all disabled:opacity-30 flex items-center justify-center gap-1.5"
             >
               {isRemovingBackground ? (
-                <Loader size={12} className="text-white/60" />
+                <Loader size={12} className="text-muted-foreground" />
               ) : (
                 <Icon name="scissors" className="w-3 h-3" />
               )}
@@ -85,11 +85,11 @@ export const ImagePreviewFooter: React.FC<ImagePreviewFooterProps> = ({
           <button
             onClick={handleEdit}
             disabled={!editPrompt.trim() || isActionRunning}
-            className="w-full h-9 bg-primary hover:bg-primary/90 disabled:bg-white/[0.03] disabled:text-white/20 rounded-lg text-[11px] font-bold text-black disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
+            className="w-full h-9 bg-primary hover:bg-primary/90 disabled:bg-white/[0.03] disabled:text-muted-foreground rounded-lg text-[11px] font-bold text-black disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
           >
             {isEditing ? (
               <>
-                <Loader size={14} className="text-white/60" />
+                <Loader size={14} className="text-muted-foreground" />
                 Processando...
               </>
             ) : (

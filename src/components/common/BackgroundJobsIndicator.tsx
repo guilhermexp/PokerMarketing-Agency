@@ -153,15 +153,15 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "queued":
-        return <Icon name="clock" className="w-3 h-3 text-white/40" />;
+        return <Icon name="clock" className="w-3 h-3 text-muted-foreground" />;
       case "processing":
         return (
           <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
         );
       case "completed":
-        return <Icon name="check" className="w-3 h-3 text-white/60" />;
+        return <Icon name="check" className="w-3 h-3 text-muted-foreground" />;
       case "failed":
-        return <Icon name="x" className="w-3 h-3 text-white/40" />;
+        return <Icon name="x" className="w-3 h-3 text-muted-foreground" />;
       default:
         return null;
     }
@@ -189,8 +189,8 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
       <div className="relative">
         {/* Expanded Panel */}
         {isExpanded && (
-          <div className="absolute bottom-full right-0 mb-2 w-72 bg-[#0a0a0a]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl overflow-hidden animate-fade-in-up">
-            <div className="px-4 py-3 border-b border-white/[0.08] flex items-center justify-between">
+          <div className="absolute bottom-full right-0 mb-2 w-72 bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl overflow-hidden animate-fade-in-up">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <h4 className="text-xs font-bold text-white">
                 Jobs em Background
               </h4>
@@ -199,14 +199,14 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
                   <button
                     onClick={handleCancelAll}
                     disabled={cancellingAll}
-                    className="px-2 py-1 text-[9px] font-medium text-white/60 hover:text-white hover:bg-white/5 rounded transition-colors disabled:opacity-30"
+                    className="px-2 py-1 text-[9px] font-medium text-muted-foreground hover:text-white hover:bg-white/5 rounded transition-colors disabled:opacity-30"
                   >
                     {cancellingAll ? "Cancelando..." : "Cancelar Todos"}
                   </button>
                 )}
                 <button
                   onClick={() => setIsExpanded(false)}
-                  className="p-1 text-white/40 hover:text-white transition-colors"
+                  className="p-1 text-muted-foreground hover:text-white transition-colors"
                 >
                   <Icon name="x" className="w-4 h-4" />
                 </button>
@@ -217,39 +217,39 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
               {/* Pending Jobs */}
               {pendingJobs.length > 0 && (
                 <div className="p-2">
-                  <p className="text-[9px] font-medium text-white/40 px-2 mb-1.5">
+                  <p className="text-[9px] font-medium text-muted-foreground px-2 mb-1.5">
                     Em Andamento ({pendingJobs.length})
                   </p>
                   {pendingJobs.map((job) => (
                     <div
                       key={job.id}
-                      className="rounded-lg bg-white/[0.03] border border-white/[0.08] mb-1.5 group overflow-hidden hover:bg-white/[0.05] transition-colors"
+                      className="rounded-lg bg-white/[0.03] border border-border mb-1.5 group overflow-hidden hover:bg-white/[0.05] transition-colors"
                     >
                       <div className="px-2.5 py-2 flex items-center gap-2">
                         {getStatusIcon(job.status)}
                         <span className="text-[10px] text-white/70 flex-1 truncate">
                           {getJobTypeLabel(job.job_type)}
                           {job.context && (
-                            <span className="text-white/30">
+                            <span className="text-muted-foreground">
                               {" "}
                               • {job.context.split("-").slice(-1)[0]}
                             </span>
                           )}
                         </span>
                         {job.status === "processing" && (
-                          <span className="text-[9px] text-white/50 font-medium">
+                          <span className="text-[9px] text-muted-foreground font-medium">
                             {job.progress || 0}%
                           </span>
                         )}
                         {job.status === "queued" && (
-                          <span className="text-[9px] text-white/30">
+                          <span className="text-[9px] text-muted-foreground">
                             Aguardando
                           </span>
                         )}
                         <button
                           onClick={() => handleCancelJob(job.id)}
                           disabled={cancellingJob === job.id}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-white/40 hover:text-white hover:bg-white/10 rounded transition-all disabled:opacity-30"
+                          className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-white hover:bg-white/10 rounded transition-all disabled:opacity-30"
                           title="Cancelar"
                         >
                           {cancellingJob === job.id ? (
@@ -338,9 +338,9 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
 
               {/* Recently Completed */}
               {recentlyCompleted.length > 0 && (
-                <div className="p-2 border-t border-white/[0.08]">
+                <div className="p-2 border-t border-border">
                   <div className="flex items-center justify-between px-2 mb-1.5">
-                    <p className="text-[9px] font-medium text-white/40">
+                    <p className="text-[9px] font-medium text-muted-foreground">
                       Concluídos Recentemente
                     </p>
                     <button
@@ -367,7 +367,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
                         }
                         setRecentlyCompleted([]);
                       }}
-                      className="text-[9px] font-medium text-white/30 hover:text-white/60 transition-colors"
+                      className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors"
                     >
                       Limpar
                     </button>
@@ -375,7 +375,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
                   {recentlyCompleted.map((job) => (
                     <div
                       key={job.id}
-                      className="px-2.5 py-2 rounded-lg bg-white/[0.03] border border-white/[0.08] flex items-center gap-2 mb-1.5 hover:bg-white/[0.05] transition-colors"
+                      className="px-2.5 py-2 rounded-lg bg-white/[0.03] border border-border flex items-center gap-2 mb-1.5 hover:bg-white/[0.05] transition-colors"
                     >
                       {getStatusIcon("completed")}
                       <span className="text-[10px] text-white/70 flex-1 truncate">
@@ -386,7 +386,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
                           href={job.result_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[9px] text-white/60 hover:text-white transition-colors"
+                          className="text-[9px] text-muted-foreground hover:text-white transition-colors"
                         >
                           Ver
                         </a>
@@ -397,7 +397,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
               )}
 
               {pendingJobs.length === 0 && recentlyCompleted.length === 0 && recentlyFailed.length === 0 && (
-                <p className="px-4 py-6 text-center text-[10px] text-white/30">
+                <p className="px-4 py-6 text-center text-[10px] text-muted-foreground">
                   Nenhum job ativo
                 </p>
               )}

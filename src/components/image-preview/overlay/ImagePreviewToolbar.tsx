@@ -1,4 +1,3 @@
-import { Typography } from 'antd';
 import {
   ZoomIn,
   ZoomOut,
@@ -33,7 +32,7 @@ const ToolbarButton = ({ icon: Icon, onClick, title, disabled = false, active = 
         ? 'opacity-30 cursor-not-allowed'
         : active
         ? 'bg-white/20 text-white hover:bg-white/30'
-        : 'bg-transparent text-white/60 hover:text-white hover:bg-white/10'
+        : 'bg-transparent text-muted-foreground hover:text-white hover:bg-white/10'
     }`}
   >
     <Icon size={16} />
@@ -135,15 +134,9 @@ export const ImagePreviewToolbar = ({
       {imageDimensions && (
         <>
           <div className="toolbar-separator" />
-          <Typography.Text
-            style={{
-              color: 'rgba(255,255,255,0.6)',
-              fontSize: '11px',
-              whiteSpace: 'nowrap',
-            }}
-          >
+          <span className="text-muted-foreground text-[11px] whitespace-nowrap">
             {imageDimensions.width} × {imageDimensions.height}
-          </Typography.Text>
+          </span>
         </>
       )}
 

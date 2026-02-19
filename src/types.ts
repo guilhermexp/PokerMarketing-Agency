@@ -175,6 +175,7 @@ export type GalleryMediaType = "image" | "video" | "audio";
 export interface GalleryImage {
   id: string;
   src: string;
+  thumbnailSrc?: string;
   prompt?: string;
   source: string;
   model: ImageModel | "video-export" | "tts-generation"; // Extended for videos and audio
@@ -259,6 +260,7 @@ export interface ChatMessage {
 export interface GenerationSetting {
   generate: boolean;
   count: number;
+  slidesPerCarousel?: number;
 }
 
 export interface GenerationOptions {

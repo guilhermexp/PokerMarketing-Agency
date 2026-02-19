@@ -119,27 +119,26 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
     <div className="h-full flex flex-col overflow-hidden">
       {/* Day Headers */}
       <div className="overflow-x-auto flex-shrink-0">
-        <div className="grid grid-cols-8 border-b border-white/10 min-w-[720px] bg-black/20">
+        <div className="grid grid-cols-8 border-b border-white/[0.06] min-w-[720px] bg-[#060606]">
           {/* Time column header */}
-          <div className="py-3 px-2 text-center text-[10px] font-medium text-white/30 border-r border-white/10">
+          <div className="py-3 px-2 text-center text-[10px] font-medium text-white/30 uppercase tracking-wider border-r border-white/[0.06]">
             Hora
           </div>
           {/* Day columns */}
           {weekDays.map((day) => (
             <div
               key={day.date}
-              className={`py-3 px-2 text-center border-r border-white/10 last:border-r-0 ${day.isToday ? "bg-white/5" : ""
-                }`}
+              className={`py-3 px-2 text-center border-r border-white/[0.06] last:border-r-0 ${day.isToday ? "bg-white/[0.02]" : ""}`}
             >
-              <div className="text-[10px] font-medium text-white/40">
+              <div className="text-[10px] font-medium text-white/30 uppercase tracking-wider">
                 {day.dayName}
               </div>
               <div
-                className={`text-2xl font-light mt-1 ${day.isToday ? "text-white" : "text-white/70"}`}
+                className={`text-2xl font-light mt-1 ${day.isToday ? "text-white" : "text-white/50"}`}
               >
                 {day.dayNumber}
               </div>
-              <div className="text-[9px] text-white/30 mt-0.5">
+              <div className="text-[9px] text-white/25 mt-0.5">
                 {day.month}
               </div>
             </div>
@@ -158,12 +157,12 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                   {/* Time Label */}
                   <div
                     ref={isCurrentHour ? currentHourRef : null}
-                    className={`py-3 px-2 text-center text-[9px] font-bold border-b border-r border-white/5 sticky left-0 bg-[#111111] ${isCurrentHour ? "text-primary" : "text-white/20"
+                    className={`py-3 px-2 text-center text-[9px] font-medium border-b border-r border-white/[0.06] sticky left-0 bg-[#060606] ${isCurrentHour ? "text-white/70" : "text-white/25"
                       }`}
                   >
                     {String(hour).padStart(2, "0")}:00
                     {isCurrentHour && (
-                      <span className="ml-1 text-[7px]">←</span>
+                      <span className="ml-1 text-[7px] text-white/40">now</span>
                     )}
                   </div>
                   {/* Day Cells */}
@@ -176,14 +175,14 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                         key={`${day.date}-${hour}`}
                         onClick={() => !isPastSlot && onDayClick(day.date, hour)}
                         className={`
-                        min-h-[60px] p-1 border-b border-r border-white/5 last:border-r-0
+                        min-h-[60px] p-1 border-b border-r border-white/[0.06] last:border-r-0
                         transition-colors
                         ${isPastSlot
-                            ? "bg-black/40 opacity-30 cursor-not-allowed"
-                            : "cursor-pointer hover:bg-white/5"
+                            ? "bg-white/[0.01] opacity-30 cursor-not-allowed"
+                            : "cursor-pointer hover:bg-white/[0.03]"
                           }
-                        ${day.isToday && !isPastSlot ? "bg-primary/5" : ""}
-                        ${isCurrentHour && day.isToday ? "ring-1 ring-primary/30" : ""}
+                        ${day.isToday && !isPastSlot ? "bg-white/[0.015]" : ""}
+                        ${isCurrentHour && day.isToday ? "ring-1 ring-inset ring-white/[0.1]" : ""}
                       `}
                       >
                         {posts.map((post) => (
@@ -208,11 +207,11 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
       </div>
 
       {/* Summary Footer */}
-      <div className="border-t border-white/10 bg-black/20 flex-shrink-0 overflow-x-auto">
+      <div className="border-t border-white/[0.06] bg-[#060606] flex-shrink-0 overflow-x-auto">
         <div className="grid grid-cols-8 min-w-[720px]">
           {/* Label column */}
-          <div className="p-3 border-r border-white/10 flex flex-col justify-center">
-            <div className="text-[10px] font-medium text-white/30 text-center">
+          <div className="p-3 border-r border-white/[0.06] flex flex-col justify-center">
+            <div className="text-[10px] font-medium text-white/30 text-center uppercase tracking-wider">
               Resumo
             </div>
           </div>
@@ -238,7 +237,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                   dayNumber: day.dayNumber,
                   month: day.month,
                 })}
-                className={`p-2 border-r border-white/10 last:border-r-0 min-h-[80px] ${day.isToday ? "bg-white/5" : ""
+                className={`p-2 border-r border-white/[0.06] last:border-r-0 min-h-[80px] ${day.isToday ? "bg-white/[0.02]" : ""
                   } ${hasActivity ? "cursor-pointer hover:bg-white/[0.02] transition-colors" : ""}`}
               >
                 {hasActivity ? (
@@ -246,33 +245,33 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                     {/* Status badges */}
                     <div className="flex flex-wrap items-center justify-center gap-1">
                       {published > 0 && (
-                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-green-500/20 rounded">
-                          <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                          <span className="text-[8px] font-bold text-green-400">
+                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-500/[0.1] rounded-md">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400/70" />
+                          <span className="text-[8px] font-medium text-emerald-400/70">
                             {published}
                           </span>
                         </div>
                       )}
                       {failed > 0 && (
-                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-red-500/20 rounded">
-                          <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                          <span className="text-[8px] font-bold text-red-400">
+                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-red-500/[0.1] rounded-md">
+                          <div className="w-1.5 h-1.5 rounded-full bg-red-400/70" />
+                          <span className="text-[8px] font-medium text-red-400/70">
                             {failed}
                           </span>
                         </div>
                       )}
                       {publishing > 0 && (
-                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/20 rounded">
-                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                          <span className="text-[8px] font-bold text-amber-400">
+                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/[0.1] rounded-md">
+                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400/70 animate-pulse" />
+                          <span className="text-[8px] font-medium text-amber-400/70">
                             {publishing}
                           </span>
                         </div>
                       )}
                       {scheduled > 0 && (
-                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/10 rounded">
-                          <div className="w-1.5 h-1.5 rounded-full bg-white/40" />
-                          <span className="text-[8px] font-bold text-white/60">
+                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/[0.04] rounded-md">
+                          <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                          <span className="text-[8px] font-medium text-white/30">
                             {scheduled}
                           </span>
                         </div>
@@ -282,10 +281,10 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                     {/* Next scheduled info */}
                     {nextPost && (
                       <div className="text-center">
-                        <div className="text-[7px] text-white/30 uppercase tracking-wider">
-                          Próximo
+                        <div className="text-[7px] text-white/25 uppercase tracking-wider">
+                          Proximo
                         </div>
-                        <div className="text-[9px] font-bold text-white/50">
+                        <div className="text-[9px] font-medium text-white/40">
                           {nextPost.scheduledTime}
                         </div>
                       </div>
@@ -294,8 +293,8 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                     {/* All published indicator */}
                     {published === total && total > 0 && (
                       <div className="text-center">
-                        <div className="text-[8px] font-bold text-green-400/80">
-                          ✓ Todos publicados
+                        <div className="text-[8px] font-medium text-emerald-400/60">
+                          Todos publicados
                         </div>
                       </div>
                     )}
@@ -303,16 +302,16 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                     {/* Has failures indicator */}
                     {failed > 0 && (
                       <div className="text-center">
-                        <div className="text-[8px] font-bold text-red-400/80">
-                          ✗ {failed} {failed === 1 ? "falhou" : "falharam"}
+                        <div className="text-[8px] font-medium text-red-400/60">
+                          {failed} {failed === 1 ? "falhou" : "falharam"}
                         </div>
                       </div>
                     )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full py-2">
-                    <div className="w-6 h-6 rounded-full border border-dashed border-white/10 flex items-center justify-center mb-1">
-                      <span className="text-[10px] text-white/20">—</span>
+                    <div className="w-6 h-6 rounded-lg border border-dashed border-white/[0.08] flex items-center justify-center mb-1">
+                      <span className="text-[10px] text-white/20">-</span>
                     </div>
                     <span className="text-[8px] text-white/20">Sem posts</span>
                   </div>
@@ -326,36 +325,36 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
       {/* Day Summary Modal */}
       {selectedDaySummary && (
         <div
-          className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/80 backdrop-blur-xl z-50 flex items-center justify-center p-4"
           onClick={() => setSelectedDaySummary(null)}
         >
           <div
-            className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-xl max-h-[85vh] overflow-hidden shadow-[0_25px_90px_rgba(0,0,0,0.7)]"
+            className="bg-[#0a0a0a] border border-white/[0.08] rounded-2xl w-full max-w-xl max-h-[85vh] overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header - Minimal */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 flex flex-col items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/[0.06] flex flex-col items-center justify-center">
                   <span className="text-xl font-light text-white">{selectedDaySummary.dayNumber}</span>
                   <span className="text-[9px] text-white/40">{selectedDaySummary.month}</span>
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-white">{selectedDaySummary.dayName}</h3>
-                  <p className="text-xs text-white/50 mt-0.5">
+                  <p className="text-xs text-white/40 mt-0.5">
                     {getPostsForDate(selectedDaySummary.date).length} posts agendados
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedDaySummary(null)}
-                className="p-2 text-white/40 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+                className="p-2 text-white/30 hover:text-white transition-colors rounded-lg hover:bg-white/[0.06]"
               >
                 <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Modal Content - Clean List */}
+            {/* Modal Content */}
             <div className="px-4 pb-4 overflow-y-auto max-h-[65vh]">
               <div className="space-y-2">
                 {getPostsForDate(selectedDaySummary.date).map((post) => {
@@ -363,14 +362,13 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                   const typeLabel = contentType === 'story' ? 'Story' :
                     contentType === 'carousel' ? 'Carousel' :
                       contentType === 'reel' ? 'Reel' : null;
-                  const _isPast = post.status === 'published'; // Approximation or just remove if unused
 
                   return (
                     <div
                       key={post.id}
-                      className="group flex items-center gap-4 p-3 rounded-xl bg-black/20 border border-white/10 hover:bg-black/30 hover:border-white/20 transition-all"
+                      className="group flex items-center gap-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] transition-all"
                     >
-                      {/* Thumbnail - Clickable */}
+                      {/* Thumbnail */}
                       <div
                         onClick={() => {
                           if (onPostClick) {
@@ -381,11 +379,11 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                         className={onPostClick ? "cursor-pointer" : ""}
                       >
                         {post.imageUrl ? (
-                          <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-black/40 border border-white/10 hover:border-white/30 transition-colors">
+                          <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-white/[0.03] border border-white/[0.06] transition-colors">
                             <img src={post.imageUrl} alt="" className="w-full h-full object-cover" />
                           </div>
                         ) : (
-                          <div className="w-20 h-20 rounded-lg bg-black/40 flex items-center justify-center flex-shrink-0 border border-white/10 hover:border-white/30 transition-colors">
+                          <div className="w-20 h-20 rounded-lg bg-white/[0.03] flex items-center justify-center flex-shrink-0 border border-white/[0.06] transition-colors">
                             <Icon name="image" className="w-6 h-6 text-white/20" />
                           </div>
                         )}
@@ -396,16 +394,16 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-semibold text-white">{post.scheduledTime}</span>
                           {typeLabel && (
-                            <span className="text-[9px] font-medium text-white/50 px-2 py-0.5 bg-black/40 border border-white/10 rounded-full">{typeLabel}</span>
+                            <span className="text-[9px] font-medium text-white/40 px-2 py-0.5 bg-white/[0.04] border border-white/[0.06] rounded-md">{typeLabel}</span>
                           )}
                           {post.status === 'published' && (
-                            <span className="text-[9px] font-medium text-emerald-400 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full">Publicado</span>
+                            <span className="text-[9px] font-medium text-emerald-400/80 px-2 py-0.5 bg-emerald-500/[0.08] border border-emerald-500/[0.15] rounded-md">Publicado</span>
                           )}
                           {post.status === 'failed' && (
-                            <span className="text-[9px] font-medium text-red-400 px-2 py-0.5 bg-red-500/10 border border-red-500/20 rounded-full">Falhou</span>
+                            <span className="text-[9px] font-medium text-red-400/80 px-2 py-0.5 bg-red-500/[0.08] border border-red-500/[0.15] rounded-md">Falhou</span>
                           )}
                         </div>
-                        <p className="text-xs text-white/50 line-clamp-2">
+                        <p className="text-xs text-white/40 line-clamp-2">
                           {post.caption || 'Sem legenda'}
                         </p>
                       </div>
@@ -417,7 +415,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                             {onPublishToInstagram && (
                               <button
                                 onClick={() => onPublishToInstagram(post)}
-                                className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                className="p-2 text-white/30 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
                                 title="Publicar agora"
                               >
                                 <Icon name="send" className="w-4 h-4" />
@@ -430,7 +428,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                                   onUpdatePost(post.id, { scheduledTime: newTime });
                                 }
                               }}
-                              className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                              className="p-2 text-white/30 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
                               title="Reagendar"
                             >
                               <Icon name="clock" className="w-4 h-4" />
@@ -439,7 +437,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                               onClick={() => {
                                 onUpdatePost(post.id, { status: 'published', publishedAt: Date.now() });
                               }}
-                              className="p-2 text-white/40 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                              className="p-2 text-white/30 hover:text-emerald-400/70 hover:bg-emerald-500/[0.08] rounded-lg transition-colors"
                               title="Marcar como publicado"
                             >
                               <Icon name="check" className="w-4 h-4" />
@@ -448,7 +446,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                         )}
                         <button
                           onClick={() => onDeletePost(post.id)}
-                          className="p-2 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                          className="p-2 text-white/30 hover:text-red-400/70 hover:bg-red-500/[0.08] rounded-lg transition-colors"
                           title="Excluir"
                         >
                           <Icon name="trash" className="w-4 h-4" />
@@ -460,14 +458,14 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
               </div>
             </div>
 
-            {/* Modal Footer - Minimal */}
-            <div className="px-5 pb-4 pt-3 border-t border-white/10">
+            {/* Modal Footer */}
+            <div className="px-5 pb-4 pt-3 border-t border-white/[0.06]">
               <button
                 onClick={() => {
                   setSelectedDaySummary(null);
                   onDayClick(selectedDaySummary.date);
                 }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white/90 bg-black/40 backdrop-blur-2xl border border-white/10 hover:border-white/30 rounded-full transition-all shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white/70 bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] rounded-xl transition-all"
               >
                 <Icon name="plus" className="w-4 h-4" />
                 Novo Agendamento

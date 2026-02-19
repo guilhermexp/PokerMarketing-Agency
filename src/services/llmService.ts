@@ -5,6 +5,7 @@
 
 import type { BrandProfile } from '../types';
 import { getAuthToken } from './authService';
+import { getCsrfToken, getCurrentCsrfToken } from './apiClient';
 
 export interface LLMResponse {
   content: string;
@@ -49,12 +50,19 @@ export const generateCreativeText = async (
       mimeType: p.inlineData!.mimeType
     }));
 
+  if (!getCurrentCsrfToken()) {
+    await getCsrfToken();
+  }
+  const csrfToken = getCurrentCsrfToken();
+
   const response = await fetch('/api/ai/text', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
+    credentials: 'include',
     body: JSON.stringify({
       type: 'custom',
       brandProfile: {

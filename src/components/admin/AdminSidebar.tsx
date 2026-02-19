@@ -71,11 +71,11 @@ export function AdminSidebar() {
   };
 
   return (
-    <aside className="w-56 bg-[#0a0a0a] h-screen fixed left-0 top-0 flex flex-col border-r border-white/[0.06]">
+    <aside className="w-56 bg-background h-screen fixed left-0 top-0 flex flex-col border-r border-border">
       {/* Logo */}
-      <div className="h-14 flex items-center px-5 border-b border-white/[0.06]">
+      <div className="h-14 flex items-center px-5 border-b border-border">
         <a href="/" className="flex items-center gap-2.5 group">
-          <div className="w-7 h-7 rounded-md bg-amber-500 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center">
             <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
@@ -86,7 +86,7 @@ export function AdminSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        <p className="px-3 mb-2 text-[10px] font-medium uppercase tracking-wider text-white/30">
+        <p className="px-3 mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Menu
         </p>
         {navItems.map((item) => (
@@ -97,7 +97,7 @@ export function AdminSidebar() {
             className={`flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-150 ${
               isActive(item.path)
                 ? 'bg-amber-500/10 text-amber-500'
-                : 'text-white/50 hover:text-white/80 hover:bg-white/[0.03]'
+                : 'text-muted-foreground hover:text-white/80 hover:bg-white/[0.03]'
             }`}
           >
             {item.icon}
@@ -107,10 +107,10 @@ export function AdminSidebar() {
       </nav>
 
       {/* Back to App */}
-      <div className="px-3 py-4 border-t border-white/[0.06]">
+      <div className="px-3 py-4 border-t border-border">
         <a
           href="/"
-          className="flex items-center gap-2.5 px-3 py-2 rounded-md text-white/40 hover:text-white/70 hover:bg-white/[0.03] transition-all duration-150"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-md text-muted-foreground hover:text-white/70 hover:bg-white/[0.03] transition-all duration-150"
         >
           <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />

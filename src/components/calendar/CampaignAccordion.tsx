@@ -46,10 +46,10 @@ export const CampaignAccordion: React.FC<CampaignAccordionProps> = ({
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
         <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-          <Icon name="folder" className="w-8 h-8 text-white/20" />
+          <Icon name="folder" className="w-8 h-8 text-muted-foreground" />
         </div>
-        <p className="text-sm font-bold text-white/40">Nenhuma Campanha</p>
-        <p className="text-xs text-white/20 mt-1">
+        <p className="text-sm font-bold text-muted-foreground">Nenhuma Campanha</p>
+        <p className="text-xs text-muted-foreground mt-1">
           Gere campanhas para ver as imagens aqui
         </p>
       </div>
@@ -64,7 +64,7 @@ export const CampaignAccordion: React.FC<CampaignAccordionProps> = ({
         return (
           <div
             key={campaign.id}
-            className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden transition-all duration-200"
+            className="rounded-xl border border-border bg-white/[0.02] overflow-hidden transition-all duration-200"
           >
             {/* Collapsed Header */}
             <button
@@ -81,7 +81,7 @@ export const CampaignAccordion: React.FC<CampaignAccordionProps> = ({
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <Icon name="image" className="w-5 h-5 text-white/20" />
+                    <Icon name="image" className="w-5 h-5 text-muted-foreground" />
                   </div>
                 )}
               </div>
@@ -91,13 +91,13 @@ export const CampaignAccordion: React.FC<CampaignAccordionProps> = ({
                 <h3 className="text-sm font-bold text-white truncate">
                   {campaign.name || 'Campanha sem nome'}
                 </h3>
-                <p className="text-[10px] text-white/40 font-medium">
+                <p className="text-[10px] text-muted-foreground font-medium">
                   {campaign.imageCount} {campaign.imageCount === 1 ? 'imagem' : 'imagens'}
                 </p>
               </div>
 
               {/* Chevron */}
-              <div className={`w-6 h-6 flex items-center justify-center text-white/30 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+              <div className={`w-6 h-6 flex items-center justify-center text-muted-foreground transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
                 <Icon name="chevron-down" className="w-4 h-4" />
               </div>
             </button>
@@ -108,16 +108,16 @@ export const CampaignAccordion: React.FC<CampaignAccordionProps> = ({
                 isExpanded ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0'
               }`}
             >
-              <div className="p-3 pt-0 border-t border-white/5">
+              <div className="p-3 pt-0 border-t border-border">
                 {campaign.images.length === 0 ? (
                   <div className="py-6 text-center">
-                    <Icon name="image" className="w-8 h-8 text-white/20 mx-auto mb-2" />
-                    <p className="text-xs text-white/30">
+                    <Icon name="image" className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground">
                       {campaign.imageCount > 0
                         ? 'Imagens ainda não foram geradas para esta campanha'
                         : 'Nenhuma imagem gerada'}
                     </p>
-                    <p className="text-[10px] text-white/20 mt-1">
+                    <p className="text-[10px] text-muted-foreground mt-1">
                       Gere as imagens na aba de Campanhas
                     </p>
                   </div>
@@ -132,10 +132,10 @@ export const CampaignAccordion: React.FC<CampaignAccordionProps> = ({
                         <div
                           key={image.id}
                           onClick={() => onSelectImage(image)}
-                          className={`group relative overflow-hidden rounded-lg border-2 bg-[#111111] transition-all cursor-pointer aspect-square ${
+                          className={`group relative overflow-hidden rounded-lg border-2 bg-card transition-all cursor-pointer aspect-square ${
                             isSelected
                               ? 'border-primary shadow-lg shadow-primary/20'
-                              : 'border-white/5 hover:border-white/20'
+                              : 'border-border hover:border-white/20'
                           }`}
                         >
                           {itemIsVideo ? (
