@@ -8,12 +8,14 @@
 
 import { put } from "@vercel/blob";
 import sharp from "sharp";
-import Replicate from "replicate";
+import { fal } from "@fal-ai/client";
+import { configureFal } from "../lib/ai/clients.mjs";
 import { validateContentType } from "../lib/validation/contentType.mjs";
 import { logAiUsage } from "./usage-tracking.mjs";
 
-// Replicate fallback config
-const REPLICATE_IMAGE_MODEL = "google/nano-banana-pro";
+// FAL.ai fallback config
+const FAL_IMAGE_MODEL = "fal-ai/gemini-3-pro-image-preview";
+const FAL_EDIT_MODEL = "fal-ai/gemini-3-pro-image-preview/edit";
 
 // Timeout for fetching remote reference images (30 seconds)
 const FETCH_TIMEOUT_MS = 30_000;
@@ -26,14 +28,6 @@ function fetchWithTimeout(url, options = {}) {
   );
 }
 
-function getReplicate() {
-  const apiToken = process.env.REPLICATE_API_TOKEN;
-  if (!apiToken) {
-    throw new Error("REPLICATE_API_TOKEN not configured");
-  }
-  return new Replicate({ auth: apiToken });
-}
-
 function isQuotaOrRateLimitError(error) {
   const errorString = String(error?.message || error || "").toLowerCase();
   return (
@@ -44,19 +38,6 @@ function isQuotaOrRateLimitError(error) {
     errorString.includes("limit") ||
     errorString.includes("exceeded")
   );
-}
-
-function normalizeReplicateOutputUrl(output) {
-  if (typeof output === "string") return output;
-  if (Array.isArray(output)) {
-    const first = output[0];
-    if (typeof first === "string") return first;
-    if (first && typeof first.url === "function") return first.url();
-    if (first && typeof first.url === "string") return first.url;
-  }
-  if (output && typeof output.url === "function") return output.url();
-  if (output && typeof output.url === "string") return output.url;
-  return null;
 }
 
 // Thumbnail settings
@@ -627,7 +608,7 @@ function mapAspectRatio(ratio) {
 
 /**
  * Build content parts array from params (reference images, product images, etc.)
- * Shared between Gemini and used to extract image inputs for Replicate fallback.
+ * Shared between Gemini and FAL.ai fallback.
  */
 async function buildContentParts(params) {
   const parts = [{ text: params.prompt }];
@@ -781,70 +762,91 @@ async function generateWithGemini(genai, parts, params) {
 }
 
 /**
- * Generate image via Replicate (fallback when Gemini quota is exhausted).
- * Returns { imageBase64, mimeType }.
+ * Generate image via FAL.ai (fallback when Gemini quota is exhausted).
+ * Returns { imageBase64, mimeType, usedProvider, usedModel }.
  */
-async function generateWithReplicate(parts, params) {
+async function generateWithFal(parts, params) {
   console.log(
-    `[ImagePlayground] Gemini quota exceeded, trying Replicate fallback (${REPLICATE_IMAGE_MODEL})`,
+    `[ImagePlayground] Gemini quota exceeded, trying FAL.ai fallback (${FAL_IMAGE_MODEL})`,
   );
 
-  const replicate = getReplicate();
-
-  const toDataUrl = (img) => `data:${img.mimeType};base64,${img.base64}`;
+  configureFal();
 
   // Collect image inputs from parts (same images that were prepared for Gemini)
   const imageInputs = parts
     .filter((p) => p.inlineData)
     .map((p) => ({ base64: p.inlineData.data, mimeType: p.inlineData.mimeType }));
 
-  const input = {
-    prompt: params.prompt,
-    output_format: "png",
-  };
-
+  const hasImages = imageInputs.length > 0;
   const aspectRatio = mapAspectRatio(params.aspectRatio || "1:1");
-  if (aspectRatio) {
-    input.aspect_ratio = aspectRatio;
+  let usedModel = FAL_IMAGE_MODEL;
+
+  let result;
+
+  if (hasImages) {
+    // Upload images to Blob for FAL.ai (needs HTTP URLs)
+    const imageUrls = await Promise.all(
+      imageInputs.slice(0, 14).map(async (img) => {
+        const buffer = Buffer.from(img.base64, "base64");
+        const ext = img.mimeType.includes("png") ? "png" : "jpg";
+        const filename = `fal-playground-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const blob = await put(filename, buffer, {
+          access: "public",
+          contentType: img.mimeType,
+        });
+        return blob.url;
+      }),
+    );
+
+    const input = {
+      prompt: params.prompt,
+      image_urls: imageUrls,
+      output_format: "png",
+    };
+    if (aspectRatio) input.aspect_ratio = aspectRatio;
+    if (["1K", "2K", "4K"].includes(params.imageSize)) input.resolution = params.imageSize;
+
+    result = await fal.subscribe(FAL_EDIT_MODEL, { input, logs: true });
+    usedModel = FAL_EDIT_MODEL;
+  } else {
+    const input = {
+      prompt: params.prompt,
+      output_format: "png",
+    };
+    if (aspectRatio) input.aspect_ratio = aspectRatio;
+    if (["1K", "2K", "4K"].includes(params.imageSize)) input.resolution = params.imageSize;
+
+    result = await fal.subscribe(FAL_IMAGE_MODEL, { input, logs: true });
   }
 
-  if (["1K", "2K", "4K"].includes(params.imageSize)) {
-    input.resolution = params.imageSize;
-  }
-
-  if (imageInputs.length > 0) {
-    input.image_input = imageInputs.slice(0, 14).map(toDataUrl);
-  }
-
-  const output = await replicate.run(REPLICATE_IMAGE_MODEL, { input });
-  const outputUrl = normalizeReplicateOutputUrl(output);
+  const outputUrl = result?.data?.images?.[0]?.url;
   if (!outputUrl) {
-    throw new Error("[Replicate] No image URL in output");
+    throw new Error("[FAL] No image URL in response");
   }
 
-  // Fetch the image from Replicate's temporary URL and convert to base64
+  // Fetch the image from FAL's temporary URL and convert to base64
   const imageResponse = await fetch(outputUrl);
   if (!imageResponse.ok) {
-    throw new Error(`[Replicate] Failed to fetch image: ${imageResponse.status}`);
+    throw new Error(`[FAL] Failed to fetch image: ${imageResponse.status}`);
   }
   const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
   const contentType = imageResponse.headers.get("content-type") || "image/png";
 
   validateContentType(contentType);
 
-  console.log(`[ImagePlayground] Replicate fallback successful`);
+  console.log(`[ImagePlayground] FAL.ai fallback successful`);
 
   return {
     imageBase64: imageBuffer.toString("base64"),
     mimeType: contentType,
-    usedProvider: "replicate",
-    usedModel: REPLICATE_IMAGE_MODEL,
+    usedProvider: "fal",
+    usedModel,
   };
 }
 
 /**
  * Background image generation processor.
- * Tries Gemini first, falls back to Replicate on quota/rate-limit errors.
+ * Tries Gemini first, falls back to FAL.ai on quota/rate-limit errors.
  */
 async function processImageGeneration(
   sql,
@@ -875,10 +877,10 @@ async function processImageGeneration(
       hasBrandProfile: !!params.brandProfile,
     });
 
-    // Build content parts (shared between Gemini and Replicate)
+    // Build content parts (shared between Gemini and FAL.ai)
     const parts = await buildContentParts(params);
 
-    // Try Gemini first, fallback to Replicate on quota errors
+    // Try Gemini first, fallback to FAL.ai on quota errors
     let imageBase64;
     let mimeType;
     let inputTokens = 0;
@@ -894,12 +896,12 @@ async function processImageGeneration(
       outputTokens = geminiResult.outputTokens || 0;
     } catch (geminiError) {
       if (isQuotaOrRateLimitError(geminiError)) {
-        // Fallback to Replicate
-        const replicateResult = await generateWithReplicate(parts, params);
-        imageBase64 = replicateResult.imageBase64;
-        mimeType = replicateResult.mimeType;
-        usedProvider = replicateResult.usedProvider;
-        usedModel = replicateResult.usedModel;
+        // Fallback to FAL.ai
+        const falResult = await generateWithFal(parts, params);
+        imageBase64 = falResult.imageBase64;
+        mimeType = falResult.mimeType;
+        usedProvider = falResult.usedProvider;
+        usedModel = falResult.usedModel;
       } else {
         // Non-quota error (safety, recitation, etc.) - re-throw as-is
         throw geminiError;
@@ -1047,7 +1049,7 @@ async function processImageGeneration(
         metadata: {
           source: "playground",
           aspectRatio: params.aspectRatio || "1:1",
-          fallbackUsed: usedProvider === "replicate",
+          fallbackUsed: usedProvider !== "google",
           generationId,
         },
       }).catch((err) => {

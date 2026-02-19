@@ -52,3 +52,5 @@ ACCEPTANCE-*.md
 docs/IMAGE-GENERATION-SUMMARY.md
 docs/security/XSS_PROTECTION_VERIFICATION.md
 .env*.local
+.playwright-cli/
+page-state.yaml

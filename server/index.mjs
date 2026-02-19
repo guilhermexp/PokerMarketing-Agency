@@ -1,11 +1,9 @@
 /**
- * Long-running server entrypoint (dev + Railway).
+ * Server entrypoint (dev + production).
  *
  * Imports the Express app from app.mjs, runs startup tasks
  * (database warmup, Redis, scheduled-posts worker), serves
  * static files, and calls app.listen().
- *
- * For Vercel serverless, see api/index.mjs instead.
  */
 
 import "dotenv/config";

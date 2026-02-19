@@ -1,12 +1,11 @@
 /**
  * AI client factory functions.
  *
- * Exports: getGeminiAi, getOpenRouter, getReplicate, callOpenRouterApi, configureFal
+ * Exports: getGeminiAi, getOpenRouter, callOpenRouterApi, configureFal
  */
 
 import { GoogleGenAI } from "@google/genai";
 import { OpenRouter } from "@openrouter/sdk";
-import Replicate from "replicate";
 import { fal } from "@fal-ai/client";
 
 export const getGeminiAi = () => {
@@ -23,14 +22,6 @@ export const getOpenRouter = () => {
     throw new Error("OPENROUTER_API_KEY not configured");
   }
   return new OpenRouter({ apiKey });
-};
-
-export const getReplicate = () => {
-  const apiToken = process.env.REPLICATE_API_TOKEN;
-  if (!apiToken) {
-    throw new Error("REPLICATE_API_TOKEN not configured");
-  }
-  return new Replicate({ auth: apiToken });
 };
 
 export const callOpenRouterApi = async (body) => {

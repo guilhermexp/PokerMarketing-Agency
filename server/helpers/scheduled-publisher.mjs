@@ -546,7 +546,7 @@ const MAX_POST_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
  * Check and publish due posts
- * Called every 5 min by the BullMQ scheduler / Vercel cron
+ * Called every 5 min by the BullMQ scheduler
  * Only runs between 7:00 and 23:59 Brasilia time
  */
 export async function checkAndPublishScheduledPosts() {

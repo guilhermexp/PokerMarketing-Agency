@@ -22,11 +22,11 @@ import {
   generateStructuredContent,
   generateTextWithOpenRouter,
   generateTextWithOpenRouterVision,
-  generateImageWithReplicate,
   mapAspectRatio,
   DEFAULT_IMAGE_MODEL,
-  REPLICATE_IMAGE_MODEL,
+  FAL_IMAGE_MODEL,
 } from "../lib/ai/image-generation.mjs";
+import { generateImageWithFal } from "../lib/ai/fal-image-generation.mjs";
 import {
   buildFlyerPrompt,
   buildQuickPostPrompt,
@@ -274,20 +274,20 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           throw new Error("A IA falhou em produzir o Flyer.");
         }
       } catch (geminiError) {
-        // Check if quota/rate limit error - fallback to Replicate
+        // Check if quota/rate limit error - fallback to FAL.ai
         if (isQuotaOrRateLimitError(geminiError)) {
           logger.warn(
             {},
-            "[Flyer API] Gemini quota exceeded, trying Replicate fallback",
+            "[Flyer API] Gemini quota exceeded, trying FAL.ai fallback",
           );
 
-          // Build text prompt for Replicate (combine all text parts)
+          // Build text prompt for FAL (combine all text parts)
           const textPrompt = parts
             .filter((p) => p.text)
             .map((p) => p.text)
             .join("\n\n");
 
-          // Collect image inputs for Replicate
+          // Collect image inputs for FAL
           const imageInputs = parts
             .filter((p) => p.inlineData)
             .map((p) => ({
@@ -295,24 +295,24 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
               mimeType: p.inlineData.mimeType,
             }));
 
-          const replicateUrl = await generateImageWithReplicate(
+          const falUrl = await generateImageWithFal(
             textPrompt,
-            aspectRatio,
+            mapAspectRatio(aspectRatio),
             imageSize,
             imageInputs.length > 0 ? imageInputs : undefined,
             undefined,
             undefined,
           );
 
-          logger.info({}, "[Flyer API] Replicate fallback successful");
+          logger.info({}, "[Flyer API] FAL.ai fallback successful");
 
-          // Upload to Vercel Blob (Replicate URLs are temporary)
+          // Upload to Vercel Blob (FAL URLs are temporary)
           logger.debug(
             {},
-            "[Flyer API] Uploading Replicate image to Vercel Blob",
+            "[Flyer API] Uploading FAL.ai image to Vercel Blob",
           );
           try {
-            const imageResponse = await fetch(replicateUrl);
+            const imageResponse = await fetch(falUrl);
             if (!imageResponse.ok) {
               throw new Error(`Failed to fetch image: ${imageResponse.status}`);
             }
@@ -341,11 +341,11 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
               { err: uploadError },
               "[Flyer API] Failed to upload to Vercel Blob",
             );
-            imageDataUrl = replicateUrl; // Use temporary URL as fallback
+            imageDataUrl = falUrl; // Use temporary URL as fallback
           }
 
-          usedProvider = "replicate";
-          usedModel = REPLICATE_IMAGE_MODEL;
+          usedProvider = "fal";
+          usedModel = FAL_IMAGE_MODEL;
         } else {
           throw geminiError;
         }
@@ -371,7 +371,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           aspectRatio,
           hasLogo: !!logo,
           hasReference: !!referenceImage,
-          fallbackUsed: usedProvider === "replicate",
+          fallbackUsed: usedProvider !== "google",
         },
       });
 
