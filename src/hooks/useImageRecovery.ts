@@ -93,7 +93,9 @@ export function useImageRecoveryEffect<T extends RecoveryItem>(
           (img) => getItemIdFromGalleryRef.current(img) === item.id,
         );
         if (galleryImage) {
-          syncToDatabaseRef.current(item.id, galleryImage.src).catch(() => {});
+          syncToDatabaseRef.current(item.id, galleryImage.src).catch((err) => {
+            console.error('[useImageRecovery] Failed to sync image to database:', { itemId: item.id, error: err });
+          });
           return galleryImage;
         }
       }
@@ -115,7 +117,9 @@ export function useImageRecoveryEffect<T extends RecoveryItem>(
         }
 
         if (galleryImage && item.id) {
-          syncToDatabaseRef.current(item.id, galleryImage.src).catch(() => {});
+          syncToDatabaseRef.current(item.id, galleryImage.src).catch((err) => {
+            console.error('[useImageRecovery] Failed to sync image to database:', { itemId: item.id, error: err });
+          });
           return galleryImage;
         }
       }

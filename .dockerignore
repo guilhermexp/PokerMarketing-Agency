@@ -5,7 +5,7 @@ dist-ssr
 # Dependencies are installed during build
 node_modules
 
-# bun.lockb locks macOS-only native deps — must resolve fresh on Linux
+# Docker build uses npm (package-lock.json) — bun.lockb is unused
 bun.lockb
 
 # Development files
