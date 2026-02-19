@@ -15,6 +15,7 @@ import { getGeminiAi } from "../lib/ai/clients.mjs";
 import {
   withRetry,
   sanitizeErrorForClient,
+  isQuotaOrRateLimitError,
 } from "../lib/ai/retry.mjs";
 import {
   generateImageWithFallback,
@@ -273,8 +274,9 @@ export function registerAiImageRoutes(app) {
         logger.error({ err: logError }, "[Image API] Falha ao logar erro no DB");
       });
 
+      const statusCode = isQuotaOrRateLimitError(error) ? 429 : 500;
       return res
-        .status(500)
+        .status(statusCode)
         .json({ error: sanitizeErrorForClient(error, "Falha ao gerar imagem. Tente novamente.") });
     }
   });
@@ -371,28 +373,41 @@ export function registerAiImageRoutes(app) {
         });
       }
 
-      const response = await withRetry(() =>
-        ai.models.generateContent({
-          model: "gemini-3-pro-image-preview",
-          contents: { parts },
-          config: { imageConfig },
-        }),
-      );
-
+      // Retry wrapper that also handles empty responses (Gemini sometimes returns
+      // MALFORMED_FUNCTION_CALL with empty content — transient, retryable)
       let imageDataUrl = null;
-      const contentParts = response.candidates?.[0]?.content?.parts;
-      if (Array.isArray(contentParts)) {
-        for (const part of contentParts) {
-          if (part.inlineData) {
-            imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-            break;
+      const maxAttempts = 3;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const response = await withRetry(() =>
+          ai.models.generateContent({
+            model: "gemini-3-pro-image-preview",
+            contents: { parts },
+            config: { imageConfig },
+          }),
+        );
+
+        const contentParts = response.candidates?.[0]?.content?.parts;
+        if (Array.isArray(contentParts)) {
+          for (const part of contentParts) {
+            if (part.inlineData) {
+              imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+              break;
+            }
           }
         }
-      }
 
-      if (!imageDataUrl) {
-        logger.error({ response }, "[Edit Image API] Empty response from API");
-        throw new Error("Failed to edit image - API returned empty response");
+        if (imageDataUrl) break;
+
+        const finishReason = response.candidates?.[0]?.finishReason;
+        logger.warn(
+          { attempt, maxAttempts, finishReason },
+          "[Edit Image API] Empty response from Gemini, retrying",
+        );
+        if (attempt === maxAttempts) {
+          logger.error({ response }, "[Edit Image API] All attempts returned empty");
+          throw new Error("Failed to edit image - API returned empty response");
+        }
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
       }
 
       logger.info({}, "[Edit Image API] Image edited successfully");
@@ -425,8 +440,9 @@ export function registerAiImageRoutes(app) {
         status: "failed",
         error: error.message,
       }).catch(() => {});
+      const statusCode = isQuotaOrRateLimitError(error) ? 429 : 500;
       return res
-        .status(500)
+        .status(statusCode)
         .json({ error: sanitizeErrorForClient(error) });
     }
   });

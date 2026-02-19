@@ -58,7 +58,14 @@ export const sanitizeErrorForClient = (error, defaultMessage = "Ocorreu um erro.
   return defaultMessage;
 };
 
-// Retry helper for 503 errors
+// Extract retryDelay from Gemini error (e.g. "retryDelay":"57s" → 57000ms)
+const extractRetryDelay = (error) => {
+  const msg = String(error?.message || "");
+  const match = msg.match(/"retryDelay"\s*:\s*"(\d+)s?"/);
+  return match ? parseInt(match[1], 10) * 1000 : 0;
+};
+
+// Retry helper for transient errors (503, 429/rate-limit)
 export const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
   let lastError = null;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -69,11 +76,16 @@ export const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
       return await fn();
     } catch (error) {
       lastError = error;
-      const isRetryable =
+      const is503 =
         error?.message?.includes("503") ||
         error?.message?.includes("overloaded") ||
         error?.message?.includes("UNAVAILABLE") ||
         error?.status === 503;
+      const is429 =
+        error?.status === 429 ||
+        error?.message?.includes("429") ||
+        error?.message?.includes("RESOURCE_EXHAUSTED");
+      const isRetryable = is503 || is429;
 
       logger.error(
         {
@@ -88,9 +100,11 @@ export const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
       );
 
       if (isRetryable && attempt < maxRetries) {
-        const waitTime = delayMs * attempt;
-        logger.debug(
-          { waitTimeMs: waitTime },
+        // For 429, respect Gemini's retryDelay (capped at 60s), else exponential backoff
+        const geminiDelay = is429 ? Math.min(extractRetryDelay(error), 60000) : 0;
+        const waitTime = geminiDelay || delayMs * attempt;
+        logger.info(
+          { waitTimeMs: waitTime, is429, is503 },
           "[withRetry] Aguardando antes de tentar novamente",
         );
         await new Promise((resolve) => setTimeout(resolve, waitTime));

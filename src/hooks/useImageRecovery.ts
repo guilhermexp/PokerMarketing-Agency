@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import type { GalleryImage } from "../types";
 
 /**
@@ -35,28 +35,54 @@ interface UseImageRecoveryOptions<T extends RecoveryItem> {
   isActivelyGenerating?: (index: number) => boolean;
 }
 
-export function useImageRecovery<T extends RecoveryItem>({
-  items,
-  galleryImages,
-  campaignId,
-  getItemIdFromGallery,
-  getSource,
-  getLegacySource,
-  syncToDatabase,
-  isActivelyGenerating,
-}: UseImageRecoveryOptions<T>) {
-  const getSourceCb = useCallback(getSource, [getSource]);
-  const getLegacySourceCb = useCallback(getLegacySource, [getLegacySource]);
+/**
+ * Hook that runs image recovery as an effect and returns the current images.
+ *
+ * Callbacks are stored in refs to avoid infinite re-render loops when callers
+ * pass inline arrow functions (which create new references every render).
+ * The effect only re-runs when actual data changes (items, galleryImages, campaignId).
+ */
+export function useImageRecoveryEffect<T extends RecoveryItem>(
+  options: UseImageRecoveryOptions<T> & {
+    setImages: React.Dispatch<React.SetStateAction<(GalleryImage | null)[]>>;
+    resetGenerationState: (length: number) => void;
+  },
+) {
+  const {
+    items,
+    galleryImages,
+    campaignId,
+    setImages,
+    resetGenerationState,
+  } = options;
 
-  const recoverImages = useCallback((): (GalleryImage | null)[] => {
-    return items.map((item, index) => {
+  // Store all callbacks in refs so they never trigger the effect
+  const getItemIdFromGalleryRef = useRef(options.getItemIdFromGallery);
+  const getSourceRef = useRef(options.getSource);
+  const getLegacySourceRef = useRef(options.getLegacySource);
+  const syncToDatabaseRef = useRef(options.syncToDatabase);
+  const isActivelyGeneratingRef = useRef(options.isActivelyGenerating);
+  const setImagesRef = useRef(setImages);
+  const resetGenerationStateRef = useRef(resetGenerationState);
+
+  getItemIdFromGalleryRef.current = options.getItemIdFromGallery;
+  getSourceRef.current = options.getSource;
+  getLegacySourceRef.current = options.getLegacySource;
+  syncToDatabaseRef.current = options.syncToDatabase;
+  isActivelyGeneratingRef.current = options.isActivelyGenerating;
+  setImagesRef.current = setImages;
+  resetGenerationStateRef.current = resetGenerationState;
+
+  useEffect(() => {
+    // Recover images using the 3-tier priority system
+    const recovered = items.map((item, index) => {
       // Priority 1: Use saved image_url from database
       if (item.image_url) {
         return {
           id: `saved-${item.id || Date.now()}`,
           src: item.image_url,
           prompt: item.image_prompt || "",
-          source: getSourceCb(index, item),
+          source: getSourceRef.current(index, item),
           model: "gemini-3-pro-image-preview" as const,
         };
       }
@@ -64,23 +90,23 @@ export function useImageRecovery<T extends RecoveryItem>({
       // Priority 2: Recover from gallery using item ID
       if (item.id && galleryImages && galleryImages.length > 0) {
         const galleryImage = galleryImages.find(
-          (img) => getItemIdFromGallery(img) === item.id,
+          (img) => getItemIdFromGalleryRef.current(img) === item.id,
         );
         if (galleryImage) {
-          syncToDatabase(item.id, galleryImage.src).catch(() => {});
+          syncToDatabaseRef.current(item.id, galleryImage.src).catch(() => {});
           return galleryImage;
         }
       }
 
       // Priority 3: Fallback to source matching (legacy)
       if (galleryImages && galleryImages.length > 0) {
-        const newSource = getSourceCb(index, item);
+        const newSource = getSourceRef.current(index, item);
         let galleryImage = galleryImages.find(
           (img) => img.source === newSource,
         );
 
         if (!galleryImage) {
-          const legacySource = getLegacySourceCb(index, item);
+          const legacySource = getLegacySourceRef.current(index, item);
           galleryImage = galleryImages.find(
             (img) =>
               img.source === legacySource &&
@@ -89,56 +115,22 @@ export function useImageRecovery<T extends RecoveryItem>({
         }
 
         if (galleryImage && item.id) {
-          syncToDatabase(item.id, galleryImage.src).catch(() => {});
+          syncToDatabaseRef.current(item.id, galleryImage.src).catch(() => {});
           return galleryImage;
         }
       }
 
       return null;
     });
-  }, [
-    items,
-    galleryImages,
-    campaignId,
-    getItemIdFromGallery,
-    getSourceCb,
-    getLegacySourceCb,
-    syncToDatabase,
-  ]);
 
-  return { recoverImages, isActivelyGenerating };
-}
-
-/**
- * Hook that runs image recovery as an effect and returns the current images.
- * Wraps useImageRecovery with state management.
- */
-export function useImageRecoveryEffect<T extends RecoveryItem>(
-  options: UseImageRecoveryOptions<T> & {
-    setImages: React.Dispatch<React.SetStateAction<(GalleryImage | null)[]>>;
-    resetGenerationState: (length: number) => void;
-  },
-) {
-  const { recoverImages } = useImageRecovery(options);
-  const {
-    items,
-    galleryImages,
-    campaignId,
-    setImages,
-    resetGenerationState,
-    isActivelyGenerating,
-  } = options;
-
-  useEffect(() => {
-    const recovered = recoverImages();
-    setImages((prevImages) =>
+    setImagesRef.current((prevImages) =>
       recovered.map((img, idx) => {
-        if (isActivelyGenerating?.(idx)) {
+        if (isActivelyGeneratingRef.current?.(idx)) {
           return prevImages[idx] ?? null;
         }
         return img;
       }),
     );
-    resetGenerationState(items.length);
-  }, [items, galleryImages, campaignId, recoverImages, setImages, resetGenerationState, isActivelyGenerating]);
+    resetGenerationStateRef.current(items.length);
+  }, [items, galleryImages, campaignId]);
 }

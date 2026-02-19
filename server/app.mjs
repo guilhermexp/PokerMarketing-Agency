@@ -132,6 +132,11 @@ app.use(
   }),
 );
 
+// Higher limit for routes that send base64 images in the JSON body
+app.use(
+  ["/api/image-playground/generate", "/api/ai/edit-image", "/api/ai/image"],
+  express.json({ limit: "25mb" }),
+);
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 
