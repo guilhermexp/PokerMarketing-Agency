@@ -1,10 +1,8 @@
 /**
- * Express app factory (shared between serverless and long-running server).
+ * Express app factory.
  *
  * This module creates and configures the Express app with all middleware and
- * routes but does NOT call app.listen(). That is left to:
- *   - server/index.mjs   (long-running: dev + Railway)
- *   - api/index.mjs       (Vercel serverless function)
+ * routes but does NOT call app.listen(). That is left to server/index.mjs.
  */
 
 import "dotenv/config";
@@ -100,6 +98,7 @@ app.use(
           "'unsafe-inline'",
           "'unsafe-eval'",
           "https://*.clerk.accounts.dev",
+          "https://*.sociallab.pro",
           "https://cdn.jsdelivr.net",
           "https://aistudiocdn.com",
         ],
@@ -115,6 +114,7 @@ app.use(
         connectSrc: [
           "'self'",
           "https://*.clerk.accounts.dev",
+          "https://*.sociallab.pro",
           "https://api.clerk.com",
           "https://*.blob.vercel-storage.com",
           "https://cdn.jsdelivr.net",
@@ -124,7 +124,7 @@ app.use(
         fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'", "blob:", "https://*.blob.vercel-storage.com"],
-        frameSrc: ["'self'", "https://*.clerk.accounts.dev"],
+        frameSrc: ["'self'", "https://*.clerk.accounts.dev", "https://*.sociallab.pro"],
         workerSrc: ["'self'", "blob:"],
       },
     },

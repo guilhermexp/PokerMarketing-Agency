@@ -21,6 +21,7 @@ import {
   generateImageWithFallback,
   DEFAULT_IMAGE_MODEL,
 } from "../lib/ai/image-generation.mjs";
+import { editImageWithFal, FAL_EDIT_MODEL } from "../lib/ai/fal-image-generation.mjs";
 import {
   buildImagePrompt,
   convertImagePromptToJson,
@@ -185,7 +186,7 @@ export function registerAiImageRoutes(app) {
             contentType = matches[1];
             imageBuffer = Buffer.from(matches[2], "base64");
           } else {
-            // Handle HTTP URL (from Replicate)
+            // Handle HTTP URL (from FAL.ai fallback)
             const imageResponse = await fetch(result.imageUrl);
             if (!imageResponse.ok) {
               throw new Error(`Failed to fetch image: ${imageResponse.status}`);
@@ -376,53 +377,92 @@ export function registerAiImageRoutes(app) {
       // Retry wrapper that also handles empty responses (Gemini sometimes returns
       // MALFORMED_FUNCTION_CALL with empty content — transient, retryable)
       let imageDataUrl = null;
-      const maxAttempts = 3;
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const response = await withRetry(() =>
-          ai.models.generateContent({
-            model: "gemini-3-pro-image-preview",
-            contents: { parts },
-            config: { imageConfig },
-          }),
-        );
+      let usedProvider = "google";
+      let usedModel = "gemini-3-pro-image-preview";
 
-        const contentParts = response.candidates?.[0]?.content?.parts;
-        if (Array.isArray(contentParts)) {
-          for (const part of contentParts) {
-            if (part.inlineData) {
-              imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-              break;
+      try {
+        const maxAttempts = 3;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          const response = await withRetry(() =>
+            ai.models.generateContent({
+              model: "gemini-3-pro-image-preview",
+              contents: { parts },
+              config: { imageConfig },
+            }),
+          );
+
+          const contentParts = response.candidates?.[0]?.content?.parts;
+          if (Array.isArray(contentParts)) {
+            for (const part of contentParts) {
+              if (part.inlineData) {
+                imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                break;
+              }
             }
           }
-        }
 
-        if (imageDataUrl) break;
+          if (imageDataUrl) break;
 
-        const finishReason = response.candidates?.[0]?.finishReason;
-        logger.warn(
-          { attempt, maxAttempts, finishReason },
-          "[Edit Image API] Empty response from Gemini, retrying",
-        );
-        if (attempt === maxAttempts) {
-          logger.error({ response }, "[Edit Image API] All attempts returned empty");
-          throw new Error("Failed to edit image - API returned empty response");
+          const finishReason = response.candidates?.[0]?.finishReason;
+          logger.warn(
+            { attempt, maxAttempts, finishReason },
+            "[Edit Image API] Empty response from Gemini, retrying",
+          );
+          if (attempt === maxAttempts) {
+            logger.error({ response }, "[Edit Image API] All attempts returned empty");
+            throw new Error("Failed to edit image - API returned empty response");
+          }
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
         }
-        await new Promise((r) => setTimeout(r, 1000 * attempt));
+      } catch (geminiError) {
+        if (isQuotaOrRateLimitError(geminiError)) {
+          logger.warn(
+            {},
+            "[Edit Image API] Gemini quota exceeded, trying FAL.ai fallback",
+          );
+
+          const falUrl = await editImageWithFal(
+            instructionPrompt,
+            cleanBase64,
+            image.mimeType,
+            referenceImage,
+          );
+
+          // Fetch from FAL and convert to data URL
+          const falResponse = await fetch(falUrl);
+          if (!falResponse.ok) {
+            throw new Error(`Failed to fetch FAL image: ${falResponse.status}`);
+          }
+          const falBuffer = Buffer.from(await falResponse.arrayBuffer());
+          const falMimeType = falResponse.headers.get("content-type") || "image/png";
+          imageDataUrl = `data:${falMimeType};base64,${falBuffer.toString("base64")}`;
+          usedProvider = "fal";
+          usedModel = FAL_EDIT_MODEL;
+
+          logger.info({}, "[Edit Image API] FAL.ai fallback successful");
+        } else {
+          throw geminiError;
+        }
       }
 
-      logger.info({}, "[Edit Image API] Image edited successfully");
+      logger.info({ provider: usedProvider }, "[Edit Image API] Image edited successfully");
 
       // Log AI usage
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/edit-image",
         operation: "edit_image",
-        model: "gemini-3-pro-image-preview",
+        model: usedModel,
+        provider: usedProvider,
         imageCount: 1,
         imageSize: "1K",
         latencyMs: timer(),
         status: "success",
-        metadata: { hasMask: !!mask, hasReference: !!referenceImage },
+        metadata: {
+          hasMask: !!mask,
+          hasReference: !!referenceImage,
+          fallbackUsed: usedProvider !== "google",
+        },
       });
 
       res.json({
