@@ -25,7 +25,6 @@ export default defineConfig({
       '**/node_modules/**',
       '**/.auto-claude/**',
       '**/dist/**',
-      '**/.vercel/**',
       'server/**',
     ],
 
