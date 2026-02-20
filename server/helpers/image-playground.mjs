@@ -880,12 +880,14 @@ async function processImageGeneration(
     // Build content parts (shared between Gemini and FAL.ai)
     const parts = await buildContentParts(params);
 
-    // Try Gemini first, fallback to FAL.ai on quota errors
+    // TODO: Gemini image temporarily disabled — using FAL.ai directly.
+    // To re-enable, uncomment the Gemini try block and remove the direct FAL.ai call.
     let imageBase64;
     let mimeType;
     let inputTokens = 0;
     let outputTokens = 0;
 
+    /*
     try {
       const geminiResult = await generateWithGemini(genai, parts, params);
       imageBase64 = geminiResult.imageBase64;
@@ -897,16 +899,18 @@ async function processImageGeneration(
     } catch (geminiError) {
       if (isQuotaOrRateLimitError(geminiError)) {
         // Fallback to FAL.ai
-        const falResult = await generateWithFal(parts, params);
-        imageBase64 = falResult.imageBase64;
-        mimeType = falResult.mimeType;
-        usedProvider = falResult.usedProvider;
-        usedModel = falResult.usedModel;
       } else {
-        // Non-quota error (safety, recitation, etc.) - re-throw as-is
         throw geminiError;
       }
     }
+    */
+
+    console.log("[ImagePlayground] Using FAL.ai directly (Gemini disabled)");
+    const falResult = await generateWithFal(parts, params);
+    imageBase64 = falResult.imageBase64;
+    mimeType = falResult.mimeType;
+    usedProvider = falResult.usedProvider;
+    usedModel = falResult.usedModel;
 
     // Validate content type before upload
     validateContentType(mimeType);

@@ -11,12 +11,13 @@
 import { getAuth } from "@clerk/express";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.mjs";
-import { getGeminiAi } from "../lib/ai/clients.mjs";
+import { callOpenRouterApi } from "../lib/ai/clients.mjs";
 import {
   withRetry,
   sanitizeErrorForClient,
   isQuotaOrRateLimitError,
 } from "../lib/ai/retry.mjs";
+// getGeminiAi — temporarily unused (Gemini image disabled)
 import {
   generateImageWithFallback,
   DEFAULT_IMAGE_MODEL,
@@ -30,7 +31,6 @@ import {
 } from "../lib/ai/prompt-builders.mjs";
 import {
   logAiUsage,
-  extractGeminiTokens,
   createTimer,
 } from "../helpers/usage-tracking.mjs";
 import { urlToBase64 } from "../helpers/image-helpers.mjs";
@@ -309,8 +309,6 @@ export function registerAiImageRoutes(app) {
         "[Edit Image API] Editing image",
       );
 
-      const ai = getGeminiAi();
-      // Usar prompt direto sem adicionar texto extra que pode confundir o modelo
       const instructionPrompt = prompt;
 
       // Validate and clean base64 data
@@ -318,79 +316,35 @@ export function registerAiImageRoutes(app) {
       if (cleanBase64.startsWith("data:")) {
         cleanBase64 = cleanBase64.split(",")[1];
       }
-      // Check for valid base64
       if (cleanBase64.length % 4 !== 0) {
-        logger.debug(
-          {},
-          "[Edit Image API] Base64 length is not multiple of 4, padding",
-        );
         cleanBase64 = cleanBase64.padEnd(
           Math.ceil(cleanBase64.length / 4) * 4,
           "=",
         );
       }
 
-      logger.debug(
-        {
-          textLength: instructionPrompt.length,
-          imageBase64Length: cleanBase64.length,
-          mimeType: image.mimeType,
-          partsCount: 2 + !!mask + !!referenceImage,
-        },
-        "[Edit Image API] Parts structure",
-      );
-
-      const parts = [
-        { text: instructionPrompt },
-        { inlineData: { data: cleanBase64, mimeType: image.mimeType } },
-      ];
-
-      let imageConfig = { imageSize: "1K" };
-
-      if (mask) {
-        logger.debug(
-          { maskSize: mask.base64?.length },
-          "[Edit Image API] Adding mask",
-        );
-        imageConfig = {
-          ...imageConfig,
-          mask: {
-            image: {
-              inlineData: {
-                data: mask.base64,
-                mimeType: mask.mimeType || "image/png",
-              },
-            },
-          },
-        };
-      }
-
-      if (referenceImage) {
-        parts.push({
-          inlineData: {
-            data: referenceImage.base64,
-            mimeType: referenceImage.mimeType,
-          },
-        });
-      }
-
-      // Retry wrapper that also handles empty responses (Gemini sometimes returns
-      // MALFORMED_FUNCTION_CALL with empty content — transient, retryable)
+      // TODO: Gemini edit temporarily disabled — using FAL.ai directly.
+      // To re-enable: restore Gemini parts/imageConfig/ai logic from git history.
       let imageDataUrl = null;
-      let usedProvider = "google";
-      let usedModel = "gemini-3-pro-image-preview";
+      let usedProvider = "fal";
+      let usedModel = FAL_EDIT_MODEL;
 
+      /*
+      // --- Gemini edit (disabled) ---
+      usedProvider = "google";
+      usedModel = "gemini-3-pro-image-preview";
       try {
         const maxAttempts = 3;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-          const response = await withRetry(() =>
-            ai.models.generateContent({
-              model: "gemini-3-pro-image-preview",
-              contents: { parts },
-              config: { imageConfig },
-            }),
+          const response = await withRetry(
+            () =>
+              ai.models.generateContent({
+                model: "gemini-3-pro-image-preview",
+                contents: { parts },
+                config: { imageConfig },
+              }),
+            1,
           );
-
           const contentParts = response.candidates?.[0]?.content?.parts;
           if (Array.isArray(contentParts)) {
             for (const part of contentParts) {
@@ -400,50 +354,34 @@ export function registerAiImageRoutes(app) {
               }
             }
           }
-
           if (imageDataUrl) break;
-
           const finishReason = response.candidates?.[0]?.finishReason;
-          logger.warn(
-            { attempt, maxAttempts, finishReason },
-            "[Edit Image API] Empty response from Gemini, retrying",
-          );
-          if (attempt === maxAttempts) {
-            logger.error({ response }, "[Edit Image API] All attempts returned empty");
-            throw new Error("Failed to edit image - API returned empty response");
-          }
+          logger.warn({ attempt, maxAttempts, finishReason }, "[Edit Image API] Empty response from Gemini, retrying");
+          if (attempt === maxAttempts) throw new Error("Failed to edit image - API returned empty response");
           await new Promise((r) => setTimeout(r, 1000 * attempt));
         }
       } catch (geminiError) {
-        if (isQuotaOrRateLimitError(geminiError)) {
-          logger.warn(
-            {},
-            "[Edit Image API] Gemini quota exceeded, trying FAL.ai fallback",
-          );
-
-          const falUrl = await editImageWithFal(
-            instructionPrompt,
-            cleanBase64,
-            image.mimeType,
-            referenceImage,
-          );
-
-          // Fetch from FAL and convert to data URL
-          const falResponse = await fetch(falUrl);
-          if (!falResponse.ok) {
-            throw new Error(`Failed to fetch FAL image: ${falResponse.status}`);
-          }
-          const falBuffer = Buffer.from(await falResponse.arrayBuffer());
-          const falMimeType = falResponse.headers.get("content-type") || "image/png";
-          imageDataUrl = `data:${falMimeType};base64,${falBuffer.toString("base64")}`;
-          usedProvider = "fal";
-          usedModel = FAL_EDIT_MODEL;
-
-          logger.info({}, "[Edit Image API] FAL.ai fallback successful");
-        } else {
-          throw geminiError;
-        }
+        if (!isQuotaOrRateLimitError(geminiError)) throw geminiError;
       }
+      // --- End Gemini edit ---
+      */
+
+      logger.info({}, "[Edit Image API] Using FAL.ai directly (Gemini disabled)");
+
+      const falUrl = await editImageWithFal(
+        instructionPrompt,
+        cleanBase64,
+        image.mimeType,
+        referenceImage,
+      );
+
+      const falResponse = await fetch(falUrl);
+      if (!falResponse.ok) {
+        throw new Error(`Failed to fetch FAL image: ${falResponse.status}`);
+      }
+      const falBuffer = Buffer.from(await falResponse.arrayBuffer());
+      const falMimeType = falResponse.headers.get("content-type") || "image/png";
+      imageDataUrl = `data:${falMimeType};base64,${falBuffer.toString("base64")}`;
 
       logger.info({ provider: usedProvider }, "[Edit Image API] Image edited successfully");
 
@@ -505,25 +443,7 @@ export function registerAiImageRoutes(app) {
 
       logger.info({}, "[Extract Colors API] Analyzing logo");
 
-      const ai = getGeminiAi();
-
-      const colorSchema = {
-        type: Type.OBJECT,
-        properties: {
-          primaryColor: { type: Type.STRING },
-          secondaryColor: { type: Type.STRING, nullable: true },
-          tertiaryColor: { type: Type.STRING, nullable: true },
-        },
-        required: ["primaryColor"],
-      };
-
-      const response = await withRetry(() =>
-        ai.models.generateContent({
-          model: DEFAULT_TEXT_MODEL,
-          contents: {
-            parts: [
-              {
-                text: `Analise este logo e extraia APENAS as cores que REALMENTE existem na imagem visível.
+      const colorPrompt = `Analise este logo e extraia APENAS as cores que REALMENTE existem na imagem visível.
 
 REGRAS IMPORTANTES:
 - Extraia somente cores que você pode ver nos pixels da imagem
@@ -537,31 +457,44 @@ PRIORIDADE DAS CORES:
 - secondaryColor: A segunda cor mais presente (se existir), ou null
 - tertiaryColor: Uma terceira cor de destaque/acento (se existir), ou null
 
-Retorne as cores em formato hexadecimal (#RRGGBB).`,
-              },
-              { inlineData: { mimeType: logo.mimeType, data: logo.base64 } },
-            ],
-          },
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: colorSchema,
-          },
+Retorne as cores em formato hexadecimal (#RRGGBB).
+Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou null, "tertiaryColor": "#..." ou null}`;
+
+      const data = await withRetry(() =>
+        callOpenRouterApi({
+          model: DEFAULT_TEXT_MODEL,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: colorPrompt },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${logo.mimeType};base64,${logo.base64}`,
+                  },
+                },
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
         }),
       );
 
-      const colors = JSON.parse(response.text.trim());
+      const colors = JSON.parse(data.choices[0].message.content.trim());
 
       logger.info({ colors }, "[Extract Colors API] Colors extracted");
 
       // Log AI usage
-      const tokens = extractGeminiTokens(response);
+      const inputTokens = data.usage?.prompt_tokens || 0;
+      const outputTokens = data.usage?.completion_tokens || 0;
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/extract-colors",
         operation: "text",
         model: DEFAULT_TEXT_MODEL,
-        inputTokens: tokens.inputTokens,
-        outputTokens: tokens.outputTokens,
+        inputTokens,
+        outputTokens,
         latencyMs: timer(),
         status: "success",
       });

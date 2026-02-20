@@ -8,19 +8,18 @@
  *          DEFAULT_TEXT_MODEL, DEFAULT_FAST_TEXT_MODEL, DEFAULT_ASSISTANT_MODEL
  */
 
-import { getGeminiAi } from "./clients.mjs";
+import { callOpenRouterApi } from "./clients.mjs";
 import { withRetry } from "./retry.mjs";
 import {
   logAiUsage,
-  extractGeminiTokens,
   createTimer,
 } from "../../helpers/usage-tracking.mjs";
 import logger from "../logger.mjs";
 
-// Model defaults
-export const DEFAULT_TEXT_MODEL = "gemini-3-flash-preview";
-export const DEFAULT_FAST_TEXT_MODEL = "gemini-3-flash-preview";
-export const DEFAULT_ASSISTANT_MODEL = "gemini-3-flash-preview";
+// Model defaults (via OpenRouter)
+export const DEFAULT_TEXT_MODEL = "google/gemini-3.1-pro-preview";
+export const DEFAULT_FAST_TEXT_MODEL = "google/gemini-3.1-pro-preview";
+export const DEFAULT_ASSISTANT_MODEL = "google/gemini-3.1-pro-preview";
 
 // Schema Type constants
 export const Type = {
@@ -197,26 +196,21 @@ export const convertImagePromptToJson = async (
   const timer = createTimer();
 
   try {
-    const ai = getGeminiAi();
     const systemPrompt = getImagePromptSystemPrompt(aspectRatio);
 
-    const response = await withRetry(() =>
-      ai.models.generateContent({
+    const data = await withRetry(() =>
+      callOpenRouterApi({
         model: DEFAULT_FAST_TEXT_MODEL,
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: `${systemPrompt}\n\nPROMPT: ${prompt}` }],
-          },
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `PROMPT: ${prompt}` },
         ],
-        config: {
-          responseMimeType: "application/json",
-          temperature: 0.2,
-        },
+        response_format: { type: "json_object" },
+        temperature: 0.2,
       }),
     );
 
-    const text = response.text?.trim() || "";
+    const text = data.choices?.[0]?.message?.content?.trim() || "";
     let parsed = null;
 
     try {
@@ -247,14 +241,15 @@ export const convertImagePromptToJson = async (
       2,
     );
 
-    const tokens = extractGeminiTokens(response);
+    const inputTokens = data.usage?.prompt_tokens || 0;
+    const outputTokens = data.usage?.completion_tokens || 0;
     await logAiUsage(sql, {
       organizationId,
       endpoint: "/api/ai/convert-image-prompt",
       operation: "text",
       model: DEFAULT_FAST_TEXT_MODEL,
-      inputTokens: tokens.inputTokens,
-      outputTokens: tokens.outputTokens,
+      inputTokens,
+      outputTokens,
       latencyMs: timer(),
       status: "success",
     });

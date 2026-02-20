@@ -110,6 +110,9 @@ app.use(
           "https://*.blob.vercel-storage.com",
           "https://*.public.blob.vercel-storage.com",
           "https://img.clerk.com",
+          "https://images.clerk.dev",
+          "https://*.clerk.com",
+          "https://*.googleusercontent.com",
         ],
         connectSrc: [
           "'self'",

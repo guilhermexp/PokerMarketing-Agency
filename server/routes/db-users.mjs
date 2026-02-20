@@ -42,7 +42,14 @@ export function registerUserRoutes(app) {
         await sql`SELECT * FROM users WHERE email = ${email} AND deleted_at IS NULL LIMIT 1`;
 
       if (existing.length > 0) {
-        const updated = await sql`UPDATE users SET last_login_at = NOW() WHERE id = ${existing[0].id} RETURNING *`;
+        const updated = await sql`
+          UPDATE users SET
+            last_login_at = NOW(),
+            auth_provider_id = COALESCE(${auth_provider_id}, auth_provider_id),
+            auth_provider = COALESCE(${auth_provider}, auth_provider),
+            name = COALESCE(${name}, name),
+            avatar_url = COALESCE(${avatar_url}, avatar_url)
+          WHERE id = ${existing[0].id} RETURNING *`;
         return res.json(updated[0]);
       }
 

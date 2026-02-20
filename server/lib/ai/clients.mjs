@@ -35,7 +35,7 @@ export const callOpenRouterApi = async (body) => {
     headers: {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": process.env.APP_URL || "https://socialab.app",
+      "HTTP-Referer": process.env.APP_URL || "https://sociallab.pro",
     },
     body: JSON.stringify(body),
   });

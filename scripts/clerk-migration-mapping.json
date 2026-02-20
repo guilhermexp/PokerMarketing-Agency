@@ -1,0 +1,27 @@
+{
+  "users": {
+    "user_38TdQGFeuisD9Z2Ay3KFcEGT88Z": "user_39uVcIj0EMfuOpTYPt3AHTs8RL5",
+    "user_3827hO9GOiMRniuY09JmIwpNw4p": "user_39uVcMUtUOPQREZYEznhGOUAQQw",
+    "user_37xvyWIjV5qCgzFubu0HCw9GE1N": "user_39uVcQiSOv1Is3GcFsBgqCMPFsT",
+    "user_37cK91uTuW5WfrswyTXdXFxA8jH": "user_39uVcZ6FVL2ItzuNdjqb73a1ABw",
+    "user_37cCv5KlEGRfi0RrzxKiaO2EjCK": "user_39uVcZZ35jg9gG3wo7ZWpUWCybQ",
+    "user_37aSb2hQyiyO90XYEqKKd7r2yYa": "user_39uVclYzjtnD0HKi8FTe7sJgcij",
+    "user_378fc20OZ5lfbZMSXns5m68zpB5": "user_39uVctmmQ5ZPA56Kw5wIUWHSBYl"
+  },
+  "organizations": {
+    "org_37RQsFkujzn77wz4yMECdS362Cq": "org_39uVhgDKL6R6ZczNUxDo6bVwye9",
+    "org_37xw0DscdAhPEL5igR3SKgF7EHY": "org_39uVhgDKL6R6ZczNUxDo6bVwye9",
+    "org_38AshWaaEP3Org8luHVBNNzrjTw": "org_39uVhgDKL6R6ZczNUxDo6bVwye9",
+    "org_37aScfCOjrQR8nQHhsmhLbmRocz": "org_39uVhgDKL6R6ZczNUxDo6bVwye9"
+  },
+  "usersNeedingPasswordReset": [
+    "varelaado@gmail.com",
+    "design.cpcpokeronline@gmail.com",
+    "guilherme-varela@hotmail.com",
+    "ocaioamador@gmail.com",
+    "neliodesantana19@gmail.com",
+    "helevarelas@gmail.com",
+    "guilhermehenriquevarela@gmail.com"
+  ],
+  "migratedAt": "2026-02-20T00:07:06.768Z"
+}
