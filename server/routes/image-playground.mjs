@@ -20,7 +20,6 @@ export function registerImagePlaygroundRoutes(
     getSql,
     resolveUserId,
     logger,
-    convertImagePromptToJson,
     buildImagePrompt,
   },
 ) {
@@ -140,6 +139,65 @@ IDIOMA OBRIGATÓRIO (pt-BR):
 - Responda e componha a direção criativa em PORTUGUÊS DO BRASIL.
 - Se houver qualquer texto na imagem (título, CTA, preço, legenda, selo), ele DEVE estar em português do Brasil.
 - Nunca use inglês ou outro idioma nos textos visíveis da arte.`;
+  };
+
+  const buildImagePromptSpec = ({
+    basePrompt,
+    aspectRatio,
+    imageSize,
+    brandProfile,
+    toneOverride,
+    fontStyleOverride,
+    hasLogo,
+    hasStyleReference,
+    hasPersonReference,
+    hasProductImagesBeyondLogo,
+  }) => {
+    const resolvedTone = toneOverride || brandProfile?.toneOfVoice || "Profissional";
+    const resolvedFont = fontStyleOverride || "Bold condensed sans-serif";
+    const resolvedAspectRatio = aspectRatio || "1:1";
+    const resolvedImageSize = imageSize || "2K";
+
+    return {
+      prompt_spec_version: "image-studio-v1",
+      language: "pt-BR",
+      output: {
+        aspect_ratio: resolvedAspectRatio,
+        resolution: resolvedImageSize,
+      },
+      brand: {
+        name: brandProfile?.name || "",
+        description: brandProfile?.description || "",
+        primary_color: brandProfile?.primaryColor || "#000000",
+        secondary_color: brandProfile?.secondaryColor || "#FFFFFF",
+        tone_of_voice: resolvedTone,
+      },
+      typography: {
+        preferred_font: resolvedFont,
+        family_policy: "single-family",
+        allowed_style: "bold-condensed-sans-serif",
+        uppercase_titles: true,
+      },
+      constraints: {
+        campaign_grade: true,
+        hyper_realistic: true,
+        cinematic_composition: true,
+        premium_finish: true,
+        text_language: "pt-BR",
+        integrate_brand_organically: true,
+        avoid_sticker_logo_look: true,
+        preserve_logo_fidelity: hasLogo,
+      },
+      references: {
+        has_logo: hasLogo,
+        has_style_reference: hasStyleReference,
+        has_person_reference: hasPersonReference,
+        has_product_images_beyond_logo: hasProductImagesBeyondLogo,
+      },
+      user_intent: {
+        prompt_base: basePrompt,
+      },
+    };
   };
 
   // Get all topics
@@ -416,20 +474,27 @@ TIPOGRAFIA PREFERENCIAL (OBRIGATÓRIO):
             : "";
           const basePrompt = `${basePromptCore}${brandIntegrationDirectives}${fontDirectives}`;
 
-          // 2. Convert prompt to JSON structured format (same as /api/ai/image)
-          const jsonPrompt = await convertImagePromptToJson(
-            basePrompt,
-            enhancedParams.aspectRatio || "1:1",
-            orgId,
-            sql,
-          );
+          // 2. Build deterministic prompt spec (no LLM conversion in image path)
+          const promptSpec = buildImagePromptSpec({
+            basePrompt: enhancedParams.prompt,
+            aspectRatio: enhancedParams.aspectRatio,
+            imageSize: enhancedParams.imageSize,
+            brandProfile: mappedBrandProfile,
+            toneOverride,
+            fontStyleOverride,
+            hasLogo,
+            hasStyleReference,
+            hasPersonReference,
+            hasProductImagesBeyondLogo,
+          });
+          const jsonPrompt = JSON.stringify(promptSpec, null, 2);
 
           // 3. Build full prompt using buildImagePrompt (same as /api/ai/image)
           const fullPrompt = buildImagePrompt(
             basePrompt,
             mappedBrandProfile,
             hasStyleReference,
-            false,
+            hasLogo,
             hasPersonReference,
             hasProductImagesBeyondLogo,
             jsonPrompt,

@@ -432,8 +432,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         )}
 
         {activeView === "campaign" && (
-          <div className={`px-4 py-4 sm:px-6 sm:py-5 relative z-10 ${
-            showUploadForm && campaigns.length === 0 ? 'flex flex-col items-center justify-center min-h-[calc(100dvh-2rem)]' : ''
+          <div className={`px-4 sm:px-6 relative z-10 ${
+            showUploadForm && campaigns.length === 0
+              ? 'py-4 sm:py-5 flex flex-col items-center justify-center min-h-[calc(100dvh-2rem)]'
+              : 'pt-32 sm:pt-40 pb-4 sm:pb-5'
           }`}>
             {showUploadForm && (
               <div className={campaigns.length === 0 ? 'w-full' : 'mb-2'}>
@@ -454,7 +456,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
             {/* Recent Campaigns Preview - shown below upload form */}
             {showUploadForm && campaigns.length > 0 && (
-              <div className="mt-1 sm:mt-2 flex flex-col items-center px-3 sm:px-0">
+              <div className="mt-24 sm:mt-32 flex flex-col items-center px-3 sm:px-0">
                 {/* Header with Tabs */}
                 <div className="w-full max-w-6xl mb-0.5">
                   <div className="flex items-center justify-between">
