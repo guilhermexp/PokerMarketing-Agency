@@ -432,11 +432,11 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         )}
 
         {activeView === "campaign" && (
-          <div className={`px-4 py-4 sm:px-6 sm:py-5 relative z-10 flex flex-col items-center ${
-            showUploadForm && campaigns.length === 0 ? 'justify-center min-h-[calc(100dvh-2rem)]' : ''
+          <div className={`px-4 py-4 sm:px-6 sm:py-5 relative z-10 ${
+            showUploadForm && campaigns.length === 0 ? 'flex flex-col items-center justify-center min-h-[calc(100dvh-2rem)]' : ''
           }`}>
             {showUploadForm && (
-              <div className={campaigns.length === 0 ? 'w-full' : 'w-full mb-2'}>
+              <div className={campaigns.length === 0 ? 'w-full' : 'mb-2'}>
                 <UploadForm
                   onGenerate={onGenerate}
                   isGenerating={isGenerating}
