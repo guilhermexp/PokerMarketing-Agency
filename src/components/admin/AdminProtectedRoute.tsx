@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
+import { authClient } from '../../lib/auth-client';
 import { useSuperAdmin } from '../../hooks/useSuperAdmin';
 import { Loader } from '../common/Loader';
 
@@ -60,16 +60,24 @@ function AdminAccessCheck({ children }: AdminProtectedRouteProps) {
 }
 
 export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
-  return (
-    <>
-      <SignedOut>
-        <RedirectToSignIn />
-      </SignedOut>
-      <SignedIn>
-        <AdminAccessCheck>{children}</AdminAccessCheck>
-      </SignedIn>
-    </>
-  );
+  const { data: sessionData, isPending } = authClient.useSession();
+  const isSignedIn = !!sessionData?.user;
+
+  if (isPending) {
+    return (
+      <div className="min-h-screen bg-[var(--color-bg-primary)] flex items-center justify-center">
+        <Loader size={20} className="text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    // Redirect to home page (which shows sign-in form)
+    window.location.href = '/';
+    return null;
+  }
+
+  return <AdminAccessCheck>{children}</AdminAccessCheck>;
 }
 
 export default AdminProtectedRoute;

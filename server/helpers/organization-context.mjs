@@ -1,10 +1,10 @@
 /**
- * Organization Context Helper - Clerk Integration
- * Uses Clerk's orgId and orgRole from JWT for multi-tenant access
+ * Organization Context Helper
+ * Uses session orgId and orgRole for multi-tenant access
  *
- * Clerk free tier provides only 2 roles:
- * - org:admin: Full access to organization
- * - org:member: Limited access to organization
+ * Roles (mapped to org:admin / org:member for compatibility):
+ * - org:admin: Full access to organization (Better Auth owner/admin)
+ * - org:member: Limited access to organization (Better Auth member)
  */
 
 // Available permissions
@@ -125,8 +125,8 @@ export class OrganizationAccessError extends Error {
 }
 
 /**
- * Create organization context from Clerk auth
- * @param {Object} auth - Clerk auth object from getAuth(req)
+ * Create organization context from auth session
+ * @param {Object} auth - Auth context with userId, orgId, orgRole
  * @returns {Object} Organization context
  */
 export function createOrgContext(auth) {

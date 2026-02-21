@@ -4,7 +4,6 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '@clerk/clerk-react';
 import { DataTable, Column } from '../common/DataTable';
 import { Pagination } from '../common/Pagination';
 import { SearchInput } from '../common/SearchInput';
@@ -32,7 +31,6 @@ interface PaginationInfo {
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export function UsersPage() {
-  const { getToken } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -47,7 +45,6 @@ export function UsersPage() {
   const fetchUsers = useCallback(async (page: number, searchQuery: string) => {
     try {
       setIsLoading(true);
-      const token = await getToken();
 
       const params = new URLSearchParams({
         page: page.toString(),
@@ -59,7 +56,7 @@ export function UsersPage() {
       }
 
       const res = await fetch(`${API_BASE}/api/admin/users?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
 
       if (!res.ok) throw new Error('Falha ao carregar usuários');
@@ -74,7 +71,7 @@ export function UsersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [getToken]);
+  }, []);
 
   useEffect(() => {
     fetchUsers(pagination.page, search);

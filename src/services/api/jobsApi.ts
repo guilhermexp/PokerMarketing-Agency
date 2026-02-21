@@ -5,7 +5,6 @@
  * processed by BullMQ.
  */
 
-import { getAuthToken } from '../authService';
 import { getCsrfToken, getCurrentCsrfToken, clearCsrfToken } from '../apiClient';
 
 // =============================================================================
@@ -80,7 +79,6 @@ export interface QueueJobResult {
 export type JobType = 'flyer' | 'flyer_daily' | 'post' | 'ad' | 'clip' | 'video' | 'image';
 
 async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
-  const token = await getAuthToken();
   const method = (options.method || 'GET').toUpperCase();
   const requiresCsrf = method !== 'GET' && method !== 'HEAD';
 
@@ -90,16 +88,12 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
 
   const headers = new Headers(options.headers);
 
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
-
   const csrfToken = getCurrentCsrfToken();
   if (requiresCsrf && csrfToken) {
     headers.set('X-CSRF-Token', csrfToken);
   }
 
-  const response = await fetch(url, { ...options, headers });
+  const response = await fetch(url, { ...options, headers, credentials: 'include' });
 
   if (response.status === 403 && requiresCsrf) {
     clearCsrfToken();

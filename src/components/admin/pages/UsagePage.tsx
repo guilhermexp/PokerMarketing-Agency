@@ -4,7 +4,6 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '@clerk/clerk-react';
 import { StatsCard } from '../common/StatsCard';
 import {
   AreaChart,
@@ -67,7 +66,6 @@ const groupByLabels: Record<GroupBy, string> = {
 };
 
 export function UsagePage() {
-  const { getToken } = useAuth();
   const [totals, setTotals] = useState<UsageTotals | null>(null);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [topUsers, setTopUsers] = useState<TopUser[]>([]);
@@ -79,10 +77,9 @@ export function UsagePage() {
   const fetchUsage = useCallback(async (group: GroupBy) => {
     try {
       setIsLoading(true);
-      const token = await getToken();
 
       const res = await fetch(`${API_BASE}/api/admin/usage?groupBy=${group}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
 
       if (!res.ok) throw new Error('Falha ao carregar dados de uso');
@@ -99,7 +96,7 @@ export function UsagePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [getToken]);
+  }, []);
 
   useEffect(() => {
     fetchUsage(groupBy);

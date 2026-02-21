@@ -5,7 +5,7 @@
  * Route: POST /api/ai/campaign
  */
 
-import { getAuth } from "@clerk/express";
+import { getRequestAuthContext } from "../lib/auth.mjs";
 import { getSql } from "../lib/db.mjs";
 import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 import {
@@ -69,8 +69,8 @@ function normalizeCarouselSlides(carousels, expectedSlides) {
 export function registerAiCampaignRoutes(app) {
   app.post("/api/ai/campaign", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
@@ -277,10 +277,17 @@ REGRAS CRÍTICAS:
         slidesPerCarousel,
       );
 
-      // Debug: log structure for troubleshooting (v2 - with carousels)
+      // Debug: log carousel summary (not raw data which is huge)
       logger.debug(
-        { carousels: campaign.carousels },
-        "[Campaign API v2] Raw carousels from AI",
+        {
+          carouselsCount: campaign.carousels?.length || 0,
+          carousels: campaign.carousels?.map((c) => ({
+            title: c.title,
+            slides: c.slides?.length || 0,
+            hook: c.hook?.slice(0, 60),
+          })),
+        },
+        "[Campaign API v2] Carousels from AI",
       );
       logger.debug(
         {

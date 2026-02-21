@@ -1,12 +1,8 @@
 import React, { useEffect, useState, createContext, useContext, useRef } from "react";
-import {
-  SignedIn,
-  SignedOut,
-  SignIn,
-  UserButton,
-  useUser,
-} from "@clerk/clerk-react";
+import { authClient } from "../../lib/auth-client";
 import { getOrCreateUser, type DbUser } from "../../services/apiClient";
+import { SignInForm } from "./SignInForm";
+import { SignUpForm } from "./SignUpForm";
 
 interface AuthContextType {
   dbUser: DbUser | null;
@@ -32,25 +28,75 @@ interface AuthWrapperProps {
   children: React.ReactNode;
 }
 
+/** Geometric star / compass SVG for the left panel */
+function GeometricStar() {
+  return (
+    <svg
+      viewBox="0 0 400 400"
+      className="w-48 h-48 sm:w-56 sm:h-56 lg:w-72 lg:h-72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Main cross */}
+      <line x1="200" y1="40" x2="200" y2="360" stroke="white" strokeWidth="2.5" />
+      <line x1="40" y1="200" x2="360" y2="200" stroke="white" strokeWidth="2.5" />
+      {/* Diagonal lines */}
+      <line x1="87" y1="87" x2="313" y2="313" stroke="white" strokeWidth="2" />
+      <line x1="313" y1="87" x2="87" y2="313" stroke="white" strokeWidth="2" />
+      {/* Secondary diagonals (22.5 deg) */}
+      <line x1="140" y1="52" x2="260" y2="348" stroke="white" strokeWidth="1.5" />
+      <line x1="260" y1="52" x2="140" y2="348" stroke="white" strokeWidth="1.5" />
+      <line x1="52" y1="140" x2="348" y2="260" stroke="white" strokeWidth="1.5" />
+      <line x1="52" y1="260" x2="348" y2="140" stroke="white" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+/** Subtle grid lines for left panel background */
+function GridBackground() {
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      {/* Subtle diagonal lines spanning the panel */}
+      <svg
+        className="absolute inset-0 w-full h-full"
+        preserveAspectRatio="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <line x1="0%" y1="0%" x2="100%" y2="100%" stroke="white" strokeOpacity="0.04" strokeWidth="1" />
+        <line x1="100%" y1="0%" x2="0%" y2="100%" stroke="white" strokeOpacity="0.04" strokeWidth="1" />
+        <line x1="50%" y1="0%" x2="50%" y2="100%" stroke="white" strokeOpacity="0.04" strokeWidth="1" />
+        <line x1="0%" y1="50%" x2="100%" y2="50%" stroke="white" strokeOpacity="0.04" strokeWidth="1" />
+        {/* Extra subtle diagonals */}
+        <line x1="30%" y1="0%" x2="0%" y2="60%" stroke="white" strokeOpacity="0.025" strokeWidth="1" />
+        <line x1="70%" y1="0%" x2="100%" y2="60%" stroke="white" strokeOpacity="0.025" strokeWidth="1" />
+        <line x1="0%" y1="40%" x2="30%" y2="100%" stroke="white" strokeOpacity="0.025" strokeWidth="1" />
+        <line x1="100%" y1="40%" x2="70%" y2="100%" stroke="white" strokeOpacity="0.025" strokeWidth="1" />
+      </svg>
+    </div>
+  );
+}
+
 export function AuthWrapper({ children }: AuthWrapperProps) {
-  const { user, isLoaded: clerkLoaded, isSignedIn } = useUser();
+  const { data: sessionData, isPending } = authClient.useSession();
   const [dbUser, setDbUser] = useState<DbUser | null>(null);
   const [isDbSyncing, setIsDbSyncing] = useState(false);
+  const [authView, setAuthView] = useState<"signIn" | "signUp">("signIn");
 
   // Track if we've already synced this user to prevent duplicate calls
   const syncedUserIdRef = useRef<string | null>(null);
 
-  // Extract primitive values to use as dependencies (prevents re-renders)
-  const clerkUserId = user?.id;
-  const userEmail = user?.primaryEmailAddress?.emailAddress;
-  const userName = user?.fullName || user?.firstName || "User";
-  const userImage = user?.imageUrl;
+  const user = sessionData?.user;
+  const isSignedIn = !!user;
+  const betterAuthUserId = user?.id;
+  const userEmail = user?.email;
+  const userName = user?.name || "User";
+  const userImage = user?.image;
 
   useEffect(() => {
     async function syncUser() {
-      if (!clerkLoaded) return;
+      if (isPending) return;
 
-      if (!isSignedIn || !clerkUserId) {
+      if (!isSignedIn || !betterAuthUserId) {
         setDbUser(null);
         setIsDbSyncing(false);
         syncedUserIdRef.current = null;
@@ -58,7 +104,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
       }
 
       // Skip if we've already synced this user
-      if (syncedUserIdRef.current === clerkUserId) {
+      if (syncedUserIdRef.current === betterAuthUserId) {
         return;
       }
 
@@ -75,185 +121,154 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
         const syncedUser = await getOrCreateUser({
           email: userEmail,
           name: userName,
-          avatar_url: userImage,
-          auth_provider: "clerk",
-          auth_provider_id: clerkUserId,
+          avatar_url: userImage || undefined,
+          auth_provider: "better-auth",
+          auth_provider_id: betterAuthUserId,
         });
 
         setDbUser(syncedUser);
-        syncedUserIdRef.current = clerkUserId; // Mark as synced
+        syncedUserIdRef.current = betterAuthUserId;
         console.debug("[Auth] User synced successfully:", syncedUser.id);
       } catch (error) {
         console.error("Failed to sync user with database:", error);
-        // Still allow access even if DB sync fails (fallback to clerk user)
         setDbUser({
-          id: clerkUserId,
+          id: betterAuthUserId,
           email: userEmail || "",
           name: userName,
           avatar_url: userImage || null,
           created_at: new Date().toISOString(),
         });
-        syncedUserIdRef.current = clerkUserId; // Still mark as synced to prevent retries
+        syncedUserIdRef.current = betterAuthUserId;
       } finally {
         setIsDbSyncing(false);
       }
     }
 
     syncUser();
-  }, [clerkLoaded, isSignedIn, clerkUserId, userEmail, userName, userImage]);
+  }, [isPending, isSignedIn, betterAuthUserId, userEmail, userName, userImage]);
 
   const contextValue: AuthContextType = {
     dbUser,
-    // isLoading is now just Clerk loading - DB sync happens in background
-    isLoading: !clerkLoaded,
-    // PERF: Always use clerkUserId for consistent SWR cache keys
-    // Server resolves clerkUserId -> dbUser.id via resolveUserId() with caching
-    // This prevents double-fetch when dbUser syncs (userId changing invalidates cache)
-    userId: clerkUserId || null,
-    clerkUserId: clerkUserId || null,
+    isLoading: isPending,
+    userId: betterAuthUserId || null,
+    clerkUserId: betterAuthUserId || null,
     isDbSyncing,
   };
 
-  const signInAppearance = {
-    variables: {
-      colorBackground: "transparent",
-      colorText: "white",
-      colorTextSecondary: "rgba(255,255,255,0.55)",
-      colorPrimary: "#f59e0b",
-      colorInputBackground: "rgba(0,0,0,0.4)",
-      colorInputText: "white",
-      colorNeutral: "white",
-      borderRadius: "0.75rem",
-    },
-    elements: {
-      rootBox: "mx-auto flex w-full justify-center",
-      cardBox: "w-full max-w-[430px] mx-auto",
-      card: "!w-full !border-0 !bg-transparent !px-2 !py-0 !shadow-none",
-      headerTitle: "!text-2xl !font-semibold !tracking-tight !text-white",
-      headerSubtitle: "!text-sm !text-white/55",
-      socialButtonsBlockButton:
-        "!h-11 !rounded-xl !border !border-white/15 !bg-white/5 !text-white transition-colors hover:!bg-white/10",
-      socialButtonsBlockButtonText: "!text-sm !font-medium !text-white",
-      dividerLine: "!bg-white/10",
-      dividerText: "!text-xs !uppercase !tracking-[0.2em] !text-white/45",
-      formFieldLabel: "!text-sm !font-medium !text-white/75",
-      formFieldInput:
-        "!h-11 !rounded-xl !border !border-white/15 !bg-black/40 !text-white placeholder:!text-white/35 transition-colors focus:!border-amber-400 focus:!ring-2 focus:!ring-amber-400/20",
-      formFieldAction: "!text-amber-400 transition-colors hover:!text-amber-300",
-      formButtonPrimary:
-        "!h-11 !rounded-xl !border !border-neutral-700 !bg-gradient-to-r !from-neutral-900 !to-neutral-700 !text-sm !font-semibold !text-white !shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all hover:!from-neutral-800 hover:!to-neutral-600",
-      footerActionText: "!text-white/45",
-      footerActionLink: "!font-medium !text-amber-400 transition-colors hover:!text-amber-300",
-      formResendCodeLink: "!text-amber-400 transition-colors hover:!text-amber-300",
-      identityPreviewText: "!text-white/80",
-      identityPreviewEditButton: "!text-amber-400 transition-colors hover:!text-amber-300",
-      otpCodeFieldInput:
-        "!rounded-xl !border !border-white/15 !bg-black/40 !text-white focus:!border-amber-400 focus:!ring-2 focus:!ring-amber-400/20",
-      alert: "!rounded-xl !border !border-amber-300/20 !bg-amber-500/10 !text-amber-100",
-      formFieldSuccessText: "!text-emerald-300",
-      footer: "!bg-transparent",
-      footerAction: "!bg-transparent",
-    },
-  } as const;
-
   return (
     <AuthContext.Provider value={contextValue}>
-      <SignedOut>
-        <div className="relative min-h-screen overflow-hidden bg-background text-white">
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-amber-500/20 blur-3xl" />
-            <div className="absolute right-[-8rem] top-[20%] h-96 w-96 rounded-full bg-white/[0.08] blur-3xl" />
-            <div className="absolute bottom-[-5rem] left-[30%] h-72 w-72 rounded-full bg-amber-300/15 blur-3xl" />
-            <div
-              className="absolute inset-0 opacity-[0.05]"
-              style={{
-                backgroundImage:
-                  "linear-gradient(to right, rgba(255,255,255,0.35) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.35) 1px, transparent 1px)",
-                backgroundSize: "56px 56px",
-              }}
-            />
-          </div>
+      {isPending ? null : !isSignedIn ? (
+        <div className="min-h-screen bg-black text-white">
+          <div className="grid min-h-screen lg:grid-cols-[1fr_1fr]">
+            {/* Left panel - Geometric star */}
+            <div className="relative hidden lg:flex lg:flex-col bg-black overflow-hidden">
+              <GridBackground />
 
-          <div className="relative mx-auto grid min-h-screen w-full max-w-[1360px] lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="relative hidden border-r border-border px-10 py-16 lg:flex lg:flex-col">
-              <img src="/logo-socialab.png" alt="Social Lab" className="h-12 w-12" />
-              <div className="mt-auto">
-                <p className="max-w-md text-4xl font-semibold leading-tight tracking-tight text-white">
-                  Plataforma profissional para operacao criativa de Midia Social.
-                </p>
-                <p className="mt-5 max-w-md text-base leading-relaxed text-white/55">
-                  Centralize campanhas, producao e performance em um unico fluxo com padrao de agencia.
-                </p>
+              {/* Brand name */}
+              <div className="relative z-10 px-10 pt-10">
+                <div className="flex items-center gap-3">
+                  <img
+                    src="/logo-socialab.png"
+                    alt="Social Lab"
+                    className="h-8 w-8"
+                  />
+                  <span className="text-base font-semibold tracking-tight text-white">
+                    Social Lab
+                  </span>
+                </div>
               </div>
 
-              <img
-                src="/icon.png"
-                alt=""
-                aria-hidden="true"
-                className="absolute left-[12%] top-[14%] h-20 w-20 rotate-[-18deg] rounded-2xl opacity-20"
-              />
-              <img
-                src="/logo-socialab.png"
-                alt=""
-                aria-hidden="true"
-                className="absolute right-[10%] top-[38%] h-24 w-24 rotate-[20deg] opacity-[0.15]"
-              />
-              <img
-                src="/icon.png"
-                alt=""
-                aria-hidden="true"
-                className="absolute bottom-[11%] right-[18%] h-16 w-16 rotate-[22deg] rounded-xl opacity-[0.18]"
-              />
+              {/* Center star */}
+              <div className="relative z-10 flex flex-1 items-center justify-center">
+                <GeometricStar />
+              </div>
+
+              {/* Copyright */}
+              <div className="relative z-10 px-10 pb-10">
+                <p className="text-xs text-white/25">
+                  &copy; Social Lab {new Date().getFullYear()}. Todos os direitos reservados.
+                </p>
+              </div>
             </div>
 
-            <div className="relative flex items-center justify-center px-4 py-8 sm:px-8 sm:py-12">
-              <div className="w-full max-w-[520px] rounded-[28px] border border-border bg-black/[0.45] p-6 shadow-[0_22px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-8">
-                <div className="mb-8 text-center">
-                  <img src="/logo-socialab.png" alt="Social Lab" className="mx-auto h-14 w-14 sm:h-16 sm:w-16" />
-                  <h1 className="mt-5 text-2xl font-semibold tracking-tight text-white sm:text-[1.85rem]">
-                    Bem-vindo ao Social Lab
-                  </h1>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Entre para continuar com sua operacao de marketing.
-                  </p>
-                </div>
-                <SignIn appearance={signInAppearance} />
+            {/* Right panel - Auth form */}
+            <div className="relative flex bg-neutral-950/80 lg:border-l lg:border-white/[0.06]">
+              {/* Mobile brand header */}
+              <div className="absolute left-0 top-0 flex items-center gap-2 p-6 lg:hidden">
+                <img
+                  src="/logo-socialab.png"
+                  alt="Social Lab"
+                  className="h-8 w-8"
+                />
+                <span className="text-sm font-semibold text-white">
+                  Social Lab
+                </span>
               </div>
+
+              {authView === "signIn" ? (
+                <SignInForm onSwitchToSignUp={() => setAuthView("signUp")} />
+              ) : (
+                <SignUpForm onSwitchToSignIn={() => setAuthView("signIn")} />
+              )}
             </div>
           </div>
         </div>
-      </SignedOut>
-      <SignedIn>{children}</SignedIn>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 }
 
 export function UserProfileButton() {
+  const { data: sessionData } = authClient.useSession();
+  const user = sessionData?.user;
+
+  const handleSignOut = async () => {
+    await authClient.signOut();
+  };
+
   return (
-    <UserButton
-      afterSignOutUrl="/"
-      appearance={{
-        elements: {
-          avatarBox: "w-8 h-8",
-        },
-      }}
-    />
+    <div className="relative group">
+      <button
+        className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 text-white text-sm font-medium overflow-hidden"
+        title={user?.name || "User"}
+      >
+        {user?.image ? (
+          <img src={user.image} alt={user.name || ""} className="w-full h-full object-cover" />
+        ) : (
+          <span>{(user?.name || "U").charAt(0).toUpperCase()}</span>
+        )}
+      </button>
+      <div className="absolute right-0 top-full mt-1 w-40 rounded-xl border border-border bg-black/90 backdrop-blur-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+        <div className="p-2">
+          <p className="px-2 py-1 text-xs text-white/60 truncate">{user?.email}</p>
+          <button
+            onClick={handleSignOut}
+            className="w-full text-left px-2 py-1.5 text-sm text-red-400 hover:bg-white/5 rounded-lg transition-colors"
+          >
+            Sair
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export function useCurrentUser() {
-  const { user, isLoaded, isSignedIn } = useUser();
+  const { data: sessionData, isPending } = authClient.useSession();
   const { dbUser, userId } = useAuth();
+  const user = sessionData?.user;
 
   return {
     user,
     dbUser,
-    isLoaded,
-    isSignedIn,
+    isLoaded: !isPending,
+    isSignedIn: !!user,
     userId,
     clerkUserId: user?.id,
-    email: user?.primaryEmailAddress?.emailAddress,
-    name: user?.fullName || user?.firstName || "User",
-    avatarUrl: user?.imageUrl,
+    email: user?.email,
+    name: user?.name || "User",
+    avatarUrl: user?.image,
   };
 }

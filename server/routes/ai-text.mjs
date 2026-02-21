@@ -9,7 +9,7 @@
  *   POST /api/ai/convert-prompt
  */
 
-import { getAuth } from "@clerk/express";
+import { getRequestAuthContext } from "../lib/auth.mjs";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.mjs";
 import { getGeminiAi, callOpenRouterApi } from "../lib/ai/clients.mjs";
@@ -49,8 +49,8 @@ export function registerAiTextRoutes(app) {
   // -------------------------------------------------------------------------
   app.post("/api/ai/flyer", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
@@ -331,8 +331,8 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
   // -------------------------------------------------------------------------
   app.post("/api/ai/text", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
@@ -492,8 +492,8 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
   // -------------------------------------------------------------------------
   app.post("/api/ai/enhance-prompt", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
 
     const sql = getSql();
 
@@ -642,8 +642,8 @@ REGRAS:
   // -------------------------------------------------------------------------
   app.post("/api/ai/convert-prompt", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {

@@ -4,7 +4,6 @@
  */
 
 import type { BrandProfile } from '../types';
-import { getAuthToken } from './authService';
 import { getCsrfToken, getCurrentCsrfToken } from './apiClient';
 
 export interface LLMResponse {
@@ -39,8 +38,6 @@ export const generateCreativeText = async (
   temperature: number = 0.7
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> => {
-  const token = await getAuthToken();
-
   // Extrai texto e imagens das partes
   const textParts = parts.filter(p => p.text).map(p => p.text!);
   const imageParts = parts
@@ -59,7 +56,6 @@ export const generateCreativeText = async (
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
     credentials: 'include',

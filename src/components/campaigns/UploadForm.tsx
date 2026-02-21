@@ -190,22 +190,15 @@ export const UploadForm: React.FC<UploadFormProps> = ({
     return () => clearTimeout(timer);
   }, [toneToast]);
 
-  // Auto-resize textarea
+  // Auto-resize textarea (compact pill: single line → expands up to 100px)
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    // Reset height to auto to shrink if needed
     textarea.style.height = 'auto';
-
-    // Get the scroll height (content height)
     const scrollHeight = textarea.scrollHeight;
-
-    // Set new height between min (60px) and max (200px on desktop, 150px on mobile)
-    const maxHeight = window.innerWidth >= 640 ? 200 : 150;
-    const minHeight = window.innerWidth >= 640 ? 80 : 60;
-    const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
-    textarea.style.height = `${newHeight}px`;
+    const maxHeight = 100;
+    textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
   }, [transcript]);
 
 
@@ -456,362 +449,270 @@ export const UploadForm: React.FC<UploadFormProps> = ({
           display: none;
         }
       `}</style>
-      <div className="relative py-6 sm:py-8 md:py-10 flex flex-col items-center w-full px-2 sm:px-4">
-        <div className="w-full max-w-sm sm:max-w-2xl py-3 sm:py-4 md:py-6 px-2 sm:px-0">
-          <div className="relative z-10 flex flex-col gap-3 sm:gap-4 items-center w-full">
-            {/* Title */}
-            <h2 className="text-lg sm:text-xl md:text-2xl font-medium text-white mb-0.5 sm:mb-1 px-2 text-center tracking-tight">
-              O que vamos criar hoje?
-            </h2>
-
-            {/* Main Input Box */}
-            <form className="w-full max-w-sm sm:max-w-2xl relative">
-              {/* Blur layer behind */}
-              <div className="absolute -inset-1 rounded-[18px] sm:rounded-[22px] bg-white/5 blur-3xl pointer-events-none z-[5]" />
-
-              <div className="relative z-10 rounded-[18px] sm:rounded-[22px] border border-white/10 bg-black/40 backdrop-blur-2xl text-white/90 focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
-                {/* Textarea */}
-                <textarea
-                  ref={textareaRef}
-                  value={transcript}
-                  onChange={(e) => setTranscript(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Descreva sua ideia..."
-                  className="hide-scrollbar w-full rounded-[18px] sm:rounded-[22px] rounded-b-none text-xs sm:text-sm leading-relaxed text-white/90 placeholder:text-muted-foreground !bg-transparent !border-0 focus:!ring-0 focus-visible:!ring-0 !shadow-none !px-3 sm:!px-4 !py-2 sm:!py-2.5 touch-manipulation resize-none outline-none overflow-y-auto min-h-[60px] sm:min-h-[80px] max-h-[150px] sm:max-h-[200px]"
-                  style={{
-                    WebkitUserSelect: 'text',
-                    WebkitTouchCallout: 'none',
-                  }}
-                />
-
-                {/* Toolbar */}
-                <div className="flex justify-between items-center rounded-t-none rounded-b-[18px] sm:rounded-b-[22px] bg-black/30 backdrop-blur-xl px-2 sm:px-3 py-1.5 sm:py-2 gap-1 sm:gap-2 text-white/80 overflow-x-auto flex-wrap">
-                  {/* Left side - Actions */}
-                  <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                    {/* Model Selector */}
-                    <div className="relative" ref={modelSelectorRef}>
-                      <button
-                        ref={modelButtonRef}
-                        type="button"
-                        onClick={handleOpenModelSelector}
-                        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg bg-white/5 border border-border text-white hover:bg-white/10 hover:text-white/90 transition-all text-[10px] sm:text-xs whitespace-nowrap font-medium"
-                      >
-                        <span>{creativeModelLabels[selectedModel].label}</span>
-                        <Icon name="chevron-down" className={`w-2.5 h-2.5 sm:w-3 sm:h-3 transition-transform ${isModelSelectorOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                    </div>
-
-                    {/* Tone Selector */}
-                    <div className="relative" ref={toneSelectorRef}>
-                      <button
-                        ref={toneButtonRef}
-                        type="button"
-                        onClick={handleOpenToneSelector}
-                        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg bg-white/5 border border-border text-white hover:bg-white/10 hover:text-white/90 transition-all text-[10px] sm:text-xs whitespace-nowrap font-medium"
-                      >
-                        <span>{toneOverride || brandProfile.toneOfVoice}</span>
-                        <Icon name="chevron-down" className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-transform ${isToneSelectorOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                    </div>
-
-                  </div>
-
-                  {/* Right side - Actions */}
-                  <div className="flex items-center gap-0.5 sm:gap-1 ml-auto">
-                    <button
-                      type="button"
-                      onClick={handleEnhancePrompt}
-                      disabled={!transcript.trim() || isEnhancing}
-                      className="flex items-center justify-center size-6 sm:size-7 rounded-md text-muted-foreground hover:text-white/90 hover:bg-white/5 transition-all disabled:opacity-30"
-                    >
-                      {isEnhancing ? (
-                        <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Icon name="wand-2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      )}
-                    </button>
-                    <button
-                      onClick={handleGenerateClick}
-                      disabled={!canGenerate}
-                      type="button"
-                      className={`size-6 sm:size-7 flex items-center justify-center transition-all ${
-                        canGenerate
-                          ? 'text-white hover:text-white/80 hover:scale-105'
-                          : 'text-muted-foreground cursor-not-allowed'
-                      }`}
-                    >
-                      {isGenerating ? (
-                        <div className="w-3 sm:w-3.5 h-3 sm:h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Icon name="send" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Hidden file inputs */}
-              <input
-                ref={productInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => handleFileUpload(e.target.files, "product")}
-              />
-              <input
-                ref={inspirationInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => handleFileUpload(e.target.files, "inspiration")}
-              />
-              <input
-                ref={collabLogoInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleFileUpload(e.target.files, "collabLogo")}
-              />
-              <input
-                ref={assetsInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => handleFileUpload(e.target.files, "assets")}
-              />
-            </form>
-          </div>
+      <div className="relative flex flex-col items-center w-full px-3 sm:px-4 -mt-8 sm:-mt-12">
+        {/* Title */}
+        <div className="flex items-center gap-3 sm:gap-4 mb-5 sm:mb-7">
+          <img src="/logo-socialab.png" alt="Social Lab" className="h-8 w-8 sm:h-10 sm:w-10" />
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-medium text-white tracking-tight">
+            O que vamos criar hoje?
+          </h2>
         </div>
 
-        {/* Type Buttons */}
-        <div className="relative w-full max-w-sm sm:max-w-2xl mt-6 sm:mt-8 md:mt-12 px-2 sm:px-0">
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 md:gap-2.5 justify-center">
-            {/* Hidden file inputs */}
-            <input
-              ref={productInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => handleFileUpload(e.target.files, "product")}
-            />
-            <input
-              ref={inspirationInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => handleFileUpload(e.target.files, "inspiration")}
-            />
-            <input
-              ref={collabLogoInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => handleFileUpload(e.target.files, "collabLogo")}
-            />
-            <input
-              ref={assetsInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => handleFileUpload(e.target.files, "assets")}
-            />
+        {/* Pill Input Bar */}
+        <form className="w-full max-w-2xl relative">
+          {/* Subtle glow behind */}
+          <div className="absolute -inset-1 rounded-[22px] bg-white/5 blur-3xl pointer-events-none" />
 
+          <div className="relative flex items-start gap-2 sm:gap-2.5 rounded-[22px] border border-white/10 bg-black/40 backdrop-blur-2xl pl-2 pr-2 py-2 sm:py-2.5 focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 transition-all shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
+            {/* + Button */}
             <button
               type="button"
               onClick={() => productInputRef.current?.click()}
-              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              className="flex-shrink-0 flex items-center justify-center size-9 sm:size-10 rounded-full bg-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-all"
             >
-              <Icon name="image" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
-              <span className="hidden sm:inline font-medium">Imagem Produto</span>
-              <span className="sm:hidden font-medium text-[10px]">Prod</span>
+              <Icon name="plus" className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
 
-            <button
-              type="button"
-              onClick={() => inspirationInputRef.current?.click()}
-              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
-            >
-              <Icon name="star" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
-              <span className="hidden sm:inline font-medium">Referência</span>
-              <span className="sm:hidden font-medium text-[10px]">Ref</span>
-            </button>
+            {/* Text Input */}
+            <textarea
+              ref={textareaRef}
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={1}
+              placeholder="Descreva sua ideia..."
+              className="hide-scrollbar flex-1 bg-transparent text-sm sm:text-base text-white/90 placeholder:text-muted-foreground border-0 focus:ring-0 focus-visible:ring-0 shadow-none outline-none resize-none py-2 sm:py-2.5 leading-snug max-h-[120px] overflow-y-auto"
+              style={{
+                WebkitUserSelect: 'text',
+                WebkitTouchCallout: 'none',
+                height: 'auto',
+              }}
+            />
 
-            <button
-              type="button"
-              onClick={() => collabLogoInputRef.current?.click()}
-              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
-            >
-              <Icon name="users" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
-              <span className="hidden sm:inline font-medium">Logo</span>
-              <span className="sm:hidden font-medium text-[10px]">Logo</span>
-            </button>
+            {/* Right Actions */}
+            <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+              {/* Enhance (sparkle) */}
+              <button
+                type="button"
+                onClick={handleEnhancePrompt}
+                disabled={!transcript.trim() || isEnhancing}
+                className="flex items-center justify-center size-8 sm:size-9 rounded-full text-muted-foreground hover:text-white/90 hover:bg-white/5 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                {isEnhancing ? (
+                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Icon name="wand-2" className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                )}
+              </button>
 
-            <button
-              type="button"
-              onClick={() => assetsInputRef.current?.click()}
-              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
-            >
-              <Icon name="layers" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
-              <span className="hidden sm:inline font-medium">Ativos</span>
-              <span className="sm:hidden font-medium text-[10px]">Ativ</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsOptionsModalOpen(true)}
-              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
-            >
-              <Icon name="settings" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
-              <span className="hidden sm:inline font-medium">Configurar</span>
-              <span className="sm:hidden font-medium text-[10px]">Config</span>
-            </button>
+              {/* Send */}
+              <button
+                onClick={handleGenerateClick}
+                disabled={!canGenerate}
+                type="button"
+                className={`flex items-center justify-center size-9 sm:size-10 rounded-full transition-all ${
+                  canGenerate
+                    ? 'text-white hover:text-white/80 hover:scale-105 active:scale-95'
+                    : 'text-muted-foreground cursor-not-allowed'
+                }`}
+              >
+                {isGenerating ? (
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Icon name="send" className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* Attachments Panel */}
+          {/* Attachment thumbnails inside pill area */}
           {hasAttachments && (
-            <div className="mt-4 bg-background border border-border rounded-xl p-3 sm:p-4 max-w-sm sm:max-w-2xl mx-auto">
-              <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <h4 className="text-[10px] sm:text-xs font-bold text-white/70">
-                  Anexos
-                </h4>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 sm:gap-2">
-                {productImages.map((img, i) => (
-                  <button
-                    key={`product-${i}`}
-                    onClick={() => handleRemoveImage(i, "product")}
-                    className="relative aspect-square rounded-lg overflow-hidden border-2 border-border hover:border-red-500/50 transition-all group"
-                  >
-                    <img
-                      src={img.preview}
-                      alt="Produto"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Icon name="x" className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="absolute bottom-0.5 left-0.5 text-[7px] font-bold text-white bg-black/70 px-1 rounded">
-                      Produto
-                    </span>
-                  </button>
-                ))}
-                {collabLogo && (
-                  <button
-                    onClick={() => setCollabLogo(null)}
-                    className="relative aspect-square rounded-lg overflow-hidden border-2 border-blue-500/30 hover:border-red-500/50 transition-all group"
-                  >
-                    <img
-                      src={collabLogo}
-                      alt="Colab"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Icon name="x" className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="absolute bottom-0.5 left-0.5 text-[7px] font-bold text-blue-400 bg-black/70 px-1 rounded">
-                      Colab
-                    </span>
-                  </button>
-                )}
-                {inspirationImages.map((img, i) => (
-                  <button
-                    key={`inspiration-${i}`}
-                    onClick={() => handleRemoveImage(i, "inspiration")}
-                    className="relative aspect-square rounded-lg overflow-hidden border-2 border-primary/30 hover:border-red-500/50 transition-all group"
-                  >
-                    <img
-                      src={img.preview}
-                      alt="Referência"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Icon name="x" className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="absolute bottom-0.5 left-0.5 text-[7px] font-bold text-primary bg-black/70 px-1 rounded">
-                      Ref
-                    </span>
-                  </button>
-                ))}
-                {compositionAssets.map((img, i) => (
-                  <button
-                    key={`asset-${i}`}
-                    onClick={() => handleRemoveImage(i, "assets")}
-                    className="relative aspect-square rounded-lg overflow-hidden border-2 border-green-500/30 hover:border-red-500/50 transition-all group"
-                  >
-                    <img
-                      src={img.preview}
-                      alt="Ativo"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Icon name="x" className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="absolute bottom-0.5 left-0.5 text-[7px] font-bold text-green-400 bg-black/70 px-1 rounded">
-                      Ativo
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Favorites Panel */}
-          {isFavoritesOpen && styleReferences.length > 0 && (
-            <div
-              ref={favoritesPanelRef}
-              className="mt-4 bg-background border border-border rounded-xl p-3 sm:p-4 max-w-sm sm:max-w-2xl mx-auto"
-            >
-              <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <h4 className="text-[10px] sm:text-xs font-bold text-white/70">
-                  Estilos Favoritos
-                </h4>
+            <div className="flex items-center gap-1.5 mt-2 px-3 overflow-x-auto hide-scrollbar">
+              {productImages.map((img, i) => (
                 <button
-                  onClick={() => setIsFavoritesOpen(false)}
-                  className="text-muted-foreground hover:text-foreground"
+                  key={`product-${i}`}
+                  type="button"
+                  onClick={() => handleRemoveImage(i, "product")}
+                  className="relative size-9 rounded-lg overflow-hidden border border-white/10 hover:border-red-500/50 transition-all group flex-shrink-0"
                 >
-                  <Icon name="x" className="w-3 sm:w-4 h-3 sm:h-4" />
+                  <img src={img.preview} alt="Produto" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Icon name="x" className="w-3 h-3 text-white" />
+                  </div>
                 </button>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 sm:gap-2">
-                {styleReferences.map((ref) => (
-                  <button
-                    key={ref.id}
-                    onClick={() => handleSelectFavorite(ref)}
-                    className={`aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${selectedStyleReference?.id === ref.id
-                      ? "border-primary ring-2 ring-primary/30"
-                      : "border-border hover:border-primary/50"
-                      }`}
-                  >
-                    <img
-                      src={ref.src}
-                      alt={ref.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-              {selectedStyleReference && (
-                <p className="text-[10px] text-primary/70 mt-2 text-center">
-                  Selecionado: {selectedStyleReference.name}
-                </p>
+              ))}
+              {collabLogo && (
+                <button
+                  type="button"
+                  onClick={() => setCollabLogo(null)}
+                  className="relative size-9 rounded-lg overflow-hidden border border-blue-500/20 hover:border-red-500/50 transition-all group flex-shrink-0"
+                >
+                  <img src={collabLogo} alt="Logo" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Icon name="x" className="w-3 h-3 text-white" />
+                  </div>
+                </button>
               )}
+              {inspirationImages.map((img, i) => (
+                <button
+                  key={`inspiration-${i}`}
+                  type="button"
+                  onClick={() => handleRemoveImage(i, "inspiration")}
+                  className="relative size-9 rounded-lg overflow-hidden border border-primary/20 hover:border-red-500/50 transition-all group flex-shrink-0"
+                >
+                  <img src={img.preview} alt="Ref" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Icon name="x" className="w-3 h-3 text-white" />
+                  </div>
+                </button>
+              ))}
+              {compositionAssets.map((img, i) => (
+                <button
+                  key={`asset-${i}`}
+                  type="button"
+                  onClick={() => handleRemoveImage(i, "assets")}
+                  className="relative size-9 rounded-lg overflow-hidden border border-green-500/20 hover:border-red-500/50 transition-all group flex-shrink-0"
+                >
+                  <img src={img.preview} alt="Ativo" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Icon name="x" className="w-3 h-3 text-white" />
+                  </div>
+                </button>
+              ))}
             </div>
           )}
 
+          {/* Hidden file inputs */}
+          <input ref={productInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFileUpload(e.target.files, "product")} />
+          <input ref={inspirationInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFileUpload(e.target.files, "inspiration")} />
+          <input ref={collabLogoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e.target.files, "collabLogo")} />
+          <input ref={assetsInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFileUpload(e.target.files, "assets")} />
+        </form>
+
+        {/* Action Pills */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 justify-center mt-5 sm:mt-6">
+          <button
+            type="button"
+            onClick={() => productInputRef.current?.click()}
+            className="flex items-center gap-1.5 sm:gap-2 h-8 sm:h-9 px-3 sm:px-3.5 rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+          >
+            <Icon name="image" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="font-medium">Produto</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => collabLogoInputRef.current?.click()}
+            className="flex items-center gap-1.5 sm:gap-2 h-8 sm:h-9 px-3 sm:px-3.5 rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+          >
+            <Icon name="wand-2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="font-medium">Logo</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => inspirationInputRef.current?.click()}
+            className="flex items-center gap-1.5 sm:gap-2 h-8 sm:h-9 px-3 sm:px-3.5 rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+          >
+            <Icon name="image" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="font-medium">Ref</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => assetsInputRef.current?.click()}
+            className="flex items-center gap-1.5 sm:gap-2 h-8 sm:h-9 px-3 sm:px-3.5 rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+          >
+            <Icon name="folder-open" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="font-medium">Ativos</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsOptionsModalOpen(true)}
+            className="flex items-center gap-1.5 sm:gap-2 h-8 sm:h-9 px-3 sm:px-3.5 rounded-[26px] text-xs sm:text-sm transition-all duration-200 whitespace-nowrap backdrop-blur-2xl border border-white/10 bg-black/40 text-white/90 hover:border-white/30 hover:bg-black/50 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+          >
+            <Icon name="settings" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="font-medium">Opções</span>
+          </button>
         </div>
+
+        {/* Model / Tone chips */}
+        <div className="flex items-center gap-2 mt-3">
+          <div className="relative" ref={modelSelectorRef}>
+            <button
+              ref={modelButtonRef}
+              type="button"
+              onClick={handleOpenModelSelector}
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg bg-white/5 border border-border text-white hover:bg-white/10 hover:text-white/90 transition-all text-[10px] sm:text-xs whitespace-nowrap font-medium"
+            >
+              <span>{creativeModelLabels[selectedModel].label}</span>
+              <Icon name="chevron-down" className={`w-2.5 h-2.5 transition-transform ${isModelSelectorOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+          <span className="text-white/20 text-[10px]">|</span>
+          <div className="relative" ref={toneSelectorRef}>
+            <button
+              ref={toneButtonRef}
+              type="button"
+              onClick={handleOpenToneSelector}
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg bg-white/5 border border-border text-white hover:bg-white/10 hover:text-white/90 transition-all text-[10px] sm:text-xs whitespace-nowrap font-medium"
+            >
+              <span>{toneOverride || brandProfile.toneOfVoice}</span>
+              <Icon name="chevron-down" className={`w-2.5 h-2.5 transition-transform ${isToneSelectorOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Favorites Panel */}
+        {isFavoritesOpen && styleReferences.length > 0 && (
+          <div
+            ref={favoritesPanelRef}
+            className="mt-4 bg-background border border-border rounded-xl p-3 sm:p-4 w-full max-w-2xl"
+          >
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <h4 className="text-[10px] sm:text-xs font-medium text-white/50">
+                Estilos Favoritos
+              </h4>
+              <button
+                onClick={() => setIsFavoritesOpen(false)}
+                className="text-white/30 hover:text-white/60"
+              >
+                <Icon name="x" className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-1.5 sm:gap-2">
+              {styleReferences.map((ref) => (
+                <button
+                  key={ref.id}
+                  onClick={() => handleSelectFavorite(ref)}
+                  className={`aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${selectedStyleReference?.id === ref.id
+                    ? "border-primary ring-2 ring-primary/30"
+                    : "border-white/[0.06] hover:border-white/20"
+                    }`}
+                >
+                  <img
+                    src={ref.src}
+                    alt={ref.name}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+            {selectedStyleReference && (
+              <p className="text-[10px] text-primary/60 mt-2 text-center">
+                Selecionado: {selectedStyleReference.name}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Model Selector Dropdown - Fixed Position */}
       {isModelSelectorOpen && (
         <div
           ref={modelDropdownRef}
-          className="fixed w-56 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 z-[300]"
+          className="fixed w-52 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-1.5 z-[300]"
           style={{ top: `${modelDropdownPosition.top}px`, left: `${modelDropdownPosition.left}px` }}
         >
           {CREATIVE_MODELS_FOR_UI.map((model) => (
@@ -819,11 +720,11 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               key={model.id}
               onClick={() => handleModelSelect(model.id)}
               className={`w-full px-3 py-2 text-left transition-colors ${
-                selectedModel === model.id ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                selectedModel === model.id ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white'
               }`}
             >
               <div className="text-xs font-medium">{model.label}</div>
-              <div className="text-[10px] text-muted-foreground">{model.provider}</div>
+              <div className="text-[10px] text-white/30">{model.provider}</div>
             </button>
           ))}
         </div>
@@ -833,13 +734,13 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       {isToneSelectorOpen && (
         <div
           ref={toneDropdownRef}
-          className="fixed w-48 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-2 z-[300]"
+          className="fixed w-44 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-1.5 z-[300]"
           style={{ top: `${toneDropdownPosition.top}px`, left: `${toneDropdownPosition.left}px` }}
         >
           <button
             onClick={() => handleToneSelect(null)}
             className={`w-full px-3 py-2 text-left text-xs transition-colors ${
-              !toneOverride ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+              !toneOverride ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white'
             }`}
           >
             Padrão ({brandProfile.toneOfVoice})
@@ -849,7 +750,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
               key={tone}
               onClick={() => handleToneSelect(tone)}
               className={`w-full px-3 py-2 text-left text-xs transition-colors ${
-                toneOverride === tone ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                toneOverride === tone ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white'
               }`}
             >
               {tone}
@@ -859,20 +760,19 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       )}
 
       {toneToast && (
-        <div className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-[400] animate-in slide-in-from-bottom-4 fade-in duration-300 px-2 sm:px-0">
-          <div className="flex items-start sm:items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl shadow-2xl border border-white/10 bg-[#0b1220]/90 backdrop-blur-sm max-w-xs sm:max-w-sm">
-            <div className="w-6 sm:w-8 h-6 sm:h-8 rounded-full flex items-center justify-center bg-white/10 flex-shrink-0">
-              <Icon name="check" className="w-3 sm:w-4 h-3 sm:h-4 text-white/70" />
+        <div className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-[400] animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-full shadow-2xl border border-white/10 bg-black/90 backdrop-blur-xl">
+            <div className="size-6 rounded-full flex items-center justify-center bg-white/10 flex-shrink-0">
+              <Icon name="check" className="w-3 h-3 text-white/60" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-white/90">{toneToast.title}</p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-2">{toneToast.description}</p>
+              <p className="text-xs font-medium text-white/80">{toneToast.title}</p>
             </div>
             <button
               onClick={() => setToneToast(null)}
-              className="p-1 rounded-full hover:bg-white/10 transition-colors ml-1 flex-shrink-0"
+              className="p-1 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
             >
-              <Icon name="x" className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-muted-foreground" />
+              <Icon name="x" className="w-3 h-3 text-white/30" />
             </button>
           </div>
         </div>

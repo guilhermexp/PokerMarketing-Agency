@@ -11,7 +11,8 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
-import { clerkMiddleware } from "@clerk/express";
+import { toNodeHandler } from "better-auth/node";
+import { auth } from "./lib/better-auth.mjs";
 import { requestLogger } from "./middleware/requestLogger.mjs";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.mjs";
 import { csrfProtection } from "./middleware/csrfProtection.mjs";
@@ -97,7 +98,6 @@ app.use(
           "'self'",
           "'unsafe-inline'",
           "'unsafe-eval'",
-          "https://*.clerk.accounts.dev",
           "https://*.sociallab.pro",
           "https://cdn.jsdelivr.net",
           "https://aistudiocdn.com",
@@ -109,16 +109,11 @@ app.use(
           "blob:",
           "https://*.blob.vercel-storage.com",
           "https://*.public.blob.vercel-storage.com",
-          "https://img.clerk.com",
-          "https://images.clerk.dev",
-          "https://*.clerk.com",
           "https://*.googleusercontent.com",
         ],
         connectSrc: [
           "'self'",
-          "https://*.clerk.accounts.dev",
           "https://*.sociallab.pro",
-          "https://api.clerk.com",
           "https://*.blob.vercel-storage.com",
           "https://cdn.jsdelivr.net",
           "https://aistudiocdn.com",
@@ -127,7 +122,7 @@ app.use(
         fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'", "blob:", "https://*.blob.vercel-storage.com"],
-        frameSrc: ["'self'", "https://*.clerk.accounts.dev", "https://*.sociallab.pro"],
+        frameSrc: ["'self'", "https://*.sociallab.pro"],
         workerSrc: ["'self'", "blob:"],
       },
     },
@@ -143,12 +138,19 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 
-app.use(
-  clerkMiddleware({
-    publishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
-    secretKey: process.env.CLERK_SECRET_KEY,
-  }),
-);
+// Better Auth endpoints (sign-in, sign-up, session, org, etc.)
+app.all("/api/auth/*splat", toNodeHandler(auth));
+
+// Session extraction middleware (replaces clerkMiddleware)
+app.use(async (req, _res, next) => {
+  try {
+    const session = await auth.api.getSession({ headers: req.headers });
+    req.authSession = session; // { session, user } or null
+  } catch {
+    req.authSession = null;
+  }
+  next();
+});
 
 // Internal auth bridge for server-to-server tool calls
 const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;

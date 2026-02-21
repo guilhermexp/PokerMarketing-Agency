@@ -17,6 +17,12 @@ import { logAiUsage } from "./usage-tracking.mjs";
 const FAL_IMAGE_MODEL = "fal-ai/gemini-3-pro-image-preview";
 const FAL_EDIT_MODEL = "fal-ai/gemini-3-pro-image-preview/edit";
 
+// Normalize FAL model names to match the image_model enum in the database
+// e.g. "fal-ai/gemini-3-pro-image-preview/edit" → "gemini-3-pro-image-preview"
+function normalizeModelForDb(model) {
+  return model.replace(/^fal-ai\//, "").replace(/\/edit$/, "");
+}
+
 // Timeout for fetching remote reference images (30 seconds)
 const FETCH_TIMEOUT_MS = 30_000;
 
@@ -1028,7 +1034,7 @@ async function processImageGeneration(
           ${thumbnailUrl},
           ${generationInfo.prompt},
           'playground',
-          ${usedModel},
+          ${normalizeModelForDb(usedModel)},
           ${params.aspectRatio || "1:1"},
           ${params.imageSize || "1K"},
           'image'

@@ -8,7 +8,7 @@
  *   POST /api/ai/extract-colors
  */
 
-import { getAuth } from "@clerk/express";
+import { getRequestAuthContext } from "../lib/auth.mjs";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.mjs";
 import { callOpenRouterApi } from "../lib/ai/clients.mjs";
@@ -43,9 +43,9 @@ export function registerAiImageRoutes(app) {
   // -------------------------------------------------------------------------
   app.post("/api/ai/image", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const userId = auth?.userId;
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const userId = authCtx?.userId;
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     logger.info(
@@ -136,7 +136,37 @@ export function registerAiImageRoutes(app) {
         jsonPrompt,
       );
 
-      logger.debug({ fullPrompt }, "[Image API] Prompt completo");
+      // Log prompt as structured summary (not raw dump)
+      const jsonMatch = fullPrompt.match(/```json\n([\s\S]*?)```/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[1]);
+          logger.debug(
+            {
+              subject: parsed.subject,
+              environment: parsed.environment,
+              style: parsed.style?.slice(0, 80),
+              text: parsed.text?.content,
+              aspectRatio: parsed.output?.aspect_ratio,
+              promptChars: fullPrompt.length,
+              hasLogo,
+              hasStyleRef: !!styleReferenceImage,
+              hasPersonRef: hasPersonReference,
+            },
+            "[Image API] Prompt (JSON estruturado)",
+          );
+        } catch {
+          logger.debug(
+            { promptChars: fullPrompt.length, promptPreview: fullPrompt.slice(0, 200) },
+            "[Image API] Prompt (parse falhou)",
+          );
+        }
+      } else {
+        logger.debug(
+          { promptChars: fullPrompt.length, promptPreview: fullPrompt.slice(0, 200) },
+          "[Image API] Prompt (texto livre)",
+        );
+      }
 
       logger.debug(
         {
@@ -287,8 +317,8 @@ export function registerAiImageRoutes(app) {
   // -------------------------------------------------------------------------
   app.post("/api/ai/edit-image", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
@@ -430,8 +460,8 @@ export function registerAiImageRoutes(app) {
   // -------------------------------------------------------------------------
   app.post("/api/ai/extract-colors", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {

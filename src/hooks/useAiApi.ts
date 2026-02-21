@@ -1,9 +1,8 @@
 /**
  * Hook for authenticated AI API calls
- * Provides getToken function from Clerk for API authentication
+ * Better Auth uses cookies — no explicit token needed
  */
 
-import { useAuth } from '@clerk/clerk-react';
 import { useCallback } from 'react';
 import {
   generateAiImage,
@@ -21,12 +20,10 @@ import {
  * Hook that provides AI API functions with automatic authentication
  */
 export function useAiApi() {
-  const { getToken } = useAuth();
-
-  // Wrapper to get token for API calls
+  // Better Auth uses cookies — no token getter needed
   const getAuthToken = useCallback(async () => {
-    return getToken();
-  }, [getToken]);
+    return null;
+  }, []);
 
   // Generate image
   const generateImage = useCallback(
@@ -39,9 +36,9 @@ export function useAiApi() {
       productImages?: AiImageFile[];
       styleReferenceImage?: AiImageFile;
     }) => {
-      return generateAiImage(params, getAuthToken);
+      return generateAiImage(params);
     },
-    [getAuthToken]
+    []
   );
 
   // Generate flyer
@@ -56,9 +53,9 @@ export function useAiApi() {
       imageSize?: '1K' | '2K' | '4K';
       compositionAssets?: AiImageFile[];
     }) => {
-      return generateAiFlyer(params, getAuthToken);
+      return generateAiFlyer(params);
     },
-    [getAuthToken]
+    []
   );
 
   // Edit image
@@ -69,17 +66,17 @@ export function useAiApi() {
       mask?: AiImageFile;
       referenceImage?: AiImageFile;
     }) => {
-      return editAiImage(params, getAuthToken);
+      return editAiImage(params);
     },
-    [getAuthToken]
+    []
   );
 
   // Generate speech
   const generateSpeech = useCallback(
     async (params: { script: string; voiceName?: string }) => {
-      return generateAiSpeech(params, getAuthToken);
+      return generateAiSpeech(params);
     },
-    [getAuthToken]
+    []
   );
 
   // Generate text (quick post or custom)
@@ -94,9 +91,9 @@ export function useAiApi() {
       temperature?: number;
       responseSchema?: Record<string, unknown>;
     }) => {
-      return generateAiText<T>(params, getAuthToken);
+      return generateAiText<T>(params);
     },
-    [getAuthToken]
+    []
   );
 
   // Generate campaign
@@ -107,9 +104,9 @@ export function useAiApi() {
       options: AiGenerationOptions;
       productImages?: AiImageFile[];
     }) => {
-      return generateAiCampaign(params, getAuthToken);
+      return generateAiCampaign(params);
     },
-    [getAuthToken]
+    []
   );
 
   return {

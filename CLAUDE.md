@@ -50,7 +50,7 @@ node scripts/check-all-data-urls.mjs  # Diagnose remaining data URLs
 - **Database**: Neon Serverless Postgres via `@neondatabase/serverless`
 - **Storage**: Vercel Blob for images
 - **Queue**: Redis + BullMQ (for scheduled posts only; image jobs removed)
-- **Auth**: Clerk (multi-tenant with organizations)
+- **Auth**: Better Auth (self-hosted, cookie-based, with organizations plugin)
 - **AI**: Google Gemini via `@google/genai` (sync operations) + Vercel AI SDK `ai` + `@ai-sdk/google` (streaming chat)
 
 ### Data Flow
@@ -102,9 +102,10 @@ Frontend (React) → Express API → Neon Postgres
 - Image columns should contain HTTPS URLs only
 
 ### User ID Resolution
-- Frontend uses Clerk user ID (`user_xxx...`)
+- Frontend uses Better Auth user ID (from session)
 - Backend resolves to database UUID via `resolveUserId()` with caching
 - Always use resolved UUID for database operations
+- Auth uses cookies (sent automatically with `credentials: "include"`), no Bearer tokens
 
 ### Environment Variables
 ```
@@ -112,8 +113,7 @@ DATABASE_URL=postgresql://...
 BLOB_READ_WRITE_TOKEN=vercel_blob_...
 REDIS_URL=redis://... (optional, for scheduled posts)
 GOOGLE_GENERATIVE_AI_API_KEY=AIza...
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
+BETTER_AUTH_SECRET=... (required for session signing, generate with: openssl rand -hex 32)
 CSRF_SECRET=... (required for CSRF protection)
 ```
 

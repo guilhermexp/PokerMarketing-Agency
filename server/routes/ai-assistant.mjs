@@ -7,7 +7,7 @@
  *   POST /api/ai/assistant
  */
 
-import { getAuth } from "@clerk/express";
+import { getRequestAuthContext } from "../lib/auth.mjs";
 import { getSql } from "../lib/db.mjs";
 import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 import {
@@ -39,8 +39,8 @@ export function registerAiAssistantRoutes(app) {
   // -------------------------------------------------------------------------
   app.post("/api/ai/assistant", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {

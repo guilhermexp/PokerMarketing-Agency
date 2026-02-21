@@ -9,7 +9,7 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { systemPrompt } from '../../lib/ai/prompts.mjs';
 import { createImageTool, editImageTool, createLogoTool } from '../../lib/ai/tools/index.mjs';
 import { validateChatRequest } from './schema.mjs';
-import { getAuth } from '@clerk/express';
+import { getRequestAuthContext } from '../../lib/auth.mjs';
 
 // Chat usa APENAS OpenRouter (não usar providers.mjs do resto do app)
 const openrouter = createOpenRouter({
@@ -113,8 +113,8 @@ export async function chatHandler(req, res) {
     // =========================================================================
     // 2. AUTENTICAÇÃO
     // =========================================================================
-    const auth = getAuth(req);
-    const { userId, orgId } = auth || {};
+    const authCtx = getRequestAuthContext(req);
+    const { userId, orgId } = authCtx || {};
 
     if (!userId) {
       console.error('[Chat API] Unauthorized: no userId');

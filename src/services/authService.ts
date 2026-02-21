@@ -1,32 +1,15 @@
 /**
- * Auth Service - Get authentication tokens from Clerk
+ * Auth Service - Authentication token management
+ *
+ * Better Auth uses cookie-based authentication.
+ * Tokens are sent automatically via cookies with credentials: "include".
+ * This module returns null for backward compatibility with code that calls getAuthToken().
  */
-
-// Clerk exposes __clerk_frontend_api on the window for getting tokens
-declare global {
-  interface Window {
-    Clerk?: {
-      session?: {
-        getToken: () => Promise<string | null>;
-      };
-    };
-  }
-}
 
 /**
- * Get authentication token from Clerk
- * Returns null if not authenticated
+ * Get authentication token
+ * Returns null — Better Auth uses cookies (sent automatically with credentials: "include")
  */
 export async function getAuthToken(): Promise<string | null> {
-  try {
-    // Try to get token from Clerk
-    if (typeof window !== "undefined" && window.Clerk?.session) {
-      const token = await window.Clerk.session.getToken();
-      return token;
-    }
-    return null;
-  } catch (error) {
-    console.warn("[Auth] Failed to get token:", error);
-    return null;
-  }
+  return null;
 }

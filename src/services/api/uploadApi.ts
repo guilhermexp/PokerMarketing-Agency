@@ -4,7 +4,6 @@
  * Handles uploads to Vercel Blob storage for images, videos, and audio.
  */
 
-import { getAuthToken } from '../authService';
 import { getCsrfToken, getCurrentCsrfToken } from '../apiClient';
 
 // =============================================================================
@@ -50,7 +49,6 @@ export async function uploadToBlob(
       '',
     ),
   );
-  const token = await getAuthToken();
   if (!getCurrentCsrfToken()) {
     await getCsrfToken();
   }
@@ -60,7 +58,6 @@ export async function uploadToBlob(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
     credentials: 'include',

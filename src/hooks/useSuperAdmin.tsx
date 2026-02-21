@@ -3,7 +3,7 @@
  * Verifies if the current user is a super admin based on email
  */
 
-import { useAuth, useUser } from '@clerk/clerk-react';
+import { authClient } from '../lib/auth-client';
 import { useEffect, useState } from 'react';
 
 
@@ -14,8 +14,7 @@ export interface SuperAdminState {
 }
 
 export function useSuperAdmin(): SuperAdminState {
-  const { user, isLoaded } = useUser();
-  const { getToken } = useAuth();
+  const { data: sessionData, isPending } = authClient.useSession();
   const [state, setState] = useState<SuperAdminState>({
     isSuperAdmin: false,
     isLoading: true,
@@ -26,11 +25,12 @@ export function useSuperAdmin(): SuperAdminState {
     let cancelled = false;
 
     const verifySuperAdmin = async () => {
-      if (!isLoaded) {
+      if (isPending) {
         return;
       }
 
-      const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || null;
+      const user = sessionData?.user;
+      const userEmail = user?.email?.toLowerCase() || null;
 
       if (!user) {
         if (!cancelled) {
@@ -40,16 +40,9 @@ export function useSuperAdmin(): SuperAdminState {
       }
 
       try {
-        const token = await getToken();
-        if (!token) {
-          if (!cancelled) {
-            setState({ isSuperAdmin: false, isLoading: false, userEmail });
-          }
-          return;
-        }
-
+        // Better Auth uses cookies — no explicit token needed
         const response = await fetch('/api/admin/stats', {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
         });
 
         if (!cancelled) {
@@ -71,7 +64,7 @@ export function useSuperAdmin(): SuperAdminState {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, user]);
+  }, [isPending, sessionData]);
 
   return state;
 }

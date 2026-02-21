@@ -4,7 +4,6 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '@clerk/clerk-react';
 import { DataTable, Column } from '../common/DataTable';
 import { Pagination } from '../common/Pagination';
 import { SearchInput } from '../common/SearchInput';
@@ -77,7 +76,6 @@ const severityColors = {
 };
 
 export function LogsPage() {
-  const { getToken } = useAuth();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [recentErrorCount, setRecentErrorCount] = useState(0);
@@ -114,7 +112,6 @@ export function LogsPage() {
   const fetchLogs = useCallback(async (page: number, currentFilters: typeof filters) => {
     try {
       setIsLoading(true);
-      const token = await getToken();
 
       const params = new URLSearchParams({
         page: page.toString(),
@@ -126,7 +123,7 @@ export function LogsPage() {
       if (currentFilters.severity) params.append('severity', currentFilters.severity);
 
       const res = await fetch(`${API_BASE}/api/admin/logs?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
 
       if (!res.ok) throw new Error('Falha ao carregar logs');
@@ -143,7 +140,7 @@ export function LogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [getToken]);
+  }, []);
 
   useEffect(() => {
     fetchLogs(pagination.page, filters);
@@ -153,10 +150,9 @@ export function LogsPage() {
   const fetchLogDetails = useCallback(async (logId: string) => {
     try {
       setIsLoadingDetails(true);
-      const token = await getToken();
 
       const res = await fetch(`${API_BASE}/api/admin/logs/${logId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
 
       if (!res.ok) throw new Error('Falha ao carregar detalhes do log');
@@ -170,7 +166,7 @@ export function LogsPage() {
     } finally {
       setIsLoadingDetails(false);
     }
-  }, [getToken]);
+  }, []);
 
   // Handle row click
   const handleRowClick = useCallback((log: ActivityLog) => {

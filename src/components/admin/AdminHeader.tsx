@@ -4,7 +4,8 @@
  */
 
 import React from 'react';
-import { useUser, UserButton } from '@clerk/clerk-react';
+import { authClient } from '../../lib/auth-client';
+import { UserProfileButton } from '../auth/AuthWrapper';
 import { useLocation } from 'react-router-dom';
 
 const pageTitles: Record<string, string> = {
@@ -16,7 +17,8 @@ const pageTitles: Record<string, string> = {
 };
 
 export function AdminHeader() {
-  const { user } = useUser();
+  const { data: sessionData } = authClient.useSession();
+  const user = sessionData?.user;
   const location = useLocation();
 
   const getPageTitle = () => {
@@ -47,7 +49,7 @@ export function AdminHeader() {
           <div className="hidden md:block text-right mr-1">
             <p className="text-[11px] text-muted-foreground leading-tight">Logado como</p>
             <p className="text-[12px] font-medium text-muted-foreground leading-tight">
-              {user?.primaryEmailAddress?.emailAddress || 'Admin'}
+              {user?.email || 'Admin'}
             </p>
           </div>
 
@@ -63,14 +65,7 @@ export function AdminHeader() {
           </button>
 
           {/* User Button */}
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{
-              elements: {
-                avatarBox: 'w-8 h-8',
-              },
-            }}
-          />
+          <UserProfileButton />
         </div>
       </div>
     </header>
