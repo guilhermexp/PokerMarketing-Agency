@@ -7,16 +7,7 @@ import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 
 export default defineConfig(({ mode }) => {
-  // Load from .env file
-  const envFile = loadEnv(mode, ".", "");
-
-  const env = {
-    VITE_CLERK_PUBLISHABLE_KEY:
-      process.env.VITE_CLERK_PUBLISHABLE_KEY ||
-      envFile.VITE_CLERK_PUBLISHABLE_KEY,
-    // SECURITY: Super admin emails should NOT be exposed to the client
-    // Admin verification happens server-side only
-  };
+  loadEnv(mode, ".", "");
 
   return {
     server: {
@@ -140,11 +131,6 @@ export default defineConfig(({ mode }) => {
         },
       }),
     ],
-    define: {
-      "import.meta.env.VITE_CLERK_PUBLISHABLE_KEY": JSON.stringify(
-        env.VITE_CLERK_PUBLISHABLE_KEY,
-      ),
-    },
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),

@@ -9,10 +9,10 @@
  *   POST /api/ai/convert-prompt
  */
 
-import { getAuth } from "@clerk/express";
+import { getRequestAuthContext } from "../lib/auth.mjs";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.mjs";
-import { getGeminiAi } from "../lib/ai/clients.mjs";
+import { getGeminiAi, callOpenRouterApi } from "../lib/ai/clients.mjs";
 import {
   withRetry,
   sanitizeErrorForClient,
@@ -38,7 +38,6 @@ import {
 } from "../lib/ai/prompt-builders.mjs";
 import {
   logAiUsage,
-  extractGeminiTokens,
   createTimer,
 } from "../helpers/usage-tracking.mjs";
 import { validateContentType } from "../lib/validation/contentType.mjs";
@@ -50,8 +49,8 @@ export function registerAiTextRoutes(app) {
   // -------------------------------------------------------------------------
   app.post("/api/ai/flyer", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
@@ -86,7 +85,7 @@ export function registerAiTextRoutes(app) {
         "[Flyer API] Generating flyer",
       );
 
-      const ai = getGeminiAi();
+      // const ai = getGeminiAi(); // Gemini image temporarily disabled
       const brandingInstruction = buildFlyerPrompt(brandProfile);
 
       const parts = [
@@ -218,137 +217,68 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         });
       }
 
+      // TODO: Gemini image temporarily disabled — using FAL.ai directly.
+      // To re-enable: uncomment the Gemini try block from git history.
       let imageDataUrl = null;
-      let usedProvider = "google";
-      let usedModel = DEFAULT_IMAGE_MODEL;
+      let usedProvider = "fal";
+      let usedModel = FAL_IMAGE_MODEL;
 
+      // Build text prompt for FAL (combine all text parts)
+      const textPrompt = parts
+        .filter((p) => p.text)
+        .map((p) => p.text)
+        .join("\n\n");
+
+      // Collect image inputs for FAL
+      const imageInputs = parts
+        .filter((p) => p.inlineData)
+        .map((p) => ({
+          base64: p.inlineData.data,
+          mimeType: p.inlineData.mimeType,
+        }));
+
+      logger.info({}, "[Flyer API] Using FAL.ai directly (Gemini disabled)");
+
+      const falUrl = await generateImageWithFal(
+        textPrompt,
+        mapAspectRatio(aspectRatio),
+        imageSize,
+        imageInputs.length > 0 ? imageInputs : undefined,
+        undefined,
+        undefined,
+      );
+
+      // Upload to Vercel Blob (FAL URLs are temporary)
       try {
-        // Try Gemini first
-        const response = await withRetry(() =>
-          ai.models.generateContent({
-            model: DEFAULT_IMAGE_MODEL,
-            contents: { parts },
-            config: {
-              imageConfig: {
-                aspectRatio: mapAspectRatio(aspectRatio),
-                imageSize,
-              },
-            },
-          }),
+        const imageResponse = await fetch(falUrl);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+        }
+        const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+        const contentType =
+          imageResponse.headers.get("content-type") || "image/png";
+
+        validateContentType(contentType);
+
+        const ext = contentType.includes("png") ? "png" : "jpg";
+        const filename = `flyer-${Date.now()}.${ext}`;
+
+        const blob = await put(filename, imageBuffer, {
+          access: "public",
+          contentType,
+        });
+
+        imageDataUrl = blob.url;
+        logger.info(
+          { blobUrl: blob.url },
+          "[Flyer API] Uploaded to Vercel Blob",
         );
-
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData) {
-            // Upload to Vercel Blob instead of returning data URL
-            console.log("[Flyer API] Uploading Gemini image to Vercel Blob...");
-            try {
-              const imageBuffer = Buffer.from(part.inlineData.data, "base64");
-              const contentType = part.inlineData.mimeType || "image/png";
-
-              // SECURITY: Validate Gemini API response content type (defense in depth)
-              validateContentType(contentType);
-
-              const ext = contentType.includes("png") ? "png" : "jpg";
-              const filename = `flyer-${Date.now()}.${ext}`;
-
-              const blob = await put(filename, imageBuffer, {
-                access: "public",
-                contentType,
-              });
-
-              imageDataUrl = blob.url;
-              console.log("[Flyer API] Uploaded to Vercel Blob:", blob.url);
-            } catch (uploadError) {
-              console.error(
-                "[Flyer API] Failed to upload to Vercel Blob:",
-                uploadError.message,
-              );
-              // Fallback to data URL only if Blob upload fails
-              imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-            }
-            break;
-          }
-        }
-
-        if (!imageDataUrl) {
-          throw new Error("A IA falhou em produzir o Flyer.");
-        }
-      } catch (geminiError) {
-        // Check if quota/rate limit error - fallback to FAL.ai
-        if (isQuotaOrRateLimitError(geminiError)) {
-          logger.warn(
-            {},
-            "[Flyer API] Gemini quota exceeded, trying FAL.ai fallback",
-          );
-
-          // Build text prompt for FAL (combine all text parts)
-          const textPrompt = parts
-            .filter((p) => p.text)
-            .map((p) => p.text)
-            .join("\n\n");
-
-          // Collect image inputs for FAL
-          const imageInputs = parts
-            .filter((p) => p.inlineData)
-            .map((p) => ({
-              base64: p.inlineData.data,
-              mimeType: p.inlineData.mimeType,
-            }));
-
-          const falUrl = await generateImageWithFal(
-            textPrompt,
-            mapAspectRatio(aspectRatio),
-            imageSize,
-            imageInputs.length > 0 ? imageInputs : undefined,
-            undefined,
-            undefined,
-          );
-
-          logger.info({}, "[Flyer API] FAL.ai fallback successful");
-
-          // Upload to Vercel Blob (FAL URLs are temporary)
-          logger.debug(
-            {},
-            "[Flyer API] Uploading FAL.ai image to Vercel Blob",
-          );
-          try {
-            const imageResponse = await fetch(falUrl);
-            if (!imageResponse.ok) {
-              throw new Error(`Failed to fetch image: ${imageResponse.status}`);
-            }
-            const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-            const contentType =
-              imageResponse.headers.get("content-type") || "image/png";
-
-            // SECURITY: Validate external image fetch content type
-            validateContentType(contentType);
-
-            const ext = contentType.includes("png") ? "png" : "jpg";
-            const filename = `flyer-${Date.now()}.${ext}`;
-
-            const blob = await put(filename, imageBuffer, {
-              access: "public",
-              contentType,
-            });
-
-            imageDataUrl = blob.url;
-            logger.info(
-              { blobUrl: blob.url },
-              "[Flyer API] Uploaded to Vercel Blob",
-            );
-          } catch (uploadError) {
-            logger.error(
-              { err: uploadError },
-              "[Flyer API] Failed to upload to Vercel Blob",
-            );
-            imageDataUrl = falUrl; // Use temporary URL as fallback
-          }
-
-          usedProvider = "fal";
-          usedModel = FAL_IMAGE_MODEL;
-        } else {
-          throw geminiError;
-        }
+      } catch (uploadError) {
+        logger.error(
+          { err: uploadError },
+          "[Flyer API] Failed to upload to Vercel Blob",
+        );
+        imageDataUrl = falUrl;
       }
 
       logger.info(
@@ -401,8 +331,8 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
   // -------------------------------------------------------------------------
   app.post("/api/ai/text", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
@@ -562,8 +492,8 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
   // -------------------------------------------------------------------------
   app.post("/api/ai/enhance-prompt", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
 
     const sql = getSql();
 
@@ -649,7 +579,7 @@ REGRAS:
         headers: {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": process.env.APP_URL || "https://socialab.app",
+          "HTTP-Referer": process.env.APP_URL || "https://sociallab.pro",
         },
         body: JSON.stringify({
           model: "x-ai/grok-4.1-fast",
@@ -712,8 +642,8 @@ REGRAS:
   // -------------------------------------------------------------------------
   app.post("/api/ai/convert-prompt", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
@@ -728,26 +658,21 @@ REGRAS:
         "[Convert Prompt API] Converting prompt to JSON",
       );
 
-      const ai = getGeminiAi();
       const systemPrompt = getVideoPromptSystemPrompt(duration, aspectRatio);
 
-      const response = await withRetry(() =>
-        ai.models.generateContent({
+      const data = await withRetry(() =>
+        callOpenRouterApi({
           model: DEFAULT_FAST_TEXT_MODEL,
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: systemPrompt + "\n\nPrompt: " + prompt }],
-            },
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Prompt: ${prompt}` },
           ],
-          config: {
-            responseMimeType: "application/json",
-            temperature: 0.7,
-          },
+          response_format: { type: "json_object" },
+          temperature: 0.7,
         }),
       );
 
-      const text = response.text?.trim() || "";
+      const text = data.choices?.[0]?.message?.content?.trim() || "";
 
       // Try to parse as JSON
       let result;
@@ -761,14 +686,15 @@ REGRAS:
       logger.info({}, "[Convert Prompt API] Conversion successful");
 
       // Log AI usage
-      const tokens = extractGeminiTokens(response);
+      const inputTokens = data.usage?.prompt_tokens || 0;
+      const outputTokens = data.usage?.completion_tokens || 0;
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/convert-prompt",
         operation: "text",
         model: DEFAULT_FAST_TEXT_MODEL,
-        inputTokens: tokens.inputTokens,
-        outputTokens: tokens.outputTokens,
+        inputTokens,
+        outputTokens,
         latencyMs: timer(),
         status: "success",
       });

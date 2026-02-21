@@ -45,7 +45,7 @@ export const InstagramPostPreview: React.FC<InstagramPostPreviewProps> = ({
           {/* Instagram Header */}
           <div className="px-2.5 py-1.5 flex items-center gap-2 border-b border-border">
             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center flex-shrink-0">
-              <span className="text-[7px] font-bold text-white">CPC</span>
+              <span className="text-[7px] font-bold text-white">SL</span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[9px] font-semibold text-white truncate">

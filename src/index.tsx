@@ -1,15 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { ClerkProvider } from "@clerk/clerk-react";
 import { registerSW } from "virtual:pwa-register";
 import Router from "./Router";
 import "./styles/main.css";
-
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-
-if (!PUBLISHABLE_KEY) {
-  throw new Error("Missing Clerk Publishable Key");
-}
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
@@ -19,9 +12,7 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
-      <Router />
-    </ClerkProvider>
+    <Router />
   </React.StrictMode>,
 );
 

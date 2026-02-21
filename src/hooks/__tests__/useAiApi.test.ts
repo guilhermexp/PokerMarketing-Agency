@@ -2,12 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useAiApi } from '../useAiApi';
 
-vi.mock('@clerk/clerk-react', () => ({
-  useAuth: vi.fn(() => ({
-    getToken: vi.fn().mockResolvedValue('mock-token'),
-  })),
-}));
-
 vi.mock('../../services/apiClient', () => ({
   generateAiImage: vi.fn(),
   generateAiFlyer: vi.fn(),
@@ -29,9 +23,9 @@ describe('useAiApi', () => {
     expect(result.current.generateCampaign).toBeDefined();
   });
 
-  it('should provide getAuthToken function', async () => {
+  it('should provide getAuthToken function that returns null (cookie-based auth)', async () => {
     const { result } = renderHook(() => useAiApi());
     const token = await result.current.getAuthToken();
-    expect(token).toBe('mock-token');
+    expect(token).toBeNull();
   });
 });

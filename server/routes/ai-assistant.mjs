@@ -7,12 +7,10 @@
  *   POST /api/ai/assistant
  */
 
-import { getAuth } from "@clerk/express";
+import { getRequestAuthContext } from "../lib/auth.mjs";
 import { getSql } from "../lib/db.mjs";
-import { getGeminiAi } from "../lib/ai/clients.mjs";
 import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 import {
-  Type,
   DEFAULT_ASSISTANT_MODEL,
 } from "../lib/ai/prompt-builders.mjs";
 import { requireAuthWithAiRateLimit } from "../lib/auth.mjs";
@@ -41,8 +39,8 @@ export function registerAiAssistantRoutes(app) {
   // -------------------------------------------------------------------------
   app.post("/api/ai/assistant", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
@@ -54,66 +52,8 @@ export function registerAiAssistantRoutes(app) {
 
       logger.info({}, "[Assistant API] Starting streaming conversation");
 
-      const ai = getGeminiAi();
-      const sanitizedHistory = history
-        .map((message) => {
-          const parts = (message.parts || []).filter(
-            (part) => part.text || part.inlineData,
-          );
-          if (!parts.length) return null;
-          return { ...message, parts };
-        })
-        .filter(Boolean);
-
-      const assistantTools = {
-        functionDeclarations: [
-          {
-            name: "create_image",
-            description: "Gera uma nova imagem de marketing do zero.",
-            parameters: {
-              type: Type.OBJECT,
-              properties: {
-                description: {
-                  type: Type.STRING,
-                  description: "Descrição técnica detalhada para a IA de imagem.",
-                },
-                aspect_ratio: {
-                  type: Type.STRING,
-                  enum: ["1:1", "9:16", "16:9"],
-                  description: "Proporção da imagem.",
-                },
-              },
-              required: ["description"],
-            },
-          },
-          {
-            name: "edit_referenced_image",
-            description: "Edita a imagem atualmente em foco.",
-            parameters: {
-              type: Type.OBJECT,
-              properties: {
-                prompt: {
-                  type: Type.STRING,
-                  description: "Descrição exata da alteração desejada.",
-                },
-              },
-              required: ["prompt"],
-            },
-          },
-          {
-            name: "create_brand_logo",
-            description: "Cria um novo logo para a marca.",
-            parameters: {
-              type: Type.OBJECT,
-              properties: {
-                prompt: { type: Type.STRING, description: "Descrição do logo." },
-              },
-              required: ["prompt"],
-            },
-          },
-        ],
-      };
-
+      // Convert Gemini history format to OpenAI messages format
+      const messages = [];
       const systemInstruction = `Você é o Diretor de Criação Sênior da DirectorAi. Especialista em Branding e Design de alta performance.
 
 SUAS CAPACIDADES CORE:
@@ -123,33 +63,163 @@ SUAS CAPACIDADES CORE:
 
 Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
 
+      messages.push({ role: "system", content: systemInstruction });
+
+      for (const message of history) {
+        const parts = (message.parts || []).filter(
+          (part) => part.text || part.inlineData,
+        );
+        if (!parts.length) continue;
+
+        const role = message.role === "model" ? "assistant" : "user";
+        const content = [];
+        for (const part of parts) {
+          if (part.text) {
+            content.push({ type: "text", text: part.text });
+          } else if (part.inlineData) {
+            content.push({
+              type: "image_url",
+              image_url: {
+                url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
+              },
+            });
+          }
+        }
+        if (content.length === 1 && content[0].type === "text") {
+          messages.push({ role, content: content[0].text });
+        } else {
+          messages.push({ role, content });
+        }
+      }
+
+      const tools = [
+        {
+          type: "function",
+          function: {
+            name: "create_image",
+            description: "Gera uma nova imagem de marketing do zero.",
+            parameters: {
+              type: "object",
+              properties: {
+                description: {
+                  type: "string",
+                  description: "Descrição técnica detalhada para a IA de imagem.",
+                },
+                aspect_ratio: {
+                  type: "string",
+                  enum: ["1:1", "9:16", "16:9"],
+                  description: "Proporção da imagem.",
+                },
+              },
+              required: ["description"],
+            },
+          },
+        },
+        {
+          type: "function",
+          function: {
+            name: "edit_referenced_image",
+            description: "Edita a imagem atualmente em foco.",
+            parameters: {
+              type: "object",
+              properties: {
+                prompt: {
+                  type: "string",
+                  description: "Descrição exata da alteração desejada.",
+                },
+              },
+              required: ["prompt"],
+            },
+          },
+        },
+        {
+          type: "function",
+          function: {
+            name: "create_brand_logo",
+            description: "Cria um novo logo para a marca.",
+            parameters: {
+              type: "object",
+              properties: {
+                prompt: { type: "string", description: "Descrição do logo." },
+              },
+              required: ["prompt"],
+            },
+          },
+        },
+      ];
+
       // Set headers for SSE
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      const stream = await ai.models.generateContentStream({
-        model: DEFAULT_ASSISTANT_MODEL,
-        contents: sanitizedHistory,
-        config: {
-          systemInstruction,
-          tools: [assistantTools],
-          temperature: 0.5,
+      const apiKey = process.env.OPENROUTER_API_KEY;
+      if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured");
+
+      const streamResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": process.env.APP_URL || "https://sociallab.pro",
         },
+        body: JSON.stringify({
+          model: DEFAULT_ASSISTANT_MODEL,
+          messages,
+          tools,
+          temperature: 0.5,
+          stream: true,
+        }),
       });
 
-      for await (const chunk of stream) {
-        const text = chunk.text || "";
-        const functionCall = chunk.candidates?.[0]?.content?.parts?.find(
-          (p) => p.functionCall,
-        )?.functionCall;
+      if (!streamResponse.ok) {
+        const errorData = await streamResponse.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `OpenRouter API error: ${streamResponse.status}`);
+      }
 
-        const data = { text };
-        if (functionCall) {
-          data.functionCall = functionCall;
+      const reader = streamResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith("data: ")) continue;
+          const payload = trimmed.slice(6);
+          if (payload === "[DONE]") continue;
+
+          try {
+            const chunk = JSON.parse(payload);
+            const delta = chunk.choices?.[0]?.delta;
+            if (!delta) continue;
+
+            const outData = { text: delta.content || "" };
+
+            // Handle tool calls
+            if (delta.tool_calls?.[0]) {
+              const tc = delta.tool_calls[0];
+              if (tc.function?.name) {
+                try {
+                  const args = JSON.parse(tc.function.arguments || "{}");
+                  outData.functionCall = { name: tc.function.name, args };
+                } catch {
+                  // Arguments may be streamed in chunks — accumulate
+                }
+              }
+            }
+
+            res.write(`data: ${JSON.stringify(outData)}\n\n`);
+          } catch {
+            // Skip malformed chunks
+          }
         }
-
-        res.write(`data: ${JSON.stringify(data)}\n\n`);
       }
 
       res.write("data: [DONE]\n\n");
@@ -157,8 +227,8 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
 
       logger.info({}, "[Assistant API] Streaming completed");
 
-      // Log AI usage - estimate tokens based on history length
-      const inputTokens = JSON.stringify(sanitizedHistory).length / 4;
+      // Log AI usage
+      const inputTokens = JSON.stringify(messages).length / 4;
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/assistant",
@@ -167,7 +237,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
         inputTokens: Math.round(inputTokens),
         latencyMs: timer(),
         status: "success",
-        metadata: { historyLength: sanitizedHistory.length },
+        metadata: { historyLength: history.length },
       }).catch(() => {});
     } catch (error) {
       logger.error({ err: error }, "[Assistant API] Error");

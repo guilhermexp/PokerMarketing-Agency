@@ -215,10 +215,10 @@ export const CampaignCarouselCard: React.FC<CampaignCarouselCardProps> = ({
                   <div className="relative bg-background rounded-[24px] overflow-hidden">
                     <div className="px-3 py-2 flex items-center gap-2 border-b border-border">
                       <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-                        <span className="text-[8px] font-bold text-white">CPC</span>
+                        <span className="text-[8px] font-bold text-white">SL</span>
                       </div>
                       <div className="flex-1">
-                        <p className="text-[10px] font-semibold text-white">cpc_poker</p>
+                        <p className="text-[10px] font-semibold text-white">sociallab</p>
                         <p className="text-[8px] text-muted-foreground">Patrocinado</p>
                       </div>
                     </div>

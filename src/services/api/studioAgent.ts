@@ -1,4 +1,3 @@
-import { getAuthToken } from '../authService';
 import { getCsrfToken, getCurrentCsrfToken, clearCsrfToken } from '../apiClient';
 
 const API_BASE = '/api/agent/studio';
@@ -44,7 +43,6 @@ export interface StudioAgentInteraction {
 }
 
 async function buildHeaders(method: string): Promise<Record<string, string>> {
-  const token = await getAuthToken();
   const requiresCsrf = method !== 'GET' && method !== 'HEAD';
 
   // Always refresh CSRF before mutating requests to avoid stale header/cookie mismatch.
@@ -55,10 +53,6 @@ async function buildHeaders(method: string): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
 
   const csrf = getCurrentCsrfToken();
   if (requiresCsrf && csrf) {

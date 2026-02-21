@@ -104,7 +104,7 @@ export function registerBrandProfileRoutes(app) {
         throw new ValidationError("user_id and name are required");
       }
 
-      // Resolve user_id (handles both Clerk IDs and UUIDs)
+      // Resolve user_id (handles both Better Auth IDs and UUIDs)
       const resolvedUserId = await resolveUserId(sql, user_id);
       if (!resolvedUserId) {
         throw new NotFoundError("User", user_id);

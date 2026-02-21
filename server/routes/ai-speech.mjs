@@ -5,7 +5,7 @@
  * Route: POST /api/ai/speech
  */
 
-import { getAuth } from "@clerk/express";
+import { getRequestAuthContext } from "../lib/auth.mjs";
 import { getSql } from "../lib/db.mjs";
 import { getGeminiAi } from "../lib/ai/clients.mjs";
 import { withRetry, sanitizeErrorForClient } from "../lib/ai/retry.mjs";
@@ -18,8 +18,8 @@ import logger from "../lib/logger.mjs";
 export function registerAiSpeechRoutes(app) {
   app.post("/api/ai/speech", async (req, res) => {
     const timer = createTimer();
-    const auth = getAuth(req);
-    const organizationId = auth?.orgId || null;
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {

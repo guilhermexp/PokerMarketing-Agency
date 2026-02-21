@@ -1,7 +1,8 @@
 import { getSql } from "../lib/db.mjs";
 import { requireSuperAdmin } from "../lib/auth.mjs";
-import { getGeminiAi } from "../lib/ai/clients.mjs";
+import { callOpenRouterApi } from "../lib/ai/clients.mjs";
 import { withRetry } from "../lib/ai/retry.mjs";
+import { DEFAULT_TEXT_MODEL } from "../lib/ai/prompt-builders.mjs";
 import logger from "../lib/logger.mjs";
 
 // Cache for AI suggestions (1 hour TTL)
@@ -608,22 +609,18 @@ export function registerAdminRoutes(app) {
 
 Formate em markdown claro com seções.`;
 
-        // Call Gemini API with retry logic
-        const gemini = getGeminiAi();
+        // Call OpenRouter API with retry logic
         const result = await withRetry(() =>
-          gemini.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: prompt }],
-              },
+          callOpenRouterApi({
+            model: DEFAULT_TEXT_MODEL,
+            messages: [
+              { role: "user", content: prompt },
             ],
           }),
         );
 
         const suggestions =
-          result.response?.candidates?.[0]?.content?.parts?.[0]?.text ||
+          result.choices?.[0]?.message?.content?.trim() ||
           "Não foi possível gerar sugestões.";
 
         // Cache the result

@@ -6,11 +6,14 @@
  *          enforceAuthenticatedIdentity, requireAuthWithAiRateLimit,
  *          checkAiRateLimit, createRateLimitMiddleware, stopRateLimitCleanup,
  *          requireSuperAdmin,
- *          getClerkOrgContext, resolveOrganizationContext
+ *          getOrgContext, resolveOrganizationContext
  */
 
-import { getAuth } from "@clerk/express";
-import { createOrgContext } from "../helpers/organization-context.mjs";
+import {
+  createOrgContext,
+  hasPermission as roleHasPermission,
+  OrganizationAccessError,
+} from "../helpers/organization-context.mjs";
 import logger from "./logger.mjs";
 
 // ============================================================================
@@ -145,6 +148,11 @@ if (!upstashRedis) {
 /** @deprecated No longer needed — cleanup is self-managing */
 export function stopRateLimitCleanup() {}
 
+/**
+ * Extract auth context from request.
+ * Reads from req.authSession (set by Better Auth session middleware)
+ * or req.internalAuth (set by internal API token middleware).
+ */
 export function getRequestAuthContext(req) {
   if (req.internalAuth?.userId) {
     return {
@@ -153,14 +161,14 @@ export function getRequestAuthContext(req) {
     };
   }
 
-  const auth = getAuth(req);
-  if (!auth?.userId) {
+  const session = req.authSession;
+  if (!session?.user?.id) {
     return null;
   }
 
   return {
-    userId: auth.userId,
-    orgId: auth.orgId || null,
+    userId: session.user.id,
+    orgId: session.session?.activeOrganizationId || null,
   };
 }
 
@@ -266,9 +274,9 @@ export function enforceAuthenticatedIdentity(req, res, next) {
 
 // Middleware for AI endpoints with stricter rate limiting
 export async function requireAuthWithAiRateLimit(req, res, next) {
-  const auth = getRequestAuthContext(req);
+  const authCtx = getRequestAuthContext(req);
 
-  if (!auth?.userId) {
+  if (!authCtx?.userId) {
     return res.status(401).json({
       error: "Authentication required",
       code: "UNAUTHORIZED",
@@ -277,7 +285,7 @@ export async function requireAuthWithAiRateLimit(req, res, next) {
 
   try {
     // Apply stricter AI rate limiting
-    const rateLimit = await checkAiRateLimit(auth.userId);
+    const rateLimit = await checkAiRateLimit(authCtx.userId);
     res.setHeader("X-RateLimit-Remaining", rateLimit.remaining);
 
     if (!rateLimit.allowed) {
@@ -288,11 +296,11 @@ export async function requireAuthWithAiRateLimit(req, res, next) {
     }
   } catch (err) {
     // Fail-open: allow request if rate limiting errors
-    logger.warn({ err, userId: auth.userId }, "[RateLimit] Error in requireAuthWithAiRateLimit");
+    logger.warn({ err, userId: authCtx.userId }, "[RateLimit] Error in requireAuthWithAiRateLimit");
   }
 
-  req.authUserId = auth.userId;
-  req.authOrgId = auth.orgId || null;
+  req.authUserId = authCtx.userId;
+  req.authOrgId = authCtx.orgId || null;
   next();
 }
 
@@ -315,37 +323,19 @@ if (SUPER_ADMIN_EMAILS.length === 0) {
 
 export async function requireSuperAdmin(req, res, next) {
   try {
-    const auth = getAuth(req);
+    const session = req.authSession;
 
-    if (!auth?.userId) {
+    if (!session?.user?.id) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Get user email from Clerk
-    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
-    const userResponse = await fetch(
-      `https://api.clerk.com/v1/users/${auth.userId}`,
-      {
-        headers: { Authorization: `Bearer ${clerkSecretKey}` },
-      },
-    );
-
-    if (!userResponse.ok) {
-      return res.status(401).json({ error: "Failed to verify user" });
-    }
-
-    const userData = await userResponse.json();
-    const primaryEmailId = userData.primary_email_address_id;
-    const primaryEmail =
-      userData.email_addresses?.find((email) => email.id === primaryEmailId)
-        ?.email_address || userData.email_addresses?.[0]?.email_address;
-    const userEmail = primaryEmail?.toLowerCase();
+    const userEmail = session.user.email?.toLowerCase();
 
     if (!userEmail || !SUPER_ADMIN_EMAILS.includes(userEmail)) {
       logger.warn(
         {
           requestId: req.id,
-          clerkUserId: auth.userId ? `${auth.userId.slice(0, 8)}...` : null,
+          userId: session.user.id ? `${session.user.id.slice(0, 8)}...` : null,
           userEmail: userEmail ? userEmail.replace(/^[^@]+/, "***") : null,
           superAdminCount: SUPER_ADMIN_EMAILS.length,
         },
@@ -368,10 +358,19 @@ export async function requireSuperAdmin(req, res, next) {
 // ORGANIZATION CONTEXT HELPERS
 // ============================================================================
 
-export function getClerkOrgContext(req) {
-  const auth = getAuth(req);
-  return createOrgContext(auth);
+export function getOrgContext(req) {
+  const session = req.authSession;
+  const userId = session?.user?.id;
+  const orgId = session?.session?.activeOrganizationId || null;
+  // Better Auth org roles: owner, admin, member
+  // Map to org:admin / org:member for compatibility
+  const rawRole = session?.session?.activeOrganizationRole || null;
+  const orgRole = rawRole === "owner" || rawRole === "admin" ? "org:admin" : rawRole === "member" ? "org:member" : null;
+  return createOrgContext({ userId, orgId, orgRole });
 }
+
+// Keep old name as alias for backward compatibility during migration
+export const getClerkOrgContext = getOrgContext;
 
 export async function resolveOrganizationContext(sql, userId, organizationId) {
   if (!organizationId) {
@@ -383,10 +382,39 @@ export async function resolveOrganizationContext(sql, userId, organizationId) {
     };
   }
 
+  // Better Auth's "member" table stores userId as Better Auth IDs (not our internal UUIDs).
+  // If we receive a UUID (from resolveUserId), look up the auth_provider_id first.
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let memberUserId = userId;
+  if (uuidPattern.test(userId)) {
+    const userRow = await sql`
+      SELECT auth_provider_id FROM users WHERE id = ${userId} LIMIT 1
+    `;
+    if (userRow.length > 0 && userRow[0].auth_provider_id) {
+      memberUserId = userRow[0].auth_provider_id;
+    }
+  }
+
+  const membership = await sql`
+    SELECT role
+    FROM "member"
+    WHERE "organizationId" = ${organizationId}
+      AND "userId" = ${memberUserId}
+    LIMIT 1
+  `;
+
+  if (!membership.length) {
+    throw new OrganizationAccessError("User is not a member of this organization");
+  }
+
+  const rawRole = membership[0].role;
+  const orgRole =
+    rawRole === "owner" || rawRole === "admin" ? "org:admin" : "org:member";
+
   return {
     organizationId,
     isPersonal: false,
-    orgRole: "org:member",
-    hasPermission: (permission) => true,
+    orgRole,
+    hasPermission: (permission) => roleHasPermission(orgRole, permission),
   };
 }

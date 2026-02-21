@@ -4,7 +4,6 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '@clerk/clerk-react';
 import { DataTable, Column } from '../common/DataTable';
 import { Pagination } from '../common/Pagination';
 
@@ -34,7 +33,6 @@ interface PaginationInfo {
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export function OrganizationsPage() {
-  const { getToken } = useAuth();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -48,10 +46,9 @@ export function OrganizationsPage() {
   const fetchOrganizations = useCallback(async (page: number) => {
     try {
       setIsLoading(true);
-      const token = await getToken();
 
       const res = await fetch(`${API_BASE}/api/admin/organizations?page=${page}&limit=20`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
 
       if (!res.ok) throw new Error('Falha ao carregar organizações');
@@ -66,7 +63,7 @@ export function OrganizationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [getToken]);
+  }, []);
 
   useEffect(() => {
     fetchOrganizations(pagination.page);

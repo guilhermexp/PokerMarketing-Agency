@@ -14,7 +14,7 @@ import type {
   ImageSize,
   Post,
 } from "../types";
-import { generateVideo as generateServerVideo, type ApiVideoModel, getCsrfToken, getCurrentCsrfToken } from "./apiClient";
+import { generateVideo as generateServerVideo, type ApiVideoModel, getCsrfToken, getCurrentCsrfToken, clearCsrfToken } from "./apiClient";
 import { uploadImageToBlob } from "./blobService";
 import { buildLogoPrompt } from "@/ai-prompts";
 
@@ -23,31 +23,42 @@ const toApiVideoModel = (model: VideoModel): ApiVideoModel => {
   if (model.includes("sora")) return "sora-2";
   return "veo-3.1";
 };
-import { getAuthToken } from "./authService";
-
 // API base URL - empty for same-origin requests
 const API_BASE = "";
 
 // Helper to make authenticated API calls
 const apiCall = async (endpoint: string, body: unknown) => {
-  const token = await getAuthToken();
-
   // Ensure CSRF token is available for state-changing requests
   if (!getCurrentCsrfToken()) {
     await getCsrfToken();
   }
   const csrfToken = getCurrentCsrfToken();
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  let response = await fetch(`${API_BASE}${endpoint}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
     },
     credentials: "include",
     body: JSON.stringify(body),
   });
+
+  // Retry once on CSRF failure (stale token after server restart)
+  if (response.status === 403) {
+    clearCsrfToken();
+    await getCsrfToken();
+    const freshToken = getCurrentCsrfToken();
+    response = await fetch(`${API_BASE}${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(freshToken ? { "X-CSRF-Token": freshToken } : {}),
+      },
+      credentials: "include",
+      body: JSON.stringify(body),
+    });
+  }
 
   if (!response.ok) {
     const error = await response

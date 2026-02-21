@@ -17,6 +17,17 @@ export const isQuotaOrRateLimitError = (error) => {
   );
 };
 
+// Check if error is a PERMANENT quota exhaustion (limit: 0, daily cap)
+// These will NOT resolve by waiting — retrying is pointless.
+export const isPermanentQuotaError = (error) => {
+  const msg = String(error?.message || "");
+  return (
+    msg.includes("limit: 0") ||
+    msg.includes("PerDayPerProject") ||
+    msg.includes("free_tier")
+  );
+};
+
 // Sanitize error messages for client - avoid leaking technical details
 export const sanitizeErrorForClient = (error, defaultMessage = "Ocorreu um erro. Tente novamente.") => {
   const errorString = String(error?.message || error || "").toLowerCase();
@@ -85,7 +96,9 @@ export const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
         error?.status === 429 ||
         error?.message?.includes("429") ||
         error?.message?.includes("RESOURCE_EXHAUSTED");
-      const isRetryable = is503 || is429;
+      // Permanent quota exhaustion (limit: 0, daily cap) — never retry
+      const isPermanentQuota = is429 && isPermanentQuotaError(error);
+      const isRetryable = (is503 || is429) && !isPermanentQuota;
 
       logger.error(
         {

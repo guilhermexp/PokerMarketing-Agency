@@ -4,7 +4,6 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
 import { StatsCard } from '../common/StatsCard';
 import {
   AreaChart,
@@ -38,7 +37,6 @@ interface UsageTimeline {
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export function OverviewPage() {
-  const { getToken } = useAuth();
   const [stats, setStats] = useState<OverviewStats | null>(null);
   const [timeline, setTimeline] = useState<UsageTimeline[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,10 +45,8 @@ export function OverviewPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = await getToken();
-
         const statsRes = await fetch(`${API_BASE}/api/admin/stats`, {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
         });
 
         if (!statsRes.ok) throw new Error('Falha ao carregar estatísticas');
@@ -58,7 +54,7 @@ export function OverviewPage() {
         setStats(statsData);
 
         const usageRes = await fetch(`${API_BASE}/api/admin/usage?groupBy=day`, {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
         });
 
         if (usageRes.ok) {
@@ -74,7 +70,7 @@ export function OverviewPage() {
     };
 
     fetchData();
-  }, [getToken]);
+  }, []);
 
   if (isLoading) {
     return (

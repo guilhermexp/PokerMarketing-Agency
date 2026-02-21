@@ -4,7 +4,6 @@
  */
 
 import type { BrandProfile, ChatMessage, AssistantFunctionCall } from '../types';
-import { getAuthToken } from './authService';
 import { getCsrfToken, getCurrentCsrfToken } from './apiClient';
 
 /**
@@ -15,8 +14,6 @@ export async function* runAssistantConversationStream(
   history: ChatMessage[],
   brandProfile: BrandProfile | null
 ): AsyncGenerator<{ text: string; functionCall?: AssistantFunctionCall }> {
-  const token = await getAuthToken();
-
   // Prepare brand info (exclude logo to save tokens)
   const brandInfo = brandProfile ? {
     name: brandProfile.name,
@@ -35,7 +32,6 @@ export async function* runAssistantConversationStream(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
     credentials: 'include',

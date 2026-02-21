@@ -30,7 +30,6 @@ import {
   updateSceneImage,
 } from "../../../services/apiClient";
 import { uploadImageToBlob } from "../../../services/blobService";
-import { getAuthToken } from "../../../services/authService";
 import { ImagePreviewModal } from "../../common/ImagePreviewModal";
 import { ExportVideoModal } from "../../common/ExportVideoModal";
 import { urlToBase64 } from "../../../utils/imageHelpers";
@@ -1791,7 +1790,6 @@ export const ClipCard: React.FC<ClipCardProps> = ({
       try {
         // Convert blob to base64 for upload
         const base64Data = await blobToBase64(wavBlob);
-        const token = await getAuthToken();
         if (!getCurrentCsrfToken()) {
           await getCsrfToken();
         }
@@ -1800,7 +1798,6 @@ export const ClipCard: React.FC<ClipCardProps> = ({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
           },
           credentials: "include",

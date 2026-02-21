@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useEffect, useMemo, useState, useTransition } from "react";
 import { AnimatePresence } from "framer-motion";
-import { useClerk } from "@clerk/clerk-react";
+import { authClient } from "../../lib/auth-client";
 import type {
   BrandProfile,
   MarketingCampaign,
@@ -319,7 +319,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
   // Debug log for productImages
   console.debug("[Dashboard] productImages:", productImages ? `${productImages.length} image(s)` : "null");
 
-  const { signOut } = useClerk();
+  const signOut = () => authClient.signOut();
   const { campaigns } = useCampaigns(userId || null, organizationId);
   const [activeTab, setActiveTab] = useState<Tab>("clips");
   const [isTabPending, startTabTransition] = useTransition();
@@ -432,9 +432,11 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         )}
 
         {activeView === "campaign" && (
-          <div className="px-4 py-4 sm:px-6 sm:py-5 relative z-10">
+          <div className={`px-4 py-4 sm:px-6 sm:py-5 relative z-10 ${
+            showUploadForm && campaigns.length === 0 ? 'flex flex-col items-center justify-center min-h-[calc(100dvh-2rem)]' : ''
+          }`}>
             {showUploadForm && (
-              <div className="mb-2">
+              <div className={campaigns.length === 0 ? 'w-full' : 'mb-2'}>
                 <UploadForm
                   onGenerate={onGenerate}
                   isGenerating={isGenerating}

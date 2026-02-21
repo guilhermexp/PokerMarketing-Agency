@@ -36,6 +36,7 @@ export const generateGeminiImage = async (
   productImages,
   styleReferenceImage,
   personReferenceImage,
+  maxRetries = 3,
 ) => {
   logger.debug(
     { model, aspectRatio: mapAspectRatio(aspectRatio), imageSize },
@@ -88,18 +89,20 @@ export const generateGeminiImage = async (
     "[generateGeminiImage] Chamando API do Gemini",
   );
 
-  const response = await withRetry(() =>
-    ai.models.generateContent({
-      model,
-      contents: { parts },
-      config: {
-        temperature: 0.7,
-        imageConfig: {
-          aspectRatio: mapAspectRatio(aspectRatio),
-          imageSize,
+  const response = await withRetry(
+    () =>
+      ai.models.generateContent({
+        model,
+        contents: { parts },
+        config: {
+          temperature: 0.7,
+          imageConfig: {
+            aspectRatio: mapAspectRatio(aspectRatio),
+            imageSize,
+          },
         },
-      },
-    }),
+      }),
+    maxRetries,
   );
 
   logger.debug({}, "[generateGeminiImage] Resposta recebida do Gemini");
@@ -150,7 +153,12 @@ export const generateImageWithFallback = async (
   styleReferenceImage,
   personReferenceImage,
 ) => {
+  // TODO: Gemini image generation temporarily disabled — using FAL.ai directly.
+  // To re-enable, uncomment the Gemini try block below and remove the direct FAL.ai call.
+
+  /*
   try {
+    // maxRetries=1: try Gemini once, then fall back to FAL.ai immediately
     const imageUrl = await generateGeminiImage(
       prompt,
       aspectRatio,
@@ -159,6 +167,7 @@ export const generateImageWithFallback = async (
       productImages,
       styleReferenceImage,
       personReferenceImage,
+      1, // single attempt — FAL.ai is the real fallback
     );
     return {
       imageUrl,
@@ -172,46 +181,69 @@ export const generateImageWithFallback = async (
         { errorMessage: error.message },
         "[generateImageWithFallback] Gemini falhou com erro de quota/rate limit, tentando fallback para FAL.ai",
       );
-
-      try {
-        const result = await generateImageWithFal(
-          prompt,
-          mapAspectRatio(aspectRatio),
-          imageSize,
-          productImages,
-          styleReferenceImage,
-          personReferenceImage,
-        );
-        logger.info(
-          {},
-          "[generateImageWithFallback] FAL.ai fallback bem sucedido",
-        );
-        return {
-          imageUrl: result,
-          usedModel: FAL_IMAGE_MODEL,
-          usedProvider: "fal",
-          usedFallback: true,
-        };
-      } catch (fallbackError) {
-        logger.error(
-          { err: fallbackError },
-          "[generateImageWithFallback] ❌ FAL.ai fallback também falhou",
-        );
-        throw error;
-      }
+    } else {
+      throw error;
     }
-
-    throw error;
   }
+  */
+
+  logger.info({}, "[generateImageWithFallback] Using FAL.ai directly (Gemini disabled)");
+
+  const result = await generateImageWithFal(
+    prompt,
+    mapAspectRatio(aspectRatio),
+    imageSize,
+    productImages,
+    styleReferenceImage,
+    personReferenceImage,
+  );
+
+  return {
+    imageUrl: result,
+    usedModel: FAL_IMAGE_MODEL,
+    usedProvider: "fal",
+    usedFallback: false,
+  };
 };
 
-// Generate structured content with Gemini
+// Generate structured content — routes through OpenRouter for LLM models
 export const generateStructuredContent = async (
   model,
   parts,
   responseSchema,
   temperature = 0.7,
 ) => {
+  // If model goes through OpenRouter (has "/"), use OpenRouter API
+  if (model.includes("/")) {
+    const { callOpenRouterApi } = await import("./clients.mjs");
+    const textParts = parts.filter((p) => p.text).map((p) => p.text);
+    const imageParts = parts.filter((p) => p.inlineData);
+
+    const content = textParts.map((text) => ({ type: "text", text }));
+    for (const img of imageParts) {
+      content.push({
+        type: "image_url",
+        image_url: {
+          url: `data:${img.inlineData.mimeType};base64,${img.inlineData.data}`,
+        },
+      });
+    }
+
+    const data = await withRetry(() =>
+      callOpenRouterApi({
+        model,
+        messages: [{ role: "user", content }],
+        response_format: { type: "json_object" },
+        temperature,
+      }),
+    );
+
+    const result = data.choices?.[0]?.message?.content;
+    if (!result) throw new Error(`OpenRouter (${model}) no content returned`);
+    return result.trim();
+  }
+
+  // Fallback: native Gemini (for legacy model IDs without "/")
   const ai = getGeminiAi();
 
   const response = await withRetry(() =>

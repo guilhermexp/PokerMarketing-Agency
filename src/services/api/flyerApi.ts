@@ -5,7 +5,6 @@
  */
 
 import { fetchApi } from './client';
-import { getAuthToken } from '../authService';
 import { getCsrfToken, getCurrentCsrfToken } from '../apiClient';
 import type { GalleryImage } from '@/types';
 import type { WeekScheduleInfo, TournamentEvent } from '@/types';
@@ -103,13 +102,11 @@ export const getScheduleById = async (id: string): Promise<WeekScheduleInfo> => 
 export const createSchedule = async (file: File): Promise<WeekScheduleInfo> => {
   const formData = new FormData();
   formData.append('file', file);
-  const token = await getAuthToken();
   if (!getCurrentCsrfToken()) {
     await getCsrfToken();
   }
   const csrfToken = getCurrentCsrfToken();
   const headers: Record<string, string> = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
   if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
   const response = await fetch('/api/db/schedules', {
     method: 'POST',
@@ -147,10 +144,9 @@ export const uploadScheduleFile = async (
 ): Promise<{ tournaments: TournamentEvent[]; scheduleInfo: WeekScheduleInfo }> => {
   const formData = new FormData();
   formData.append('file', file);
-  const token = await getAuthToken();
   const response = await fetch('/api/schedule/upload', {
     method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    credentials: 'include',
     body: formData,
   });
   if (!response.ok) {

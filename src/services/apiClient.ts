@@ -3,8 +3,6 @@
  * Provides typed methods for all database entities
  */
 
-import { getAuthToken } from "./authService";
-
 const API_BASE = "/api/db";
 const DEV_API_ORIGIN =
   import.meta.env.DEV && import.meta.env.VITE_API_ORIGIN
@@ -134,9 +132,6 @@ async function fetchApi<T>(
   const maxAttempts = canRetry ? 2 : 1;
   let lastError: unknown = null;
 
-  // Get Clerk authentication token
-  const token = await getAuthToken();
-
   // For state-changing operations, ensure we have a CSRF token
   const requiresCsrf = method !== "GET" && method !== "HEAD";
   if (requiresCsrf && !csrfToken) {
@@ -147,9 +142,9 @@ async function fetchApi<T>(
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` }),
           ...(requiresCsrf && csrfToken && { "X-CSRF-Token": csrfToken }),
           ...options.headers,
         },
@@ -936,11 +931,9 @@ export async function uploadToBlob(
       "",
     ),
   );
-  const token = await getAuthToken();
 
   // Get CSRF token if not cached
-  const requiresCsrf = true;
-  if (requiresCsrf && !getCurrentCsrfToken()) {
+  if (!getCurrentCsrfToken()) {
     await getCsrfToken();
   }
 
@@ -948,7 +941,6 @@ export async function uploadToBlob(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(getCurrentCsrfToken() ? { "X-CSRF-Token": getCurrentCsrfToken()! } : {}),
     },
     credentials: "include",
@@ -1326,11 +1318,8 @@ export async function queueImageJob(
 export async function getGenerationJobStatus(
   jobId: string,
 ): Promise<GenerationJob> {
-  const token = await getAuthToken();
   const response = await fetch(`/api/generate/status?jobId=${jobId}`, {
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -1356,11 +1345,8 @@ export async function getGenerationJobs(
   if (options?.status) params.append("status", options.status);
   if (options?.limit) params.append("limit", options.limit.toString());
 
-  const token = await getAuthToken();
   const response = await fetch(`/api/generate/status?${params}`, {
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -1408,8 +1394,6 @@ export async function pollGenerationJob(
  * Cancel a specific generation job
  */
 export async function cancelGenerationJob(jobId: string): Promise<void> {
-  const token = await getAuthToken();
-
   // Get CSRF token if not cached
   if (!getCurrentCsrfToken()) {
     await getCsrfToken();
@@ -1418,7 +1402,6 @@ export async function cancelGenerationJob(jobId: string): Promise<void> {
   const response = await fetch(`/api/generate/job/${jobId}`, {
     method: "DELETE",
     headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(getCurrentCsrfToken() ? { "X-CSRF-Token": getCurrentCsrfToken()! } : {}),
     },
     credentials: "include",
@@ -1483,17 +1466,11 @@ const AI_API_BASE = `${DEV_API_ORIGIN}/api/ai`;
 async function fetchAiApi<T>(
   endpoint: string,
   options: RequestInit = {},
-  getToken?: () => Promise<string | null>,
+  _getToken?: () => Promise<string | null>,
 ): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-
-  // Add auth token (explicit getter first, then Clerk fallback)
-  const token = getToken ? await getToken() : await getAuthToken();
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
 
   // Add CSRF token for state-changing methods
   const method = (options.method || "GET").toUpperCase();

@@ -1,7 +1,7 @@
 /**
  * AI client factory functions.
  *
- * Exports: getGeminiAi, getOpenRouter, callOpenRouterApi, configureFal
+ * Exports: getGeminiAi, getOpenRouter, callOpenRouterApi, callOpenRouterSdkChat, configureFal
  */
 
 import { GoogleGenAI } from "@google/genai";
@@ -35,7 +35,7 @@ export const callOpenRouterApi = async (body) => {
     headers: {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": process.env.APP_URL || "https://socialab.app",
+      "HTTP-Referer": process.env.APP_URL || "https://sociallab.pro",
     },
     body: JSON.stringify(body),
   });
@@ -46,6 +46,11 @@ export const callOpenRouterApi = async (body) => {
   }
 
   return response.json();
+};
+
+export const callOpenRouterSdkChat = async (chatGenerationParams) => {
+  const openRouter = getOpenRouter();
+  return openRouter.chat.send({ chatGenerationParams });
 };
 
 export const configureFal = () => {

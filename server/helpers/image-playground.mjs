@@ -17,6 +17,12 @@ import { logAiUsage } from "./usage-tracking.mjs";
 const FAL_IMAGE_MODEL = "fal-ai/gemini-3-pro-image-preview";
 const FAL_EDIT_MODEL = "fal-ai/gemini-3-pro-image-preview/edit";
 
+// Normalize FAL model names to match the image_model enum in the database
+// e.g. "fal-ai/gemini-3-pro-image-preview/edit" → "gemini-3-pro-image-preview"
+function normalizeModelForDb(model) {
+  return model.replace(/^fal-ai\//, "").replace(/\/edit$/, "");
+}
+
 // Timeout for fetching remote reference images (30 seconds)
 const FETCH_TIMEOUT_MS = 30_000;
 
@@ -880,12 +886,14 @@ async function processImageGeneration(
     // Build content parts (shared between Gemini and FAL.ai)
     const parts = await buildContentParts(params);
 
-    // Try Gemini first, fallback to FAL.ai on quota errors
+    // TODO: Gemini image temporarily disabled — using FAL.ai directly.
+    // To re-enable, uncomment the Gemini try block and remove the direct FAL.ai call.
     let imageBase64;
     let mimeType;
     let inputTokens = 0;
     let outputTokens = 0;
 
+    /*
     try {
       const geminiResult = await generateWithGemini(genai, parts, params);
       imageBase64 = geminiResult.imageBase64;
@@ -897,16 +905,18 @@ async function processImageGeneration(
     } catch (geminiError) {
       if (isQuotaOrRateLimitError(geminiError)) {
         // Fallback to FAL.ai
-        const falResult = await generateWithFal(parts, params);
-        imageBase64 = falResult.imageBase64;
-        mimeType = falResult.mimeType;
-        usedProvider = falResult.usedProvider;
-        usedModel = falResult.usedModel;
       } else {
-        // Non-quota error (safety, recitation, etc.) - re-throw as-is
         throw geminiError;
       }
     }
+    */
+
+    console.log("[ImagePlayground] Using FAL.ai directly (Gemini disabled)");
+    const falResult = await generateWithFal(parts, params);
+    imageBase64 = falResult.imageBase64;
+    mimeType = falResult.mimeType;
+    usedProvider = falResult.usedProvider;
+    usedModel = falResult.usedModel;
 
     // Validate content type before upload
     validateContentType(mimeType);
@@ -1024,7 +1034,7 @@ async function processImageGeneration(
           ${thumbnailUrl},
           ${generationInfo.prompt},
           'playground',
-          ${usedModel},
+          ${normalizeModelForDb(usedModel)},
           ${params.aspectRatio || "1:1"},
           ${params.imageSize || "1K"},
           'image'

@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { useClerk } from '@clerk/clerk-react';
+import { authClient } from '../../lib/auth-client';
 import type { BrandProfile, ToneOfVoice } from '../../types';
 import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
@@ -9,8 +9,12 @@ import { Loader } from '../common/Loader';
 import { extractColorsFromLogo } from '../../services/geminiService';
 import { uploadImageToBlob } from '../../services/blobService';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const orgApi = authClient.organization as any;
+
 interface BrandProfileSetupProps {
   onProfileSubmit: (profile: BrandProfile) => void;
+  onInviteAccepted?: () => void;
   existingProfile?: BrandProfile | null;
 }
 
@@ -93,7 +97,7 @@ const ColorWidget: React.FC<{
     <div className="flex flex-col min-w-0 flex-1 pr-1.5">
       <label className="text-[10px] font-medium text-muted-foreground mb-0.5 truncate">{label}</label>
       <span className={`text-[10px] font-mono text-muted-foreground group-hover:text-white transition-colors truncate ${isAnalyzing ? 'animate-pulse' : ''}`}>
-        {isAnalyzing ? 'Sync...' : color.toUpperCase()}
+        {isAnalyzing ? 'Sinc...' : color.toUpperCase()}
       </span>
     </div>
     <div className="relative w-7 h-7 flex items-center justify-center flex-shrink-0">
@@ -113,8 +117,44 @@ const ColorWidget: React.FC<{
   </div>
 );
 
-export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileSubmit, existingProfile }) => {
-  const { signOut } = useClerk();
+export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileSubmit, onInviteAccepted, existingProfile }) => {
+  const signOut = () => authClient.signOut();
+
+  // Invite token flow
+  const [showInviteInput, setShowInviteInput] = useState(false);
+  const [inviteToken, setInviteToken] = useState("");
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+
+  const handleAcceptInvite = async () => {
+    if (!inviteToken.trim()) return;
+    setIsAccepting(true);
+    setInviteError(null);
+    try {
+      const result = await orgApi.acceptInvitation({
+        invitationId: inviteToken.trim(),
+      });
+      if (result.error) {
+        const msg = result.error.message || "Token invalido ou expirado";
+        setInviteError(msg);
+        return;
+      }
+      // Explicitly set the org as active to refresh the session cookie
+      // (cookie cache may have stale data without activeOrganizationId)
+      const orgId = result.data?.member?.organizationId || result.data?.organizationId;
+      if (orgId) {
+        await orgApi.setActive({ organizationId: orgId });
+      }
+      // Success — org is now active, reload data
+      onInviteAccepted?.();
+    } catch (err) {
+      setInviteError(
+        err instanceof Error ? err.message : "Falha ao aceitar convite"
+      );
+    } finally {
+      setIsAccepting(false);
+    }
+  };
   const [profile, setProfile] = useState<Omit<BrandProfile, 'logo'> & { logo: string | null | File }>({
     name: existingProfile?.name || '',
     description: existingProfile?.description || '',
@@ -226,7 +266,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
               <div className="w-10 h-10 rounded-xl bg-white/5 border border-border flex items-center justify-center backdrop-blur-xl">
                 <Icon name="logo" className="w-5 h-5 text-white" />
               </div>
-              <span className="text-sm font-semibold text-muted-foreground">CPC Agency</span>
+              <span className="text-sm font-semibold text-muted-foreground">Social Lab</span>
             </div>
             <button
               type="button"
@@ -282,7 +322,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                       value={profile.name}
                       onChange={handleChange}
                       required
-                      placeholder="CPC POKER"
+                      placeholder="Nome da sua marca"
                       className="w-full bg-[#0a0a0a]/60 border border-border rounded-xl p-3 text-white text-sm font-medium transition-all placeholder:text-muted-foreground backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-ring focus-visible:ring-[3px]"
                     />
                   </div>
@@ -294,7 +334,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                       onChange={handleChange}
                       required
                       rows={4}
-                      placeholder="Clube de Poker"
+                      placeholder="Descreva sua marca e o que ela oferece"
                       className="w-full bg-[#0a0a0a]/60 border border-border rounded-xl p-3 text-white text-sm transition-all resize-none placeholder:text-muted-foreground backdrop-blur-xl focus-visible:outline-none focus-visible:border-white/30 focus-visible:ring-ring focus-visible:ring-[3px]"
                     />
                   </div>
@@ -331,20 +371,20 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                   {/* Technical Grid */}
                   <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                     <CustomSelect
-                      label="Tone"
+                      label="Tom"
                       value={profile.toneOfVoice}
                       options={tones}
                       onChange={handleToneChange}
                     />
                     <ColorWidget
-                      label="Primary"
+                      label="Primaria"
                       name="primaryColor"
                       color={profile.primaryColor}
                       onChange={handleChange}
                       isAnalyzing={isAnalyzingLogo}
                     />
                     <ColorWidget
-                      label="Accent"
+                      label="Destaque"
                       name="secondaryColor"
                       color={profile.secondaryColor}
                       onChange={handleChange}
@@ -366,10 +406,61 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                 </Button>
               </div>
             </form>
+
+            {/* Invite token section — only show for new profiles */}
+            {!existingProfile && (
+              <div className="mt-6 pt-6 border-t border-border">
+                {!showInviteInput ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowInviteInput(true)}
+                    className="w-full text-center text-xs text-muted-foreground hover:text-white transition-colors py-2"
+                  >
+                    Tenho um convite para entrar em uma marca existente
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Cole o token do convite que voce recebeu:
+                    </p>
+                    {inviteError && (
+                      <p className="text-xs text-red-400">{inviteError}</p>
+                    )}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={inviteToken}
+                        onChange={(e) => setInviteToken(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleAcceptInvite()}
+                        placeholder="Token do convite"
+                        className="flex-1 bg-[#0a0a0a]/60 border border-border rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-white/30"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleAcceptInvite}
+                        disabled={!inviteToken.trim() || isAccepting}
+                        size="medium"
+                        className="px-4 py-2.5 text-sm font-semibold bg-white text-black hover:bg-white/90 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        variant="primary"
+                      >
+                        {isAccepting ? 'Entrando...' : 'Entrar'}
+                      </Button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setShowInviteInput(false); setInviteError(null); }}
+                      className="text-[10px] text-muted-foreground hover:text-white transition-colors"
+                    >
+                      Voltar
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <p className="text-center text-muted-foreground text-xs font-medium mt-6">
-            CPC Agency
+            Social Lab
           </p>
         </div>
       </div>

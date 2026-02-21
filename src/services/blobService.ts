@@ -3,7 +3,6 @@
  * Uses /api/upload endpoint to keep tokens secure on server
  */
 
-import { getAuthToken } from "./authService";
 import { getCsrfToken, getCurrentCsrfToken } from "./apiClient";
 
 /**
@@ -28,7 +27,6 @@ export const uploadImageToBlob = async (
   const extension = mimeType.split('/')[1] || 'png';
   const filename = `upload-${Date.now()}.${extension}`;
 
-  const token = await getAuthToken();
   if (!getCurrentCsrfToken()) {
     await getCsrfToken();
   }
@@ -38,7 +36,6 @@ export const uploadImageToBlob = async (
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
     credentials: 'include',

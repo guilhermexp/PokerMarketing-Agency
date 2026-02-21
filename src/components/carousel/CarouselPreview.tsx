@@ -140,11 +140,11 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
             {/* Instagram Header */}
             <div className="px-3 py-2 flex items-center gap-2 border-b border-border">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-                <span className="text-[8px] font-bold text-white">CPC</span>
+                <span className="text-[8px] font-bold text-white">SL</span>
               </div>
               <div className="flex-1">
                 <p className="text-[10px] font-semibold text-white">
-                  cpc_poker
+                  sociallab
                 </p>
                 <p className="text-[8px] text-muted-foreground">Patrocinado</p>
               </div>
@@ -244,7 +244,7 @@ export const CarouselPreview: React.FC<CarouselPreviewProps> = ({
                 className="w-full text-left hover:bg-white/5 rounded p-1 -m-1 transition-colors"
               >
                 <p className="text-[10px] text-white/90 line-clamp-2">
-                  <span className="font-semibold">cpc_poker</span> {caption || clipTitle}
+                  <span className="font-semibold">sociallab</span> {caption || clipTitle}
                 </p>
                 <span className="text-[8px] text-muted-foreground mt-1 flex items-center gap-1">
                   <Icon name="edit-2" className="w-2.5 h-2.5" />

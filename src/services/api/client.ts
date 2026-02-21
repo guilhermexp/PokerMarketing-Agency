@@ -5,7 +5,6 @@
  * and typed responses. Used by all domain-specific API modules.
  */
 
-import { getAuthToken } from '../authService';
 import { getCsrfToken, getCurrentCsrfToken } from '../apiClient';
 
 export const API_BASE = '/api/db';
@@ -38,7 +37,6 @@ export async function fetchApi<T>(
   const canRetry = method === 'GET';
   const maxAttempts = canRetry ? 2 : 1;
   let lastError: unknown = null;
-  const token = await getAuthToken();
 
   // Ensure CSRF token for state-changing requests
   const needsCsrf = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
@@ -54,7 +52,6 @@ export async function fetchApi<T>(
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...(needsCsrf && csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
           ...options.headers,
         },
@@ -90,18 +87,10 @@ export async function fetchApi<T>(
 export async function fetchAiApi<T>(
   endpoint: string,
   options: RequestInit = {},
-  getToken?: () => Promise<string | null>,
 ): Promise<T> {
-  const resolvedGetToken = getToken || getAuthToken;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-
-  // Add auth token if available
-  const token = await resolvedGetToken();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   // Add CSRF token for state-changing requests
   const method = (options.method || 'GET').toUpperCase();

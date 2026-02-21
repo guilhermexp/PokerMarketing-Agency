@@ -435,7 +435,33 @@ TIPOGRAFIA PREFERENCIAL (OBRIGATÓRIO):
             jsonPrompt,
           );
 
-          logger.debug({ fullPrompt }, "[ImagePlayground] Brand profile prompt");
+          // Log structured summary instead of raw prompt dump
+          const jsonMatch = fullPrompt.match(/```json\n([\s\S]*?)```/);
+          if (jsonMatch) {
+            try {
+              const parsed = JSON.parse(jsonMatch[1]);
+              logger.debug(
+                {
+                  subject: parsed.subject,
+                  text: parsed.text?.content?.slice(0, 100),
+                  style: parsed.style?.slice(0, 80),
+                  aspectRatio: parsed.output?.aspect_ratio,
+                  promptChars: fullPrompt.length,
+                },
+                "[ImagePlayground] Prompt (JSON estruturado)",
+              );
+            } catch {
+              logger.debug(
+                { promptChars: fullPrompt.length, promptPreview: fullPrompt.slice(0, 200) },
+                "[ImagePlayground] Prompt (resumo)",
+              );
+            }
+          } else {
+            logger.debug(
+              { promptChars: fullPrompt.length, promptPreview: fullPrompt.slice(0, 200) },
+              "[ImagePlayground] Prompt (resumo)",
+            );
+          }
 
           // 4. Update enhanced params with full prompt and product images
           enhancedParams = {

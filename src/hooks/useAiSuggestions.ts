@@ -1,10 +1,10 @@
 /**
- * Hook para gerenciar sugestões de IA para logs de erro
- * Fornece estado e funções para buscar sugestões de correção
+ * Hook para gerenciar sugestoes de IA para logs de erro
+ * Fornece estado e funcoes para buscar sugestoes de correcao
  */
 
 import { useState, useCallback } from 'react';
-import { useAuth } from '@clerk/clerk-react';
+import { getCsrfToken, getCurrentCsrfToken } from '../services/apiClient';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -16,10 +16,9 @@ interface AiSuggestionsState {
 }
 
 /**
- * Hook que gerencia o estado de sugestões de IA para um log específico
+ * Hook que gerencia o estado de sugestoes de IA para um log especifico
  */
 export function useAiSuggestions(logId: string | null) {
-  const { getToken } = useAuth();
   const [state, setState] = useState<AiSuggestionsState>({
     suggestions: null,
     isLoading: false,
@@ -31,7 +30,7 @@ export function useAiSuggestions(logId: string | null) {
     if (!logId) {
       setState(prev => ({
         ...prev,
-        error: 'ID do log não fornecido',
+        error: 'ID do log nao fornecido',
       }));
       return;
     }
@@ -43,14 +42,18 @@ export function useAiSuggestions(logId: string | null) {
     }));
 
     try {
-      const token = await getToken();
+      // Get CSRF token if not cached
+      if (!getCurrentCsrfToken()) {
+        await getCsrfToken();
+      }
 
       const response = await fetch(`${API_BASE}/api/admin/logs/${logId}/ai-suggestions`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
+          ...(getCurrentCsrfToken() ? { 'X-CSRF-Token': getCurrentCsrfToken()! } : {}),
         },
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -71,11 +74,11 @@ export function useAiSuggestions(logId: string | null) {
       setState({
         suggestions: null,
         isLoading: false,
-        error: err instanceof Error ? err.message : 'Falha ao gerar sugestões de IA',
+        error: err instanceof Error ? err.message : 'Falha ao gerar sugestoes de IA',
         isCached: false,
       });
     }
-  }, [logId, getToken]);
+  }, [logId]);
 
   const reset = useCallback(() => {
     setState({

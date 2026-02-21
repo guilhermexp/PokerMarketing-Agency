@@ -103,7 +103,6 @@ export async function generateAiImage(
     productImages?: AiImageFile[];
     styleReferenceImage?: AiImageFile;
   },
-  getToken?: () => Promise<string | null>,
 ): Promise<string> {
   const result = await fetchAiApi<AiGenerationResult<never>>(
     '/image',
@@ -111,7 +110,6 @@ export async function generateAiImage(
       method: 'POST',
       body: JSON.stringify(params),
     },
-    getToken,
   );
   return result.imageUrl!;
 }
@@ -130,7 +128,6 @@ export async function generateAiFlyer(
     imageSize?: '1K' | '2K' | '4K';
     compositionAssets?: AiImageFile[];
   },
-  getToken?: () => Promise<string | null>,
 ): Promise<string> {
   const result = await fetchAiApi<AiGenerationResult<never>>(
     '/flyer',
@@ -138,7 +135,6 @@ export async function generateAiFlyer(
       method: 'POST',
       body: JSON.stringify(params),
     },
-    getToken,
   );
   return result.imageUrl!;
 }
@@ -153,7 +149,6 @@ export async function editAiImage(
     mask?: AiImageFile;
     referenceImage?: AiImageFile;
   },
-  getToken?: () => Promise<string | null>,
 ): Promise<string> {
   const result = await fetchAiApi<AiGenerationResult<never>>(
     '/edit-image',
@@ -161,7 +156,6 @@ export async function editAiImage(
       method: 'POST',
       body: JSON.stringify(params),
     },
-    getToken,
   );
   return result.imageUrl!;
 }
@@ -178,7 +172,6 @@ export async function generateAiSpeech(
     script: string;
     voiceName?: string;
   },
-  getToken?: () => Promise<string | null>,
 ): Promise<string> {
   const result = await fetchAiApi<AiGenerationResult<never>>(
     '/speech',
@@ -186,7 +179,6 @@ export async function generateAiSpeech(
       method: 'POST',
       body: JSON.stringify(params),
     },
-    getToken,
   );
   return result.audioBase64!;
 }
@@ -209,7 +201,6 @@ export async function generateAiText<T = Record<string, unknown>>(
     temperature?: number;
     responseSchema?: Record<string, unknown>;
   },
-  getToken?: () => Promise<string | null>,
 ): Promise<T> {
   const result = await fetchAiApi<AiGenerationResult<T>>(
     '/text',
@@ -217,7 +208,6 @@ export async function generateAiText<T = Record<string, unknown>>(
       method: 'POST',
       body: JSON.stringify(params),
     },
-    getToken,
   );
   return result.result!;
 }
@@ -236,7 +226,6 @@ export async function generateAiCampaign(
     options: AiGenerationOptions;
     productImages?: AiImageFile[];
   },
-  getToken?: () => Promise<string | null>,
 ): Promise<AiCampaign> {
   const result = await fetchAiApi<AiGenerationResult<never>>(
     '/campaign',
@@ -244,7 +233,6 @@ export async function generateAiCampaign(
       method: 'POST',
       body: JSON.stringify(params),
     },
-    getToken,
   );
   return result.campaign!;
 }

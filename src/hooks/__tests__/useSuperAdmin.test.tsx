@@ -1,23 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { useSuperAdmin } from '../useSuperAdmin';
 
-const mockUseUser = vi.fn();
-const mockUseAuth = vi.fn();
-vi.mock('@clerk/clerk-react', () => ({
-  useUser: () => mockUseUser(),
-  useAuth: () => mockUseAuth(),
+const mockUseSession = vi.fn();
+vi.mock('../../lib/auth-client', () => ({
+  authClient: {
+    useSession: () => mockUseSession(),
+  },
 }));
 
 describe('useSuperAdmin', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn());
-    mockUseAuth.mockReturnValue({ getToken: vi.fn().mockResolvedValue('test-token') });
   });
 
-  it('should return loading state when user not loaded', () => {
-    mockUseUser.mockReturnValue({ user: null, isLoaded: false });
+  it('should return loading state when session is pending', () => {
+    mockUseSession.mockReturnValue({ data: null, isPending: true });
     const { result } = renderHook(() => useSuperAdmin());
 
     expect(result.current.isLoading).toBe(true);
@@ -30,18 +29,20 @@ describe('useSuperAdmin', () => {
       ok: true,
     } as Response);
 
-    mockUseUser.mockReturnValue({
-      user: { primaryEmailAddress: { emailAddress: 'admin@example.com' } },
-      isLoaded: true,
+    mockUseSession.mockReturnValue({
+      data: { user: { id: 'user1', email: 'admin@example.com', name: 'Admin' } },
+      isPending: false,
     });
 
     const { result } = renderHook(() => useSuperAdmin());
-    await act(async () => {
+
+    await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
+
     expect(result.current.isSuperAdmin).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith('/api/admin/stats', {
-      headers: { Authorization: 'Bearer test-token' },
+      credentials: 'include',
     });
   });
 
@@ -51,15 +52,17 @@ describe('useSuperAdmin', () => {
       ok: false,
     } as Response);
 
-    mockUseUser.mockReturnValue({
-      user: { primaryEmailAddress: { emailAddress: 'regular@example.com' } },
-      isLoaded: true,
+    mockUseSession.mockReturnValue({
+      data: { user: { id: 'user2', email: 'regular@example.com', name: 'Regular' } },
+      isPending: false,
     });
 
     const { result } = renderHook(() => useSuperAdmin());
-    await act(async () => {
+
+    await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
+
     expect(result.current.isSuperAdmin).toBe(false);
   });
 });

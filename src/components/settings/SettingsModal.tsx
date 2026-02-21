@@ -11,8 +11,9 @@ import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 import { extractColorsFromLogo } from '../../services/geminiService';
 import { uploadImageToBlob } from '../../services/blobService';
-import { useOrganization, OrganizationProfile, useUser } from '@clerk/clerk-react';
+import { authClient } from '../../lib/auth-client';
 import { ConnectInstagramModal, useInstagramAccounts } from './ConnectInstagramModal';
+import { TeamManagement } from './TeamManagement';
 import { CREATIVE_MODELS_FOR_UI, getDefaultModelId } from '../../config/ai-models';
 
 interface SettingsModalProps {
@@ -85,8 +86,10 @@ const ColorWidget: React.FC<{
 
 
 export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: SettingsModalProps) {
-  const { organization } = useOrganization();
-  const { user } = useUser();
+  const { data: activeOrg } = authClient.useActiveOrganization();
+  const { data: sessionData } = authClient.useSession();
+  const organization = activeOrg;
+  const user = sessionData?.user;
   const [activeTab, setActiveTab] = useState<Tab>('brand');
   const [showInstagramModal, setShowInstagramModal] = useState(false);
 
@@ -621,25 +624,9 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
             )}
 
             {activeTab === 'team' && (
-              <OrganizationProfile
-                appearance={{
-                  elements: {
-                    rootBox: 'w-full',
-                    card: 'bg-transparent shadow-none border-none',
-                    navbar: 'hidden',
-                    pageScrollBox: 'p-0',
-                    profileSection: 'border-border',
-                    profileSectionTitle: 'text-muted-foreground',
-                    profileSectionContent: 'text-white',
-                    formFieldLabel: 'text-muted-foreground',
-                    formFieldInput: 'bg-white/5 border-border text-white',
-                    formButtonPrimary: 'bg-primary text-black hover:bg-primary/90',
-                    membersPageInviteButton: 'bg-primary text-black hover:bg-primary/90',
-                    tableHead: 'text-muted-foreground',
-                    tableCell: 'text-white/80',
-                  }
-                }}
-              />
+              <div className="py-2">
+                <TeamManagement />
+              </div>
             )}
           </div>
         </div>

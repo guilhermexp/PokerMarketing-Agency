@@ -43,7 +43,7 @@ import {
   AuthWrapper,
   useAuth,
 } from "./components/auth/AuthWrapper";
-import { useOrganization } from "@clerk/clerk-react";
+import { authClient } from "./lib/auth-client";
 import { BackgroundJobsProvider } from "./hooks/useBackgroundJobs";
 import { BackgroundJobsIndicator } from "./components/common/BackgroundJobsIndicator";
 import { ToastContainer } from "./components/common/ToastContainer";
@@ -236,18 +236,19 @@ function AppContent() {
     isDbSyncing: _isDbSyncing,
     dbUser,
   } = useAuth();
-  const { organization, isLoaded: orgLoaded } = useOrganization();
-  const organizationId = organization?.id || null;
+  const { data: activeOrg } = authClient.useActiveOrganization();
+  const orgLoaded = true; // Better Auth loads org synchronously with session
+  const organizationId = activeOrg?.id || null;
 
   // DEBUG: Track org loading state changes to identify double-fetch cause
   useEffect(() => {
     console.debug("[App] Org state:", {
       orgLoaded,
-      hasOrganization: !!organization,
+      hasOrganization: !!activeOrg,
       organizationId,
       clerkUserId,
     });
-  }, [orgLoaded, organization, organizationId, clerkUserId]);
+  }, [orgLoaded, activeOrg, organizationId, clerkUserId]);
 
   // Track if initial data load has happened (prevents hot reload re-fetches)
   const hasInitializedRef = useRef(false);
@@ -255,6 +256,9 @@ function AppContent() {
     userId: string | null;
     orgId: string | null;
   }>({ userId: null, orgId: null });
+
+  // Skip brandProfile clear on org switch triggered by onboarding (brand creation auto-creates org)
+  const skipBrandClearOnOrgSwitch = useRef(false);
 
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [campaign, setCampaign] = useState<MarketingCampaign | null>(null);
@@ -556,7 +560,13 @@ function AppContent() {
 
   // === OPTIMIZED: Use initialData from unified endpoint ===
   // Clear brandProfile when switching contexts (user/organization)
+  // Skip when the org change was triggered by brand profile creation (onboarding)
   useEffect(() => {
+    if (skipBrandClearOnOrgSwitch.current) {
+      console.debug("[App] Context changed (org switch from onboarding), skipping brandProfile clear");
+      skipBrandClearOnOrgSwitch.current = false;
+      return;
+    }
     console.debug("[App] Context changed, clearing brandProfile");
     setBrandProfile(null);
   }, [userId, organizationId]);
@@ -2381,42 +2391,66 @@ function AppContent() {
       )}
       {!brandProfile ? (
         <BrandProfileSetup
+          onInviteAccepted={() => {
+            // Force reload: session now has active org from accepted invite
+            window.location.reload();
+          }}
           onProfileSubmit={async (p) => {
-            console.debug(
-              "[BrandProfile] onProfileSubmit called, userId:",
-              userId,
-              "orgId:",
-              organizationId,
-            );
+            console.debug("[BrandProfile] onProfileSubmit called, userId:", userId);
+            // Show Dashboard immediately (optimistic)
             setBrandProfile(p);
-            // Save to database if authenticated
-            if (userId) {
-              console.debug(
-                "[BrandProfile] Saving to database with userId:",
-                userId,
-                "orgId:",
-                organizationId,
-              );
-              try {
-                console.debug("[BrandProfile] Creating new profile...");
-                const created = await createBrandProfile(userId, {
-                  name: p.name,
-                  description: p.description,
-                  logo_url: p.logo || undefined,
-                  primary_color: p.primaryColor,
-                  secondary_color: p.secondaryColor,
-                  tertiary_color: p.tertiaryColor,
-                  tone_of_voice: p.toneOfVoice,
-                  organization_id: organizationId,
+
+            if (!userId) {
+              console.debug("[BrandProfile] userId is null, skipping save");
+              return;
+            }
+
+            try {
+              // Step 1: Create org with brand name (brand = org)
+              let newOrgId: string | null = organizationId;
+              if (!newOrgId) {
+                console.debug("[BrandProfile] Creating organization for brand:", p.name);
+                const slug = p.name
+                  .trim()
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, "-")
+                  .replace(/^-|-$/g, "");
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const orgResult = await (authClient.organization as any).create({
+                  name: p.name.trim(),
+                  slug,
                 });
-                console.debug("[BrandProfile] Created:", created);
-              } catch (e) {
-                console.error("Failed to save brand profile:", e);
+                if (orgResult.data?.id) {
+                  newOrgId = orgResult.data.id;
+                  console.debug("[BrandProfile] Organization created:", newOrgId);
+                }
               }
-            } else {
-              console.debug(
-                "[BrandProfile] userId is null/undefined, skipping save",
-              );
+
+              // Step 2: Activate org FIRST (updates session cookie so middleware injects org_id)
+              if (newOrgId && newOrgId !== organizationId) {
+                skipBrandClearOnOrgSwitch.current = true;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (authClient.organization as any).setActive({
+                  organizationId: newOrgId,
+                });
+                console.debug("[BrandProfile] Organization activated:", newOrgId);
+              }
+
+              // Step 3: Save brand profile — don't pass organization_id,
+              // the enforceAuthenticatedIdentity middleware injects it from session cookie
+              console.debug("[BrandProfile] Saving brand profile to DB");
+              const created = await createBrandProfile(userId, {
+                name: p.name,
+                description: p.description,
+                logo_url: p.logo || undefined,
+                primary_color: p.primaryColor,
+                secondary_color: p.secondaryColor,
+                tertiary_color: p.tertiaryColor,
+                tone_of_voice: p.toneOfVoice,
+              });
+              console.debug("[BrandProfile] Created:", created);
+            } catch (e) {
+              console.error("Failed to save brand profile:", e);
             }
           }}
           existingProfile={null}
@@ -2639,10 +2673,10 @@ function AppContent() {
 
 function AppWithBackgroundJobs() {
   const { userId } = useAuth();
-  const { organization } = useOrganization();
+  const { data: activeOrg } = authClient.useActiveOrganization();
 
   return (
-    <BackgroundJobsProvider userId={userId} organizationId={organization?.id}>
+    <BackgroundJobsProvider userId={userId} organizationId={activeOrg?.id}>
       <AppContent />
     </BackgroundJobsProvider>
   );
