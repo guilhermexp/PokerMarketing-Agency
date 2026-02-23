@@ -193,8 +193,8 @@ export interface ImagePlaygroundStore extends
 // Default Values
 // =============================================================================
 
-const DEFAULT_MODEL = 'gemini-3-pro-image-preview';
-const DEFAULT_PROVIDER = 'google';
+const DEFAULT_MODEL = 'nano-banana-pro';
+const DEFAULT_PROVIDER = 'replicate';
 const DEFAULT_ASPECT_RATIO = '1:1';
 const DEFAULT_IMAGE_SIZE: '1K' | '2K' | '4K' = '2K';
 const MAX_PERSISTED_STATE_SIZE_BYTES = 400_000;

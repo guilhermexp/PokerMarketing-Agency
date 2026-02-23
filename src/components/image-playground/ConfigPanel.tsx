@@ -26,16 +26,23 @@ import { uploadDataUrlToBlob } from '../../services/blobService';
 import type { ToneOfVoice } from '../../types';
 
 // =============================================================================
-// Model Options - Only Gemini 3 Pro Image Preview
+// Model Options
 // =============================================================================
 
 const MODEL_OPTIONS = [
   {
-    provider: 'google',
-    model: 'gemini-3-pro-image-preview',
-    label: 'Gemini Pro Image',
+    provider: 'replicate',
+    model: 'nano-banana',
+    label: 'Standard',
+    color: '#34A853',
+    desc: 'Rapido e economico',
+  },
+  {
+    provider: 'replicate',
+    model: 'nano-banana-pro',
+    label: 'Pro',
     color: '#4285F4',
-    desc: 'Google DeepMind',
+    desc: 'Melhor qualidade',
   },
 ];
 

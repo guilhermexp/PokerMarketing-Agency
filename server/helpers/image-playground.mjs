@@ -731,13 +731,19 @@ async function processImageGeneration(
       .filter((p) => p.inlineData)
       .map((p) => ({ base64: p.inlineData.data, mimeType: p.inlineData.mimeType }));
 
+    // Map user model choice to Replicate model ID
+    const replicateModel = params.model === "nano-banana"
+      ? "google/nano-banana"
+      : "google/nano-banana-pro";
+
     // Run through provider chain with automatic fallback
-    console.log("[ImagePlayground] Using provider chain");
+    console.log("[ImagePlayground] Using provider chain", { replicateModel });
     const result = await runWithProviderFallback("generate", {
       prompt: params.prompt,
       aspectRatio: params.aspectRatio || "1:1",
       imageSize: params.imageSize || "1K",
       productImages: imageInputs.length > 0 ? imageInputs : undefined,
+      replicateModel,
     });
 
     usedProvider = result.usedProvider;
