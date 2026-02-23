@@ -16,7 +16,6 @@ import { getGeminiAi, callOpenRouterApi } from "../lib/ai/clients.mjs";
 import {
   withRetry,
   sanitizeErrorForClient,
-  isQuotaOrRateLimitError,
 } from "../lib/ai/retry.mjs";
 import {
   generateStructuredContent,
@@ -24,9 +23,8 @@ import {
   generateTextWithOpenRouterVision,
   mapAspectRatio,
   DEFAULT_IMAGE_MODEL,
-  FAL_IMAGE_MODEL,
 } from "../lib/ai/image-generation.mjs";
-import { generateImageWithFal } from "../lib/ai/fal-image-generation.mjs";
+import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
 import {
   buildFlyerPrompt,
   buildQuickPostPrompt,
@@ -217,19 +215,13 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         });
       }
 
-      // TODO: Gemini image temporarily disabled — using FAL.ai directly.
-      // To re-enable: uncomment the Gemini try block from git history.
-      let imageDataUrl = null;
-      let usedProvider = "fal";
-      let usedModel = FAL_IMAGE_MODEL;
-
-      // Build text prompt for FAL (combine all text parts)
+      // Build text prompt (combine all text parts)
       const textPrompt = parts
         .filter((p) => p.text)
         .map((p) => p.text)
         .join("\n\n");
 
-      // Collect image inputs for FAL
+      // Collect image inputs (logos, reference images)
       const imageInputs = parts
         .filter((p) => p.inlineData)
         .map((p) => ({
@@ -237,48 +229,79 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           mimeType: p.inlineData.mimeType,
         }));
 
-      logger.info({}, "[Flyer API] Using FAL.ai directly (Gemini disabled)");
+      logger.info({}, "[Flyer API] Using provider chain");
 
-      const falUrl = await generateImageWithFal(
-        textPrompt,
-        mapAspectRatio(aspectRatio),
+      const providerResult = await runWithProviderFallback("generate", {
+        prompt: textPrompt,
+        aspectRatio: mapAspectRatio(aspectRatio),
         imageSize,
-        imageInputs.length > 0 ? imageInputs : undefined,
-        undefined,
-        undefined,
-      );
+        productImages: imageInputs.length > 0 ? imageInputs : undefined,
+      });
 
-      // Upload to Vercel Blob (FAL URLs are temporary)
-      try {
-        const imageResponse = await fetch(falUrl);
-        if (!imageResponse.ok) {
-          throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+      let imageDataUrl = providerResult.imageUrl;
+      const usedProvider = providerResult.usedProvider;
+      const usedModel = providerResult.usedModel;
+
+      // If result is an HTTP URL, upload to Vercel Blob for permanence
+      if (imageDataUrl && imageDataUrl.startsWith("http")) {
+        try {
+          const imageResponse = await fetch(imageDataUrl);
+          if (!imageResponse.ok) {
+            throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+          }
+          const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+          const contentType =
+            imageResponse.headers.get("content-type") || "image/png";
+
+          validateContentType(contentType);
+
+          const ext = contentType.includes("png") ? "png" : "jpg";
+          const filename = `flyer-${Date.now()}.${ext}`;
+
+          const blob = await put(filename, imageBuffer, {
+            access: "public",
+            contentType,
+          });
+
+          imageDataUrl = blob.url;
+          logger.info(
+            { blobUrl: blob.url },
+            "[Flyer API] Uploaded to Vercel Blob",
+          );
+        } catch (uploadError) {
+          logger.error(
+            { err: uploadError },
+            "[Flyer API] Failed to upload to Vercel Blob",
+          );
         }
-        const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-        const contentType =
-          imageResponse.headers.get("content-type") || "image/png";
+      } else if (imageDataUrl && imageDataUrl.startsWith("data:")) {
+        // Gemini returns data URLs — upload base64 to Blob
+        try {
+          const matches = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+          if (matches) {
+            const contentType = matches[1];
+            validateContentType(contentType);
+            const imageBuffer = Buffer.from(matches[2], "base64");
+            const ext = contentType.includes("png") ? "png" : "jpg";
+            const filename = `flyer-${Date.now()}.${ext}`;
 
-        validateContentType(contentType);
+            const blob = await put(filename, imageBuffer, {
+              access: "public",
+              contentType,
+            });
 
-        const ext = contentType.includes("png") ? "png" : "jpg";
-        const filename = `flyer-${Date.now()}.${ext}`;
-
-        const blob = await put(filename, imageBuffer, {
-          access: "public",
-          contentType,
-        });
-
-        imageDataUrl = blob.url;
-        logger.info(
-          { blobUrl: blob.url },
-          "[Flyer API] Uploaded to Vercel Blob",
-        );
-      } catch (uploadError) {
-        logger.error(
-          { err: uploadError },
-          "[Flyer API] Failed to upload to Vercel Blob",
-        );
-        imageDataUrl = falUrl;
+            imageDataUrl = blob.url;
+            logger.info(
+              { blobUrl: blob.url },
+              "[Flyer API] Uploaded data URL to Vercel Blob",
+            );
+          }
+        } catch (uploadError) {
+          logger.error(
+            { err: uploadError },
+            "[Flyer API] Failed to upload data URL to Vercel Blob",
+          );
+        }
       }
 
       logger.info(
@@ -301,7 +324,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           aspectRatio,
           hasLogo: !!logo,
           hasReference: !!referenceImage,
-          fallbackUsed: usedProvider !== "google",
+          fallbackUsed: providerResult.usedFallback,
         },
       });
 
