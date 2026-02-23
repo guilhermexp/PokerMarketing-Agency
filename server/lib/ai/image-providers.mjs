@@ -13,6 +13,23 @@ import { isQuotaOrRateLimitError } from "./retry.mjs";
 import logger from "../logger.mjs";
 
 /**
+ * Check if an error is a transient service unavailability.
+ * E.g. Replicate E003 "Service is currently unavailable due to high demand".
+ * We should fallback to the next provider rather than failing entirely.
+ */
+function isServiceUnavailableError(error) {
+  const msg = String(error?.message || error || "").toLowerCase();
+  const status = error?.status || error?.statusCode;
+  return (
+    status === 503 ||
+    msg.includes("unavailable") ||
+    msg.includes("high demand") ||
+    msg.includes("overloaded") ||
+    msg.includes("service_unavailable")
+  );
+}
+
+/**
  * Check if an error is an authentication/authorization failure.
  * This means the API key exists but is invalid, expired, or revoked.
  * We should fallback to the next provider rather than failing entirely.
@@ -181,6 +198,14 @@ export async function runWithProviderFallback(operation, params) {
         logger.warn(
           { provider: providerName, operation, error: error.message },
           `[ImageProviders] ${providerName} auth error (invalid/expired key), trying next provider`,
+        );
+        continue;
+      }
+
+      if (canFallback && isServiceUnavailableError(error)) {
+        logger.warn(
+          { provider: providerName, operation, error: error.message },
+          `[ImageProviders] ${providerName} service unavailable, trying next provider`,
         );
         continue;
       }

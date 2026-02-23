@@ -15,6 +15,9 @@ import logger from "../../logger.mjs";
 
 export const REPLICATE_MODEL = "google/nano-banana-pro";
 
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 10_000; // Replicate rate limit resets in ~10s
+
 let replicateClient = null;
 
 function getClient() {
@@ -25,6 +28,43 @@ function getClient() {
     });
   }
   return replicateClient;
+}
+
+/**
+ * Check if a Replicate error is a rate limit (429) that we should retry locally.
+ */
+function isRateLimitError(error) {
+  const msg = String(error?.message || "").toLowerCase();
+  return (
+    error?.status === 429 ||
+    msg.includes("429") ||
+    msg.includes("rate limit") ||
+    msg.includes("throttled")
+  );
+}
+
+/**
+ * Run a Replicate call with local retry on 429 rate limits.
+ * This avoids immediately falling back to another provider when the rate limit
+ * resets in just 10 seconds.
+ */
+async function runWithRateRetry(fn) {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (isRateLimitError(error) && attempt < MAX_RETRIES) {
+        const delay = RETRY_BASE_DELAY_MS * attempt;
+        logger.warn(
+          { attempt, maxRetries: MAX_RETRIES, delayMs: delay },
+          `[ReplicateAdapter] Rate limited, retrying in ${delay / 1000}s`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
 }
 
 /**
@@ -93,7 +133,7 @@ export async function generate({
     "[ReplicateAdapter] generate",
   );
 
-  const output = await replicate.run(REPLICATE_MODEL, { input });
+  const output = await runWithRateRetry(() => replicate.run(REPLICATE_MODEL, { input }));
 
   const imageUrl = typeof output === "string" ? output : String(output);
   if (!imageUrl || !imageUrl.startsWith("http")) {
@@ -140,7 +180,7 @@ export async function edit({ prompt, imageBase64, mimeType, referenceImage }) {
     "[ReplicateAdapter] edit",
   );
 
-  const output = await replicate.run(REPLICATE_MODEL, { input });
+  const output = await runWithRateRetry(() => replicate.run(REPLICATE_MODEL, { input }));
 
   const imageUrl = typeof output === "string" ? output : String(output);
   if (!imageUrl || !imageUrl.startsWith("http")) {
