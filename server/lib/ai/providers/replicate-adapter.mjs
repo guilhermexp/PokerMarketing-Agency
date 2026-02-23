@@ -13,7 +13,8 @@ import Replicate from "replicate";
 import { put } from "@vercel/blob";
 import logger from "../../logger.mjs";
 
-export const REPLICATE_MODEL = "google/nano-banana-pro";
+export const REPLICATE_MODEL_PRO = "google/nano-banana-pro";
+export const REPLICATE_MODEL_STANDARD = "google/nano-banana";
 
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 10_000; // Replicate rate limit resets in ~10s
@@ -84,12 +85,14 @@ async function uploadBase64ToBlob(base64, mimeType, prefix = "replicate-ref") {
 }
 
 /**
- * Generate an image with Replicate (google/nano-banana-pro).
+ * Generate an image with Replicate.
+ * Supports both nano-banana (Standard) and nano-banana-pro (Pro).
  *
  * @param {object} params
  * @param {string} params.prompt
  * @param {string} [params.aspectRatio]
  * @param {string} [params.imageSize]
+ * @param {string} [params.replicateModel] - "google/nano-banana" or "google/nano-banana-pro"
  * @param {Array<{base64: string, mimeType: string}>} [params.productImages]
  * @param {{base64: string, mimeType: string}} [params.styleRef]
  * @param {{base64: string, mimeType: string}} [params.personRef]
@@ -99,19 +102,26 @@ export async function generate({
   prompt,
   aspectRatio = "1:1",
   imageSize = "1K",
+  replicateModel,
   productImages,
   styleRef,
   personRef,
 }) {
   const replicate = getClient();
+  const model = replicateModel || REPLICATE_MODEL_PRO;
+  const isStandard = model === REPLICATE_MODEL_STANDARD;
 
   const input = {
     prompt,
     aspect_ratio: aspectRatio,
-    resolution: imageSize,
     output_format: "png",
-    safety_filter_level: "block_only_high",
   };
+
+  // Standard (nano-banana) doesn't support resolution or safety_filter_level
+  if (!isStandard) {
+    input.resolution = imageSize;
+    input.safety_filter_level = "block_only_high";
+  }
 
   // Upload reference images to Blob (Replicate needs HTTP URLs)
   const refImages = [];
@@ -119,9 +129,11 @@ export async function generate({
   if (styleRef) refImages.push(styleRef);
   if (productImages) refImages.push(...productImages);
 
+  // Standard supports max 3 reference images, Pro supports 14
+  const maxRefs = isStandard ? 3 : 14;
   if (refImages.length > 0) {
     const imageUrls = await Promise.all(
-      refImages.slice(0, 14).map((img) =>
+      refImages.slice(0, maxRefs).map((img) =>
         uploadBase64ToBlob(img.base64, img.mimeType, "replicate-ref"),
       ),
     );
@@ -129,22 +141,22 @@ export async function generate({
   }
 
   logger.debug(
-    { model: REPLICATE_MODEL, aspectRatio, imageSize, imageCount: refImages.length },
+    { model, aspectRatio, imageSize, imageCount: refImages.length },
     "[ReplicateAdapter] generate",
   );
 
-  const output = await runWithRateRetry(() => replicate.run(REPLICATE_MODEL, { input }));
+  const output = await runWithRateRetry(() => replicate.run(model, { input }));
 
   const imageUrl = typeof output === "string" ? output : String(output);
   if (!imageUrl || !imageUrl.startsWith("http")) {
     throw new Error("[Replicate] No valid image URL in response");
   }
 
-  return { imageUrl, usedModel: REPLICATE_MODEL };
+  return { imageUrl, usedModel: model };
 }
 
 /**
- * Edit an image with Replicate (google/nano-banana-pro).
+ * Edit an image with Replicate (always uses Pro for quality).
  *
  * @param {object} params
  * @param {string} params.prompt - Edit instruction
@@ -180,12 +192,12 @@ export async function edit({ prompt, imageBase64, mimeType, referenceImage }) {
     "[ReplicateAdapter] edit",
   );
 
-  const output = await runWithRateRetry(() => replicate.run(REPLICATE_MODEL, { input }));
+  const output = await runWithRateRetry(() => replicate.run(REPLICATE_MODEL_PRO, { input }));
 
   const imageUrl = typeof output === "string" ? output : String(output);
   if (!imageUrl || !imageUrl.startsWith("http")) {
     throw new Error("[Replicate] No valid image URL in edit response");
   }
 
-  return { imageUrl, usedModel: REPLICATE_MODEL };
+  return { imageUrl, usedModel: REPLICATE_MODEL_PRO };
 }

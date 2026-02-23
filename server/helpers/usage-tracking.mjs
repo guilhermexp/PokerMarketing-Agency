@@ -102,13 +102,21 @@ const MODEL_PRICING = {
     provider: 'fal',
     costPerSecond: 10
   },
-  // Replicate Image Model (same Gemini 3 Pro Image via Replicate)
+  // Replicate Image Models
   'google/nano-banana-pro': {
     provider: 'replicate',
     costPerImage: {
       '1K': 4,    // $0.04/image = 4 cents
       '2K': 8,
       '4K': 16
+    }
+  },
+  'google/nano-banana': {
+    provider: 'replicate',
+    costPerImage: {
+      '1K': 2,    // $0.02/image = 2 cents
+      '2K': 4,
+      '4K': 8
     }
   }
 };
