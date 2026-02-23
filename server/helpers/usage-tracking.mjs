@@ -102,20 +102,20 @@ const MODEL_PRICING = {
     provider: 'fal',
     costPerSecond: 10
   },
-  // Replicate Image Models
+  // Replicate Image Models (Replicate charges ~2x Google direct pricing)
   'google/nano-banana-pro': {
     provider: 'replicate',
     costPerImage: {
-      '1K': 4,    // $0.04/image = 4 cents
-      '2K': 8,
-      '4K': 16
+      '1K': 31,   // ~$0.31/image via Replicate (Google direct: $0.155)
+      '2K': 31,
+      '4K': 48    // ~$0.48/image (Google direct: $0.24)
     }
   },
   'google/nano-banana': {
     provider: 'replicate',
     costPerImage: {
-      '1K': 2,    // $0.02/image = 2 cents
-      '2K': 4,
+      '1K': 8,    // ~$0.08/image via Replicate (Google direct: $0.039)
+      '2K': 8,
       '4K': 8
     }
   }
