@@ -10,6 +10,7 @@ interface AuthContextType {
   userId: string | null;
   clerkUserId: string | null;
   isDbSyncing: boolean;
+  isOrgReady: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
   userId: null,
   clerkUserId: null,
   isDbSyncing: false,
+  isOrgReady: false,
 });
 
 export function useAuth() {
@@ -80,6 +82,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   const { data: sessionData, isPending } = authClient.useSession();
   const [dbUser, setDbUser] = useState<DbUser | null>(null);
   const [isDbSyncing, setIsDbSyncing] = useState(false);
+  const [isOrgReady, setIsOrgReady] = useState(false);
   const [authView, setAuthView] = useState<"signIn" | "signUp">("signIn");
 
   // Track if we've already synced this user to prevent duplicate calls
@@ -99,6 +102,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
       if (!isSignedIn || !betterAuthUserId) {
         setDbUser(null);
         setIsDbSyncing(false);
+        setIsOrgReady(true);
         syncedUserIdRef.current = null;
         return;
       }
@@ -129,6 +133,24 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
         setDbUser(syncedUser);
         syncedUserIdRef.current = betterAuthUserId;
         console.debug("[Auth] User synced successfully:", syncedUser.id);
+
+        // Auto-activate organization if user has one but session doesn't
+        try {
+          const orgApi = authClient.organization as any;
+          const session = sessionData?.session as any;
+          if (!session?.activeOrganizationId) {
+            const orgsResult = await orgApi.list({});
+            const orgs = orgsResult?.data;
+            if (orgs && orgs.length > 0) {
+              console.debug("[Auth] No active org but user has", orgs.length, "org(s). Auto-activating:", orgs[0].name);
+              await orgApi.setActive({ organizationId: orgs[0].id });
+            }
+          }
+        } catch (orgErr) {
+          console.warn("[Auth] Failed to auto-activate org:", orgErr);
+        } finally {
+          setIsOrgReady(true);
+        }
       } catch (error) {
         console.error("Failed to sync user with database:", error);
         setDbUser({
@@ -153,6 +175,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
     userId: betterAuthUserId || null,
     clerkUserId: betterAuthUserId || null,
     isDbSyncing,
+    isOrgReady,
   };
 
   return (

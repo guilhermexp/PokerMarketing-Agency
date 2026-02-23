@@ -14,9 +14,11 @@ export function SignInForm({ onSwitchToSignUp }: SignInFormProps) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSignIn = async () => {
-    await authClient.signIn.email({
+    setError(null);
+    const result = await authClient.signIn.email({
       email,
       password,
       rememberMe,
@@ -25,6 +27,18 @@ export function SignInForm({ onSwitchToSignUp }: SignInFormProps) {
         onResponse: () => setLoading(false),
       },
     });
+    if (result.error) {
+      const code = result.error.code;
+      if (code === "INVALID_PASSWORD" || code === "INVALID_EMAIL_OR_PASSWORD") {
+        setError("Email ou senha incorretos.");
+      } else if (code === "USER_NOT_FOUND") {
+        setError("Nenhuma conta encontrada com este email.");
+      } else if (code === "TOO_MANY_REQUESTS") {
+        setError("Muitas tentativas. Tente novamente em alguns minutos.");
+      } else {
+        setError(result.error.message || "Erro ao fazer login.");
+      }
+    }
   };
 
   return (
@@ -81,6 +95,12 @@ export function SignInForm({ onSwitchToSignUp }: SignInFormProps) {
             />
           </div>
         </div>
+
+        {error && (
+          <div className="rounded-lg border border-red-300/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-200 mt-4">
+            {error}
+          </div>
+        )}
 
         <div className="flex items-center justify-between mt-5">
           <div className="flex items-center gap-2">
