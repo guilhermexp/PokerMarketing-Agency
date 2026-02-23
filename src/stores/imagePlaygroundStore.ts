@@ -196,7 +196,7 @@ export interface ImagePlaygroundStore extends
 const DEFAULT_MODEL = 'nano-banana-pro';
 const DEFAULT_PROVIDER = 'replicate';
 const DEFAULT_ASPECT_RATIO = '1:1';
-const DEFAULT_IMAGE_SIZE: '1K' | '2K' | '4K' = '2K';
+const DEFAULT_IMAGE_SIZE: '1K' | '2K' | '4K' = '1K';
 const MAX_PERSISTED_STATE_SIZE_BYTES = 400_000;
 const MAX_PERSISTED_PARAM_STRING_LENGTH = 4_000;
 const NON_PERSISTED_PARAM_KEYS = new Set([
