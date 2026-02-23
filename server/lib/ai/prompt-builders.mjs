@@ -19,9 +19,9 @@ import {
 import logger from "../logger.mjs";
 
 // Model defaults (via OpenRouter)
-export const DEFAULT_TEXT_MODEL = "google/gemini-3.1-pro-preview";
-export const DEFAULT_FAST_TEXT_MODEL = "google/gemini-3.1-pro-preview";
-export const DEFAULT_ASSISTANT_MODEL = "google/gemini-3.1-pro-preview";
+export const DEFAULT_TEXT_MODEL = "google/gemini-3-flash-preview";
+export const DEFAULT_FAST_TEXT_MODEL = "google/gemini-3-flash-preview";
+export const DEFAULT_ASSISTANT_MODEL = "google/gemini-3-flash-preview";
 export const AI_INFLUENCER_FLASH_MODEL = "google/gemini-3-flash-preview";
 
 // Schema Type constants

@@ -9,10 +9,10 @@ import { randomUUID } from 'crypto';
 // Updated with actual pricing from providers
 const MODEL_PRICING = {
   // Google Gemini Text Models (via OpenRouter)
-  'google/gemini-3.1-pro-preview': {
+  'google/gemini-3-flash-preview': {
     provider: 'google',
-    inputPerMillion: 200,  // $2/1M = 200 cents
-    outputPerMillion: 1200  // $12/1M = 1200 cents
+    inputPerMillion: 50,  // $0.50/1M = 50 cents
+    outputPerMillion: 300  // $3/1M = 300 cents
   },
   // Legacy model IDs (kept for historical usage logs)
   'gemini-3-pro-preview': {
@@ -21,11 +21,6 @@ const MODEL_PRICING = {
     outputPerMillion: 1200
   },
   'gemini-3-flash-preview': {
-    provider: 'google',
-    inputPerMillion: 50,
-    outputPerMillion: 300
-  },
-  'google/gemini-3-flash-preview': {
     provider: 'google',
     inputPerMillion: 50,
     outputPerMillion: 300
