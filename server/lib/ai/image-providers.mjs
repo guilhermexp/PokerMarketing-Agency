@@ -63,7 +63,7 @@ const adapterCache = {};
  * Read IMAGE_PROVIDERS, validate names, check API keys, return active chain.
  */
 function resolveProviderChain() {
-  const raw = (process.env.IMAGE_PROVIDERS || "replicate,gemini,fal")
+  const raw = (process.env.IMAGE_PROVIDERS || "gemini,replicate,fal")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
