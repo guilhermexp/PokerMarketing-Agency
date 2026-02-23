@@ -235,9 +235,10 @@ function AppContent() {
     isLoading: authLoading,
     isDbSyncing: _isDbSyncing,
     dbUser,
+    isOrgReady,
   } = useAuth();
   const { data: activeOrg } = authClient.useActiveOrganization();
-  const orgLoaded = true; // Better Auth loads org synchronously with session
+  const orgLoaded = isOrgReady; // Wait for AuthWrapper to auto-activate org if needed
   const organizationId = activeOrg?.id || null;
 
   // DEBUG: Track org loading state changes to identify double-fetch cause
