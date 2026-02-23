@@ -15,6 +15,7 @@ import {
   ImagePlus,
   Pause,
   Play,
+  RotateCw,
 } from 'lucide-react';
 import { useGenerationPolling, useImagePlaygroundBatches } from '../../hooks/useImagePlayground';
 import { useImagePlaygroundStore } from '../../stores/imagePlaygroundStore';
@@ -147,13 +148,37 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
     }
   }, [generation.id, deleteGeneration]);
 
+  const handleRetry = useCallback(async () => {
+    const { batchesMap, addBatch } = useImagePlaygroundStore.getState();
+    const batches = batchesMap[topicId] || [];
+    const batch = batches.find(b => b.generations.some(g => g.id === generation.id));
+    if (!batch) return;
+
+    // Delete the failed generation first
+    await deleteGeneration(generation.id);
+
+    // Re-create with the same config, imageNum=1
+    const result = await api.createImage({
+      topicId,
+      provider: batch.provider,
+      model: batch.model,
+      imageNum: 1,
+      params: {
+        prompt: batch.prompt,
+        ...(batch.config as Record<string, unknown>),
+      },
+    });
+
+    addBatch(topicId, result.data.batch);
+  }, [generation.id, topicId, deleteGeneration]);
+
   // Loading State
   if (!generation.asset) {
     return (
       <div className="aspect-square rounded-xl border border-white/[0.06] overflow-hidden relative bg-white/[0.02]">
         {status === 'error' ? (
           <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-            <GenerationError error={pollingError} onDelete={handleDelete} />
+            <GenerationError error={pollingError} onDelete={handleDelete} onRetry={handleRetry} />
           </div>
         ) : (
           <>
@@ -287,9 +312,10 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
 interface GenerationErrorProps {
   error: unknown;
   onDelete: () => void;
+  onRetry?: () => void;
 }
 
-function GenerationError({ error, onDelete }: GenerationErrorProps) {
+function GenerationError({ error, onDelete, onRetry }: GenerationErrorProps) {
   const errorObj = error && typeof error === 'object' ? (error as Record<string, unknown>) : null;
   const code = errorObj?.code as string | undefined;
   const message = errorObj?.message as string | undefined;
@@ -349,13 +375,23 @@ function GenerationError({ error, onDelete }: GenerationErrorProps) {
       <p className="text-[11px] text-white/30 text-center leading-snug max-w-[200px]">
         {description}
       </p>
-      <button
-        onClick={onDelete}
-        className="flex items-center gap-1.5 px-3 py-1.5 mt-1 rounded-lg bg-white/[0.04] text-white/40 text-xs hover:bg-white/[0.08] transition-colors"
-      >
-        <Trash2 className="w-3 h-3" />
-        Remover
-      </button>
+      <div className="flex items-center gap-2 mt-1">
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] text-white/50 text-xs hover:bg-white/[0.12] transition-colors"
+          >
+            <RotateCw className="w-3 h-3" />
+            Tentar novamente
+          </button>
+        )}
+        <button
+          onClick={onDelete}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] text-white/30 text-xs hover:bg-white/[0.08] transition-colors"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      </div>
     </div>
   );
 }
