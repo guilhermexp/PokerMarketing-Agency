@@ -409,52 +409,33 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
 
             {/* Invite token section — only show for new profiles */}
             {!existingProfile && (
-              <div className="mt-6 pt-6 border-t border-border">
-                {!showInviteInput ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowInviteInput(true)}
-                    className="w-full text-center text-xs text-muted-foreground hover:text-white transition-colors py-2"
-                  >
-                    Tenho um convite para entrar em uma marca existente
-                  </button>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Cole o token do convite que voce recebeu:
-                    </p>
-                    {inviteError && (
-                      <p className="text-xs text-red-400">{inviteError}</p>
-                    )}
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={inviteToken}
-                        onChange={(e) => setInviteToken(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleAcceptInvite()}
-                        placeholder="Token do convite"
-                        className="flex-1 bg-[#0a0a0a]/60 border border-border rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-white/30"
-                      />
-                      <Button
-                        type="button"
-                        onClick={handleAcceptInvite}
-                        disabled={!inviteToken.trim() || isAccepting}
-                        size="medium"
-                        className="px-4 py-2.5 text-sm font-semibold bg-white text-black hover:bg-white/90 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                        variant="primary"
-                      >
-                        {isAccepting ? 'Entrando...' : 'Entrar'}
-                      </Button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setShowInviteInput(false); setInviteError(null); }}
-                      className="text-[10px] text-muted-foreground hover:text-white transition-colors"
-                    >
-                      Voltar
-                    </button>
-                  </div>
+              <div className="mt-6 pt-6 border-t border-border space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Tem um convite? Cole o token para entrar em uma marca existente:
+                </p>
+                {inviteError && (
+                  <p className="text-xs text-red-400">{inviteError}</p>
                 )}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={inviteToken}
+                    onChange={(e) => setInviteToken(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAcceptInvite()}
+                    placeholder="Token do convite"
+                    className="flex-1 bg-[#0a0a0a]/60 border border-border rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-white/30"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleAcceptInvite}
+                    disabled={!inviteToken.trim() || isAccepting}
+                    size="medium"
+                    className="px-4 py-2.5 text-sm font-semibold bg-white text-black hover:bg-white/90 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    variant="primary"
+                  >
+                    {isAccepting ? 'Entrando...' : 'Entrar'}
+                  </Button>
+                </div>
               </div>
             )}
           </div>

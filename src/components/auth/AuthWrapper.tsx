@@ -148,8 +148,6 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
           }
         } catch (orgErr) {
           console.warn("[Auth] Failed to auto-activate org:", orgErr);
-        } finally {
-          setIsOrgReady(true);
         }
       } catch (error) {
         console.error("Failed to sync user with database:", error);
@@ -163,6 +161,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
         syncedUserIdRef.current = betterAuthUserId;
       } finally {
         setIsDbSyncing(false);
+        setIsOrgReady(true);
       }
     }
 
