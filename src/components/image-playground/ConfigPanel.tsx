@@ -11,11 +11,15 @@ import {
   X,
   Palette,
   Instagram,
+  Sparkles,
   Loader2,
   Check,
   ChevronDown,
   Upload,
   Image,
+  Package,
+  Layers,
+  Shield,
 } from 'lucide-react';
 import { useImagePlaygroundStore, type ReferenceImage } from '../../stores/imagePlaygroundStore';
 import { uploadDataUrlToBlob } from '../../services/blobService';
@@ -102,6 +106,10 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
     activeImageSize,
     useBrandProfile,
     useInstagramMode,
+    useAiInfluencerMode,
+    useProductHeroMode,
+    useExplodedProductMode,
+    useBrandIdentityMode,
     setModelAndProvider,
     setImageNum,
     setAspectRatio,
@@ -109,6 +117,10 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
     setParam,
     toggleBrandProfile,
     toggleInstagramMode,
+    toggleAiInfluencerMode,
+    toggleProductHeroMode,
+    toggleExplodedProductMode,
+    toggleBrandIdentityMode,
     addReferenceImage,
     removeReferenceImage,
     updateReferenceImageBlobUrl,
@@ -388,6 +400,142 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
                 }`}>
                   <div className={`absolute top-[3px] w-3 h-3 rounded-full transition-all duration-200 ${
                     useInstagramMode ? 'left-[17px] bg-white' : 'left-[3px] bg-white/30'
+                }`} />
+              </div>
+            </button>
+
+            {/* AI Influencer Mode Toggle */}
+            <button
+              onClick={toggleAiInfluencerMode}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all duration-200 ${
+                useAiInfluencerMode
+                  ? 'bg-white/[0.08] border border-white/[0.12]'
+                  : 'bg-transparent border border-white/[0.06] hover:bg-white/[0.04]'
+              }`}
+              title={useAiInfluencerMode ? 'Modo AI Influencer ativo (4:5)' : 'Ativar modo AI Influencer'}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                useAiInfluencerMode
+                  ? 'bg-white text-black'
+                  : 'bg-white/[0.06] text-white/40'
+              }`}>
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div className="flex-1 text-left">
+                <span className={`text-sm font-medium ${useAiInfluencerMode ? 'text-white' : 'text-white/60'}`}>
+                  AI Influencer
+                </span>
+                <p className="text-[10px] text-white/25 mt-0.5">
+                  {useAiInfluencerMode ? 'Ativo - 4:5 fotorrealista' : 'Desativado'}
+                </p>
+              </div>
+              <div className={`w-8 h-[18px] rounded-full transition-all duration-200 relative ${
+                useAiInfluencerMode ? 'bg-white/20' : 'bg-white/[0.06]'
+              }`}>
+                <div className={`absolute top-[3px] w-3 h-3 rounded-full transition-all duration-200 ${
+                  useAiInfluencerMode ? 'left-[17px] bg-white' : 'left-[3px] bg-white/30'
+                }`} />
+              </div>
+            </button>
+
+            {/* Product Hero Shot Mode Toggle */}
+            <button
+              onClick={toggleProductHeroMode}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all duration-200 ${
+                useProductHeroMode
+                  ? 'bg-white/[0.08] border border-white/[0.12]'
+                  : 'bg-transparent border border-white/[0.06] hover:bg-white/[0.04]'
+              }`}
+              title={useProductHeroMode ? 'Modo Product Hero ativo (1:1)' : 'Ativar modo Product Hero Shot'}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                useProductHeroMode
+                  ? 'bg-white text-black'
+                  : 'bg-white/[0.06] text-white/40'
+              }`}>
+                <Package className="w-4 h-4" />
+              </div>
+              <div className="flex-1 text-left">
+                <span className={`text-sm font-medium ${useProductHeroMode ? 'text-white' : 'text-white/60'}`}>
+                  Product Hero Shot
+                </span>
+                <p className="text-[10px] text-white/25 mt-0.5">
+                  {useProductHeroMode ? 'Ativo - 1:1 hero shot' : 'Desativado'}
+                </p>
+              </div>
+              <div className={`w-8 h-[18px] rounded-full transition-all duration-200 relative ${
+                useProductHeroMode ? 'bg-white/20' : 'bg-white/[0.06]'
+              }`}>
+                <div className={`absolute top-[3px] w-3 h-3 rounded-full transition-all duration-200 ${
+                  useProductHeroMode ? 'left-[17px] bg-white' : 'left-[3px] bg-white/30'
+                }`} />
+              </div>
+            </button>
+
+            {/* Exploded Product Mode Toggle */}
+            <button
+              onClick={toggleExplodedProductMode}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all duration-200 ${
+                useExplodedProductMode
+                  ? 'bg-white/[0.08] border border-white/[0.12]'
+                  : 'bg-transparent border border-white/[0.06] hover:bg-white/[0.04]'
+              }`}
+              title={useExplodedProductMode ? 'Modo Exploded Product ativo (9:16)' : 'Ativar modo Exploded Product'}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                useExplodedProductMode
+                  ? 'bg-white text-black'
+                  : 'bg-white/[0.06] text-white/40'
+              }`}>
+                <Layers className="w-4 h-4" />
+              </div>
+              <div className="flex-1 text-left">
+                <span className={`text-sm font-medium ${useExplodedProductMode ? 'text-white' : 'text-white/60'}`}>
+                  Exploded Product
+                </span>
+                <p className="text-[10px] text-white/25 mt-0.5">
+                  {useExplodedProductMode ? 'Ativo - 9:16 desconstrução' : 'Desativado'}
+                </p>
+              </div>
+              <div className={`w-8 h-[18px] rounded-full transition-all duration-200 relative ${
+                useExplodedProductMode ? 'bg-white/20' : 'bg-white/[0.06]'
+              }`}>
+                <div className={`absolute top-[3px] w-3 h-3 rounded-full transition-all duration-200 ${
+                  useExplodedProductMode ? 'left-[17px] bg-white' : 'left-[3px] bg-white/30'
+                }`} />
+              </div>
+            </button>
+
+            {/* Brand Identity Mode Toggle */}
+            <button
+              onClick={toggleBrandIdentityMode}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all duration-200 ${
+                useBrandIdentityMode
+                  ? 'bg-white/[0.08] border border-white/[0.12]'
+                  : 'bg-transparent border border-white/[0.06] hover:bg-white/[0.04]'
+              }`}
+              title={useBrandIdentityMode ? 'Modo Brand Identity ativo (4:5 + marca)' : 'Ativar modo Brand Identity'}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                useBrandIdentityMode
+                  ? 'bg-white text-black'
+                  : 'bg-white/[0.06] text-white/40'
+              }`}>
+                <Shield className="w-4 h-4" />
+              </div>
+              <div className="flex-1 text-left">
+                <span className={`text-sm font-medium ${useBrandIdentityMode ? 'text-white' : 'text-white/60'}`}>
+                  Brand Identity
+                </span>
+                <p className="text-[10px] text-white/25 mt-0.5">
+                  {useBrandIdentityMode ? 'Ativo - 4:5 + marca' : 'Desativado'}
+                </p>
+              </div>
+              <div className={`w-8 h-[18px] rounded-full transition-all duration-200 relative ${
+                useBrandIdentityMode ? 'bg-white/20' : 'bg-white/[0.06]'
+              }`}>
+                <div className={`absolute top-[3px] w-3 h-3 rounded-full transition-all duration-200 ${
+                  useBrandIdentityMode ? 'left-[17px] bg-white' : 'left-[3px] bg-white/30'
                 }`} />
               </div>
             </button>

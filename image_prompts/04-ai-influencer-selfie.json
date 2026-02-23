@@ -1,0 +1,48 @@
+{
+  "image_analysis": {
+    "subject": {
+      "demographics": "Young woman, fair skin tone",
+      "hair": "Dark brown, long, straight to slightly wavy, falling behind shoulders",
+      "face": {
+        "skin_texture": "Highly detailed with prominent natural features",
+        "eyes": "Green/hazel, looking directly at the camera",
+        "expression": "Soft, relaxed, confident",
+        "makeup": "Natural look, minimal makeup"
+      },
+      "accessories": "Small gold hoop earrings"
+    },
+    "apparel": {
+      "garment": "Soccer jersey (football kit)",
+      "color_palette": "Bright yellow with navy blue accents",
+      "brand_details": "Black Adidas logo on the right chest, signature navy blue three-stripes on the shoulders",
+      "pattern": "Thin vertical navy blue pinstripes running down the front",
+      "logos": {
+        "crest": "Shield-shaped team crest on the left chest (yellow/green details)",
+        "sponsor": "Large, stylized black graphic text logo in the center (abstract lettering)"
+      },
+      "fit": "Casual, slightly loose fit, navy blue trim on sleeve cuffs"
+    },
+    "pose_and_composition": {
+      "angle": "High-angle selfie perspective (arm extended)",
+      "body_position": "Reclining back on a bed, legs bent at the knees, bare legs visible",
+      "framing": "Close-up on upper body, capturing torso and legs in the background"
+    },
+    "environment": {
+      "setting": "Attic or loft bedroom",
+      "architectural_features": "Slanted white ceiling with a rectangular skylight window",
+      "furniture": "White 3-drawer chest/dresser, pink/mauve plush bedding and pillows",
+      "decor": "Small mushroom-style table lamp, framed line-art print leaning on the dresser, books"
+    },
+    "lighting_and_atmosphere": {
+      "source": "Natural daylight entering through the skylight",
+      "quality": "Soft, diffused, high-key lighting",
+      "shadows": "Gentle, natural shadows casting depth on the face and fabric folds"
+    },
+    "technical_specs": {
+      "resolution": "4K HD, High Definition",
+      "style": "Photorealistic, candid selfie, social media aesthetic",
+      "texture_quality": "High fidelity skin texture, realistic fabric creases"
+    }
+  },
+  "generation_prompt": "A photorealistic 4k HD selfie of a young woman with dark hair, wearing a yellow Adidas soccer jersey with thin navy pinstripes and a central black sponsor logo. She is reclining comfortably on pink bedding in a bright attic bedroom with a slanted ceiling and skylight. In the background, a white dresser with a small lamp and framed art is visible. The lighting is soft natural daylight, highlighting the texture of her skin and the fabric of the jersey. High resolution, candid style, sharp focus."
+}

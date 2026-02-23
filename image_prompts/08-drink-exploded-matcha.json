@@ -1,0 +1,20 @@
+{
+  "subject": "Hyper-realistic vertical exploded deconstruction of a matcha cream-top fruit coffee drink",
+  "layout": "Center-aligned vertically, each component floating independently with clear spacing",
+  "layers": [
+    { "component": "Fine matcha powder particles", "position": "top" },
+    { "component": "Fresh strawberry and mango slices with glistening moisture", "position": "independent layer" },
+    { "component": "Thick salty cheese matcha cream cap with delicate foam", "position": "independent layer" },
+    { "component": "Clear cold brew coffee merging with emerald matcha layer", "position": "independent layer" },
+    { "component": "Crystal-clear ice cubes with mint leaves", "position": "independent layer" },
+    { "component": "Bottom concentrated fruit puree (raspberry sauce)", "position": "independent layer" },
+    { "component": "Minimalist straight-sided striped glass cup (empty)", "position": "bottom" }
+  ],
+  "background": "Fresh minimal background: bright studio, light beige to light gray soft gradient",
+  "lighting_and_style": {
+    "lighting": "Bright natural light feel with clear glass reflections and layered shadows",
+    "detail": "Ultra-sharp macro realism, minimalist indicator lines with English labels on right side",
+    "category": "High-end product infographic",
+    "resolution": "8K"
+  }
+}

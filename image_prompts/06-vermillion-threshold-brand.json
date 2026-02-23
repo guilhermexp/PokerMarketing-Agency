@@ -1,0 +1,46 @@
+{
+  "brand_identity": {
+    "name": "VERMILLION THRESHOLD",
+    "tagline": "Cross the Line",
+    "essence": "Chromatic Brutalism — raw power meets surgical precision"
+  },
+  "style_direction": {
+    "name": "Chromatic Brutalism",
+    "description": "Heavy industrial foundation with a single explosive accent color. Influenced by Swiss modernism, Soviet constructivism, and concrete architecture.",
+    "influences": ["Brutalist architecture", "Swiss International Style", "Japanese minimalism", "Industrial design", "Constructivist posters"],
+    "principles": ["Maximum contrast", "Geometric precision", "Negative space as power", "One accent color only", "Typography as architecture"],
+    "mood": "Monolithic. Precise. Explosive restraint."
+  },
+  "color_palette": {
+    "philosophy": "Stark monochromatic foundation with a single high-voltage accent.",
+    "core_palette": {
+      "void": { "hex": "#0C0C0C", "role": "Primary foundation, dominance, weight", "usage": "Backgrounds, primary surfaces, 60%" },
+      "concrete": { "hex": "#2A2A2F", "role": "Secondary depth, panels, elevation", "usage": "Cards, containers, layered surfaces" },
+      "steel": { "hex": "#6B6B73", "role": "Tertiary, inactive states, borders", "usage": "Dividers, disabled elements" },
+      "bone": { "hex": "#E8E4DF", "role": "Primary text, contrast, light surfaces", "usage": "Headlines, body text, icons" },
+      "vermillion": { "hex": "#E34234", "role": "THE accent — action, selection, danger, power", "usage": "Interactive elements, highlights. Use sparingly." }
+    },
+    "usage_rules": {
+      "ratio": "70% void/concrete, 20% bone/steel, 10% vermillion maximum",
+      "vermillion_rule": "Never use vermillion for large areas. Small, precise, powerful."
+    }
+  },
+  "typography": {
+    "primary_display": { "name": "Monument Extended / Bebas Neue", "style": "Ultra Bold Extended", "usage": "Logo, headlines" },
+    "secondary_display": { "name": "IBM Plex Sans Condensed", "style": "Bold Condensed", "usage": "Subheadings, menu items" },
+    "body": { "name": "IBM Plex Mono", "style": "Regular", "usage": "Stats, labels, descriptions" },
+    "accent": { "name": "Custom stencil / Knockout", "style": "Stencil Bold", "usage": "Warnings, special moves" }
+  },
+  "brand_guidelines": {
+    "absolute_rules": [
+      "Never add colors outside the 5-color palette",
+      "Never use rounded corners on any element",
+      "Never center-align body text",
+      "Never use vermillion for backgrounds or large fills",
+      "Never use gradients",
+      "Never use drop shadows",
+      "Never use decorative elements"
+    ],
+    "voice": "Direct. Confident. Few words. No fluff."
+  }
+}
