@@ -4,7 +4,7 @@
  * Professional design matching Video Studio
  */
 
-import React, { useCallback, useRef, KeyboardEvent } from 'react';
+import React, { useCallback, useRef, useEffect, KeyboardEvent } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { useImagePlaygroundStore, imagePlaygroundSelectors } from '../../stores/imagePlaygroundStore';
 import { useCreateImage } from '../../hooks/useImagePlayground';
@@ -14,6 +14,13 @@ export const PromptInput: React.FC = () => {
   const prompt = useImagePlaygroundStore(imagePlaygroundSelectors.prompt);
   const setParam = useImagePlaygroundStore((s) => s.setParam);
   const { createImage, isCreating, canGenerate } = useCreateImage();
+
+  // Reset textarea height when prompt is cleared programmatically
+  useEffect(() => {
+    if (!prompt && textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  }, [prompt]);
 
   const handlePromptChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
