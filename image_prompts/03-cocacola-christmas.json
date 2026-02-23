@@ -1,0 +1,55 @@
+{
+  "subject": "Premium hero shot of a Coca-Cola Christmas seasonal bottle placed in the center of the frame, with gentle bubbles rising",
+  "productDesign": {
+    "cup": "Iconic red Coca-Cola holiday bottle with refined gold accents and festive illustrations",
+    "details": "Rich texture, visible bubble patterns, premium embossed logo"
+  },
+  "scene": {
+    "environment": "Warm, elegant Christmas ambiance with soft snowfall and golden fairy lights",
+    "elements": [
+      "Subtle bokeh lights forming a soft halo around the bottle",
+      "Delicate snowflakes falling in foreground",
+      "Clean wooden surface with warm reflections"
+    ],
+    "tone": "Magical, luxurious, comforting"
+  },
+  "camera": {
+    "angle": "Centered straight-on product shot",
+    "lens": "85mm prime lens with strong background separation",
+    "focus": "Absolute sharpness on bottle and bubble patterns"
+  },
+  "lighting": {
+    "type": "Soft, warm, premium holiday lighting",
+    "direction": "Golden backlight enhancing bubbles and rim highlights",
+    "effects": "Elegant glow, subtle light bloom, festive sparkle"
+  },
+  "fx": {
+    "stylizations": "High-end advertising bloom, delicate glow on gold elements",
+    "atmosphere": [
+      "Bubbles illuminated with soft gradient colors",
+      "Snow particles shimmering in backlight"
+    ]
+  },
+  "composition": {
+    "layout": "Central hero composition with symmetrical visual balance",
+    "theory": "Vertical alignment placing the bottle perfectly in center, typography floating above and below",
+    "depth": "Foreground snow, mid bottle, deep blurred lights behind"
+  },
+  "typography": {
+    "headline": "CELEBRATE THE SEASON",
+    "subheadline": "Coca-Cola Holiday Collection",
+    "style": "Elegant serif typography with refined contrast and soft gold foil effect",
+    "layout": "Perfectly centered above and below the bottle, maintaining vertical harmony",
+    "spacing": "Wide tracking, sophisticated premium look",
+    "effects": "Soft outer glow, subtle shadow for depth"
+  },
+  "visualStyle": {
+    "render": "Ultra-photorealistic luxury advertising photography",
+    "palette": "Holiday reds, warm gold, soft whites, gentle greens",
+    "grading": "Premium warm contrast with slight cinematic lift"
+  },
+  "output": {
+    "type": "High-end Christmas advertising visual",
+    "goal": "Luxury Coca-Cola holiday campaign with iconic, elegant typography"
+  }
+}

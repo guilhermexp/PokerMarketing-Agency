@@ -9,10 +9,10 @@ import { randomUUID } from 'crypto';
 // Updated with actual pricing from providers
 const MODEL_PRICING = {
   // Google Gemini Text Models (via OpenRouter)
-  'google/gemini-3.1-pro-preview': {
+  'google/gemini-3-flash-preview': {
     provider: 'google',
-    inputPerMillion: 200,  // $2/1M = 200 cents
-    outputPerMillion: 1200  // $12/1M = 1200 cents
+    inputPerMillion: 50,  // $0.50/1M = 50 cents
+    outputPerMillion: 300  // $3/1M = 300 cents
   },
   // Legacy model IDs (kept for historical usage logs)
   'gemini-3-pro-preview': {
@@ -101,6 +101,15 @@ const MODEL_PRICING = {
   'fal-ai/sora-2/image-to-video': {
     provider: 'fal',
     costPerSecond: 10
+  },
+  // Replicate Image Model (same Gemini 3 Pro Image via Replicate)
+  'google/nano-banana-pro': {
+    provider: 'replicate',
+    costPerImage: {
+      '1K': 4,    // $0.04/image = 4 cents
+      '2K': 8,
+      '4K': 16
+    }
   }
 };
 
@@ -167,6 +176,7 @@ function getProvider(model) {
   // Fallback detection
   if (model.includes('gemini') || model.includes('imagen')) return 'google';
   if (model.includes('fal-ai/')) return 'fal';
+  if (model.includes('replicate') || model.includes('nano-banana')) return 'replicate';
   if (model.includes('gpt') || model.includes('grok') || model.includes('claude')) return 'openrouter';
   if (model.includes('veo') || model.includes('sora') || model.includes('fal')) return 'fal';
 

@@ -1,0 +1,20 @@
+{
+  "subject": "Hyper-realistic vertical exploded deconstruction of a chocolate coffee drink",
+  "layout": "Center-aligned vertically, each component floating independently with clear spacing",
+  "layers": [
+    { "component": "Cocoa powder particles", "position": "top" },
+    { "component": "Glossy dark chocolate sauce ribbons and drips", "position": "independent layer" },
+    { "component": "Light whipped cream pile", "position": "independent layer" },
+    { "component": "Silky chocolate coffee liquid layer", "position": "independent layer" },
+    { "component": "Roasted coffee beans", "position": "independent layer" },
+    { "component": "Sugar crystals", "position": "independent layer" },
+    { "component": "Small clear threaded glass cup with weighted base (empty)", "position": "bottom" }
+  ],
+  "background": "Premium dark background: clean studio backdrop, near-black graphite-to-charcoal gradient, soft and smooth",
+  "lighting_and_style": {
+    "lighting": "Soft controlled studio light with clear layered shadows beneath each component",
+    "detail": "Ultra-sharp macro realism, minimalist indicator lines with English labels on right side",
+    "category": "High-end product infographic",
+    "resolution": "8K"
+  }
+}

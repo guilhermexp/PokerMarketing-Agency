@@ -39,7 +39,7 @@ const googleNative = google({
  *
  * @example
  * // Gemini (via OpenRouter)
- * const model = getLanguageModel('google/gemini-3.1-pro-preview');
+ * const model = getLanguageModel('google/gemini-3-flash-preview');
  *
  * // OpenRouter
  * const model = getLanguageModel('openai/gpt-5.2');
@@ -71,15 +71,15 @@ export function getLanguageModel(modelId) {
   // -------------------------
   // Fallback: Default para Gemini 3.1 Pro via OpenRouter
   // -------------------------
-  console.warn(`[Providers] Modelo desconhecido "${modelId}", usando Gemini 3.1 Pro via OpenRouter como fallback`);
-  return openrouter.languageModel('google/gemini-3.1-pro-preview');
+  console.warn(`[Providers] Modelo desconhecido "${modelId}", usando Gemini 3 Flash via OpenRouter como fallback`);
+  return openrouter.languageModel('google/gemini-3-flash-preview');
 }
 
 /**
  * Retorna o modelo padrão para artifacts (mais capaz)
  */
 export function getArtifactModel() {
-  return getLanguageModel('google/gemini-3.1-pro-preview');
+  return getLanguageModel('google/gemini-3-flash-preview');
 }
 
 /**
@@ -89,7 +89,7 @@ export function getBrandModel(brandProfile) {
   if (brandProfile?.preferredAIModel) {
     return getLanguageModel(brandProfile.preferredAIModel);
   }
-  return getLanguageModel('google/gemini-3.1-pro-preview');
+  return getLanguageModel('google/gemini-3-flash-preview');
 }
 
 // ============================================================================
@@ -98,7 +98,7 @@ export function getBrandModel(brandProfile) {
 
 export const SUPPORTED_MODELS = [
   // Gemini (via OpenRouter)
-  { id: 'google/gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', provider: 'Google', fast: false },
+  { id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash', provider: 'Google', fast: true },
 
   // OpenRouter
   { id: 'openai/gpt-5.2', name: 'GPT-5.2', provider: 'OpenAI', fast: false },

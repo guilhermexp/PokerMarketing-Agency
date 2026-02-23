@@ -1,0 +1,49 @@
+{
+  "image_analysis": {
+    "reference_constraints": {
+      "identity": "Preserve the exact facial structure, proportions, eye shape, nose, lips, and skin tone from the reference image",
+      "no_identity_drift": true,
+      "no_face_stylization": true
+    },
+    "subject": {
+      "demographics": "Young woman, fair skin tone (match reference exactly)",
+      "hair": "Dark brown hair, tied back in a low loose ponytail, natural flyaways visible, realistic texture",
+      "face": {
+        "skin_texture": "High fidelity natural skin texture with subtle imperfections, match reference",
+        "eyes": "Green/hazel eyes, same shape and spacing as reference, looking at the camera",
+        "expression": "Neutral to soft relaxed expression, realistic and unposed",
+        "makeup": "Very minimal makeup, natural look, no heavy styling"
+      },
+      "accessories": "Small gold hoop earrings, subtle and realistic"
+    },
+    "apparel": {
+      "garment": "Casual oversized hoodie",
+      "color_palette": "Muted light gray",
+      "fabric_texture": "Soft cotton fleece, visible folds and natural creases",
+      "fit": "Relaxed, slightly oversized, realistic drape"
+    },
+    "pose_and_composition": {
+      "angle": "Eye-level selfie perspective, arm slightly extended",
+      "body_position": "Sitting upright on a sofa, relaxed posture",
+      "framing": "Medium close-up, upper torso and shoulders in frame"
+    },
+    "environment": {
+      "setting": "Modern living room",
+      "architectural_features": "Large window with sheer white curtains",
+      "furniture": "Neutral-toned fabric sofa, wooden side table",
+      "decor": "Minimal decor, soft and realistic interior styling"
+    },
+    "lighting_and_atmosphere": {
+      "source": "Natural daylight from the side window",
+      "quality": "Soft, diffused, realistic indoor lighting",
+      "shadows": "Subtle natural shadows, no harsh contrast"
+    },
+    "technical_specs": {
+      "resolution": "4K HD",
+      "style": "Photorealistic, candid smartphone selfie",
+      "texture_quality": "High fidelity skin and fabric textures",
+      "camera_behavior": "Slight smartphone lens softness, realistic depth and perspective"
+    }
+  },
+  "generation_prompt": "Photorealistic 4K HD image based strictly on the provided reference photo. Preserve the same person, facial structure, proportions, and identity without alteration. A young woman with dark brown hair tied back loosely, minimal makeup, and small gold hoop earrings, wearing a light gray oversized hoodie. She is sitting on a sofa in a modern living room with soft natural daylight coming from a side window through sheer curtains. Eye-level selfie perspective, relaxed candid pose, realistic skin texture with subtle imperfections, natural fabric folds, clean background, sharp focus, realistic smartphone photo aesthetic."
+}

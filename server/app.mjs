@@ -28,7 +28,7 @@ import {
 } from "./lib/auth.mjs";
 import { resourceAccessMiddleware } from "./lib/resource-access.mjs";
 import { resolveUserId } from "./lib/user-resolver.mjs";
-import { convertImagePromptToJson, buildImagePrompt } from "./lib/ai/prompt-builders.mjs";
+import { buildImagePrompt } from "./lib/ai/prompt-builders.mjs";
 
 // ---------------------------------------------------------------------------
 // Route modules
@@ -239,7 +239,6 @@ registerImagePlaygroundRoutes(app, {
   getSql,
   resolveUserId,
   logger,
-  convertImagePromptToJson,
   buildImagePrompt,
 });
 

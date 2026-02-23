@@ -249,124 +249,103 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
     <div className="min-h-screen flex flex-col bg-[#060606]">
       {/* Sticky Header */}
       <header className="sticky top-0 z-50 bg-[#060606]/95 backdrop-blur-xl border-b border-white/[0.06]">
-        <div className="px-4 md:px-6 py-4 md:py-5">
-          <div className="flex flex-col gap-4">
-            {/* Row 1: Title + Add Button */}
-            <div className="flex justify-between items-start">
-              <div>
-                <h1 className="text-2xl font-semibold text-white tracking-tight">Agenda</h1>
-                <p className="text-[11px] text-white/40 uppercase tracking-wider mt-1.5 font-medium">
-                  {scheduledPosts.length} post{scheduledPosts.length !== 1 ? "s" : ""} agendado{scheduledPosts.length !== 1 ? "s" : ""}
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setSelectedDate(null);
-                  setIsScheduleModalOpen(true);
-                }}
-                className="flex items-center gap-1.5 px-4 py-2 bg-white/[0.06] border border-white/[0.08] rounded-xl text-[11px] font-medium text-white/70 uppercase tracking-wide hover:bg-white/[0.1] hover:text-white transition-all active:scale-95"
-              >
-                <Icon name="plus" className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Agendar</span>
-              </button>
-            </div>
-
-            {/* Row 2: Month Navigation + Stats */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
+        <div className="px-4 md:px-8 py-4 md:py-5">
+          {/* Row 1: Navigation + Title + Actions */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-0.5">
                 <button
                   onClick={goToPreviousMonth}
-                  className="p-2 text-white/40 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
+                  className="p-1.5 text-white/30 hover:text-white/70 hover:bg-white/[0.06] rounded-lg transition-colors"
                 >
                   <Icon name="chevron-left" className="w-4 h-4" />
                 </button>
                 <button
                   onClick={goToNextMonth}
-                  className="p-2 text-white/40 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
+                  className="p-1.5 text-white/30 hover:text-white/70 hover:bg-white/[0.06] rounded-lg transition-colors"
                 >
                   <Icon name="chevron-right" className="w-4 h-4" />
                 </button>
-                <h3 className="text-sm font-medium text-white/60 ml-1">
-                  {monthNames[currentMonth]} {currentYear}
-                </h3>
-                <button
-                  onClick={() => {
-                    goToToday();
-                    setShowTodayView(true);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-[11px] font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.06] transition-all ml-2"
-                >
-                  <Icon name="calendar" className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Hoje</span>
-                </button>
               </div>
+              <h1 className="text-lg font-medium text-white tracking-tight">
+                {monthNames[currentMonth]} <span className="text-white/40">{currentYear}</span>
+              </h1>
+              <button
+                onClick={() => {
+                  goToToday();
+                  setShowTodayView(true);
+                }}
+                className="px-2.5 py-1 text-[11px] font-medium text-white/40 hover:text-white/70 hover:bg-white/[0.04] rounded-md transition-colors"
+              >
+                Hoje
+              </button>
+            </div>
 
+            <div className="flex items-center gap-3">
               {/* Stats */}
-              <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-amber-500/80" />
-                  <span className="text-[10px] font-medium text-white/40">
-                    {stats.scheduled}
-                  </span>
-                </div>
-                <div className="h-3 w-px bg-white/[0.06]" />
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500/80" />
-                  <span className="text-[10px] font-medium text-white/40">
-                    {stats.published}
-                  </span>
-                </div>
+              <div className="hidden sm:flex items-center gap-4 text-[11px] font-medium text-white/30">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                  {stats.scheduled} agendado{stats.scheduled !== 1 ? "s" : ""}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
+                  {stats.published} publicado{stats.published !== 1 ? "s" : ""}
+                </span>
                 {stats.failed > 0 && (
-                  <>
-                    <div className="h-3 w-px bg-white/[0.06]" />
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-red-500/80" />
-                      <span className="text-[10px] font-medium text-white/40">
-                        {stats.failed}
-                      </span>
-                    </div>
-                  </>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500/60" />
+                    {stats.failed}
+                  </span>
                 )}
               </div>
+
+              <button
+                onClick={() => {
+                  setSelectedDate(null);
+                  setIsScheduleModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white/[0.06] border border-white/[0.08] rounded-lg text-[11px] font-medium text-white/60 hover:bg-white/[0.1] hover:text-white transition-all"
+              >
+                <Icon name="plus" className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Agendar</span>
+              </button>
             </div>
           </div>
 
           {/* Day headers */}
-          <div className="flex mt-4">
-            <div className="flex-1 grid grid-cols-7">
-              {dayNamesShort.map((day, idx) => (
-                <div key={day} className="p-1 md:p-2 text-center font-medium text-[10px] md:text-xs text-white/30 uppercase tracking-wider">
-                  <span className="md:hidden">{day}</span>
-                  <span className="hidden md:inline">{dayNames[idx]}</span>
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-7 mt-5 border-b border-white/[0.04] pb-2">
+            {dayNamesShort.map((day, idx) => (
+              <div key={day} className="text-center text-[10px] font-medium text-white/25 uppercase tracking-widest">
+                <span className="md:hidden">{day}</span>
+                <span className="hidden md:inline">{dayNames[idx]}</span>
+              </div>
+            ))}
           </div>
         </div>
       </header>
 
       {/* Notification Banner */}
       {showNotificationBanner && pendingPosts.length > 0 && (
-        <div className="px-3 md:px-6 py-2.5 md:py-3 bg-amber-500/[0.06] border-b border-amber-500/[0.12] flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <Icon name="bell" className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
-            <p className="text-[10px] md:text-xs font-medium text-amber-400/80 truncate">
-              {pendingPosts.length} pendente{pendingPosts.length > 1 ? "s" : ""}
+        <div className="px-4 md:px-8 py-2.5 border-b border-white/[0.04] flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500/60 flex-shrink-0" />
+            <p className="text-[11px] font-medium text-white/40 truncate">
+              {pendingPosts.length} post{pendingPosts.length > 1 ? "s" : ""} pendente{pendingPosts.length > 1 ? "s" : ""}
             </p>
           </div>
-          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {isRubeConfigured() && (
               <button
                 onClick={handlePublishAll}
-                className="flex items-center gap-1 md:gap-2 px-3 py-1.5 bg-white/[0.06] border border-white/[0.08] rounded-lg text-[10px] md:text-xs font-medium text-white/70 hover:bg-white/[0.1] transition-all"
+                className="text-[11px] font-medium text-white/40 hover:text-white/70 transition-colors"
               >
-                <Icon name="send" className="w-3 h-3" />
-                <span className="hidden sm:inline">Publicar</span>
+                Publicar
               </button>
             )}
             <button
               onClick={() => setShowNotificationBanner(false)}
-              className="p-1 text-amber-400/30 hover:text-amber-400/70 transition-colors"
+              className="p-1 text-white/20 hover:text-white/50 transition-colors"
             >
               <Icon name="x" className="w-3 h-3" />
             </button>
@@ -524,35 +503,25 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-white/[0.06]">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/[0.06] flex flex-col items-center justify-center">
-                    <span className="text-xl font-light text-white">
-                      {new Date(selectedDayDate).getDate()}
-                    </span>
-                    <span className="text-[9px] text-white/40 uppercase">
-                      {new Date(selectedDayDate).toLocaleDateString("pt-BR", { month: "short" })}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-white capitalize">
-                      {new Date(selectedDayDate).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
-                    </h3>
-                    <p className="text-xs text-white/40 mt-0.5">
-                      {(() => {
-                        const dayPosts = scheduledPosts.filter((p) => p.scheduledDate === selectedDayDate);
-                        const published = dayPosts.filter((p) => p.status === "published").length;
-                        const scheduled = dayPosts.filter((p) => p.status === "scheduled").length;
-                        const parts = [];
-                        if (scheduled > 0) parts.push(`${scheduled} agendado${scheduled !== 1 ? "s" : ""}`);
-                        if (published > 0) parts.push(`${published} publicado${published !== 1 ? "s" : ""}`);
-                        return parts.length > 0 ? parts.join(" · ") : "Nenhum post";
-                      })()}
-                    </p>
-                  </div>
+                <div>
+                  <h3 className="text-base font-medium text-white capitalize">
+                    {new Date(selectedDayDate).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
+                  </h3>
+                  <p className="text-[11px] text-white/30 mt-1">
+                    {(() => {
+                      const dayPosts = scheduledPosts.filter((p) => p.scheduledDate === selectedDayDate);
+                      const published = dayPosts.filter((p) => p.status === "published").length;
+                      const scheduled = dayPosts.filter((p) => p.status === "scheduled").length;
+                      const parts = [];
+                      if (scheduled > 0) parts.push(`${scheduled} agendado${scheduled !== 1 ? "s" : ""}`);
+                      if (published > 0) parts.push(`${published} publicado${published !== 1 ? "s" : ""}`);
+                      return parts.length > 0 ? parts.join(" · ") : "Nenhum post";
+                    })()}
+                  </p>
                 </div>
                 <button
                   onClick={() => setDayViewDialogOpen(false)}
-                  className="p-2 text-white/30 hover:text-white transition-colors rounded-lg hover:bg-white/[0.06]"
+                  className="p-1.5 text-white/20 hover:text-white/50 rounded-lg hover:bg-white/[0.04] transition-colors"
                 >
                   <Icon name="x" className="w-4 h-4" />
                 </button>
@@ -719,40 +688,36 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
         const scheduledCount = todayPosts.filter((p) => p.status === "scheduled").length;
 
         return (
-          <main className="flex-1 px-3 md:px-6 py-4 md:py-6 flex flex-col">
-            <div className="flex items-center justify-between mb-6">
+          <main className="flex-1 px-3 md:px-8 py-4 md:py-6 flex flex-col">
+            <div className="flex items-center gap-4 mb-8">
               <button
                 onClick={() => setShowTodayView(false)}
-                className="flex items-center gap-2 px-4 py-2 bg-white/[0.04] border border-white/[0.06] rounded-xl text-xs font-medium text-white/50 hover:text-white/80 transition-all"
+                className="p-1.5 text-white/30 hover:text-white/70 hover:bg-white/[0.06] rounded-lg transition-colors"
               >
                 <Icon name="chevron-left" className="w-4 h-4" />
-                <span>Voltar</span>
               </button>
-              <div className="text-center">
-                <h2 className="text-lg md:text-xl font-semibold text-white">
+              <div>
+                <h2 className="text-lg font-medium text-white capitalize">
                   {today.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
                 </h2>
-                <p className="text-xs text-white/40 mt-1">
+                <p className="text-[11px] text-white/30 mt-0.5">
                   {todayPosts.length === 0 ? "Nenhum post" : (
                     <>
                       {scheduledCount > 0 && <span>{scheduledCount} agendado{scheduledCount !== 1 ? "s" : ""}</span>}
                       {scheduledCount > 0 && publishedCount > 0 && <span> · </span>}
-                      {publishedCount > 0 && <span className="text-emerald-400/70">{publishedCount} publicado{publishedCount !== 1 ? "s" : ""}</span>}
+                      {publishedCount > 0 && <span className="text-emerald-400/50">{publishedCount} publicado{publishedCount !== 1 ? "s" : ""}</span>}
                     </>
                   )}
                 </p>
               </div>
-              <div className="w-20" />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               {todayPosts.length === 0 ? (
-                <div className="col-span-full flex flex-col items-center justify-center py-20">
-                  <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
-                    <Icon name="calendar" className="w-7 h-7 text-white/20" />
-                  </div>
-                  <p className="text-sm font-medium text-white/50">Nenhum post para hoje</p>
-                  <p className="text-xs text-white/30 mt-2 text-center">Clique em "Agendar" para criar o primeiro</p>
+                <div className="col-span-full flex flex-col items-center justify-center py-24">
+                  <Icon name="calendar" className="w-6 h-6 text-white/10 mb-3" />
+                  <p className="text-sm font-medium text-white/30">Nenhum post para hoje</p>
+                  <p className="text-[11px] text-white/15 mt-1">Clique em "Agendar" para criar o primeiro</p>
                 </div>
               ) : (
                 todayPosts.map((post) => {
@@ -769,7 +734,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                   return (
                     <div
                       key={post.id}
-                      className="group bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden transition-all flex flex-col hover:bg-white/[0.04] hover:border-white/[0.1]"
+                      className="group bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden transition-all flex flex-col hover:bg-white/[0.03] hover:border-white/[0.08]"
                     >
                       {/* Post Image */}
                       <div
@@ -868,39 +833,46 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
 
       {/* Regular Calendar View */}
       {!showTodayView && (
-      <main className="flex-1 px-2 md:px-6 py-3 md:py-6 flex flex-col">
-        <div className="grid grid-cols-7 gap-px bg-white/[0.04] border border-white/[0.06] rounded-2xl overflow-hidden flex-1">
+      <main className="flex-1 px-3 md:px-8 py-2 md:py-4 flex flex-col">
+        <div className="grid grid-cols-7 flex-1">
           {monthCalendar.map((day, index) => {
             const dayIsToday = isToday(day.date);
             return (
               <div
                 key={index}
                 onClick={() => day.dateStr && handleDayClick(day.dateStr)}
-                className={`bg-[#060606] min-h-[80px] sm:min-h-[100px] md:min-h-[140px] p-1.5 sm:p-2 md:p-3 transition-all flex flex-col ${
+                className={`min-h-[72px] sm:min-h-[90px] md:min-h-[120px] p-1.5 sm:p-2 md:p-3 transition-all flex flex-col border-b border-r border-white/[0.04] ${
                   day.date ? "cursor-pointer hover:bg-white/[0.02]" : ""
-                } ${dayIsToday ? "bg-white/[0.02]" : ""}`}
+                } ${dayIsToday ? "bg-white/[0.03]" : ""} ${
+                  index % 7 === 0 ? "border-l-0" : ""
+                }`}
               >
                 {day.date && (
                   <>
-                    <h3
-                      onClick={(e) => {
-                        if (day.posts.length > 0 && day.dateStr) {
-                          e.stopPropagation();
-                          handleDayViewClick(day.dateStr);
-                        }
-                      }}
-                      className={`mb-1 md:mb-3 font-light text-xl sm:text-3xl md:text-6xl transition-colors ${
-                        dayIsToday
-                          ? "text-white"
-                          : "text-white/50"
-                      } ${
-                        day.posts.length > 0 ? "cursor-pointer hover:text-white" : ""
-                      }`}
-                    >
-                      {day.date}
-                    </h3>
+                    <div className="flex items-center justify-between mb-1.5 md:mb-2">
+                      <span
+                        onClick={(e) => {
+                          if (day.posts.length > 0 && day.dateStr) {
+                            e.stopPropagation();
+                            handleDayViewClick(day.dateStr);
+                          }
+                        }}
+                        className={`text-sm md:text-lg font-light transition-colors ${
+                          dayIsToday
+                            ? "text-white"
+                            : "text-white/40"
+                        } ${
+                          day.posts.length > 0 ? "cursor-pointer hover:text-white/80" : ""
+                        }`}
+                      >
+                        {day.date}
+                      </span>
+                      {day.posts.length > 0 && (
+                        <span className="text-[9px] font-medium text-white/20">{day.posts.length}</span>
+                      )}
+                    </div>
                     {/* Mobile: show dots for posts */}
-                    <div className="md:hidden flex flex-wrap gap-1">
+                    <div className="md:hidden flex flex-wrap gap-0.5 mt-auto">
                       {day.posts.slice(0, 4).map((post) => (
                         <div
                           key={post.id}
@@ -908,54 +880,46 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                             e.stopPropagation();
                             handlePostClick(post);
                           }}
-                          className={`w-2.5 h-2.5 sm:w-2 sm:h-2 rounded-full cursor-pointer ${
-                            post.status === "published" ? "bg-emerald-500/70" :
-                            post.status === "failed" ? "bg-red-500/70" : "bg-white/30"
+                          className={`w-1.5 h-1.5 rounded-full cursor-pointer ${
+                            post.status === "published" ? "bg-emerald-500/50" :
+                            post.status === "failed" ? "bg-red-500/50" : "bg-white/20"
                           }`}
                         />
                       ))}
                       {day.posts.length > 4 && (
-                        <span className="text-[8px] text-white/30">+{day.posts.length - 4}</span>
+                        <span className="text-[7px] text-white/20">+{day.posts.length - 4}</span>
                       )}
                     </div>
                     {/* Desktop: show post cards */}
-                    <div className="hidden md:block space-y-1.5">
-                      {day.posts.slice(0, 3).map((post) => (
+                    <div className="hidden md:flex flex-col gap-1 mt-auto">
+                      {day.posts.slice(0, 2).map((post) => (
                         <div
                           key={post.id}
                           onClick={(e) => {
                             e.stopPropagation();
                             handlePostClick(post);
                           }}
-                          className={`text-xs p-2 rounded-lg border transition-all hover:bg-white/[0.04] cursor-pointer group relative ${
-                            post.status === "published"
-                              ? "border-emerald-500/[0.15] bg-emerald-500/[0.04]"
-                              : post.status === "failed"
-                                ? "border-red-500/[0.15] bg-red-500/[0.04]"
-                                : "border-white/[0.06] bg-white/[0.02]"
-                          }`}
+                          className="text-[10px] px-1.5 py-1 rounded-md transition-all hover:bg-white/[0.04] cursor-pointer flex items-center gap-1.5"
                         >
-                          <div className="font-medium text-white/70 truncate">{post.scheduledTime}</div>
-                          <div className="text-white/30 text-[10px] truncate mt-0.5">
-                            {post.caption?.substring(0, 40)}...
-                          </div>
-                          {post.status === "published" && (
-                            <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
-                          )}
-                          {post.status === "failed" && (
-                            <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-500/60" />
-                          )}
+                          <span className={`w-1 h-1 rounded-full flex-shrink-0 ${
+                            post.status === "published"
+                              ? "bg-emerald-500/60"
+                              : post.status === "failed"
+                                ? "bg-red-500/60"
+                                : "bg-white/20"
+                          }`} />
+                          <span className="font-medium text-white/50 truncate">{post.scheduledTime}</span>
                         </div>
                       ))}
-                      {day.posts.length > 3 && (
+                      {day.posts.length > 2 && (
                         <div
                           onClick={(e) => {
                             e.stopPropagation();
                             if (day.dateStr) handleDayViewClick(day.dateStr);
                           }}
-                          className="text-[10px] text-white/30 hover:text-white/60 pl-2 cursor-pointer transition-colors"
+                          className="text-[9px] text-white/20 hover:text-white/40 pl-1.5 cursor-pointer transition-colors"
                         >
-                          +{day.posts.length - 3} mais
+                          +{day.posts.length - 2} mais
                         </div>
                       )}
                     </div>

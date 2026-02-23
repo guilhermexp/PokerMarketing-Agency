@@ -17,12 +17,11 @@ import {
   sanitizeErrorForClient,
   isQuotaOrRateLimitError,
 } from "../lib/ai/retry.mjs";
-// getGeminiAi — temporarily unused (Gemini image disabled)
 import {
   generateImageWithFallback,
   DEFAULT_IMAGE_MODEL,
 } from "../lib/ai/image-generation.mjs";
-import { editImageWithFal, FAL_EDIT_MODEL } from "../lib/ai/fal-image-generation.mjs";
+import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
 import {
   buildImagePrompt,
   convertImagePromptToJson,
@@ -353,65 +352,31 @@ export function registerAiImageRoutes(app) {
         );
       }
 
-      // TODO: Gemini edit temporarily disabled — using FAL.ai directly.
-      // To re-enable: restore Gemini parts/imageConfig/ai logic from git history.
-      let imageDataUrl = null;
-      let usedProvider = "fal";
-      let usedModel = FAL_EDIT_MODEL;
+      logger.info({}, "[Edit Image API] Using provider chain");
 
-      /*
-      // --- Gemini edit (disabled) ---
-      usedProvider = "google";
-      usedModel = "gemini-3-pro-image-preview";
-      try {
-        const maxAttempts = 3;
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-          const response = await withRetry(
-            () =>
-              ai.models.generateContent({
-                model: "gemini-3-pro-image-preview",
-                contents: { parts },
-                config: { imageConfig },
-              }),
-            1,
-          );
-          const contentParts = response.candidates?.[0]?.content?.parts;
-          if (Array.isArray(contentParts)) {
-            for (const part of contentParts) {
-              if (part.inlineData) {
-                imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                break;
-              }
-            }
-          }
-          if (imageDataUrl) break;
-          const finishReason = response.candidates?.[0]?.finishReason;
-          logger.warn({ attempt, maxAttempts, finishReason }, "[Edit Image API] Empty response from Gemini, retrying");
-          if (attempt === maxAttempts) throw new Error("Failed to edit image - API returned empty response");
-          await new Promise((r) => setTimeout(r, 1000 * attempt));
-        }
-      } catch (geminiError) {
-        if (!isQuotaOrRateLimitError(geminiError)) throw geminiError;
-      }
-      // --- End Gemini edit ---
-      */
-
-      logger.info({}, "[Edit Image API] Using FAL.ai directly (Gemini disabled)");
-
-      const falUrl = await editImageWithFal(
-        instructionPrompt,
-        cleanBase64,
-        image.mimeType,
+      const result = await runWithProviderFallback("edit", {
+        prompt: instructionPrompt,
+        imageBase64: cleanBase64,
+        mimeType: image.mimeType,
         referenceImage,
-      );
+      });
 
-      const falResponse = await fetch(falUrl);
-      if (!falResponse.ok) {
-        throw new Error(`Failed to fetch FAL image: ${falResponse.status}`);
+      const { usedProvider, usedModel } = result;
+
+      // Convert to data URL for the response (endpoint contract is data URL)
+      let imageDataUrl;
+      if (result.imageUrl.startsWith("data:")) {
+        imageDataUrl = result.imageUrl;
+      } else {
+        // HTTP URL (from FAL.ai or Replicate) — fetch and convert to data URL
+        const imgResponse = await fetch(result.imageUrl);
+        if (!imgResponse.ok) {
+          throw new Error(`Failed to fetch edited image: ${imgResponse.status}`);
+        }
+        const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
+        const imgMimeType = imgResponse.headers.get("content-type") || "image/png";
+        imageDataUrl = `data:${imgMimeType};base64,${imgBuffer.toString("base64")}`;
       }
-      const falBuffer = Buffer.from(await falResponse.arrayBuffer());
-      const falMimeType = falResponse.headers.get("content-type") || "image/png";
-      imageDataUrl = `data:${falMimeType};base64,${falBuffer.toString("base64")}`;
 
       logger.info({ provider: usedProvider }, "[Edit Image API] Image edited successfully");
 

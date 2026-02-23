@@ -1,0 +1,20 @@
+{
+  "subject": "Hyper-realistic vertical exploded deconstruction of a pink grapefruit peach milkshake",
+  "layout": "Center-aligned vertically, each component floating independently with clear spacing",
+  "layers": [
+    { "component": "Dried rose petal fragments with gold sugar powder", "position": "top" },
+    { "component": "Crystal-clear grapefruit pulp particles", "position": "independent layer" },
+    { "component": "Light cherry blossom pink whipped cream pile", "position": "independent layer" },
+    { "component": "Silky peach oolong milkshake liquid layer with fine coating effect", "position": "independent layer" },
+    { "component": "Fresh juicy peach chunks", "position": "independent layer" },
+    { "component": "Bouncy semi-transparent amber boba pearls or tea jelly", "position": "independent layer" },
+    { "component": "Minimalist elegant thin-stemmed tulip glass (empty)", "position": "bottom" }
+  ],
+  "background": "Premium Morandi pink background: soft warm cream pink to light beige gradient, pure and translucent",
+  "lighting_and_style": {
+    "lighting": "Bright fresh natural light, high-key lighting with light transparent shadows beneath each layer",
+    "detail": "Ultra-sharp macro realism, minimalist indicator lines with English labels on right side",
+    "category": "High-end beverage visual poster",
+    "resolution": "8K"
+  }
+}

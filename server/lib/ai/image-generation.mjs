@@ -6,8 +6,9 @@
  */
 
 import { getGeminiAi } from "./clients.mjs";
-import { withRetry, isQuotaOrRateLimitError } from "./retry.mjs";
-import { generateImageWithFal, FAL_IMAGE_MODEL } from "./fal-image-generation.mjs";
+import { withRetry } from "./retry.mjs";
+import { FAL_IMAGE_MODEL } from "./fal-image-generation.mjs";
+import { runWithProviderFallback } from "./image-providers.mjs";
 import logger from "../logger.mjs";
 
 export const DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview";
@@ -153,57 +154,16 @@ export const generateImageWithFallback = async (
   styleReferenceImage,
   personReferenceImage,
 ) => {
-  // TODO: Gemini image generation temporarily disabled — using FAL.ai directly.
-  // To re-enable, uncomment the Gemini try block below and remove the direct FAL.ai call.
+  logger.info({}, "[generateImageWithFallback] Using provider chain");
 
-  /*
-  try {
-    // maxRetries=1: try Gemini once, then fall back to FAL.ai immediately
-    const imageUrl = await generateGeminiImage(
-      prompt,
-      aspectRatio,
-      model,
-      imageSize,
-      productImages,
-      styleReferenceImage,
-      personReferenceImage,
-      1, // single attempt — FAL.ai is the real fallback
-    );
-    return {
-      imageUrl,
-      usedModel: model,
-      usedProvider: "google",
-      usedFallback: false,
-    };
-  } catch (error) {
-    if (isQuotaOrRateLimitError(error)) {
-      logger.warn(
-        { errorMessage: error.message },
-        "[generateImageWithFallback] Gemini falhou com erro de quota/rate limit, tentando fallback para FAL.ai",
-      );
-    } else {
-      throw error;
-    }
-  }
-  */
-
-  logger.info({}, "[generateImageWithFallback] Using FAL.ai directly (Gemini disabled)");
-
-  const result = await generateImageWithFal(
+  return runWithProviderFallback("generate", {
     prompt,
-    mapAspectRatio(aspectRatio),
+    aspectRatio,
     imageSize,
     productImages,
-    styleReferenceImage,
-    personReferenceImage,
-  );
-
-  return {
-    imageUrl: result,
-    usedModel: FAL_IMAGE_MODEL,
-    usedProvider: "fal",
-    usedFallback: false,
-  };
+    styleRef: styleReferenceImage,
+    personRef: personReferenceImage,
+  });
 };
 
 // Generate structured content — routes through OpenRouter for LLM models

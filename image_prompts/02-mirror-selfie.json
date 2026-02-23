@@ -1,0 +1,47 @@
+{
+  "scene": {
+    "setting": "modern_restaurant_bathroom_night",
+    "lighting": {
+      "style": "soft_warm_overhead_and_side_lighting",
+      "effects": ["subtle_glow_on_skin", "mirror_reflections", "ambient_bathroom_light"],
+      "mood": "night_out_elegance"
+    },
+    "background": {
+      "elements": ["large_mirror", "dark_tile_walls", "soft_wall_sconces", "minimalist_sink"],
+      "palette": "deep_neutrals_with_gold_accents"
+    }
+  },
+  "subject": {
+    "description": "same woman from the reference photo, extremely elegant and stylish",
+    "pose": "mirror_selfie_with_phone_in_right_hand",
+    "expression": "soft_confident_night_out_look",
+    "appearance": {
+      "hair": "loose_natural_shiny_waves",
+      "makeup": "subtle_glam_evening_style_with_warm_highlights",
+      "skin": "warm_even_skin_tone_with_soft_glow"
+    },
+    "outfit": {
+      "type": "black_evening_dress",
+      "style": "sleek_minimalist_elegant",
+      "details": "clean_silhouette_high_end_fabric",
+      "accessories": ["gold_hoop_earrings", "thin_gold_necklace", "subtle_rings"]
+    }
+  },
+  "camera": {
+    "perspective": "mirror_selfie_portrait",
+    "framing": "medium_close_up_showing_upper_body_outfit_and_mirror_environment",
+    "phone": {
+      "model": "modern_smartphone",
+      "finish": "gold",
+      "reflections": "visible_in_glass"
+    },
+    "focus": "sharp_on_subject_face_soft_background",
+    "lens": "standard_35mm_look"
+  },
+  "visual_style": {
+    "render": "ultra_realistic_evening_photography",
+    "color_grade": "rich_warm_tones_with_subtle_contrast",
+    "detail_level": "high_skin_texture_hair_strands_fabric_detail",
+    "vibe": "luxury_night_out_elegance"
+  }
+}

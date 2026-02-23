@@ -8,6 +8,7 @@
 
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
+import net from 'net';
 
 // Redis connection - Railway provides REDIS_URL
 // In development without Redis, scheduled posts will use fallback polling
@@ -17,6 +18,7 @@ let connection = null;
 let scheduledPostsQueue = null;
 let scheduledPostsWorker = null;
 let redisAvailable = false;
+let redisGaveUp = false;
 
 /**
  * Check if Redis is available
@@ -26,15 +28,45 @@ export function isRedisAvailable() {
 }
 
 /**
+ * Quick TCP probe to check if host:port is reachable and stable.
+ * Returns true only if we can connect AND the connection stays open for 1s.
+ */
+function probeRedis(url, timeoutMs = 3000) {
+  return new Promise((resolve) => {
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname;
+      const port = parseInt(parsed.port, 10) || 6379;
+
+      const socket = net.connect({ host, port, timeout: timeoutMs });
+      let settled = false;
+      const settle = (val) => { if (!settled) { settled = true; socket.destroy(); resolve(val); } };
+
+      socket.on('connect', () => {
+        // Wait briefly to detect immediate ECONNRESET (unstable proxy)
+        setTimeout(() => settle(true), 500);
+      });
+      socket.on('error', () => settle(false));
+      socket.on('timeout', () => settle(false));
+      socket.on('close', () => { if (!settled) settle(false); });
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+/**
  * Wait for Redis to connect (with timeout)
  * Returns true if connected, false if timeout/failed
  */
 export async function waitForRedis(timeoutMs = 5000) {
   if (redisAvailable) return true;
-  if (!REDIS_URL) return false;
+  if (!REDIS_URL || redisGaveUp) return false;
 
   // Ensure connection is initiated
-  getRedisConnection();
+  await getRedisConnection();
+
+  if (redisGaveUp) return false;
 
   // Wait for connection or timeout
   return new Promise((resolve) => {
@@ -54,33 +86,44 @@ export async function waitForRedis(timeoutMs = 5000) {
 
 /**
  * Get or create Redis connection
- * Returns null if Redis is not configured or unavailable
+ * Returns null if Redis is not configured or unavailable.
+ * Now async — probes host reachability before creating ioredis.
  */
-export function getRedisConnection() {
-  if (!REDIS_URL) {
+export async function getRedisConnection() {
+  if (!REDIS_URL || redisGaveUp) {
     return null;
   }
 
   if (!connection) {
-    console.log('[JobQueue] Connecting to Redis:', REDIS_URL.replace(/\/\/.*@/, '//***@'));
+    const maskedUrl = REDIS_URL.replace(/\/\/.*@/, '//***@');
+    console.log('[JobQueue] Probing Redis:', maskedUrl);
+
+    // Quick TCP probe — avoids all the ioredis/BullMQ error noise if host is dead
+    const reachable = await probeRedis(REDIS_URL);
+    if (!reachable) {
+      console.log('[JobQueue] Redis not reachable, skipping (development mode OK, will use fallback)');
+      redisGaveUp = true;
+      return null;
+    }
+
     connection = new IORedis(REDIS_URL, {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
       lazyConnect: true,
+      connectTimeout: 5000,
       retryStrategy: (times) => {
         if (times > 3) {
           console.log('[JobQueue] Redis connection failed after 3 attempts, giving up');
           redisAvailable = false;
-          return null; // Stop retrying
+          redisGaveUp = true;
+          return null;
         }
         return Math.min(times * 100, 2000);
       },
     });
 
-    connection.on('error', (err) => {
-      if (!err.message.includes('ECONNREFUSED')) {
-        console.error('[JobQueue] Redis error:', err.message);
-      }
+    // Suppress ALL error events — Redis is optional, errors are non-fatal
+    connection.on('error', () => {
       redisAvailable = false;
     });
 
@@ -94,7 +137,7 @@ export function getRedisConnection() {
     });
 
     // Try to connect
-    connection.connect().catch((err) => {
+    connection.connect().catch(() => {
       console.log('[JobQueue] Redis not available (development mode OK, will use fallback)');
       redisAvailable = false;
     });
@@ -107,12 +150,11 @@ export function getRedisConnection() {
  */
 export function getScheduledPostsQueue() {
   if (!scheduledPostsQueue) {
-    const conn = getRedisConnection();
-    if (!conn || !redisAvailable) {
+    if (!connection || !redisAvailable) {
       return null;
     }
     scheduledPostsQueue = new Queue('scheduled-posts', {
-      connection: conn,
+      connection,
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -218,9 +260,8 @@ export async function cancelScheduledPost(postId) {
  */
 export async function initializeScheduledPostsChecker(publishFn, publishSingleFn) {
   const queue = getScheduledPostsQueue();
-  const conn = getRedisConnection();
 
-  if (!queue || !conn || !redisAvailable) {
+  if (!queue || !connection || !redisAvailable) {
     console.log('[ScheduledPosts] Redis not available, using fallback-only mode (checks every 5min via database polling)');
     return null;
   }
@@ -250,7 +291,7 @@ export async function initializeScheduledPostsChecker(publishFn, publishSingleFn
 
     return { skipped: true };
   }, {
-    connection: conn,
+    connection,
     concurrency: 1, // One at a time to avoid race conditions
   });
 

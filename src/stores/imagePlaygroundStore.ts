@@ -100,6 +100,10 @@ interface GenerationConfigState {
   activeImageSize: '1K' | '2K' | '4K';
   useBrandProfile: boolean;
   useInstagramMode: boolean;
+  useAiInfluencerMode: boolean;
+  useProductHeroMode: boolean;
+  useExplodedProductMode: boolean;
+  useBrandIdentityMode: boolean;
   uploadingImageIds: string[];
 }
 
@@ -136,6 +140,10 @@ interface GenerationConfigActions {
   reuseSeed: (seed: number) => void;
   toggleBrandProfile: () => void;
   toggleInstagramMode: () => void;
+  toggleAiInfluencerMode: () => void;
+  toggleProductHeroMode: () => void;
+  toggleExplodedProductMode: () => void;
+  toggleBrandIdentityMode: () => void;
   // Reference images actions
   addReferenceImage: (image: ReferenceImage) => void;
   removeReferenceImage: (id: string) => void;
@@ -320,6 +328,10 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
         activeImageSize: DEFAULT_IMAGE_SIZE,
         useBrandProfile: false,
         useInstagramMode: false,
+        useAiInfluencerMode: false,
+        useProductHeroMode: false,
+        useExplodedProductMode: false,
+        useBrandIdentityMode: false,
         uploadingImageIds: [],
 
         // =============================================================================
@@ -480,12 +492,85 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
           if (newValue) {
             set({
               useInstagramMode: true,
+              useAiInfluencerMode: false,
+              useProductHeroMode: false,
+              useExplodedProductMode: false,
+              useBrandIdentityMode: false,
               useBrandProfile: true,
               activeAspectRatio: '1:1',
               parameters: { ...get().parameters, aspectRatio: '1:1' },
             });
           } else {
             set({ useInstagramMode: false });
+          }
+        },
+
+        toggleAiInfluencerMode: () => {
+          const newValue = !get().useAiInfluencerMode;
+          if (newValue) {
+            set({
+              useAiInfluencerMode: true,
+              useInstagramMode: false,
+              useProductHeroMode: false,
+              useExplodedProductMode: false,
+              useBrandIdentityMode: false,
+              activeAspectRatio: '4:5',
+              parameters: { ...get().parameters, aspectRatio: '4:5' },
+            });
+          } else {
+            set({ useAiInfluencerMode: false });
+          }
+        },
+
+        toggleProductHeroMode: () => {
+          const newValue = !get().useProductHeroMode;
+          if (newValue) {
+            set({
+              useProductHeroMode: true,
+              useInstagramMode: false,
+              useAiInfluencerMode: false,
+              useExplodedProductMode: false,
+              useBrandIdentityMode: false,
+              activeAspectRatio: '1:1',
+              parameters: { ...get().parameters, aspectRatio: '1:1' },
+            });
+          } else {
+            set({ useProductHeroMode: false });
+          }
+        },
+
+        toggleExplodedProductMode: () => {
+          const newValue = !get().useExplodedProductMode;
+          if (newValue) {
+            set({
+              useExplodedProductMode: true,
+              useInstagramMode: false,
+              useAiInfluencerMode: false,
+              useProductHeroMode: false,
+              useBrandIdentityMode: false,
+              activeAspectRatio: '9:16',
+              parameters: { ...get().parameters, aspectRatio: '9:16' },
+            });
+          } else {
+            set({ useExplodedProductMode: false });
+          }
+        },
+
+        toggleBrandIdentityMode: () => {
+          const newValue = !get().useBrandIdentityMode;
+          if (newValue) {
+            set({
+              useBrandIdentityMode: true,
+              useInstagramMode: false,
+              useAiInfluencerMode: false,
+              useProductHeroMode: false,
+              useExplodedProductMode: false,
+              useBrandProfile: true,
+              activeAspectRatio: '4:5',
+              parameters: { ...get().parameters, aspectRatio: '4:5' },
+            });
+          } else {
+            set({ useBrandIdentityMode: false });
           }
         },
 
@@ -706,6 +791,10 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
             activeImageSize: DEFAULT_IMAGE_SIZE,
             useBrandProfile: false,
             useInstagramMode: false,
+            useAiInfluencerMode: false,
+            useProductHeroMode: false,
+            useExplodedProductMode: false,
+            useBrandIdentityMode: false,
           };
         },
         partialize: (state) => ({
@@ -725,6 +814,10 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
           activeImageSize: DEFAULT_IMAGE_SIZE,
           useBrandProfile: false,
           useInstagramMode: false,
+          useAiInfluencerMode: false,
+          useProductHeroMode: false,
+          useExplodedProductMode: false,
+          useBrandIdentityMode: false,
         }),
       }
     )

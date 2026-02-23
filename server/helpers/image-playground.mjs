@@ -8,19 +8,20 @@
 
 import { put } from "@vercel/blob";
 import sharp from "sharp";
-import { fal } from "@fal-ai/client";
-import { configureFal } from "../lib/ai/clients.mjs";
 import { validateContentType } from "../lib/validation/contentType.mjs";
+import { isQuotaOrRateLimitError } from "../lib/ai/retry.mjs";
+import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
 import { logAiUsage } from "./usage-tracking.mjs";
 
-// FAL.ai fallback config
-const FAL_IMAGE_MODEL = "fal-ai/gemini-3-pro-image-preview";
-const FAL_EDIT_MODEL = "fal-ai/gemini-3-pro-image-preview/edit";
-
-// Normalize FAL model names to match the image_model enum in the database
-// e.g. "fal-ai/gemini-3-pro-image-preview/edit" → "gemini-3-pro-image-preview"
+// Normalize model names to match the image_model enum in the database.
+// The DB enum currently only has 'gemini-3-pro-image-preview', so we map
+// all provider models to that value until the enum is extended.
 function normalizeModelForDb(model) {
-  return model.replace(/^fal-ai\//, "").replace(/\/edit$/, "");
+  // FAL: "fal-ai/gemini-3-pro-image-preview/edit" → "gemini-3-pro-image-preview"
+  const normalized = model.replace(/^fal-ai\//, "").replace(/\/edit$/, "");
+  // Replicate/other models: map to the only valid enum value
+  if (normalized.includes("/")) return "gemini-3-pro-image-preview";
+  return normalized;
 }
 
 // Timeout for fetching remote reference images (30 seconds)
@@ -31,18 +32,6 @@ function fetchWithTimeout(url, options = {}) {
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   return fetch(url, { ...options, signal: controller.signal }).finally(() =>
     clearTimeout(timeoutId),
-  );
-}
-
-function isQuotaOrRateLimitError(error) {
-  const errorString = String(error?.message || error || "").toLowerCase();
-  return (
-    errorString.includes("resource_exhausted") ||
-    errorString.includes("quota") ||
-    errorString.includes("429") ||
-    errorString.includes("rate") ||
-    errorString.includes("limit") ||
-    errorString.includes("exceeded")
   );
 }
 
@@ -702,155 +691,6 @@ async function buildContentParts(params) {
 }
 
 /**
- * Generate image via Gemini SDK. Returns { imageBase64, mimeType }.
- * Throws on failure (caller handles fallback).
- */
-async function generateWithGemini(genai, parts, params) {
-  const model = "gemini-3-pro-image-preview";
-  const mappedAspectRatio = mapAspectRatio(params.aspectRatio || "1:1");
-
-  console.log(
-    `[ImagePlayground] Calling Gemini SDK with model=${model}, aspectRatio=${mappedAspectRatio}, imageSize=${params.imageSize || "1K"}`,
-  );
-
-  const response = await genai.models.generateContent({
-    model,
-    contents: { parts },
-    config: {
-      temperature: 0.7,
-      imageConfig: {
-        aspectRatio: mappedAspectRatio,
-        imageSize: params.imageSize || "1K",
-      },
-    },
-  });
-
-  const responseParts = response?.candidates?.[0]?.content?.parts;
-
-  if (!Array.isArray(responseParts)) {
-    const finishReason = response?.candidates?.[0]?.finishReason;
-    if (finishReason === "NO_IMAGE") {
-      throw new Error(
-        'O modelo não conseguiu gerar a imagem. Tente um prompt mais descritivo e específico (ex: "um pôr do sol na praia com cores vibrantes")',
-      );
-    } else if (finishReason === "SAFETY") {
-      throw new Error(
-        "O prompt foi bloqueado por políticas de segurança. Tente reformular.",
-      );
-    } else if (finishReason === "RECITATION") {
-      throw new Error(
-        "O modelo detectou possível violação de direitos autorais.",
-      );
-    }
-    throw new Error("Falha ao gerar imagem - resposta inválida do modelo");
-  }
-
-  // Extract token usage from Gemini response
-  const usageMetadata = response?.usageMetadata;
-  console.log(`[ImagePlayground] Gemini usageMetadata:`, JSON.stringify(usageMetadata || null));
-  const inputTokens = usageMetadata?.promptTokenCount || 0;
-  const outputTokens = usageMetadata?.candidatesTokenCount || 0;
-
-  for (const part of responseParts) {
-    if (part.inlineData) {
-      return {
-        imageBase64: part.inlineData.data,
-        mimeType: part.inlineData.mimeType || "image/png",
-        usedProvider: "google",
-        usedModel: model,
-        inputTokens,
-        outputTokens,
-      };
-    }
-  }
-
-  throw new Error("Falha ao gerar imagem. Tente um prompt diferente.");
-}
-
-/**
- * Generate image via FAL.ai (fallback when Gemini quota is exhausted).
- * Returns { imageBase64, mimeType, usedProvider, usedModel }.
- */
-async function generateWithFal(parts, params) {
-  console.log(
-    `[ImagePlayground] Gemini quota exceeded, trying FAL.ai fallback (${FAL_IMAGE_MODEL})`,
-  );
-
-  configureFal();
-
-  // Collect image inputs from parts (same images that were prepared for Gemini)
-  const imageInputs = parts
-    .filter((p) => p.inlineData)
-    .map((p) => ({ base64: p.inlineData.data, mimeType: p.inlineData.mimeType }));
-
-  const hasImages = imageInputs.length > 0;
-  const aspectRatio = mapAspectRatio(params.aspectRatio || "1:1");
-  let usedModel = FAL_IMAGE_MODEL;
-
-  let result;
-
-  if (hasImages) {
-    // Upload images to Blob for FAL.ai (needs HTTP URLs)
-    const imageUrls = await Promise.all(
-      imageInputs.slice(0, 14).map(async (img) => {
-        const buffer = Buffer.from(img.base64, "base64");
-        const ext = img.mimeType.includes("png") ? "png" : "jpg";
-        const filename = `fal-playground-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        const blob = await put(filename, buffer, {
-          access: "public",
-          contentType: img.mimeType,
-        });
-        return blob.url;
-      }),
-    );
-
-    const input = {
-      prompt: params.prompt,
-      image_urls: imageUrls,
-      output_format: "png",
-    };
-    if (aspectRatio) input.aspect_ratio = aspectRatio;
-    if (["1K", "2K", "4K"].includes(params.imageSize)) input.resolution = params.imageSize;
-
-    result = await fal.subscribe(FAL_EDIT_MODEL, { input, logs: true });
-    usedModel = FAL_EDIT_MODEL;
-  } else {
-    const input = {
-      prompt: params.prompt,
-      output_format: "png",
-    };
-    if (aspectRatio) input.aspect_ratio = aspectRatio;
-    if (["1K", "2K", "4K"].includes(params.imageSize)) input.resolution = params.imageSize;
-
-    result = await fal.subscribe(FAL_IMAGE_MODEL, { input, logs: true });
-  }
-
-  const outputUrl = result?.data?.images?.[0]?.url;
-  if (!outputUrl) {
-    throw new Error("[FAL] No image URL in response");
-  }
-
-  // Fetch the image from FAL's temporary URL and convert to base64
-  const imageResponse = await fetch(outputUrl);
-  if (!imageResponse.ok) {
-    throw new Error(`[FAL] Failed to fetch image: ${imageResponse.status}`);
-  }
-  const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-  const contentType = imageResponse.headers.get("content-type") || "image/png";
-
-  validateContentType(contentType);
-
-  console.log(`[ImagePlayground] FAL.ai fallback successful`);
-
-  return {
-    imageBase64: imageBuffer.toString("base64"),
-    mimeType: contentType,
-    usedProvider: "fal",
-    usedModel,
-  };
-}
-
-/**
  * Background image generation processor.
  * Tries Gemini first, falls back to FAL.ai on quota/rate-limit errors.
  */
@@ -883,40 +723,45 @@ async function processImageGeneration(
       hasBrandProfile: !!params.brandProfile,
     });
 
-    // Build content parts (shared between Gemini and FAL.ai)
+    // Build content parts to extract reference images
     const parts = await buildContentParts(params);
 
-    // TODO: Gemini image temporarily disabled — using FAL.ai directly.
-    // To re-enable, uncomment the Gemini try block and remove the direct FAL.ai call.
+    // Extract image inputs from parts for the provider chain
+    const imageInputs = parts
+      .filter((p) => p.inlineData)
+      .map((p) => ({ base64: p.inlineData.data, mimeType: p.inlineData.mimeType }));
+
+    // Run through provider chain with automatic fallback
+    console.log("[ImagePlayground] Using provider chain");
+    const result = await runWithProviderFallback("generate", {
+      prompt: params.prompt,
+      aspectRatio: params.aspectRatio || "1:1",
+      imageSize: params.imageSize || "1K",
+      productImages: imageInputs.length > 0 ? imageInputs : undefined,
+    });
+
+    usedProvider = result.usedProvider;
+    usedModel = result.usedModel;
+
+    // Convert result to base64 for upload
     let imageBase64;
     let mimeType;
-    let inputTokens = 0;
-    let outputTokens = 0;
 
-    /*
-    try {
-      const geminiResult = await generateWithGemini(genai, parts, params);
-      imageBase64 = geminiResult.imageBase64;
-      mimeType = geminiResult.mimeType;
-      usedProvider = geminiResult.usedProvider;
-      usedModel = geminiResult.usedModel;
-      inputTokens = geminiResult.inputTokens || 0;
-      outputTokens = geminiResult.outputTokens || 0;
-    } catch (geminiError) {
-      if (isQuotaOrRateLimitError(geminiError)) {
-        // Fallback to FAL.ai
-      } else {
-        throw geminiError;
+    if (result.imageUrl.startsWith("data:")) {
+      const matches = result.imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!matches) throw new Error("Invalid data URL from provider");
+      mimeType = matches[1];
+      imageBase64 = matches[2];
+    } else {
+      // HTTP URL (from FAL.ai or Replicate) — fetch and convert
+      const imgResponse = await fetch(result.imageUrl);
+      if (!imgResponse.ok) {
+        throw new Error(`Failed to fetch provider image: ${imgResponse.status}`);
       }
+      const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
+      mimeType = imgResponse.headers.get("content-type") || "image/png";
+      imageBase64 = imgBuffer.toString("base64");
     }
-    */
-
-    console.log("[ImagePlayground] Using FAL.ai directly (Gemini disabled)");
-    const falResult = await generateWithFal(parts, params);
-    imageBase64 = falResult.imageBase64;
-    mimeType = falResult.mimeType;
-    usedProvider = falResult.usedProvider;
-    usedModel = falResult.usedModel;
 
     // Validate content type before upload
     validateContentType(mimeType);
@@ -959,15 +804,13 @@ async function processImageGeneration(
       params.imageSize || "1K",
     );
 
-    // Update generation with asset (include token usage and provider info)
+    // Update generation with asset (include provider info)
     const asset = {
       url: blob.url,
       width: dimensions.width,
       height: dimensions.height,
       provider: usedProvider,
       model: usedModel,
-      inputTokens: inputTokens || undefined,
-      outputTokens: outputTokens || undefined,
     };
 
     await sql`
@@ -1051,15 +894,13 @@ async function processImageGeneration(
         operation: "image",
         model: usedModel,
         provider: usedProvider,
-        inputTokens,
-        outputTokens,
         imageCount: 1,
         imageSize: params.imageSize || "1K",
         status: "success",
         metadata: {
           source: "playground",
           aspectRatio: params.aspectRatio || "1:1",
-          fallbackUsed: usedProvider !== "google",
+          fallbackUsed: result.usedFallback,
           generationId,
         },
       }).catch((err) => {

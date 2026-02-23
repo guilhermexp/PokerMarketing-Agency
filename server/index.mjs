@@ -23,12 +23,19 @@ import { checkAndPublishScheduledPosts, publishScheduledPostById } from "./helpe
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function isTransientRedisError(error) {
+  const msg = error?.message || "";
+  return msg.includes("ECONNRESET") || msg.includes("ECONNREFUSED") || msg.includes("Connection is closed");
+}
+
 process.on("uncaughtException", (error) => {
+  if (isTransientRedisError(error)) return; // Redis is optional — ignore
   logger.fatal({ err: error }, "Uncaught exception in Production API");
   process.exit(1);
 });
 
 process.on("unhandledRejection", (error) => {
+  if (isTransientRedisError(error)) return; // Redis is optional — ignore
   logger.fatal({ err: error }, "Unhandled rejection in Production API");
   process.exit(1);
 });

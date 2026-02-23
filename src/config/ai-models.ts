@@ -45,12 +45,12 @@ export const CREATIVE_MODELS = [
   // GOOGLE GEMINI (via OpenRouter)
   // -------------------------------------------------------------------------
   {
-    id: 'google/gemini-3.1-pro-preview',
-    label: 'Gemini 3.1 Pro',
+    id: 'google/gemini-3-flash-preview',
+    label: 'Gemini 3 Flash',
     provider: 'Google',
     type: 'openrouter' as const,
     capabilities: { text: true, image: false, vision: true },
-    description: 'Modelo mais capaz do Google via OpenRouter',
+    description: 'Modelo rápido e barato do Google via OpenRouter',
     costTier: 'medium' as const,
   },
 
@@ -159,7 +159,7 @@ export function getModelsByProvider(provider: string): CreativeModelConfig[] {
  * Get default model ID
  */
 export function getDefaultModelId(): CreativeModelId {
-  return 'google/gemini-3.1-pro-preview';
+  return 'google/gemini-3-flash-preview';
 }
 
 // ============================================================================
