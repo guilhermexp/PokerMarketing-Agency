@@ -22,6 +22,7 @@ interface CalendarViewProps {
   galleryImages: GalleryImage[];
   campaigns?: DbCampaign[];
   onPublishToInstagram: (post: ScheduledPost) => void;
+  onRetryScheduledPost?: (postId: string) => void;
   publishingStates: Record<string, InstagramPublishState>;
 }
 
@@ -51,6 +52,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
   galleryImages,
   campaigns = [],
   onPublishToInstagram,
+  onRetryScheduledPost,
   publishingStates: _publishingStates,
 }) {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -475,6 +477,18 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                   </button>
                 </>
               )}
+              {selectedPost.status === "failed" && onRetryScheduledPost && (
+                <button
+                  onClick={() => {
+                    onRetryScheduledPost(selectedPost.id);
+                    setPostDialogOpen(false);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white/[0.06] border border-white/[0.08] rounded-xl text-sm font-medium text-white/80 hover:bg-white/[0.1] transition-all"
+                >
+                  <Icon name="refresh-cw" className="w-4 h-4" />
+                  Tentar Novamente
+                </button>
+              )}
               <button
                 onClick={() => {
                   onDeleteScheduledPost(selectedPost.id);
@@ -648,6 +662,18 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                               </button>
                             </>
                           )}
+                          {post.status === "failed" && onRetryScheduledPost && (
+                            <button
+                              onClick={() => {
+                                onRetryScheduledPost(post.id);
+                                setDayViewDialogOpen(false);
+                              }}
+                              className="p-2 text-white/30 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
+                              title="Tentar novamente"
+                            >
+                              <Icon name="refresh-cw" className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => onDeleteScheduledPost(post.id)}
                             className="p-2 text-white/30 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
@@ -811,6 +837,15 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                               title="Editar"
                             >
                               <Icon name="edit" className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {post.status === "failed" && onRetryScheduledPost && (
+                            <button
+                              onClick={() => onRetryScheduledPost(post.id)}
+                              className="flex-1 p-1.5 text-white/30 hover:text-white hover:bg-white/[0.06] rounded-lg text-[10px] font-medium transition-colors"
+                              title="Tentar novamente"
+                            >
+                              <Icon name="refresh-cw" className="w-3.5 h-3.5" />
                             </button>
                           )}
                           <button

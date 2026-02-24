@@ -57,6 +57,7 @@ import {
   createScheduledPost,
   updateScheduledPost as updateScheduledPostApi,
   deleteScheduledPost as deleteScheduledPostApi,
+  retryScheduledPost as retryScheduledPostApi,
   getCampaignById,
   createCampaign as createCampaignApi,
   createWeekSchedule,
@@ -1185,6 +1186,26 @@ function AppContent() {
       await deleteScheduledPostApi(postId);
     } catch (e) {
       console.error("Failed to delete scheduled post:", e);
+    }
+  };
+
+  const handleRetryScheduledPost = async (postId: string) => {
+    if (!userId) return;
+    try {
+      const updatedPost = await retryScheduledPostApi(postId, userId);
+      // Update SWR cache with the reset post
+      swrUpdateScheduledPost(postId, {
+        status: updatedPost.status,
+        error_message: null,
+        publish_attempts: 0,
+        instagram_account_id: updatedPost.instagram_account_id,
+        scheduled_timestamp: updatedPost.scheduled_timestamp,
+      });
+    } catch (e: unknown) {
+      const errorMsg =
+        e instanceof Error ? e.message : "Failed to retry scheduled post";
+      console.error("Failed to retry scheduled post:", errorMsg);
+      alert(errorMsg);
     }
   };
 
@@ -2583,6 +2604,7 @@ function AppContent() {
                 onSchedulePost={handleSchedulePost}
                 onUpdateScheduledPost={handleUpdateScheduledPost}
                 onDeleteScheduledPost={handleDeleteScheduledPost}
+                onRetryScheduledPost={handleRetryScheduledPost}
                 onPublishToInstagram={handlePublishToInstagram}
                 publishingStates={publishingStates}
                 campaignsList={campaignsList}

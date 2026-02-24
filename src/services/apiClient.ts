@@ -409,6 +409,7 @@ export interface DbScheduledPost {
   instagram_container_id?: string;
   publish_attempts?: number;
   last_publish_attempt?: string;
+  instagram_account_id?: string | null;
 }
 
 export async function getScheduledPosts(
@@ -467,6 +468,16 @@ export async function updateScheduledPost(
 
 export async function deleteScheduledPost(id: string): Promise<void> {
   await fetchApi(`/scheduled-posts?id=${id}`, { method: "DELETE" });
+}
+
+export async function retryScheduledPost(
+  id: string,
+  userId: string,
+): Promise<DbScheduledPost> {
+  return fetchApi<DbScheduledPost>("/scheduled-posts/retry", {
+    method: "POST",
+    body: JSON.stringify({ id, user_id: userId }),
+  });
 }
 
 // ============================================================================

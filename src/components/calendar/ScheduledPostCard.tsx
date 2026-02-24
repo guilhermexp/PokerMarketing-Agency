@@ -9,6 +9,7 @@ interface ScheduledPostCardProps {
   onUpdate: (postId: string, updates: Partial<ScheduledPost>) => void;
   onDelete: (postId: string) => void;
   onPublishToInstagram?: (post: ScheduledPost) => void;
+  onRetry?: (postId: string) => void;
   publishingState?: InstagramPublishState | null;
 }
 
@@ -18,6 +19,7 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
   onUpdate,
   onDelete,
   onPublishToInstagram,
+  onRetry,
   publishingState
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -205,11 +207,13 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
               )}
 
               {/* Error Message */}
-              {publishingState?.step === 'failed' && (
+              {(publishingState?.step === 'failed' || post.status === 'failed') && (
                 <div className="px-3 py-2 bg-red-500/[0.04]">
                   <div className="flex items-center gap-2">
                     <Icon name="alert-circle" className="w-3 h-3 text-red-400/60" />
-                    <span className="text-[9px] text-red-400/60">{publishingState.message}</span>
+                    <span className="text-[9px] text-red-400/60">
+                      {publishingState?.message || post.errorMessage || 'Falha na publicação'}
+                    </span>
                   </div>
                 </div>
               )}
@@ -311,13 +315,24 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                   </>
                 )}
                 {post.status !== 'scheduled' && (
-                  <button
-                    onClick={() => { onDelete(post.id); setIsExpanded(false); }}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-white/[0.04] border border-white/[0.06] hover:bg-red-500/[0.08] rounded-xl text-[10px] font-medium text-white/40 hover:text-red-400/70 transition-all"
-                  >
-                    <Icon name="trash" className="w-3.5 h-3.5" />
-                    Excluir
-                  </button>
+                  <div className="flex gap-2 w-full">
+                    {post.status === 'failed' && onRetry && (
+                      <button
+                        onClick={() => { onRetry(post.id); setIsExpanded(false); }}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-white/[0.06] border border-white/[0.08] rounded-xl text-[10px] font-medium text-white/70 hover:bg-white/[0.1] transition-all"
+                      >
+                        <Icon name="refresh-cw" className="w-3.5 h-3.5" />
+                        Tentar Novamente
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { onDelete(post.id); setIsExpanded(false); }}
+                      className={`${post.status === 'failed' && onRetry ? '' : 'flex-1'} flex items-center justify-center gap-2 px-4 py-2 bg-white/[0.04] border border-white/[0.06] hover:bg-red-500/[0.08] rounded-xl text-[10px] font-medium text-white/40 hover:text-red-400/70 transition-all`}
+                    >
+                      <Icon name="trash" className="w-3.5 h-3.5" />
+                      {post.status === 'failed' && onRetry ? '' : 'Excluir'}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -395,6 +410,15 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
                 <Icon name="check" className="w-4 h-4" />
               </button>
             </>
+          )}
+          {post.status === 'failed' && onRetry && (
+            <button
+              onClick={() => onRetry(post.id)}
+              className="p-2 text-white/25 hover:text-white/60 hover:bg-white/[0.04] rounded-lg transition-colors"
+              title="Tentar novamente"
+            >
+              <Icon name="refresh-cw" className="w-4 h-4" />
+            </button>
           )}
           <button
             onClick={() => onDelete(post.id)}
