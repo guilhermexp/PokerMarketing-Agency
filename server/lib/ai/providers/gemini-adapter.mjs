@@ -11,7 +11,7 @@
 
 import { getGeminiAi } from "../clients.mjs";
 import { withRetry } from "../retry.mjs";
-import { mapAspectRatio, DEFAULT_IMAGE_MODEL } from "../image-generation.mjs";
+import { mapAspectRatio, DEFAULT_IMAGE_MODEL, STANDARD_IMAGE_MODEL } from "../image-generation.mjs";
 import logger from "../../logger.mjs";
 
 /**
@@ -48,6 +48,7 @@ function extractImageFromResponse(response) {
  * @param {Array<{base64: string, mimeType: string}>} [params.productImages]
  * @param {{base64: string, mimeType: string}} [params.styleRef]
  * @param {{base64: string, mimeType: string}} [params.personRef]
+ * @param {string} [params.modelTier] - "standard" or "pro" (default: "pro")
  * @returns {Promise<{imageUrl: string, usedModel: string}>}
  */
 export async function generate({
@@ -57,9 +58,10 @@ export async function generate({
   productImages,
   styleRef,
   personRef,
+  modelTier,
 }) {
   const ai = getGeminiAi();
-  const model = DEFAULT_IMAGE_MODEL;
+  const model = modelTier === "standard" ? STANDARD_IMAGE_MODEL : DEFAULT_IMAGE_MODEL;
   const parts = [{ text: prompt }];
 
   if (personRef) {
@@ -107,11 +109,12 @@ export async function generate({
  * @param {string} params.imageBase64 - Base64 of image to edit (no data: prefix)
  * @param {string} params.mimeType
  * @param {{base64: string, mimeType: string}} [params.referenceImage]
+ * @param {string} [params.modelTier] - "standard" or "pro" (default: "pro")
  * @returns {Promise<{imageUrl: string, usedModel: string}>}
  */
-export async function edit({ prompt, imageBase64, mimeType, referenceImage }) {
+export async function edit({ prompt, imageBase64, mimeType, referenceImage, modelTier }) {
   const ai = getGeminiAi();
-  const model = DEFAULT_IMAGE_MODEL;
+  const model = modelTier === "standard" ? STANDARD_IMAGE_MODEL : DEFAULT_IMAGE_MODEL;
 
   const parts = [
     { text: prompt },

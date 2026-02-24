@@ -337,10 +337,38 @@ async function publishPost(post) {
   try {
     console.log(`[Publisher] Publishing post ${post.id}...`);
 
-    // Get credentials - from database if instagram_account_id, else fallback to global
+    // Get credentials - from database if instagram_account_id, else try to auto-resolve
     let credentials;
-    if (post.instagram_account_id) {
-      const dbCredentials = await getInstagramCredentials(post.instagram_account_id);
+    let instagramAccountId = post.instagram_account_id;
+
+    // Auto-resolve: if no instagram_account_id, find active account for this user/org
+    if (!instagramAccountId) {
+      console.log('[Publisher] No instagram_account_id on post, auto-resolving...');
+      try {
+        const sql = getSql();
+        const orgFilter = post.organization_id
+          ? sql`AND organization_id = ${post.organization_id}`
+          : sql`AND (organization_id IS NULL OR organization_id = '')`;
+
+        const accounts = await sql`
+          SELECT id FROM instagram_accounts
+          WHERE is_active = TRUE
+            ${orgFilter}
+          ORDER BY connected_at DESC
+          LIMIT 1
+        `;
+
+        if (accounts.length > 0) {
+          instagramAccountId = accounts[0].id;
+          console.log(`[Publisher] Auto-resolved instagram account: ${instagramAccountId}`);
+        }
+      } catch (err) {
+        console.error('[Publisher] Failed to auto-resolve instagram account:', err);
+      }
+    }
+
+    if (instagramAccountId) {
+      const dbCredentials = await getInstagramCredentials(instagramAccountId);
       if (!dbCredentials) {
         throw new Error('Instagram account not found or inactive. Please reconnect in Settings → Integrations.');
       }
@@ -350,7 +378,7 @@ async function publishPost(post) {
       };
       console.log(`[Publisher] Using user token for Instagram: ${credentials.instagramUserId}`);
     } else {
-      // Legacy: no instagram_account_id - use global token (should not happen for new posts)
+      // Legacy: no instagram_account_id and no active accounts - use global token
       if (!RUBE_TOKEN) {
         throw new Error('No Instagram account connected. Please connect in Settings → Integrations.');
       }

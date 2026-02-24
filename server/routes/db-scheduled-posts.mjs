@@ -344,4 +344,127 @@ export function registerScheduledPostRoutes(app) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // Retry a failed scheduled post: reset status, assign active instagram account, reschedule
+  app.post("/api/db/scheduled-posts/retry", async (req, res) => {
+    try {
+      const sql = getSql();
+      const { id, user_id } = req.body;
+
+      if (!id || !user_id) {
+        return res.status(400).json({ error: "id and user_id are required" });
+      }
+
+      const resolvedUserId = await resolveUserId(sql, user_id);
+      if (!resolvedUserId) {
+        return res.status(400).json({ error: "User not found" });
+      }
+
+      // Get the post
+      const posts = await sql`
+        SELECT * FROM scheduled_posts WHERE id = ${id} LIMIT 1
+      `;
+      if (posts.length === 0) {
+        return res.status(404).json({ error: "Scheduled post not found" });
+      }
+
+      const post = posts[0];
+
+      if (post.status !== "failed") {
+        return res
+          .status(400)
+          .json({ error: "Only failed posts can be retried" });
+      }
+
+      // Verify org permission if applicable
+      if (post.organization_id) {
+        const context = await resolveOrganizationContext(
+          sql,
+          resolvedUserId,
+          post.organization_id,
+        );
+        if (!hasPermission(context.orgRole, PERMISSIONS.SCHEDULE_POST)) {
+          return res
+            .status(403)
+            .json({ error: "Permission denied: schedule_post required" });
+        }
+      }
+
+      // Find the active instagram account for this user/org
+      let instagramAccountId = post.instagram_account_id;
+      if (!instagramAccountId) {
+        const orgFilter = post.organization_id
+          ? sql`AND organization_id = ${post.organization_id}`
+          : sql`AND (organization_id IS NULL OR organization_id = '')`;
+
+        const accounts = await sql`
+          SELECT id FROM instagram_accounts
+          WHERE is_active = TRUE
+            ${orgFilter}
+          ORDER BY connected_at DESC
+          LIMIT 1
+        `;
+
+        if (accounts.length > 0) {
+          instagramAccountId = accounts[0].id;
+        }
+      }
+
+      if (!instagramAccountId) {
+        return res.status(400).json({
+          error:
+            "Nenhuma conta do Instagram conectada. Conecte em Configurações → Integrações.",
+        });
+      }
+
+      // Reset post: status=scheduled, clear error, assign instagram account, reschedule for now + 1min
+      const newTimestamp = Date.now() + 60_000;
+      const result = await sql`
+        UPDATE scheduled_posts
+        SET status = 'scheduled',
+            error_message = NULL,
+            publish_attempts = 0,
+            last_publish_attempt = NULL,
+            instagram_account_id = ${instagramAccountId},
+            scheduled_timestamp = ${newTimestamp}
+        WHERE id = ${id}
+        RETURNING *
+      `;
+
+      const updatedPost = result[0];
+
+      // Schedule job in BullMQ for exact-time publishing
+      try {
+        await schedulePostForPublishing(
+          updatedPost.id,
+          resolvedUserId,
+          newTimestamp,
+        );
+        logger.info(
+          {
+            postId: updatedPost.id,
+            instagramAccountId,
+            scheduledAt: new Date(newTimestamp).toISOString(),
+          },
+          "[API] Retried failed post - rescheduled with active instagram account",
+        );
+      } catch (error) {
+        logger.error(
+          { err: error, postId: updatedPost.id },
+          `[API] Failed to schedule retry job for post ${updatedPost.id}`,
+        );
+      }
+
+      res.json(updatedPost);
+    } catch (error) {
+      if (
+        error instanceof OrganizationAccessError ||
+        error instanceof PermissionDeniedError
+      ) {
+        return res.status(403).json({ error: error.message });
+      }
+      logError("Scheduled Posts API", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 }

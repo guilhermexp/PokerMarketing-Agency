@@ -1,10 +1,11 @@
 /**
- * Image generation via FAL.ai (Gemini 3 Pro Image Preview).
+ * Image generation via FAL.ai (Standard: Gemini 2.5 Flash, Pro: Gemini 3 Pro).
  *
  * Used as fallback when Google Gemini direct API returns 429/RESOURCE_EXHAUSTED.
- * Same model (gemini-3-pro-image-preview) running on FAL.ai infrastructure.
+ * Supports both Standard (gemini-25-flash-image) and Pro (gemini-3-pro-image-preview) tiers.
  *
- * Exports: generateImageWithFal, editImageWithFal, FAL_IMAGE_MODEL, FAL_EDIT_MODEL
+ * Exports: generateImageWithFal, editImageWithFal, FAL_IMAGE_MODEL, FAL_EDIT_MODEL,
+ *          FAL_IMAGE_MODEL_STANDARD, FAL_EDIT_MODEL_STANDARD
  */
 
 import { fal } from "@fal-ai/client";
@@ -14,6 +15,8 @@ import logger from "../logger.mjs";
 
 export const FAL_IMAGE_MODEL = "fal-ai/gemini-3-pro-image-preview";
 export const FAL_EDIT_MODEL = "fal-ai/gemini-3-pro-image-preview/edit";
+export const FAL_IMAGE_MODEL_STANDARD = "fal-ai/gemini-25-flash-image";
+export const FAL_EDIT_MODEL_STANDARD = "fal-ai/gemini-25-flash-image/edit";
 
 /**
  * Upload a base64 image to Vercel Blob so FAL.ai can access it via HTTP URL.
@@ -44,7 +47,8 @@ async function uploadBase64ToBlob(base64, mimeType, prefix = "fal-ref") {
  * @param {Array<{base64: string, mimeType: string}>} [productImages] - Product/logo images
  * @param {{base64: string, mimeType: string}} [styleReferenceImage] - Style reference
  * @param {{base64: string, mimeType: string}} [personReferenceImage] - Person reference
- * @returns {Promise<string>} Image URL from FAL.ai
+ * @param {string} [modelTier] - "standard" or "pro" (default: "pro")
+ * @returns {Promise<{url: string, usedModel: string}>} Image URL + model ID from FAL.ai
  */
 export async function generateImageWithFal(
   prompt,
@@ -53,8 +57,13 @@ export async function generateImageWithFal(
   productImages,
   styleReferenceImage,
   personReferenceImage,
+  modelTier,
 ) {
   configureFal();
+
+  const isStandard = modelTier === "standard";
+  const genModel = isStandard ? FAL_IMAGE_MODEL_STANDARD : FAL_IMAGE_MODEL;
+  const editModel = isStandard ? FAL_EDIT_MODEL_STANDARD : FAL_EDIT_MODEL;
 
   // Collect all reference images
   const refImages = [];
@@ -83,11 +92,11 @@ export async function generateImageWithFal(
     if (["1K", "2K", "4K"].includes(imageSize)) input.resolution = imageSize;
 
     logger.info(
-      { endpoint: FAL_EDIT_MODEL, imageUrlsCount: imageUrls.length },
+      { endpoint: editModel, imageUrlsCount: imageUrls.length, modelTier: isStandard ? "standard" : "pro" },
       "[FAL] Calling FAL.ai edit endpoint with reference images",
     );
 
-    const result = await fal.subscribe(FAL_EDIT_MODEL, {
+    const result = await fal.subscribe(editModel, {
       input,
       logs: true,
     });
@@ -96,7 +105,7 @@ export async function generateImageWithFal(
     if (!url) {
       throw new Error("[FAL] No image URL in response");
     }
-    return url;
+    return { url, usedModel: editModel };
   }
 
   // Text-to-image (no reference images)
@@ -108,11 +117,11 @@ export async function generateImageWithFal(
   if (["1K", "2K", "4K"].includes(imageSize)) input.resolution = imageSize;
 
   logger.info(
-    { endpoint: FAL_IMAGE_MODEL, aspectRatio, imageSize },
+    { endpoint: genModel, aspectRatio, imageSize, modelTier: isStandard ? "standard" : "pro" },
     "[FAL] Calling FAL.ai text-to-image",
   );
 
-  const result = await fal.subscribe(FAL_IMAGE_MODEL, {
+  const result = await fal.subscribe(genModel, {
     input,
     logs: true,
   });
@@ -121,7 +130,7 @@ export async function generateImageWithFal(
   if (!url) {
     throw new Error("[FAL] No image URL in response");
   }
-  return url;
+  return { url, usedModel: genModel };
 }
 
 /**
@@ -131,10 +140,14 @@ export async function generateImageWithFal(
  * @param {string} imageBase64 - Base64 of image to edit (no data: prefix)
  * @param {string} mimeType - MIME type of the image
  * @param {{base64: string, mimeType: string}} [referenceImage] - Optional reference image
- * @returns {Promise<string>} Edited image URL from FAL.ai
+ * @param {string} [modelTier] - "standard" or "pro" (default: "pro")
+ * @returns {Promise<{url: string, usedModel: string}>} Edited image URL + model ID from FAL.ai
  */
-export async function editImageWithFal(prompt, imageBase64, mimeType, referenceImage) {
+export async function editImageWithFal(prompt, imageBase64, mimeType, referenceImage, modelTier) {
   configureFal();
+
+  const isStandard = modelTier === "standard";
+  const editModel = isStandard ? FAL_EDIT_MODEL_STANDARD : FAL_EDIT_MODEL;
 
   // Upload the main image to Blob
   const imageUrls = [await uploadBase64ToBlob(imageBase64, mimeType, "fal-edit")];
@@ -154,11 +167,11 @@ export async function editImageWithFal(prompt, imageBase64, mimeType, referenceI
   };
 
   logger.info(
-    { endpoint: FAL_EDIT_MODEL, imageUrlsCount: imageUrls.length },
+    { endpoint: editModel, imageUrlsCount: imageUrls.length, modelTier: isStandard ? "standard" : "pro" },
     "[FAL] Calling FAL.ai edit endpoint",
   );
 
-  const result = await fal.subscribe(FAL_EDIT_MODEL, {
+  const result = await fal.subscribe(editModel, {
     input,
     logs: true,
   });
@@ -167,5 +180,5 @@ export async function editImageWithFal(prompt, imageBase64, mimeType, referenceI
   if (!url) {
     throw new Error("[FAL] No image URL in edit response");
   }
-  return url;
+  return { url, usedModel: editModel };
 }

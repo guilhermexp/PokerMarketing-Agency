@@ -236,7 +236,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         aspectRatio: mapAspectRatio(aspectRatio),
         imageSize,
         productImages: imageInputs.length > 0 ? imageInputs : undefined,
-        replicateModel: "google/nano-banana-pro", // Always use Pro for flyers (typography)
+        modelTier: "pro", // Always use Pro for flyers (typography)
       });
 
       let imageDataUrl = providerResult.imageUrl;

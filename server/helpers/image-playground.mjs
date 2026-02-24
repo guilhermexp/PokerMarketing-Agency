@@ -19,8 +19,11 @@ import { logAiUsage } from "./usage-tracking.mjs";
 function normalizeModelForDb(model) {
   // FAL: "fal-ai/gemini-3-pro-image-preview/edit" → "gemini-3-pro-image-preview"
   const normalized = model.replace(/^fal-ai\//, "").replace(/\/edit$/, "");
-  // Replicate/other models: map to the only valid enum value
+  // Map all model variants to valid DB enum values
+  // DB enum currently only has 'gemini-3-pro-image-preview'
   if (normalized.includes("/")) return "gemini-3-pro-image-preview";
+  // Standard models (gemini-2.5-flash-image, gemini-25-flash-image) → map to only valid enum value
+  if (normalized !== "gemini-3-pro-image-preview") return "gemini-3-pro-image-preview";
   return normalized;
 }
 
@@ -481,7 +484,7 @@ export async function createImageBatch(
   const aspectRatio =
     params.aspectRatio || getAspectRatioFromDimensions(width, height);
   const imageSize = params.imageSize || getImageSizeFromWidth(width);
-  const generationParams = { ...params, aspectRatio, imageSize };
+  const generationParams = { ...params, aspectRatio, imageSize, model };
   const storedParams = compactForStorage(generationParams);
   const displayPrompt =
     typeof params.userPrompt === "string" && params.userPrompt.trim()
@@ -731,19 +734,17 @@ async function processImageGeneration(
       .filter((p) => p.inlineData)
       .map((p) => ({ base64: p.inlineData.data, mimeType: p.inlineData.mimeType }));
 
-    // Map user model choice to Replicate model ID
-    const replicateModel = params.model === "nano-banana"
-      ? "google/nano-banana"
-      : "google/nano-banana-pro";
+    // Map user model choice to generic tier for all providers
+    const modelTier = params.model === "nano-banana" ? "standard" : "pro";
 
     // Run through provider chain with automatic fallback
-    console.log("[ImagePlayground] Using provider chain", { replicateModel });
+    console.log("[ImagePlayground] Using provider chain", { modelTier });
     const result = await runWithProviderFallback("generate", {
       prompt: params.prompt,
       aspectRatio: params.aspectRatio || "1:1",
       imageSize: params.imageSize || "1K",
       productImages: imageInputs.length > 0 ? imageInputs : undefined,
-      replicateModel,
+      modelTier,
     });
 
     usedProvider = result.usedProvider;

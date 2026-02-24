@@ -134,6 +134,7 @@ interface DashboardProps {
     updates: Partial<ScheduledPost>,
   ) => void;
   onDeleteScheduledPost: (postId: string) => void;
+  onRetryScheduledPost?: (postId: string) => void;
   // Instagram Publishing
   onPublishToInstagram: (post: ScheduledPost) => void;
   publishingStates: Record<string, InstagramPublishState>;
@@ -289,6 +290,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     onSchedulePost,
     onUpdateScheduledPost,
     onDeleteScheduledPost,
+    onRetryScheduledPost,
     onPublishToInstagram,
     publishingStates,
     campaignsList: _campaignsList,
@@ -840,6 +842,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 galleryImages={galleryImages}
                 campaigns={campaigns}
                 onPublishToInstagram={onPublishToInstagram}
+                onRetryScheduledPost={onRetryScheduledPost}
                 publishingStates={publishingStates}
               />
             </Suspense>
