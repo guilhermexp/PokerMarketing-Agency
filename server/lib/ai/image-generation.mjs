@@ -2,7 +2,7 @@
  * Image generation with Gemini and FAL.ai fallback.
  *
  * Exports: generateGeminiImage, generateImageWithFallback,
- *          mapAspectRatio, DEFAULT_IMAGE_MODEL, FAL_IMAGE_MODEL
+ *          mapAspectRatio, DEFAULT_IMAGE_MODEL, STANDARD_IMAGE_MODEL, FAL_IMAGE_MODEL
  */
 
 import { getGeminiAi } from "./clients.mjs";
@@ -12,6 +12,7 @@ import { runWithProviderFallback } from "./image-providers.mjs";
 import logger from "../logger.mjs";
 
 export const DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview";
+export const STANDARD_IMAGE_MODEL = "gemini-2.5-flash-image";
 export { FAL_IMAGE_MODEL };
 
 export const mapAspectRatio = (ratio) => {

@@ -92,7 +92,8 @@ async function uploadBase64ToBlob(base64, mimeType, prefix = "replicate-ref") {
  * @param {string} params.prompt
  * @param {string} [params.aspectRatio]
  * @param {string} [params.imageSize]
- * @param {string} [params.replicateModel] - "google/nano-banana" or "google/nano-banana-pro"
+ * @param {string} [params.modelTier] - "standard" or "pro" (default: "pro")
+ * @param {string} [params.replicateModel] - Legacy override (backward-compat)
  * @param {Array<{base64: string, mimeType: string}>} [params.productImages]
  * @param {{base64: string, mimeType: string}} [params.styleRef]
  * @param {{base64: string, mimeType: string}} [params.personRef]
@@ -102,13 +103,15 @@ export async function generate({
   prompt,
   aspectRatio = "1:1",
   imageSize = "1K",
+  modelTier,
   replicateModel,
   productImages,
   styleRef,
   personRef,
 }) {
   const replicate = getClient();
-  const model = replicateModel || REPLICATE_MODEL_PRO;
+  // Legacy override takes priority, then modelTier, default Pro
+  const model = replicateModel || (modelTier === "standard" ? REPLICATE_MODEL_STANDARD : REPLICATE_MODEL_PRO);
   const isStandard = model === REPLICATE_MODEL_STANDARD;
 
   const input = {
@@ -163,10 +166,13 @@ export async function generate({
  * @param {string} params.imageBase64 - Base64 (no data: prefix)
  * @param {string} params.mimeType
  * @param {{base64: string, mimeType: string}} [params.referenceImage]
+ * @param {string} [params.modelTier] - "standard" or "pro" (default: "pro")
  * @returns {Promise<{imageUrl: string, usedModel: string}>}
  */
-export async function edit({ prompt, imageBase64, mimeType, referenceImage }) {
+export async function edit({ prompt, imageBase64, mimeType, referenceImage, modelTier }) {
   const replicate = getClient();
+  // Edit always uses Pro (Standard doesn't support edit well on Replicate)
+  const model = REPLICATE_MODEL_PRO;
 
   // Upload the main image to Blob
   const imageUrls = [await uploadBase64ToBlob(imageBase64, mimeType, "replicate-edit")];
@@ -188,16 +194,16 @@ export async function edit({ prompt, imageBase64, mimeType, referenceImage }) {
   };
 
   logger.debug(
-    { imageCount: imageUrls.length },
+    { imageCount: imageUrls.length, modelTier },
     "[ReplicateAdapter] edit",
   );
 
-  const output = await runWithRateRetry(() => replicate.run(REPLICATE_MODEL_PRO, { input }));
+  const output = await runWithRateRetry(() => replicate.run(model, { input }));
 
   const imageUrl = typeof output === "string" ? output : String(output);
   if (!imageUrl || !imageUrl.startsWith("http")) {
     throw new Error("[Replicate] No valid image URL in edit response");
   }
 
-  return { imageUrl, usedModel: REPLICATE_MODEL_PRO };
+  return { imageUrl, usedModel: model };
 }

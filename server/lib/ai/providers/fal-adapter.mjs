@@ -8,8 +8,6 @@
 import {
   generateImageWithFal,
   editImageWithFal,
-  FAL_IMAGE_MODEL,
-  FAL_EDIT_MODEL,
 } from "../fal-image-generation.mjs";
 import { mapAspectRatio } from "../image-generation.mjs";
 import logger from "../../logger.mjs";
@@ -24,6 +22,7 @@ import logger from "../../logger.mjs";
  * @param {Array<{base64: string, mimeType: string}>} [params.productImages]
  * @param {{base64: string, mimeType: string}} [params.styleRef]
  * @param {{base64: string, mimeType: string}} [params.personRef]
+ * @param {string} [params.modelTier] - "standard" or "pro" (default: "pro")
  * @returns {Promise<{imageUrl: string, usedModel: string}>}
  */
 export async function generate({
@@ -33,27 +32,24 @@ export async function generate({
   productImages,
   styleRef,
   personRef,
+  modelTier,
 }) {
   logger.debug(
-    { aspectRatio, imageSize },
+    { aspectRatio, imageSize, modelTier },
     "[FalAdapter] generate",
   );
 
-  const imageUrl = await generateImageWithFal(
+  const result = await generateImageWithFal(
     prompt,
     mapAspectRatio(aspectRatio),
     imageSize,
     productImages,
     styleRef,
     personRef,
+    modelTier,
   );
 
-  // Determine which model was used (edit endpoint if images were provided)
-  const hasImages =
-    (personRef || styleRef || (productImages && productImages.length > 0));
-  const usedModel = hasImages ? FAL_EDIT_MODEL : FAL_IMAGE_MODEL;
-
-  return { imageUrl, usedModel };
+  return { imageUrl: result.url, usedModel: result.usedModel };
 }
 
 /**
@@ -64,12 +60,13 @@ export async function generate({
  * @param {string} params.imageBase64 - Base64 (no data: prefix)
  * @param {string} params.mimeType
  * @param {{base64: string, mimeType: string}} [params.referenceImage]
+ * @param {string} [params.modelTier] - "standard" or "pro" (default: "pro")
  * @returns {Promise<{imageUrl: string, usedModel: string}>}
  */
-export async function edit({ prompt, imageBase64, mimeType, referenceImage }) {
-  logger.debug({}, "[FalAdapter] edit");
+export async function edit({ prompt, imageBase64, mimeType, referenceImage, modelTier }) {
+  logger.debug({ modelTier }, "[FalAdapter] edit");
 
-  const imageUrl = await editImageWithFal(prompt, imageBase64, mimeType, referenceImage);
+  const result = await editImageWithFal(prompt, imageBase64, mimeType, referenceImage, modelTier);
 
-  return { imageUrl, usedModel: FAL_EDIT_MODEL };
+  return { imageUrl: result.url, usedModel: result.usedModel };
 }

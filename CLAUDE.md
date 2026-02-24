@@ -72,6 +72,8 @@ Frontend (React) → Express API → Neon Postgres
 2. **Optimistic Updates**: UI updates immediately, syncs with server afterward
 3. **Image Storage**: Always upload to Vercel Blob, store only URLs in database (never base64 data URLs)
 4. **Synchronous Image Generation**: Images generate synchronously via `/api/images` (background job queue was removed)
+5. **Image Provider Chain**: `IMAGE_PROVIDERS` env var controls fallback order (default: `gemini,replicate,fal`). See `server/lib/ai/image-providers.mjs`. Replicate offers two models: `google/nano-banana` (Standard, cheaper) and `google/nano-banana-pro` (Pro, better typography). Flyers always force Pro.
+6. **Admin Panel**: Route is `/admin` (NOT `/adm`). Protected by `SUPER_ADMIN_EMAILS` env var. See `server/lib/auth.mjs` → `requireSuperAdmin` middleware.
 
 ## Key Files
 
@@ -115,6 +117,10 @@ REDIS_URL=redis://... (optional, for scheduled posts)
 GOOGLE_GENERATIVE_AI_API_KEY=AIza...
 BETTER_AUTH_SECRET=... (required for session signing, generate with: openssl rand -hex 32)
 CSRF_SECRET=... (required for CSRF protection)
+SUPER_ADMIN_EMAILS=email1@example.com,email2@example.com (required for /admin access)
+IMAGE_PROVIDERS=gemini,replicate,fal (fallback order for image generation)
+REPLICATE_API_TOKEN=r8_... (for Replicate image models)
+FAL_KEY=... (for FAL.ai image/video models)
 ```
 
 ## Security
