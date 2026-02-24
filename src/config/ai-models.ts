@@ -2,20 +2,16 @@
  * AI Models Configuration
  * ========================
  *
- * Este arquivo centraliza toda a configuração de modelos de IA.
- * Para adicionar um novo modelo, siga os passos:
- *
- * 1. Adicione o modelo ao array CREATIVE_MODELS abaixo
- * 2. O tipo CreativeModelId será atualizado automaticamente
- * 3. Pronto! O modelo aparecerá nas configurações da marca
+ * All LLM text models use Google Gemini native API (direct).
+ * OpenRouter has been removed.
  *
  * ESTRUTURA DE UM MODELO:
  * -----------------------
  * {
  *   id: string           - ID único do modelo (usado na API)
  *   label: string        - Nome exibido na UI
- *   provider: string     - Provedor (Google, OpenAI, xAI, Anthropic, etc)
- *   type: 'native' | 'openrouter'  - Como chamar a API
+ *   provider: string     - Provedor (Google)
+ *   type: 'native'       - Sempre native (Gemini direto)
  *   capabilities: {
  *     text: boolean      - Gera texto (campanhas, posts)
  *     image: boolean     - Gera imagens
@@ -24,16 +20,6 @@
  *   description?: string - Descrição opcional
  *   costTier?: 'free' | 'low' | 'medium' | 'high'
  * }
- *
- * TIPOS DE MODELOS:
- * -----------------
- * - 'native': Modelos do Google (Gemini) - chamados diretamente via @google/genai
- * - 'openrouter': Modelos de terceiros (OpenAI, xAI, Anthropic) - via OpenRouter SDK
- *
- * COMO IDENTIFICAR O TIPO:
- * ------------------------
- * - Se o ID contém "/" (ex: "openai/gpt-5.2") → OpenRouter
- * - Se o ID começa com "gemini" → Native (Google)
  */
 
 // ============================================================================
@@ -42,56 +28,26 @@
 
 export const CREATIVE_MODELS = [
   // -------------------------------------------------------------------------
-  // GOOGLE GEMINI (via OpenRouter)
+  // GOOGLE GEMINI (native / direct API)
   // -------------------------------------------------------------------------
   {
-    id: 'google/gemini-3-flash-preview',
+    id: 'gemini-3-flash-preview',
     label: 'Gemini 3 Flash',
     provider: 'Google',
-    type: 'openrouter' as const,
+    type: 'native' as const,
     capabilities: { text: true, image: false, vision: true },
-    description: 'Modelo rápido e barato do Google via OpenRouter',
+    description: 'Modelo rápido e eficiente do Google',
+    costTier: 'low' as const,
+  },
+  {
+    id: 'gemini-3-pro-preview',
+    label: 'Gemini 3 Pro',
+    provider: 'Google',
+    type: 'native' as const,
+    capabilities: { text: true, image: false, vision: true },
+    description: 'Modelo mais capaz do Google para tarefas complexas',
     costTier: 'medium' as const,
   },
-
-  // -------------------------------------------------------------------------
-  // OPENAI (via OpenRouter)
-  // -------------------------------------------------------------------------
-  {
-    id: 'openai/gpt-5.2',
-    label: 'GPT-5.2',
-    provider: 'OpenAI',
-    type: 'openrouter' as const,
-    capabilities: { text: true, image: false, vision: true },
-    description: 'Modelo mais avançado da OpenAI',
-    costTier: 'high' as const,
-  },
-
-  // -------------------------------------------------------------------------
-  // xAI (via OpenRouter)
-  // -------------------------------------------------------------------------
-  {
-    id: 'x-ai/grok-4.1-fast',
-    label: 'Grok 4.1 Fast',
-    provider: 'xAI',
-    type: 'openrouter' as const,
-    capabilities: { text: true, image: false, vision: true },
-    description: 'Modelo rápido da xAI, bom custo-benefício',
-    costTier: 'medium' as const,
-  },
-
-  // -------------------------------------------------------------------------
-  // PARA ADICIONAR NOVOS MODELOS, COPIE O TEMPLATE ABAIXO:
-  // -------------------------------------------------------------------------
-  // {
-  //   id: 'provider/model-name',      // Ex: 'anthropic/claude-4-opus'
-  //   label: 'Nome para UI',          // Ex: 'Claude 4 Opus'
-  //   provider: 'Provider Name',      // Ex: 'Anthropic'
-  //   type: 'openrouter' as const,    // 'native' para Gemini, 'openrouter' para outros
-  //   capabilities: { text: true, image: false, vision: true },
-  //   description: 'Descrição opcional',
-  //   costTier: 'high' as const,
-  // },
 ] as const;
 
 // ============================================================================
@@ -112,7 +68,9 @@ export type CreativeModelConfig = typeof CREATIVE_MODELS[number];
  * Get model configuration by ID
  */
 export function getModelConfig(modelId: string): CreativeModelConfig | undefined {
-  return CREATIVE_MODELS.find(m => m.id === modelId);
+  // Normalize: strip "google/" prefix if present (legacy)
+  const normalized = modelId.replace(/^google\//, "");
+  return CREATIVE_MODELS.find(m => m.id === normalized);
 }
 
 /**
@@ -128,24 +86,14 @@ export function getModelLabel(modelId: string): string {
  */
 export function getModelProvider(modelId: string): string {
   const model = getModelConfig(modelId);
-  return model?.provider || 'Unknown';
+  return model?.provider || 'Google';
 }
 
 /**
- * Check if model uses OpenRouter
+ * Check if model is native (all models are native now)
  */
-export function isOpenRouterModel(modelId: string): boolean {
-  const model = getModelConfig(modelId);
-  if (model) return model.type === 'openrouter';
-  // Fallback: check if ID contains "/"
-  return modelId.includes('/');
-}
-
-/**
- * Check if model is native (Gemini)
- */
-export function isNativeModel(modelId: string): boolean {
-  return !isOpenRouterModel(modelId);
+export function isNativeModel(_modelId: string): boolean {
+  return true;
 }
 
 /**
@@ -159,7 +107,7 @@ export function getModelsByProvider(provider: string): CreativeModelConfig[] {
  * Get default model ID
  */
 export function getDefaultModelId(): CreativeModelId {
-  return 'google/gemini-3-flash-preview';
+  return 'gemini-3-flash-preview';
 }
 
 // ============================================================================

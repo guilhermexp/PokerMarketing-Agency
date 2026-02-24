@@ -11,7 +11,7 @@
 import { getRequestAuthContext } from "../lib/auth.mjs";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.mjs";
-import { callOpenRouterApi } from "../lib/ai/clients.mjs";
+import { callGeminiTextApi } from "../lib/ai/clients.mjs";
 import {
   withRetry,
   sanitizeErrorForClient,
@@ -456,7 +456,7 @@ Retorne as cores em formato hexadecimal (#RRGGBB).
 Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou null, "tertiaryColor": "#..." ou null}`;
 
       const data = await withRetry(() =>
-        callOpenRouterApi({
+        callGeminiTextApi({
           model: DEFAULT_TEXT_MODEL,
           messages: [
             {

@@ -8,13 +8,12 @@ import { randomUUID } from 'crypto';
 // Model pricing configuration (in USD cents per million tokens/per item)
 // Updated with actual pricing from providers
 const MODEL_PRICING = {
-  // Google Gemini Text Models (via OpenRouter)
+  // Google Gemini Text Models (native API)
   'google/gemini-3-flash-preview': {
     provider: 'google',
-    inputPerMillion: 50,  // $0.50/1M = 50 cents
+    inputPerMillion: 50,  // $0.50/1M = 50 cents (legacy ID, kept for historical logs)
     outputPerMillion: 300  // $3/1M = 300 cents
   },
-  // Legacy model IDs (kept for historical usage logs)
   'gemini-3-pro-preview': {
     provider: 'google',
     inputPerMillion: 200,

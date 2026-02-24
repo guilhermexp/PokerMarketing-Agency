@@ -152,8 +152,8 @@ export const chatBodySchema = z.object({
   // Array de mensagens (modo: tool approval ou histórico completo)
   messages: z.array(messageSchema).optional(),
 
-  // Modelo de LLM selecionado (apenas OpenRouter)
-  selectedChatModel: z.string().default('x-ai/grok-4.1-fast'),
+  // Modelo de LLM selecionado (Gemini native)
+  selectedChatModel: z.string().default('gemini-3-flash-preview'),
 
   // Brand profile (contexto da marca)
   brandProfile: brandProfileSchema,
@@ -201,8 +201,8 @@ export function validateMessage(message) {
  * @returns {boolean}
  */
 export function isValidModelId(modelId) {
-  // Formato: "provider/model-name"
-  const pattern = /^[a-z\-]+\/[a-z0-9\-\.]+$/i;
+  // Formato: "gemini-xxx" or legacy "google/gemini-xxx"
+  const pattern = /^(google\/)?gemini-[a-z0-9\-\.]+$/i;
   return pattern.test(modelId);
 }
 

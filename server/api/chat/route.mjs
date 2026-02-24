@@ -5,15 +5,15 @@
  */
 
 import { createUIMessageStream, streamText, smoothStream, convertToModelMessages } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { google } from '@ai-sdk/google';
 import { systemPrompt } from '../../lib/ai/prompts.mjs';
 import { createImageTool, editImageTool, createLogoTool } from '../../lib/ai/tools/index.mjs';
 import { validateChatRequest } from './schema.mjs';
 import { getRequestAuthContext } from '../../lib/auth.mjs';
 
-// Chat usa APENAS OpenRouter (não usar providers.mjs do resto do app)
-const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY
+// Chat usa Gemini nativo via @ai-sdk/google
+const googleProvider = google({
+  apiKey: process.env.GEMINI_API_KEY
 });
 
 // Nota: convertToModelMessages agora vem do SDK oficial (import acima)
@@ -103,11 +103,12 @@ export async function chatHandler(req, res) {
     const { id, message, messages, brandProfile } = validation.data;
     let { selectedChatModel } = validation.data;
 
-    // CHAT USA APENAS OPENROUTER: Forçar modelos válidos
-    const validModels = ['openai/gpt-5.2', 'x-ai/grok-4.1-fast'];
+    // Normalize model: strip "google/" prefix and validate
+    selectedChatModel = selectedChatModel.replace(/^google\//, "");
+    const validModels = ['gemini-3-flash-preview', 'gemini-3-pro-preview'];
     if (!validModels.includes(selectedChatModel)) {
-      console.log(`[Chat API] Modelo inválido "${selectedChatModel}", forçando x-ai/grok-4.1-fast`);
-      selectedChatModel = 'x-ai/grok-4.1-fast';
+      console.log(`[Chat API] Modelo inválido "${selectedChatModel}", forçando gemini-3-flash-preview`);
+      selectedChatModel = 'gemini-3-flash-preview';
     }
 
     // =========================================================================
@@ -229,7 +230,7 @@ export async function chatHandler(req, res) {
     const activeTools = isReasoningModel ? [] : ['createImage', 'editImage', 'createLogo'];
 
     console.log(`[Chat API] Starting streamText | activeTools: ${activeTools.length}`);
-    console.log(`[Chat API] Usando OpenRouter para modelo: ${selectedChatModel}`);
+    console.log(`[Chat API] Usando Gemini nativo para modelo: ${selectedChatModel}`);
     console.log(`[Chat API] Reference image:`, chatReferenceImage ? `id=${chatReferenceImage.id}` : 'none');
 
     const systemMessage = systemPrompt({ brandProfile, selectedChatModel });
@@ -243,7 +244,7 @@ export async function chatHandler(req, res) {
     const convertedMessages = await convertToModelMessages(sanitizedMessages);
 
     const result = streamText({
-      model: openrouter.chat(selectedChatModel),
+      model: googleProvider(selectedChatModel),
       system: systemMessage,
       messages: convertedMessages,
       tools,

@@ -12,15 +12,15 @@
 import { getRequestAuthContext } from "../lib/auth.mjs";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.mjs";
-import { getGeminiAi, callOpenRouterApi } from "../lib/ai/clients.mjs";
+import { getGeminiAi, callGeminiTextApi } from "../lib/ai/clients.mjs";
 import {
   withRetry,
   sanitizeErrorForClient,
 } from "../lib/ai/retry.mjs";
 import {
   generateStructuredContent,
-  generateTextWithOpenRouter,
-  generateTextWithOpenRouterVision,
+  generateTextWithGemini,
+  generateTextWithGeminiVision,
   mapAspectRatio,
   DEFAULT_IMAGE_MODEL,
 } from "../lib/ai/image-generation.mjs";
@@ -377,8 +377,10 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
 
       logger.info({ type }, "[Text API] Generating text");
 
-      const model = brandProfile.creativeModel || DEFAULT_TEXT_MODEL;
-      const isOpenRouter = model.includes("/");
+      // Normalize model: strip "google/" prefix if present (legacy brand profiles may have OpenRouter IDs)
+      const rawModel = brandProfile.creativeModel || DEFAULT_TEXT_MODEL;
+      const model = rawModel.replace(/^google\//, "");
+      const isOpenRouter = false; // All models now use Gemini native API
 
       let result;
 
@@ -394,14 +396,14 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         if (isOpenRouter) {
           const parts = [prompt];
           if (image) {
-            result = await generateTextWithOpenRouterVision(
+            result = await generateTextWithGeminiVision(
               model,
               parts,
               [image],
               temperature,
             );
           } else {
-            result = await generateTextWithOpenRouter(
+            result = await generateTextWithGemini(
               model,
               "",
               prompt,
@@ -435,14 +437,14 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         if (isOpenRouter) {
           if (image) {
             const parts = userPrompt ? [userPrompt] : [];
-            result = await generateTextWithOpenRouterVision(
+            result = await generateTextWithGeminiVision(
               model,
               parts,
               [image],
               temperature,
             );
           } else {
-            result = await generateTextWithOpenRouter(
+            result = await generateTextWithGemini(
               model,
               systemPrompt || "",
               userPrompt || "",
@@ -528,7 +530,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         return res.status(400).json({ error: "prompt is required" });
       }
 
-      logger.info({}, "[Enhance Prompt API] Enhancing prompt with Grok");
+      logger.info({}, "[Enhance Prompt API] Enhancing prompt with Gemini");
 
       const systemPrompt = `Você é um especialista em marketing digital e criação de conteúdo multiplataforma. Sua função é aprimorar briefings de campanhas para gerar máximo engajamento em TODOS os formatos de conteúdo.
 
@@ -592,21 +594,9 @@ REGRAS:
 
       const userPrompt = `BRIEFING ORIGINAL:\n${prompt}`;
 
-      // Direct API call to OpenRouter (bypassing SDK validation issues)
-      const apiKey = process.env.OPENROUTER_API_KEY;
-      if (!apiKey) {
-        throw new Error("OPENROUTER_API_KEY not configured");
-      }
-
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": process.env.APP_URL || "https://sociallab.pro",
-        },
-        body: JSON.stringify({
-          model: "x-ai/grok-4.1-fast",
+      const data = await withRetry(() =>
+        callGeminiTextApi({
+          model: DEFAULT_FAST_TEXT_MODEL,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
@@ -614,19 +604,13 @@ REGRAS:
           temperature: 0.5,
           max_tokens: 2048,
         }),
-      });
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `OpenRouter API error: ${response.status}`);
-      }
-
-      const data = await response.json();
       const enhancedPrompt = data.choices?.[0]?.message?.content?.trim() || "";
 
       logger.info(
         {},
-        "[Enhance Prompt API] Successfully enhanced prompt with Grok",
+        "[Enhance Prompt API] Successfully enhanced prompt with Gemini",
       );
 
       // Log AI usage
@@ -636,7 +620,7 @@ REGRAS:
         organizationId,
         endpoint: "/api/ai/enhance-prompt",
         operation: "text",
-        model: "x-ai/grok-4.1-fast",
+        model: DEFAULT_FAST_TEXT_MODEL,
         inputTokens,
         outputTokens,
         latencyMs: timer(),
@@ -650,7 +634,7 @@ REGRAS:
         organizationId,
         endpoint: "/api/ai/enhance-prompt",
         operation: "text",
-        model: "x-ai/grok-4.1-fast",
+        model: DEFAULT_FAST_TEXT_MODEL,
         latencyMs: timer(),
         status: "failed",
         error: error.message,
@@ -685,7 +669,7 @@ REGRAS:
       const systemPrompt = getVideoPromptSystemPrompt(duration, aspectRatio);
 
       const data = await withRetry(() =>
-        callOpenRouterApi({
+        callGeminiTextApi({
           model: DEFAULT_FAST_TEXT_MODEL,
           messages: [
             { role: "system", content: systemPrompt },

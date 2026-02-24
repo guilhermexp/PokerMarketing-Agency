@@ -167,49 +167,20 @@ export const generateImageWithFallback = async (
   });
 };
 
-// Generate structured content — routes through OpenRouter for LLM models
+// Generate structured content — uses Gemini native API
 export const generateStructuredContent = async (
   model,
   parts,
   responseSchema,
   temperature = 0.7,
 ) => {
-  // If model goes through OpenRouter (has "/"), use OpenRouter API
-  if (model.includes("/")) {
-    const { callOpenRouterApi } = await import("./clients.mjs");
-    const textParts = parts.filter((p) => p.text).map((p) => p.text);
-    const imageParts = parts.filter((p) => p.inlineData);
-
-    const content = textParts.map((text) => ({ type: "text", text }));
-    for (const img of imageParts) {
-      content.push({
-        type: "image_url",
-        image_url: {
-          url: `data:${img.inlineData.mimeType};base64,${img.inlineData.data}`,
-        },
-      });
-    }
-
-    const data = await withRetry(() =>
-      callOpenRouterApi({
-        model,
-        messages: [{ role: "user", content }],
-        response_format: { type: "json_object" },
-        temperature,
-      }),
-    );
-
-    const result = data.choices?.[0]?.message?.content;
-    if (!result) throw new Error(`OpenRouter (${model}) no content returned`);
-    return result.trim();
-  }
-
-  // Fallback: native Gemini (for legacy model IDs without "/")
   const ai = getGeminiAi();
+  // Normalize model ID (strip "google/" prefix if present)
+  const normalizedModel = model.replace(/^google\//, "");
 
   const response = await withRetry(() =>
     ai.models.generateContent({
-      model,
+      model: normalizedModel,
       contents: { parts },
       config: {
         responseMimeType: "application/json",
@@ -222,18 +193,18 @@ export const generateStructuredContent = async (
   return response.text.trim();
 };
 
-// Generate text with OpenRouter
-export const generateTextWithOpenRouter = async (
+// Generate text with Gemini (JSON mode)
+export const generateTextWithGemini = async (
   model,
   systemPrompt,
   userPrompt,
   temperature = 0.7,
 ) => {
-  const { callOpenRouterApi } = await import("./clients.mjs");
-  const data = await callOpenRouterApi({
+  const { callGeminiTextApi } = await import("./clients.mjs");
+  const data = await callGeminiTextApi({
     model,
     messages: [
-      { role: "system", content: systemPrompt },
+      ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
       { role: "user", content: userPrompt },
     ],
     response_format: { type: "json_object" },
@@ -242,20 +213,20 @@ export const generateTextWithOpenRouter = async (
 
   const content = data.choices?.[0]?.message?.content;
   if (!content) {
-    throw new Error(`OpenRouter (${model}) no content returned`);
+    throw new Error(`Gemini (${model}) no content returned`);
   }
 
   return content;
 };
 
-// Generate text with OpenRouter + Vision
-export const generateTextWithOpenRouterVision = async (
+// Generate text with Gemini + Vision
+export const generateTextWithGeminiVision = async (
   model,
   textParts,
   imageParts,
   temperature = 0.7,
 ) => {
-  const { callOpenRouterApi } = await import("./clients.mjs");
+  const { callGeminiTextApi } = await import("./clients.mjs");
   const content = textParts.map((text) => ({ type: "text", text }));
 
   for (const img of imageParts) {
@@ -267,7 +238,7 @@ export const generateTextWithOpenRouterVision = async (
     });
   }
 
-  const data = await callOpenRouterApi({
+  const data = await callGeminiTextApi({
     model,
     messages: [{ role: "user", content }],
     response_format: { type: "json_object" },
@@ -276,7 +247,7 @@ export const generateTextWithOpenRouterVision = async (
 
   const result = data.choices?.[0]?.message?.content;
   if (!result) {
-    throw new Error(`OpenRouter (${model}) no content returned`);
+    throw new Error(`Gemini (${model}) no content returned`);
   }
 
   return result;

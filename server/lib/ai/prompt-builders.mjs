@@ -10,7 +10,7 @@
  *          DEFAULT_TEXT_MODEL, DEFAULT_FAST_TEXT_MODEL, DEFAULT_ASSISTANT_MODEL, AI_INFLUENCER_FLASH_MODEL
  */
 
-import { callOpenRouterApi } from "./clients.mjs";
+import { callGeminiTextApi } from "./clients.mjs";
 import { withRetry } from "./retry.mjs";
 import {
   logAiUsage,
@@ -18,11 +18,11 @@ import {
 } from "../../helpers/usage-tracking.mjs";
 import logger from "../logger.mjs";
 
-// Model defaults (via OpenRouter)
-export const DEFAULT_TEXT_MODEL = "google/gemini-3-flash-preview";
-export const DEFAULT_FAST_TEXT_MODEL = "google/gemini-3-flash-preview";
-export const DEFAULT_ASSISTANT_MODEL = "google/gemini-3-flash-preview";
-export const AI_INFLUENCER_FLASH_MODEL = "google/gemini-3-flash-preview";
+// Model defaults (Gemini native)
+export const DEFAULT_TEXT_MODEL = "gemini-3-flash-preview";
+export const DEFAULT_FAST_TEXT_MODEL = "gemini-3-flash-preview";
+export const DEFAULT_ASSISTANT_MODEL = "gemini-3-flash-preview";
+export const AI_INFLUENCER_FLASH_MODEL = "gemini-3-flash-preview";
 
 // Schema Type constants
 export const Type = {
@@ -215,7 +215,7 @@ export const convertImagePromptToJson = async (
     const systemPrompt = getImagePromptSystemPrompt(aspectRatio);
 
     const data = await withRetry(() =>
-      callOpenRouterApi({
+      callGeminiTextApi({
         model: DEFAULT_FAST_TEXT_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
@@ -394,7 +394,7 @@ export const expandAiInfluencerPrompt = async (
     });
 
     const data = await withRetry(() =>
-      callOpenRouterApi({
+      callGeminiTextApi({
         model: AI_INFLUENCER_FLASH_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
@@ -577,7 +577,7 @@ export const expandProductHeroPrompt = async (
     });
 
     const data = await withRetry(() =>
-      callOpenRouterApi({
+      callGeminiTextApi({
         model: AI_INFLUENCER_FLASH_MODEL,
         messages: [
           { role: "system", content: PRODUCT_HERO_SYSTEM_PROMPT },
@@ -752,7 +752,7 @@ export const expandExplodedProductPrompt = async (
     });
 
     const data = await withRetry(() =>
-      callOpenRouterApi({
+      callGeminiTextApi({
         model: AI_INFLUENCER_FLASH_MODEL,
         messages: [
           { role: "system", content: EXPLODED_PRODUCT_SYSTEM_PROMPT },
@@ -906,7 +906,7 @@ export const expandBrandIdentityPrompt = async (
     });
 
     const data = await withRetry(() =>
-      callOpenRouterApi({
+      callGeminiTextApi({
         model: AI_INFLUENCER_FLASH_MODEL,
         messages: [
           { role: "system", content: BRAND_IDENTITY_SYSTEM_PROMPT },
