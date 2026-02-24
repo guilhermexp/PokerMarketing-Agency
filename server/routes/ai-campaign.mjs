@@ -10,8 +10,8 @@ import { getSql } from "../lib/db.mjs";
 import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 import {
   generateStructuredContent,
-  generateTextWithOpenRouter,
-  generateTextWithOpenRouterVision,
+  generateTextWithGemini,
+  generateTextWithGeminiVision,
 } from "../lib/ai/image-generation.mjs";
 import {
   campaignSchema,
@@ -109,10 +109,10 @@ export function registerAiCampaignRoutes(app) {
       if (collabLogo) allImages.push(collabLogo);
       if (compositionAssets) allImages.push(...compositionAssets);
 
-      // Model selection - config in config/ai-models.ts
-      // OpenRouter models have "/" in their ID (e.g., "openai/gpt-5.2")
-      const model = brandProfile.creativeModel || DEFAULT_TEXT_MODEL;
-      const isOpenRouter = model.includes("/");
+      // Model selection - all models now use Gemini native API
+      const rawModel = brandProfile.creativeModel || DEFAULT_TEXT_MODEL;
+      const model = rawModel.replace(/^google\//, "");
+      const isOpenRouter = false; // All models now use Gemini native
 
       const quantityInstructions = buildQuantityInstructions(options, "dev");
       const slidesPerCarousel = Math.max(
@@ -205,14 +205,14 @@ REGRAS CRÍTICAS:
         const textParts = [jsonSchemaPrompt];
 
         if (allImages.length > 0) {
-          result = await generateTextWithOpenRouterVision(
+          result = await generateTextWithGeminiVision(
             model,
             textParts,
             allImages,
             0.7,
           );
         } else {
-          result = await generateTextWithOpenRouter(
+          result = await generateTextWithGemini(
             model,
             "",
             jsonSchemaPrompt,
