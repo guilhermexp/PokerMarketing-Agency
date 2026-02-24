@@ -1,6 +1,6 @@
 import { getSql } from "../lib/db.mjs";
 import { requireSuperAdmin } from "../lib/auth.mjs";
-import { callOpenRouterApi } from "../lib/ai/clients.mjs";
+import { callGeminiTextApi } from "../lib/ai/clients.mjs";
 import { withRetry } from "../lib/ai/retry.mjs";
 import { DEFAULT_TEXT_MODEL } from "../lib/ai/prompt-builders.mjs";
 import logger from "../lib/logger.mjs";
@@ -609,9 +609,9 @@ export function registerAdminRoutes(app) {
 
 Formate em markdown claro com seções.`;
 
-        // Call OpenRouter API with retry logic
+        // Call Gemini API with retry logic
         const result = await withRetry(() =>
-          callOpenRouterApi({
+          callGeminiTextApi({
             model: DEFAULT_TEXT_MODEL,
             messages: [
               { role: "user", content: prompt },

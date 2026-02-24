@@ -10,6 +10,7 @@
 import { getRequestAuthContext } from "../lib/auth.mjs";
 import { getSql } from "../lib/db.mjs";
 import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
+import { callGeminiStreamApi } from "../lib/ai/clients.mjs";
 import {
   DEFAULT_ASSISTANT_MODEL,
 } from "../lib/ai/prompt-builders.mjs";
@@ -153,72 +154,18 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      const apiKey = process.env.OPENROUTER_API_KEY;
-      if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured");
-
-      const streamResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": process.env.APP_URL || "https://sociallab.pro",
-        },
-        body: JSON.stringify({
-          model: DEFAULT_ASSISTANT_MODEL,
-          messages,
-          tools,
-          temperature: 0.5,
-          stream: true,
-        }),
+      // Use Gemini streaming API
+      const streamResponse = await callGeminiStreamApi({
+        model: DEFAULT_ASSISTANT_MODEL,
+        messages,
+        temperature: 0.5,
       });
 
-      if (!streamResponse.ok) {
-        const errorData = await streamResponse.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `OpenRouter API error: ${streamResponse.status}`);
-      }
-
-      const reader = streamResponse.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith("data: ")) continue;
-          const payload = trimmed.slice(6);
-          if (payload === "[DONE]") continue;
-
-          try {
-            const chunk = JSON.parse(payload);
-            const delta = chunk.choices?.[0]?.delta;
-            if (!delta) continue;
-
-            const outData = { text: delta.content || "" };
-
-            // Handle tool calls
-            if (delta.tool_calls?.[0]) {
-              const tc = delta.tool_calls[0];
-              if (tc.function?.name) {
-                try {
-                  const args = JSON.parse(tc.function.arguments || "{}");
-                  outData.functionCall = { name: tc.function.name, args };
-                } catch {
-                  // Arguments may be streamed in chunks — accumulate
-                }
-              }
-            }
-
-            res.write(`data: ${JSON.stringify(outData)}\n\n`);
-          } catch {
-            // Skip malformed chunks
-          }
+      // Process Gemini stream chunks
+      for await (const chunk of streamResponse) {
+        const text = chunk.text || "";
+        if (text) {
+          res.write(`data: ${JSON.stringify({ text })}\n\n`);
         }
       }
 

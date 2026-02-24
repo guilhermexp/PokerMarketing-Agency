@@ -187,7 +187,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     ...({ body: {
       brandProfile: effectiveBrandProfile,
       chatReferenceImage: referenceImage,
-      selectedChatModel: brandProfile?.creativeModel || 'x-ai/grok-4.1-fast'
+      selectedChatModel: brandProfile?.creativeModel || 'gemini-3-flash-preview'
     },
     sendAutomaticallyWhen: ({ messages }: { messages: UIMessage[] }) =>
       lastAssistantMessageIsCompleteWithToolCalls({ messages }) ||
