@@ -1,4 +1,5 @@
 import { getSql } from "../lib/db.mjs";
+import { resolveUserId } from "../lib/user-resolver.mjs";
 import logger from "../lib/logger.mjs";
 import { RUBE_MCP_URL, RUBE_TIMEOUT_MS } from "../lib/constants.mjs";
 
@@ -23,35 +24,28 @@ export function registerRubeRoutes(app) {
           "[Rube Proxy] Multi-tenant mode - fetching token for account",
         );
 
-        // Resolve user_id: can be DB UUID or Clerk ID
-        let resolvedUserId = user_id;
-        if (user_id.startsWith("user_")) {
-          const userResult =
-            await sql`SELECT id FROM users WHERE auth_provider_id = ${user_id} AND auth_provider = 'clerk' LIMIT 1`;
-          resolvedUserId = userResult[0]?.id;
-          if (!resolvedUserId) {
-            logger.debug(
-              { clerkUserId: user_id },
-              "[Rube Proxy] User not found for Clerk ID",
-            );
-            return res.status(400).json({ error: "User not found" });
-          }
+        // Resolve user_id: handles Better Auth IDs, Clerk IDs, and UUIDs
+        const resolvedUserId = await resolveUserId(sql, user_id);
+        if (!resolvedUserId) {
           logger.debug(
-            { resolvedUserId },
-            "[Rube Proxy] Resolved Clerk ID to DB UUID",
+            { user_id },
+            "[Rube Proxy] User not found",
           );
+          return res.status(400).json({ error: "User not found" });
         }
+        logger.debug(
+          { resolvedUserId },
+          "[Rube Proxy] Resolved user ID to DB UUID",
+        );
 
         // Fetch account token and instagram_user_id
-        // Check both personal accounts (user_id match) and organization accounts (org_id match)
+        // Instagram accounts belong to organizations - any org member can use them
         const accountResult = organization_id
           ? await sql`
               SELECT rube_token, instagram_user_id FROM instagram_accounts
               WHERE id = ${instagram_account_id}
-                AND (
-                  (organization_id = ${organization_id} AND is_active = TRUE)
-                  OR (user_id = ${resolvedUserId} AND is_active = TRUE)
-                )
+                AND organization_id = ${organization_id}
+                AND is_active = TRUE
               LIMIT 1
             `
           : await sql`
