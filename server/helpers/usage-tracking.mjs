@@ -34,13 +34,13 @@ const MODEL_PRICING = {
       '4K': 24      // $0.24/image = 24 cents
     }
   },
-  // Google Gemini Image Models — Standard
+  // Google Gemini Image Models — Standard (flat rate; model outputs 1024px only)
   'gemini-2.5-flash-image': {
     provider: 'google',
     costPerImage: {
       '1K': 4,     // ~$0.039/image = 4 cents
       '2K': 4,
-      '4K': 8      // ~$0.078/image = 8 cents
+      '4K': 4
     }
   },
   // FAL.ai Image Models — Pro (Gemini 3 Pro Image via FAL)
@@ -60,13 +60,13 @@ const MODEL_PRICING = {
       '4K': 30
     }
   },
-  // FAL.ai Image Models — Standard (Gemini 2.5 Flash Image via FAL)
+  // FAL.ai Image Models — Standard (Gemini 2.5 Flash Image via FAL; flat rate, 1024px only)
   'fal-ai/gemini-25-flash-image': {
     provider: 'fal',
     costPerImage: {
       '1K': 5,    // ~$0.05/image = 5 cents
       '2K': 5,
-      '4K': 10    // ~$0.10/image = 10 cents
+      '4K': 5
     }
   },
   'fal-ai/gemini-25-flash-image/edit': {
@@ -74,7 +74,7 @@ const MODEL_PRICING = {
     costPerImage: {
       '1K': 5,
       '2K': 5,
-      '4K': 10
+      '4K': 5
     }
   },
   // Google TTS Models
