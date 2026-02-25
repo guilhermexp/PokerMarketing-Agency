@@ -38,6 +38,7 @@ export const useClipsTab = ({
     onUpdateGalleryImage,
     productImages,
 }: UseClipsTabProps) => {
+    const DEFAULT_CLIP_IMAGE_MODEL: ImageModel = "gemini-3-pro-image-preview";
     const [thumbnails, setThumbnails] = useState<(GalleryImage | null)[]>([]);
     const [extraInstructions, setExtraInstructions] = useState<string[]>([]);
     const [generationState, setGenerationState] = useState<{
@@ -47,9 +48,6 @@ export const useClipsTab = ({
         isGenerating: [],
         errors: [],
     });
-    const [selectedImageModel] = useState<ImageModel>(
-        "gemini-3-pro-image-preview"
-    );
     const [sceneImageTriggers, setSceneImageTriggers] = useState<number[]>([]);
     const [generatingAllForClip, setGeneratingAllForClip] = useState<
         number | null
@@ -209,7 +207,7 @@ export const useClipsTab = ({
                         src: job.result_url,
                         prompt: clip?.image_prompt || "",
                         source: "Clipe",
-                        model: selectedImageModel,
+                        model: DEFAULT_CLIP_IMAGE_MODEL,
                         video_script_id: clip?.id,
                     });
                     setThumbnails((prev) => {
@@ -261,11 +259,15 @@ export const useClipsTab = ({
         onJobFailed,
         onAddImageToGallery,
         videoClipScripts,
-        selectedImageModel,
+        DEFAULT_CLIP_IMAGE_MODEL,
     ]);
 
     const handleGenerateThumbnail = useCallback(
-        async (index: number, extraInstruction?: string) => {
+        async (
+            index: number,
+            extraInstruction?: string,
+            selectedImageModel: ImageModel = DEFAULT_CLIP_IMAGE_MODEL
+        ) => {
             if (selectedImageModel === "gemini-3-pro-image-preview") {
                 if (
                     window.aistudio &&
@@ -366,22 +368,26 @@ export const useClipsTab = ({
         },
         [
             videoClipScripts,
-            selectedImageModel,
             userId,
             brandProfile,
             onAddImageToGallery,
             productImages,
+            DEFAULT_CLIP_IMAGE_MODEL,
         ]
     );
 
     const handleGenerateAllForClip = useCallback(
-        async (clipIndex: number) => {
+        async (
+            clipIndex: number,
+            selectedImageModel: ImageModel = DEFAULT_CLIP_IMAGE_MODEL
+        ) => {
             setGeneratingAllForClip(clipIndex);
             try {
                 if (!thumbnails[clipIndex]) {
                     await handleGenerateThumbnail(
                         clipIndex,
-                        extraInstructions[clipIndex]
+                        extraInstructions[clipIndex],
+                        selectedImageModel
                     );
                 }
                 await new Promise((resolve) => setTimeout(resolve, 300));
@@ -394,7 +400,7 @@ export const useClipsTab = ({
                 setGeneratingAllForClip(null);
             }
         },
-        [thumbnails, extraInstructions, handleGenerateThumbnail]
+        [thumbnails, extraInstructions, handleGenerateThumbnail, DEFAULT_CLIP_IMAGE_MODEL]
     );
 
     return {

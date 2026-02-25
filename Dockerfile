@@ -24,7 +24,7 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
-# Build args from Railway
+# Build args from 
 ARG GEMINI_API_KEY
 ARG BETTER_AUTH_SECRET
 ARG BETTER_AUTH_BASE_URL
@@ -73,7 +73,7 @@ COPY --from=builder /app/dist ./dist
 COPY package.json ./
 COPY server ./server
 
-# Runtime env from Railway
+# Runtime env from 
 ARG GEMINI_API_KEY
 ARG BETTER_AUTH_SECRET
 ARG BETTER_AUTH_BASE_URL

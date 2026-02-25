@@ -89,8 +89,8 @@ export interface ClipCardProps {
   clip: VideoClipScript;
   brandProfile: BrandProfile;
   thumbnail: GalleryImage | null;
-  onGenerateThumbnail: () => void;
-  onRegenerateThumbnail: () => void;
+  onGenerateThumbnail: (model: ImageModel) => void;
+  onRegenerateThumbnail: (model: ImageModel) => void;
   isGeneratingThumbnail: boolean;
   extraInstruction: string;
   onExtraInstructionChange: (value: string) => void;
@@ -103,7 +103,7 @@ export interface ClipCardProps {
   onAddImageToGallery?: (image: Omit<GalleryImage, "id">) => GalleryImage;
   galleryImages?: GalleryImage[];
   campaignId?: string;
-  onGenerateAllClipImages?: () => void; // Generate thumbnail + all scene images for this clip
+  onGenerateAllClipImages?: (model: ImageModel) => void; // Generate thumbnail + all scene images for this clip
   isGeneratingAllClipImages?: boolean;
   productImages?: ImageFile[] | null;
   // QuickPost & Schedule
@@ -1593,7 +1593,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
           const resultImgUrl = await generateImage(prompt, brandProfile, {
             aspectRatio: CLIP_ASPECT_RATIO,
-            model: "gemini-3-pro-image-preview",
+            model: selectedImageModel,
             styleReferenceImage: styleRef,
             productImages: productImagesToUse.length > 0 ? productImagesToUse : undefined,
           });
@@ -1608,7 +1608,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                 src: resultImgUrl,
                 prompt: scene.visual,
                 source: getSceneSource(scene.sceneNumber),
-                model: "gemini-3-pro-image-preview",
+                model: selectedImageModel,
                 video_script_id: clip.id,
               });
             }
@@ -1656,6 +1656,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
     getSceneSource,
     onAddImageToGallery,
     buildProductImages,
+    selectedImageModel,
   ]);
 
 
@@ -1702,7 +1703,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
       const imageUrl = await generateImage(prompt, brandProfile, {
         aspectRatio: CLIP_ASPECT_RATIO,
-        model: "gemini-3-pro-image-preview",
+        model: selectedImageModel,
         styleReferenceImage: styleRef,
         productImages: productImagesToUse.length > 0 ? productImagesToUse : undefined,
       });
@@ -1727,7 +1728,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
           src: httpUrl,
           prompt: scene.visual,
           source: getSceneSource(sceneNumber),
-          model: "gemini-3-pro-image-preview",
+          model: selectedImageModel,
           video_script_id: clip.id,
         });
       }
@@ -1764,6 +1765,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
     onAddImageToGallery,
     productImageDataUrls,
     buildProductImages,
+    selectedImageModel,
   ]);
 
   const handleGenerateAudio = async () => {
@@ -3595,7 +3597,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             {/* Action Buttons */}
             {onGenerateAllClipImages && (
               <Button
-                onClick={onGenerateAllClipImages}
+                onClick={() => onGenerateAllClipImages(selectedImageModel)}
                 isLoading={isGeneratingAllClipImages}
                 disabled={
                   isGeneratingAllClipImages ||
@@ -4626,7 +4628,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
               {!thumbnail && clip.image_prompt && (
                 <Button
-                  onClick={onGenerateThumbnail}
+                  onClick={() => onGenerateThumbnail(selectedImageModel)}
                   isLoading={isGeneratingThumbnail}
                   size="small"
                   className="w-full mt-3 !rounded-lg !bg-background !text-white/70 !border !border-border hover:!bg-card hover:!text-white"
@@ -4646,7 +4648,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                       className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-[9px] text-white/70 focus:border-primary/50 outline-none transition-all"
                     />
                     <button
-                      onClick={onRegenerateThumbnail}
+                      onClick={() => onRegenerateThumbnail(selectedImageModel)}
                       disabled={isGeneratingThumbnail}
                       className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
                       title="Regenerar capa com instrucao extra"

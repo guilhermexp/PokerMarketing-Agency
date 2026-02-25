@@ -3,6 +3,7 @@ import type {
   VideoClipScript,
   BrandProfile,
   GalleryImage,
+  ImageModel,
   StyleReference,
   ScheduledPost,
   ImageFile,
@@ -85,11 +86,11 @@ export const ClipsTab = React.memo<ClipsTabProps>(function ClipsTab({
           brandProfile={brandProfile}
           thumbnail={thumbnails[index]}
           isGeneratingThumbnail={generationState.isGenerating[index]}
-          onGenerateThumbnail={() =>
-            handleGenerateThumbnail(index, extraInstructions[index])
+          onGenerateThumbnail={(model: ImageModel) =>
+            handleGenerateThumbnail(index, extraInstructions[index], model)
           }
-          onRegenerateThumbnail={() =>
-            handleGenerateThumbnail(index, extraInstructions[index])
+          onRegenerateThumbnail={(model: ImageModel) =>
+            handleGenerateThumbnail(index, extraInstructions[index], model)
           }
           extraInstruction={extraInstructions[index] || ""}
           onExtraInstructionChange={(value) => {
@@ -108,7 +109,9 @@ export const ClipsTab = React.memo<ClipsTabProps>(function ClipsTab({
           onAddImageToGallery={onAddImageToGallery}
           galleryImages={galleryImages}
           campaignId={campaignId}
-          onGenerateAllClipImages={() => handleGenerateAllForClip(index)}
+          onGenerateAllClipImages={(model: ImageModel) =>
+            handleGenerateAllForClip(index, model)
+          }
           isGeneratingAllClipImages={generatingAllForClip === index}
           onQuickPost={setQuickPostImage}
           onSchedulePost={onSchedulePost ? setScheduleImage : undefined}

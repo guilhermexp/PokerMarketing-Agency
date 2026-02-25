@@ -35,6 +35,29 @@ import { urlToBase64 } from "../helpers/image-helpers.mjs";
 import { validateContentType } from "../lib/validation/contentType.mjs";
 import logger from "../lib/logger.mjs";
 
+const SUPPORTED_IMAGE_MODELS = new Set([
+  "gemini-3-pro-image-preview",
+  "gemini-2.5-flash-image",
+  "gemini-25-flash-image",
+  "nano-banana",
+  "nano-banana-pro",
+  "google/nano-banana",
+  "google/nano-banana-pro",
+]);
+
+function normalizeRequestedImageModel(model) {
+  if (typeof model !== "string") return DEFAULT_IMAGE_MODEL;
+  const normalized = model.trim().toLowerCase();
+  if (!SUPPORTED_IMAGE_MODELS.has(normalized)) {
+    return DEFAULT_IMAGE_MODEL;
+  }
+
+  if (normalized === "gemini-25-flash-image") return "gemini-2.5-flash-image";
+  if (normalized === "google/nano-banana") return "nano-banana";
+  if (normalized === "google/nano-banana-pro") return "nano-banana-pro";
+  return normalized;
+}
+
 export function registerAiImageRoutes(app) {
   // -------------------------------------------------------------------------
   // POST /api/ai/image
@@ -45,6 +68,7 @@ export function registerAiImageRoutes(app) {
     const userId = authCtx?.userId;
     const organizationId = authCtx?.orgId || null;
     const sql = getSql();
+    let selectedModelForLogs = DEFAULT_IMAGE_MODEL;
 
     logger.info(
       { userId, organizationId: organizationId || "personal" },
@@ -57,11 +81,13 @@ export function registerAiImageRoutes(app) {
         brandProfile,
         aspectRatio = "1:1",
         imageSize = "1K",
+        model: requestedModel,
         productImages,
         styleReferenceImage,
         personReferenceImage,
       } = req.body;
-      const model = DEFAULT_IMAGE_MODEL;
+      const model = normalizeRequestedImageModel(requestedModel);
+      selectedModelForLogs = model;
 
       logger.debug(
         {
@@ -295,7 +321,7 @@ export function registerAiImageRoutes(app) {
         organizationId,
         endpoint: "/api/ai/image",
         operation: "image",
-        model: DEFAULT_IMAGE_MODEL,
+        model: selectedModelForLogs,
         latencyMs: elapsedTime,
         status: "failed",
         error: error.message,

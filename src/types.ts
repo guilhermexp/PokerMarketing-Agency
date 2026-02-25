@@ -154,7 +154,11 @@ export interface WeekScheduleInfo {
   daily_flyer_urls?: Record<string, string[]>; // { "MORNING": [...urls], "AFTERNOON": [...urls], ... }
 }
 
-export type ImageModel = "gemini-3-pro-image-preview";
+export type ImageModel =
+  | "gemini-3-pro-image-preview"
+  | "gemini-2.5-flash-image"
+  | "nano-banana"
+  | "nano-banana-pro";
 export type ImageSize = "1K" | "2K" | "4K";
 
 // Video Models

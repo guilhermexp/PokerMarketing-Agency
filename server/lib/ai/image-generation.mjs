@@ -168,6 +168,23 @@ export const generateImageWithFallback = async (
 ) => {
   logger.info({}, "[generateImageWithFallback] Using provider chain");
 
+  const normalizedModel = String(model || DEFAULT_IMAGE_MODEL).toLowerCase();
+  const isStandardModel =
+    normalizedModel === "gemini-2.5-flash-image" ||
+    normalizedModel === "gemini-25-flash-image" ||
+    normalizedModel === "nano-banana" ||
+    normalizedModel === "google/nano-banana";
+  const modelTier = isStandardModel ? "standard" : "pro";
+  const replicateModel =
+    normalizedModel === "nano-banana"
+      ? "google/nano-banana"
+      : normalizedModel === "nano-banana-pro"
+        ? "google/nano-banana-pro"
+        : normalizedModel === "google/nano-banana" ||
+            normalizedModel === "google/nano-banana-pro"
+          ? normalizedModel
+          : undefined;
+
   return runWithProviderFallback("generate", {
     prompt,
     aspectRatio,
@@ -175,5 +192,7 @@ export const generateImageWithFallback = async (
     productImages,
     styleRef: styleReferenceImage,
     personRef: personReferenceImage,
+    modelTier,
+    replicateModel,
   });
 };

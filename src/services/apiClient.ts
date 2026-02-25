@@ -1603,7 +1603,7 @@ export async function generateAiImage(
     prompt: string;
     brandProfile: AiBrandProfile;
     aspectRatio?: string;
-    model?: "gemini-3-pro-image-preview";
+    model?: string;
     imageSize?: "1K" | "2K" | "4K";
     productImages?: AiImageFile[];
     styleReferenceImage?: AiImageFile;
