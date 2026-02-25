@@ -8,14 +8,10 @@
 import { getRequestAuthContext } from "../lib/auth.mjs";
 import { getSql } from "../lib/db.mjs";
 import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
-import {
-  generateStructuredContent,
-  generateTextWithGemini,
-  generateTextWithGeminiVision,
-} from "../lib/ai/image-generation.mjs";
+import { generateStructuredContent } from "../lib/ai/text-generation.mjs";
+import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.mjs";
 import {
   campaignSchema,
-  DEFAULT_TEXT_MODEL,
   getToneText,
 } from "../lib/ai/prompt-builders.mjs";
 import {
@@ -109,10 +105,9 @@ export function registerAiCampaignRoutes(app) {
       if (collabLogo) allImages.push(collabLogo);
       if (compositionAssets) allImages.push(...compositionAssets);
 
-      // Model selection - all models now use Gemini native API
+      // Normalize model: strip "google/" prefix if present (legacy brand profiles)
       const rawModel = brandProfile.creativeModel || DEFAULT_TEXT_MODEL;
       const model = rawModel.replace(/^google\//, "");
-      const isOpenRouter = false; // All models now use Gemini native
 
       const quantityInstructions = buildQuantityInstructions(options, "dev");
       const slidesPerCarousel = Math.max(
@@ -130,113 +125,22 @@ export function registerAiCampaignRoutes(app) {
         slidesPerCarousel,
       );
 
-      let result;
+      const parts = [{ text: prompt }];
 
-      if (isOpenRouter) {
-        const slideExamples = Array.from({ length: slidesPerCarousel })
-          .map((_, idx) => {
-            const slideNumber = idx + 1;
-            const role =
-              slideNumber === 1
-                ? "capa/título"
-                : slideNumber === slidesPerCarousel
-                  ? "CTA/final"
-                  : "conteúdo";
-            return `        {"slide": ${slideNumber}, "visual": "descrição visual detalhada do slide ${slideNumber} - ${role}", "text": "TEXTO CURTO EM MAIÚSCULAS"}`;
-          })
-          .join(",\n");
-
-        // Add explicit JSON schema for OpenRouter models
-        const jsonSchemaPrompt = `${prompt}
-
-**FORMATO JSON OBRIGATÓRIO - TODOS OS CAMPOS SÃO OBRIGATÓRIOS:**
-
-ATENÇÃO: Você DEVE gerar TODOS os 4 arrays: videoClipScripts, posts, adCreatives E carousels.
-O campo "carousels" é OBRIGATÓRIO e NÃO pode ser omitido.
-
-\`\`\`json
-{
-  "videoClipScripts": [
-    {
-      "title": "Título do vídeo",
-      "hook": "Gancho inicial do vídeo",
-      "scenes": [
-        {"scene": 1, "visual": "descrição visual", "narration": "narração", "duration_seconds": 5}
-      ],
-      "image_prompt": "prompt para thumbnail com cores da marca, estilo cinematográfico",
-      "audio_script": "script de áudio completo"
-    }
-  ],
-  "posts": [
-    {
-      "platform": "Instagram|Facebook|Twitter|LinkedIn",
-      "content": "texto do post",
-      "hashtags": ["tag1", "tag2"],
-      "image_prompt": "descrição da imagem com cores da marca, estilo cinematográfico"
-    }
-  ],
-  "adCreatives": [
-    {
-      "platform": "Facebook|Google",
-      "headline": "título do anúncio",
-      "body": "corpo do anúncio",
-      "cta": "call to action",
-      "image_prompt": "descrição da imagem com cores da marca, estilo cinematográfico"
-    }
-  ],
-  "carousels": [
-    {
-      "title": "Título do carrossel Instagram",
-      "hook": "Gancho/abertura impactante do carrossel",
-      "cover_prompt": "Imagem de capa cinematográfica com cores da marca, título em fonte bold condensed sans-serif, estilo luxuoso e premium, composição visual impactante",
-      "slides": [
-${slideExamples}
-      ]
-    }
-  ]
-}
-\`\`\`
-
-REGRAS CRÍTICAS:
-1. O JSON DEVE conter EXATAMENTE os 4 arrays: videoClipScripts, posts, adCreatives, carousels
-2. O array "carousels" NUNCA pode estar vazio - gere pelo menos 1 carrossel com EXATAMENTE ${slidesPerCarousel} slides
-3. Responda APENAS com o JSON válido, sem texto adicional.`;
-
-        const textParts = [jsonSchemaPrompt];
-
-        if (allImages.length > 0) {
-          result = await generateTextWithGeminiVision(
-            model,
-            textParts,
-            allImages,
-            0.7,
-          );
-        } else {
-          result = await generateTextWithGemini(
-            model,
-            "",
-            jsonSchemaPrompt,
-            0.7,
-          );
-        }
-      } else {
-        const parts = [{ text: prompt }];
-
-        if (allImages.length > 0) {
-          allImages.forEach((img) => {
-            parts.push({
-              inlineData: { mimeType: img.mimeType, data: img.base64 },
-            });
+      if (allImages.length > 0) {
+        allImages.forEach((img) => {
+          parts.push({
+            inlineData: { mimeType: img.mimeType, data: img.base64 },
           });
-        }
-
-        result = await generateStructuredContent(
-          model,
-          parts,
-          campaignSchema,
-          0.7,
-        );
+        });
       }
+
+      const result = await generateStructuredContent(
+        model,
+        parts,
+        campaignSchema,
+        0.7,
+      );
 
       // Clean markdown code blocks if present
       let cleanResult = result.trim();

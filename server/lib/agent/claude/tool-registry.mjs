@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { tool } from '@anthropic-ai/claude-agent-sdk';
 import { put } from '@vercel/blob';
 import { getGeminiAi } from '../../ai/clients.mjs';
+import { generateStructuredContent } from '../../ai/text-generation.mjs';
 import {
   buildVideoPrompt,
   buildImagePrompt,
@@ -12,7 +14,6 @@ import {
 } from '../../ai/prompt-builders.mjs';
 import {
   generateImageWithFallback,
-  generateStructuredContent,
 } from '../../ai/image-generation.mjs';
 import {
   generateVideoWithFal,
@@ -94,11 +95,11 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
   const genai = getGeminiAi();
 
   return [
-    {
-      name: 'studio_image_list_topics',
-      description: 'Lista tópicos do Image Studio.',
-      inputSchema: {},
-      handler: async () => {
+    tool(
+      'studio_image_list_topics',
+      'Lista tópicos do Image Studio.',
+      {},
+      async () => {
         try {
           const topics = await getImageTopics(sql, userId, organizationId);
           return { content: [{ type: 'text', text: JSON.stringify(ok(topics)) }] };
@@ -106,12 +107,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_image_create_topic',
-      description: 'Cria tópico no Image Studio.',
-      inputSchema: { title: z.string().optional() },
-      handler: async ({ title }) => {
+    ),
+    tool(
+      'studio_image_create_topic',
+      'Cria tópico no Image Studio.',
+      { title: z.string().optional() },
+      async ({ title }) => {
         try {
           const topic = await createImageTopic(sql, userId, organizationId, title || null);
           return { content: [{ type: 'text', text: JSON.stringify(ok(topic)) }] };
@@ -119,16 +120,16 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_image_update_topic',
-      description: 'Renomeia ou atualiza capa de tópico no Image Studio.',
-      inputSchema: {
+    ),
+    tool(
+      'studio_image_update_topic',
+      'Renomeia ou atualiza capa de tópico no Image Studio.',
+      {
         topicId: z.string(),
         title: z.string().optional(),
         coverUrl: z.string().optional(),
       },
-      handler: async ({ topicId, title, coverUrl }) => {
+      async ({ topicId, title, coverUrl }) => {
         try {
           const topic = await updateImageTopic(sql, topicId, userId, { title, coverUrl }, organizationId);
           return { content: [{ type: 'text', text: JSON.stringify(ok(topic)) }] };
@@ -136,12 +137,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_image_delete_topic',
-      description: 'Exclui tópico do Image Studio.',
-      inputSchema: { topicId: z.string() },
-      handler: async ({ topicId }) => {
+    ),
+    tool(
+      'studio_image_delete_topic',
+      'Exclui tópico do Image Studio.',
+      { topicId: z.string() },
+      async ({ topicId }) => {
         try {
           await deleteImageTopic(sql, topicId, userId, organizationId);
           return { content: [{ type: 'text', text: JSON.stringify(ok({ topicId })) }] };
@@ -149,12 +150,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_image_list_batches',
-      description: 'Lista batches de um tópico do Image Studio.',
-      inputSchema: { topicId: z.string(), limit: z.number().optional() },
-      handler: async ({ topicId, limit }) => {
+    ),
+    tool(
+      'studio_image_list_batches',
+      'Lista batches de um tópico do Image Studio.',
+      { topicId: z.string(), limit: z.number().optional() },
+      async ({ topicId, limit }) => {
         try {
           const batches = await getImageBatches(sql, topicId, userId, organizationId, limit || 100);
           return { content: [{ type: 'text', text: JSON.stringify(ok(batches)) }] };
@@ -162,12 +163,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_image_delete_batch',
-      description: 'Exclui batch no Image Studio.',
-      inputSchema: { batchId: z.string() },
-      handler: async ({ batchId }) => {
+    ),
+    tool(
+      'studio_image_delete_batch',
+      'Exclui batch no Image Studio.',
+      { batchId: z.string() },
+      async ({ batchId }) => {
         try {
           await deleteImageBatch(sql, batchId, userId, organizationId);
           return { content: [{ type: 'text', text: JSON.stringify(ok({ batchId })) }] };
@@ -175,11 +176,11 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_image_generate',
-      description: 'Gera imagens no Image Studio usando pipeline existente.',
-      inputSchema: {
+    ),
+    tool(
+      'studio_image_generate',
+      'Gera imagens no Image Studio usando pipeline existente.',
+      {
         topicId: z.string(),
         prompt: z.string(),
         imageNum: z.number().int().min(1).max(8).optional(),
@@ -191,7 +192,7 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           mimeType: z.string(),
         })).optional(),
       },
-      handler: async ({ topicId, prompt, imageNum, aspectRatio, imageSize, referenceImages }) => {
+      async ({ topicId, prompt, imageNum, aspectRatio, imageSize, referenceImages }) => {
         try {
           const result = await createImageBatch(
             sql,
@@ -219,15 +220,15 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_image_get_generation_status',
-      description: 'Consulta status de geração de imagem.',
-      inputSchema: {
+    ),
+    tool(
+      'studio_image_get_generation_status',
+      'Consulta status de geração de imagem.',
+      {
         generationId: z.string(),
         asyncTaskId: z.string().optional(),
       },
-      handler: async ({ generationId, asyncTaskId }) => {
+      async ({ generationId, asyncTaskId }) => {
         try {
           const status = await getGenerationStatus(sql, generationId, asyncTaskId || '');
           return { content: [{ type: 'text', text: JSON.stringify(ok(status)) }] };
@@ -235,12 +236,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_image_delete_generation',
-      description: 'Exclui uma geração de imagem.',
-      inputSchema: { generationId: z.string() },
-      handler: async ({ generationId }) => {
+    ),
+    tool(
+      'studio_image_delete_generation',
+      'Exclui uma geração de imagem.',
+      { generationId: z.string() },
+      async ({ generationId }) => {
         try {
           await deleteImageGeneration(sql, generationId, userId, organizationId);
           return { content: [{ type: 'text', text: JSON.stringify(ok({ generationId })) }] };
@@ -248,13 +249,13 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
+    ),
 
-    {
-      name: 'studio_video_list_topics',
-      description: 'Lista tópicos do Studio Video.',
-      inputSchema: {},
-      handler: async () => {
+    tool(
+      'studio_video_list_topics',
+      'Lista tópicos do Studio Video.',
+      {},
+      async () => {
         try {
           const topics = await getVideoTopics(sql, userId, organizationId);
           return { content: [{ type: 'text', text: JSON.stringify(ok(topics)) }] };
@@ -262,12 +263,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_video_create_topic',
-      description: 'Cria tópico no Studio Video.',
-      inputSchema: { title: z.string().optional() },
-      handler: async ({ title }) => {
+    ),
+    tool(
+      'studio_video_create_topic',
+      'Cria tópico no Studio Video.',
+      { title: z.string().optional() },
+      async ({ title }) => {
         try {
           const topic = await createVideoTopic(sql, userId, organizationId, title || null);
           return { content: [{ type: 'text', text: JSON.stringify(ok(topic)) }] };
@@ -275,16 +276,16 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_video_update_topic',
-      description: 'Atualiza tópico do Studio Video.',
-      inputSchema: {
+    ),
+    tool(
+      'studio_video_update_topic',
+      'Atualiza tópico do Studio Video.',
+      {
         topicId: z.string(),
         title: z.string().optional(),
         coverUrl: z.string().optional(),
       },
-      handler: async ({ topicId, title, coverUrl }) => {
+      async ({ topicId, title, coverUrl }) => {
         try {
           const topic = await updateVideoTopic(sql, topicId, userId, { title, coverUrl }, organizationId);
           return { content: [{ type: 'text', text: JSON.stringify(ok(topic)) }] };
@@ -292,12 +293,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_video_delete_topic',
-      description: 'Exclui tópico do Studio Video.',
-      inputSchema: { topicId: z.string() },
-      handler: async ({ topicId }) => {
+    ),
+    tool(
+      'studio_video_delete_topic',
+      'Exclui tópico do Studio Video.',
+      { topicId: z.string() },
+      async ({ topicId }) => {
         try {
           await deleteVideoTopic(sql, topicId, userId, organizationId);
           return { content: [{ type: 'text', text: JSON.stringify(ok({ topicId })) }] };
@@ -305,12 +306,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_video_list_sessions',
-      description: 'Lista sessões de vídeo de um tópico.',
-      inputSchema: { topicId: z.string(), limit: z.number().optional() },
-      handler: async ({ topicId, limit }) => {
+    ),
+    tool(
+      'studio_video_list_sessions',
+      'Lista sessões de vídeo de um tópico.',
+      { topicId: z.string(), limit: z.number().optional() },
+      async ({ topicId, limit }) => {
         try {
           const sessions = await getVideoSessions(sql, topicId, userId, organizationId, limit || 100);
           return { content: [{ type: 'text', text: JSON.stringify(ok(sessions)) }] };
@@ -318,12 +319,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_video_delete_session',
-      description: 'Exclui sessão de vídeo.',
-      inputSchema: { sessionId: z.string() },
-      handler: async ({ sessionId }) => {
+    ),
+    tool(
+      'studio_video_delete_session',
+      'Exclui sessão de vídeo.',
+      { sessionId: z.string() },
+      async ({ sessionId }) => {
         try {
           await deleteVideoSession(sql, sessionId, userId, organizationId);
           return { content: [{ type: 'text', text: JSON.stringify(ok({ sessionId })) }] };
@@ -331,11 +332,11 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_video_generate',
-      description: 'Gera vídeo no Studio Video e atualiza sessão/geração.',
-      inputSchema: {
+    ),
+    tool(
+      'studio_video_generate',
+      'Gera vídeo no Studio Video e atualiza sessão/geração.',
+      {
         topicId: z.string(),
         prompt: z.string(),
         model: z.enum(['veo-3.1', 'sora-2']).optional(),
@@ -345,7 +346,7 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
         useBrandProfile: z.boolean().optional(),
         generateAudio: z.boolean().optional(),
       },
-      handler: async ({
+      async ({
         topicId,
         prompt,
         model,
@@ -488,18 +489,18 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           };
         }
       },
-    },
-    {
-      name: 'studio_video_update_generation',
-      description: 'Atualiza status de geração de vídeo.',
-      inputSchema: {
+    ),
+    tool(
+      'studio_video_update_generation',
+      'Atualiza status de geração de vídeo.',
+      {
         generationId: z.string(),
         status: z.enum(['pending', 'generating', 'success', 'error']).optional(),
         videoUrl: z.string().optional(),
         duration: z.number().optional(),
         errorMessage: z.string().optional(),
       },
-      handler: async ({ generationId, status, videoUrl, duration, errorMessage }) => {
+      async ({ generationId, status, videoUrl, duration, errorMessage }) => {
         try {
           const generation = await updateVideoGeneration(
             sql,
@@ -513,12 +514,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_video_delete_generation',
-      description: 'Exclui uma geração de vídeo.',
-      inputSchema: { generationId: z.string() },
-      handler: async ({ generationId }) => {
+    ),
+    tool(
+      'studio_video_delete_generation',
+      'Exclui uma geração de vídeo.',
+      { generationId: z.string() },
+      async ({ generationId }) => {
         try {
           await deleteVideoGeneration(sql, generationId, userId, organizationId);
           return { content: [{ type: 'text', text: JSON.stringify(ok({ generationId })) }] };
@@ -526,22 +527,21 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
+    ),
 
     // =========================================================================
     // Reading tools — gallery, brand, campaigns, posts, clips, carousels, scheduled
     // =========================================================================
 
-    {
-      name: 'studio_gallery_search',
-      description:
-        'Busca imagens na galeria do usuário. Pode filtrar por texto (prompt/source) e source.',
-      inputSchema: {
+    tool(
+      'studio_gallery_search',
+      'Busca imagens na galeria do usuário. Pode filtrar por texto (prompt/source) e source.',
+      {
         query: z.string().optional(),
         source: z.string().optional(),
         limit: z.number().int().min(1).max(50).optional(),
       },
-      handler: async ({ query, source, limit }) => {
+      async ({ query, source, limit }) => {
         try {
           const max = limit || 20;
           const conditions = [
@@ -568,12 +568,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_gallery_get',
-      description: 'Obtém detalhes completos de uma imagem específica da galeria.',
-      inputSchema: { imageId: z.string() },
-      handler: async ({ imageId }) => {
+    ),
+    tool(
+      'studio_gallery_get',
+      'Obtém detalhes completos de uma imagem específica da galeria.',
+      { imageId: z.string() },
+      async ({ imageId }) => {
         try {
           const userCondition = organizationId
             ? sql`organization_id = ${organizationId}`
@@ -590,13 +590,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_brand_profile_get',
-      description:
-        'Obtém o brand profile do usuário (nome, descrição, logo, cores, tom de voz).',
-      inputSchema: {},
-      handler: async () => {
+    ),
+    tool(
+      'studio_brand_profile_get',
+      'Obtém o brand profile do usuário (nome, descrição, logo, cores, tom de voz).',
+      {},
+      async () => {
         try {
           const raw = await getBrandProfile(sql, userId, organizationId);
           if (!raw) return { content: [{ type: 'text', text: JSON.stringify(ok(null)) }] };
@@ -617,13 +616,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_campaigns_list',
-      description:
-        'Lista campanhas do usuário com contagem de clips, posts, ads e carrosséis.',
-      inputSchema: { limit: z.number().int().min(1).max(50).optional() },
-      handler: async ({ limit }) => {
+    ),
+    tool(
+      'studio_campaigns_list',
+      'Lista campanhas do usuário com contagem de clips, posts, ads e carrosséis.',
+      { limit: z.number().int().min(1).max(50).optional() },
+      async ({ limit }) => {
         try {
           const max = limit || 20;
           const userCondition = organizationId
@@ -650,13 +648,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_campaign_get',
-      description:
-        'Obtém campanha completa com clips, posts, ads e carrosséis.',
-      inputSchema: { campaignId: z.string() },
-      handler: async ({ campaignId }) => {
+    ),
+    tool(
+      'studio_campaign_get',
+      'Obtém campanha completa com clips, posts, ads e carrosséis.',
+      { campaignId: z.string() },
+      async ({ campaignId }) => {
         try {
           const userCondition = organizationId
             ? sql`organization_id = ${organizationId}`
@@ -679,12 +676,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_posts_list',
-      description: 'Lista posts de uma campanha.',
-      inputSchema: { campaignId: z.string() },
-      handler: async ({ campaignId }) => {
+    ),
+    tool(
+      'studio_posts_list',
+      'Lista posts de uma campanha.',
+      { campaignId: z.string() },
+      async ({ campaignId }) => {
         try {
           const ownerCondition = organizationId
             ? sql`c.organization_id = ${organizationId}`
@@ -701,12 +698,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_clips_list',
-      description: 'Lista video clips de uma campanha.',
-      inputSchema: { campaignId: z.string() },
-      handler: async ({ campaignId }) => {
+    ),
+    tool(
+      'studio_clips_list',
+      'Lista video clips de uma campanha.',
+      { campaignId: z.string() },
+      async ({ campaignId }) => {
         try {
           const ownerCondition = organizationId
             ? sql`c.organization_id = ${organizationId}`
@@ -723,12 +720,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_carousels_list',
-      description: 'Lista carrosséis de uma campanha.',
-      inputSchema: { campaignId: z.string() },
-      handler: async ({ campaignId }) => {
+    ),
+    tool(
+      'studio_carousels_list',
+      'Lista carrosséis de uma campanha.',
+      { campaignId: z.string() },
+      async ({ campaignId }) => {
         try {
           const ownerCondition = organizationId
             ? sql`c.organization_id = ${organizationId}`
@@ -745,12 +742,12 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_scheduled_posts_list',
-      description: 'Lista posts agendados do usuário.',
-      inputSchema: { limit: z.number().int().min(1).max(50).optional() },
-      handler: async ({ limit }) => {
+    ),
+    tool(
+      'studio_scheduled_posts_list',
+      'Lista posts agendados do usuário.',
+      { limit: z.number().int().min(1).max(50).optional() },
+      async ({ limit }) => {
         try {
           const max = limit || 20;
           const userCondition = organizationId
@@ -768,22 +765,21 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
+    ),
 
     // =========================================================================
     // Mutation tools — edit, flyer, save, text, campaign generation
     // =========================================================================
 
-    {
-      name: 'studio_image_edit',
-      description:
-        'Edita uma imagem existente com prompt de instrução (ex: alterar cores, adicionar texto, remover fundo). Recebe URL da imagem e prompt de edição.',
-      inputSchema: {
+    tool(
+      'studio_image_edit',
+      'Edita uma imagem existente com prompt de instrução (ex: alterar cores, adicionar texto, remover fundo). Recebe URL da imagem e prompt de edição.',
+      {
         imageUrl: z.string().describe('URL da imagem a editar'),
         prompt: z.string().describe('Instrução de edição'),
         referenceImageUrl: z.string().optional().describe('URL de imagem de referência opcional'),
       },
-      handler: async ({ imageUrl, prompt, referenceImageUrl }) => {
+      async ({ imageUrl, prompt, referenceImageUrl }) => {
         try {
           const base64 = await urlToBase64(imageUrl);
           if (!base64) throw new Error('Falha ao converter imagem para base64.');
@@ -828,18 +824,17 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_flyer_generate',
-      description:
-        'Gera um flyer/arte usando o brand profile e prompt do usuário. Ideal para materiais promocionais.',
-      inputSchema: {
+    ),
+    tool(
+      'studio_flyer_generate',
+      'Gera um flyer/arte usando o brand profile e prompt do usuário. Ideal para materiais promocionais.',
+      {
         prompt: z.string().describe('Descrição do flyer a gerar'),
         aspectRatio: z.string().optional(),
         imageSize: z.enum(['1K', '2K', '4K']).optional(),
         useBrandProfile: z.boolean().optional().describe('Usar brand profile do usuário? Default true.'),
       },
-      handler: async ({ prompt: userPrompt, aspectRatio, imageSize, useBrandProfile }) => {
+      async ({ prompt: userPrompt, aspectRatio, imageSize, useBrandProfile }) => {
         try {
           const shouldUseBrand = useBrandProfile !== false;
           const rawBrand = shouldUseBrand ? await getBrandProfile(sql, userId, organizationId) : null;
@@ -862,18 +857,17 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_gallery_save',
-      description:
-        'Salva uma imagem na galeria do usuário (para imagens geradas ou editadas).',
-      inputSchema: {
+    ),
+    tool(
+      'studio_gallery_save',
+      'Salva uma imagem na galeria do usuário (para imagens geradas ou editadas).',
+      {
         imageUrl: z.string().describe('URL da imagem a salvar'),
         source: z.string().describe('Origem (ex: agent-flyer, agent-edit, agent-image)'),
         prompt: z.string().optional(),
         model: z.string().optional(),
       },
-      handler: async ({ imageUrl, source, prompt: imgPrompt, model: imgModel }) => {
+      async ({ imageUrl, source, prompt: imgPrompt, model: imgModel }) => {
         try {
           if (!imageUrl.startsWith('https://')) {
             return { content: [{ type: 'text', text: JSON.stringify(fail('imageUrl deve ser uma URL HTTPS válida (data URLs não são permitidas).')) }], isError: true };
@@ -896,17 +890,16 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_text_generate',
-      description:
-        'Gera texto de marketing (caption, post, ad copy) usando IA. Pode usar brand profile.',
-      inputSchema: {
+    ),
+    tool(
+      'studio_text_generate',
+      'Gera texto de marketing (caption, post, ad copy) usando IA. Pode usar brand profile.',
+      {
         type: z.enum(['quick_post', 'caption', 'ad_copy', 'custom']).describe('Tipo de texto'),
         prompt: z.string().describe('Contexto ou instrução do texto'),
         useBrandProfile: z.boolean().optional(),
       },
-      handler: async ({ type, prompt: userPrompt, useBrandProfile }) => {
+      async ({ type, prompt: userPrompt, useBrandProfile }) => {
         try {
           const shouldUseBrand = useBrandProfile !== false;
           const rawBrand = shouldUseBrand ? await getBrandProfile(sql, userId, organizationId) : null;
@@ -937,12 +930,11 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
-    {
-      name: 'studio_campaign_generate',
-      description:
-        'Gera uma campanha de marketing completa (clips, posts, ads, carrosséis) a partir de um transcript ou briefing.',
-      inputSchema: {
+    ),
+    tool(
+      'studio_campaign_generate',
+      'Gera uma campanha de marketing completa (clips, posts, ads, carrosséis) a partir de um transcript ou briefing.',
+      {
         transcript: z.string().describe('Transcript, briefing ou descrição do conteúdo'),
         options: z.object({
           clips: z.number().int().min(0).max(10).optional(),
@@ -952,7 +944,7 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
         }).optional(),
         useBrandProfile: z.boolean().optional(),
       },
-      handler: async ({ transcript, options, useBrandProfile }) => {
+      async ({ transcript, options, useBrandProfile }) => {
         try {
           const shouldUseBrand = useBrandProfile !== false;
           const rawBrand = shouldUseBrand ? await getBrandProfile(sql, userId, organizationId) : null;
@@ -990,6 +982,6 @@ ${transcript}`;
           return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
         }
       },
-    },
+    ),
   ];
 }

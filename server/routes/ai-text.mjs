@@ -12,27 +12,29 @@
 import { getRequestAuthContext } from "../lib/auth.mjs";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.mjs";
-import { getGeminiAi, callGeminiTextApi } from "../lib/ai/clients.mjs";
 import {
   withRetry,
   sanitizeErrorForClient,
 } from "../lib/ai/retry.mjs";
 import {
+  generateTextFromMessages,
   generateStructuredContent,
-  generateTextWithGemini,
-  generateTextWithGeminiVision,
+} from "../lib/ai/text-generation.mjs";
+import {
   mapAspectRatio,
   DEFAULT_IMAGE_MODEL,
 } from "../lib/ai/image-generation.mjs";
 import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
+import {
+  DEFAULT_TEXT_MODEL,
+  DEFAULT_FAST_TEXT_MODEL,
+} from "../lib/ai/models.mjs";
 import {
   buildFlyerPrompt,
   buildQuickPostPrompt,
   convertImagePromptToJson,
   getVideoPromptSystemPrompt,
   quickPostSchema,
-  DEFAULT_TEXT_MODEL,
-  DEFAULT_FAST_TEXT_MODEL,
 } from "../lib/ai/prompt-builders.mjs";
 import {
   logAiUsage,
@@ -377,10 +379,9 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
 
       logger.info({ type }, "[Text API] Generating text");
 
-      // Normalize model: strip "google/" prefix if present (legacy brand profiles may have OpenRouter IDs)
+      // Normalize model: strip "google/" prefix if present (legacy brand profiles)
       const rawModel = brandProfile.creativeModel || DEFAULT_TEXT_MODEL;
       const model = rawModel.replace(/^google\//, "");
-      const isOpenRouter = false; // All models now use Gemini native API
 
       let result;
 
@@ -392,41 +393,21 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         }
 
         const prompt = buildQuickPostPrompt(brandProfile, context);
-
-        if (isOpenRouter) {
-          const parts = [prompt];
-          if (image) {
-            result = await generateTextWithGeminiVision(
-              model,
-              parts,
-              [image],
-              temperature,
-            );
-          } else {
-            result = await generateTextWithGemini(
-              model,
-              "",
-              prompt,
-              temperature,
-            );
-          }
-        } else {
-          const parts = [{ text: prompt }];
-          if (image) {
-            parts.push({
-              inlineData: {
-                mimeType: image.mimeType,
-                data: image.base64,
-              },
-            });
-          }
-          result = await generateStructuredContent(
-            model,
-            parts,
-            quickPostSchema,
-            temperature,
-          );
+        const parts = [{ text: prompt }];
+        if (image) {
+          parts.push({
+            inlineData: {
+              mimeType: image.mimeType,
+              data: image.base64,
+            },
+          });
         }
+        result = await generateStructuredContent(
+          model,
+          parts,
+          quickPostSchema,
+          temperature,
+        );
       } else {
         if (!systemPrompt && !userPrompt) {
           return res.status(400).json({
@@ -434,44 +415,25 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           });
         }
 
-        if (isOpenRouter) {
-          if (image) {
-            const parts = userPrompt ? [userPrompt] : [];
-            result = await generateTextWithGeminiVision(
-              model,
-              parts,
-              [image],
-              temperature,
-            );
-          } else {
-            result = await generateTextWithGemini(
-              model,
-              systemPrompt || "",
-              userPrompt || "",
-              temperature,
-            );
-          }
-        } else {
-          const parts = [];
-          if (userPrompt) {
-            parts.push({ text: userPrompt });
-          }
-          if (image) {
-            parts.push({
-              inlineData: {
-                mimeType: image.mimeType,
-                data: image.base64,
-              },
-            });
-          }
-
-          result = await generateStructuredContent(
-            model,
-            parts,
-            responseSchema || quickPostSchema,
-            temperature,
-          );
+        const parts = [];
+        if (userPrompt) {
+          parts.push({ text: userPrompt });
         }
+        if (image) {
+          parts.push({
+            inlineData: {
+              mimeType: image.mimeType,
+              data: image.base64,
+            },
+          });
+        }
+
+        result = await generateStructuredContent(
+          model,
+          parts,
+          responseSchema || quickPostSchema,
+          temperature,
+        );
       }
 
       logger.info({}, "[Text API] Text generated successfully");
@@ -594,28 +556,28 @@ REGRAS:
 
       const userPrompt = `BRIEFING ORIGINAL:\n${prompt}`;
 
-      const data = await withRetry(() =>
-        callGeminiTextApi({
+      const { text, usage } = await withRetry(() =>
+        generateTextFromMessages({
           model: DEFAULT_FAST_TEXT_MODEL,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
           temperature: 0.5,
-          max_tokens: 2048,
+          maxTokens: 2048,
         }),
       );
 
-      const enhancedPrompt = data.choices?.[0]?.message?.content?.trim() || "";
+      const enhancedPrompt = text?.trim() || "";
 
       logger.info(
         {},
-        "[Enhance Prompt API] Successfully enhanced prompt with Gemini",
+        "[Enhance Prompt API] Successfully enhanced prompt",
       );
 
       // Log AI usage
-      const inputTokens = data.usage?.prompt_tokens || Math.round((systemPrompt.length + userPrompt.length) / 4);
-      const outputTokens = data.usage?.completion_tokens || Math.round(enhancedPrompt.length / 4);
+      const inputTokens = usage.inputTokens || Math.round((systemPrompt.length + userPrompt.length) / 4);
+      const outputTokens = usage.outputTokens || Math.round(enhancedPrompt.length / 4);
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/enhance-prompt",
@@ -668,19 +630,19 @@ REGRAS:
 
       const systemPrompt = getVideoPromptSystemPrompt(duration, aspectRatio);
 
-      const data = await withRetry(() =>
-        callGeminiTextApi({
+      const { text: rawText, usage } = await withRetry(() =>
+        generateTextFromMessages({
           model: DEFAULT_FAST_TEXT_MODEL,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: `Prompt: ${prompt}` },
           ],
-          response_format: { type: "json_object" },
+          jsonMode: true,
           temperature: 0.7,
         }),
       );
 
-      const text = data.choices?.[0]?.message?.content?.trim() || "";
+      const text = rawText?.trim() || "";
 
       // Try to parse as JSON
       let result;
@@ -694,8 +656,8 @@ REGRAS:
       logger.info({}, "[Convert Prompt API] Conversion successful");
 
       // Log AI usage
-      const inputTokens = data.usage?.prompt_tokens || 0;
-      const outputTokens = data.usage?.completion_tokens || 0;
+      const inputTokens = usage.inputTokens || 0;
+      const outputTokens = usage.outputTokens || 0;
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/convert-prompt",

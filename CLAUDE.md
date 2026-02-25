@@ -80,11 +80,38 @@ Frontend (React) → Express API → Neon Postgres
 ### Server (Express API) — Modular Architecture
 - `server/index.mjs` - Orchestrator (308 LOC): setup, middleware, route registration, startup
 - `server/lib/` - Core libraries (db, auth, user-resolver, resource-access, logging-helpers, csrf, errors, validation)
-- `server/lib/ai/` - AI providers (clients, retry, image-generation, video-generation, prompt-builders, providers, tools)
+- `server/lib/ai/` - AI modules (see AI Module Architecture below)
 - `server/routes/` - 23 route modules (health, admin, init, db-*, ai-*, upload, generation-jobs, *-playground, rube)
+- `server/lib/agent/claude/` - Studio Agent (Claude Agent SDK) — see Studio Agent section below
 - `server/middleware/` - CSRF protection, error handler, request logger
 - `server/helpers/` - Job queue, scheduled publisher, usage tracking, campaign prompts
 - `server/api/chat/` - Vercel AI SDK chat handler with tool support
+
+### AI Module Architecture (Centralized)
+
+To change AI providers or models, modify these files only:
+- `server/lib/ai/models.mjs` — **Single source of truth** for all model IDs, Type enum, normalizeModelId()
+- `server/lib/ai/text-generation.mjs` — Provider-agnostic text generation (generateTextFromMessages, streamTextFromMessages, generateStructuredContent, generateText, generateTextWithVision)
+- `server/lib/ai/clients.mjs` — SDK factories only (getGeminiAi, configureFal)
+- `server/lib/ai/image-generation.mjs` — Image generation only (Gemini native + provider fallback chain)
+- `server/lib/ai/providers.mjs` — Vercel AI SDK wrapper for chat streaming (getLanguageModel)
+- `server/lib/ai/prompt-builders.mjs` — Prompt templates/schemas; re-exports model constants from models.mjs
+
+Consumer files (routes) import from text-generation.mjs and models.mjs — never directly from @google/genai.
+
+### Studio Agent (Claude Agent SDK)
+
+AI-powered creative assistant for Image Studio and Video Studio, using `@anthropic-ai/claude-agent-sdk`.
+
+- **Route**: `server/routes/agent-studio.mjs` — SSE endpoint at `POST /api/agent/studio/stream`
+- **Runner**: `server/lib/agent/claude/runner.mjs` — Orchestrates Claude Agent SDK `query()` calls, SSE streaming, loop guards, interaction timeouts
+- **MCP Bridge**: `server/lib/agent/claude/mcp-bridge.mjs` — Exposes studio tools as MCP server via `createSdkMcpServer()`
+- **Tool Registry**: `server/lib/agent/claude/tool-registry.mjs` — 30+ tools prefixed `studio_*` (image/video CRUD, generation, gallery, brand profile, campaigns, etc.)
+- **Session Store**: `server/lib/agent/claude/session-store.mjs` — Thread/message persistence for multi-turn conversations
+- **Frontend Client**: `src/services/api/studioAgent.ts` — SSE client for `/api/agent/studio`
+- **Capabilities**: Generate images/videos/flyers/text/campaigns, edit images, search gallery, access brand profile, list campaigns/posts/clips/carousels
+- **Content Mentions**: Supports `@gallery:uuid`, `@campaign:uuid`, `@clip:uuid`, `@carousel:uuid` inline references
+- **Native tools blocked**: Read, Write, Edit, Bash, Glob, Grep, etc. — agent can only use `mcp__studio__*` tools
 
 ### Frontend Entry Points
 - `src/App.tsx` - Main app component (~91K chars, handles all state)
@@ -114,7 +141,7 @@ Frontend (React) → Express API → Neon Postgres
 DATABASE_URL=postgresql://...
 BLOB_READ_WRITE_TOKEN=vercel_blob_...
 REDIS_URL=redis://... (optional, for scheduled posts)
-GOOGLE_GENERATIVE_AI_API_KEY=AIza...
+GEMINI_API_KEY=AIza... (Google Gemini API key for all AI text/image generation)
 BETTER_AUTH_SECRET=... (required for session signing, generate with: openssl rand -hex 32)
 CSRF_SECRET=... (required for CSRF protection)
 SUPER_ADMIN_EMAILS=email1@example.com,email2@example.com (required for /admin access)
@@ -146,6 +173,7 @@ CSRF validation is enforced on **all state-changing operations** (POST, PUT, DEL
 - `/api/image-playground/*` - Image operations
 - `/api/video-playground/*` - Video playground operations
 - `/api/admin/*` - Admin operations
+- `/api/agent/*` - Studio Agent operations
 
 **Note:** GET, HEAD, and OPTIONS requests do NOT require CSRF tokens.
 

@@ -1,18 +1,29 @@
 /**
- * Image generation with Gemini and FAL.ai fallback.
+ * Image Generation — Gemini native image generation with provider fallback.
  *
- * Exports: generateGeminiImage, generateImageWithFallback,
- *          mapAspectRatio, DEFAULT_IMAGE_MODEL, STANDARD_IMAGE_MODEL, FAL_IMAGE_MODEL
+ * ┌────────────────────────────────────────────────────────────────┐
+ * │  This file handles IMAGE generation only.                      │
+ * │  For text generation, use text-generation.mjs.                 │
+ * │  For model IDs, use models.mjs.                                │
+ * └────────────────────────────────────────────────────────────────┘
+ *
+ * Exports: generateGeminiImage, generateImageWithFallback, mapAspectRatio,
+ *          DEFAULT_IMAGE_MODEL, STANDARD_IMAGE_MODEL, FAL_IMAGE_MODEL
  */
 
 import { getGeminiAi } from "./clients.mjs";
 import { withRetry } from "./retry.mjs";
+import {
+  IMAGE_MODEL_PRO,
+  IMAGE_MODEL_STANDARD,
+} from "./models.mjs";
 import { FAL_IMAGE_MODEL } from "./fal-image-generation.mjs";
 import { runWithProviderFallback } from "./image-providers.mjs";
 import logger from "../logger.mjs";
 
-export const DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview";
-export const STANDARD_IMAGE_MODEL = "gemini-2.5-flash-image";
+// Re-export model constants for backward compatibility
+export const DEFAULT_IMAGE_MODEL = IMAGE_MODEL_PRO;
+export const STANDARD_IMAGE_MODEL = IMAGE_MODEL_STANDARD;
 export { FAL_IMAGE_MODEL };
 
 export const mapAspectRatio = (ratio) => {
@@ -79,7 +90,7 @@ export const generateGeminiImage = async (
       { count: productImages.length },
       "[generateGeminiImage] Adicionando productImages",
     );
-    productImages.forEach((img, idx) => {
+    productImages.forEach((img) => {
       parts.push({
         inlineData: { data: img.base64, mimeType: img.mimeType },
       });
@@ -122,7 +133,7 @@ export const generateGeminiImage = async (
   if (!Array.isArray(responseParts)) {
     logger.error(
       { response },
-      "[generateGeminiImage] ❌ Estrutura de resposta inválida!",
+      "[generateGeminiImage] Estrutura de resposta inválida!",
     );
     throw new Error("Failed to generate image - invalid response structure");
   }
@@ -141,7 +152,7 @@ export const generateGeminiImage = async (
 
   logger.error(
     { responseParts },
-    "[generateGeminiImage] ❌ Nenhuma imagem encontrada nos parts da resposta",
+    "[generateGeminiImage] Nenhuma imagem encontrada nos parts da resposta",
   );
   throw new Error("Failed to generate image - no image data in response");
 };
@@ -165,90 +176,4 @@ export const generateImageWithFallback = async (
     styleRef: styleReferenceImage,
     personRef: personReferenceImage,
   });
-};
-
-// Generate structured content — uses Gemini native API
-export const generateStructuredContent = async (
-  model,
-  parts,
-  responseSchema,
-  temperature = 0.7,
-) => {
-  const ai = getGeminiAi();
-  // Normalize model ID (strip "google/" prefix if present)
-  const normalizedModel = model.replace(/^google\//, "");
-
-  const response = await withRetry(() =>
-    ai.models.generateContent({
-      model: normalizedModel,
-      contents: { parts },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature,
-      },
-    }),
-  );
-
-  return response.text.trim();
-};
-
-// Generate text with Gemini (JSON mode)
-export const generateTextWithGemini = async (
-  model,
-  systemPrompt,
-  userPrompt,
-  temperature = 0.7,
-) => {
-  const { callGeminiTextApi } = await import("./clients.mjs");
-  const data = await callGeminiTextApi({
-    model,
-    messages: [
-      ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-      { role: "user", content: userPrompt },
-    ],
-    response_format: { type: "json_object" },
-    temperature,
-  });
-
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error(`Gemini (${model}) no content returned`);
-  }
-
-  return content;
-};
-
-// Generate text with Gemini + Vision
-export const generateTextWithGeminiVision = async (
-  model,
-  textParts,
-  imageParts,
-  temperature = 0.7,
-) => {
-  const { callGeminiTextApi } = await import("./clients.mjs");
-  const content = textParts.map((text) => ({ type: "text", text }));
-
-  for (const img of imageParts) {
-    content.push({
-      type: "image_url",
-      image_url: {
-        url: `data:${img.mimeType};base64,${img.base64}`,
-      },
-    });
-  }
-
-  const data = await callGeminiTextApi({
-    model,
-    messages: [{ role: "user", content }],
-    response_format: { type: "json_object" },
-    temperature,
-  });
-
-  const result = data.choices?.[0]?.message?.content;
-  if (!result) {
-    throw new Error(`Gemini (${model}) no content returned`);
-  }
-
-  return result;
 };

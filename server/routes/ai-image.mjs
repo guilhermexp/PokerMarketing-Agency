@@ -11,22 +11,21 @@
 import { getRequestAuthContext } from "../lib/auth.mjs";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.mjs";
-import { callGeminiTextApi } from "../lib/ai/clients.mjs";
 import {
   withRetry,
   sanitizeErrorForClient,
   isQuotaOrRateLimitError,
 } from "../lib/ai/retry.mjs";
+import { generateTextFromMessages } from "../lib/ai/text-generation.mjs";
 import {
   generateImageWithFallback,
   DEFAULT_IMAGE_MODEL,
 } from "../lib/ai/image-generation.mjs";
 import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
+import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.mjs";
 import {
   buildImagePrompt,
   convertImagePromptToJson,
-  Type,
-  DEFAULT_TEXT_MODEL,
 } from "../lib/ai/prompt-builders.mjs";
 import {
   logAiUsage,
@@ -455,8 +454,8 @@ PRIORIDADE DAS CORES:
 Retorne as cores em formato hexadecimal (#RRGGBB).
 Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou null, "tertiaryColor": "#..." ou null}`;
 
-      const data = await withRetry(() =>
-        callGeminiTextApi({
+      const { text, usage } = await withRetry(() =>
+        generateTextFromMessages({
           model: DEFAULT_TEXT_MODEL,
           messages: [
             {
@@ -472,17 +471,17 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
               ],
             },
           ],
-          response_format: { type: "json_object" },
+          jsonMode: true,
         }),
       );
 
-      const colors = JSON.parse(data.choices[0].message.content.trim());
+      const colors = JSON.parse(text.trim());
 
       logger.info({ colors }, "[Extract Colors API] Colors extracted");
 
       // Log AI usage
-      const inputTokens = data.usage?.prompt_tokens || 0;
-      const outputTokens = data.usage?.completion_tokens || 0;
+      const inputTokens = usage.inputTokens || 0;
+      const outputTokens = usage.outputTokens || 0;
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/extract-colors",

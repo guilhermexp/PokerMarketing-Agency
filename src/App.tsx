@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallbac
 
 import { BrandProfileSetup } from "./components/brand/BrandProfileSetup";
 import { SettingsModal } from "./components/settings/SettingsModal";
+import { ClientFeedback } from "./feedback";
 import { useInstagramAccounts } from "./components/settings/ConnectInstagramModal";
 import { Loader } from "./components/common/Loader";
 import {
@@ -2688,6 +2689,7 @@ function AppContent() {
           </ChatProvider>
         </>
       )}
+      <ClientFeedback />
       <BackgroundJobsIndicator isAssistantOpen={isAssistantOpen} />
       <ToastContainer />
     </>

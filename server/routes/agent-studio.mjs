@@ -169,6 +169,7 @@ export function registerAgentStudioRoutes(app) {
       attachments: safeAttachments,
       mentions: safeMentions,
       signal: abortController.signal,
+      abortController,
     });
 
     if (!res.writableEnded) res.end();

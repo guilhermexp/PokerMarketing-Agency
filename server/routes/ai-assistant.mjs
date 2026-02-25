@@ -10,10 +10,8 @@
 import { getRequestAuthContext } from "../lib/auth.mjs";
 import { getSql } from "../lib/db.mjs";
 import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
-import { callGeminiStreamApi } from "../lib/ai/clients.mjs";
-import {
-  DEFAULT_ASSISTANT_MODEL,
-} from "../lib/ai/prompt-builders.mjs";
+import { streamTextFromMessages } from "../lib/ai/text-generation.mjs";
+import { ASSISTANT_MODEL } from "../lib/ai/models.mjs";
 import { requireAuthWithAiRateLimit } from "../lib/auth.mjs";
 import {
   logAiUsage,
@@ -154,9 +152,9 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      // Use Gemini streaming API
-      const streamResponse = await callGeminiStreamApi({
-        model: DEFAULT_ASSISTANT_MODEL,
+      // Stream text using provider-agnostic function
+      const streamResponse = await streamTextFromMessages({
+        model: ASSISTANT_MODEL,
         messages,
         temperature: 0.5,
       });
@@ -180,7 +178,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
         organizationId,
         endpoint: "/api/ai/assistant",
         operation: "text",
-        model: DEFAULT_ASSISTANT_MODEL,
+        model: ASSISTANT_MODEL,
         inputTokens: Math.round(inputTokens),
         latencyMs: timer(),
         status: "success",
@@ -192,7 +190,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
         organizationId,
         endpoint: "/api/ai/assistant",
         operation: "text",
-        model: DEFAULT_ASSISTANT_MODEL,
+        model: ASSISTANT_MODEL,
         latencyMs: timer(),
         status: "failed",
         error: error.message,

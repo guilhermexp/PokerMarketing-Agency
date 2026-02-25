@@ -10,29 +10,23 @@
  *          DEFAULT_TEXT_MODEL, DEFAULT_FAST_TEXT_MODEL, DEFAULT_ASSISTANT_MODEL, AI_INFLUENCER_FLASH_MODEL
  */
 
-import { callGeminiTextApi } from "./clients.mjs";
+import { generateTextFromMessages } from "./text-generation.mjs";
 import { withRetry } from "./retry.mjs";
+import {
+  DEFAULT_TEXT_MODEL,
+  DEFAULT_FAST_TEXT_MODEL,
+  DEFAULT_ASSISTANT_MODEL,
+  AI_INFLUENCER_FLASH_MODEL,
+  Type,
+} from "./models.mjs";
 import {
   logAiUsage,
   createTimer,
 } from "../../helpers/usage-tracking.mjs";
 import logger from "../logger.mjs";
 
-// Model defaults (Gemini native)
-export const DEFAULT_TEXT_MODEL = "gemini-3-flash-preview";
-export const DEFAULT_FAST_TEXT_MODEL = "gemini-3-flash-preview";
-export const DEFAULT_ASSISTANT_MODEL = "gemini-3-flash-preview";
-export const AI_INFLUENCER_FLASH_MODEL = "gemini-3-flash-preview";
-
-// Schema Type constants
-export const Type = {
-  OBJECT: "OBJECT",
-  ARRAY: "ARRAY",
-  STRING: "STRING",
-  INTEGER: "INTEGER",
-  BOOLEAN: "BOOLEAN",
-  NUMBER: "NUMBER",
-};
+// Re-export model constants and Type for backward compatibility
+export { DEFAULT_TEXT_MODEL, DEFAULT_FAST_TEXT_MODEL, DEFAULT_ASSISTANT_MODEL, AI_INFLUENCER_FLASH_MODEL, Type };
 
 export const shouldUseTone = (brandProfile, target) => {
   if (!brandProfile) return false;
@@ -214,19 +208,19 @@ export const convertImagePromptToJson = async (
   try {
     const systemPrompt = getImagePromptSystemPrompt(aspectRatio);
 
-    const data = await withRetry(() =>
-      callGeminiTextApi({
+    const { text: rawText } = await withRetry(() =>
+      generateTextFromMessages({
         model: DEFAULT_FAST_TEXT_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `PROMPT: ${prompt}` },
         ],
-        response_format: { type: "json_object" },
+        jsonMode: true,
         temperature: 0.2,
       }),
     );
 
-    const text = data.choices?.[0]?.message?.content?.trim() || "";
+    const text = rawText?.trim() || "";
     let parsed = null;
 
     try {
@@ -393,20 +387,20 @@ export const expandAiInfluencerPrompt = async (
       target_aspect_ratio: aspectRatio,
     });
 
-    const data = await withRetry(() =>
-      callGeminiTextApi({
+    const { text: rawText, usage } = await withRetry(() =>
+      generateTextFromMessages({
         model: AI_INFLUENCER_FLASH_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
         ],
-        response_format: { type: "json_object" },
+        jsonMode: true,
         temperature: 0.7,
-        max_tokens: 2000,
+        maxTokens: 2000,
       }),
     );
 
-    const text = data.choices?.[0]?.message?.content?.trim() || "";
+    const text = rawText?.trim() || "";
     let parsed = null;
     try {
       parsed = JSON.parse(text);
@@ -422,8 +416,8 @@ export const expandAiInfluencerPrompt = async (
       return null;
     }
 
-    const inputTokens = data.usage?.prompt_tokens || 0;
-    const outputTokens = data.usage?.completion_tokens || 0;
+    const inputTokens = usage.inputTokens || 0;
+    const outputTokens = usage.outputTokens || 0;
 
     if (sql) {
       await logAiUsage(sql, {
@@ -576,20 +570,20 @@ export const expandProductHeroPrompt = async (
       target_aspect_ratio: aspectRatio,
     });
 
-    const data = await withRetry(() =>
-      callGeminiTextApi({
+    const { text: rawText, usage } = await withRetry(() =>
+      generateTextFromMessages({
         model: AI_INFLUENCER_FLASH_MODEL,
         messages: [
           { role: "system", content: PRODUCT_HERO_SYSTEM_PROMPT },
           { role: "user", content: userMessage },
         ],
-        response_format: { type: "json_object" },
+        jsonMode: true,
         temperature: 0.7,
-        max_tokens: 2000,
+        maxTokens: 2000,
       }),
     );
 
-    const text = data.choices?.[0]?.message?.content?.trim() || "";
+    const text = rawText?.trim() || "";
     let parsed = null;
     try { parsed = JSON.parse(text); } catch { parsed = null; }
 
@@ -601,8 +595,8 @@ export const expandProductHeroPrompt = async (
       return null;
     }
 
-    const inputTokens = data.usage?.prompt_tokens || 0;
-    const outputTokens = data.usage?.completion_tokens || 0;
+    const inputTokens = usage.inputTokens || 0;
+    const outputTokens = usage.outputTokens || 0;
 
     if (sql) {
       await logAiUsage(sql, {
@@ -751,20 +745,20 @@ export const expandExplodedProductPrompt = async (
       target_aspect_ratio: aspectRatio,
     });
 
-    const data = await withRetry(() =>
-      callGeminiTextApi({
+    const { text: rawText, usage } = await withRetry(() =>
+      generateTextFromMessages({
         model: AI_INFLUENCER_FLASH_MODEL,
         messages: [
           { role: "system", content: EXPLODED_PRODUCT_SYSTEM_PROMPT },
           { role: "user", content: userMessage },
         ],
-        response_format: { type: "json_object" },
+        jsonMode: true,
         temperature: 0.7,
-        max_tokens: 2000,
+        maxTokens: 2000,
       }),
     );
 
-    const text = data.choices?.[0]?.message?.content?.trim() || "";
+    const text = rawText?.trim() || "";
     let parsed = null;
     try { parsed = JSON.parse(text); } catch { parsed = null; }
 
@@ -776,8 +770,8 @@ export const expandExplodedProductPrompt = async (
       return null;
     }
 
-    const inputTokens = data.usage?.prompt_tokens || 0;
-    const outputTokens = data.usage?.completion_tokens || 0;
+    const inputTokens = usage.inputTokens || 0;
+    const outputTokens = usage.outputTokens || 0;
 
     if (sql) {
       await logAiUsage(sql, {
@@ -905,20 +899,20 @@ export const expandBrandIdentityPrompt = async (
       target_aspect_ratio: aspectRatio,
     });
 
-    const data = await withRetry(() =>
-      callGeminiTextApi({
+    const { text: rawText, usage } = await withRetry(() =>
+      generateTextFromMessages({
         model: AI_INFLUENCER_FLASH_MODEL,
         messages: [
           { role: "system", content: BRAND_IDENTITY_SYSTEM_PROMPT },
           { role: "user", content: userMessage },
         ],
-        response_format: { type: "json_object" },
+        jsonMode: true,
         temperature: 0.5,
-        max_tokens: 2000,
+        maxTokens: 2000,
       }),
     );
 
-    const text = data.choices?.[0]?.message?.content?.trim() || "";
+    const text = rawText?.trim() || "";
     let parsed = null;
     try { parsed = JSON.parse(text); } catch { parsed = null; }
 
@@ -930,8 +924,8 @@ export const expandBrandIdentityPrompt = async (
       return null;
     }
 
-    const inputTokens = data.usage?.prompt_tokens || 0;
-    const outputTokens = data.usage?.completion_tokens || 0;
+    const inputTokens = usage.inputTokens || 0;
+    const outputTokens = usage.outputTokens || 0;
 
     if (sql) {
       await logAiUsage(sql, {

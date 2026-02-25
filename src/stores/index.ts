@@ -37,5 +37,8 @@ export {
   type JobStatus,
 } from './jobsStore';
 
+// Feedback Store - Client feedback mode toggle
+export { useFeedbackStore } from './feedbackStore';
+
 // Version for debugging
 export const STORES_VERSION = '1.0.0';
