@@ -5,6 +5,8 @@ import { afterEach, vi } from 'vitest';
 // Cleanup após cada teste
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 // Mock do import.meta.env
@@ -13,9 +15,6 @@ vi.stubGlobal('import.meta.env', {
   PROD: false,
   MODE: 'test',
 });
-
-// Mock do fetch para testes
-global.fetch = vi.fn();
 
 // Mock do localStorage
 const localStorageMock = {

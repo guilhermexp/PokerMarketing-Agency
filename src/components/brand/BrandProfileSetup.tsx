@@ -436,7 +436,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
                       type="button"
                       onClick={handleAcceptInvite}
                       disabled={!inviteToken.trim() || isAccepting}
-                      size="medium"
+                      size="normal"
                       className="px-5 py-3 text-sm font-semibold bg-white text-black hover:bg-white/90 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       variant="primary"
                     >

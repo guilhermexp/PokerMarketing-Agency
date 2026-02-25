@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 /**
  * Integration tests for /api/upload security - dangerous content-type rejection
@@ -15,8 +15,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
  * - Executables pose direct security risk
  */
 
-describe('/api/upload security', () => {
-  const API_BASE_URL = process.env.TEST_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.TEST_API_URL;
+const describeIntegration = API_BASE_URL ? describe : describe.skip;
+
+describeIntegration('/api/upload security', () => {
   const UPLOAD_ENDPOINT = `${API_BASE_URL}/api/upload`;
 
   // Helper to create base64 encoded test data
