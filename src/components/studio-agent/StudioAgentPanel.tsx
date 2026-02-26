@@ -421,13 +421,20 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
   };
 
   const renderComposer = (size: 'sidebar' | 'inline') => {
+    const isSidebar = size === 'sidebar';
     const textSize = size === 'sidebar' ? 'text-[13px]' : 'text-xs';
+    const composerWrapperClass = isSidebar
+      ? 'relative'
+      : 'relative rounded-2xl border border-border bg-[#06070a] overflow-hidden';
+    const composerFooterClass = isSidebar
+      ? 'px-3 py-2 flex items-center justify-between gap-2'
+      : 'border-t border-border/70 px-3 py-2 flex items-center justify-between gap-2';
 
     return (
       <div className="relative">
         {renderMentionSuggestions()}
 
-        <div className="relative rounded-2xl border border-border bg-[#06070a] overflow-hidden">
+        <div className={composerWrapperClass}>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -463,10 +470,10 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
               }
             }}
             placeholder={topicId ? 'Converse com o agente...' : 'Selecione um tópico para habilitar'}
-            className={`w-full bg-transparent px-4 py-3 pr-14 ${textSize} text-white placeholder:text-muted-foreground resize-none outline-none`}
+            className={`w-full bg-transparent px-4 py-3 pr-14 ${textSize} text-white placeholder:text-muted-foreground resize-none outline-none ${isSidebar ? 'min-h-[96px]' : ''}`}
           />
 
-          <div className="border-t border-border/70 px-3 py-2 flex items-center justify-between gap-2">
+          <div className={composerFooterClass}>
             <div className="flex items-center gap-2">
               <input
                 ref={attachmentInputRef}

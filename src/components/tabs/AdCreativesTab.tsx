@@ -26,6 +26,7 @@ import { updateAdCreativeImage } from "../../services/apiClient";
 import { useFavoriteToggle } from "../../hooks/useFavoriteToggle";
 import { useGenerationState } from "../../hooks/useGenerationState";
 import { useImageRecoveryEffect } from "../../hooks/useImageRecovery";
+import { IMAGE_GENERATION_MODEL_OPTIONS } from "../../config/imageGenerationModelOptions";
 
 interface AdCreativesTabProps {
   adCreatives: AdCreative[];
@@ -45,6 +46,8 @@ interface AdCreativesTabProps {
   campaignId?: string; // Campaign ID to filter images correctly
   onQuickPost?: (image: GalleryImage) => void;
   onSchedulePost?: (image: GalleryImage) => void;
+  selectedImageModel?: ImageModel;
+  onChangeSelectedImageModel?: (model: ImageModel) => void;
 }
 
 const AdCard: React.FC<{
@@ -235,6 +238,8 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
   campaignId,
   onQuickPost,
   onSchedulePost,
+  selectedImageModel: selectedImageModelProp,
+  onChangeSelectedImageModel,
 }) {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
   const {
@@ -248,9 +253,12 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
     failGenerating,
     hasAnyGenerating,
   } = useGenerationState();
-  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>(
+  const [localSelectedImageModel, setLocalSelectedImageModel] = useState<ImageModel>(
     "gemini-3-pro-image-preview",
   );
+  const selectedImageModel = selectedImageModelProp ?? localSelectedImageModel;
+  const setSelectedImageModel = onChangeSelectedImageModel ?? setLocalSelectedImageModel;
+  const isUsingGlobalImageModel = !!selectedImageModelProp && !!onChangeSelectedImageModel;
   const [editingAdImage, setEditingAdImage] = useState<{
     image: GalleryImage;
     index: number;
@@ -491,19 +499,25 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
           <Icon name="zap" className="w-4 h-4" />
           Gerar Todos
         </button>
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] text-muted-foreground">Modelo:</span>
-          <select
-            id="model-select-ads"
-            value={selectedImageModel}
-            onChange={(e) =>
-              setSelectedImageModel(e.target.value as ImageModel)
-            }
-            className="bg-transparent border border-border rounded-md px-2.5 py-1.5 text-[10px] text-muted-foreground focus:ring-1 focus:ring-primary/30 focus:border-primary/30 outline-none transition-all"
-          >
-            <option value="gemini-3-pro-image-preview">Gemini 3 Pro</option>
-          </select>
-        </div>
+        {!isUsingGlobalImageModel && (
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-muted-foreground">Modelo:</span>
+            <select
+              id="model-select-ads"
+              value={selectedImageModel}
+              onChange={(e) =>
+                setSelectedImageModel(e.target.value as ImageModel)
+              }
+              className="bg-transparent border border-border rounded-md px-2.5 py-1.5 text-[10px] text-muted-foreground focus:ring-1 focus:ring-primary/30 focus:border-primary/30 outline-none transition-all"
+            >
+              {IMAGE_GENERATION_MODEL_OPTIONS.map((option) => (
+                <option key={option.model} value={option.model}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {adCreatives.map((ad, index) => {

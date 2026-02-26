@@ -24,15 +24,18 @@ import { ImageGenerationLoader } from '../ui/ai-chat-image-generation-1';
 import type { Generation } from '../../stores/imagePlaygroundStore';
 import type { GalleryImage } from '../../types';
 import * as api from '../../services/api/imagePlayground';
+import { getImageModelDisplayLabel } from './imageModelLabels';
 
 interface GenerationItemProps {
   generation: Generation;
   topicId: string;
+  fallbackModel?: string;
 }
 
 export const GenerationItem: React.FC<GenerationItemProps> = ({
   generation,
   topicId,
+  fallbackModel,
 }) => {
   const [showActions, setShowActions] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -43,6 +46,8 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
   const { updateGeneration, topics, updateTopic: updateTopicStore } = useImagePlaygroundStore();
 
   const currentTopic = topics.find(t => t.id === topicId);
+  const generationModelId = generation.asset?.model || fallbackModel || null;
+  const generationModelLabel = getImageModelDisplayLabel(generationModelId);
 
   const needsPolling = !generation.asset && !!generation.asyncTaskId;
 
@@ -112,12 +117,27 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       const reader = new FileReader();
       reader.onloadend = () => {
         const dataUrl = reader.result as string;
-        const { addReferenceImage } = useImagePlaygroundStore.getState();
+        const {
+          addReferenceImage,
+          useBrandIdentityMode,
+          toggleBrandIdentityMode,
+          useBrandProfile,
+          toggleBrandProfile,
+        } = useImagePlaygroundStore.getState();
         addReferenceImage({
           id: crypto.randomUUID(),
           dataUrl,
           mimeType,
         });
+
+        // If the user is reusing an existing generation as reference, switch off
+        // style-driven modes so the next action behaves like an edit workflow.
+        if (useBrandIdentityMode) {
+          toggleBrandIdentityMode();
+        }
+        if (useBrandProfile) {
+          toggleBrandProfile();
+        }
       };
       reader.readAsDataURL(blob);
     } catch (error) {
@@ -176,6 +196,14 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
   if (!generation.asset) {
     return (
       <div className="aspect-square rounded-xl border border-white/[0.06] overflow-hidden relative bg-white/[0.02]">
+        {generationModelLabel && (
+          <div
+            className="absolute top-2 right-2 max-w-[75%] px-2 py-1 bg-black/45 backdrop-blur-sm rounded-lg text-[10px] text-white/60 truncate z-30"
+            title={generationModelId || undefined}
+          >
+            {generationModelLabel}
+          </div>
+        )}
         {status === 'error' ? (
           <div className="w-full h-full flex flex-col items-center justify-center gap-3">
             <GenerationError error={pollingError} onDelete={handleDelete} onRetry={handleRetry} />
@@ -242,6 +270,14 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
         <div className="absolute top-2 left-2 px-2 py-1 bg-black/50 backdrop-blur-sm rounded-lg text-[10px] text-white/60 flex items-center gap-1">
           <Hash className="w-3 h-3" />
           {generation.seed}
+        </div>
+      )}
+      {generationModelLabel && (
+        <div
+          className="absolute top-2 right-2 max-w-[75%] px-2 py-1 bg-black/50 backdrop-blur-sm rounded-lg text-[10px] text-white/70 truncate"
+          title={generationModelId || undefined}
+        >
+          {generationModelLabel}
         </div>
       )}
 

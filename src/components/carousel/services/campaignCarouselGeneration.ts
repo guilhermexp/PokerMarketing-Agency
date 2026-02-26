@@ -3,7 +3,7 @@
  */
 
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import type { BrandProfile, ImageFile, CarouselScript, ChatReferenceImage, StyleReference } from '../../../types';
+import type { BrandProfile, ImageFile, CarouselScript, ChatReferenceImage, StyleReference, ImageModel } from '../../../types';
 import { generateImage } from '../../../services/geminiService';
 import { uploadImageToBlob } from '../../../services/blobService';
 import {
@@ -20,6 +20,7 @@ import { toCarouselScript } from '../utils';
 
 interface GenerationContext {
   brandProfile: BrandProfile;
+  imageModel?: ImageModel;
   chatReferenceImage?: ChatReferenceImage | null;
   selectedStyleReference?: StyleReference | null;
   compositionAssets?: { base64: string; mimeType: string }[]; // Assets (ativos) for composition
@@ -127,7 +128,7 @@ export const generateCampaignCover = async (
 
     const imageUrl = await generateImage(prompt, context.brandProfile, {
       aspectRatio: '4:5',
-      model: 'gemini-3-pro-image-preview',
+      model: context.imageModel || 'gemini-3-pro-image-preview',
       productImages: productImages.length > 0 ? productImages : undefined,
       compositionAssets: context.compositionAssets?.length > 0 ? context.compositionAssets : undefined,
     });
@@ -279,7 +280,7 @@ export const generateCampaignSlide = async (
 
     const imageUrl = await generateImage(prompt, context.brandProfile, {
       aspectRatio: '4:5',
-      model: 'gemini-3-pro-image-preview',
+      model: context.imageModel || 'gemini-3-pro-image-preview',
       styleReferenceImage: styleRef,
       productImages: productImages.length > 0 ? productImages : undefined,
       compositionAssets: context.compositionAssets?.length > 0 ? context.compositionAssets : undefined,

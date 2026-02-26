@@ -12,6 +12,7 @@ import { uploadImageToBlob } from "../../../services/blobService";
 import { urlToBase64 } from "../../../utils/imageHelpers";
 import { getErrorMessage } from "../../../utils/errorMessages";
 import { buildThumbnailPrompt } from "@/ai-prompts";
+import { DEFAULT_CAMPAIGN_IMAGE_MODEL } from "../../../config/imageGenerationModelOptions";
 
 const CLIP_ASPECT_RATIO = "9:16" as const;
 import {
@@ -38,7 +39,7 @@ export const useClipsTab = ({
     onUpdateGalleryImage,
     productImages,
 }: UseClipsTabProps) => {
-    const DEFAULT_CLIP_IMAGE_MODEL: ImageModel = "gemini-3-pro-image-preview";
+    const DEFAULT_CLIP_IMAGE_MODEL: ImageModel = DEFAULT_CAMPAIGN_IMAGE_MODEL;
     const [thumbnails, setThumbnails] = useState<(GalleryImage | null)[]>([]);
     const [extraInstructions, setExtraInstructions] = useState<string[]>([]);
     const [generationState, setGenerationState] = useState<{

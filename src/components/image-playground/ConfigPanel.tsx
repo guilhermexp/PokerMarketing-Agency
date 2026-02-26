@@ -24,27 +24,11 @@ import {
 import { useImagePlaygroundStore, type ReferenceImage } from '../../stores/imagePlaygroundStore';
 import { uploadDataUrlToBlob } from '../../services/blobService';
 import type { ToneOfVoice } from '../../types';
+import { IMAGE_GENERATION_MODEL_OPTIONS as MODEL_OPTIONS } from '../../config/imageGenerationModelOptions';
 
 // =============================================================================
 // Model Options
 // =============================================================================
-
-const MODEL_OPTIONS = [
-  {
-    provider: 'replicate',
-    model: 'nano-banana-2',
-    label: 'Nano Banana 2',
-    color: '#34A853',
-    desc: 'Flash Image 3.1 (rapido)',
-  },
-  {
-    provider: 'replicate',
-    model: 'nano-banana-pro',
-    label: 'Pro',
-    color: '#4285F4',
-    desc: 'Melhor qualidade',
-  },
-];
 
 const RESOLUTION_OPTIONS: Array<{ label: string; value: '1K' | '2K' | '4K'; desc: string }> = [
   { label: '1K', value: '1K', desc: 'Standard' },

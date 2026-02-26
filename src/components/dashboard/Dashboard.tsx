@@ -17,6 +17,7 @@ import type {
   CampaignSummary,
   CreativeModel,
   PendingToolEdit,
+  ImageModel,
 } from "../../types";
 import type { InstagramContext } from "../../services/rubeService";
 import type { WeekScheduleWithCount } from "../../services/apiClient";
@@ -31,6 +32,10 @@ import type { ScheduledPost } from "../../types";
 import { GeneratingLoader } from "../ui/quantum-pulse-loade";
 import { PublishedStoriesWidget } from "../ui/published-stories-widget";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";
+import {
+  DEFAULT_CAMPAIGN_IMAGE_MODEL,
+  IMAGE_GENERATION_MODEL_OPTIONS,
+} from "../../config/imageGenerationModelOptions";
 
 type View = "campaign" | "campaigns" | "carousels" | "flyer" | "gallery" | "calendar" | "playground" | "image-playground";
 
@@ -325,6 +330,9 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
   const { campaigns } = useCampaigns(userId || null, organizationId);
   const [activeTab, setActiveTab] = useState<Tab>("clips");
   const [isTabPending, startTabTransition] = useTransition();
+  const [selectedCampaignImageModel, setSelectedCampaignImageModel] = useState<ImageModel>(
+    DEFAULT_CAMPAIGN_IMAGE_MODEL,
+  );
   const [isInsideSchedule, setIsInsideSchedule] = useState(false);
   const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(
     null,
@@ -576,6 +584,23 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-full bg-black/40 backdrop-blur-2xl border border-border px-3 py-2 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        Imagem
+                      </span>
+                      <select
+                        value={selectedCampaignImageModel}
+                        onChange={(e) => setSelectedCampaignImageModel(e.target.value as ImageModel)}
+                        className="bg-transparent border border-white/10 rounded-full px-3 py-1 text-xs text-white/90 focus:outline-none focus:border-white/30"
+                        title="Modelo global de geração de imagens da campanha"
+                      >
+                        {IMAGE_GENERATION_MODEL_OPTIONS.map((option) => (
+                          <option key={option.model} value={option.model}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     {/* Tabs Navigation */}
                     {availableTabs.map((tab) => (
                       <button
@@ -606,6 +631,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       <ClipsTab
                         brandProfile={brandProfile}
                         videoClipScripts={campaign.videoClipScripts}
+                        selectedImageModel={selectedCampaignImageModel}
+                        onChangeSelectedImageModel={setSelectedCampaignImageModel}
                         onAddImageToGallery={onAddImageToGallery}
                         onUpdateGalleryImage={onUpdateGalleryImage}
                         onSetChatReference={onSetChatReference}
@@ -632,6 +659,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                         selectedStyleReference={selectedStyleReference || undefined}
                         compositionAssets={compositionAssets || undefined}
                         productImages={productImages || undefined}
+                        selectedImageModel={selectedCampaignImageModel}
                         onAddImageToGallery={onAddImageToGallery}
                         onUpdateGalleryImage={onUpdateGalleryImage}
                         onSetChatReference={onSetChatReference}
@@ -646,6 +674,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       <PostsTab
                         posts={campaign.posts}
                         brandProfile={brandProfile}
+                        selectedImageModel={selectedCampaignImageModel}
+                        onChangeSelectedImageModel={setSelectedCampaignImageModel}
                         referenceImage={productImages?.[0] || null}
                         chatReferenceImage={chatReferenceImage || undefined}
                         onAddImageToGallery={onAddImageToGallery}
@@ -688,6 +718,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       <AdCreativesTab
                         adCreatives={campaign.adCreatives}
                         brandProfile={brandProfile}
+                        selectedImageModel={selectedCampaignImageModel}
+                        onChangeSelectedImageModel={setSelectedCampaignImageModel}
                         referenceImage={productImages?.[0] || null}
                         chatReferenceImage={chatReferenceImage || undefined}
                         onAddImageToGallery={onAddImageToGallery}

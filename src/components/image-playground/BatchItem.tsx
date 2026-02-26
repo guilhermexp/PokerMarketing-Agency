@@ -17,6 +17,7 @@ import { GenerationItem } from './GenerationItem';
 import { useImagePlaygroundBatches } from '../../hooks/useImagePlayground';
 import { useImagePlaygroundStore } from '../../stores/imagePlaygroundStore';
 import type { GenerationBatch } from '../../stores/imagePlaygroundStore';
+import { getImageModelDisplayLabel } from './imageModelLabels';
 
 interface BatchItemProps {
   batch: GenerationBatch;
@@ -81,6 +82,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
       link.href = url;
       link.download = `generation_${successGenerations[0].id}.png`;
       link.click();
+      setShowMenu(false);
       return;
     }
 
@@ -105,6 +107,14 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
   const fontStyleOverride = getStringConfig(config, 'fontStyleOverride');
   const useBrandProfile = getBooleanConfig(config, 'useBrandProfile');
   const useInstagramMode = getBooleanConfig(config, 'useInstagramMode');
+  const requestedModelLabel = getImageModelDisplayLabel(batch.model) || (batch.model.split('/').pop() || batch.model);
+  const usedModelLabels = Array.from(
+    new Set(
+      batch.generations
+        .map((g) => getImageModelDisplayLabel(g.asset?.model))
+        .filter((label): label is string => !!label)
+    )
+  );
 
   const totalTokens = batch.generations.reduce(
     (acc, g) => {
@@ -142,9 +152,15 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
         <div className="flex-1 min-w-0">
           <p className="text-sm text-white/90 line-clamp-2 leading-relaxed">{displayPrompt}</p>
           <div className="flex items-center gap-1.5 mt-2 text-[10px] text-white/30 flex-wrap">
-            <span className="px-1.5 py-0.5 bg-white/[0.06] rounded-md">
-              {batch.model.split('/').pop() || batch.model}
-            </span>
+            {(usedModelLabels.length > 0 ? usedModelLabels : [requestedModelLabel]).map((label) => (
+              <span
+                key={label}
+                className="px-1.5 py-0.5 bg-white/[0.06] rounded-md"
+                title={usedModelLabels.length > 0 ? 'Modelo usado nas geracoes concluidas' : batch.model}
+              >
+                {label}
+              </span>
+            ))}
             {useInstagramMode && (
               <span className="px-1.5 py-0.5 bg-pink-500/15 text-pink-300/80 rounded-md">
                 Instagram
@@ -262,6 +278,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
                 key={generation.id}
                 generation={generation}
                 topicId={topicId}
+                fallbackModel={batch.model}
               />
             ))}
           </div>

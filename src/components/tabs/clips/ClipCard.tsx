@@ -96,6 +96,8 @@ export interface ClipCardProps {
   onExtraInstructionChange: (value: string) => void;
   onUpdateGalleryImage: (imageId: string, newImageSrc: string) => void;
   onSetChatReference: (image: GalleryImage | null) => void;
+  selectedImageModel: ImageModel;
+  onChangeSelectedImageModel: (model: ImageModel) => void;
   styleReferences?: StyleReference[];
   onAddStyleReference?: (ref: Omit<StyleReference, "id" | "createdAt">) => void;
   onRemoveStyleReference?: (id: string) => void;
@@ -124,6 +126,8 @@ export const ClipCard: React.FC<ClipCardProps> = ({
   onExtraInstructionChange,
   onUpdateGalleryImage,
   onSetChatReference,
+  selectedImageModel,
+  onChangeSelectedImageModel,
   styleReferences,
   onAddStyleReference,
   onRemoveStyleReference,
@@ -164,9 +168,6 @@ export const ClipCard: React.FC<ClipCardProps> = ({
     Record<number, string>
   >({});
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
-  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>(
-    "gemini-3-pro-image-preview",
-  );
   const [selectedVideoModel, setSelectedVideoModel] = useState<VideoModel>(
     "veo-3.1-fast-generate-preview",
   );
@@ -3553,7 +3554,6 @@ export const ClipCard: React.FC<ClipCardProps> = ({
   const selectedEditorClip =
     editorState?.clips.find((c) => c.id === editorState.selectedClipId) ||
     editorState?.clips[0];
-
   return (
     <>
       <div className="bg-background rounded-xl border border-border overflow-hidden">
@@ -5500,7 +5500,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         selectedImageModel={selectedImageModel}
-        onChangeImageModel={setSelectedImageModel}
+        onChangeImageModel={onChangeSelectedImageModel}
         selectedVideoModel={selectedVideoModel}
         onChangeVideoModel={setSelectedVideoModel}
         includeNarration={includeNarration}

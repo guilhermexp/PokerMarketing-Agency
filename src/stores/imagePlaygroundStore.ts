@@ -193,9 +193,10 @@ export interface ImagePlaygroundStore extends
 // Default Values
 // =============================================================================
 
-const DEFAULT_MODEL = 'nano-banana-pro';
+const DEFAULT_MODEL = 'nano-banana-2';
 const DEFAULT_PROVIDER = 'replicate';
-const DEFAULT_ASPECT_RATIO = '1:1';
+// Brand Identity mode is the default entry experience in Image Studio.
+const DEFAULT_ASPECT_RATIO = '4:5';
 const DEFAULT_IMAGE_SIZE: '1K' | '2K' | '4K' = '1K';
 const MAX_PERSISTED_STATE_SIZE_BYTES = 400_000;
 const MAX_PERSISTED_PARAM_STRING_LENGTH = 4_000;
@@ -326,12 +327,12 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
         isAspectRatioLocked: false,
         activeAspectRatio: DEFAULT_ASPECT_RATIO,
         activeImageSize: DEFAULT_IMAGE_SIZE,
-        useBrandProfile: false,
+        useBrandProfile: true,
         useInstagramMode: false,
         useAiInfluencerMode: false,
         useProductHeroMode: false,
         useExplodedProductMode: false,
-        useBrandIdentityMode: false,
+        useBrandIdentityMode: true,
         uploadingImageIds: [],
 
         // =============================================================================
@@ -766,7 +767,7 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
       }),
       {
         name: 'IMAGE_PLAYGROUND_STORE',
-        version: 4,
+        version: 5,
         storage: safePersistStorage,
         migrate: (persistedState) => {
           if (!persistedState || typeof persistedState !== 'object') {
@@ -793,12 +794,12 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
             isAspectRatioLocked: false,
             activeAspectRatio: DEFAULT_ASPECT_RATIO,
             activeImageSize: DEFAULT_IMAGE_SIZE,
-            useBrandProfile: false,
+            useBrandProfile: true,
             useInstagramMode: false,
             useAiInfluencerMode: false,
             useProductHeroMode: false,
             useExplodedProductMode: false,
-            useBrandIdentityMode: false,
+            useBrandIdentityMode: true,
           };
         },
         partialize: (state) => ({
@@ -816,12 +817,12 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
           isAspectRatioLocked: false,
           activeAspectRatio: DEFAULT_ASPECT_RATIO,
           activeImageSize: DEFAULT_IMAGE_SIZE,
-          useBrandProfile: false,
+          useBrandProfile: true,
           useInstagramMode: false,
           useAiInfluencerMode: false,
           useProductHeroMode: false,
           useExplodedProductMode: false,
-          useBrandIdentityMode: false,
+          useBrandIdentityMode: true,
         }),
       }
     )

@@ -167,46 +167,44 @@ export function CarouselsList({
               setIsCreating(false);
             }
           }}
-          className="rounded-xl border border-border bg-white/[0.02] p-3"
+          className="w-full max-w-4xl flex flex-col sm:flex-row gap-2 rounded-[20px] border border-white/10 bg-black/40 backdrop-blur-2xl p-1.5 sm:p-2 focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 transition-all shadow-[0_18px_60px_rgba(0,0,0,0.38)]"
         >
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Descreva o carrossel que deseja criar..."
-              className="flex-1 h-10 rounded-lg border border-border bg-black/40 px-3 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-white/20"
-            />
-            <select
-              value={slidesPerCarousel}
-              onChange={(e) => setSlidesPerCarousel(Number(e.target.value))}
-              className="h-10 rounded-lg border border-border bg-black/40 px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/20"
-            >
-              <option value={2}>2 imagens</option>
-              <option value={3}>3 imagens</option>
-              <option value={4}>4 imagens</option>
-              <option value={5}>5 imagens</option>
-              <option value={6}>6 imagens</option>
-              <option value={7}>7 imagens</option>
-              <option value={8}>8 imagens</option>
-            </select>
-            <button
-              type="submit"
-              disabled={!prompt.trim() || isCreating}
-              className="h-10 px-4 rounded-lg border border-border bg-black/40 text-sm text-white/90 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-            >
-              {isCreating ? (
-                <>
-                  <Loader size={14} />
-                  Criando...
-                </>
-              ) : (
-                <>
-                  <Icon name="zap" className="w-3.5 h-3.5" />
-                  Criar
-                </>
-              )}
-            </button>
-          </div>
+          <input
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Descreva o carrossel que deseja criar..."
+            className="flex-1 h-10 sm:h-11 rounded-xl border border-transparent bg-transparent px-3.5 text-sm text-white/90 placeholder:text-muted-foreground focus:outline-none"
+          />
+          <select
+            value={slidesPerCarousel}
+            onChange={(e) => setSlidesPerCarousel(Number(e.target.value))}
+            className="h-10 sm:h-11 rounded-xl border border-white/10 bg-black/20 px-3.5 text-sm text-white/90 focus:outline-none focus:ring-1 focus:ring-white/10 focus:border-white/20"
+          >
+            <option value={2}>2 imagens</option>
+            <option value={3}>3 imagens</option>
+            <option value={4}>4 imagens</option>
+            <option value={5}>5 imagens</option>
+            <option value={6}>6 imagens</option>
+            <option value={7}>7 imagens</option>
+            <option value={8}>8 imagens</option>
+          </select>
+          <button
+            type="submit"
+            disabled={!prompt.trim() || isCreating}
+            className="h-10 sm:h-11 px-4 rounded-xl border border-white/10 bg-black/20 text-sm text-white/90 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+          >
+            {isCreating ? (
+              <>
+                <Loader size={14} />
+                Criando...
+              </>
+            ) : (
+              <>
+                <Icon name="zap" className="w-3.5 h-3.5" />
+                Criar
+              </>
+            )}
+          </button>
         </form>
       )}
 
@@ -225,7 +223,7 @@ export function CarouselsList({
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-3 mt-4 sm:mt-6">
         {localCarousels.map((carousel, index) => {
           const carouselId = carousel.id || `carousel-${index}`;
           const carouselKey = `carousel-${carouselId}`;

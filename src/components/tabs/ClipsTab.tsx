@@ -33,6 +33,8 @@ export interface ClipsTabProps {
     post: Omit<ScheduledPost, "id" | "createdAt" | "updatedAt">,
   ) => void;
   productImages?: ImageFile[] | null;
+  selectedImageModel: ImageModel;
+  onChangeSelectedImageModel: (model: ImageModel) => void;
 }
 
 export const ClipsTab = React.memo<ClipsTabProps>(function ClipsTab({
@@ -50,6 +52,8 @@ export const ClipsTab = React.memo<ClipsTabProps>(function ClipsTab({
   instagramContext,
   onSchedulePost,
   productImages,
+  selectedImageModel,
+  onChangeSelectedImageModel,
 }) {
   // QuickPost and Schedule modals
   const [quickPostImage, setQuickPostImage] = useState<GalleryImage | null>(
@@ -102,6 +106,8 @@ export const ClipsTab = React.memo<ClipsTabProps>(function ClipsTab({
           }}
           onUpdateGalleryImage={onUpdateGalleryImage}
           onSetChatReference={onSetChatReference}
+          selectedImageModel={selectedImageModel}
+          onChangeSelectedImageModel={onChangeSelectedImageModel}
           styleReferences={styleReferences}
           onAddStyleReference={onAddStyleReference}
           onRemoveStyleReference={onRemoveStyleReference}

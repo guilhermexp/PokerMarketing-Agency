@@ -28,6 +28,7 @@ import { useFavoriteToggle } from "../../hooks/useFavoriteToggle";
 import { useGenerationState } from "../../hooks/useGenerationState";
 import { useImageRecoveryEffect } from "../../hooks/useImageRecovery";
 import { updatePostImage } from "../../services/apiClient";
+import { IMAGE_GENERATION_MODEL_OPTIONS } from "../../config/imageGenerationModelOptions";
 
 interface PostsTabProps {
   posts: Post[];
@@ -47,6 +48,8 @@ interface PostsTabProps {
   campaignId?: string; // Campaign ID to filter images correctly
   onQuickPost?: (image: GalleryImage) => void;
   onSchedulePost?: (image: GalleryImage) => void;
+  selectedImageModel?: ImageModel;
+  onChangeSelectedImageModel?: (model: ImageModel) => void;
 }
 
 
@@ -246,6 +249,8 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
   campaignId,
   onQuickPost,
   onSchedulePost,
+  selectedImageModel: selectedImageModelProp,
+  onChangeSelectedImageModel,
 }) {
   const [images, setImages] = useState<(GalleryImage | null)[]>([]);
   const {
@@ -260,9 +265,12 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
     isActivelyGenerating,
     hasAnyGenerating,
   } = useGenerationState();
-  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>(
+  const [localSelectedImageModel, setLocalSelectedImageModel] = useState<ImageModel>(
     "gemini-3-pro-image-preview",
   );
+  const selectedImageModel = selectedImageModelProp ?? localSelectedImageModel;
+  const setSelectedImageModel = onChangeSelectedImageModel ?? setLocalSelectedImageModel;
+  const isUsingGlobalImageModel = !!selectedImageModelProp && !!onChangeSelectedImageModel;
   const [editingInstagramImage, setEditingInstagramImage] = useState<{
     image: GalleryImage;
     index: number;
@@ -525,19 +533,25 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
           <Icon name="zap" className="w-4 h-4" />
           Gerar Todas
         </button>
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] text-muted-foreground">Modelo:</span>
-          <select
-            id="model-select-posts"
-            value={selectedImageModel}
-            onChange={(e) =>
-              setSelectedImageModel(e.target.value as ImageModel)
-            }
-            className="bg-transparent border border-border rounded-md px-2.5 py-1.5 text-[10px] text-muted-foreground focus:ring-1 focus:ring-primary/30 focus:border-primary/30 outline-none transition-all"
-          >
-            <option value="gemini-3-pro-image-preview">Gemini 3 Pro</option>
-          </select>
-        </div>
+        {!isUsingGlobalImageModel && (
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-muted-foreground">Modelo:</span>
+            <select
+              id="model-select-posts"
+              value={selectedImageModel}
+              onChange={(e) =>
+                setSelectedImageModel(e.target.value as ImageModel)
+              }
+              className="bg-transparent border border-border rounded-md px-2.5 py-1.5 text-[10px] text-muted-foreground focus:ring-1 focus:ring-primary/30 focus:border-primary/30 outline-none transition-all"
+            >
+              {IMAGE_GENERATION_MODEL_OPTIONS.map((option) => (
+                <option key={option.model} value={option.model}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {posts.map((post, index) => {
