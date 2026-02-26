@@ -32,10 +32,10 @@ import type { ToneOfVoice } from '../../types';
 const MODEL_OPTIONS = [
   {
     provider: 'replicate',
-    model: 'nano-banana',
-    label: 'Standard',
+    model: 'nano-banana-2',
+    label: 'Nano Banana 2',
     color: '#34A853',
-    desc: 'Rapido e economico',
+    desc: 'Flash Image 3.1 (rapido)',
   },
   {
     provider: 'replicate',

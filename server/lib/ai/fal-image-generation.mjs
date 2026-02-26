@@ -1,8 +1,9 @@
 /**
- * Image generation via FAL.ai (Standard: Gemini 2.5 Flash, Pro: Gemini 3 Pro).
+ * Image generation via FAL.ai (Standard fallback: Gemini 2.5 Flash, Pro: Gemini 3 Pro).
  *
  * Used as fallback when Google Gemini direct API returns 429/RESOURCE_EXHAUSTED.
  * Supports both Standard (gemini-25-flash-image) and Pro (gemini-3-pro-image-preview) tiers.
+ * Note: Standard fallback remains on the legacy FAL endpoint until a Gemini 3.1 Flash Image endpoint is confirmed on FAL.
  *
  * Exports: generateImageWithFal, editImageWithFal, FAL_IMAGE_MODEL, FAL_EDIT_MODEL,
  *          FAL_IMAGE_MODEL_STANDARD, FAL_EDIT_MODEL_STANDARD

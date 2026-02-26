@@ -37,10 +37,13 @@ import logger from "../lib/logger.mjs";
 
 const SUPPORTED_IMAGE_MODELS = new Set([
   "gemini-3-pro-image-preview",
+  "gemini-3.1-flash-image-preview",
   "gemini-2.5-flash-image",
   "gemini-25-flash-image",
+  "nano-banana-2",
   "nano-banana",
   "nano-banana-pro",
+  "google/nano-banana-2",
   "google/nano-banana",
   "google/nano-banana-pro",
 ]);
@@ -52,8 +55,16 @@ function normalizeRequestedImageModel(model) {
     return DEFAULT_IMAGE_MODEL;
   }
 
-  if (normalized === "gemini-25-flash-image") return "gemini-2.5-flash-image";
-  if (normalized === "google/nano-banana") return "nano-banana";
+  // Upgrade legacy standard IDs/aliases to Nano Banana 2 (Gemini 3.1 Flash Image preview)
+  if (
+    normalized === "gemini-25-flash-image" ||
+    normalized === "gemini-2.5-flash-image"
+  ) return "gemini-3.1-flash-image-preview";
+  if (
+    normalized === "nano-banana" ||
+    normalized === "google/nano-banana" ||
+    normalized === "google/nano-banana-2"
+  ) return "nano-banana-2";
   if (normalized === "google/nano-banana-pro") return "nano-banana-pro";
   return normalized;
 }

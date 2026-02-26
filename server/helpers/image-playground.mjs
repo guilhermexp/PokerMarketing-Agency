@@ -22,7 +22,7 @@ function normalizeModelForDb(model) {
   // Map all model variants to valid DB enum values
   // DB enum currently only has 'gemini-3-pro-image-preview'
   if (normalized.includes("/")) return "gemini-3-pro-image-preview";
-  // Standard models (gemini-2.5-flash-image, gemini-25-flash-image) → map to only valid enum value
+  // Standard models (Gemini Flash Image variants / Nano Banana aliases) → map to only valid enum value
   if (normalized !== "gemini-3-pro-image-preview") return "gemini-3-pro-image-preview";
   return normalized;
 }
@@ -735,7 +735,15 @@ async function processImageGeneration(
       .map((p) => ({ base64: p.inlineData.data, mimeType: p.inlineData.mimeType }));
 
     // Map user model choice to generic tier for all providers
-    const modelTier = params.model === "nano-banana" ? "standard" : "pro";
+    const normalizedRequestedModel = String(params.model || "").toLowerCase();
+    const standardModels = new Set([
+      "nano-banana",
+      "nano-banana-2",
+      "gemini-2.5-flash-image",
+      "gemini-25-flash-image",
+      "gemini-3.1-flash-image-preview",
+    ]);
+    const modelTier = standardModels.has(normalizedRequestedModel) ? "standard" : "pro";
 
     // Run through provider chain with automatic fallback
     console.log("[ImagePlayground] Using provider chain", { modelTier });

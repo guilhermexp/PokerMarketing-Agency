@@ -78,9 +78,11 @@ export const ClipSettingsModal: React.FC<ClipSettingsModalProps> = ({
                                 className="w-full bg-[#0a0a0a]/60 border border-border rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/30 transition-all backdrop-blur-xl"
                             >
                                 <option value="gemini-3-pro-image-preview">Gemini 3 Pro</option>
-                                <option value="gemini-2.5-flash-image">Gemini 2.5 Flash</option>
-                                <option value="nano-banana">Nano Banana</option>
+                                <option value="gemini-3.1-flash-image-preview">Gemini 3.1 Flash Image (Nano Banana 2)</option>
+                                <option value="nano-banana-2">Nano Banana 2</option>
                                 <option value="nano-banana-pro">Nano Banana Pro</option>
+                                <option value="gemini-2.5-flash-image">Gemini 2.5 Flash (Legacy)</option>
+                                <option value="nano-banana">Nano Banana (Legacy)</option>
                             </select>
                         </div>
 

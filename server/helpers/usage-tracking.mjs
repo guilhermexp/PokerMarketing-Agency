@@ -34,6 +34,15 @@ const MODEL_PRICING = {
     }
   },
   // Google Gemini Image Models — Standard (flat rate; model outputs 1024px only)
+  'gemini-3.1-flash-image-preview': {
+    provider: 'google',
+    costPerImage: {
+      // Temporary parity with previous Flash Image pricing until pricing table is revalidated here.
+      '1K': 4,
+      '2K': 4,
+      '4K': 4
+    }
+  },
   'gemini-2.5-flash-image': {
     provider: 'google',
     costPerImage: {
@@ -142,6 +151,14 @@ const MODEL_PRICING = {
       '1K': 8,    // ~$0.08/image via Replicate (Google direct: $0.039)
       '2K': 8,
       '4K': 8
+    }
+  },
+  'nano-banana-2': {
+    provider: 'google',
+    costPerImage: {
+      '1K': 4,
+      '2K': 4,
+      '4K': 4
     }
   }
 };

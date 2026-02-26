@@ -170,14 +170,19 @@ export const generateImageWithFallback = async (
 
   const normalizedModel = String(model || DEFAULT_IMAGE_MODEL).toLowerCase();
   const isStandardModel =
+    normalizedModel === "gemini-3.1-flash-image-preview" ||
     normalizedModel === "gemini-2.5-flash-image" ||
     normalizedModel === "gemini-25-flash-image" ||
+    normalizedModel === "nano-banana-2" ||
+    normalizedModel === "google/nano-banana-2" ||
     normalizedModel === "nano-banana" ||
     normalizedModel === "google/nano-banana";
   const modelTier = isStandardModel ? "standard" : "pro";
   const replicateModel =
-    normalizedModel === "nano-banana"
-      ? "google/nano-banana"
+    normalizedModel === "nano-banana-2" || normalizedModel === "google/nano-banana-2"
+      ? undefined
+      : normalizedModel === "nano-banana"
+        ? "google/nano-banana"
       : normalizedModel === "nano-banana-pro"
         ? "google/nano-banana-pro"
         : normalizedModel === "google/nano-banana" ||

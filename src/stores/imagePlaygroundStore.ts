@@ -766,7 +766,7 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
       }),
       {
         name: 'IMAGE_PLAYGROUND_STORE',
-        version: 3,
+        version: 4,
         storage: safePersistStorage,
         migrate: (persistedState) => {
           if (!persistedState || typeof persistedState !== 'object') {
@@ -781,6 +781,10 @@ export const useImagePlaygroundStore = create<ImagePlaygroundStore>()(
 
           return {
             ...typedState,
+            model:
+              typedState.model === 'nano-banana' ? 'nano-banana-2' :
+              typedState.model === 'gemini-2.5-flash-image' ? 'gemini-3.1-flash-image-preview' :
+              typedState.model,
             parameters: {
               ...defaultParameters,
               ...safeParams,

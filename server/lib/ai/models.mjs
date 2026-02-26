@@ -31,7 +31,7 @@ export const ASSISTANT_MODEL = "gemini-3-flash-preview";
 // IMAGE GENERATION MODELS (native Gemini)
 // ============================================================================
 export const IMAGE_MODEL_PRO = "gemini-3-pro-image-preview";
-export const IMAGE_MODEL_STANDARD = "gemini-2.5-flash-image";
+export const IMAGE_MODEL_STANDARD = "gemini-3.1-flash-image-preview";
 
 // ============================================================================
 // VIDEO GENERATION MODELS
