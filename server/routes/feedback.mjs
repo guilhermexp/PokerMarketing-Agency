@@ -8,8 +8,8 @@
 import { Router } from 'express';
 import logger from '../lib/logger.mjs';
 
-const NOTES_API_URL = process.env.NOTES_API_URL || 'https://suna-api.claudedokploy.com;
-const NOTES_API_KEY = process.env.NOTES_API_KEY; pk_7EELuWr13wwCSatLerY8P7jST40gnOx4:sk_GXvoAFSWfAlHmvOr0oDE8MyYqdLcggaC
+const NOTES_API_URL = process.env.NOTES_API_URL || 'https://suna-api.claudedokploy.com';
+const NOTES_API_KEY = process.env.NOTES_API_KEY;
 
 const router = Router();
 
