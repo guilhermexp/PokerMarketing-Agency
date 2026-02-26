@@ -241,7 +241,11 @@ export async function logAiUsage(sql, {
   metadata = {}
 }) {
   const requestId = randomUUID();
-  const detectedProvider = provider || getProvider(model);
+  const rawProvider = provider || getProvider(model);
+  // Normalize internal provider names to DB enum values
+  // The provider chain uses "gemini" internally, but the DB enum uses "google"
+  const PROVIDER_TO_ENUM = { gemini: 'google' };
+  const detectedProvider = PROVIDER_TO_ENUM[rawProvider] || rawProvider;
 
   // Calculate cost
   const estimatedCostCents = calculateCost({

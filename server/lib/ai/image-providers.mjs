@@ -9,7 +9,7 @@
  * Exports: PROVIDER_CHAIN, isProviderEnabled, runWithProviderFallback
  */
 
-import { isQuotaOrRateLimitError } from "./retry.mjs";
+import { isQuotaOrRateLimitError, isTimeoutError } from "./retry.mjs";
 import logger from "../logger.mjs";
 
 /**
@@ -206,6 +206,14 @@ export async function runWithProviderFallback(operation, params) {
         logger.warn(
           { provider: providerName, operation, error: error.message },
           `[ImageProviders] ${providerName} service unavailable, trying next provider`,
+        );
+        continue;
+      }
+
+      if (canFallback && isTimeoutError(error)) {
+        logger.warn(
+          { provider: providerName, operation, error: error.message },
+          `[ImageProviders] ${providerName} timed out, trying next provider`,
         );
         continue;
       }

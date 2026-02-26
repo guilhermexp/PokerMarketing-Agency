@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
 interface SignInFormProps {
-  onSwitchToSignUp: () => void;
+  onSwitchToSignUp: (email?: string) => void;
 }
 
 export function SignInForm({ onSwitchToSignUp }: SignInFormProps) {
@@ -15,9 +15,12 @@ export function SignInForm({ onSwitchToSignUp }: SignInFormProps) {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCreateAccountSuggestion, setShowCreateAccountSuggestion] =
+    useState(false);
 
   const handleSignIn = async () => {
     setError(null);
+    setShowCreateAccountSuggestion(false);
     const result = await authClient.signIn.email({
       email,
       password,
@@ -31,8 +34,10 @@ export function SignInForm({ onSwitchToSignUp }: SignInFormProps) {
       const code = result.error.code;
       if (code === "INVALID_PASSWORD" || code === "INVALID_EMAIL_OR_PASSWORD") {
         setError("Email ou senha incorretos.");
+        setShowCreateAccountSuggestion(true);
       } else if (code === "USER_NOT_FOUND") {
         setError("Nenhuma conta encontrada com este email.");
+        setShowCreateAccountSuggestion(true);
       } else if (code === "TOO_MANY_REQUESTS") {
         setError("Muitas tentativas. Tente novamente em alguns minutos.");
       } else {
@@ -47,7 +52,7 @@ export function SignInForm({ onSwitchToSignUp }: SignInFormProps) {
       <div className="flex justify-end">
         <button
           type="button"
-          onClick={onSwitchToSignUp}
+          onClick={() => onSwitchToSignUp(email.trim() || undefined)}
           className="text-sm text-white/50 hover:text-white transition-colors cursor-pointer"
         >
           Criar conta
@@ -97,8 +102,17 @@ export function SignInForm({ onSwitchToSignUp }: SignInFormProps) {
         </div>
 
         {error && (
-          <div className="rounded-lg border border-red-300/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-200 mt-4">
-            {error}
+          <div className="rounded-lg border border-red-300/20 bg-red-500/10 px-4 py-3 text-sm text-red-200 mt-4">
+            <p>{error}</p>
+            {showCreateAccountSuggestion && (
+              <button
+                type="button"
+                onClick={() => onSwitchToSignUp(email.trim() || undefined)}
+                className="mt-2 inline-flex items-center text-xs font-medium text-white underline underline-offset-4 hover:text-white/80 transition-colors"
+              >
+                Nao tem conta? Criar agora
+              </button>
+            )}
           </div>
         )}
 
