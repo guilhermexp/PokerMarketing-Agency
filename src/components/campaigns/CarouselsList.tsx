@@ -5,7 +5,11 @@ import { CampaignCarouselCard } from "../carousel/CampaignCarouselCard";
 import { generateAllCampaignCarouselImages } from "../carousel/services/campaignCarouselGeneration";
 import { getCarouselPreviewImages } from "../carousel/utils";
 import { getCarousels, type DbCarouselListItem } from "../../services/apiClient";
-import type { BrandProfile, CarouselScript, GalleryImage } from "../../types";
+import type { BrandProfile, CarouselScript, GalleryImage, ImageModel } from "../../types";
+import {
+  DEFAULT_CAMPAIGN_IMAGE_MODEL,
+  IMAGE_GENERATION_MODEL_OPTIONS,
+} from "../../config/imageGenerationModelOptions";
 
 interface CarouselsListProps {
   userId: string;
@@ -15,6 +19,7 @@ interface CarouselsListProps {
   onCreateCarouselFromPrompt?: (
     prompt: string,
     slidesPerCarousel: number,
+    imageModel?: ImageModel,
   ) => Promise<void>;
   onSelectCampaign?: (campaignId: string) => void;
 }
@@ -32,6 +37,9 @@ export function CarouselsList({
   const [error, setError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [slidesPerCarousel, setSlidesPerCarousel] = useState(5);
+  const [selectedImageModel, setSelectedImageModel] = useState<ImageModel>(
+    DEFAULT_CAMPAIGN_IMAGE_MODEL,
+  );
   const [isCreating, setIsCreating] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -113,6 +121,7 @@ export function CarouselsList({
     setPauseState(key, false);
     await generateAllCampaignCarouselImages(carousel, {
       brandProfile,
+      imageModel: selectedImageModel,
       shouldPause: () => !!pausedRef.current[key],
       setGeneratingCarousel,
       setLocalCarousels,
@@ -156,7 +165,11 @@ export function CarouselsList({
             setIsCreating(true);
             setError(null);
             try {
-              await onCreateCarouselFromPrompt(value, slidesPerCarousel);
+              await onCreateCarouselFromPrompt(
+                value,
+                slidesPerCarousel,
+                selectedImageModel,
+              );
               setPrompt("");
               setReloadToken((prev) => prev + 1);
             } catch (err) {
@@ -167,44 +180,58 @@ export function CarouselsList({
               setIsCreating(false);
             }
           }}
-          className="w-full max-w-4xl flex flex-col sm:flex-row gap-2 rounded-[20px] border border-white/10 bg-black/40 backdrop-blur-2xl p-1.5 sm:p-2 focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 transition-all shadow-[0_18px_60px_rgba(0,0,0,0.38)]"
+          className="w-full max-w-4xl mx-auto flex flex-col sm:flex-row gap-2 rounded-2xl border border-white/10 bg-black/20 px-2 py-1.5 transition-colors focus-within:border-white/20"
         >
           <input
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Descreva o carrossel que deseja criar..."
-            className="flex-1 h-10 sm:h-11 rounded-xl border border-transparent bg-transparent px-3.5 text-sm text-white/90 placeholder:text-muted-foreground focus:outline-none"
+            className="flex-1 h-10 rounded-xl border border-transparent bg-transparent px-3 text-sm text-white/90 placeholder:text-muted-foreground focus:outline-none"
           />
-          <select
-            value={slidesPerCarousel}
-            onChange={(e) => setSlidesPerCarousel(Number(e.target.value))}
-            className="h-10 sm:h-11 rounded-xl border border-white/10 bg-black/20 px-3.5 text-sm text-white/90 focus:outline-none focus:ring-1 focus:ring-white/10 focus:border-white/20"
-          >
-            <option value={2}>2 imagens</option>
-            <option value={3}>3 imagens</option>
-            <option value={4}>4 imagens</option>
-            <option value={5}>5 imagens</option>
-            <option value={6}>6 imagens</option>
-            <option value={7}>7 imagens</option>
-            <option value={8}>8 imagens</option>
-          </select>
-          <button
-            type="submit"
-            disabled={!prompt.trim() || isCreating}
-            className="h-10 sm:h-11 px-4 rounded-xl border border-white/10 bg-black/20 text-sm text-white/90 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-          >
-            {isCreating ? (
-              <>
-                <Loader size={14} />
-                Criando...
-              </>
-            ) : (
-              <>
-                <Icon name="zap" className="w-3.5 h-3.5" />
-                Criar
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-1 sm:gap-1.5 sm:pl-2 sm:ml-1 sm:border-l sm:border-white/10">
+            <select
+              value={slidesPerCarousel}
+              onChange={(e) => setSlidesPerCarousel(Number(e.target.value))}
+              className="h-9 rounded-lg border border-transparent bg-transparent px-2.5 text-sm text-white/80 focus:outline-none focus:border-white/10"
+            >
+              <option value={2}>2 imagens</option>
+              <option value={3}>3 imagens</option>
+              <option value={4}>4 imagens</option>
+              <option value={5}>5 imagens</option>
+              <option value={6}>6 imagens</option>
+              <option value={7}>7 imagens</option>
+              <option value={8}>8 imagens</option>
+            </select>
+            <select
+              value={selectedImageModel}
+              onChange={(e) => setSelectedImageModel(e.target.value as ImageModel)}
+              className="h-9 rounded-lg border border-transparent bg-transparent px-2.5 text-sm text-white/80 focus:outline-none focus:border-white/10"
+              title="Modelo para gerar imagens do carrossel"
+            >
+              {IMAGE_GENERATION_MODEL_OPTIONS.map((option) => (
+                <option key={option.model} value={option.model}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              disabled={!prompt.trim() || isCreating}
+              className="h-9 px-3 rounded-lg border border-white/10 bg-transparent text-sm text-white/85 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+            >
+              {isCreating ? (
+                <>
+                  <Loader size={14} />
+                  Criando...
+                </>
+              ) : (
+                <>
+                  <Icon name="zap" className="w-3.5 h-3.5" />
+                  Criar
+                </>
+              )}
+            </button>
+          </div>
         </form>
       )}
 

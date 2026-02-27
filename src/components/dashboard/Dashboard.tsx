@@ -149,6 +149,7 @@ interface DashboardProps {
   onCreateCarouselFromPrompt?: (
     prompt: string,
     slidesPerCarousel: number,
+    imageModel?: ImageModel,
   ) => Promise<void>;
   userId?: string;
   organizationId?: string | null;
