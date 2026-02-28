@@ -141,6 +141,7 @@ export function useCreateVideo(onAddToGallery?: (data: {
     activeTopicId,
     setIsCreating,
     addSession,
+    updateSession,
     clearPrompt,
     topics,
     updateTopic,
@@ -210,7 +211,7 @@ export function useCreateVideo(onAddToGallery?: (data: {
           videoUrl,
         });
 
-        // Update local store with video URL
+        // Update existing session in store with video URL
         sessionWithVideo = {
           ...result.data.session,
           generations: [{
@@ -220,7 +221,7 @@ export function useCreateVideo(onAddToGallery?: (data: {
           }],
         };
 
-        addSession(topicId, sessionWithVideo);
+        updateSession(topicId, result.data.session.id, sessionWithVideo);
       } catch (genError) {
         // Update generation as error
         await api.updateGeneration(generationId, {
@@ -283,6 +284,7 @@ export function useCreateVideo(onAddToGallery?: (data: {
     setIsCreating,
     createTopic,
     addSession,
+    updateSession,
     clearPrompt,
     refreshSessions,
     updateTopic,

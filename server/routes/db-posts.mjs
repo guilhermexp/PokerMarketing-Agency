@@ -1,5 +1,6 @@
 import { getSql } from "../lib/db.mjs";
 import { logError } from "../lib/logging-helpers.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 
 export function registerPostRoutes(app) {
   app.patch("/api/db/posts", async (req, res) => {
@@ -25,7 +26,7 @@ export function registerPostRoutes(app) {
       res.json(result[0]);
     } catch (error) {
       logError("Posts API", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -53,7 +54,7 @@ export function registerPostRoutes(app) {
       res.json(result[0]);
     } catch (error) {
       logError("Ad Creatives API", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 }

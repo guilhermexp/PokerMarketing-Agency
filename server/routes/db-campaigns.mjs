@@ -15,6 +15,7 @@ import {
   DatabaseError,
 } from "../lib/errors/index.mjs";
 import logger from "../lib/logger.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 
 export function registerCampaignRoutes(app) {
   app.get("/api/db/campaigns", async (req, res) => {
@@ -539,7 +540,7 @@ export function registerCampaignRoutes(app) {
         return res.status(403).json({ error: error.message });
       }
       logError("Campaigns API", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -569,7 +570,7 @@ export function registerCampaignRoutes(app) {
       res.json(result[0]);
     } catch (error) {
       logError("Campaigns API (PATCH clip)", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -619,7 +620,7 @@ export function registerCampaignRoutes(app) {
       res.json(result[0]);
     } catch (error) {
       logError("Campaigns API (PATCH scene)", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -706,7 +707,7 @@ export function registerCampaignRoutes(app) {
       res.json(result);
     } catch (error) {
       logError("Carousels API (GET)", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -721,20 +722,7 @@ export function registerCampaignRoutes(app) {
         return res.status(400).json({ error: "id is required" });
       }
 
-      // Build dynamic update
-      const updates = [];
-      const values = [];
-
-      if (cover_url !== undefined) {
-        updates.push("cover_url = $1");
-        values.push(cover_url);
-      }
-      if (caption !== undefined) {
-        updates.push(`caption = $${values.length + 1}`);
-        values.push(caption);
-      }
-
-      if (updates.length === 0) {
+      if (cover_url === undefined && caption === undefined) {
         return res.status(400).json({ error: "No fields to update" });
       }
 
@@ -754,7 +742,7 @@ export function registerCampaignRoutes(app) {
       res.json(result[0]);
     } catch (error) {
       logError("Carousels API (PATCH)", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -803,7 +791,7 @@ export function registerCampaignRoutes(app) {
       res.json(result[0]);
     } catch (error) {
       logError("Carousels API (PATCH slide)", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 }

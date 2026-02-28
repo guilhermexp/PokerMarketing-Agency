@@ -5,6 +5,7 @@ import { logError } from "../lib/logging-helpers.mjs";
 import { ValidationError, DatabaseError } from "../lib/errors/index.mjs";
 import { OrganizationAccessError } from "../helpers/organization-context.mjs";
 import logger from "../lib/logger.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 
 export function registerTournamentRoutes(app) {
 app.get("/api/db/tournaments/list", async (req, res) => {
@@ -57,7 +58,7 @@ app.get("/api/db/tournaments/list", async (req, res) => {
       return res.status(403).json({ error: error.message });
     }
     logError("Tournaments API List", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -219,7 +220,7 @@ app.post("/api/db/tournaments", async (req, res) => {
       return res.status(403).json({ error: error.message });
     }
     logError("Tournaments API", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -267,7 +268,7 @@ app.delete("/api/db/tournaments", async (req, res) => {
       return res.status(403).json({ error: error.message });
     }
     logError("Tournaments API", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -318,7 +319,7 @@ app.patch("/api/db/tournaments/event-flyer", async (req, res) => {
     res.json(result[0]);
   } catch (error) {
     logError("Tournaments API (PATCH event-flyer)", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -402,7 +403,7 @@ app.patch("/api/db/tournaments/daily-flyer", async (req, res) => {
     res.json(result[0]);
   } catch (error) {
     logError("Tournaments API (PATCH daily-flyer)", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: sanitizeErrorForClient(error) });
   }
 });
 }

@@ -448,7 +448,7 @@ export function registerAiImageRoutes(app) {
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
       const statusCode = isQuotaOrRateLimitError(error) ? 429 : 500;
       return res
         .status(statusCode)
@@ -541,7 +541,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
       return res
         .status(500)
         .json({ error: sanitizeErrorForClient(error) });

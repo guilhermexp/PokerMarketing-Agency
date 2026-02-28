@@ -13,12 +13,15 @@
 import { GoogleGenAI } from "@google/genai";
 import { fal } from "@fal-ai/client";
 
+let cachedGeminiAi = null;
 export const getGeminiAi = () => {
+  if (cachedGeminiAi) return cachedGeminiAi;
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY not configured");
   }
-  return new GoogleGenAI({ apiKey });
+  cachedGeminiAi = new GoogleGenAI({ apiKey });
+  return cachedGeminiAi;
 };
 
 export const configureFal = () => {

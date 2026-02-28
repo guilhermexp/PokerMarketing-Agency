@@ -5,6 +5,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import useSWR from 'swr';
+import { useShallow } from 'zustand/react/shallow';
 import { useImagePlaygroundStore, imagePlaygroundSelectors } from '../stores/imagePlaygroundStore';
 import * as api from '../services/api/imagePlayground';
 import type { GenerationBatch, AsyncTaskStatus } from '../stores/imagePlaygroundStore';
@@ -16,7 +17,15 @@ import { useApiErrorHandler } from './useApiErrorHandler';
 
 export function useImagePlaygroundTopics() {
   const { setTopics, addTopic, updateTopic, removeTopic, setActiveTopicId, topics, activeTopicId } =
-    useImagePlaygroundStore();
+    useImagePlaygroundStore(useShallow((s) => ({
+      setTopics: s.setTopics,
+      addTopic: s.addTopic,
+      updateTopic: s.updateTopic,
+      removeTopic: s.removeTopic,
+      setActiveTopicId: s.setActiveTopicId,
+      topics: s.topics,
+      activeTopicId: s.activeTopicId,
+    })));
 
   const { data, error, isLoading, mutate } = useSWR(
     'image-playground-topics',
@@ -82,7 +91,14 @@ export function useImagePlaygroundTopics() {
 
 export function useImagePlaygroundBatches(topicId: string | null) {
   const { setBatches, addBatch, removeBatch, removeGeneration, batchesMap, loadedTopicIds } =
-    useImagePlaygroundStore();
+    useImagePlaygroundStore(useShallow((s) => ({
+      setBatches: s.setBatches,
+      addBatch: s.addBatch,
+      removeBatch: s.removeBatch,
+      removeGeneration: s.removeGeneration,
+      batchesMap: s.batchesMap,
+      loadedTopicIds: s.loadedTopicIds,
+    })));
 
   const batches = topicId ? batchesMap[topicId] || [] : [];
   const isLoaded = topicId ? loadedTopicIds.includes(topicId) : false;
@@ -208,31 +224,31 @@ export function useGenerationPolling(
 // =============================================================================
 
 export function useCreateImage() {
-  const {
-    model,
-    provider,
-    parameters,
-    imageNum,
-    activeTopicId,
-    useBrandProfile,
-    useInstagramMode,
-    useAiInfluencerMode,
-    useProductHeroMode,
-    useExplodedProductMode,
-    useBrandIdentityMode,
-    setIsCreating,
-    setIsCreatingWithNewTopic,
-    addBatch,
-    setParam,
-    topics,
-    updateTopic,
-  } = useImagePlaygroundStore();
+  // Only subscribe to actions (stable references) via the hook.
+  // State values (model, provider, parameters, etc.) are read inside the callback
+  // via getState() to avoid re-creating the callback on every state change.
+  const { setIsCreating, setIsCreatingWithNewTopic, addBatch, setParam, updateTopic } =
+    useImagePlaygroundStore(useShallow((s) => ({
+      setIsCreating: s.setIsCreating,
+      setIsCreatingWithNewTopic: s.setIsCreatingWithNewTopic,
+      addBatch: s.addBatch,
+      setParam: s.setParam,
+      updateTopic: s.updateTopic,
+    })));
+
+  const activeTopicId = useImagePlaygroundStore((s) => s.activeTopicId);
 
   const { createTopic } = useImagePlaygroundTopics();
   const { refresh: refreshBatches } = useImagePlaygroundBatches(activeTopicId);
   const { handleApiError } = useApiErrorHandler();
 
   const createImage = useCallback(async () => {
+    // Read current state at call time instead of subscribing to every field
+    const state = useImagePlaygroundStore.getState();
+    const { model, provider, parameters, imageNum, useBrandProfile,
+      useInstagramMode, useAiInfluencerMode, useProductHeroMode,
+      useExplodedProductMode, useBrandIdentityMode, topics } = state;
+
     const prompt = parameters.prompt?.trim();
     if (!prompt) {
       throw new Error('Por favor, digite um prompt');
@@ -315,18 +331,7 @@ export function useCreateImage() {
       setIsCreatingWithNewTopic(false);
     }
   }, [
-    parameters,
     activeTopicId,
-    provider,
-    model,
-    imageNum,
-    useBrandProfile,
-    useInstagramMode,
-    useAiInfluencerMode,
-    useProductHeroMode,
-    useExplodedProductMode,
-    useBrandIdentityMode,
-    topics,
     setIsCreating,
     setIsCreatingWithNewTopic,
     createTopic,
@@ -348,6 +353,13 @@ export function useCreateImage() {
 // Combined Hook
 // =============================================================================
 
+/**
+ * @deprecated Prefer using the individual hooks directly (useImagePlaygroundTopics,
+ * useImagePlaygroundBatches, useCreateImage) instead of this combined hook.
+ * This hook spreads the entire store via `...store`, which subscribes to ALL
+ * 30+ store fields and causes re-renders on any state change, defeating the
+ * purpose of fine-grained selectors used in the individual hooks.
+ */
 export function useImagePlayground() {
   const store = useImagePlaygroundStore();
   const topicsHook = useImagePlaygroundTopics();

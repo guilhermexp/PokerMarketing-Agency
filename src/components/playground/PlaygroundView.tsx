@@ -34,6 +34,7 @@ import {
   PlaygroundAspectRatio,
 } from './types';
 import type { BrandProfile, GalleryImage } from '../../types';
+import { useShallow } from 'zustand/react/shallow';
 import {
   useVideoPlaygroundStore,
   videoPlaygroundSelectors,
@@ -101,7 +102,18 @@ const ConfigPanel: React.FC = () => {
     setResolution,
     toggleBrandProfile,
     setReferenceImage,
-  } = useVideoPlaygroundStore();
+  } = useVideoPlaygroundStore(useShallow((s) => ({
+    model: s.model,
+    aspectRatio: s.aspectRatio,
+    resolution: s.resolution,
+    useBrandProfile: s.useBrandProfile,
+    referenceImage: s.referenceImage,
+    setModel: s.setModel,
+    setAspectRatio: s.setAspectRatio,
+    setResolution: s.setResolution,
+    toggleBrandProfile: s.toggleBrandProfile,
+    setReferenceImage: s.setReferenceImage,
+  })));
 
   const handleReferenceUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -476,7 +488,8 @@ const TopicItem: React.FC<TopicItemProps> = ({
 const TopicsSidebar: React.FC = () => {
   const { topics, isLoading: topicsLoading, createTopic, deleteTopic, updateTopic } =
     useVideoPlaygroundTopics();
-  const { activeTopicId, switchTopic } = useVideoPlaygroundStore();
+  const activeTopicId = useVideoPlaygroundStore((s) => s.activeTopicId);
+  const switchTopic = useVideoPlaygroundStore((s) => s.switchTopic);
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreateTopic = useCallback(async () => {
@@ -551,7 +564,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ brandProfile, onAddImageToGallery
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [mode, setMode] = useState<'direct' | 'agent'>('direct');
 
-  const { prompt, setPrompt, activeTopicId, model, resolution } = useVideoPlaygroundStore();
+  const { prompt, setPrompt, activeTopicId, model, resolution } = useVideoPlaygroundStore(useShallow((s) => ({
+    prompt: s.prompt,
+    setPrompt: s.setPrompt,
+    activeTopicId: s.activeTopicId,
+    model: s.model,
+    resolution: s.resolution,
+  })));
   const { sessions, isLoading: sessionsLoading } = useVideoPlaygroundSessions(activeTopicId);
   const { createTopic } = useVideoPlaygroundTopics();
   const { createVideo, isCreating, canGenerate } = useCreateVideo(

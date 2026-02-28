@@ -552,7 +552,8 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           ];
           if (source) conditions.push(sql`source = ${source}`);
           if (query) {
-            const pattern = `%${query}%`;
+            const escaped = query.replace(/[%_\\]/g, '\\$&');
+            const pattern = `%${escaped}%`;
             conditions.push(sql`(prompt ILIKE ${pattern} OR source ILIKE ${pattern})`);
           }
           const where = conditions.reduce((a, b) => sql`${a} AND ${b}`);

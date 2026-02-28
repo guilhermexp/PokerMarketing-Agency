@@ -191,8 +191,9 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
             });
           }
         });
-        console.log(
-          `[Flyer API] Added ${allCollabLogos.length} collab logo(s) to parts`,
+        logger.info(
+          { collabLogosCount: allCollabLogos.length },
+          "[Flyer API] Added collab logo(s) to parts",
         );
       }
 
@@ -345,7 +346,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
       return res
         .status(500)
         .json({ error: sanitizeErrorForClient(error) });
@@ -468,7 +469,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
       return res
         .status(500)
         .json({ error: sanitizeErrorForClient(error) });
@@ -600,7 +601,7 @@ REGRAS:
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
       return res
         .status(500)
         .json({ error: sanitizeErrorForClient(error) });
@@ -683,7 +684,7 @@ REGRAS:
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
       return res
         .status(500)
         .json({ error: sanitizeErrorForClient(error) });

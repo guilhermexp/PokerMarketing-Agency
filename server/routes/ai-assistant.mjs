@@ -183,7 +183,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
         latencyMs: timer(),
         status: "success",
         metadata: { historyLength: history.length },
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
     } catch (error) {
       logger.error({ err: error }, "[Assistant API] Error");
       await logAiUsage(sql, {
@@ -194,7 +194,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
       if (!res.headersSent) {
         return res
           .status(500)

@@ -275,7 +275,7 @@ export const convertImagePromptToJson = async (
       latencyMs: timer(),
       status: "failed",
       error: error.message,
-    }).catch(() => {});
+    }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
     return null;
   }
 };
@@ -429,7 +429,7 @@ export const expandAiInfluencerPrompt = async (
         outputTokens,
         latencyMs: timer(),
         status: "success",
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
     }
 
     logger.info(
@@ -450,7 +450,7 @@ export const expandAiInfluencerPrompt = async (
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
     }
 
     return null;
@@ -608,7 +608,7 @@ export const expandProductHeroPrompt = async (
         outputTokens,
         latencyMs: timer(),
         status: "success",
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
     }
 
     logger.info(
@@ -629,7 +629,7 @@ export const expandProductHeroPrompt = async (
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
     }
 
     return null;
@@ -783,7 +783,7 @@ export const expandExplodedProductPrompt = async (
         outputTokens,
         latencyMs: timer(),
         status: "success",
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
     }
 
     logger.info(
@@ -804,7 +804,7 @@ export const expandExplodedProductPrompt = async (
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
     }
 
     return null;
@@ -937,7 +937,7 @@ export const expandBrandIdentityPrompt = async (
         outputTokens,
         latencyMs: timer(),
         status: "success",
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
     }
 
     logger.info(
@@ -958,7 +958,7 @@ export const expandBrandIdentityPrompt = async (
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
     }
 
     return null;

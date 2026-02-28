@@ -11,6 +11,7 @@ import React, {
   useEffect,
   useCallback,
   useRef,
+  useMemo,
 } from "react";
 import {
   queueGenerationJob,
@@ -112,11 +113,18 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
   }
 
   // Derived state
-  const pendingJobs = jobs.filter(
-    (j) => j.status === "queued" || j.status === "processing",
+  const pendingJobs = useMemo(
+    () => jobs.filter((j) => j.status === "queued" || j.status === "processing"),
+    [jobs],
   );
-  const completedJobs = jobs.filter((j) => j.status === "completed");
-  const failedJobs = jobs.filter((j) => j.status === "failed");
+  const completedJobs = useMemo(
+    () => jobs.filter((j) => j.status === "completed"),
+    [jobs],
+  );
+  const failedJobs = useMemo(
+    () => jobs.filter((j) => j.status === "failed"),
+    [jobs],
+  );
 
   // Debug: log when jobs change
   useEffect(() => {
@@ -309,7 +317,7 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
     return () => failListeners.current.delete(callback);
   }, []);
 
-  const value: BackgroundJobsContextValue = {
+  const value: BackgroundJobsContextValue = useMemo(() => ({
     jobs,
     pendingJobs,
     completedJobs,
@@ -321,7 +329,19 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
     onJobFailed,
     isLoading,
     refreshJobs,
-  };
+  }), [
+    jobs,
+    pendingJobs,
+    completedJobs,
+    failedJobs,
+    queueJob,
+    getJobByContext,
+    getJobById,
+    onJobComplete,
+    onJobFailed,
+    isLoading,
+    refreshJobs,
+  ]);
 
   return (
     <BackgroundJobsContext.Provider value={value}>

@@ -12,6 +12,7 @@
  */
 
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 import { devtools, persist } from 'zustand/middleware';
 import type {
   GenerationJob,
@@ -359,15 +360,14 @@ export const useGenerationJobStore = (context: string) => {
 };
 
 /**
- * Hook to get job counts for UI indicators
+ * Hook to get job counts for UI indicators.
+ * Uses useShallow to prevent re-renders when the computed counts haven't changed.
  */
 export const useJobCounts = () => {
-  const jobs = useJobsStore((state) => state.jobs);
-
-  return {
-    total: jobs.length,
-    pending: jobs.filter((j) => j.status === 'queued' || j.status === 'processing').length,
-    completed: jobs.filter((j) => j.status === 'completed').length,
-    failed: jobs.filter((j) => j.status === 'failed').length,
-  };
+  return useJobsStore(useShallow((state) => ({
+    total: state.jobs.length,
+    pending: state.jobs.filter((j) => j.status === 'queued' || j.status === 'processing').length,
+    completed: state.jobs.filter((j) => j.status === 'completed').length,
+    failed: state.jobs.filter((j) => j.status === 'failed').length,
+  })));
 };

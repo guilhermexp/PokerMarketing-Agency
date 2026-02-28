@@ -81,7 +81,7 @@ export function registerAiSpeechRoutes(app) {
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
       return res
         .status(500)
         .json({ error: sanitizeErrorForClient(error) });

@@ -2,6 +2,7 @@ import { getSql } from "../lib/db.mjs";
 import { resolveUserId } from "../lib/user-resolver.mjs";
 import { RUBE_MCP_URL, RUBE_TIMEOUT_MS } from "../lib/constants.mjs";
 import logger from "../lib/logger.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 
 // ============================================================================
 // INSTAGRAM ACCOUNTS API (Multi-tenant Rube MCP)
@@ -161,7 +162,7 @@ export function registerInstagramRoutes(app) {
       res.json(result);
     } catch (error) {
       logger.error({ err: error }, "[Instagram Accounts API] Error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -238,7 +239,7 @@ export function registerInstagramRoutes(app) {
       });
     } catch (error) {
       logger.error({ err: error }, "[Instagram Accounts API] Error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -274,7 +275,7 @@ export function registerInstagramRoutes(app) {
       });
     } catch (error) {
       logger.error({ err: error }, "[Instagram Accounts API] Error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -292,7 +293,7 @@ export function registerInstagramRoutes(app) {
       res.json({ success: true, message: "Conta desconectada." });
     } catch (error) {
       logger.error({ err: error }, "[Instagram Accounts API] Error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 }

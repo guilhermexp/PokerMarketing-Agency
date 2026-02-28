@@ -12,6 +12,7 @@ import { validateContentType } from "../lib/validation/contentType.mjs";
 import { isQuotaOrRateLimitError } from "../lib/ai/retry.mjs";
 import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
 import { logAiUsage } from "./usage-tracking.mjs";
+import logger from "../lib/logger.mjs";
 
 // Normalize model names to match the image_model enum in the database.
 // The DB enum currently only has 'gemini-3-pro-image-preview', so we map
@@ -950,7 +951,7 @@ async function processImageGeneration(
       status: "failed",
       error: error.message,
       metadata: { source: "playground", generationId, provider: usedProvider },
-    }).catch(() => {});
+    }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
 
     // Build user-friendly error for the frontend
     const isQuota = isQuotaOrRateLimitError(error);

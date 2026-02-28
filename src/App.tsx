@@ -2,7 +2,9 @@ import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallbac
 
 import { BrandProfileSetup } from "./components/brand/BrandProfileSetup";
 import { SettingsModal } from "./components/settings/SettingsModal";
-import { ClientFeedback } from "./feedback";
+const ClientFeedback = lazy(() =>
+  import("./feedback/client-feedback").then((m) => ({ default: m.ClientFeedback })),
+);
 import { useInstagramAccounts } from "./components/settings/ConnectInstagramModal";
 import { Loader } from "./components/common/Loader";
 import {
@@ -38,6 +40,7 @@ import type {
   CreativeModel,
   AssistantFunctionCall,
   PendingToolEdit,
+  CarouselScript,
 } from "./types";
 import { Icon } from "./components/common/Icon";
 import {
@@ -402,17 +405,13 @@ function AppContent() {
 
 
   // Get active Instagram context (first active account)
-  const getInstagramContext = (): InstagramContext | undefined => {
+  const instagramContext = useMemo(() => {
     const activeAccount = instagramAccounts.find((a) => a.is_active);
     if (activeAccount && userId) {
-      return {
-        instagramAccountId: activeAccount.id,
-        userId: userId,
-        organizationId: organizationId || undefined,
-      };
+      return { instagramAccountId: activeAccount.id, userId, organizationId: organizationId || undefined };
     }
     return undefined;
-  };
+  }, [instagramAccounts, userId, organizationId]);
 
   const [tournamentEvents, setTournamentEvents] = useState<TournamentEvent[]>(
     [],
@@ -437,7 +436,7 @@ function AppContent() {
   });
 
   // Transform SWR data to local format
-  const galleryImages: GalleryImage[] = (swrGalleryImages || [])
+  const galleryImages: GalleryImage[] = useMemo(() => (swrGalleryImages || [])
     .filter((img) => {
       // Filter out invalid images: blob URLs, empty src_url, null/undefined
       if (!img.src_url || img.src_url === '') return false;
@@ -460,9 +459,9 @@ function AppContent() {
       // Timestamps
       created_at: img.created_at,
       published_at: img.published_at || undefined,
-    }));
+    })), [swrGalleryImages]);
 
-  const scheduledPosts: ScheduledPost[] = (swrScheduledPosts || [])
+  const scheduledPosts: ScheduledPost[] = useMemo(() => (swrScheduledPosts || [])
     .map((post) => {
       const normalizedDate =
         post.scheduled_date?.split("T")[0] || post.scheduled_date;
@@ -492,29 +491,30 @@ function AppContent() {
           "gallery") as ScheduledPost["createdFrom"],
       };
     })
-    .sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp);
+    .sort((a, b) => a.scheduledTimestamp - b.scheduledTimestamp), [swrScheduledPosts]);
 
-  const campaignsList: CampaignSummary[] = (swrCampaigns || []).map(
+  const campaignsList: CampaignSummary[] = useMemo(() => (swrCampaigns || []).map(
     (c: DbCampaign) => ({
       id: c.id,
       name: c.name,
       status: c.status,
       createdAt: c.created_at,
     }),
-  );
+  ), [swrCampaigns]);
 
+  // Sync SWR data to local state. Cannot convert to useMemo because
+  // tournamentEvents and allSchedules are also mutated independently
+  // (file upload, schedule selection, adding events, deleting schedules).
   useEffect(() => {
     if (swrTournamentEvents && swrTournamentEvents.length > 0) {
       setTournamentEvents(swrTournamentEvents.map(mapDbEventToTournamentEvent));
     } else if (tournamentEvents.length > 0) {
-      // Only clear if we actually had events before (avoids unnecessary renders)
       setTournamentEvents([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [swrTournamentEvents]);
 
   useEffect(() => {
-    // Only update if the schedules actually differ
     if (swrAllSchedules && swrAllSchedules.length > 0) {
       setAllSchedules(swrAllSchedules);
     } else if (allSchedules.length > 0) {
@@ -1060,7 +1060,6 @@ function AppContent() {
 
     try {
       // 1. Create post in database
-      const instagramContext = getInstagramContext();
       const payload = {
         content_type: post.type,
         content_id: post.contentId,
@@ -1247,7 +1246,6 @@ function AppContent() {
         post.instagramContentType || "photo";
 
       // Step 4: Publish to Instagram with progress tracking
-      const instagramContext = getInstagramContext();
       if (!instagramContext) {
         throw new Error(
           "Conecte sua conta Instagram em Configurações → Integrações para publicar.",
@@ -2376,6 +2374,97 @@ function AppContent() {
     handleSetChatReferenceSilent
   ]);
 
+  const handleEditProfile = useCallback(() => setIsEditingProfile(true), []);
+
+  const handleResetCampaign = useCallback(() => {
+    setCampaign(null);
+    setCampaignProductImages(null);
+    setCampaignCompositionAssets(null);
+  }, []);
+
+  const handleToggleAssistant = useCallback(
+    () => setIsAssistantOpen((prev) => !prev),
+    [],
+  );
+
+  const handleThemeToggle = useCallback(
+    () => setTheme((t) => (t === "light" ? "dark" : "light")),
+    [],
+  );
+
+  const handleAddTournamentEvent = useCallback(
+    (ev: TournamentEvent) => setTournamentEvents((p) => [ev, ...p]),
+    [],
+  );
+
+  const handleDeleteSchedule = useCallback(async (scheduleId: string) => {
+    if (!userId) return;
+    try {
+      await deleteWeekSchedule(userId, scheduleId, organizationId);
+      setAllSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
+      if (currentScheduleId === scheduleId) {
+        setCurrentScheduleId(null);
+        setTournamentEvents([]);
+        setWeekScheduleInfo(null);
+        setIsWeekExpired(false);
+      }
+      console.debug("[Tournaments] Deleted schedule:", scheduleId);
+    } catch (e) {
+      console.error("[Tournaments] Failed to delete schedule:", e);
+    }
+  }, [userId, organizationId, currentScheduleId]);
+
+  const handleClearSelectedStyleReference = useCallback(
+    () => setSelectedStyleReference(null),
+    [],
+  );
+
+  const handleClearExpiredSchedule = useCallback(async () => {
+    if (userId && currentScheduleId) {
+      try {
+        await deleteWeekSchedule(userId, currentScheduleId, organizationId);
+        setCurrentScheduleId(null);
+        setTournamentEvents([]);
+        setWeekScheduleInfo(null);
+        setIsWeekExpired(false);
+      } catch (e) {
+        console.error("[Tournaments] Failed to clear expired schedule:", e);
+      }
+    }
+  }, [userId, currentScheduleId, organizationId]);
+
+  const handleUpdateCreativeModel = useCallback(async (model: CreativeModel) => {
+    setBrandProfile((prev) => (prev ? { ...prev, creativeModel: model } : prev));
+    if (userId) {
+      try {
+        const existingProfile = await getBrandProfile(userId, organizationId);
+        if (existingProfile) {
+          await updateBrandProfile(existingProfile.id, {
+            settings: {
+              ...existingProfile.settings,
+              creativeModel: model,
+            },
+          });
+          console.debug("[BrandProfile] Creative model updated to:", model);
+        }
+      } catch (e) {
+        console.error("Failed to update creative model:", e);
+      }
+    }
+  }, [userId, organizationId]);
+
+  const handleCarouselUpdate = useCallback((updatedCarousel: CarouselScript) => {
+    setCampaign((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        carousels: prev.carousels?.map((c) =>
+          c.id === updatedCarousel.id ? updatedCarousel : c
+        ) || [],
+      };
+    });
+  }, []);
+
   // Show loader while:
   // 1. Authentication is loading
   // 2. Initial data is loading
@@ -2530,14 +2619,10 @@ function AppContent() {
                 compositionAssets={campaignCompositionAssets}
                 onGenerate={handleGenerateCampaign}
                 isGenerating={isGenerating}
-                onEditProfile={() => setIsEditingProfile(true)}
-                onResetCampaign={() => {
-                  setCampaign(null);
-                  setCampaignProductImages(null);
-                  setCampaignCompositionAssets(null);
-                }}
+                onEditProfile={handleEditProfile}
+                onResetCampaign={handleResetCampaign}
                 isAssistantOpen={isAssistantOpen}
-                onToggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
+                onToggleAssistant={handleToggleAssistant}
                 assistantHistory={chatHistory}
                 isAssistantLoading={isAssistantLoading}
                 onAssistantSendMessage={handleAssistantSendMessage}
@@ -2545,9 +2630,7 @@ function AppContent() {
                 onSetChatReference={handleSetChatReference}
                 onSetChatReferenceSilent={handleSetChatReferenceSilent}
                 theme={theme}
-                onThemeToggle={() =>
-                  setTheme((t) => (t === "light" ? "dark" : "light"))
-                }
+                onThemeToggle={handleThemeToggle}
                 galleryImages={galleryImages}
                 onAddImageToGallery={handleAddImageToGallery}
                 onUpdateGalleryImage={handleUpdateGalleryImage}
@@ -2558,32 +2641,11 @@ function AppContent() {
                 tournamentEvents={tournamentEvents}
                 weekScheduleInfo={weekScheduleInfo}
                 onTournamentFileUpload={handleTournamentFileUpload}
-                onAddTournamentEvent={(ev) =>
-                  setTournamentEvents((p) => [ev, ...p])
-                }
+                onAddTournamentEvent={handleAddTournamentEvent}
                 allSchedules={allSchedules}
                 currentScheduleId={currentScheduleId}
                 onSelectSchedule={handleSelectSchedule}
-                onDeleteSchedule={async (scheduleId) => {
-                  if (!userId) return;
-                  try {
-                    await deleteWeekSchedule(userId, scheduleId, organizationId);
-                    // Update local state
-                    setAllSchedules((prev) =>
-                      prev.filter((s) => s.id !== scheduleId),
-                    );
-                    // If deleted the current schedule, clear it
-                    if (currentScheduleId === scheduleId) {
-                      setCurrentScheduleId(null);
-                      setTournamentEvents([]);
-                      setWeekScheduleInfo(null);
-                      setIsWeekExpired(false);
-                    }
-                    console.debug("[Tournaments] Deleted schedule:", scheduleId);
-                  } catch (e) {
-                    console.error("[Tournaments] Failed to delete schedule:", e);
-                  }
-                }}
+                onDeleteSchedule={handleDeleteSchedule}
                 flyerState={flyerState}
                 setFlyerState={setFlyerState}
                 dailyFlyerState={dailyFlyerState}
@@ -2598,9 +2660,7 @@ function AppContent() {
                 onRemoveStyleReference={handleRemoveStyleReference}
                 onSelectStyleReference={handleSelectStyleReference}
                 selectedStyleReference={selectedStyleReference}
-                onClearSelectedStyleReference={() =>
-                  setSelectedStyleReference(null)
-                }
+                onClearSelectedStyleReference={handleClearSelectedStyleReference}
                 scheduledPosts={scheduledPosts}
                 onSchedulePost={handleSchedulePost}
                 onUpdateScheduledPost={handleUpdateScheduledPost}
@@ -2614,68 +2674,10 @@ function AppContent() {
                 userId={userId}
                 organizationId={organizationId}
                 isWeekExpired={isWeekExpired}
-                onClearExpiredSchedule={async () => {
-                  if (userId && currentScheduleId) {
-                    try {
-                      await deleteWeekSchedule(
-                        userId,
-                        currentScheduleId,
-                        organizationId,
-                      );
-                      setCurrentScheduleId(null);
-                      setTournamentEvents([]);
-                      setWeekScheduleInfo(null);
-                      setIsWeekExpired(false);
-                    } catch (e) {
-                      console.error(
-                        "[Tournaments] Failed to clear expired schedule:",
-                        e,
-                      );
-                    }
-                  }
-                }}
-                instagramContext={getInstagramContext()}
-                onUpdateCreativeModel={async (model: CreativeModel) => {
-                  // Update local state immediately
-                  setBrandProfile((prev) =>
-                    prev ? { ...prev, creativeModel: model } : prev,
-                  );
-                  // Save to database in background
-                  if (userId) {
-                    try {
-                      const existingProfile = await getBrandProfile(
-                        userId,
-                        organizationId,
-                      );
-                      if (existingProfile) {
-                        await updateBrandProfile(existingProfile.id, {
-                          settings: {
-                            ...existingProfile.settings,
-                            creativeModel: model,
-                          },
-                        });
-                        console.debug(
-                          "[BrandProfile] Creative model updated to:",
-                          model,
-                        );
-                      }
-                    } catch (e) {
-                      console.error("Failed to update creative model:", e);
-                    }
-                  }
-                }}
-                onCarouselUpdate={(updatedCarousel) => {
-                  // Update carousel in campaign state
-                  setCampaign((prev) => {
-                    if (!prev) return prev;
-                    return {
-                      ...prev,
-                      carousels: prev.carousels?.map((c) =>
-                        c.id === updatedCarousel.id ? updatedCarousel : c
-                      ) || [],
-                    };
-                  });
-                }}
+                onClearExpiredSchedule={handleClearExpiredSchedule}
+                instagramContext={instagramContext}
+                onUpdateCreativeModel={handleUpdateCreativeModel}
+                onCarouselUpdate={handleCarouselUpdate}
                 pendingToolEdit={pendingToolEdit}
                 editingImage={editingImage}
                 onRequestImageEdit={handleRequestImageEdit}
@@ -2689,7 +2691,7 @@ function AppContent() {
           </ChatProvider>
         </>
       )}
-      <ClientFeedback />
+      <Suspense fallback={null}><ClientFeedback /></Suspense>
       <BackgroundJobsIndicator isAssistantOpen={isAssistantOpen} />
       <ToastContainer />
     </>
