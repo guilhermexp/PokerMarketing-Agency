@@ -1,6 +1,7 @@
 import { getSql } from "../lib/db.mjs";
 import { resolveUserId } from "../lib/user-resolver.mjs";
 import { logError } from "../lib/logging-helpers.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 
 export function registerGenerationJobRoutes(app) {
 app.post("/api/generate/queue", async (req, res) => {
@@ -144,7 +145,7 @@ app.get("/api/generate/status", async (req, res) => {
     return res.status(400).json({ error: "jobId or userId is required" });
   } catch (error) {
     logError("Generate Status", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -181,7 +182,7 @@ app.post("/api/generate/cancel-all", async (req, res) => {
     });
   } catch (error) {
     logError("Cancel All Jobs API", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: sanitizeErrorForClient(error) });
   }
 });
 }

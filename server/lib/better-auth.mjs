@@ -31,7 +31,9 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // refresh daily
-    cookieCache: { enabled: true, maxAge: 5 * 60 },
+    // Avoid stale activeOrganizationId after org switch/login auto-activation.
+    // We need org context on protected API routes to be immediately consistent.
+    cookieCache: { enabled: false },
   },
   trustedOrigins: [...new Set(TRUSTED_ORIGINS)],
   plugins: [

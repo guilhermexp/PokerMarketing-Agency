@@ -21,30 +21,15 @@ import {
   Layers,
   Shield,
 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useImagePlaygroundStore, type ReferenceImage } from '../../stores/imagePlaygroundStore';
 import { uploadDataUrlToBlob } from '../../services/blobService';
 import type { ToneOfVoice } from '../../types';
+import { IMAGE_GENERATION_MODEL_OPTIONS as MODEL_OPTIONS } from '../../config/imageGenerationModelOptions';
 
 // =============================================================================
 // Model Options
 // =============================================================================
-
-const MODEL_OPTIONS = [
-  {
-    provider: 'replicate',
-    model: 'nano-banana',
-    label: 'Standard',
-    color: '#34A853',
-    desc: 'Rapido e economico',
-  },
-  {
-    provider: 'replicate',
-    model: 'nano-banana-pro',
-    label: 'Pro',
-    color: '#4285F4',
-    desc: 'Melhor qualidade',
-  },
-];
 
 const RESOLUTION_OPTIONS: Array<{ label: string; value: '1K' | '2K' | '4K'; desc: string }> = [
   { label: '1K', value: '1K', desc: 'Standard' },
@@ -133,7 +118,35 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
     updateReferenceImageBlobUrl,
     uploadingImageIds,
     setUploadingImageIds,
-  } = useImagePlaygroundStore();
+  } = useImagePlaygroundStore(useShallow((s) => ({
+    model: s.model,
+    parameters: s.parameters,
+    imageNum: s.imageNum,
+    activeAspectRatio: s.activeAspectRatio,
+    activeImageSize: s.activeImageSize,
+    useBrandProfile: s.useBrandProfile,
+    useInstagramMode: s.useInstagramMode,
+    useAiInfluencerMode: s.useAiInfluencerMode,
+    useProductHeroMode: s.useProductHeroMode,
+    useExplodedProductMode: s.useExplodedProductMode,
+    useBrandIdentityMode: s.useBrandIdentityMode,
+    setModelAndProvider: s.setModelAndProvider,
+    setImageNum: s.setImageNum,
+    setAspectRatio: s.setAspectRatio,
+    setImageSize: s.setImageSize,
+    setParam: s.setParam,
+    toggleBrandProfile: s.toggleBrandProfile,
+    toggleInstagramMode: s.toggleInstagramMode,
+    toggleAiInfluencerMode: s.toggleAiInfluencerMode,
+    toggleProductHeroMode: s.toggleProductHeroMode,
+    toggleExplodedProductMode: s.toggleExplodedProductMode,
+    toggleBrandIdentityMode: s.toggleBrandIdentityMode,
+    addReferenceImage: s.addReferenceImage,
+    removeReferenceImage: s.removeReferenceImage,
+    updateReferenceImageBlobUrl: s.updateReferenceImageBlobUrl,
+    uploadingImageIds: s.uploadingImageIds,
+    setUploadingImageIds: s.setUploadingImageIds,
+  })));
 
   const referenceImages = parameters.referenceImages || [];
 

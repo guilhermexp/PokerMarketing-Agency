@@ -152,12 +152,8 @@ function buildCanUseTool({ threadId, emitEvent }) {
   const recentSignatures = new Map();
 
   return async (toolName, input, options = {}) => {
-    if (BLOCKED_NATIVE_TOOLS.includes(toolName)) {
-      return {
-        behavior: 'deny',
-        message: `Built-in '${toolName}' está desabilitada. Use as tools MCP do Studio.`,
-      };
-    }
+    // NOTE: Native tools are already blocked via `disallowedTools` in query options.
+    // canUseTool here handles: AskUserQuestion interception + loop guard.
 
     // Handle interactive tools before the loop guard — these must always
     // suspend execution and wait for user input regardless of call count.
@@ -243,7 +239,7 @@ function buildCanUseTool({ threadId, emitEvent }) {
 
     if (!bucket || now - bucket.lastTs > LOOP_GUARD_WINDOW_SECONDS * 1000) {
       recentSignatures.set(signature, { count: 1, lastTs: now });
-      return { behavior: 'allow' };
+      return { behavior: 'allow', updatedInput: input };
     }
 
     bucket.count += 1;
@@ -278,6 +274,7 @@ export async function runStudioAgentStream({
   attachments = [],
   mentions = [],
   signal,
+  abortController,
 }) {
   const sessionDir = getSessionDir(thread.id);
   await fs.mkdir(sessionDir, { recursive: true });
@@ -339,6 +336,7 @@ export async function runStudioAgentStream({
   const q = query({
     prompt: composedPrompt,
     options: {
+      abortController,
       cwd: process.cwd(),
       env,
       mcpServers: { studio: mcpServer },
@@ -353,7 +351,7 @@ export async function runStudioAgentStream({
       includePartialMessages: true,
       maxTurns: 100,
       resume: thread.claude_session_id || undefined,
-      settingSources: ['project', 'user'],
+      settingSources: ['project'],
       model: env.ANTHROPIC_MODEL || process.env.ANTHROPIC_MODEL || 'kimi-k2.5-coding',
       stderr: (line) => logger.warn({ line }, '[StudioAgent] SDK stderr'),
     },

@@ -56,6 +56,7 @@ import { registerRubeRoutes } from "./routes/rube.mjs";
 import { registerImagePlaygroundRoutes } from "./routes/image-playground.mjs";
 import { registerVideoPlaygroundRoutes } from "./routes/video-playground.mjs";
 import { registerAgentStudioRoutes } from "./routes/agent-studio.mjs";
+import { registerFeedbackRoutes } from "./routes/feedback.mjs";
 
 // ---------------------------------------------------------------------------
 // App creation
@@ -188,6 +189,7 @@ const PROTECTED_API_PREFIXES = [
   "/api/video-playground",
   "/api/agent",
   "/api/admin",
+  "/api/feedback",
 ];
 
 for (const prefix of PROTECTED_API_PREFIXES) {
@@ -249,6 +251,7 @@ registerVideoPlaygroundRoutes(app, {
   logger,
 });
 registerAgentStudioRoutes(app);
+registerFeedbackRoutes(app);
 
 // ---------------------------------------------------------------------------
 // NOTE: notFoundHandler & errorHandler are NOT registered here.

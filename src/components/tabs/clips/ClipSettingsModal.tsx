@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon } from '../../common/Icon';
 import type { ImageModel, VideoModel } from '../../../types';
+import { IMAGE_GENERATION_MODEL_OPTIONS } from '../../../config/imageGenerationModelOptions';
 
 interface ClipSettingsModalProps {
     isOpen: boolean;
@@ -32,6 +33,9 @@ export const ClipSettingsModal: React.FC<ClipSettingsModalProps> = ({
     onToggleFrameInterpolation,
 }) => {
     if (!isOpen) return null;
+    const hasSupportedImageModel = IMAGE_GENERATION_MODEL_OPTIONS.some(
+        (option) => option.model === selectedImageModel
+    );
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -77,7 +81,16 @@ export const ClipSettingsModal: React.FC<ClipSettingsModalProps> = ({
                                 }
                                 className="w-full bg-[#0a0a0a]/60 border border-border rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/30 transition-all backdrop-blur-xl"
                             >
-                                <option value="gemini-3-pro-image-preview">Gemini 3</option>
+                                {IMAGE_GENERATION_MODEL_OPTIONS.map((option) => (
+                                    <option key={option.model} value={option.model}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                                {!hasSupportedImageModel && (
+                                    <option value={selectedImageModel}>
+                                        {selectedImageModel} (Legacy)
+                                    </option>
+                                )}
                             </select>
                         </div>
 

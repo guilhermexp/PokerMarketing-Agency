@@ -69,7 +69,10 @@ export default defineConfig(({ mode }) => {
           // so the browser receives fresh CSP headers from Express/helmet.
           // Precaching HTML bakes stale response headers into the SW cache.
           navigateFallback: null,
-          globPatterns: ["**/*.{js,css,ico,png,svg,webp,woff2}"],
+          // Exclude JS from precache — 300+ Shiki grammar chunks bloat it to ~17MB.
+          // JS assets are cached on-demand via StaleWhileRevalidate runtime strategy.
+          globPatterns: ["**/*.{css,ico,png,svg,webp,woff2}"],
+          globIgnores: ["**/node_modules/**"],
           // Force immediate update - don't wait for user to close all tabs
           skipWaiting: true,
           clientsClaim: true,
@@ -144,7 +147,7 @@ export default defineConfig(({ mode }) => {
       pure: mode === 'production' ? ['console.log', 'console.debug'] : [],
     },
     build: {
-      chunkSizeWarningLimit: 3000,
+      chunkSizeWarningLimit: 800,
     },
   };
 });

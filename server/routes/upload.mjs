@@ -2,6 +2,7 @@ import { put } from "@vercel/blob";
 import { logExternalAPI, logExternalAPIResult, logError } from "../lib/logging-helpers.mjs";
 import { validateContentType } from "../lib/validation/contentType.mjs";
 import logger from "../lib/logger.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 
 // Max file size: 100MB
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
@@ -75,7 +76,7 @@ app.get("/api/proxy-video", async (req, res) => {
     res.send(Buffer.from(buffer));
   } catch (error) {
     logError("Video Proxy", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: sanitizeErrorForClient(error) });
   }
 });
 
@@ -145,7 +146,7 @@ app.post("/api/upload", async (req, res) => {
   } catch (error) {
     logError("Upload API", error);
     return res.status(500).json({
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: sanitizeErrorForClient(error),
     });
   }
 });

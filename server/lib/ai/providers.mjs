@@ -1,36 +1,43 @@
 /**
- * Providers Wrapper - Vercel AI SDK
+ * Providers Wrapper — Vercel AI SDK language model factory.
  *
- * All LLM calls use Google Gemini native API.
- * OpenRouter has been removed.
+ * ┌────────────────────────────────────────────────────────────────┐
+ * │  For model IDs, see models.mjs.                                │
+ * │  For text generation, see text-generation.mjs.                 │
+ * │  This file only wraps the Vercel AI SDK provider.              │
+ * └────────────────────────────────────────────────────────────────┘
+ *
+ * Exports: getLanguageModel, getArtifactModel, getBrandModel,
+ *          SUPPORTED_MODELS, isModelSupported, getModelInfo
  */
 
 import { google } from '@ai-sdk/google';
+import {
+  normalizeModelId,
+  TEXT_MODEL,
+  SUPPORTED_CHAT_MODELS,
+} from './models.mjs';
 
 // ============================================================================
-// CONFIGURAÇÃO DO PROVIDER
+// PROVIDER INSTANCE
 // ============================================================================
 
-/**
- * Google AI SDK - Para modelos Gemini (native)
- */
 const googleNative = google({
-  apiKey: process.env.GEMINI_API_KEY
+  apiKey: process.env.GEMINI_API_KEY,
 });
 
 // ============================================================================
-// FUNÇÃO PRINCIPAL: getLanguageModel
+// PUBLIC API
 // ============================================================================
 
 /**
- * Retorna o modelo de linguagem configurado baseado no ID
+ * Get a Vercel AI SDK language model instance by ID.
  *
- * @param {string} modelId - ID do modelo (e.g. "gemini-3-flash-preview" or "google/gemini-3-flash-preview")
- * @returns {LanguageModel} - Instância do modelo configurada
+ * @param {string} modelId - e.g. "gemini-3-flash-preview" or "google/gemini-3-flash-preview"
+ * @returns {LanguageModel}
  */
 export function getLanguageModel(modelId) {
-  // Normalize: strip "google/" prefix if present (legacy IDs)
-  const normalizedId = modelId.replace(/^google\//, "");
+  const normalizedId = normalizeModelId(modelId);
 
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY não configurada');
@@ -41,37 +48,37 @@ export function getLanguageModel(modelId) {
 }
 
 /**
- * Retorna o modelo padrão para artifacts (mais capaz)
+ * Get default model for artifacts (most capable).
  */
 export function getArtifactModel() {
-  return getLanguageModel('gemini-3-flash-preview');
+  return getLanguageModel(TEXT_MODEL);
 }
 
 /**
- * Retorna o modelo configurado na brand profile ou default
+ * Get model configured in brand profile or default.
  */
 export function getBrandModel(brandProfile) {
   if (brandProfile?.preferredAIModel) {
     return getLanguageModel(brandProfile.preferredAIModel);
   }
-  return getLanguageModel('gemini-3-flash-preview');
+  return getLanguageModel(TEXT_MODEL);
 }
 
 // ============================================================================
-// MODELOS SUPORTADOS
+// SUPPORTED MODELS (re-exported from models.mjs with provider info)
 // ============================================================================
 
-export const SUPPORTED_MODELS = [
-  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash', provider: 'Google', fast: true },
-  { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro', provider: 'Google', fast: false },
-];
+export const SUPPORTED_MODELS = SUPPORTED_CHAT_MODELS.map((m) => ({
+  ...m,
+  provider: 'Google',
+}));
 
 export function isModelSupported(modelId) {
-  const normalized = modelId.replace(/^google\//, "");
-  return SUPPORTED_MODELS.some(m => m.id === normalized);
+  const normalized = normalizeModelId(modelId);
+  return SUPPORTED_MODELS.some((m) => m.id === normalized);
 }
 
 export function getModelInfo(modelId) {
-  const normalized = modelId.replace(/^google\//, "");
-  return SUPPORTED_MODELS.find(m => m.id === normalized) || null;
+  const normalized = normalizeModelId(modelId);
+  return SUPPORTED_MODELS.find((m) => m.id === normalized) || null;
 }

@@ -123,7 +123,7 @@ interface FlyerActions {
   // --- Style Reference Actions ---
   setGlobalStyleReference: (style: StyleReference | null) => void;
   setManualStyleReference: (style: StyleReference | null) => void;
-  toggleStyleFavorite: (styleId: string) => void;
+  toggleStyleFavorite: (style: StyleReference) => void;
   setStyleFavorites: (favorites: StyleReference[]) => void;
 
   // --- UI Actions ---
@@ -285,11 +285,11 @@ export const useFlyerStore = create<FlyerState & FlyerActions>()(
         // --- Style Reference Actions ---
         setGlobalStyleReference: (style) => set({ globalStyleReference: style }),
         setManualStyleReference: (style) => set({ manualStyleReference: style }),
-        toggleStyleFavorite: (styleId) => set((state) => {
-          const isFavorite = state.styleFavorites.some((f) => f.id === styleId);
+        toggleStyleFavorite: (style) => set((state) => {
+          const isFavorite = state.styleFavorites.some((f) => f.id === style.id);
           const newFavorites = isFavorite
-            ? state.styleFavorites.filter((f) => f.id !== styleId)
-            : [...state.styleFavorites, state.styleFavorites.find((f) => f.id === styleId)!].filter(Boolean);
+            ? state.styleFavorites.filter((f) => f.id !== style.id)
+            : [...state.styleFavorites, style];
           return { styleFavorites: newFavorites };
         }),
         setStyleFavorites: (favorites) => set({ styleFavorites: favorites }),
@@ -399,11 +399,16 @@ export const useFlyerStore = create<FlyerState & FlyerActions>()(
 export const selectCurrentDayTournaments = (state: FlyerState & FlyerActions) =>
   state.tournaments.filter((t) => t.day === state.selectedDay);
 
-export const selectEnabledPeriodTournaments = (state: FlyerState & FlyerActions) =>
-  state.tournaments.filter((t) =>
+export const selectEnabledPeriodTournaments = (state: FlyerState & FlyerActions) => {
+  const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+  const todayIndex = DAY_ORDER.indexOf(today);
+
+  return state.tournaments.filter((t) =>
     state.enabledPeriods.includes(t.day as TimePeriod) &&
-    (state.showPastTournaments || !state.showPastTournaments)
+    (state.showPastTournaments || DAY_ORDER.indexOf(t.day) >= todayIndex)
   );
+};
 
 export const selectSortedTournaments = (state: FlyerState & FlyerActions) => {
   const tournaments = state.tournaments.filter((t) => t.day === state.selectedDay);
@@ -421,6 +426,8 @@ export const selectSortedTournaments = (state: FlyerState & FlyerActions) => {
   });
 };
 
+// Use with useShallow to prevent unnecessary re-renders:
+// const config = useFlyerStore(useShallow(selectGenerationConfig));
 export const selectGenerationConfig = (state: FlyerState & FlyerActions) => ({
   aspectRatio: state.selectedAspectRatio,
   imageSize: state.selectedImageSize,

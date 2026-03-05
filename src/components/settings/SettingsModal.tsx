@@ -15,6 +15,7 @@ import { authClient } from '../../lib/auth-client';
 import { ConnectInstagramModal, useInstagramAccounts } from './ConnectInstagramModal';
 import { TeamManagement } from './TeamManagement';
 import { CREATIVE_MODELS_FOR_UI, getDefaultModelId } from '../../config/ai-models';
+import { useFeedbackStore } from '../../stores/feedbackStore';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -23,7 +24,7 @@ interface SettingsModalProps {
   onSaveProfile: (profile: BrandProfile) => void;
 }
 
-type Tab = 'brand' | 'tone' | 'integrations' | 'team';
+type Tab = 'brand' | 'tone' | 'integrations' | 'team' | 'tools';
 
 const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string; dataUrl: string }> =>
   new Promise((resolve, reject) => {
@@ -92,6 +93,8 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
   const user = sessionData?.user;
   const [activeTab, setActiveTab] = useState<Tab>('brand');
   const [showInstagramModal, setShowInstagramModal] = useState(false);
+  const feedbackEnabled = useFeedbackStore((s) => s.enabled);
+  const toggleFeedback = useFeedbackStore((s) => s.toggle);
 
   // Instagram accounts management
   const {
@@ -259,6 +262,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
     { id: 'tone', label: 'Tom', icon: 'sliders' },
     { id: 'integrations', label: 'Integrações', icon: 'link' },
     { id: 'team', label: 'Time', icon: 'users' },
+    { id: 'tools', label: 'Ferramentas', icon: 'zap' },
   ];
 
   return (
@@ -626,6 +630,51 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
             {activeTab === 'team' && (
               <div className="py-2">
                 <TeamManagement />
+              </div>
+            )}
+
+            {activeTab === 'tools' && (
+              <div className="space-y-6 py-2">
+                {/* Feedback Mode */}
+                <div className="border border-border rounded-xl p-5 bg-white/[0.02]">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center">
+                        <Icon name="message-circle" className="w-5 h-5 text-indigo-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Modo Feedback</h3>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Permite que clientes cliquem em elementos e deixem comentários visuais
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={feedbackEnabled}
+                      onClick={toggleFeedback}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0 ${
+                        feedbackEnabled ? 'bg-indigo-500' : 'bg-white/10'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                          feedbackEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {feedbackEnabled && (
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Um botão "Feedback" aparecerá no canto inferior direito da tela.
+                        Clique nele para ativar o modo de anotação, depois clique em qualquer
+                        elemento da página para deixar um comentário.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

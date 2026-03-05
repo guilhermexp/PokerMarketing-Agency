@@ -4,6 +4,7 @@ import { resolveUserId } from "../lib/user-resolver.mjs";
 import { logError } from "../lib/logging-helpers.mjs";
 import { ValidationError, DatabaseError } from "../lib/errors/index.mjs";
 import logger from "../lib/logger.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 import {
   hasPermission,
   PERMISSIONS,
@@ -187,7 +188,7 @@ export function registerGalleryRoutes(app) {
         return res.status(403).json({ error: error.message });
       }
       logError("Gallery Daily Flyers API GET", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -264,7 +265,7 @@ export function registerGalleryRoutes(app) {
         return res.status(403).json({ error: error.message });
       }
       logError("Gallery API POST", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -301,7 +302,7 @@ export function registerGalleryRoutes(app) {
       return res.status(200).json(result[0]);
     } catch (error) {
       logError("Gallery API PATCH", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -369,7 +370,7 @@ export function registerGalleryRoutes(app) {
         return res.status(403).json({ error: error.message });
       }
       logError("Gallery API", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 }

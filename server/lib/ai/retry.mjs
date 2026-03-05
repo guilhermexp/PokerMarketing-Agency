@@ -4,6 +4,18 @@
 
 import logger from "../logger.mjs";
 
+// Check if an error is a timeout that warrants retry/fallback
+export const isTimeoutError = (error) => {
+  const msg = String(error?.message || error || "").toLowerCase();
+  return (
+    error?.name === "TimeoutError" ||
+    msg.includes("timeouterror") ||
+    msg.includes("timed out") ||
+    msg.includes("the operation timed out") ||
+    error?.status === 504
+  );
+};
+
 // Check if an error is a quota/rate limit error that warrants fallback
 export const isQuotaOrRateLimitError = (error) => {
   const errorString = String(error?.message || error || "").toLowerCase();
@@ -96,9 +108,15 @@ export const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
         error?.status === 429 ||
         error?.message?.includes("429") ||
         error?.message?.includes("RESOURCE_EXHAUSTED");
+      const isTimeout =
+        error?.name === "TimeoutError" ||
+        error?.message?.includes("TimeoutError") ||
+        error?.message?.includes("timed out") ||
+        error?.message?.includes("The operation timed out") ||
+        error?.status === 504;
       // Permanent quota exhaustion (limit: 0, daily cap) — never retry
       const isPermanentQuota = is429 && isPermanentQuotaError(error);
-      const isRetryable = (is503 || is429) && !isPermanentQuota;
+      const isRetryable = (is503 || is429 || isTimeout) && !isPermanentQuota;
 
       logger.error(
         {
@@ -117,7 +135,7 @@ export const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
         const geminiDelay = is429 ? Math.min(extractRetryDelay(error), 60000) : 0;
         const waitTime = geminiDelay || delayMs * attempt;
         logger.info(
-          { waitTimeMs: waitTime, is429, is503 },
+          { waitTimeMs: waitTime, is429, is503, isTimeout },
           "[withRetry] Aguardando antes de tentar novamente",
         );
         await new Promise((resolve) => setTimeout(resolve, waitTime));

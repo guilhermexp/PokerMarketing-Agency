@@ -84,6 +84,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   const [isDbSyncing, setIsDbSyncing] = useState(false);
   const [isOrgReady, setIsOrgReady] = useState(false);
   const [authView, setAuthView] = useState<"signIn" | "signUp">("signIn");
+  const [authEmailDraft, setAuthEmailDraft] = useState("");
 
   // Track if we've already synced this user to prevent duplicate calls
   const syncedUserIdRef = useRef<string | null>(null);
@@ -228,9 +229,20 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
               </div>
 
               {authView === "signIn" ? (
-                <SignInForm onSwitchToSignUp={() => setAuthView("signUp")} />
+                <SignInForm
+                  onSwitchToSignUp={(email) => {
+                    if (email) setAuthEmailDraft(email);
+                    setAuthView("signUp");
+                  }}
+                />
               ) : (
-                <SignUpForm onSwitchToSignIn={() => setAuthView("signIn")} />
+                <SignUpForm
+                  initialEmail={authEmailDraft}
+                  onSwitchToSignIn={(email) => {
+                    if (email) setAuthEmailDraft(email);
+                    setAuthView("signIn");
+                  }}
+                />
               )}
             </div>
           </div>

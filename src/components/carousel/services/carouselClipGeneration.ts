@@ -3,7 +3,7 @@
  */
 
 import type { Dispatch, SetStateAction } from 'react';
-import type { BrandProfile, GalleryImage, ImageFile, VideoClipScript, ChatReferenceImage, StyleReference } from '../../../types';
+import type { BrandProfile, GalleryImage, ImageFile, VideoClipScript, ChatReferenceImage, StyleReference, ImageModel } from '../../../types';
 import { generateImage } from '../../../services/geminiService';
 import { uploadImageToBlob } from '../../../services/blobService';
 import { buildCarouselSlide4x5Prompt } from '@/ai-prompts';
@@ -20,6 +20,7 @@ interface Generate4x5Params {
   scene: { visual: string; narration: string };
   originalImage: GalleryImage;
   brandProfile: BrandProfile;
+  imageModel?: ImageModel;
   chatReferenceImage?: ChatReferenceImage | null;
   selectedStyleReference?: StyleReference | null;
   compositionAssets?: { base64: string; mimeType: string }[]; // Assets (ativos) for composition
@@ -34,6 +35,7 @@ export const generateCarouselSlide4x5 = async ({
   scene,
   originalImage,
   brandProfile,
+  imageModel,
   chatReferenceImage,
   selectedStyleReference,
   compositionAssets,
@@ -130,7 +132,7 @@ export const generateCarouselSlide4x5 = async ({
 
     const imageUrl = await generateImage(prompt, brandProfile, {
       aspectRatio: '4:5',
-      model: 'gemini-3-pro-image-preview',
+      model: imageModel || 'gemini-3-pro-image-preview',
       styleReferenceImage: styleRef,
       productImages: productImageRefs.length > 0 ? productImageRefs : undefined,
       compositionAssets: compositionAssets?.length > 0 ? compositionAssets : undefined,
@@ -150,7 +152,7 @@ export const generateCarouselSlide4x5 = async ({
         src: httpUrl,
         prompt: scene.visual,
         source: getCarrosselSource(clip.title, sceneNumber),
-        model: 'gemini-3-pro-image-preview',
+        model: imageModel || 'gemini-3-pro-image-preview',
         video_script_id: clip.id,
       });
     }
@@ -165,6 +167,7 @@ interface GenerateAllParams {
   clip: VideoClipScript;
   galleryImages: GalleryImage[] | undefined;
   brandProfile: BrandProfile;
+  imageModel?: ImageModel;
   chatReferenceImage?: ChatReferenceImage | null;
   selectedStyleReference?: StyleReference | null;
   compositionAssets?: { base64: string; mimeType: string }[]; // Assets (ativos) for composition
@@ -178,6 +181,7 @@ export const generateAllCarouselSlides4x5 = async ({
   clip,
   galleryImages,
   brandProfile,
+  imageModel,
   chatReferenceImage,
   selectedStyleReference,
   compositionAssets,
@@ -209,6 +213,7 @@ export const generateAllCarouselSlides4x5 = async ({
         scene,
         originalImage,
         brandProfile,
+        imageModel,
         chatReferenceImage,
         selectedStyleReference,
         compositionAssets,

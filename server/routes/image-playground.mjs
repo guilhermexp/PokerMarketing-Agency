@@ -1,5 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
 import { urlToBase64 } from "../helpers/image-helpers.mjs";
+import { getGeminiAi } from "../lib/ai/clients.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 import { expandAiInfluencerPrompt, expandProductHeroPrompt, expandExplodedProductPrompt, expandBrandIdentityPrompt } from "../lib/ai/prompt-builders.mjs";
 import {
   getTopics,
@@ -182,7 +183,7 @@ ${userPrompt}`;
       res.json({ topics });
     } catch (error) {
       logger.error({ err: error }, "[ImagePlayground] Get topics error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -202,7 +203,7 @@ ${userPrompt}`;
       res.json({ success: true, topic });
     } catch (error) {
       logger.error({ err: error }, "[ImagePlayground] Create topic error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -229,7 +230,7 @@ ${userPrompt}`;
       res.json({ success: true, topic });
     } catch (error) {
       logger.error({ err: error }, "[ImagePlayground] Update topic error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -249,7 +250,7 @@ ${userPrompt}`;
       res.json({ success: true });
     } catch (error) {
       logger.error({ err: error }, "[ImagePlayground] Delete topic error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -296,7 +297,7 @@ ${userPrompt}`;
         return res.json({ batches: [] });
       }
       logger.error({ err: error }, "[ImagePlayground] Get batches error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -316,7 +317,7 @@ ${userPrompt}`;
       res.json({ success: true });
     } catch (error) {
       logger.error({ err: error }, "[ImagePlayground] Delete batch error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -595,7 +596,7 @@ ${userPrompt}`;
       }
 
       // Initialize Gemini
-      const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const genai = getGeminiAi();
 
       const result = await createImageBatch(
         sql,
@@ -621,7 +622,7 @@ ${userPrompt}`;
         return;
       }
       logger.error({ err: error }, "[ImagePlayground] Generate error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -641,7 +642,7 @@ ${userPrompt}`;
       res.json(status);
     } catch (error) {
       logger.error({ err: error }, "[ImagePlayground] Get status error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -661,7 +662,7 @@ ${userPrompt}`;
       res.json({ success: true });
     } catch (error) {
       logger.error({ err: error }, "[ImagePlayground] Delete generation error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -677,13 +678,13 @@ ${userPrompt}`;
         return res.status(400).json({ error: "prompts array required" });
       }
 
-      const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const genai = getGeminiAi();
       const title = await generateTopicTitle(prompts, genai);
 
       res.json({ title });
     } catch (error) {
       logger.error({ err: error }, "[ImagePlayground] Generate title error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 }

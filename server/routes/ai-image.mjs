@@ -11,22 +11,21 @@
 import { getRequestAuthContext } from "../lib/auth.mjs";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.mjs";
-import { callGeminiTextApi } from "../lib/ai/clients.mjs";
 import {
   withRetry,
   sanitizeErrorForClient,
   isQuotaOrRateLimitError,
 } from "../lib/ai/retry.mjs";
+import { generateTextFromMessages } from "../lib/ai/text-generation.mjs";
 import {
   generateImageWithFallback,
   DEFAULT_IMAGE_MODEL,
 } from "../lib/ai/image-generation.mjs";
 import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
+import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.mjs";
 import {
   buildImagePrompt,
   convertImagePromptToJson,
-  Type,
-  DEFAULT_TEXT_MODEL,
 } from "../lib/ai/prompt-builders.mjs";
 import {
   logAiUsage,
@@ -35,6 +34,40 @@ import {
 import { urlToBase64 } from "../helpers/image-helpers.mjs";
 import { validateContentType } from "../lib/validation/contentType.mjs";
 import logger from "../lib/logger.mjs";
+
+const SUPPORTED_IMAGE_MODELS = new Set([
+  "gemini-3-pro-image-preview",
+  "gemini-3.1-flash-image-preview",
+  "gemini-2.5-flash-image",
+  "gemini-25-flash-image",
+  "nano-banana-2",
+  "nano-banana",
+  "nano-banana-pro",
+  "google/nano-banana-2",
+  "google/nano-banana",
+  "google/nano-banana-pro",
+]);
+
+function normalizeRequestedImageModel(model) {
+  if (typeof model !== "string") return DEFAULT_IMAGE_MODEL;
+  const normalized = model.trim().toLowerCase();
+  if (!SUPPORTED_IMAGE_MODELS.has(normalized)) {
+    return DEFAULT_IMAGE_MODEL;
+  }
+
+  // Upgrade legacy standard IDs/aliases to Nano Banana 2 (Gemini 3.1 Flash Image preview)
+  if (
+    normalized === "gemini-25-flash-image" ||
+    normalized === "gemini-2.5-flash-image"
+  ) return "gemini-3.1-flash-image-preview";
+  if (
+    normalized === "nano-banana" ||
+    normalized === "google/nano-banana" ||
+    normalized === "google/nano-banana-2"
+  ) return "nano-banana-2";
+  if (normalized === "google/nano-banana-pro") return "nano-banana-pro";
+  return normalized;
+}
 
 export function registerAiImageRoutes(app) {
   // -------------------------------------------------------------------------
@@ -46,6 +79,7 @@ export function registerAiImageRoutes(app) {
     const userId = authCtx?.userId;
     const organizationId = authCtx?.orgId || null;
     const sql = getSql();
+    let selectedModelForLogs = DEFAULT_IMAGE_MODEL;
 
     logger.info(
       { userId, organizationId: organizationId || "personal" },
@@ -58,11 +92,13 @@ export function registerAiImageRoutes(app) {
         brandProfile,
         aspectRatio = "1:1",
         imageSize = "1K",
+        model: requestedModel,
         productImages,
         styleReferenceImage,
         personReferenceImage,
       } = req.body;
-      const model = DEFAULT_IMAGE_MODEL;
+      const model = normalizeRequestedImageModel(requestedModel);
+      selectedModelForLogs = model;
 
       logger.debug(
         {
@@ -296,7 +332,7 @@ export function registerAiImageRoutes(app) {
         organizationId,
         endpoint: "/api/ai/image",
         operation: "image",
-        model: DEFAULT_IMAGE_MODEL,
+        model: selectedModelForLogs,
         latencyMs: elapsedTime,
         status: "failed",
         error: error.message,
@@ -412,7 +448,7 @@ export function registerAiImageRoutes(app) {
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
       const statusCode = isQuotaOrRateLimitError(error) ? 429 : 500;
       return res
         .status(statusCode)
@@ -455,8 +491,8 @@ PRIORIDADE DAS CORES:
 Retorne as cores em formato hexadecimal (#RRGGBB).
 Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou null, "tertiaryColor": "#..." ou null}`;
 
-      const data = await withRetry(() =>
-        callGeminiTextApi({
+      const { text, usage } = await withRetry(() =>
+        generateTextFromMessages({
           model: DEFAULT_TEXT_MODEL,
           messages: [
             {
@@ -472,17 +508,17 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
               ],
             },
           ],
-          response_format: { type: "json_object" },
+          jsonMode: true,
         }),
       );
 
-      const colors = JSON.parse(data.choices[0].message.content.trim());
+      const colors = JSON.parse(text.trim());
 
       logger.info({ colors }, "[Extract Colors API] Colors extracted");
 
       // Log AI usage
-      const inputTokens = data.usage?.prompt_tokens || 0;
-      const outputTokens = data.usage?.completion_tokens || 0;
+      const inputTokens = usage.inputTokens || 0;
+      const outputTokens = usage.outputTokens || 0;
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/extract-colors",
@@ -505,7 +541,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         latencyMs: timer(),
         status: "failed",
         error: error.message,
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
       return res
         .status(500)
         .json({ error: sanitizeErrorForClient(error) });

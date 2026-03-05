@@ -1,8 +1,8 @@
 import { getSql } from "../lib/db.mjs";
 import { requireSuperAdmin } from "../lib/auth.mjs";
-import { callGeminiTextApi } from "../lib/ai/clients.mjs";
+import { generateTextFromMessages } from "../lib/ai/text-generation.mjs";
 import { withRetry } from "../lib/ai/retry.mjs";
-import { DEFAULT_TEXT_MODEL } from "../lib/ai/prompt-builders.mjs";
+import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.mjs";
 import logger from "../lib/logger.mjs";
 
 // Cache for AI suggestions (1 hour TTL)
@@ -609,9 +609,9 @@ export function registerAdminRoutes(app) {
 
 Formate em markdown claro com seções.`;
 
-        // Call Gemini API with retry logic
-        const result = await withRetry(() =>
-          callGeminiTextApi({
+        // Call text generation with retry logic
+        const { text } = await withRetry(() =>
+          generateTextFromMessages({
             model: DEFAULT_TEXT_MODEL,
             messages: [
               { role: "user", content: prompt },
@@ -620,7 +620,7 @@ Formate em markdown claro com seções.`;
         );
 
         const suggestions =
-          result.choices?.[0]?.message?.content?.trim() ||
+          text?.trim() ||
           "Não foi possível gerar sugestões.";
 
         // Cache the result

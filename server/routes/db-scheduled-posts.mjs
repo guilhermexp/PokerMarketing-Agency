@@ -14,6 +14,7 @@ import {
 } from "../helpers/organization-context.mjs";
 import { ValidationError, DatabaseError } from "../lib/errors/index.mjs";
 import logger from "../lib/logger.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 
 export function registerScheduledPostRoutes(app) {
   app.get("/api/db/scheduled-posts", async (req, res) => {
@@ -202,7 +203,7 @@ export function registerScheduledPostRoutes(app) {
         return res.status(403).json({ error: error.message });
       }
       logError("Scheduled Posts API", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -279,7 +280,7 @@ export function registerScheduledPostRoutes(app) {
         return res.status(403).json({ error: error.message });
       }
       logError("Scheduled Posts API", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -341,7 +342,7 @@ export function registerScheduledPostRoutes(app) {
         return res.status(403).json({ error: error.message });
       }
       logError("Scheduled Posts API", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -464,7 +465,7 @@ export function registerScheduledPostRoutes(app) {
         return res.status(403).json({ error: error.message });
       }
       logError("Scheduled Posts API", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 }

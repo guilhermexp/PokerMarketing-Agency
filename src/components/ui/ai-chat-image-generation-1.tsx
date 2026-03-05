@@ -25,13 +25,11 @@ export const ImageGenerationLoader = ({
   showLabel = true,
   onRevealComplete,
 }: ImageGenerationLoaderProps) => {
-  const [progress, setProgress] = React.useState(0);
   const [loadingState, setLoadingState] = React.useState<
     "waiting" | "generating" | "revealing" | "completed"
   >("waiting");
   const [isImageLoaded, setIsImageLoaded] = React.useState(false);
   const [currentImageSrc, setCurrentImageSrc] = React.useState<string | null>(null);
-  const revealDuration = 3000; // 3 seconds to reveal
 
   // Track when image URL changes to reset loaded state
   React.useEffect(() => {
@@ -44,31 +42,9 @@ export const ImageGenerationLoader = ({
   // Handle state transitions - only start reveal when image is fully loaded
   React.useEffect(() => {
     if (imageSrc && isImageLoaded && loadingState !== "revealing" && loadingState !== "completed") {
-      // If not generating (image already exists), skip animation
-      if (!isGenerating) {
-        setLoadingState("completed");
-        setProgress(100);
-        return;
-      }
-
-      // Image arrived and loaded - start reveal
-      setLoadingState("revealing");
-      setProgress(0);
-
-      const startTime = Date.now();
-      const interval = setInterval(() => {
-        const elapsedTime = Date.now() - startTime;
-        const progressPercentage = Math.min(100, (elapsedTime / revealDuration) * 100);
-        setProgress(progressPercentage);
-
-        if (progressPercentage >= 100) {
-          clearInterval(interval);
-          setLoadingState("completed");
-          onRevealComplete?.();
-        }
-      }, 16);
-
-      return () => clearInterval(interval);
+      // Show the image immediately when it has fully loaded.
+      setLoadingState("completed");
+      onRevealComplete?.();
     } else if (!imageSrc && isGenerating) {
       // No image yet, start generating state after delay
       const timeout = setTimeout(() => {
@@ -82,7 +58,6 @@ export const ImageGenerationLoader = ({
   React.useEffect(() => {
     if (isGenerating && !imageSrc) {
       setLoadingState("waiting");
-      setProgress(0);
     }
   }, [isGenerating, imageSrc]);
 
@@ -90,7 +65,6 @@ export const ImageGenerationLoader = ({
     setIsImageLoaded(true);
   };
 
-  const isRevealing = loadingState === "revealing";
   const isCompleted = loadingState === "completed";
   const showLoader = !imageSrc && isGenerating;
 
@@ -125,24 +99,19 @@ export const ImageGenerationLoader = ({
 
       {/* Blur overlay that reveals from top to bottom */}
       <AnimatePresence>
-        {(isRevealing || showLoader) && !isCompleted && (
+        {showLoader && !isCompleted && (
           <motion.div
             className="absolute inset-0 pointer-events-none backdrop-blur-2xl bg-black/40"
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            style={isRevealing ? {
-              clipPath: `polygon(0 ${progress}%, 100% ${progress}%, 100% 100%, 0 100%)`,
-              maskImage: `linear-gradient(to bottom, transparent ${Math.max(0, progress - 15)}%, black ${progress + 5}%)`,
-              WebkitMaskImage: `linear-gradient(to bottom, transparent ${Math.max(0, progress - 15)}%, black ${progress + 5}%)`,
-            } : undefined}
           />
         )}
       </AnimatePresence>
 
       {/* Loading text - Centralized */}
       <AnimatePresence>
-        {showLabel && (showLoader || isRevealing) && !isCompleted && (
+        {showLabel && showLoader && !isCompleted && (
           <motion.div
             className="absolute inset-0 flex items-center justify-center z-20"
             initial={{ opacity: 0, scale: 0.9 }}
@@ -160,7 +129,7 @@ export const ImageGenerationLoader = ({
                 ease: "linear",
               }}
             >
-              {isRevealing ? "Criando imagem..." : loadingState === "waiting" ? "Iniciando..." : "Gerando imagem..."}
+              {loadingState === "waiting" ? "Iniciando..." : "Gerando imagem..."}
             </motion.span>
           </motion.div>
         )}

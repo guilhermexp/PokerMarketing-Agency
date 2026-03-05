@@ -12,6 +12,7 @@ import type {
   ChatReferenceImage,
   StyleReference,
   ImageFile,
+  ImageModel,
 } from "../../types";
 import { Icon } from "../common/Icon";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
@@ -48,6 +49,7 @@ export interface CarrosselTabProps {
     post: Omit<ScheduledPost, "id" | "createdAt" | "updatedAt">,
   ) => void;
   onCarouselUpdate?: (carousel: CarouselScript) => void;
+  selectedImageModel?: ImageModel;
 }
 
 // Carousel Preview Component - Instagram-style preview
@@ -66,6 +68,7 @@ export const CarouselTab = React.memo<CarrosselTabProps>(function CarouselTab({
   onPublishCarousel,
   onSchedulePost,
   onCarouselUpdate,
+  selectedImageModel = "gemini-3-pro-image-preview",
 }) {
   // Track which images are being generated: { "clipId-sceneNumber": true }
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
@@ -265,6 +268,7 @@ export const CarouselTab = React.memo<CarrosselTabProps>(function CarouselTab({
       clip,
       galleryImages,
       brandProfile,
+      imageModel: selectedImageModel,
       chatReferenceImage,
       selectedStyleReference,
       compositionAssets,
@@ -309,6 +313,7 @@ export const CarouselTab = React.memo<CarrosselTabProps>(function CarouselTab({
     setPauseState(carouselKey, false);
     await generateAllCampaignCarouselImages(carousel, {
       brandProfile,
+      imageModel: selectedImageModel,
       chatReferenceImage: chatReferenceImage || null,
       selectedStyleReference: selectedStyleReference || null,
       compositionAssets: compositionAssets || undefined,

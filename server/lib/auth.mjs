@@ -148,6 +148,38 @@ if (!upstashRedis) {
 /** @deprecated No longer needed — cleanup is self-managing */
 export function stopRateLimitCleanup() {}
 
+function getSessionRecord(authSession) {
+  if (!authSession || typeof authSession !== "object") return null;
+
+  // Better Auth getSession usually returns { user, session }, but some client/server
+  // paths can expose session fields on the root object.
+  if (authSession.session && typeof authSession.session === "object") {
+    return authSession.session;
+  }
+
+  return authSession;
+}
+
+function getActiveOrganizationId(authSession) {
+  const sessionRecord = getSessionRecord(authSession);
+
+  return (
+    sessionRecord?.activeOrganizationId ||
+    sessionRecord?.active_organization_id ||
+    null
+  );
+}
+
+function getActiveOrganizationRole(authSession) {
+  const sessionRecord = getSessionRecord(authSession);
+
+  return (
+    sessionRecord?.activeOrganizationRole ||
+    sessionRecord?.active_organization_role ||
+    null
+  );
+}
+
 /**
  * Extract auth context from request.
  * Reads from req.authSession (set by Better Auth session middleware)
@@ -168,7 +200,7 @@ export function getRequestAuthContext(req) {
 
   return {
     userId: session.user.id,
-    orgId: session.session?.activeOrganizationId || null,
+    orgId: getActiveOrganizationId(session),
   };
 }
 
@@ -361,10 +393,10 @@ export async function requireSuperAdmin(req, res, next) {
 export function getOrgContext(req) {
   const session = req.authSession;
   const userId = session?.user?.id;
-  const orgId = session?.session?.activeOrganizationId || null;
+  const orgId = getActiveOrganizationId(session);
   // Better Auth org roles: owner, admin, member
   // Map to org:admin / org:member for compatibility
-  const rawRole = session?.session?.activeOrganizationRole || null;
+  const rawRole = getActiveOrganizationRole(session);
   const orgRole = rawRole === "owner" || rawRole === "admin" ? "org:admin" : rawRole === "member" ? "org:member" : null;
   return createOrgContext({ userId, orgId, orgRole });
 }

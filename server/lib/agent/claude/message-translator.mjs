@@ -63,14 +63,6 @@ export function translateSdkMessage(message) {
 
       }
 
-      if (block?.type === 'tool_result') {
-        events.push({
-          type: block.is_error ? 'tool_failed' : 'tool_completed',
-          tool_call_id: block.tool_use_id,
-          content: safeString(block.content),
-          sessionId,
-        });
-      }
     }
 
     return events;

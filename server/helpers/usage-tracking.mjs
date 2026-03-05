@@ -34,6 +34,15 @@ const MODEL_PRICING = {
     }
   },
   // Google Gemini Image Models — Standard (flat rate; model outputs 1024px only)
+  'gemini-3.1-flash-image-preview': {
+    provider: 'google',
+    costPerImage: {
+      // Temporary parity with previous Flash Image pricing until pricing table is revalidated here.
+      '1K': 4,
+      '2K': 4,
+      '4K': 4
+    }
+  },
   'gemini-2.5-flash-image': {
     provider: 'google',
     costPerImage: {
@@ -143,6 +152,14 @@ const MODEL_PRICING = {
       '2K': 8,
       '4K': 8
     }
+  },
+  'nano-banana-2': {
+    provider: 'google',
+    costPerImage: {
+      '1K': 4,
+      '2K': 4,
+      '4K': 4
+    }
   }
 };
 
@@ -241,7 +258,11 @@ export async function logAiUsage(sql, {
   metadata = {}
 }) {
   const requestId = randomUUID();
-  const detectedProvider = provider || getProvider(model);
+  const rawProvider = provider || getProvider(model);
+  // Normalize internal provider names to DB enum values
+  // The provider chain uses "gemini" internally, but the DB enum uses "google"
+  const PROVIDER_TO_ENUM = { gemini: 'google' };
+  const detectedProvider = PROVIDER_TO_ENUM[rawProvider] || rawProvider;
 
   // Calculate cost
   const estimatedCostCents = calculateCost({

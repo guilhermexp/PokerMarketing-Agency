@@ -248,7 +248,7 @@ export function registerAiVideoRoutes(app) {
         latencyMs: timer(),
         status: "failed",
         error: error instanceof Error ? error.message : "Unknown error",
-      }).catch(() => {});
+      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
       return res.status(500).json({
         error:
           error instanceof Error ? error.message : "Failed to generate video",

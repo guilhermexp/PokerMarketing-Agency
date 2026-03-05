@@ -169,6 +169,7 @@ export function registerAgentStudioRoutes(app) {
       attachments: safeAttachments,
       mentions: safeMentions,
       signal: abortController.signal,
+      abortController,
     });
 
     if (!res.writableEnded) res.end();
@@ -335,7 +336,8 @@ export function registerAgentStudioRoutes(app) {
       const userCondition = organizationId
         ? sql`organization_id = ${organizationId}`
         : sql`user_id = ${userId} AND organization_id IS NULL`;
-      const pattern = query ? `%${query}%` : '%';
+      const escaped = query ? query.replace(/[%_\\]/g, '\\$&') : '';
+      const pattern = escaped ? `%${escaped}%` : '%';
       let results = [];
 
       if (type === 'gallery') {

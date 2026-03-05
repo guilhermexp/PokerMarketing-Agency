@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import {
   getTopics,
   createTopic,
@@ -11,6 +10,8 @@ import {
   updateGeneration,
   generateTopicTitle,
 } from "../helpers/video-playground.mjs";
+import { getGeminiAi } from "../lib/ai/clients.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 
 export function registerVideoPlaygroundRoutes(
   app,
@@ -44,7 +45,7 @@ export function registerVideoPlaygroundRoutes(
         return res.json({ topics: [] });
       }
       logger.error({ err: error }, "[VideoPlayground] Get topics error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -64,7 +65,7 @@ export function registerVideoPlaygroundRoutes(
       res.json({ success: true, topic });
     } catch (error) {
       logger.error({ err: error }, "[VideoPlayground] Create topic error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -94,7 +95,7 @@ export function registerVideoPlaygroundRoutes(
       res.json({ success: true, topic });
     } catch (error) {
       logger.error({ err: error }, "[VideoPlayground] Update topic error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -114,7 +115,7 @@ export function registerVideoPlaygroundRoutes(
       res.json({ success: true });
     } catch (error) {
       logger.error({ err: error }, "[VideoPlayground] Delete topic error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -152,7 +153,7 @@ export function registerVideoPlaygroundRoutes(
         return res.json({ sessions: [] });
       }
       logger.error({ err: error }, "[VideoPlayground] Get sessions error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -185,7 +186,7 @@ export function registerVideoPlaygroundRoutes(
       res.json({ success: true, data: result });
     } catch (error) {
       logger.error({ err: error }, "[VideoPlayground] Create session error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -205,7 +206,7 @@ export function registerVideoPlaygroundRoutes(
       res.json({ success: true });
     } catch (error) {
       logger.error({ err: error }, "[VideoPlayground] Delete session error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -225,7 +226,7 @@ export function registerVideoPlaygroundRoutes(
       res.json({ success: true });
     } catch (error) {
       logger.error({ err: error }, "[VideoPlayground] Delete generation error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -251,7 +252,7 @@ export function registerVideoPlaygroundRoutes(
       res.json({ success: true, generation });
     } catch (error) {
       logger.error({ err: error }, "[VideoPlayground] Update generation error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
@@ -267,13 +268,13 @@ export function registerVideoPlaygroundRoutes(
         return res.status(400).json({ error: "prompts array required" });
       }
 
-      const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const genai = getGeminiAi();
       const title = await generateTopicTitle(prompts, genai);
 
       res.json({ title });
     } catch (error) {
       logger.error({ err: error }, "[VideoPlayground] Generate title error");
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 }

@@ -14,6 +14,7 @@ import {
 } from "../helpers/organization-context.mjs";
 import { logError } from "../lib/logging-helpers.mjs";
 import logger from "../lib/logger.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 
 export function registerBrandProfileRoutes(app) {
   app.get("/api/db/brand-profiles", async (req, res) => {
@@ -206,7 +207,7 @@ export function registerBrandProfileRoutes(app) {
         return res.status(403).json({ error: error.message });
       }
       logError("Brand Profiles API", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 }
