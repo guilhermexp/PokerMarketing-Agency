@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback, useTransition } from "react";
 
 import { BrandProfileSetup } from "./components/brand/BrandProfileSetup";
+import { OnboardingModal } from "./components/brand/OnboardingModal";
 import { SettingsModal } from "./components/settings/SettingsModal";
 const ClientFeedback = lazy(() =>
   import("./feedback/client-feedback").then((m) => ({ default: m.ClientFeedback })),
@@ -304,6 +305,7 @@ function AppContent() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(true);
   const [activeView, setActiveView] = useState<ViewType>("campaign");
   const [, startViewTransition] = useTransition();
   const handleViewChange = useCallback((view: ViewType) => {
@@ -2502,11 +2504,15 @@ function AppContent() {
         </OverlayPortal>
       )}
       {!brandProfile ? (
-        <BrandProfileSetup
+        showOnboarding ? (
+        <OnboardingModal
           onInviteAccepted={() => {
-            // Force reload: session now has active org from accepted invite
             window.location.reload();
           }}
+          onCreateBrand={() => setShowOnboarding(false)}
+        />
+        ) : (
+        <BrandProfileSetup
           onProfileSubmit={async (p) => {
             console.debug("[BrandProfile] onProfileSubmit called, userId:", userId);
             // Show Dashboard immediately (optimistic)
@@ -2567,6 +2573,7 @@ function AppContent() {
           }}
           existingProfile={null}
         />
+        )
       ) : (
         <>
           <SettingsModal
