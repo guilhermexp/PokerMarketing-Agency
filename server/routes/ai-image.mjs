@@ -34,6 +34,13 @@ import {
 import { urlToBase64 } from "../helpers/image-helpers.mjs";
 import { validateContentType } from "../lib/validation/contentType.mjs";
 import logger from "../lib/logger.mjs";
+import {
+  enqueueImageGeneration,
+  enqueueImageGenerationBatch,
+  getImageGenerationJobStatus,
+  getUserImageGenerationJobs,
+  cancelImageGenerationJob,
+} from "../helpers/job-queue.mjs";
 
 const SUPPORTED_IMAGE_MODELS = new Set([
   "gemini-3-pro-image-preview",
