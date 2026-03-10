@@ -554,4 +554,225 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         .json({ error: sanitizeErrorForClient(error) });
     }
   });
+
+  // ============================================================================
+  // ASYNC IMAGE GENERATION ROUTES (Queue-based)
+  // ============================================================================
+
+  // -------------------------------------------------------------------------
+  // POST /api/ai/image/async - Queue a single image generation
+  // -------------------------------------------------------------------------
+  app.post("/api/ai/image/async", async (req, res) => {
+    const authCtx = getRequestAuthContext(req);
+    const userId = authCtx?.userId;
+    const organizationId = authCtx?.orgId || null;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    try {
+      const {
+        prompt,
+        brandProfile,
+        aspectRatio = "1:1",
+        imageSize = "1K",
+        model: requestedModel,
+        productImages,
+        styleReferenceImage,
+        personReferenceImage,
+        priority,
+      } = req.body;
+
+      const model = normalizeRequestedImageModel(requestedModel);
+
+      if (!prompt || !brandProfile) {
+        return res.status(400).json({ error: "prompt and brandProfile are required" });
+      }
+
+      // Queue the job
+      const result = await enqueueImageGeneration({
+        userId,
+        organizationId,
+        prompt,
+        brandProfile,
+        aspectRatio,
+        imageSize,
+        model,
+        productImages,
+        styleReferenceImage,
+        personReferenceImage,
+      }, { priority });
+
+      logger.info(
+        { jobId: result.jobId, userId, queuePosition: result.queuePosition },
+        "[Image Async] Job queued"
+      );
+
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error) {
+      logger.error({ err: error, userId }, "[Image Async] Failed to queue job");
+      
+      if (error.message.includes("Redis not available")) {
+        return res.status(503).json({ 
+          error: "Image queue temporarily unavailable. Use /api/ai/image for synchronous generation.",
+          useSyncEndpoint: true 
+        });
+      }
+      
+      return res.status(500).json({ error: sanitizeErrorForClient(error) });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /api/ai/image/async/batch - Queue multiple images
+  // -------------------------------------------------------------------------
+  app.post("/api/ai/image/async/batch", async (req, res) => {
+    const authCtx = getRequestAuthContext(req);
+    const userId = authCtx?.userId;
+    const organizationId = authCtx?.orgId || null;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    try {
+      const { jobs, priority } = req.body;
+
+      if (!Array.isArray(jobs) || jobs.length === 0) {
+        return res.status(400).json({ error: "jobs array is required" });
+      }
+
+      if (jobs.length > 10) {
+        return res.status(400).json({ error: "Maximum 10 images per batch" });
+      }
+
+      // Add user context to each job
+      const jobsWithContext = jobs.map(job => ({
+        ...job,
+        userId,
+        organizationId,
+        model: normalizeRequestedImageModel(job.model),
+      }));
+
+      const results = await enqueueImageGenerationBatch(jobsWithContext, { priority });
+
+      const successCount = results.filter(r => !r.error).length;
+      logger.info(
+        { userId, batchSize: jobs.length, successCount },
+        "[Image Async] Batch queued"
+      );
+
+      res.json({
+        success: true,
+        batchSize: jobs.length,
+        queued: successCount,
+        jobs: results,
+      });
+    } catch (error) {
+      logger.error({ err: error, userId }, "[Image Async] Failed to queue batch");
+      
+      if (error.message.includes("Redis not available")) {
+        return res.status(503).json({ 
+          error: "Image queue temporarily unavailable. Use /api/ai/image for synchronous generation.",
+          useSyncEndpoint: true 
+        });
+      }
+      
+      return res.status(500).json({ error: sanitizeErrorForClient(error) });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /api/ai/image/async/status/:jobId - Check job status
+  // -------------------------------------------------------------------------
+  app.get("/api/ai/image/async/status/:jobId", async (req, res) => {
+    const authCtx = getRequestAuthContext(req);
+    const userId = authCtx?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    try {
+      const { jobId } = req.params;
+      const status = await getImageGenerationJobStatus(jobId);
+
+      if (!status) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Verify ownership
+      if (status.data.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json(status);
+    } catch (error) {
+      logger.error({ err: error, userId }, "[Image Async] Failed to get status");
+      return res.status(500).json({ error: sanitizeErrorForClient(error) });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /api/ai/image/async/jobs - List user's jobs
+  // -------------------------------------------------------------------------
+  app.get("/api/ai/image/async/jobs", async (req, res) => {
+    const authCtx = getRequestAuthContext(req);
+    const userId = authCtx?.userId;
+    const organizationId = authCtx?.orgId || null;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    try {
+      const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
+      const jobs = await getUserImageGenerationJobs(userId, organizationId, limit);
+
+      res.json({ jobs });
+    } catch (error) {
+      logger.error({ err: error, userId }, "[Image Async] Failed to list jobs");
+      return res.status(500).json({ error: sanitizeErrorForClient(error) });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // DELETE /api/ai/image/async/cancel/:jobId - Cancel a job
+  // -------------------------------------------------------------------------
+  app.delete("/api/ai/image/async/cancel/:jobId", async (req, res) => {
+    const authCtx = getRequestAuthContext(req);
+    const userId = authCtx?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    try {
+      const { jobId } = req.params;
+      
+      // Verify ownership first
+      const status = await getImageGenerationJobStatus(jobId);
+      if (!status) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      if (status.data.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const cancelled = await cancelImageGenerationJob(jobId);
+
+      if (cancelled) {
+        res.json({ success: true, message: "Job cancelled" });
+      } else {
+        res.status(400).json({ success: false, message: "Job already completed or failed" });
+      }
+    } catch (error) {
+      logger.error({ err: error, userId }, "[Image Async] Failed to cancel job");
+      return res.status(500).json({ error: sanitizeErrorForClient(error) });
+    }
+  });
 }

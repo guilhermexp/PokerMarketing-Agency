@@ -14,8 +14,12 @@ import express from "express";
 import app, { finalizeApp } from "./app.mjs";
 import logger from "./lib/logger.mjs";
 import { DATABASE_URL, getSql, warmupDatabase, ensureGallerySourceType } from "./lib/db.mjs";
-import { initializeScheduledPostsChecker, waitForRedis } from "./helpers/job-queue.mjs";
+import { initializeScheduledPostsChecker, waitForRedis, initializeImageGenerationWorker, registerImageGenerationProcessor } from "./helpers/job-queue.mjs";
 import { checkAndPublishScheduledPosts, publishScheduledPostById } from "./helpers/scheduled-publisher.mjs";
+import { generateImageWithFallback } from "./lib/ai/image-generation.mjs";
+import { getSql } from "./lib/db.mjs";
+import { put } from "@vercel/blob";
+import { validateContentType } from "./lib/validation/contentType.mjs";
 
 // ---------------------------------------------------------------------------
 // Process handlers (long-running only, not applicable in serverless)
@@ -79,6 +83,8 @@ const startup = async () => {
 
   if (redisConnected) {
     logger.info({}, "Redis connected");
+    
+    // Initialize scheduled posts worker
     try {
       const worker = await initializeScheduledPostsChecker(
         checkAndPublishScheduledPosts,
@@ -90,9 +96,105 @@ const startup = async () => {
     } catch (error) {
       logger.error({ err: error }, "Failed to initialize scheduled posts worker");
     }
+
+    // Initialize image generation worker
+    try {
+      // Register the processor function
+      registerImageGenerationProcessor(async (jobData, progressCallback) => {
+        const {
+          prompt,
+          brandProfile,
+          aspectRatio,
+          imageSize,
+          model,
+          productImages,
+          styleReferenceImage,
+          personReferenceImage,
+        } = jobData;
+
+        progressCallback(20);
+
+        // Build prompt with brand context
+        const { buildImagePrompt, convertImagePromptToJson } = await import("./lib/ai/prompt-builders.mjs");
+        const { getSql } = await import("./lib/db.mjs");
+        const sql = getSql();
+        
+        const jsonPrompt = await convertImagePromptToJson(
+          prompt,
+          aspectRatio,
+          jobData.organizationId,
+          sql,
+        );
+        
+        const fullPrompt = buildImagePrompt(
+          prompt,
+          brandProfile,
+          !!styleReferenceImage,
+          !!(brandProfile?.logo || productImages?.length),
+          !!personReferenceImage,
+          !!productImages?.length,
+          jsonPrompt,
+        );
+
+        progressCallback(40);
+
+        // Generate image
+        const result = await generateImageWithFallback(
+          fullPrompt,
+          aspectRatio,
+          model,
+          imageSize,
+          productImages,
+          styleReferenceImage,
+          personReferenceImage,
+        );
+
+        progressCallback(80);
+
+        // Upload to Vercel Blob if needed
+        let finalImageUrl = result.imageUrl;
+        if (result.imageUrl?.startsWith("data:")) {
+          try {
+            const matches = result.imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (matches) {
+              const contentType = matches[1];
+              const buffer = Buffer.from(matches[2], "base64");
+              validateContentType(contentType);
+              const ext = contentType.includes("png") ? "png" : "jpg";
+              const filename = `generated-${Date.now()}.${ext}`;
+              const blob = await put(filename, buffer, {
+                access: "public",
+                contentType,
+              });
+              finalImageUrl = blob.url;
+            }
+          } catch (uploadError) {
+            logger.error({ err: uploadError }, "[ImageGenWorker] Blob upload failed");
+          }
+        }
+
+        progressCallback(100);
+
+        return {
+          imageUrl: finalImageUrl,
+          usedProvider: result.usedProvider,
+          usedModel: result.usedModel,
+          usedFallback: result.usedFallback,
+        };
+      });
+
+      // Start the worker
+      const imgWorker = await initializeImageGenerationWorker();
+      if (imgWorker) {
+        logger.info({}, "Image generation worker initialized");
+      }
+    } catch (error) {
+      logger.error({ err: error }, "Failed to initialize image generation worker");
+    }
   } else {
     logger.warn({}, "Redis not available - job processing disabled");
     logger.warn({}, "Scheduled posts using fallback mode (database polling)");
+    logger.warn({}, "Image generation using synchronous mode only");
   }
 
   app.listen(PORT, () => {
