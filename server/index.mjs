@@ -17,7 +17,6 @@ import { DATABASE_URL, getSql, warmupDatabase, ensureGallerySourceType } from ".
 import { initializeScheduledPostsChecker, waitForRedis, initializeImageGenerationWorker, registerImageGenerationProcessor } from "./helpers/job-queue.mjs";
 import { checkAndPublishScheduledPosts, publishScheduledPostById } from "./helpers/scheduled-publisher.mjs";
 import { generateImageWithFallback } from "./lib/ai/image-generation.mjs";
-import { getSql } from "./lib/db.mjs";
 import { put } from "@vercel/blob";
 import { validateContentType } from "./lib/validation/contentType.mjs";
 
