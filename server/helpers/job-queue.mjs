@@ -3,20 +3,21 @@
  * Uses Redis for job queue management
  */
 
-import { Queue, Worker, FlowProducer } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import net from 'net';
 
 // Redis connection - Railway provides REDIS_URL
 // In development without Redis, scheduled posts will use fallback polling
 const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || null;
+const JOB_QUEUE_ENABLED = process.env.NODE_ENV === 'production';
 
 let connection = null;
+let connectionPromise = null;
 let scheduledPostsQueue = null;
 let scheduledPostsWorker = null;
 let imageGenerationQueue = null;
 let imageGenerationWorker = null;
-let flowProducer = null;
 let redisAvailable = false;
 let redisGaveUp = false;
 
@@ -30,6 +31,10 @@ const IMAGE_GEN_MAX_RETRIES = parseInt(process.env.IMAGE_GEN_MAX_RETRIES || '3',
  */
 export function isRedisAvailable() {
   return redisAvailable;
+}
+
+export function isJobQueueEnabled() {
+  return JOB_QUEUE_ENABLED && !!REDIS_URL;
 }
 
 /**
@@ -66,12 +71,12 @@ function probeRedis(url, timeoutMs = 3000) {
  */
 export async function waitForRedis(timeoutMs = 5000) {
   if (redisAvailable) return true;
-  if (!REDIS_URL || redisGaveUp) return false;
+  if (!isJobQueueEnabled() || redisGaveUp) return false;
 
   // Ensure connection is initiated
-  await getRedisConnection();
+  const activeConnection = await getRedisConnection();
 
-  if (redisGaveUp) return false;
+  if (!activeConnection || redisGaveUp) return false;
 
   // Wait for connection or timeout
   return new Promise((resolve) => {
@@ -95,6 +100,10 @@ export async function waitForRedis(timeoutMs = 5000) {
  * Now async — probes host reachability before creating ioredis.
  */
 export async function getRedisConnection() {
+  if (!JOB_QUEUE_ENABLED) {
+    return null;
+  }
+
   if (!REDIS_URL || redisGaveUp) {
     return null;
   }
@@ -113,7 +122,7 @@ export async function getRedisConnection() {
 
     connection = new IORedis(REDIS_URL, {
       maxRetriesPerRequest: null,
-      enableReadyCheck: false,
+      enableReadyCheck: true,
       lazyConnect: true,
       connectTimeout: 5000,
       retryStrategy: (times) => {
@@ -133,7 +142,11 @@ export async function getRedisConnection() {
     });
 
     connection.on('connect', () => {
-      console.log('[JobQueue] Redis connected');
+      console.log('[JobQueue] Redis socket connected');
+    });
+
+    connection.on('ready', () => {
+      console.log('[JobQueue] Redis ready');
       redisAvailable = true;
     });
 
@@ -141,12 +154,30 @@ export async function getRedisConnection() {
       redisAvailable = false;
     });
 
-    // Try to connect
-    connection.connect().catch(() => {
-      console.log('[JobQueue] Redis not available (development mode OK, will use fallback)');
+    connection.on('end', () => {
       redisAvailable = false;
     });
+
+    // Try to connect
+    connectionPromise = connection.connect()
+      .then(async () => {
+        await connection.ping();
+        redisAvailable = true;
+        return connection;
+      })
+      .catch(() => {
+        console.log('[JobQueue] Redis not available, using fallback');
+        redisAvailable = false;
+        connection = null;
+        connectionPromise = null;
+        return null;
+      });
   }
+
+  if (connectionPromise) {
+    return connectionPromise;
+  }
+
   return connection;
 }
 
