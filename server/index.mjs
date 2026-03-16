@@ -8,6 +8,7 @@
 
 import "dotenv/config";
 
+import { validateEnv } from "./lib/env.mjs";
 import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
@@ -19,6 +20,8 @@ import { checkAndPublishScheduledPosts, publishScheduledPostById } from "./helpe
 import { generateImageWithFallback } from "./lib/ai/image-generation.mjs";
 import { put } from "@vercel/blob";
 import { validateContentType } from "./lib/validation/contentType.mjs";
+
+validateEnv();
 
 // ---------------------------------------------------------------------------
 // Process handlers (long-running only, not applicable in serverless)
