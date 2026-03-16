@@ -1,97 +1,33 @@
 /**
- * Configurable Image Provider Registry + Fallback Loop.
- *
- * Reads IMAGE_PROVIDERS env var (default: "gemini,fal") to determine the
- * priority chain. Skips providers whose API key is missing (with a warning).
- * Provides runWithProviderFallback() that iterates the chain, falling back
- * on quota/rate-limit errors and auth errors (expired/invalid keys).
+ * Image provider registry restricted to Gemini only.
  *
  * Exports: PROVIDER_CHAIN, isProviderEnabled, runWithProviderFallback
  */
 
-import { isQuotaOrRateLimitError, isTimeoutError } from "./retry.mjs";
 import logger from "../logger.mjs";
-
-/**
- * Check if an error is a transient service unavailability.
- * E.g. Replicate E003 "Service is currently unavailable due to high demand".
- * We should fallback to the next provider rather than failing entirely.
- */
-function isServiceUnavailableError(error) {
-  const msg = String(error?.message || error || "").toLowerCase();
-  const status = error?.status || error?.statusCode;
-  return (
-    status === 503 ||
-    msg.includes("unavailable") ||
-    msg.includes("high demand") ||
-    msg.includes("overloaded") ||
-    msg.includes("service_unavailable")
-  );
-}
-
-/**
- * Check if an error is an authentication/authorization failure.
- * This means the API key exists but is invalid, expired, or revoked.
- * We should fallback to the next provider rather than failing entirely.
- */
-function isAuthError(error) {
-  const msg = String(error?.message || error || "").toLowerCase();
-  const status = error?.status || error?.statusCode;
-  return (
-    status === 401 ||
-    status === 403 ||
-    msg.includes("forbidden") ||
-    msg.includes("unauthorized") ||
-    msg.includes("invalid api key") ||
-    msg.includes("invalid_api_key") ||
-    msg.includes("authentication")
-  );
-}
-
-const VALID_PROVIDERS = ["gemini", "fal", "replicate"];
-
-const API_KEY_ENV = {
-  gemini: "GEMINI_API_KEY",
-  fal: "FAL_KEY",
-  replicate: "REPLICATE_API_TOKEN",
-};
 
 // Lazy-loaded adapter cache (avoids importing SDKs that aren't used)
 const adapterCache = {};
 
 /**
- * Read IMAGE_PROVIDERS, validate names, check API keys, return active chain.
+ * Gemini is the only supported image provider.
  */
 function resolveProviderChain() {
-  const raw = (process.env.IMAGE_PROVIDERS || "gemini,replicate,fal")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-
   const chain = [];
 
-  for (const name of raw) {
-    if (!VALID_PROVIDERS.includes(name)) {
-      logger.warn({ provider: name }, "[ImageProviders] Unknown provider, skipping");
-      continue;
-    }
-
-    const envKey = API_KEY_ENV[name];
-    if (!process.env[envKey]) {
-      logger.warn(
-        { provider: name, envKey },
-        "[ImageProviders] API key missing, skipping provider",
-      );
-      continue;
-    }
-
-    chain.push(name);
+  if (!process.env.GEMINI_API_KEY) {
+    logger.error(
+      { envKey: "GEMINI_API_KEY" },
+      "[ImageProviders] Gemini API key missing",
+    );
+  } else {
+    chain.push("gemini");
   }
 
   if (chain.length === 0) {
     logger.error(
       {},
-      "[ImageProviders] No providers available! Check IMAGE_PROVIDERS and API keys.",
+      "[ImageProviders] No providers available! Configure GEMINI_API_KEY.",
     );
   }
 
@@ -112,33 +48,23 @@ export function isProviderEnabled(name) {
 }
 
 /**
- * Lazy-import the correct adapter module.
- * @param {string} name - "gemini" | "fal" | "replicate"
+ * Lazy-import the Gemini adapter module.
+ * @param {string} name - "gemini"
  */
 async function getAdapter(name) {
   if (adapterCache[name]) return adapterCache[name];
 
-  let mod;
-  switch (name) {
-    case "gemini":
-      mod = await import("./providers/gemini-adapter.mjs");
-      break;
-    case "fal":
-      mod = await import("./providers/fal-adapter.mjs");
-      break;
-    case "replicate":
-      mod = await import("./providers/replicate-adapter.mjs");
-      break;
-    default:
-      throw new Error(`Unknown provider: ${name}`);
+  if (name !== "gemini") {
+    throw new Error(`Unknown provider: ${name}`);
   }
 
+  const mod = await import("./providers/gemini-adapter.mjs");
   adapterCache[name] = mod;
   return mod;
 }
 
 /**
- * Run an image operation through the provider chain with automatic fallback.
+ * Run an image operation through Gemini only.
  *
  * @param {"generate" | "edit"} operation
  * @param {object} params - Operation-specific parameters:
@@ -148,81 +74,25 @@ async function getAdapter(name) {
  */
 export async function runWithProviderFallback(operation, params) {
   if (PROVIDER_CHAIN.length === 0) {
-    throw new Error("No image providers configured. Set IMAGE_PROVIDERS and provide API keys.");
+    throw new Error("No image providers configured. Set GEMINI_API_KEY.");
   }
 
-  let lastError = null;
+  const providerName = PROVIDER_CHAIN[0];
+  const adapter = await getAdapter(providerName);
+  let result;
 
-  for (let i = 0; i < PROVIDER_CHAIN.length; i++) {
-    const providerName = PROVIDER_CHAIN[i];
-    const isFallback = i > 0;
-
-    try {
-      const adapter = await getAdapter(providerName);
-      let result;
-
-      if (operation === "generate") {
-        result = await adapter.generate(params);
-      } else if (operation === "edit") {
-        result = await adapter.edit(params);
-      } else {
-        throw new Error(`Unknown operation: ${operation}`);
-      }
-
-      if (isFallback) {
-        logger.info(
-          { provider: providerName, operation },
-          `[ImageProviders] Fallback to ${providerName} succeeded`,
-        );
-      }
-
-      return {
-        imageUrl: result.imageUrl,
-        usedModel: result.usedModel,
-        usedProvider: providerName,
-        usedFallback: isFallback,
-      };
-    } catch (error) {
-      lastError = error;
-      const canFallback = i < PROVIDER_CHAIN.length - 1;
-
-      if (canFallback && isQuotaOrRateLimitError(error)) {
-        logger.warn(
-          { provider: providerName, operation, error: error.message },
-          `[ImageProviders] ${providerName} quota/rate-limit error, trying next provider`,
-        );
-        continue;
-      }
-
-      if (canFallback && isAuthError(error)) {
-        logger.warn(
-          { provider: providerName, operation, error: error.message },
-          `[ImageProviders] ${providerName} auth error (invalid/expired key), trying next provider`,
-        );
-        continue;
-      }
-
-      if (canFallback && isServiceUnavailableError(error)) {
-        logger.warn(
-          { provider: providerName, operation, error: error.message },
-          `[ImageProviders] ${providerName} service unavailable, trying next provider`,
-        );
-        continue;
-      }
-
-      if (canFallback && isTimeoutError(error)) {
-        logger.warn(
-          { provider: providerName, operation, error: error.message },
-          `[ImageProviders] ${providerName} timed out, trying next provider`,
-        );
-        continue;
-      }
-
-      // Non-recoverable error or last provider — throw immediately
-      throw error;
-    }
+  if (operation === "generate") {
+    result = await adapter.generate(params);
+  } else if (operation === "edit") {
+    result = await adapter.edit(params);
+  } else {
+    throw new Error(`Unknown operation: ${operation}`);
   }
 
-  // Should not reach here, but just in case
-  throw lastError;
+  return {
+    imageUrl: result.imageUrl,
+    usedModel: result.usedModel,
+    usedProvider: providerName,
+    usedFallback: false,
+  };
 }

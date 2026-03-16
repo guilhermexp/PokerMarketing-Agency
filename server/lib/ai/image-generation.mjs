@@ -1,5 +1,5 @@
 /**
- * Image Generation — Gemini native image generation with provider fallback.
+ * Image Generation — Gemini native image generation only.
  *
  * ┌────────────────────────────────────────────────────────────────┐
  * │  This file handles IMAGE generation only.                      │
@@ -166,7 +166,7 @@ export const generateImageWithFallback = async (
   styleReferenceImage,
   personReferenceImage,
 ) => {
-  logger.info({}, "[generateImageWithFallback] Using provider chain");
+  logger.info({}, "[generateImageWithFallback] Using Gemini only");
 
   const normalizedModel = String(model || DEFAULT_IMAGE_MODEL).toLowerCase();
   const isStandardModel =
@@ -178,18 +178,6 @@ export const generateImageWithFallback = async (
     normalizedModel === "nano-banana" ||
     normalizedModel === "google/nano-banana";
   const modelTier = isStandardModel ? "standard" : "pro";
-  const replicateModel =
-    normalizedModel === "nano-banana-2" || normalizedModel === "google/nano-banana-2"
-      ? undefined
-      : normalizedModel === "nano-banana"
-        ? "google/nano-banana"
-      : normalizedModel === "nano-banana-pro"
-        ? "google/nano-banana-pro"
-        : normalizedModel === "google/nano-banana" ||
-            normalizedModel === "google/nano-banana-pro"
-          ? normalizedModel
-          : undefined;
-
   return runWithProviderFallback("generate", {
     prompt,
     aspectRatio,
@@ -198,6 +186,5 @@ export const generateImageWithFallback = async (
     styleRef: styleReferenceImage,
     personRef: personReferenceImage,
     modelTier,
-    replicateModel,
   });
 };

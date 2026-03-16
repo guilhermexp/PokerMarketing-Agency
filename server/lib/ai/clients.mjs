@@ -20,7 +20,10 @@ export const getGeminiAi = () => {
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY not configured");
   }
-  cachedGeminiAi = new GoogleGenAI({ apiKey });
+  cachedGeminiAi = new GoogleGenAI({
+    apiKey,
+    httpOptions: { timeout: 120_000 }, // 120s — image generation needs more time
+  });
   return cachedGeminiAi;
 };
 

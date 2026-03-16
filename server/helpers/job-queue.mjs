@@ -1,9 +1,6 @@
 /**
- * BullMQ Job Queue for Scheduled Post Publishing
+ * BullMQ Job Queue for Scheduled Post Publishing & Image Generation
  * Uses Redis for job queue management
- *
- * NOTE: Image generation jobs were REMOVED (2026-01-25)
- * Images are now generated synchronously via /api/images endpoint
  */
 
 import { Queue, Worker } from 'bullmq';
@@ -13,18 +10,31 @@ import net from 'net';
 // Redis connection - Railway provides REDIS_URL
 // In development without Redis, scheduled posts will use fallback polling
 const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || null;
+const JOB_QUEUE_ENABLED = process.env.NODE_ENV === 'production';
 
 let connection = null;
+let connectionPromise = null;
 let scheduledPostsQueue = null;
 let scheduledPostsWorker = null;
+let imageGenerationQueue = null;
+let imageGenerationWorker = null;
 let redisAvailable = false;
 let redisGaveUp = false;
+
+// Image generation config (env-controlled)
+const IMAGE_GEN_CONCURRENCY = parseInt(process.env.IMAGE_GEN_CONCURRENCY || '2', 10);
+const IMAGE_GEN_DELAY_MS = parseInt(process.env.IMAGE_GEN_DELAY_MS || '1500', 10);
+const IMAGE_GEN_MAX_RETRIES = parseInt(process.env.IMAGE_GEN_MAX_RETRIES || '3', 10);
 
 /**
  * Check if Redis is available
  */
 export function isRedisAvailable() {
   return redisAvailable;
+}
+
+export function isJobQueueEnabled() {
+  return JOB_QUEUE_ENABLED && !!REDIS_URL;
 }
 
 /**
@@ -61,12 +71,12 @@ function probeRedis(url, timeoutMs = 3000) {
  */
 export async function waitForRedis(timeoutMs = 5000) {
   if (redisAvailable) return true;
-  if (!REDIS_URL || redisGaveUp) return false;
+  if (!isJobQueueEnabled() || redisGaveUp) return false;
 
   // Ensure connection is initiated
-  await getRedisConnection();
+  const activeConnection = await getRedisConnection();
 
-  if (redisGaveUp) return false;
+  if (!activeConnection || redisGaveUp) return false;
 
   // Wait for connection or timeout
   return new Promise((resolve) => {
@@ -90,6 +100,10 @@ export async function waitForRedis(timeoutMs = 5000) {
  * Now async — probes host reachability before creating ioredis.
  */
 export async function getRedisConnection() {
+  if (!JOB_QUEUE_ENABLED) {
+    return null;
+  }
+
   if (!REDIS_URL || redisGaveUp) {
     return null;
   }
@@ -108,7 +122,7 @@ export async function getRedisConnection() {
 
     connection = new IORedis(REDIS_URL, {
       maxRetriesPerRequest: null,
-      enableReadyCheck: false,
+      enableReadyCheck: true,
       lazyConnect: true,
       connectTimeout: 5000,
       retryStrategy: (times) => {
@@ -128,7 +142,11 @@ export async function getRedisConnection() {
     });
 
     connection.on('connect', () => {
-      console.log('[JobQueue] Redis connected');
+      console.log('[JobQueue] Redis socket connected');
+    });
+
+    connection.on('ready', () => {
+      console.log('[JobQueue] Redis ready');
       redisAvailable = true;
     });
 
@@ -136,12 +154,30 @@ export async function getRedisConnection() {
       redisAvailable = false;
     });
 
-    // Try to connect
-    connection.connect().catch(() => {
-      console.log('[JobQueue] Redis not available (development mode OK, will use fallback)');
+    connection.on('end', () => {
       redisAvailable = false;
     });
+
+    // Try to connect
+    connectionPromise = connection.connect()
+      .then(async () => {
+        await connection.ping();
+        redisAvailable = true;
+        return connection;
+      })
+      .catch(() => {
+        console.log('[JobQueue] Redis not available, using fallback');
+        redisAvailable = false;
+        connection = null;
+        connectionPromise = null;
+        return null;
+      });
   }
+
+  if (connectionPromise) {
+    return connectionPromise;
+  }
+
   return connection;
 }
 
@@ -323,10 +359,354 @@ export async function initializeScheduledPostsChecker(publishFn, publishSingleFn
   return scheduledPostsWorker;
 }
 
+// ============================================================================
+// IMAGE GENERATION QUEUE
+// ============================================================================
+
+let imageGenerationProcessor = null;
+
+/**
+ * Register the image generation processor function
+ * This is called from the server initialization with the actual generate function
+ */
+export function registerImageGenerationProcessor(processorFn) {
+  imageGenerationProcessor = processorFn;
+  console.log('[ImageGenQueue] Processor registered');
+}
+
+/**
+ * Get or create the image generation queue
+ */
+export function getImageGenerationQueue() {
+  if (!imageGenerationQueue) {
+    if (!connection || !redisAvailable) {
+      return null;
+    }
+    imageGenerationQueue = new Queue('image-generation', {
+      connection,
+      defaultJobOptions: {
+        attempts: IMAGE_GEN_MAX_RETRIES,
+        backoff: {
+          type: 'exponential',
+          delay: 5000, // Start with 5s, then 10s, 20s
+        },
+        removeOnComplete: {
+          count: 200,
+          age: 24 * 60 * 60 * 1000, // Keep for 24h
+        },
+        removeOnFail: {
+          count: 100,
+          age: 7 * 24 * 60 * 60 * 1000, // Keep failures for 7 days
+        },
+      },
+    });
+    console.log(`[ImageGenQueue] Created with concurrency=${IMAGE_GEN_CONCURRENCY}, delay=${IMAGE_GEN_DELAY_MS}ms`);
+  }
+  return imageGenerationQueue;
+}
+
+/**
+ * Add an image generation job to the queue
+ * Uses rate limiting via job delays to avoid provider rate limits
+ */
+export async function enqueueImageGeneration(jobData, options = {}) {
+  const queue = getImageGenerationQueue();
+
+  if (!queue) {
+    throw new Error('Redis not available - cannot queue image generation');
+  }
+
+  const {
+    userId,
+    organizationId,
+    prompt,
+    brandProfile,
+    aspectRatio = '1:1',
+    imageSize = '1K',
+    model,
+    productImages,
+    styleReferenceImage,
+    personReferenceImage,
+    jobId = `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  } = jobData;
+
+  // Get current queue size to calculate delay
+  const waitingCount = await queue.getWaitingCount();
+  const activeCount = await queue.getActiveCount();
+  
+  // Add delay based on position in queue to avoid burst
+  // Each job waits for the previous one + IMAGE_GEN_DELAY_MS
+  const calculatedDelay = (waitingCount + activeCount) * IMAGE_GEN_DELAY_MS;
+  const delay = options.delay !== undefined ? options.delay : calculatedDelay;
+
+  const job = await queue.add('generate-image', {
+    userId,
+    organizationId,
+    prompt,
+    brandProfile,
+    aspectRatio,
+    imageSize,
+    model,
+    productImages,
+    styleReferenceImage,
+    personReferenceImage,
+    queuedAt: Date.now(),
+  }, {
+    jobId,
+    delay: Math.max(0, delay),
+    priority: options.priority || 5, // 1-10, lower = higher priority
+    ...options,
+  });
+
+  const estimatedStart = Date.now() + delay;
+  console.log(`[ImageGenQueue] Job ${jobId} queued (delay=${delay}ms, position=${waitingCount + 1})`);
+
+  return {
+    jobId: job.id,
+    status: 'queued',
+    delay,
+    estimatedStart: new Date(estimatedStart).toISOString(),
+    queuePosition: waitingCount + 1,
+  };
+}
+
+/**
+ * Add multiple image generation jobs as a batch
+ * Each job gets staggered delays automatically
+ */
+export async function enqueueImageGenerationBatch(jobsData, options = {}) {
+  const queue = getImageGenerationQueue();
+
+  if (!queue) {
+    throw new Error('Redis not available - cannot queue image generation');
+  }
+
+  const results = [];
+  
+  for (let i = 0; i < jobsData.length; i++) {
+    const jobData = jobsData[i];
+    const jobOptions = {
+      ...options,
+      // Stagger delays: first job immediate, others spaced by IMAGE_GEN_DELAY_MS
+      delay: i * IMAGE_GEN_DELAY_MS,
+    };
+    
+    try {
+      const result = await enqueueImageGeneration(jobData, jobOptions);
+      results.push(result);
+    } catch (error) {
+      console.error(`[ImageGenQueue] Failed to queue batch job ${i}:`, error.message);
+      results.push({ error: error.message, jobId: null });
+    }
+  }
+
+  console.log(`[ImageGenQueue] Batch queued: ${results.filter(r => !r.error).length}/${jobsData.length} jobs`);
+  return results;
+}
+
+/**
+ * Get job status and progress
+ */
+export async function getImageGenerationJobStatus(jobId) {
+  const queue = getImageGenerationQueue();
+  if (!queue) return null;
+
+  try {
+    const job = await queue.getJob(jobId);
+    if (!job) return null;
+
+    const state = await job.getState();
+    const progress = job.progress || 0;
+
+    return {
+      jobId: job.id,
+      state, // 'waiting', 'active', 'completed', 'failed', 'delayed'
+      progress,
+      data: job.data,
+      result: job.returnvalue,
+      failedReason: job.failedReason,
+      attemptsMade: job.attemptsMade,
+      processedOn: job.processedOn,
+      finishedOn: job.finishedOn,
+    };
+  } catch (error) {
+    console.error(`[ImageGenQueue] Error getting job status:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Get all jobs for a user
+ */
+export async function getUserImageGenerationJobs(userId, organizationId = null, limit = 50) {
+  const queue = getImageGenerationQueue();
+  if (!queue) return [];
+
+  try {
+    // Get jobs from all states
+    const [waiting, active, completed, failed] = await Promise.all([
+      queue.getWaiting(0, limit),
+      queue.getActive(0, limit),
+      queue.getCompleted(0, limit),
+      queue.getFailed(0, limit),
+    ]);
+
+    const allJobs = [...waiting, ...active, ...completed, ...failed];
+    
+    // Filter by user/organization
+    return allJobs
+      .filter(job => {
+        if (organizationId) {
+          return job.data.organizationId === organizationId;
+        }
+        return job.data.userId === userId && !job.data.organizationId;
+      })
+      .map(job => ({
+        jobId: job.id,
+        state: job.getState(),
+        progress: job.progress || 0,
+        prompt: job.data.prompt?.slice(0, 100) + '...',
+        model: job.data.model,
+        createdAt: job.timestamp,
+        finishedOn: job.finishedOn,
+        attemptsMade: job.attemptsMade,
+      }))
+      .slice(0, limit);
+  } catch (error) {
+    console.error(`[ImageGenQueue] Error getting user jobs:`, error.message);
+    return [];
+  }
+}
+
+/**
+ * Initialize the image generation worker
+ * Processes jobs with controlled concurrency and rate limiting
+ */
+export async function initializeImageGenerationWorker() {
+  const queue = getImageGenerationQueue();
+
+  if (!queue || !connection || !redisAvailable) {
+    console.log('[ImageGenQueue] Redis not available, worker not started');
+    return null;
+  }
+
+  if (!imageGenerationProcessor) {
+    console.warn('[ImageGenQueue] No processor registered - worker will not process jobs');
+    return null;
+  }
+
+  // Create worker with limited concurrency to avoid rate limits
+  imageGenerationWorker = new Worker('image-generation', async (job) => {
+    const startTime = Date.now();
+    const { userId, organizationId, prompt, model, queuedAt } = job.data;
+    
+    console.log(`[ImageGenWorker] Processing job ${job.id} (waited ${Date.now() - queuedAt}ms)`);
+    
+    // Update progress
+    await job.updateProgress(10);
+
+    try {
+      // Call the registered processor (the actual generate function)
+      const result = await imageGenerationProcessor(job.data, (progress) => {
+        job.updateProgress(10 + progress * 0.8); // 10-90% during generation
+      });
+
+      await job.updateProgress(100);
+      
+      const duration = Date.now() - startTime;
+      console.log(`[ImageGenWorker] Job ${job.id} completed in ${duration}ms`);
+
+      return {
+        success: true,
+        imageUrl: result.imageUrl,
+        usedProvider: result.usedProvider,
+        usedModel: result.usedModel,
+        usedFallback: result.usedFallback,
+        duration,
+      };
+    } catch (error) {
+      console.error(`[ImageGenWorker] Job ${job.id} failed:`, error.message);
+      throw error; // Let BullMQ handle retry
+    }
+  }, {
+    connection,
+    concurrency: IMAGE_GEN_CONCURRENCY, // Process N jobs simultaneously max
+    limiter: {
+      // Additional rate limiting: max 1 job per IMAGE_GEN_DELAY_MS per worker
+      max: 1,
+      duration: IMAGE_GEN_DELAY_MS,
+    },
+  });
+
+  imageGenerationWorker.on('completed', (job, result) => {
+    console.log(`[ImageGenWorker] ✓ ${job.id} completed (${result.usedProvider})`);
+  });
+
+  imageGenerationWorker.on('failed', (job, err) => {
+    console.error(`[ImageGenWorker] ✗ ${job?.id} failed:`, err.message);
+  });
+
+  imageGenerationWorker.on('progress', (job, progress) => {
+    console.log(`[ImageGenWorker] ${job.id} progress: ${progress}%`);
+  });
+
+  console.log(`[ImageGenWorker] Initialized (concurrency=${IMAGE_GEN_CONCURRENCY})`);
+  return imageGenerationWorker;
+}
+
+/**
+ * Cancel an image generation job
+ */
+export async function cancelImageGenerationJob(jobId) {
+  const queue = getImageGenerationQueue();
+  if (!queue) return false;
+
+  try {
+    const job = await queue.getJob(jobId);
+    if (!job) return false;
+
+    const state = await job.getState();
+    if (state === 'completed' || state === 'failed') {
+      return false; // Already finished
+    }
+
+    await job.remove();
+    console.log(`[ImageGenQueue] Job ${jobId} cancelled`);
+    return true;
+  } catch (error) {
+    console.error(`[ImageGenQueue] Error cancelling job:`, error.message);
+    return false;
+  }
+}
+
+/**
+ * Clean up old completed jobs
+ */
+export async function cleanupImageGenerationJobs(keepCompleted = 100, keepFailed = 50) {
+  const queue = getImageGenerationQueue();
+  if (!queue) return;
+
+  try {
+    await queue.clean(24 * 60 * 60 * 1000, 'completed', keepCompleted);
+    await queue.clean(7 * 24 * 60 * 60 * 1000, 'failed', keepFailed);
+    console.log('[ImageGenQueue] Cleaned up old jobs');
+  } catch (error) {
+    console.error('[ImageGenQueue] Cleanup error:', error.message);
+  }
+}
+
 /**
  * Graceful shutdown
  */
 export async function closeQueue() {
+  if (imageGenerationWorker) {
+    await imageGenerationWorker.close();
+    imageGenerationWorker = null;
+  }
+  if (imageGenerationQueue) {
+    await imageGenerationQueue.close();
+    imageGenerationQueue = null;
+  }
   if (scheduledPostsWorker) {
     await scheduledPostsWorker.close();
     scheduledPostsWorker = null;

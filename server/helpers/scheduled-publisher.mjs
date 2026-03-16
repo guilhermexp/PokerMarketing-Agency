@@ -4,23 +4,12 @@
  * Supports multi-tenant mode via instagram_account_id
  */
 
-import { neon } from "@neondatabase/serverless";
 import { put } from "@vercel/blob";
 import { validateContentType } from "../lib/validation/contentType.mjs";
+import { getSql, DATABASE_URL } from "../lib/db.mjs";
 
-const DATABASE_URL = process.env.DATABASE_URL;
 const RUBE_TOKEN = process.env.RUBE_TOKEN; // Fallback for legacy posts
 const MCP_URL = 'https://rube.app/mcp';
-
-/**
- * Get database connection
- */
-function getSql() {
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL not configured');
-  }
-  return neon(DATABASE_URL);
-}
 
 /**
  * Generate unique JSON-RPC ID
@@ -64,9 +53,12 @@ async function getInstagramCredentials(instagramAccountId) {
       WHERE id = ${instagramAccountId} AND is_active = TRUE
       LIMIT 1
     `;
+    if (!result[0]) {
+      console.error(`[Publisher] Instagram account ${instagramAccountId} not found or inactive`);
+    }
     return result[0] || null;
   } catch (error) {
-    console.error('[Publisher] Failed to get Instagram credentials:', error);
+    console.error(`[Publisher] DB error fetching Instagram credentials for ${instagramAccountId}:`, error?.message || error);
     return null;
   }
 }
@@ -346,24 +338,26 @@ async function publishPost(post) {
       console.log('[Publisher] No instagram_account_id on post, auto-resolving...');
       try {
         const sql = getSql();
-        const orgFilter = post.organization_id
-          ? sql`AND organization_id = ${post.organization_id}`
-          : sql`AND (organization_id IS NULL OR organization_id = '')`;
-
-        const accounts = await sql`
-          SELECT id FROM instagram_accounts
-          WHERE is_active = TRUE
-            ${orgFilter}
-          ORDER BY connected_at DESC
-          LIMIT 1
-        `;
+        const accounts = post.organization_id
+          ? await sql`
+              SELECT id FROM instagram_accounts
+              WHERE is_active = TRUE AND organization_id = ${post.organization_id}
+              ORDER BY connected_at DESC
+              LIMIT 1
+            `
+          : await sql`
+              SELECT id FROM instagram_accounts
+              WHERE is_active = TRUE AND (organization_id IS NULL OR organization_id = '')
+              ORDER BY connected_at DESC
+              LIMIT 1
+            `;
 
         if (accounts.length > 0) {
           instagramAccountId = accounts[0].id;
           console.log(`[Publisher] Auto-resolved instagram account: ${instagramAccountId}`);
         }
       } catch (err) {
-        console.error('[Publisher] Failed to auto-resolve instagram account:', err);
+        console.error('[Publisher] Failed to auto-resolve instagram account:', err?.message || err);
       }
     }
 
@@ -379,12 +373,12 @@ async function publishPost(post) {
       console.log(`[Publisher] Using user token for Instagram: ${credentials.instagramUserId}`);
     } else {
       // Legacy: no instagram_account_id and no active accounts - use global token
-      if (!RUBE_TOKEN) {
+      if (!RUBE_TOKEN || !process.env.INSTAGRAM_USER_ID) {
         throw new Error('No Instagram account connected. Please connect in Settings → Integrations.');
       }
       credentials = {
         token: RUBE_TOKEN,
-        instagramUserId: process.env.INSTAGRAM_USER_ID || '25281402468195799'
+        instagramUserId: process.env.INSTAGRAM_USER_ID
       };
       console.log('[Publisher] Warning: Using legacy global token');
     }
@@ -470,10 +464,6 @@ async function publishPost(post) {
 export async function publishScheduledPostById(postId, userId) {
   if (!DATABASE_URL) {
     return { success: false, error: 'DATABASE_URL not configured' };
-  }
-
-  if (!RUBE_TOKEN) {
-    return { success: false, error: 'RUBE_TOKEN not configured' };
   }
 
   // Check publishing hours
@@ -585,11 +575,6 @@ export async function checkAndPublishScheduledPosts() {
 
   if (!DATABASE_URL) {
     console.log('[Publisher] DATABASE_URL not configured, skipping');
-    return { published: 0, failed: 0, skipped: true };
-  }
-
-  if (!RUBE_TOKEN) {
-    console.log('[Publisher] RUBE_TOKEN not configured, skipping');
     return { published: 0, failed: 0, skipped: true };
   }
 
