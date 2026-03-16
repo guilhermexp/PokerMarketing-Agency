@@ -260,7 +260,7 @@ const CampaignCard: React.FC<{
               {campaign.carouselsCount > 0 && (
                 <span>{campaign.carouselsCount} carrossel{campaign.carouselsCount !== 1 ? 'is' : ''}</span>
               )}
-              {toneLabel && <span>Tom: {toneLabel}</span>}
+              {toneLabel ? <span>Tom: {toneLabel}</span> : null}
               {isSelected && (
                 <span className="ml-auto text-primary/60 font-medium">Aberta</span>
               )}

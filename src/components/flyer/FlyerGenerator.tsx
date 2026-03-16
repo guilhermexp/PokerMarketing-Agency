@@ -426,9 +426,9 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        {isCurrentWeek && <span className="text-[7px] font-black text-emerald-400 bg-emerald-500/[0.15] px-1.5 py-0.5 rounded uppercase">Atual</span>}
-                        {isExpired && !isCurrentWeek && <span className="text-[7px] font-black text-white/30 bg-white/[0.04] px-1.5 py-0.5 rounded uppercase">Expirada</span>}
-                        {isSelected && <Icon name="check" className="w-3 h-3 text-white/80" />}
+                        {isCurrentWeek ? <span className="text-[7px] font-black text-emerald-400 bg-emerald-500/[0.15] px-1.5 py-0.5 rounded uppercase">Atual</span> : null}
+                        {isExpired && !isCurrentWeek ? <span className="text-[7px] font-black text-white/30 bg-white/[0.04] px-1.5 py-0.5 rounded uppercase">Expirada</span> : null}
+                        {isSelected ? <Icon name="check" className="w-3 h-3 text-white/80" /> : null}
                       </div>
                     </button>
                   );
@@ -694,7 +694,7 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
       </div>
 
       {/* Mobile Drawer Overlay */}
-      {isMobilePanelOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsMobilePanelOpen(false)} />}
+      {isMobilePanelOpen ? <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsMobilePanelOpen(false)} /> : null}
 
       {/* Side Panel */}
       <div className={`fixed lg:relative inset-y-0 right-0 z-50 lg:z-auto w-[85%] sm:w-80 bg-[#080808] lg:bg-[#060606] border-l border-white/[0.06] flex flex-col flex-shrink-0 transform transition-transform duration-300 ease-in-out ${isMobilePanelOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>

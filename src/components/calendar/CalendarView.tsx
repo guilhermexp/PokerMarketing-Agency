@@ -729,9 +729,9 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
                 <p className="text-[11px] text-white/30 mt-0.5">
                   {todayPosts.length === 0 ? "Nenhum post" : (
                     <>
-                      {scheduledCount > 0 && <span>{scheduledCount} agendado{scheduledCount !== 1 ? "s" : ""}</span>}
-                      {scheduledCount > 0 && publishedCount > 0 && <span> · </span>}
-                      {publishedCount > 0 && <span className="text-emerald-400/50">{publishedCount} publicado{publishedCount !== 1 ? "s" : ""}</span>}
+                      {scheduledCount > 0 ? <span>{scheduledCount} agendado{scheduledCount !== 1 ? "s" : ""}</span> : null}
+                      {scheduledCount > 0 && publishedCount > 0 ? <span> · </span> : null}
+                      {publishedCount > 0 ? <span className="text-emerald-400/50">{publishedCount} publicado{publishedCount !== 1 ? "s" : ""}</span> : null}
                     </>
                   )}
                 </p>

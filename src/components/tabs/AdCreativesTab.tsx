@@ -205,7 +205,7 @@ const AdCard: React.FC<{
               </Button>
             )}
           </div>
-          {error && <p className="text-red-400 text-[9px] px-4 pb-3">{error}</p>}
+          {error ? <p className="text-red-400 text-[9px] px-4 pb-3">{error}</p> : null}
         </div>
         {editingImage && (
           <ImagePreviewModal

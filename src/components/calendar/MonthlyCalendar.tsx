@@ -188,9 +188,9 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
                 {/* Status Indicators */}
                 {posts.length > 0 && (
                   <div className="flex items-center gap-1">
-                    {hasScheduled && <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
-                    {hasPublished && <div className="w-1.5 h-1.5 rounded-full bg-green-500" />}
-                    {hasFailed && <div className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+                    {hasScheduled ? <div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> : null}
+                    {hasPublished ? <div className="w-1.5 h-1.5 rounded-full bg-green-500" /> : null}
+                    {hasFailed ? <div className="w-1.5 h-1.5 rounded-full bg-red-500" /> : null}
                   </div>
                 )}
               </div>

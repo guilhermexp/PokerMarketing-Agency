@@ -179,7 +179,11 @@ const SectionCard: React.FC<{
       </div>
     </div>
 
-    {enabled && children && <div className="mt-3 flex-1" onClick={(e) => e.stopPropagation()}>{children}</div>}
+    {enabled ? (
+      children ? (
+        <div className="mt-3 flex-1" onClick={(e) => e.stopPropagation()}>{children}</div>
+      ) : null
+    ) : null}
 
     <div className="flex items-center justify-between pt-3 border-t border-border mt-auto">
       <span className="text-xs text-muted-foreground">Quantidade:</span>

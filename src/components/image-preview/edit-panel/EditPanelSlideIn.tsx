@@ -138,7 +138,7 @@ const EditPanelContent = (props: Omit<EditPanelSlideInProps, 'open' | 'onClose'>
   return (
     <div className="edit-panel-content">
       {/* Error Banner */}
-      {error && <ErrorBanner message={error} />}
+      {error ? <ErrorBanner message={error} /> : null}
 
       {/* AI Edit Section */}
       {editPrompt !== undefined && setEditPrompt && setBrushSize && (

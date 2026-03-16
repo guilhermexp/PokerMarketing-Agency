@@ -558,7 +558,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
               </div>
             )}
             <AnimatePresence>
-              {isGenerating && <GeneratingLoader />}
+              {isGenerating ? <GeneratingLoader /> : null}
             </AnimatePresence>
             {campaign && (
               <div className="animate-fade-in-up space-y-8">

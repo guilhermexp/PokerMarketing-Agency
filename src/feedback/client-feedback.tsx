@@ -158,7 +158,7 @@ export function ClientFeedback({
       >
         <span style={styles.toggleIcon}>{isActive ? '\u25CF' : '\u25CB'}</span>
         <span>Feedback</span>
-        {annotations.length > 0 && <span style={styles.badge}>{annotations.length}</span>}
+        {annotations.length > 0 ? <span style={styles.badge}>{annotations.length}</span> : null}
       </button>
 
       {annotations.length > 0 && (
@@ -185,7 +185,7 @@ export function ClientFeedback({
         />
       )}
 
-      {copyFeedback && <div style={styles.toast}>Copiado para a area de transferencia!</div>}
+      {copyFeedback ? <div style={styles.toast}>Copiado para a area de transferencia!</div> : null}
 
       {isActive && (
         <Agentation

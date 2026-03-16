@@ -22,7 +22,7 @@ const SidebarSection: React.FC<{ title: string; hint?: string; children: React.R
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
           {title}
         </p>
-        {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
+        {hint ? <p className="text-[10px] text-muted-foreground">{hint}</p> : null}
       </div>
     </div>
     {children}
