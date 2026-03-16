@@ -198,4 +198,3 @@ export function OrganizationsPage() {
   );
 }
 
-export default OrganizationsPage;

@@ -69,4 +69,3 @@ export function useSuperAdmin(): SuperAdminState {
   return state;
 }
 
-export default useSuperAdmin;

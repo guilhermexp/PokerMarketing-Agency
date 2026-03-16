@@ -40,4 +40,3 @@ export const VeoLogo: React.FC<VeoLogoProps> = ({ className }) => {
   );
 };
 
-export default VeoLogo;

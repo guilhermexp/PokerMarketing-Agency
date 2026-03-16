@@ -869,4 +869,3 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
   );
 };
 
-export default ConfigPanel;

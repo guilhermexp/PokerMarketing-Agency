@@ -2716,7 +2716,7 @@ function AppWithBackgroundJobs() {
   );
 }
 
-function App() {
+export function App() {
   return (
     <AuthWrapper>
       <AppWithBackgroundJobs />
@@ -2724,4 +2724,3 @@ function App() {
   );
 }
 
-export default App;

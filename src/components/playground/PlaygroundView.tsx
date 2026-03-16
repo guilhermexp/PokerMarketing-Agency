@@ -813,4 +813,3 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({
   );
 };
 
-export default PlaygroundView;

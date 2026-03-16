@@ -438,4 +438,3 @@ export function LogsPage() {
   );
 }
 
-export default LogsPage;

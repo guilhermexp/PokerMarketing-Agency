@@ -288,4 +288,3 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
   );
 };
 
-export default BatchItem;

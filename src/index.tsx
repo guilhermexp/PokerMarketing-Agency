@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
-import Router from "./Router";
+import { Router } from "./Router";
 import "./styles/main.css";
 
 const rootElement = document.getElementById("root");

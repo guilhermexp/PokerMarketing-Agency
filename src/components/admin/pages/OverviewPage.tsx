@@ -317,4 +317,3 @@ export function OverviewPage() {
   );
 }
 
-export default OverviewPage;

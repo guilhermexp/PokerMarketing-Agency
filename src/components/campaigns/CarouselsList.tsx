@@ -322,4 +322,3 @@ export function CarouselsList({
   );
 }
 
-export default CarouselsList;

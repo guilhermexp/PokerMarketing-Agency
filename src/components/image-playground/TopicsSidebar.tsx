@@ -226,4 +226,3 @@ const TopicItem: React.FC<TopicItemProps> = ({
   );
 };
 
-export default TopicsSidebar;

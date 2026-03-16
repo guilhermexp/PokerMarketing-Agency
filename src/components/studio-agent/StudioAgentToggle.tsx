@@ -34,4 +34,3 @@ export const StudioAgentToggle: React.FC<StudioAgentToggleProps> = ({ mode, onCh
   );
 };
 
-export default StudioAgentToggle;

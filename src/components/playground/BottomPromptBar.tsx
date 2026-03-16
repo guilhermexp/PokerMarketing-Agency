@@ -685,4 +685,3 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
   );
 };
 
-export default BottomPromptBar;

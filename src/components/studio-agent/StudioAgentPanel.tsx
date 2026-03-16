@@ -783,4 +783,3 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
   );
 };
 
-export default StudioAgentPanel;

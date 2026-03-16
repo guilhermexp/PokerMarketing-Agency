@@ -91,4 +91,3 @@ export const PromptInput: React.FC = () => {
   );
 };
 
-export default PromptInput;

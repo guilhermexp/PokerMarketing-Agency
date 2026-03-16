@@ -229,4 +229,3 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
   );
 };
 
-export default VideoCard;

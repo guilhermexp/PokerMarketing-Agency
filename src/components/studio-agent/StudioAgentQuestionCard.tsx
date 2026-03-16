@@ -324,4 +324,3 @@ export const StudioAgentQuestionCard: React.FC<StudioAgentQuestionCardProps> = m
 
 StudioAgentQuestionCard.displayName = 'StudioAgentQuestionCard';
 
-export default StudioAgentQuestionCard;

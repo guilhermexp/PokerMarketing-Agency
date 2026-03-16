@@ -96,4 +96,3 @@ export function useAiSuggestions(logId: string | null) {
   };
 }
 
-export default useAiSuggestions;

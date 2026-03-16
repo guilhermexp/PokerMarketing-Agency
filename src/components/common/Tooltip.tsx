@@ -33,7 +33,7 @@ interface TooltipProps {
   delayDuration?: number;
 }
 
-const Tooltip: React.FC<TooltipProps> = ({
+export const Tooltip: React.FC<TooltipProps> = ({
   children,
   content,
   side = "right",
@@ -49,11 +49,8 @@ const Tooltip: React.FC<TooltipProps> = ({
 );
 
 export {
-  Tooltip,
   TooltipRoot,
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
 };
-
-export default Tooltip;

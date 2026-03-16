@@ -441,4 +441,3 @@ function formatTime(seconds: number): string {
   return `${mins}m ${secs}s`;
 }
 
-export default GenerationItem;

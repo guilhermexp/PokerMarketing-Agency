@@ -5,11 +5,13 @@
 
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import App from './App';
+import { App } from './App';
 import { Loader } from './components/common/Loader';
 
 // Lazy load admin panel for code splitting
-const AdminApp = lazy(() => import('./components/admin/AdminApp'));
+const AdminApp = lazy(() =>
+  import('./components/admin/AdminApp').then((m) => ({ default: m.AdminApp })),
+);
 
 // Dev-only: Error notification test page
 const ErrorNotificationTest = lazy(() =>
@@ -61,5 +63,3 @@ function AdminLoadingFallback() {
     </div>
   );
 }
-
-export default Router;

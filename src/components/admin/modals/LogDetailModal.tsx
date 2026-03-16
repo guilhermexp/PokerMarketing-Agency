@@ -283,4 +283,3 @@ function formatMarkdown(text: string): string {
   return formatted;
 }
 
-export default LogDetailModal;
