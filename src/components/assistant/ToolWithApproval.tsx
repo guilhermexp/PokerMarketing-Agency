@@ -12,6 +12,8 @@ import { ToolDisplay, type ToolDisplayMetadata } from './ToolDisplay';
 import { ToolApproval } from './ToolApproval';
 import { Icon } from '../common/Icon';
 
+export type { ToolDisplayMetadata } from './ToolDisplay';
+
 export interface ToolWithApprovalProps {
   toolCallId: string;
   toolName: string;

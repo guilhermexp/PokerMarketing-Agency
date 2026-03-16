@@ -123,7 +123,7 @@ const parseSSEResponse = (text: string): Record<string, unknown> | { error?: str
 export const callRubeMCP = async (
   toolName: string,
   args: Record<string, unknown>,
-  context: InstagramContext
+  context?: InstagramContext
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> => {
   if (!context?.instagramAccountId || !context?.userId) {

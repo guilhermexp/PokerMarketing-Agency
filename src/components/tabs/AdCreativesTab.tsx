@@ -394,7 +394,7 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
           aspectRatio: "1.91:1",
           model: selectedImageModel,
           productImages: productImages.length > 0 ? productImages : undefined,
-          compositionAssets: compositionAssets?.length > 0 ? compositionAssets : undefined,
+          compositionAssets: (compositionAssets?.length ?? 0) > 0 ? compositionAssets : undefined,
         },
       );
 
@@ -538,7 +538,7 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
                 onImageClick={image ? () => setEditingAdImage({ image, index, platform: ad.platform }) : undefined}
                 imagePrompt={ad.image_prompt}
                 error={errors[index]}
-                galleryImage={image}
+                galleryImage={image ?? undefined}
               />
             );
           }
@@ -558,7 +558,7 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
                 onImageClick={image ? () => setEditingAdImage({ image, index, platform: ad.platform }) : undefined}
                 imagePrompt={ad.image_prompt}
                 error={errors[index]}
-                galleryImage={image}
+                galleryImage={image ?? undefined}
               />
             );
           }

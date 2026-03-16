@@ -337,7 +337,8 @@ export const ClipCard: React.FC<ClipCardProps> = ({
       );
 
       // Update video states with the completed video
-      if (job.result_url) {
+      const resultUrl = job.result_url;
+      if (resultUrl) {
         setVideoStates((prev) => {
           const existing = prev[sceneNumber] || [];
           // Add new video to the beginning
@@ -345,7 +346,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             ...prev,
             [sceneNumber]: [
               {
-                url: job.result_url,
+                url: resultUrl,
                 isLoading: false,
                 model: selectedVideoModel,
               },
@@ -363,6 +364,11 @@ export const ClipCard: React.FC<ClipCardProps> = ({
         // Save video to gallery for persistence (same as sync generation)
         // This ensures the video is linked to this clip/campaign
         if (onAddImageToGallery) {
+          const resultUrl = job.result_url;
+          if (!resultUrl) {
+            return;
+          }
+
           // Find the scene to get the visual description for the prompt
           const currentScene = scenes.find(
             (s) => s.sceneNumber === sceneNumber,
@@ -382,7 +388,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
           );
 
           onAddImageToGallery({
-            src: job.result_url,
+            src: resultUrl,
             prompt: `[VIDEO:${selectedVideoModel}] ${visualDescription}`,
             source: videoSource as string,
             model: "gemini-3-pro-image-preview", // Fallback - DB enum doesn't support video models
@@ -1599,7 +1605,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             productImages: productImagesToUse.length > 0 ? productImagesToUse : undefined,
           });
 
-          if (resultImgUrl) {
+          if (resultImgUrl && clip.id) {
             // Save to database
             await updateSceneImage(clip.id, scene.sceneNumber, resultImgUrl);
 
@@ -2335,7 +2341,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
         );
 
         // Add to gallery as a video (linked to clip for filtering)
-        onAddImageToGallery({
+        onAddImageToGallery?.({
           src: videoUrl,
           prompt: `Video editado com ${editorState.clips.length} cenas`,
           source: "Video Final",
@@ -3453,7 +3459,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
       onAddStyleReference({
         src: image.src,
         name:
-          image.prompt.substring(0, 50) ||
+          image.prompt?.substring(0, 50) ||
           `Favorito ${new Date().toLocaleDateString("pt-BR")}`,
       });
     }

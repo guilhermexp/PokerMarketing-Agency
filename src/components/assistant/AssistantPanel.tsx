@@ -72,6 +72,7 @@ const ChatBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
   const isModel = message.role === "model";
   const textPart = message.parts.find((p) => p.text)?.text;
   const imagePart = message.parts.find((p) => p.inlineData);
+  const inlineData = imagePart?.inlineData;
 
   if (!textPart && !message.parts[0].functionCall && !imagePart) return null;
   const htmlContent = textPart ? parseMarkdown(textPart) : "";
@@ -83,10 +84,10 @@ const ChatBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
       <div
         className={`max-w-[90%] rounded-3xl px-5 py-4 shadow-xl ${isModel ? "bg-card border border-border rounded-bl-none text-white/90" : "bg-primary text-black font-bold rounded-br-none"}`}
       >
-        {imagePart && (
+        {inlineData && (
           <div className="mb-3 rounded-2xl overflow-hidden border border-border group relative">
             <img
-              src={`data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`}
+              src={`data:${inlineData.mimeType};base64,${inlineData.data}`}
               alt="Anexo"
               className="w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />

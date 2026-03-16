@@ -19,6 +19,20 @@ export interface StudioAgentChatMessage {
   mentions?: StudioAgentMention[];
 }
 
+type InteractionOption = {
+  id?: unknown;
+  label?: unknown;
+  description?: unknown;
+};
+
+type InteractionQuestion = {
+  id?: unknown;
+  header?: unknown;
+  question?: unknown;
+  multiSelect?: unknown;
+  options?: unknown;
+};
+
 function extractAssistantText(payload: unknown): string {
   if (!payload || typeof payload !== 'object') return '';
   const candidate = payload as { message?: { content?: Array<{ type?: string; text?: string }> } };
@@ -107,9 +121,9 @@ export function useStudioAgent(studioType: StudioType, topicId: string | null) {
     }
 
     if (event.type === 'ask_user') {
-      const rawQuestions = Array.isArray(event.questions) ? event.questions : [];
+      const rawQuestions: InteractionQuestion[] = Array.isArray(event.questions) ? event.questions : [];
       const firstQuestion = rawQuestions[0];
-      const rawOptions = Array.isArray(firstQuestion?.options)
+      const rawOptions: InteractionOption[] = Array.isArray(firstQuestion?.options)
         ? firstQuestion.options
         : Array.isArray(event.options)
           ? event.options

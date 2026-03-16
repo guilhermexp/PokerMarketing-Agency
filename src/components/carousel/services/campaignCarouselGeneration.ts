@@ -130,7 +130,7 @@ export const generateCampaignCover = async (
       aspectRatio: '4:5',
       model: context.imageModel || 'gemini-3-pro-image-preview',
       productImages: productImages.length > 0 ? productImages : undefined,
-      compositionAssets: context.compositionAssets?.length > 0 ? context.compositionAssets : undefined,
+      compositionAssets: (context.compositionAssets?.length ?? 0) > 0 ? context.compositionAssets : undefined,
     });
 
     // API now returns HTTP URL directly (Vercel Blob), no need to re-upload
@@ -283,7 +283,7 @@ export const generateCampaignSlide = async (
       model: context.imageModel || 'gemini-3-pro-image-preview',
       styleReferenceImage: styleRef,
       productImages: productImages.length > 0 ? productImages : undefined,
-      compositionAssets: context.compositionAssets?.length > 0 ? context.compositionAssets : undefined,
+      compositionAssets: (context.compositionAssets?.length ?? 0) > 0 ? context.compositionAssets : undefined,
     });
 
     // API now returns HTTP URL directly (Vercel Blob), no need to re-upload

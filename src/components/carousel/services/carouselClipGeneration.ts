@@ -135,7 +135,7 @@ export const generateCarouselSlide4x5 = async ({
       model: imageModel || 'gemini-3-pro-image-preview',
       styleReferenceImage: styleRef,
       productImages: productImageRefs.length > 0 ? productImageRefs : undefined,
-      compositionAssets: compositionAssets?.length > 0 ? compositionAssets : undefined,
+      compositionAssets: (compositionAssets?.length ?? 0) > 0 ? compositionAssets : undefined,
     });
 
     // API now returns HTTP URL directly (Vercel Blob), no need to re-upload

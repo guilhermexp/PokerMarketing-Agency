@@ -29,7 +29,7 @@ export function useFavoriteToggle({
         onAddStyleReference({
           src: img.src,
           name:
-            img.prompt.substring(0, 50) ||
+            img.prompt?.substring(0, 50) ||
             `Favorito ${new Date().toLocaleDateString("pt-BR")}`,
         });
       }

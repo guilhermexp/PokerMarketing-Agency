@@ -282,7 +282,8 @@ export function useImageCanvas({ imageSrc }: UseImageCanvasProps): UseImageCanva
     const ctx = maskCanvas.getContext('2d');
     const imageData = ctx?.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
     const data = imageData?.data;
-    const hasDrawing = data?.some((channel) => channel !== 0);
+    if (!data) return undefined;
+    const hasDrawing = data.some((channel) => channel !== 0);
 
     if (!hasDrawing) return undefined;
 

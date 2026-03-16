@@ -1376,7 +1376,7 @@ function AppContent() {
                 title: c.title,
                 hook: c.hook,
                 cover_prompt: c.cover_prompt,
-                caption: c.caption || null,
+                caption: c.caption ?? undefined,
                 slides: c.slides || [],
               })),
           });
@@ -1531,7 +1531,7 @@ function AppContent() {
           title: c.title,
           hook: c.hook,
           cover_prompt: c.cover_prompt,
-          caption: c.caption || null,
+          caption: c.caption ?? undefined,
           slides: c.slides || [],
         })),
       });
@@ -2339,7 +2339,7 @@ function AppContent() {
               onClearReference={() => handleSetChatReferenceSilent(null)}
               onUpdateReference={(ref) => handleSetChatReferenceSilent(ref)}
               galleryImages={galleryImages}
-              brandProfile={brandProfile}
+              brandProfile={brandProfile ?? undefined}
               pendingToolEdit={pendingToolEdit}
               onRequestImageEdit={handleRequestImageEdit}
               onToolEditApproved={handleToolEditApproved}
@@ -2678,7 +2678,7 @@ function AppContent() {
                 campaignsList={campaignsList}
                 onLoadCampaign={handleLoadCampaign}
                 onCreateCarouselFromPrompt={handleCreateCarouselFromPrompt}
-                userId={userId}
+                userId={userId ?? undefined}
                 organizationId={organizationId}
                 isWeekExpired={isWeekExpired}
                 onClearExpiredSchedule={handleClearExpiredSchedule}

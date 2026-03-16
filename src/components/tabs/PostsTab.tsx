@@ -426,7 +426,7 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
           aspectRatio: "1:1",
           model: selectedImageModel,
           productImages: productImages.length > 0 ? productImages : undefined,
-          compositionAssets: compositionAssets?.length > 0 ? compositionAssets : undefined,
+          compositionAssets: (compositionAssets?.length ?? 0) > 0 ? compositionAssets : undefined,
         },
       );
 
@@ -571,7 +571,7 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
                 onImageClick={image ? () => setEditingInstagramImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
                 error={errors[index]}
-                galleryImage={image}
+                galleryImage={image ?? undefined}
               />
             );
           }
@@ -592,7 +592,7 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
                 onImageClick={image ? () => setEditingFacebookImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
                 error={errors[index]}
-                galleryImage={image}
+                galleryImage={image ?? undefined}
               />
             );
           }
@@ -613,7 +613,7 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
                 onImageClick={image ? () => setEditingTwitterImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
                 error={errors[index]}
-                galleryImage={image}
+                galleryImage={image ?? undefined}
               />
             );
           }
@@ -635,7 +635,7 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
                 onImageClick={image ? () => setEditingLinkedInImage({ image, index }) : undefined}
                 imagePrompt={post.image_prompt}
                 error={errors[index]}
-                galleryImage={image}
+                galleryImage={image ?? undefined}
               />
             );
           }

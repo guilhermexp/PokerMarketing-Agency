@@ -59,11 +59,11 @@ export interface UiState {
   currentView: string;
 
   // Actions
-  openModal: (modal: ModalType, data?: Record<string, unknown>) => void;
+  openModal: (modal: ModalType, data?: Record<string, unknown> | null) => void;
   closeModal: () => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  setGlobalLoading: (loading: boolean, message?: string) => void;
+  setGlobalLoading: (loading: boolean, message?: string | null) => void;
   addToast: (toast: Omit<Toast, 'id'>) => string;
   removeToast: (id: string) => void;
   clearToasts: () => void;

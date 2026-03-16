@@ -33,7 +33,12 @@ export const ScheduledPostCard: React.FC<ScheduledPostCardProps> = ({
     setEditDate(post.scheduledDate);
     setEditTime(post.scheduledTime);
   }, [post.scheduledDate, post.scheduledTime]);
-  const isPublishing = publishingState && publishingState.step !== 'idle' && publishingState.step !== 'completed' && publishingState.step !== 'failed';
+  const isPublishing = Boolean(
+    publishingState &&
+      publishingState.step !== 'idle' &&
+      publishingState.step !== 'completed' &&
+      publishingState.step !== 'failed',
+  );
 
   const statusColors = {
     scheduled: 'bg-white/[0.06] border-white/[0.08] text-white/60',

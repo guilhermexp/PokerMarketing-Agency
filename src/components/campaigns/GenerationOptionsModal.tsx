@@ -3,6 +3,12 @@ import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { Button } from '../common/Button';
 import type { GenerationOptions, GenerationSetting } from '../../types';
 
+type PostPlatformKey = keyof GenerationOptions['posts'];
+type AdPlatformKey = keyof GenerationOptions['adCreatives'];
+
+const POST_PLATFORM_KEYS: PostPlatformKey[] = ['instagram', 'facebook', 'twitter', 'linkedin'];
+const AD_PLATFORM_KEYS: AdPlatformKey[] = ['facebook', 'google'];
+
 // Animation variants
 const overlayVariants: Variants = {
   hidden: { opacity: 0 },
@@ -251,7 +257,7 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
     }));
   };
 
-  const togglePostPlatform = (key: string) => {
+  const togglePostPlatform = (key: PostPlatformKey) => {
     setOptions(prev => ({
       ...prev,
       posts: {
@@ -261,7 +267,7 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
     }));
   };
 
-  const toggleAdPlatform = (key: string) => {
+  const toggleAdPlatform = (key: AdPlatformKey) => {
     setOptions(prev => ({
       ...prev,
       adCreatives: {
@@ -274,7 +280,7 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
   const setPostsCount = (count: number) => {
     setOptions(prev => {
       const newPosts = { ...prev.posts };
-      for (const key in newPosts) {
+      for (const key of POST_PLATFORM_KEYS) {
         if (newPosts[key].generate) {
           newPosts[key] = { ...newPosts[key], count };
         }
@@ -286,7 +292,7 @@ export const GenerationOptionsModal: React.FC<GenerationOptionsModalProps> = ({
   const setAdsCount = (count: number) => {
     setOptions(prev => {
       const newAds = { ...prev.adCreatives };
-      for (const key in newAds) {
+      for (const key of AD_PLATFORM_KEYS) {
         if (newAds[key].generate) {
           newAds[key] = { ...newAds[key], count };
         }

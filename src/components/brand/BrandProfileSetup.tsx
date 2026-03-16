@@ -153,7 +153,7 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
         console.debug('[BrandProfile] Profile updated with colors');
       } catch (error) {
         console.error("[BrandProfile] Failed to extract colors:", error);
-        alert(`Erro ao extrair cores: ${error.message}`);
+        alert(`Erro ao extrair cores: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
         setIsAnalyzingLogo(false);
       }

@@ -226,9 +226,11 @@ function isQuotaExceededError(error: unknown): boolean {
 }
 
 function sanitizeParametersForPersistence(parameters: RuntimeImageGenParams): Partial<RuntimeImageGenParams> {
-  const safeEntries = Object.entries(parameters).flatMap(([key, value]) => {
+  const safeEntries: Array<[string, string | number | boolean | null]> = [];
+
+  for (const [key, value] of Object.entries(parameters)) {
     if (NON_PERSISTED_PARAM_KEYS.has(key)) {
-      return [];
+      continue;
     }
 
     if (
@@ -236,24 +238,23 @@ function sanitizeParametersForPersistence(parameters: RuntimeImageGenParams): Pa
       typeof value === 'boolean' ||
       typeof value === 'number'
     ) {
-      return [[key, value] as const];
+      safeEntries.push([key, value]);
+      continue;
     }
 
     if (typeof value === 'string') {
       if (value.length <= MAX_PERSISTED_PARAM_STRING_LENGTH) {
-        return [[key, value] as const];
+        safeEntries.push([key, value]);
+        continue;
       }
 
       if (key === 'prompt') {
-        return [[key, value.slice(0, MAX_PERSISTED_PARAM_STRING_LENGTH)] as const];
+        safeEntries.push([key, value.slice(0, MAX_PERSISTED_PARAM_STRING_LENGTH)]);
       }
-
-      return [];
     }
 
     // Ignore arrays/objects in persisted parameters to avoid oversized localStorage payloads.
-    return [];
-  });
+  }
 
   return Object.fromEntries(safeEntries) as Partial<RuntimeImageGenParams>;
 }

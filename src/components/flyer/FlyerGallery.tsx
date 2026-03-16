@@ -352,7 +352,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
           onImageUpdate={
             onUpdateGalleryImage
               ? (newSrc) => onUpdateGalleryImage(selectedImage.id, newSrc)
-              : undefined
+              : () => {}
           }
           onSetChatReference={onSetChatReference}
         />

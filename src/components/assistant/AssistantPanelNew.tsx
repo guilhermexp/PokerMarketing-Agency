@@ -27,6 +27,7 @@ import type { DataUIPart } from './DataStreamProvider';
 import { MessageResponse } from './MessageResponse';
 import { MessageActionsEnhanced } from './MessageActionsEnhanced';
 import { ToolWithApproval } from './ToolWithApproval';
+import type { ToolDisplayMetadata } from './ToolWithApproval';
 import { LoadingIndicatorEnhanced } from './LoadingIndicatorEnhanced';
 import { uploadDataUrlToBlob } from '../../services/blobService';
 
@@ -82,6 +83,23 @@ const getImageMediaType = (url: string): 'image/jpeg' | 'image/png' | 'image/web
   if (lowerUrl.includes('.heif')) return 'image/heif';
   return 'image/png'; // default
 };
+
+function isToolDisplayMetadata(value: unknown): value is ToolDisplayMetadata {
+  if (!value || typeof value !== 'object') return false;
+  const metadata = value as Record<string, unknown>;
+
+  return (
+    (metadata.title === undefined || typeof metadata.title === 'string') &&
+    (metadata.description === undefined || typeof metadata.description === 'string') &&
+    (metadata.estimatedTime === undefined || typeof metadata.estimatedTime === 'string') &&
+    (metadata.cost === undefined || typeof metadata.cost === 'string') &&
+    (metadata.icon === undefined || typeof metadata.icon === 'string') &&
+    (
+      metadata.willDo === undefined ||
+      (Array.isArray(metadata.willDo) && metadata.willDo.every((item) => typeof item === 'string'))
+    )
+  );
+}
 
 // ChatBubble component - Apenas renderiza mensagens (approvals são mostrados acima do input)
 const ChatBubble: React.FC<{ message: UIMessage }> = ({ message }) => {
@@ -715,8 +733,11 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
                     toolName={toolPart.type.replace('tool-', '')}
                     args={toolArgs}
                     metadata={
-                      'metadata' in toolPart
-                        ? (toolPart as { metadata?: { preview?: unknown } }).metadata?.preview
+                      'metadata' in toolPart &&
+                      isToolDisplayMetadata(
+                        (toolPart as { metadata?: { preview?: unknown } }).metadata?.preview,
+                      )
+                        ? (toolPart as { metadata?: { preview?: ToolDisplayMetadata } }).metadata?.preview
                         : undefined
                     }
                     state={mapToolState(toolPart.state)}
