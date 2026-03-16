@@ -51,6 +51,43 @@ interface RubeMCPRequest {
   };
 }
 
+type RubeRecord = Record<string, unknown>;
+
+interface RubeResult extends RubeRecord {
+  id?: string;
+  creation_id?: string;
+  container_id?: string;
+  media_container_id?: string;
+  status_code?: string;
+  status?: string;
+  username?: string;
+  quota_usage?: number;
+  config?: RubeRecord & { quota_total?: number };
+  data?: RubeRecord | RubeRecord[] | unknown;
+  value?: string;
+}
+
+interface RubeExecutionResult extends RubeRecord {
+  data?: {
+    data?: {
+      results?: Array<{
+        response?: {
+          error?: string;
+          data?: unknown;
+        };
+      }>;
+    };
+    results?: Array<{
+      error?: string;
+      response?: {
+        data?: unknown;
+      };
+      data?: unknown;
+    }>;
+  };
+  error?: string;
+}
+
 // Instagram content types
 export type InstagramContentType = 'photo' | 'video' | 'reel' | 'story' | 'carousel';
 
@@ -124,8 +161,7 @@ export const callRubeMCP = async (
   toolName: string,
   args: Record<string, unknown>,
   context?: InstagramContext
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> => {
+): Promise<RubeExecutionResult> => {
   if (!context?.instagramAccountId || !context?.userId) {
     throw new Error('Conecte sua conta Instagram em Configurações → Integrações para publicar.');
   }
@@ -206,7 +242,7 @@ export const callRubeMCP = async (
     throw new Error(`Erro Rube MCP: ${data.error}`);
   }
 
-  return data;
+  return data as RubeExecutionResult;
 };
 
 /**
@@ -221,8 +257,7 @@ export const executeInstagramTool = async (
   args: Record<string, unknown>,
   sessionId: string = 'zulu',
   context?: InstagramContext
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> => {
+): Promise<RubeResult> => {
   const result = await callRubeMCP('RUBE_MULTI_EXECUTE_TOOL', {
     tools: [{
       tool_slug: toolSlug,
@@ -251,7 +286,13 @@ export const executeInstagramTool = async (
     // Get the actual data from response.data
     const actualData = toolResult?.response?.data;
     console.debug(`[Rube MCP] Extracted data for ${toolSlug}:`, JSON.stringify(actualData, null, 2));
-    return actualData;
+    if (Array.isArray(actualData)) {
+      return { data: actualData };
+    }
+    if (actualData && typeof actualData === 'object') {
+      return actualData as RubeResult;
+    }
+    return { value: typeof actualData === 'string' ? actualData : JSON.stringify(actualData) };
   }
 
   // Fallback to old structure if new one doesn't match
@@ -260,7 +301,14 @@ export const executeInstagramTool = async (
     if (toolResult?.error) {
       throw new Error(toolResult.error);
     }
-    return toolResult?.response?.data || toolResult?.data || toolResult;
+    const actualData = toolResult?.response?.data || toolResult?.data || toolResult;
+    if (Array.isArray(actualData)) {
+      return { data: actualData };
+    }
+    if (actualData && typeof actualData === 'object') {
+      return actualData as RubeResult;
+    }
+    return { value: typeof actualData === 'string' ? actualData : JSON.stringify(actualData) };
   }
 
   return result;
@@ -290,7 +338,9 @@ export const checkPublishingQuota = async (context?: InstagramContext): Promise<
     );
 
     // Result can be an array or object
-    const quotaData = Array.isArray(result?.data) ? result.data[0] : (Array.isArray(result) ? result[0] : result);
+    const quotaData = Array.isArray(result.data)
+      ? (result.data[0] as RubeResult | undefined)
+      : result;
     const quotaUsage = quotaData?.quota_usage || result?.quota_usage || 0;
     const config = quotaData?.config || result?.config || { quota_total: 25 };
 
@@ -341,16 +391,20 @@ export const createMediaContainer = async (
   }
 
   const result = await executeInstagramTool('INSTAGRAM_CREATE_MEDIA_CONTAINER', args, 'zulu', context);
+  const resultData = !Array.isArray(result.data) && result.data && typeof result.data === 'object'
+    ? (result.data as { id?: string })
+    : undefined;
 
   console.debug('[Rube MCP] createMediaContainer result:', JSON.stringify(result, null, 2));
 
   // Try multiple paths to find container ID
   const containerId = result?.id
-    || result?.data?.id
+    || (typeof resultData?.id === 'string' ? resultData.id : null)
     || result?.creation_id
     || result?.container_id
     || result?.media_container_id
-    || (typeof result === 'string' ? result : null);
+    || result?.value
+    || null;
 
   if (!containerId) {
     console.error('[Rube MCP] Could not find container ID in result:', result);
@@ -407,8 +461,15 @@ export const createCarouselContainer = async (
 
   console.debug('[Rube MCP] Creating carousel with', imageUrls.length, 'images and', videoUrls.length, 'videos');
   const result = await executeInstagramTool('INSTAGRAM_CREATE_CAROUSEL_CONTAINER', carouselArgs, 'zulu', context);
+  const resultData = !Array.isArray(result.data) && result.data && typeof result.data === 'object'
+    ? (result.data as { id?: string })
+    : undefined;
 
-  const containerId = result?.id || result?.data?.id || result?.creation_id || result?.container_id;
+  const containerId =
+    result?.id ||
+    (typeof resultData?.id === 'string' ? resultData.id : null) ||
+    result?.creation_id ||
+    result?.container_id;
 
   if (!containerId) {
     console.error('[Rube MCP] Could not find carousel container ID in result:', result);
@@ -427,8 +488,11 @@ export const getContainerStatus = async (containerId: string, context?: Instagra
   const result = await executeInstagramTool('INSTAGRAM_GET_POST_STATUS', {
     creation_id: containerId
   }, 'zulu', context);
+  const resultData = !Array.isArray(result.data) && result.data && typeof result.data === 'object'
+    ? (result.data as { status_code?: string })
+    : undefined;
 
-  return result.status_code || result.data?.status_code || result.status || 'IN_PROGRESS';
+  return result.status_code || (typeof resultData?.status_code === 'string' ? resultData.status_code : undefined) || result.status || 'IN_PROGRESS';
 };
 
 /**
@@ -445,8 +509,11 @@ export const publishContainer = async (containerId: string, context?: InstagramC
   }
 
   const result = await executeInstagramTool('INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH', args, 'zulu', context);
+  const resultData = !Array.isArray(result.data) && result.data && typeof result.data === 'object'
+    ? (result.data as { id?: string })
+    : undefined;
 
-  return result.id || result.data?.id;
+  return result.id || (typeof resultData?.id === 'string' ? resultData.id : '');
 };
 
 /**
@@ -463,8 +530,11 @@ export const publishCarousel = async (containerId: string, context?: InstagramCo
   }
 
   const result = await executeInstagramTool('INSTAGRAM_CREATE_POST', args, 'zulu', context);
+  const resultData = !Array.isArray(result.data) && result.data && typeof result.data === 'object'
+    ? (result.data as { id?: string })
+    : undefined;
 
-  return result.id || result.data?.id;
+  return result.id || (typeof resultData?.id === 'string' ? resultData.id : '');
 };
 
 /**

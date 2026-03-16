@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { authClient } from "../../lib/auth-client";
+import { authClient, getOrganizationApi } from "../../lib/auth-client";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -22,9 +22,7 @@ import {
   Check,
 } from "lucide-react";
 
-// Better Auth organization client uses Proxy — methods exist at runtime but TS doesn't type them
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const orgApi = authClient.organization as any;
+const orgApi = getOrganizationApi();
 
 interface Member {
   id: string;
@@ -126,7 +124,10 @@ export function TeamManagement() {
         query: { organizationId: activeOrg.id },
       });
       // Response: { data: { members: [...], total: N } } or { data: [...] }
-      const membersData = result.data?.members ?? result.data;
+      const membersData =
+        result.data && !Array.isArray(result.data) && Array.isArray(result.data.members)
+          ? result.data.members
+          : result.data;
       if (Array.isArray(membersData)) {
         setMembers(membersData as unknown as Member[]);
       }

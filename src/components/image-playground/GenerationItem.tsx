@@ -153,7 +153,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       src: generation.asset.url,
       prompt: '',
       source: 'playground',
-      model: 'gemini-3-pro-image-preview' as any,
+      model: 'gemini-3-pro-image-preview' as const,
       aspectRatio: undefined,
       imageSize: undefined,
       mediaType: 'image',

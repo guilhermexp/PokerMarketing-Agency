@@ -1,5 +1,5 @@
 import React, { useEffect, useState, createContext, useContext, useRef } from "react";
-import { authClient } from "../../lib/auth-client";
+import { authClient, getOrganizationApi, type Session } from "../../lib/auth-client";
 import { getOrCreateUser, type DbUser } from "../../services/apiClient";
 import { SignInForm } from "./SignInForm";
 import { SignUpForm } from "./SignUpForm";
@@ -137,8 +137,8 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
 
         // Auto-activate organization if user has one but session doesn't
         try {
-          const orgApi = authClient.organization as any;
-          const session = sessionData?.session as any;
+          const orgApi = getOrganizationApi();
+          const session = sessionData?.session as Session["session"] | undefined;
           if (!session?.activeOrganizationId) {
             const orgsResult = await orgApi.list({});
             const orgs = orgsResult?.data;

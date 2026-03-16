@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { authClient } from '../../lib/auth-client';
+import { getOrganizationApi } from '../../lib/auth-client';
 import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const orgApi = authClient.organization as any;
+const orgApi = getOrganizationApi();
 
 interface OnboardingModalProps {
   onInviteAccepted: () => void;

@@ -48,7 +48,7 @@ import {
   AuthWrapper,
   useAuth,
 } from "./components/auth/AuthWrapper";
-import { authClient } from "./lib/auth-client";
+import { authClient, getOrganizationApi } from "./lib/auth-client";
 import { BackgroundJobsProvider } from "./hooks/useBackgroundJobs";
 import { BackgroundJobsIndicator } from "./components/common/BackgroundJobsIndicator";
 import { ToastContainer } from "./components/common/ToastContainer";
@@ -2533,8 +2533,8 @@ function AppContent() {
                   .toLowerCase()
                   .replace(/[^a-z0-9]+/g, "-")
                   .replace(/^-|-$/g, "");
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const orgResult = await (authClient.organization as any).create({
+                const orgApi = getOrganizationApi();
+                const orgResult = await orgApi.create({
                   name: p.name.trim(),
                   slug,
                 });
@@ -2547,8 +2547,8 @@ function AppContent() {
               // Step 2: Activate org FIRST (updates session cookie so middleware injects org_id)
               if (newOrgId && newOrgId !== organizationId) {
                 skipBrandClearOnOrgSwitch.current = true;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                await (authClient.organization as any).setActive({
+                const orgApi = getOrganizationApi();
+                await orgApi.setActive({
                   organizationId: newOrgId,
                 });
                 console.debug("[BrandProfile] Organization activated:", newOrgId);

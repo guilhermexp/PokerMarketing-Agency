@@ -202,10 +202,10 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
   // useChat hook do Vercel AI SDK
   const chatOptions = {
     id: chatId,
-    ...({ body: {
+    body: {
       brandProfile: effectiveBrandProfile,
       chatReferenceImage: referenceImage,
-      selectedChatModel: brandProfile?.creativeModel || 'gemini-3-flash-preview'
+      selectedChatModel: brandProfile?.creativeModel || 'gemini-3-flash-preview',
     },
     sendAutomaticallyWhen: ({ messages }: { messages: UIMessage[] }) =>
       lastAssistantMessageIsCompleteWithToolCalls({ messages }) ||
@@ -217,8 +217,9 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       console.error('[AssistantPanel] Error:', error);
 
       // Detectar erro de limite de tokens
-      const isTokenLimitError = error.message?.includes('tokens limit exceeded') ||
-                                 error.message?.includes('context_length_exceeded');
+      const isTokenLimitError =
+        error.message?.includes('tokens limit exceeded') ||
+        error.message?.includes('context_length_exceeded');
 
       if (isTokenLimitError) {
         setErrorMessage('Conversa muito longa. Por favor, inicie uma nova conversa clicando em "Limpar chat".');
@@ -229,14 +230,13 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       // Auto-limpar erro após 8 segundos (mais tempo para erros de token)
       setTimeout(() => setErrorMessage(null), isTokenLimitError ? 10000 : 5000);
     },
-    onFinish: (message: UIMessage) => {
+    onFinish: ({ message }: { message: UIMessage }) => {
       console.info('[AssistantPanel] Message finished:', {
         role: message.role,
-        partsCount: message.parts?.length || 0
+        partsCount: message.parts?.length || 0,
       });
-    }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any) as Parameters<typeof useChat>[0]};
+    },
+  } as unknown as Parameters<typeof useChat>[0];
 
   const { messages, sendMessage, status, addToolApprovalResponse, setMessages } = useChat<UIMessage>(chatOptions);
 

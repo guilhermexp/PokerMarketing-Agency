@@ -1,9 +1,7 @@
 import React, { useState } from "react";
-import { authClient } from "../../lib/auth-client";
+import { authClient, getOrganizationApi } from "../../lib/auth-client";
 
-// Better Auth organization client uses Proxy — methods exist at runtime but TS doesn't type them
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const orgApi = authClient.organization as any;
+const orgApi = getOrganizationApi();
 
 export function OrgSwitcher() {
   const { data: orgs } = authClient.useListOrganizations();
@@ -25,7 +23,7 @@ export function OrgSwitcher() {
         slug: newOrgName.trim().toLowerCase().replace(/\s+/g, "-"),
       });
       if (result.data) {
-        await orgApi.setActive({ organizationId: result.data.id });
+        await orgApi.setActive({ organizationId: result.data.id ?? null });
       }
       setNewOrgName("");
       setIsCreating(false);

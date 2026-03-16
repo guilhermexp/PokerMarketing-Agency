@@ -33,11 +33,9 @@ export interface PromptPart {
 export const generateCreativeText = async (
   brandProfile: BrandProfile,
   parts: { text?: string; inlineData?: { mimeType: string; data: string } }[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema: any,
+  schema: unknown,
   temperature: number = 0.7
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> => {
+): Promise<string> => {
   // Extrai texto e imagens das partes
   const textParts = parts.filter(p => p.text).map(p => p.text!);
   const imageParts = parts
