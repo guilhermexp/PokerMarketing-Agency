@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "postinstall": "node scripts/ensure-sharp-libvips-link.mjs",
+    "prepare": "husky",
     "dev": "concurrently -n api,vite -c cyan,green \"bun run dev:api\" \"sleep 3 && vite\"",
     "bun:dev": "bun run dev",
     "dev:local": "bun run dev:redis && concurrently -n redis,api,vite -c red,cyan,green \"docker compose logs -f redis\" \"bun run dev:api\" \"bun run dev:vite\"",
@@ -87,6 +88,8 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.1.18",
     "@testing-library/jest-dom": "^6.9.1",
@@ -102,6 +105,7 @@
     "eslint": "^10.0.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
+    "husky": "^9.1.7",
     "jsdom": "^28.0.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
