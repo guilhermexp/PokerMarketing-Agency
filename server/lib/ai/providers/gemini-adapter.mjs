@@ -94,7 +94,7 @@ export async function generate({
           },
         },
       }),
-    1, // single attempt — fallback loop handles retries across providers
+    3, // retry up to 3x on timeout/transient errors before falling back
   );
 
   const imageUrl = extractImageFromResponse(response);
