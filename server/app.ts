@@ -15,11 +15,12 @@ import cors from "cors";
 import helmet from "helmet";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/better-auth.js";
-import { isResponseEnvelope, sendError, sendSuccess } from "./lib/response.js";
+import { registerApiDocs } from "./lib/api-docs.js";
 import { requestLogger } from "./middleware/requestLogger.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { csrfProtection } from "./middleware/csrfProtection.js";
 import logger from "./lib/logger.js";
+import { createResponseEnvelopeMiddleware } from "./lib/response-middleware.js";
 
 // Lib imports (used in middleware only)
 import { getSql } from "./lib/db.js";
@@ -178,27 +179,7 @@ app.use((req, res, next) => {
 });
 
 app.use(requestLogger);
-
-app.use((req, res, next) => {
-  const rawJson = res.json.bind(res);
-  res._rawJson = rawJson;
-  res.sendSuccess = (data, meta) => sendSuccess(res, data, meta);
-  res.sendError = (error) => sendError(res, error);
-
-  res.json = (payload) => {
-    if (res.locals.skipResponseEnvelope || isResponseEnvelope(payload)) {
-      return rawJson(payload);
-    }
-
-    if (res.statusCode >= 400 || (payload && typeof payload === "object" && "error" in payload)) {
-      return sendError(res, payload);
-    }
-
-    return sendSuccess(res, payload);
-  };
-
-  next();
-});
+app.use(createResponseEnvelopeMiddleware());
 
 // Auth + CSRF protection on all protected API prefixes
 const PROTECTED_API_PREFIXES = [
@@ -276,6 +257,7 @@ registerVideoPlaygroundRoutes(app, {
 });
 registerAgentStudioRoutes(app);
 registerFeedbackRoutes(app);
+registerApiDocs(app);
 
 // ---------------------------------------------------------------------------
 // NOTE: notFoundHandler & errorHandler are NOT registered here.
