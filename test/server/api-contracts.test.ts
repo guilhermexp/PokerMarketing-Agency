@@ -3,6 +3,7 @@ import {
   getOpenApiDocument,
   getRouteContract,
   normalizeOpenApiPath,
+  routeContracts,
   validateRouteOutput,
 } from "../../server/schemas/api-contracts.js";
 
@@ -50,5 +51,10 @@ describe("API contracts", () => {
         "application/octet-stream"
       ],
     ).toBeDefined();
+  });
+
+  it("tracks every registered route contract centrally", () => {
+    expect(routeContracts).toHaveLength(98);
+    expect(getRouteContract("POST", "/api/feedback")).toBeDefined();
   });
 });

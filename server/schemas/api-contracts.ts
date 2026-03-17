@@ -319,7 +319,7 @@ const tournamentsOutputSchema = z.object({
   events: z.array(z.unknown()),
 });
 
-const routeContracts: ApiRouteContract[] = [
+export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/health",
