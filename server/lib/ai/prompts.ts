@@ -4,15 +4,25 @@
  * Define instruções de sistema para o agente de marketing
  */
 
+export interface BrandProfile {
+  name?: string;
+  description?: string;
+  tone?: string;
+  targetAudience?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  values?: string[];
+}
+
+export interface SystemPromptOptions {
+  brandProfile?: BrandProfile;
+  selectedChatModel?: string;
+}
+
 /**
  * Gera o system prompt principal baseado no contexto
- *
- * @param {object} options - Opções de configuração
- * @param {object} options.brandProfile - Profile da marca do usuário
- * @param {string} options.selectedChatModel - Modelo sendo usado
- * @returns {string} - System prompt formatado
  */
-export function systemPrompt({ brandProfile, selectedChatModel } = {}) {
+export function systemPrompt({ brandProfile, selectedChatModel }: SystemPromptOptions = {}): string {
   let prompt = BASE_PROMPT;
 
   // Adicionar contexto de marca se disponível
@@ -120,11 +130,8 @@ const IMAGE_GENERATION_RULES = `
 
 /**
  * Constrói contexto de marca formatado
- *
- * @param {object} brandProfile
- * @returns {string}
  */
-function buildBrandContext(brandProfile) {
+export function buildBrandContext(brandProfile: BrandProfile): string {
   const parts = ['**CONTEXTO DA MARCA:**'];
 
   if (brandProfile.name) {
@@ -164,19 +171,13 @@ function buildBrandContext(brandProfile) {
 /**
  * Constrói instrução específica para campanha
  * (Compatibilidade com sistema antigo)
- *
- * @param {object} brandProfile
- * @param {string} transcript
- * @param {string} quantityInstructions
- * @param {string} toneText
- * @returns {string}
  */
 export function buildCampaignPrompt(
-  brandProfile,
-  transcript,
-  quantityInstructions,
-  toneText
-) {
+  brandProfile: BrandProfile,
+  transcript: string,
+  quantityInstructions: string,
+  toneText: string
+): string {
   return `
 **PERFIL DA MARCA:**
 - Nome: ${brandProfile.name}
@@ -209,9 +210,3 @@ ${quantityInstructions}
 **MISSÃO:** Gere uma campanha completa em JSON com as QUANTIDADES EXATAS especificadas. Cada image_prompt DEVE ser em PORTUGUÊS e alinhado com seu content.
   `.trim();
 }
-
-// ============================================================================
-// EXPORTS ADICIONAIS
-// ============================================================================
-
-export { buildBrandContext };

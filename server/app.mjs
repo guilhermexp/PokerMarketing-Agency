@@ -29,7 +29,7 @@ import {
 } from "./lib/auth.js";
 import { resourceAccessMiddleware } from "./lib/resource-access.js";
 import { resolveUserId } from "./lib/user-resolver.js";
-import { buildImagePrompt } from "./lib/ai/prompt-builders.mjs";
+import { buildImagePrompt } from "./lib/ai/prompt-builders.js";
 
 // ---------------------------------------------------------------------------
 // Route modules

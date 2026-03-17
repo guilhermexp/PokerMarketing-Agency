@@ -6,19 +6,73 @@
  *
  * Returns data URLs (data:mime;base64,...).
  * Uses withRetry(..., 1) — single internal attempt; the external fallback
- * loop in image-providers.mjs handles cross-provider retries.
+ * loop in image-providers.ts handles cross-provider retries.
  */
 
 import { getGeminiAi } from "../clients.js";
 import { withRetry } from "../retry.js";
-import { mapAspectRatio, DEFAULT_IMAGE_MODEL, STANDARD_IMAGE_MODEL } from "../image-generation.mjs";
+import { mapAspectRatio, DEFAULT_IMAGE_MODEL, STANDARD_IMAGE_MODEL } from "../image-generation.js";
 import logger from "../../logger.js";
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface ImageReference {
+  base64: string;
+  mimeType: string;
+}
+
+export interface GenerateParams {
+  prompt: string;
+  aspectRatio?: string;
+  imageSize?: string;
+  productImages?: ImageReference[];
+  styleRef?: ImageReference;
+  personRef?: ImageReference;
+  modelTier?: "standard" | "pro";
+}
+
+export interface EditParams {
+  prompt: string;
+  imageBase64: string;
+  mimeType: string;
+  referenceImage?: ImageReference;
+  modelTier?: "standard" | "pro";
+}
+
+export interface ProviderResult {
+  imageUrl: string;
+  usedModel: string;
+}
+
+interface GeminiPart {
+  text?: string;
+  inlineData?: {
+    data: string;
+    mimeType: string;
+  };
+}
+
+interface GeminiCandidate {
+  content?: {
+    parts?: GeminiPart[];
+  };
+  finishReason?: string;
+}
+
+interface GeminiResponse {
+  candidates?: GeminiCandidate[];
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
 
 /**
  * Extract the first image from a Gemini response.
- * @returns {string} data URL
  */
-function extractImageFromResponse(response) {
+function extractImageFromResponse(response: GeminiResponse): string {
   const parts = response?.candidates?.[0]?.content?.parts;
 
   if (!Array.isArray(parts)) {
@@ -38,18 +92,12 @@ function extractImageFromResponse(response) {
   throw new Error("Failed to generate image - no image data in response");
 }
 
+// ============================================================================
+// PUBLIC API
+// ============================================================================
+
 /**
  * Generate an image with Gemini.
- *
- * @param {object} params
- * @param {string} params.prompt
- * @param {string} [params.aspectRatio]
- * @param {string} [params.imageSize]
- * @param {Array<{base64: string, mimeType: string}>} [params.productImages]
- * @param {{base64: string, mimeType: string}} [params.styleRef]
- * @param {{base64: string, mimeType: string}} [params.personRef]
- * @param {string} [params.modelTier] - "standard" or "pro" (default: "pro")
- * @returns {Promise<{imageUrl: string, usedModel: string}>}
  */
 export async function generate({
   prompt,
@@ -59,10 +107,10 @@ export async function generate({
   styleRef,
   personRef,
   modelTier,
-}) {
+}: GenerateParams): Promise<ProviderResult> {
   const ai = getGeminiAi();
   const model = modelTier === "standard" ? STANDARD_IMAGE_MODEL : DEFAULT_IMAGE_MODEL;
-  const parts = [{ text: prompt }];
+  const parts: GeminiPart[] = [{ text: prompt }];
 
   if (personRef) {
     parts.push({ inlineData: { data: personRef.base64, mimeType: personRef.mimeType } });
@@ -95,7 +143,7 @@ export async function generate({
         },
       }),
     3, // retry up to 3x on timeout/transient errors before falling back
-  );
+  ) as GeminiResponse;
 
   const imageUrl = extractImageFromResponse(response);
   return { imageUrl, usedModel: model };
@@ -103,20 +151,18 @@ export async function generate({
 
 /**
  * Edit an image with Gemini.
- *
- * @param {object} params
- * @param {string} params.prompt - Edit instruction
- * @param {string} params.imageBase64 - Base64 of image to edit (no data: prefix)
- * @param {string} params.mimeType
- * @param {{base64: string, mimeType: string}} [params.referenceImage]
- * @param {string} [params.modelTier] - "standard" or "pro" (default: "pro")
- * @returns {Promise<{imageUrl: string, usedModel: string}>}
  */
-export async function edit({ prompt, imageBase64, mimeType, referenceImage, modelTier }) {
+export async function edit({
+  prompt,
+  imageBase64,
+  mimeType,
+  referenceImage,
+  modelTier,
+}: EditParams): Promise<ProviderResult> {
   const ai = getGeminiAi();
   const model = modelTier === "standard" ? STANDARD_IMAGE_MODEL : DEFAULT_IMAGE_MODEL;
 
-  const parts = [
+  const parts: GeminiPart[] = [
     { text: prompt },
     { inlineData: { data: imageBase64, mimeType } },
   ];
@@ -143,7 +189,7 @@ export async function edit({ prompt, imageBase64, mimeType, referenceImage, mode
         },
       }),
     1,
-  );
+  ) as GeminiResponse;
 
   const imageUrl = extractImageFromResponse(response);
   return { imageUrl, usedModel: model };

@@ -1,6 +1,6 @@
 import { getSql } from "../lib/db.js";
 import { requireSuperAdmin } from "../lib/auth.js";
-import { generateTextFromMessages } from "../lib/ai/text-generation.mjs";
+import { generateTextFromMessages } from "../lib/ai/text-generation.js";
 import { withRetry } from "../lib/ai/retry.js";
 import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.js";
 import logger from "../lib/logger.js";

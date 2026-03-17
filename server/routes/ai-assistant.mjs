@@ -10,7 +10,7 @@
 import { getRequestAuthContext } from "../lib/auth.js";
 import { getSql } from "../lib/db.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
-import { streamTextFromMessages } from "../lib/ai/text-generation.mjs";
+import { streamTextFromMessages } from "../lib/ai/text-generation.js";
 import { ASSISTANT_MODEL } from "../lib/ai/models.js";
 import { requireAuthWithAiRateLimit } from "../lib/auth.js";
 import {

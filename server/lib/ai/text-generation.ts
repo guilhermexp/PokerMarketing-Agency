@@ -22,22 +22,96 @@ import { normalizeModelId, TEXT_MODEL } from "./models.js";
 import { withRetry } from "./retry.js";
 
 // ============================================================================
+// TYPES
+// ============================================================================
+
+interface TextPart {
+  type: "text";
+  text: string;
+}
+
+interface ImageUrlPart {
+  type: "image_url";
+  image_url: {
+    url: string;
+  };
+}
+
+type ContentPart = TextPart | ImageUrlPart;
+
+export interface Message {
+  role: "system" | "user" | "assistant";
+  content: string | ContentPart[];
+}
+
+interface GeminiTextPart {
+  text: string;
+}
+
+interface GeminiInlineDataPart {
+  inlineData: {
+    mimeType: string;
+    data: string;
+  };
+}
+
+type GeminiPart = GeminiTextPart | GeminiInlineDataPart;
+
+interface GeminiContent {
+  role: "user" | "model";
+  parts: GeminiPart[];
+}
+
+interface ConvertedMessages {
+  systemInstruction: string | undefined;
+  contents: GeminiContent[];
+}
+
+export interface GenerateTextFromMessagesOptions {
+  model?: string;
+  messages: Message[];
+  temperature?: number;
+  jsonMode?: boolean;
+  maxTokens?: number;
+}
+
+export interface GenerateTextResult {
+  text: string;
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+  };
+}
+
+export interface StreamTextFromMessagesOptions {
+  model?: string;
+  messages: Message[];
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface ImagePart {
+  base64: string;
+  mimeType: string;
+}
+
+// ============================================================================
 // INTERNAL: Convert OpenAI-style messages → Gemini contents format
 // ============================================================================
 
-function convertMessages(messages) {
-  let systemInstruction;
-  const contents = [];
+function convertMessages(messages: Message[] | undefined): ConvertedMessages {
+  let systemInstruction: string | undefined;
+  const contents: GeminiContent[] = [];
 
   for (const msg of messages || []) {
     if (msg.role === "system") {
       systemInstruction =
-        typeof msg.content === "string" ? msg.content : msg.content;
+        typeof msg.content === "string" ? msg.content : String(msg.content);
       continue;
     }
 
     if (Array.isArray(msg.content)) {
-      const parts = [];
+      const parts: GeminiPart[] = [];
       for (const part of msg.content) {
         if (part.type === "text") {
           parts.push({ text: part.text });
@@ -47,7 +121,7 @@ function convertMessages(messages) {
           );
           if (match) {
             parts.push({
-              inlineData: { mimeType: match[1], data: match[2] },
+              inlineData: { mimeType: match[1]!, data: match[2]! },
             });
           }
         }
@@ -73,14 +147,6 @@ function convertMessages(messages) {
 
 /**
  * Generate text from a list of messages (system, user, assistant).
- *
- * @param {Object}  options
- * @param {string}  [options.model]       - Model ID (default: TEXT_MODEL)
- * @param {Array}   options.messages      - Array of { role, content } messages
- * @param {number}  [options.temperature] - Temperature (default: 0.7)
- * @param {boolean} [options.jsonMode]    - Return JSON (default: false)
- * @param {number}  [options.maxTokens]   - Max output tokens
- * @returns {Promise<{ text: string, usage: { inputTokens: number, outputTokens: number } }>}
  */
 export async function generateTextFromMessages({
   model = TEXT_MODEL,
@@ -88,12 +154,12 @@ export async function generateTextFromMessages({
   temperature = 0.7,
   jsonMode = false,
   maxTokens,
-}) {
+}: GenerateTextFromMessagesOptions): Promise<GenerateTextResult> {
   const ai = getGeminiAi();
   const normalizedModel = normalizeModelId(model);
   const { systemInstruction, contents } = convertMessages(messages);
 
-  const config = { temperature };
+  const config: Record<string, unknown> = { temperature };
   if (systemInstruction) config.systemInstruction = systemInstruction;
   if (jsonMode) config.responseMimeType = "application/json";
   if (maxTokens) config.maxOutputTokens = maxTokens;
@@ -110,33 +176,26 @@ export async function generateTextFromMessages({
   return {
     text,
     usage: {
-      inputTokens: usage.promptTokenCount || 0,
-      outputTokens: usage.candidatesTokenCount || 0,
+      inputTokens: (usage as { promptTokenCount?: number }).promptTokenCount || 0,
+      outputTokens: (usage as { candidatesTokenCount?: number }).candidatesTokenCount || 0,
     },
   };
 }
 
 /**
  * Stream text from a list of messages. Returns an async iterable.
- *
- * @param {Object}  options
- * @param {string}  [options.model]       - Model ID (default: TEXT_MODEL)
- * @param {Array}   options.messages      - Array of { role, content } messages
- * @param {number}  [options.temperature] - Temperature (default: 0.7)
- * @param {number}  [options.maxTokens]   - Max output tokens
- * @returns {Promise<AsyncIterable>}
  */
 export async function streamTextFromMessages({
   model = TEXT_MODEL,
   messages,
   temperature = 0.7,
   maxTokens,
-}) {
+}: StreamTextFromMessagesOptions): Promise<AsyncIterable<unknown>> {
   const ai = getGeminiAi();
   const normalizedModel = normalizeModelId(model);
   const { systemInstruction, contents } = convertMessages(messages);
 
-  const config = { temperature };
+  const config: Record<string, unknown> = { temperature };
   if (systemInstruction) config.systemInstruction = systemInstruction;
   if (maxTokens) config.maxOutputTokens = maxTokens;
 
@@ -150,19 +209,13 @@ export async function streamTextFromMessages({
 /**
  * Generate structured content constrained by a JSON schema.
  * Includes automatic retry logic.
- *
- * @param {string}  model          - Model ID
- * @param {Array}   parts          - Content parts (text + inlineData)
- * @param {Object}  responseSchema - Gemini JSON schema
- * @param {number}  [temperature]  - Temperature (default: 0.7)
- * @returns {Promise<string>}      - The response text (JSON string)
  */
 export async function generateStructuredContent(
-  model,
-  parts,
-  responseSchema,
-  temperature = 0.7,
-) {
+  model: string,
+  parts: GeminiPart[],
+  responseSchema: Record<string, unknown>,
+  temperature: number = 0.7,
+): Promise<string> {
   const ai = getGeminiAi();
   const normalizedModel = normalizeModelId(model);
 
@@ -178,31 +231,28 @@ export async function generateStructuredContent(
     }),
   );
 
-  return response.text.trim();
+  return response.text?.trim() ?? "";
 }
 
 /**
  * Generate text with a simple system + user prompt (JSON mode).
  * Shorthand for generateTextFromMessages.
- *
- * @param {string}  model         - Model ID
- * @param {string}  systemPrompt  - System prompt (optional, can be "")
- * @param {string}  userPrompt    - User prompt
- * @param {number}  [temperature] - Temperature (default: 0.7)
- * @returns {Promise<string>}     - The response text
  */
 export async function generateText(
-  model,
-  systemPrompt,
-  userPrompt,
-  temperature = 0.7,
-) {
+  model: string,
+  systemPrompt: string,
+  userPrompt: string,
+  temperature: number = 0.7,
+): Promise<string> {
+  const messages: Message[] = [];
+  if (systemPrompt) {
+    messages.push({ role: "system", content: systemPrompt });
+  }
+  messages.push({ role: "user", content: userPrompt });
+
   const { text } = await generateTextFromMessages({
     model,
-    messages: [
-      ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-      { role: "user", content: userPrompt },
-    ],
+    messages,
     temperature,
     jsonMode: true,
   });
@@ -216,24 +266,18 @@ export async function generateText(
 
 /**
  * Generate text with vision (text + images) in JSON mode.
- *
- * @param {string}  model     - Model ID
- * @param {Array<string>} textParts  - Array of text strings
- * @param {Array<{base64: string, mimeType: string}>} imageParts - Images
- * @param {number}  [temperature] - Temperature (default: 0.7)
- * @returns {Promise<string>}     - The response text
  */
 export async function generateTextWithVision(
-  model,
-  textParts,
-  imageParts,
-  temperature = 0.7,
-) {
-  const content = textParts.map((text) => ({ type: "text", text }));
+  model: string,
+  textParts: string[],
+  imageParts: ImagePart[],
+  temperature: number = 0.7,
+): Promise<string> {
+  const content: ContentPart[] = textParts.map((text) => ({ type: "text" as const, text }));
 
   for (const img of imageParts) {
     content.push({
-      type: "image_url",
+      type: "image_url" as const,
       image_url: {
         url: `data:${img.mimeType};base64,${img.base64}`,
       },

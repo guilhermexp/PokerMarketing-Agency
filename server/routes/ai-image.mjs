@@ -16,17 +16,17 @@ import {
   sanitizeErrorForClient,
   isQuotaOrRateLimitError,
 } from "../lib/ai/retry.js";
-import { generateTextFromMessages } from "../lib/ai/text-generation.mjs";
+import { generateTextFromMessages } from "../lib/ai/text-generation.js";
 import {
   generateImageWithFallback,
   DEFAULT_IMAGE_MODEL,
-} from "../lib/ai/image-generation.mjs";
-import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
+} from "../lib/ai/image-generation.js";
+import { runWithProviderFallback } from "../lib/ai/image-providers.js";
 import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.js";
 import {
   buildImagePrompt,
   convertImagePromptToJson,
-} from "../lib/ai/prompt-builders.mjs";
+} from "../lib/ai/prompt-builders.js";
 import {
   logAiUsage,
   createTimer,

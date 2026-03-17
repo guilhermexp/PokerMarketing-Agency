@@ -6,8 +6,8 @@
 
 import { createUIMessageStream, streamText, smoothStream, convertToModelMessages } from 'ai';
 import { google } from '@ai-sdk/google';
-import { systemPrompt } from '../../lib/ai/prompts.mjs';
-import { createImageTool, editImageTool, createLogoTool } from '../../lib/ai/tools/index.mjs';
+import { systemPrompt } from '../../lib/ai/prompts.js';
+import { createImageTool, editImageTool, createLogoTool } from '../../lib/ai/tools/index.js';
 import { validateChatRequest } from './schema.mjs';
 import { getRequestAuthContext } from '../../lib/auth.js';
 

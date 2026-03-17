@@ -13,15 +13,57 @@ import { configureFal } from "./clients.js";
 import { logExternalAPI, logExternalAPIResult } from "../logging-helpers.js";
 import logger from "../logger.js";
 
-export const parseDataUrlImage = (dataUrl) => {
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface ParsedDataUrl {
+  mimeType: string;
+  base64: string;
+}
+
+export interface VideoResult {
+  videoBuffer: Buffer;
+  contentType: string;
+}
+
+interface FalVideoResponse {
+  data?: {
+    video?: {
+      url: string;
+    };
+  };
+  video?: {
+    url: string;
+  };
+}
+
+interface GeneratedVideo {
+  video?: {
+    uri?: string;
+  };
+}
+
+interface VeoOperation {
+  done?: boolean;
+  response?: {
+    generatedVideos?: GeneratedVideo[];
+  };
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+export function parseDataUrlImage(dataUrl: string | null | undefined): ParsedDataUrl | null {
   if (!dataUrl || typeof dataUrl !== "string") return null;
   const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return null;
   const [, mimeType, base64] = matches;
-  return { mimeType, base64 };
-};
+  return { mimeType: mimeType!, base64: base64! };
+}
 
-export const mimeTypeToExtension = (mimeType) => {
+export function mimeTypeToExtension(mimeType: string): string {
   switch (mimeType) {
     case "image/jpeg":
       return "jpg";
@@ -33,9 +75,12 @@ export const mimeTypeToExtension = (mimeType) => {
     default:
       return "png";
   }
-};
+}
 
-export async function uploadDataUrlImageToBlob(dataUrl, prefix = "video-reference") {
+export async function uploadDataUrlImageToBlob(
+  dataUrl: string,
+  prefix: string = "video-reference",
+): Promise<string | null> {
   const parsed = parseDataUrlImage(dataUrl);
   if (!parsed) return null;
 
@@ -54,13 +99,19 @@ export async function uploadDataUrlImageToBlob(dataUrl, prefix = "video-referenc
   return blob.url;
 }
 
-// Generate video using Google Veo API directly
+// ============================================================================
+// PUBLIC API
+// ============================================================================
+
+/**
+ * Generate video using Google Veo API directly
+ */
 export async function generateVideoWithGoogleVeo(
-  prompt,
-  aspectRatio,
-  imageUrl,
-  lastFrameUrl = null,
-) {
+  prompt: string,
+  aspectRatio: string,
+  imageUrl: string | null | undefined,
+  lastFrameUrl: string | null = null,
+): Promise<VideoResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY not configured");
@@ -80,7 +131,7 @@ export async function generateVideoWithGoogleVeo(
   logExternalAPI("Google Veo", `Veo 3.1 ${mode}`, `720p | ${aspectRatio}`);
   const startTime = Date.now();
 
-  const generateParams = {
+  const generateParams: Record<string, unknown> = {
     model: "veo-3.1-fast-generate-preview",
     prompt,
     config: {
@@ -92,7 +143,7 @@ export async function generateVideoWithGoogleVeo(
     },
   };
 
-  if (isHttpUrl) {
+  if (isHttpUrl && imageUrl) {
     const imageResponse = await fetch(imageUrl);
     const imageArrayBuffer = await imageResponse.arrayBuffer();
     const imageBase64 = Buffer.from(imageArrayBuffer).toString("base64");
@@ -103,7 +154,7 @@ export async function generateVideoWithGoogleVeo(
       imageBytes: imageBase64,
       mimeType: contentType,
     };
-  } else if (isDataUrl) {
+  } else if (isDataUrl && imageUrl) {
     const matches = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
     if (matches) {
       const [, mimeType, base64Data] = matches;
@@ -114,7 +165,7 @@ export async function generateVideoWithGoogleVeo(
     }
   }
 
-  if (hasLastFrame) {
+  if (hasLastFrame && lastFrameUrl) {
     const lastFrameResponse = await fetch(lastFrameUrl);
     const lastFrameArrayBuffer = await lastFrameResponse.arrayBuffer();
     const lastFrameBase64 =
@@ -128,7 +179,7 @@ export async function generateVideoWithGoogleVeo(
     };
   }
 
-  let operation = await ai.models.generateVideos(generateParams);
+  let operation = await ai.models.generateVideos(generateParams as unknown as Parameters<typeof ai.models.generateVideos>[0]) as VeoOperation;
 
   const maxWaitTime = 5 * 60 * 1000;
   const pollInterval = 10000;
@@ -140,7 +191,7 @@ export async function generateVideoWithGoogleVeo(
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollInterval));
-    operation = await ai.operations.getVideosOperation({ operation });
+    operation = await ai.operations.getVideosOperation({ operation: operation as Parameters<typeof ai.operations.getVideosOperation>[0]["operation"] }) as VeoOperation;
   }
 
   logExternalAPIResult("Google Veo", `Veo 3.1 ${mode}`, Date.now() - startTime);
@@ -150,7 +201,7 @@ export async function generateVideoWithGoogleVeo(
     throw new Error("No videos generated by Google Veo");
   }
 
-  const videoUri = generatedVideos[0].video?.uri;
+  const videoUri = generatedVideos[0]!.video?.uri;
   if (!videoUri) {
     throw new Error("Invalid video response from Google Veo");
   }
@@ -166,15 +217,17 @@ export async function generateVideoWithGoogleVeo(
   return { videoBuffer, contentType: "video/mp4" };
 }
 
-// Generate video using FAL.ai (fallback)
+/**
+ * Generate video using FAL.ai (fallback)
+ */
 export async function generateVideoWithFal(
-  prompt,
-  aspectRatio,
-  model,
-  imageUrl,
-  sceneDuration,
-  generateAudio = true,
-) {
+  prompt: string,
+  aspectRatio: string,
+  model: string,
+  imageUrl: string | null | undefined,
+  sceneDuration: number | null | undefined,
+  generateAudio: boolean = true,
+): Promise<string> {
   configureFal();
 
   const isHttpUrl = imageUrl && imageUrl.startsWith("http");
@@ -189,31 +242,31 @@ export async function generateVideoWithFal(
     logExternalAPI("Fal.ai", `Sora 2 ${mode}`, `${duration}s | ${aspectRatio}`);
     const startTime = Date.now();
 
-    let result;
+    let result: FalVideoResponse;
 
-    if (isHttpUrl) {
+    if (isHttpUrl && imageUrl) {
       result = await fal.subscribe(endpoint, {
         input: {
           prompt,
           image_url: imageUrl,
           resolution: "720p",
-          aspect_ratio: aspectRatio,
-          duration,
+          aspect_ratio: aspectRatio as "9:16" | "16:9" | "auto",
+          duration: String(duration) as "4" | "8" | "12",
           delete_video: false,
         },
         logs: true,
-      });
+      }) as FalVideoResponse;
     } else {
       result = await fal.subscribe(endpoint, {
         input: {
           prompt,
           resolution: "720p",
-          aspect_ratio: aspectRatio,
-          duration,
+          aspect_ratio: aspectRatio as "9:16" | "16:9" | "auto",
+          duration: String(duration) as "4" | "8" | "12",
           delete_video: false,
-        },
+        } as unknown as Parameters<typeof fal.subscribe>[1]["input"],
         logs: true,
-      });
+      }) as FalVideoResponse;
     }
 
     logExternalAPIResult("Fal.ai", `Sora 2 ${mode}`, Date.now() - startTime);
@@ -232,32 +285,32 @@ export async function generateVideoWithFal(
     logExternalAPI("Fal.ai", `Veo 3.1 ${mode}`, `${duration} | ${aspectRatio}`);
     const startTime = Date.now();
 
-    let result;
+    let result: FalVideoResponse;
 
-    if (isHttpUrl) {
+    if (isHttpUrl && imageUrl) {
       result = await fal.subscribe(endpoint, {
         input: {
           prompt,
           image_url: imageUrl,
-          aspect_ratio: aspectRatio,
+          aspect_ratio: aspectRatio as "9:16" | "16:9" | "auto",
           duration,
           resolution: "720p",
           generate_audio: generateAudio,
         },
         logs: true,
-      });
+      }) as FalVideoResponse;
     } else {
       result = await fal.subscribe(endpoint, {
         input: {
           prompt,
-          aspect_ratio: aspectRatio,
+          aspect_ratio: aspectRatio as "9:16" | "16:9" | "auto",
           duration,
           resolution: "720p",
           generate_audio: generateAudio,
           auto_fix: true,
-        },
+        } as unknown as Parameters<typeof fal.subscribe>[1]["input"],
         logs: true,
-      });
+      }) as FalVideoResponse;
     }
 
     logExternalAPIResult("Fal.ai", `Veo 3.1 ${mode}`, Date.now() - startTime);

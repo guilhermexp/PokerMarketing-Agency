@@ -2,8 +2,8 @@
  * Providers Wrapper — Vercel AI SDK language model factory.
  *
  * ┌────────────────────────────────────────────────────────────────┐
- * │  For model IDs, see models.mjs.                                │
- * │  For text generation, see text-generation.mjs.                 │
+ * │  For model IDs, see models.ts.                                 │
+ * │  For text generation, see text-generation.ts.                  │
  * │  This file only wraps the Vercel AI SDK provider.              │
  * └────────────────────────────────────────────────────────────────┘
  *
@@ -11,18 +11,35 @@
  *          SUPPORTED_MODELS, isModelSupported, getModelInfo
  */
 
-import { google } from '@ai-sdk/google';
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import type { LanguageModel } from "ai";
 import {
   normalizeModelId,
   TEXT_MODEL,
   SUPPORTED_CHAT_MODELS,
-} from './models.js';
+} from "./models.js";
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface SupportedModel {
+  id: string;
+  name: string;
+  fast: boolean;
+  provider: string;
+}
+
+export interface BrandProfile {
+  preferredAIModel?: string;
+  [key: string]: unknown;
+}
 
 // ============================================================================
 // PROVIDER INSTANCE
 // ============================================================================
 
-const googleNative = google({
+const googleProvider = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
@@ -32,32 +49,29 @@ const googleNative = google({
 
 /**
  * Get a Vercel AI SDK language model instance by ID.
- *
- * @param {string} modelId - e.g. "gemini-3-flash-preview" or "google/gemini-3-flash-preview"
- * @returns {LanguageModel}
  */
-export function getLanguageModel(modelId) {
+export function getLanguageModel(modelId: string): LanguageModel {
   const normalizedId = normalizeModelId(modelId);
 
   if (!process.env.GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY não configurada');
+    throw new Error("GEMINI_API_KEY não configurada");
   }
 
   console.log(`[Providers] Usando Gemini Native: ${normalizedId}`);
-  return googleNative(normalizedId);
+  return googleProvider(normalizedId);
 }
 
 /**
  * Get default model for artifacts (most capable).
  */
-export function getArtifactModel() {
+export function getArtifactModel(): LanguageModel {
   return getLanguageModel(TEXT_MODEL);
 }
 
 /**
  * Get model configured in brand profile or default.
  */
-export function getBrandModel(brandProfile) {
+export function getBrandModel(brandProfile?: BrandProfile | null): LanguageModel {
   if (brandProfile?.preferredAIModel) {
     return getLanguageModel(brandProfile.preferredAIModel);
   }
@@ -65,20 +79,20 @@ export function getBrandModel(brandProfile) {
 }
 
 // ============================================================================
-// SUPPORTED MODELS (re-exported from models.mjs with provider info)
+// SUPPORTED MODELS (re-exported from models.ts with provider info)
 // ============================================================================
 
-export const SUPPORTED_MODELS = SUPPORTED_CHAT_MODELS.map((m) => ({
+export const SUPPORTED_MODELS: SupportedModel[] = SUPPORTED_CHAT_MODELS.map((m) => ({
   ...m,
-  provider: 'Google',
+  provider: "Google",
 }));
 
-export function isModelSupported(modelId) {
+export function isModelSupported(modelId: string): boolean {
   const normalized = normalizeModelId(modelId);
   return SUPPORTED_MODELS.some((m) => m.id === normalized);
 }
 
-export function getModelInfo(modelId) {
+export function getModelInfo(modelId: string): SupportedModel | null {
   const normalized = normalizeModelId(modelId);
   return SUPPORTED_MODELS.find((m) => m.id === normalized) || null;
 }

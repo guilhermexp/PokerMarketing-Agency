@@ -22,8 +22,8 @@ import {
   generateVideoWithGoogleVeo,
   generateVideoWithFal,
   uploadDataUrlImageToBlob,
-} from "../lib/ai/video-generation.mjs";
-import { buildVideoPrompt } from "../lib/ai/prompt-builders.mjs";
+} from "../lib/ai/video-generation.js";
+import { buildVideoPrompt } from "../lib/ai/prompt-builders.js";
 import logger from "../lib/logger.js";
 
 export function registerAiVideoRoutes(app) {

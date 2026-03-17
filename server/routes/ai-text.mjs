@@ -19,12 +19,12 @@ import {
 import {
   generateTextFromMessages,
   generateStructuredContent,
-} from "../lib/ai/text-generation.mjs";
+} from "../lib/ai/text-generation.js";
 import {
   mapAspectRatio,
   DEFAULT_IMAGE_MODEL,
-} from "../lib/ai/image-generation.mjs";
-import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
+} from "../lib/ai/image-generation.js";
+import { runWithProviderFallback } from "../lib/ai/image-providers.js";
 import {
   DEFAULT_TEXT_MODEL,
   DEFAULT_FAST_TEXT_MODEL,
@@ -35,7 +35,7 @@ import {
   convertImagePromptToJson,
   getVideoPromptSystemPrompt,
   quickPostSchema,
-} from "../lib/ai/prompt-builders.mjs";
+} from "../lib/ai/prompt-builders.js";
 import {
   logAiUsage,
   createTimer,

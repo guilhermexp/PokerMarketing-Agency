@@ -14,19 +14,47 @@ import { put } from "@vercel/blob";
 import { configureFal } from "./clients.js";
 import logger from "../logger.js";
 
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
 export const FAL_IMAGE_MODEL = "fal-ai/gemini-3-pro-image-preview";
 export const FAL_EDIT_MODEL = "fal-ai/gemini-3-pro-image-preview/edit";
 export const FAL_IMAGE_MODEL_STANDARD = "fal-ai/gemini-25-flash-image";
 export const FAL_EDIT_MODEL_STANDARD = "fal-ai/gemini-25-flash-image/edit";
 
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface ImageReference {
+  base64: string;
+  mimeType: string;
+}
+
+export interface FalImageResult {
+  url: string;
+  usedModel: string;
+}
+
+interface FalResponse {
+  data?: {
+    images?: Array<{ url: string }>;
+  };
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
 /**
  * Upload a base64 image to Vercel Blob so FAL.ai can access it via HTTP URL.
- * @param {string} base64 - Raw base64 string (no data: prefix)
- * @param {string} mimeType - e.g. "image/png"
- * @param {string} prefix - Filename prefix
- * @returns {Promise<string>} Public HTTP URL
  */
-async function uploadBase64ToBlob(base64, mimeType, prefix = "fal-ref") {
+async function uploadBase64ToBlob(
+  base64: string,
+  mimeType: string,
+  prefix: string = "fal-ref",
+): Promise<string> {
   const buffer = Buffer.from(base64, "base64");
   const ext = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
   const filename = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
@@ -39,27 +67,22 @@ async function uploadBase64ToBlob(base64, mimeType, prefix = "fal-ref") {
   return blob.url;
 }
 
+// ============================================================================
+// PUBLIC API
+// ============================================================================
+
 /**
  * Generate an image via FAL.ai using the Gemini 3 Pro Image Preview model.
- *
- * @param {string} prompt - Text prompt
- * @param {string} aspectRatio - e.g. "1:1", "16:9"
- * @param {string} imageSize - "1K", "2K", or "4K"
- * @param {Array<{base64: string, mimeType: string}>} [productImages] - Product/logo images
- * @param {{base64: string, mimeType: string}} [styleReferenceImage] - Style reference
- * @param {{base64: string, mimeType: string}} [personReferenceImage] - Person reference
- * @param {string} [modelTier] - "standard" or "pro" (default: "pro")
- * @returns {Promise<{url: string, usedModel: string}>} Image URL + model ID from FAL.ai
  */
 export async function generateImageWithFal(
-  prompt,
-  aspectRatio,
-  imageSize = "1K",
-  productImages,
-  styleReferenceImage,
-  personReferenceImage,
-  modelTier,
-) {
+  prompt: string,
+  aspectRatio: string | undefined,
+  imageSize: string = "1K",
+  productImages?: ImageReference[],
+  styleReferenceImage?: ImageReference,
+  personReferenceImage?: ImageReference,
+  modelTier?: "standard" | "pro",
+): Promise<FalImageResult> {
   configureFal();
 
   const isStandard = modelTier === "standard";
@@ -67,7 +90,7 @@ export async function generateImageWithFal(
   const editModel = isStandard ? FAL_EDIT_MODEL_STANDARD : FAL_EDIT_MODEL;
 
   // Collect all reference images
-  const refImages = [];
+  const refImages: ImageReference[] = [];
   if (personReferenceImage) refImages.push(personReferenceImage);
   if (styleReferenceImage) refImages.push(styleReferenceImage);
   if (productImages && productImages.length > 0) refImages.push(...productImages);
@@ -84,7 +107,7 @@ export async function generateImageWithFal(
       refImages.slice(0, 14).map((img) => uploadBase64ToBlob(img.base64, img.mimeType, "fal-ref")),
     );
 
-    const input = {
+    const input: Record<string, unknown> = {
       prompt,
       image_urls: imageUrls,
       output_format: "png",
@@ -98,9 +121,9 @@ export async function generateImageWithFal(
     );
 
     const result = await fal.subscribe(editModel, {
-      input,
+      input: input as Parameters<typeof fal.subscribe>[1]["input"],
       logs: true,
-    });
+    }) as FalResponse;
 
     const url = result?.data?.images?.[0]?.url;
     if (!url) {
@@ -110,7 +133,7 @@ export async function generateImageWithFal(
   }
 
   // Text-to-image (no reference images)
-  const input = {
+  const input: Record<string, unknown> = {
     prompt,
     output_format: "png",
   };
@@ -123,9 +146,9 @@ export async function generateImageWithFal(
   );
 
   const result = await fal.subscribe(genModel, {
-    input,
+    input: input as Parameters<typeof fal.subscribe>[1]["input"],
     logs: true,
-  });
+  }) as FalResponse;
 
   const url = result?.data?.images?.[0]?.url;
   if (!url) {
@@ -136,15 +159,14 @@ export async function generateImageWithFal(
 
 /**
  * Edit an image via FAL.ai using the Gemini 3 Pro Image Preview /edit endpoint.
- *
- * @param {string} prompt - Edit instruction
- * @param {string} imageBase64 - Base64 of image to edit (no data: prefix)
- * @param {string} mimeType - MIME type of the image
- * @param {{base64: string, mimeType: string}} [referenceImage] - Optional reference image
- * @param {string} [modelTier] - "standard" or "pro" (default: "pro")
- * @returns {Promise<{url: string, usedModel: string}>} Edited image URL + model ID from FAL.ai
  */
-export async function editImageWithFal(prompt, imageBase64, mimeType, referenceImage, modelTier) {
+export async function editImageWithFal(
+  prompt: string,
+  imageBase64: string,
+  mimeType: string,
+  referenceImage?: ImageReference,
+  modelTier?: "standard" | "pro",
+): Promise<FalImageResult> {
   configureFal();
 
   const isStandard = modelTier === "standard";
@@ -160,7 +182,7 @@ export async function editImageWithFal(prompt, imageBase64, mimeType, referenceI
     );
   }
 
-  const input = {
+  const input: Record<string, unknown> = {
     prompt,
     image_urls: imageUrls,
     resolution: "1K",
@@ -173,9 +195,9 @@ export async function editImageWithFal(prompt, imageBase64, mimeType, referenceI
   );
 
   const result = await fal.subscribe(editModel, {
-    input,
+    input: input as Parameters<typeof fal.subscribe>[1]["input"],
     logs: true,
-  });
+  }) as FalResponse;
 
   const url = result?.data?.images?.[0]?.url;
   if (!url) {

@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file in a future refactoring
 /**
  * AI prompt builders and schemas.
  *
@@ -10,7 +12,8 @@
  *          DEFAULT_TEXT_MODEL, DEFAULT_FAST_TEXT_MODEL, DEFAULT_ASSISTANT_MODEL, AI_INFLUENCER_FLASH_MODEL
  */
 
-import { generateTextFromMessages } from "./text-generation.mjs";
+import type { NeonQueryFunction } from "@neondatabase/serverless";
+import { generateTextFromMessages } from "./text-generation.js";
 import { withRetry } from "./retry.js";
 import {
   DEFAULT_TEXT_MODEL,
@@ -25,10 +28,34 @@ import {
 } from "../../helpers/usage-tracking.js";
 import logger from "../logger.js";
 
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface BrandProfile {
+  name?: string;
+  description?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  toneOfVoice?: string;
+  toneTargets?: string[];
+  logo?: string;
+  [key: string]: unknown;
+}
+
+export interface PromptResult {
+  status?: "success" | "error";
+  prompt?: string;
+  raw?: string;
+  error?: string;
+}
+
+type ToneTarget = "campaigns" | "posts" | "images" | "flyers";
+
 // Re-export model constants and Type for backward compatibility
 export { DEFAULT_TEXT_MODEL, DEFAULT_FAST_TEXT_MODEL, DEFAULT_ASSISTANT_MODEL, AI_INFLUENCER_FLASH_MODEL, Type };
 
-export const shouldUseTone = (brandProfile, target) => {
+export const shouldUseTone = (brandProfile: BrandProfile | null | undefined, target: ToneTarget): boolean => {
   if (!brandProfile) return false;
   const targets = brandProfile.toneTargets || [
     "campaigns",
@@ -39,7 +66,7 @@ export const shouldUseTone = (brandProfile, target) => {
   return targets.includes(target);
 };
 
-export const getToneText = (brandProfile, target) => {
+export const getToneText = (brandProfile: BrandProfile | null | undefined, target: ToneTarget): string => {
   if (!brandProfile) return "";
   return shouldUseTone(brandProfile, target)
     ? brandProfile.toneOfVoice || ""

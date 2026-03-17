@@ -8,12 +8,12 @@
 import { getRequestAuthContext } from "../lib/auth.js";
 import { getSql } from "../lib/db.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
-import { generateStructuredContent } from "../lib/ai/text-generation.mjs";
+import { generateStructuredContent } from "../lib/ai/text-generation.js";
 import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.js";
 import {
   campaignSchema,
   getToneText,
-} from "../lib/ai/prompt-builders.mjs";
+} from "../lib/ai/prompt-builders.js";
 import {
   buildCampaignPrompt,
   buildQuantityInstructions,

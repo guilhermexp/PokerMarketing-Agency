@@ -11,7 +11,7 @@ describe("image provider chain", () => {
         "--input-type=module",
         "-e",
         `
-          const mod = await import("./server/lib/ai/image-providers.mjs");
+          const mod = await import("./server/lib/ai/image-providers.js");
           console.log(JSON.stringify({
             chain: mod.PROVIDER_CHAIN,
             gemini: mod.isProviderEnabled("gemini"),

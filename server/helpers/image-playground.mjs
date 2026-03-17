@@ -10,7 +10,7 @@ import { put } from "@vercel/blob";
 import sharp from "sharp";
 import { validateContentType } from "../lib/validation/contentType.js";
 import { isQuotaOrRateLimitError } from "../lib/ai/retry.js";
-import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
+import { runWithProviderFallback } from "../lib/ai/image-providers.js";
 import { logAiUsage } from "./usage-tracking.js";
 import logger from "../lib/logger.js";
 

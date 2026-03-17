@@ -17,7 +17,7 @@ import logger from "./lib/logger.js";
 import { DATABASE_URL, getSql, warmupDatabase, ensureGallerySourceType } from "./lib/db.js";
 import { initializeScheduledPostsChecker, waitForRedis, initializeImageGenerationWorker, registerImageGenerationProcessor } from "./helpers/job-queue.mjs";
 import { checkAndPublishScheduledPosts, publishScheduledPostById } from "./helpers/scheduled-publisher.mjs";
-import { generateImageWithFallback } from "./lib/ai/image-generation.mjs";
+import { generateImageWithFallback } from "./lib/ai/image-generation.js";
 import { put } from "@vercel/blob";
 import { validateContentType } from "./lib/validation/contentType.js";
 
@@ -47,7 +47,7 @@ process.on("unhandledRejection", (error) => {
 });
 
 // ---------------------------------------------------------------------------
-// Static files (production — Railway serves frontend from dist/)
+// Static files (production — serves frontend from dist/)
 // ---------------------------------------------------------------------------
 const distPath = path.join(__dirname, "../dist");
 logger.info({ distPath }, "[Static] Serving static files");
@@ -117,7 +117,7 @@ const startup = async () => {
         progressCallback(20);
 
         // Build prompt with brand context
-        const { buildImagePrompt, convertImagePromptToJson } = await import("./lib/ai/prompt-builders.mjs");
+        const { buildImagePrompt, convertImagePromptToJson } = await import("./lib/ai/prompt-builders.js");
         const { getSql } = await import("./lib/db.mjs");
         const sql = getSql();
         

@@ -3,8 +3,8 @@
  *
  * ┌────────────────────────────────────────────────────────────────┐
  * │  This file handles IMAGE generation only.                      │
- * │  For text generation, use text-generation.mjs.                 │
- * │  For model IDs, use models.mjs.                                │
+ * │  For text generation, use text-generation.ts.                  │
+ * │  For model IDs, use models.ts.                                 │
  * └────────────────────────────────────────────────────────────────┘
  *
  * Exports: generateGeminiImage, generateImageWithFallback, mapAspectRatio,
@@ -17,17 +17,52 @@ import {
   IMAGE_MODEL_PRO,
   IMAGE_MODEL_STANDARD,
 } from "./models.js";
-import { FAL_IMAGE_MODEL } from "./fal-image-generation.mjs";
-import { runWithProviderFallback } from "./image-providers.mjs";
+import { FAL_IMAGE_MODEL } from "./fal-image-generation.js";
+import { runWithProviderFallback, type FallbackResult, type GenerateParams } from "./image-providers.js";
 import logger from "../logger.js";
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
 
 // Re-export model constants for backward compatibility
 export const DEFAULT_IMAGE_MODEL = IMAGE_MODEL_PRO;
 export const STANDARD_IMAGE_MODEL = IMAGE_MODEL_STANDARD;
 export { FAL_IMAGE_MODEL };
 
-export const mapAspectRatio = (ratio) => {
-  const map = {
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface ImageReference {
+  base64: string;
+  mimeType: string;
+}
+
+interface GeminiPart {
+  text?: string;
+  inlineData?: {
+    data: string;
+    mimeType: string;
+  };
+}
+
+interface GeminiCandidate {
+  content?: {
+    parts?: GeminiPart[];
+  };
+}
+
+interface GeminiResponse {
+  candidates?: GeminiCandidate[];
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+export function mapAspectRatio(ratio: string): string {
+  const map: Record<string, string> = {
     "1:1": "1:1",
     "9:16": "9:16",
     "16:9": "16:9",
@@ -39,25 +74,29 @@ export const mapAspectRatio = (ratio) => {
     "3:2": "3:2",
   };
   return map[ratio] || "1:1";
-};
+}
 
-export const generateGeminiImage = async (
-  prompt,
-  aspectRatio,
-  model = DEFAULT_IMAGE_MODEL,
-  imageSize = "1K",
-  productImages,
-  styleReferenceImage,
-  personReferenceImage,
-  maxRetries = 3,
-) => {
+// ============================================================================
+// PUBLIC API
+// ============================================================================
+
+export async function generateGeminiImage(
+  prompt: string,
+  aspectRatio: string,
+  model: string = DEFAULT_IMAGE_MODEL,
+  imageSize: string = "1K",
+  productImages?: ImageReference[],
+  styleReferenceImage?: ImageReference,
+  personReferenceImage?: ImageReference,
+  maxRetries: number = 3,
+): Promise<string> {
   logger.debug(
     { model, aspectRatio: mapAspectRatio(aspectRatio), imageSize },
     "[generateGeminiImage] Iniciando geração",
   );
 
   const ai = getGeminiAi();
-  const parts = [{ text: prompt }];
+  const parts: GeminiPart[] = [{ text: prompt }];
 
   if (personReferenceImage) {
     logger.debug(
@@ -116,7 +155,7 @@ export const generateGeminiImage = async (
         },
       }),
     maxRetries,
-  );
+  ) as GeminiResponse;
 
   logger.debug({}, "[generateGeminiImage] Resposta recebida do Gemini");
 
@@ -155,17 +194,17 @@ export const generateGeminiImage = async (
     "[generateGeminiImage] Nenhuma imagem encontrada nos parts da resposta",
   );
   throw new Error("Failed to generate image - no image data in response");
-};
+}
 
-export const generateImageWithFallback = async (
-  prompt,
-  aspectRatio,
-  model = DEFAULT_IMAGE_MODEL,
-  imageSize = "1K",
-  productImages,
-  styleReferenceImage,
-  personReferenceImage,
-) => {
+export async function generateImageWithFallback(
+  prompt: string,
+  aspectRatio: string,
+  model: string = DEFAULT_IMAGE_MODEL,
+  imageSize: string = "1K",
+  productImages?: ImageReference[],
+  styleReferenceImage?: ImageReference,
+  personReferenceImage?: ImageReference,
+): Promise<FallbackResult> {
   logger.info({}, "[generateImageWithFallback] Using Gemini only");
 
   const normalizedModel = String(model || DEFAULT_IMAGE_MODEL).toLowerCase();
@@ -177,8 +216,9 @@ export const generateImageWithFallback = async (
     normalizedModel === "google/nano-banana-2" ||
     normalizedModel === "nano-banana" ||
     normalizedModel === "google/nano-banana";
-  const modelTier = isStandardModel ? "standard" : "pro";
-  return runWithProviderFallback("generate", {
+  const modelTier: "standard" | "pro" = isStandardModel ? "standard" : "pro";
+
+  const params: GenerateParams = {
     prompt,
     aspectRatio,
     imageSize,
@@ -186,5 +226,7 @@ export const generateImageWithFallback = async (
     styleRef: styleReferenceImage,
     personRef: personReferenceImage,
     modelTier,
-  });
-};
+  };
+
+  return runWithProviderFallback("generate", params);
+}
