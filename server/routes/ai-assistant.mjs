@@ -9,7 +9,7 @@
 
 import { getRequestAuthContext } from "../lib/auth.mjs";
 import { getSql } from "../lib/db.mjs";
-import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import { streamTextFromMessages } from "../lib/ai/text-generation.mjs";
 import { ASSISTANT_MODEL } from "../lib/ai/models.js";
 import { requireAuthWithAiRateLimit } from "../lib/auth.mjs";
@@ -18,7 +18,7 @@ import {
   createTimer,
 } from "../helpers/usage-tracking.mjs";
 import { chatHandler } from "../api/chat/route.mjs";
-import logger from "../lib/logger.mjs";
+import logger from "../lib/logger.js";
 
 export function registerAiAssistantRoutes(app) {
   // -------------------------------------------------------------------------

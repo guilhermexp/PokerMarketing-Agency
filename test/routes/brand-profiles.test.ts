@@ -35,7 +35,7 @@ describe("brand profile routes", () => {
   });
 
   it("returns not found envelope when update target is missing", async () => {
-    const { NotFoundError } = await import("../../server/lib/errors/index.mjs");
+    const { NotFoundError } = await import("../../server/lib/errors/index.js");
     const updateBrandProfileMock = vi.fn().mockRejectedValue(
       new NotFoundError("Brand profile"),
     );

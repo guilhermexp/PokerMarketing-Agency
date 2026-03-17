@@ -17,9 +17,9 @@
  *   generateTextWithVision    — Text + images generation (JSON mode)
  */
 
-import { getGeminiAi } from "./clients.mjs";
+import { getGeminiAi } from "./clients.js";
 import { normalizeModelId, TEXT_MODEL } from "./models.js";
-import { withRetry } from "./retry.mjs";
+import { withRetry } from "./retry.js";
 
 // ============================================================================
 // INTERNAL: Convert OpenAI-style messages → Gemini contents format

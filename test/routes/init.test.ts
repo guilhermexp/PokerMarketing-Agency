@@ -25,7 +25,7 @@ describe("init routes", () => {
     vi.doMock("../../server/lib/user-resolver.mjs", () => ({
       resolveUserId: resolveUserIdMock,
     }));
-    vi.doMock("../../server/lib/logger.mjs", () => ({
+    vi.doMock("../../server/lib/logger.js", () => ({
       default: { debug: vi.fn() },
     }));
 
@@ -56,7 +56,7 @@ describe("init routes", () => {
     vi.doMock("../../server/lib/user-resolver.mjs", () => ({
       resolveUserId: resolveUserIdMock,
     }));
-    vi.doMock("../../server/lib/logger.mjs", () => ({
+    vi.doMock("../../server/lib/logger.js", () => ({
       default: { debug: vi.fn() },
     }));
 

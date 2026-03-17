@@ -6,18 +6,24 @@
  * - Production: JSON logs for log aggregation tools
  */
 
-import pino from 'pino';
+import pino, { type Logger } from 'pino';
 
 // Determine environment
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const isTest = process.env.NODE_ENV === 'test';
 
+// Determine log level based on environment
+function getLogLevel(): string {
+  if (isTest) return 'silent';
+  return process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info');
+}
+
 /**
  * Create logger instance with environment-specific configuration
  */
-const logger = pino({
+const logger: Logger = pino({
   // Log level configuration
-  level: process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info'),
+  level: getLogLevel(),
 
   // Base configuration
   base: {
@@ -50,11 +56,8 @@ const logger = pino({
   },
 
   // Development: Pretty print for human readability
-  // Production: JSON for log aggregation
-  // Test: Silent or minimal output
-  ...(isTest
-    ? { level: 'silent' }
-    : isDevelopment
+  // Production/Test: JSON for log aggregation
+  ...(isDevelopment && !isTest
     ? {
         transport: {
           target: 'pino-pretty',
@@ -73,27 +76,15 @@ const logger = pino({
 
 /**
  * Create child logger with additional context
- * @param {Object} context - Additional context to include in all logs
- * @returns {pino.Logger}
- *
- * @example
- * const reqLogger = createChildLogger({ requestId: 'abc-123' });
- * reqLogger.info('Processing request');
  */
-export function createChildLogger(context) {
+export function createChildLogger(context: Record<string, unknown>): Logger {
   return logger.child(context);
 }
 
 /**
  * Log an error with full context
- * @param {Error} error - Error object
- * @param {string} message - Additional message
- * @param {Object} context - Additional context
- *
- * @example
- * logError(err, 'Failed to process campaign', { campaignId: 123 });
  */
-export function logError(error, message, context = {}) {
+export function logError(error: Error, message: string, context: Record<string, unknown> = {}): void {
   logger.error({
     err: error,
     ...context,
@@ -102,37 +93,22 @@ export function logError(error, message, context = {}) {
 
 /**
  * Log a warning with context
- * @param {string} message - Warning message
- * @param {Object} context - Additional context
- *
- * @example
- * logWarning('Rate limit approaching', { userId: 'user_123', current: 95, limit: 100 });
  */
-export function logWarning(message, context = {}) {
+export function logWarning(message: string, context: Record<string, unknown> = {}): void {
   logger.warn(context, message);
 }
 
 /**
  * Log an info message with context
- * @param {string} message - Info message
- * @param {Object} context - Additional context
- *
- * @example
- * logInfo('Campaign created', { campaignId: 123, userId: 'user_123' });
  */
-export function logInfo(message, context = {}) {
+export function logInfo(message: string, context: Record<string, unknown> = {}): void {
   logger.info(context, message);
 }
 
 /**
  * Log a debug message with context
- * @param {string} message - Debug message
- * @param {Object} context - Additional context
- *
- * @example
- * logDebug('Database query executed', { query: 'SELECT * FROM campaigns', duration: 45 });
  */
-export function logDebug(message, context = {}) {
+export function logDebug(message: string, context: Record<string, unknown> = {}): void {
   logger.debug(context, message);
 }
 

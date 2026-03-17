@@ -15,7 +15,7 @@ import {
   withRetry,
   sanitizeErrorForClient,
   isQuotaOrRateLimitError,
-} from "../lib/ai/retry.mjs";
+} from "../lib/ai/retry.js";
 import { generateTextFromMessages } from "../lib/ai/text-generation.mjs";
 import {
   generateImageWithFallback,
@@ -33,7 +33,7 @@ import {
 } from "../helpers/usage-tracking.mjs";
 import { urlToBase64 } from "../helpers/image-helpers.mjs";
 import { validateContentType } from "../lib/validation/contentType.js";
-import logger from "../lib/logger.mjs";
+import logger from "../lib/logger.js";
 import {
   enqueueImageGeneration,
   enqueueImageGenerationBatch,

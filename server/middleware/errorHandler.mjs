@@ -8,9 +8,9 @@
  * - Environment-specific error details (stack traces in dev only)
  */
 
-import logger from "../lib/logger.mjs";
+import logger from "../lib/logger.js";
 import { sendError } from "../lib/response.js";
-import { AppError, ERROR_CODES, HTTP_STATUS } from "../lib/errors/index.mjs";
+import { AppError, ERROR_CODES, HTTP_STATUS } from "../lib/errors/index.js";
 import { randomUUID } from "crypto";
 
 /**

@@ -7,13 +7,13 @@
 
 import { getRequestAuthContext } from "../lib/auth.mjs";
 import { getSql } from "../lib/db.mjs";
-import { getGeminiAi } from "../lib/ai/clients.mjs";
-import { withRetry, sanitizeErrorForClient } from "../lib/ai/retry.mjs";
+import { getGeminiAi } from "../lib/ai/clients.js";
+import { withRetry, sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {
   logAiUsage,
   createTimer,
 } from "../helpers/usage-tracking.mjs";
-import logger from "../lib/logger.mjs";
+import logger from "../lib/logger.js";
 
 export function registerAiSpeechRoutes(app) {
   app.post("/api/ai/speech", async (req, res) => {

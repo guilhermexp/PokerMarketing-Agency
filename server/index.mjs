@@ -8,12 +8,12 @@
 
 import "dotenv/config";
 
-import { validateEnv } from "./lib/env.mjs";
+import { validateEnv } from "./lib/env.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
 import app, { finalizeApp } from "./app.mjs";
-import logger from "./lib/logger.mjs";
+import logger from "./lib/logger.js";
 import { DATABASE_URL, getSql, warmupDatabase, ensureGallerySourceType } from "./lib/db.mjs";
 import { initializeScheduledPostsChecker, waitForRedis, initializeImageGenerationWorker, registerImageGenerationProcessor } from "./helpers/job-queue.mjs";
 import { checkAndPublishScheduledPosts, publishScheduledPostById } from "./helpers/scheduled-publisher.mjs";

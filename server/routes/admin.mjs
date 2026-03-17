@@ -1,9 +1,9 @@
 import { getSql } from "../lib/db.mjs";
 import { requireSuperAdmin } from "../lib/auth.mjs";
 import { generateTextFromMessages } from "../lib/ai/text-generation.mjs";
-import { withRetry } from "../lib/ai/retry.mjs";
+import { withRetry } from "../lib/ai/retry.js";
 import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.js";
-import logger from "../lib/logger.mjs";
+import logger from "../lib/logger.js";
 
 // Cache for AI suggestions (1 hour TTL)
 const aiSuggestionsCache = new Map();

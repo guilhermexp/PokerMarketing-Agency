@@ -9,7 +9,7 @@ import { betterAuth } from "better-auth";
 import { organization } from "better-auth/plugins/organization";
 import IORedis from "ioredis";
 import pg from "pg";
-import logger from "./logger.mjs";
+import logger from "./logger.js";
 
 const { Pool } = pg;
 const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || null;

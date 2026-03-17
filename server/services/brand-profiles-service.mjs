@@ -4,7 +4,7 @@ import { resolveOrganizationContext } from "../lib/auth.mjs";
 import {
   ValidationError,
   NotFoundError,
-} from "../lib/errors/index.mjs";
+} from "../lib/errors/index.js";
 import {
   hasPermission,
   PERMISSIONS,

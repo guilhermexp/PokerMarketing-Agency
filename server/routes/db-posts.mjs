@@ -1,6 +1,6 @@
 import { getSql } from "../lib/db.mjs";
 import { logError } from "../lib/logging-helpers.mjs";
-import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 
 export function registerPostRoutes(app) {
   app.patch("/api/db/posts", async (req, res) => {

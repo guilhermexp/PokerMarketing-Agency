@@ -2,13 +2,13 @@ import {
   ValidationError,
   NotFoundError,
   DatabaseError,
-} from "../lib/errors/index.mjs";
+} from "../lib/errors/index.js";
 import {
   OrganizationAccessError,
   PermissionDeniedError,
 } from "../helpers/organization-context.mjs";
 import { logError } from "../lib/logging-helpers.mjs";
-import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {
   listScheduledPosts,
   createScheduledPost,

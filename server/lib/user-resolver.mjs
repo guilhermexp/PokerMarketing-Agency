@@ -7,7 +7,7 @@
 
 import { getSql } from "./db.mjs";
 import { isUndefinedColumnError } from "./db.mjs";
-import logger from "./logger.mjs";
+import logger from "./logger.js";
 
 // Cache for resolved user IDs (5 minute TTL)
 export const userIdCache = new Map();

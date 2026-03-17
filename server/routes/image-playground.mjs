@@ -1,6 +1,6 @@
 import { urlToBase64 } from "../helpers/image-helpers.mjs";
-import { getGeminiAi } from "../lib/ai/clients.mjs";
-import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
+import { getGeminiAi } from "../lib/ai/clients.js";
+import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import { expandAiInfluencerPrompt, expandProductHeroPrompt, expandExplodedProductPrompt, expandBrandIdentityPrompt } from "../lib/ai/prompt-builders.mjs";
 import {
   getTopics,

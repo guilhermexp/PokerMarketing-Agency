@@ -1,6 +1,6 @@
 import { getSql } from "../lib/db.mjs";
 import { resolveUserId } from "../lib/user-resolver.mjs";
-import logger from "../lib/logger.mjs";
+import logger from "../lib/logger.js";
 import { RUBE_MCP_URL, RUBE_TIMEOUT_MS } from "../lib/constants.js";
 
 // ============================================================================

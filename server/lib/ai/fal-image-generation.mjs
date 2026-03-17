@@ -11,8 +11,8 @@
 
 import { fal } from "@fal-ai/client";
 import { put } from "@vercel/blob";
-import { configureFal } from "./clients.mjs";
-import logger from "../logger.mjs";
+import { configureFal } from "./clients.js";
+import logger from "../logger.js";
 
 export const FAL_IMAGE_MODEL = "fal-ai/gemini-3-pro-image-preview";
 export const FAL_EDIT_MODEL = "fal-ai/gemini-3-pro-image-preview/edit";

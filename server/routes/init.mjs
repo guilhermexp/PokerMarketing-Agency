@@ -1,7 +1,7 @@
 import { getSql } from "../lib/db.mjs";
 import { resolveUserId } from "../lib/user-resolver.mjs";
 import { logError } from "../lib/logging-helpers.mjs";
-import logger from "../lib/logger.mjs";
+import logger from "../lib/logger.js";
 import { validateRequest } from "../middleware/validate.mjs";
 import { initQuerySchema } from "../schemas/init-schemas.mjs";
 

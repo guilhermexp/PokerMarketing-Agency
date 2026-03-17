@@ -6,7 +6,7 @@
  */
 
 import { neon } from "@neondatabase/serverless";
-import logger from "./logger.mjs";
+import logger from "./logger.js";
 
 export const DATABASE_URL = process.env.DATABASE_URL;
 

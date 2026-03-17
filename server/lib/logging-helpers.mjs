@@ -2,7 +2,7 @@
  * Logging helper functions for external API calls.
  */
 
-import logger from "./logger.mjs";
+import logger from "./logger.js";
 
 export function logExternalAPI(service, action, details = "") {
   logger.debug(

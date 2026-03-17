@@ -3,7 +3,7 @@ import {
   ValidationError,
   PermissionDeniedError,
   ExternalServiceError,
-} from "../lib/errors/index.mjs";
+} from "../lib/errors/index.js";
 import { validateContentType } from "../lib/validation/contentType.js";
 import { logExternalAPI, logExternalAPIResult } from "../lib/logging-helpers.mjs";
 

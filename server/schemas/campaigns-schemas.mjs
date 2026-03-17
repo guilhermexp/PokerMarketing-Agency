@@ -8,7 +8,7 @@ import {
   postSchema,
   userIdSchema,
   clipScriptSchema,
-} from "./common.mjs";
+} from "./common.js";
 
 export const campaignsQuerySchema = z.object({
   user_id: userIdSchema.optional(),

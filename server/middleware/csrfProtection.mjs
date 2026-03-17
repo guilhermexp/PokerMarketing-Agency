@@ -14,9 +14,9 @@
  * - Cookies use sameSite to prevent cross-site attacks
  */
 
-import { generateCsrfToken, validateCsrfToken } from "../lib/csrf.mjs";
-import { AppError, ERROR_CODES, HTTP_STATUS } from "../lib/errors/index.mjs";
-import logger from "../lib/logger.mjs";
+import { generateCsrfToken, validateCsrfToken } from "../lib/csrf.js";
+import { AppError, ERROR_CODES, HTTP_STATUS } from "../lib/errors/index.js";
+import logger from "../lib/logger.js";
 
 // Cookie name for CSRF token
 const CSRF_COOKIE_NAME = "csrf_token";

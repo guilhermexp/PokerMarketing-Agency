@@ -7,7 +7,7 @@
 
 import { getSql } from "./db.mjs";
 import { resolveUserId } from "./user-resolver.mjs";
-import logger from "./logger.mjs";
+import logger from "./logger.js";
 
 export const RESOURCE_ACCESS_RULES = [
   { methods: ["PUT"], path: "/api/db/brand-profiles", idKey: "id", table: "brand_profiles" },

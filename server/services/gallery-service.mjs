@@ -5,13 +5,13 @@ import { resolveOrganizationContext } from "../lib/auth.mjs";
 import {
   ValidationError,
   NotFoundError,
-} from "../lib/errors/index.mjs";
+} from "../lib/errors/index.js";
 import {
   hasPermission,
   PERMISSIONS,
   PermissionDeniedError,
 } from "../helpers/organization-context.mjs";
-import logger from "../lib/logger.mjs";
+import logger from "../lib/logger.js";
 
 export async function listGallery({
   user_id,

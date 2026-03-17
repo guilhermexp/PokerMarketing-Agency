@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { organizationIdSchema, optionalString, userIdSchema } from "./common.mjs";
+import { organizationIdSchema, optionalString, userIdSchema } from "./common.js";
 
 export const initQuerySchema = z.object({
   user_id: userIdSchema.optional(),

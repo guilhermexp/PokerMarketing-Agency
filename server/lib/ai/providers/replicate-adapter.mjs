@@ -11,7 +11,7 @@
 
 import Replicate from "replicate";
 import { put } from "@vercel/blob";
-import logger from "../../logger.mjs";
+import logger from "../../logger.js";
 
 export const REPLICATE_MODEL_PRO = "google/nano-banana-pro";
 export const REPLICATE_MODEL_STANDARD = "google/nano-banana";

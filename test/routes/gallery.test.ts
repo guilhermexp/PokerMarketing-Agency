@@ -36,7 +36,7 @@ describe("gallery routes", () => {
   });
 
   it("returns validation errors on invalid gallery creation", async () => {
-    const { ValidationError } = await import("../../server/lib/errors/index.mjs");
+    const { ValidationError } = await import("../../server/lib/errors/index.js");
     const createGalleryImageMock = vi.fn().mockRejectedValue(
       new ValidationError("user_id, src_url, source, and model are required"),
     );

@@ -6,6 +6,8 @@ describe("image provider chain", () => {
     const result = spawnSync(
       process.execPath,
       [
+        "--import",
+        "tsx",
         "--input-type=module",
         "-e",
         `

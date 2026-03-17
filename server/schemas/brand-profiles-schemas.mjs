@@ -4,7 +4,7 @@ import {
   optionalNullableString,
   organizationIdSchema,
   userIdSchema,
-} from "./common.mjs";
+} from "./common.js";
 
 export const brandProfileQuerySchema = z.object({
   user_id: userIdSchema.optional(),

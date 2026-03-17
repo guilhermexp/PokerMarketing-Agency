@@ -9,10 +9,10 @@
 import { put } from "@vercel/blob";
 import sharp from "sharp";
 import { validateContentType } from "../lib/validation/contentType.js";
-import { isQuotaOrRateLimitError } from "../lib/ai/retry.mjs";
+import { isQuotaOrRateLimitError } from "../lib/ai/retry.js";
 import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
 import { logAiUsage } from "./usage-tracking.mjs";
-import logger from "../lib/logger.mjs";
+import logger from "../lib/logger.js";
 
 // Normalize model names to match the image_model enum in the database.
 // The DB enum currently only has 'gemini-3-pro-image-preview', so we map

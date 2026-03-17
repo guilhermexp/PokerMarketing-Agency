@@ -1,5 +1,5 @@
 import { getSql } from "../lib/db.mjs";
-import { ValidationError, DatabaseError } from "../lib/errors/index.mjs";
+import { ValidationError, DatabaseError } from "../lib/errors/index.js";
 
 export function registerUserRoutes(app) {
   app.get("/api/db/users", async (req, res) => {

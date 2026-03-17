@@ -3,21 +3,17 @@
  * Specific error types for common error scenarios
  */
 
-import { AppError, ERROR_CODES, HTTP_STATUS } from "./AppError.js";
+import { AppError, ERROR_CODES, HTTP_STATUS, type ErrorDetails } from "./AppError.js";
 
 // Re-export base error and constants
-export { AppError, ERROR_CODES, HTTP_STATUS };
+export { AppError, ERROR_CODES, HTTP_STATUS, type ErrorDetails };
 
 /**
  * Validation Error (400)
  * Thrown when request data fails validation
  */
 export class ValidationError extends AppError {
-  /**
-   * @param {string} message - Error message
-   * @param {Object|Array} details - Validation error details (field errors, etc.)
-   */
-  constructor(message = "Validation failed", details = null) {
+  constructor(message: string = "Validation failed", details: ErrorDetails | null = null) {
     super(message, ERROR_CODES.VALIDATION_ERROR, HTTP_STATUS.BAD_REQUEST, true, details);
   }
 }
@@ -27,11 +23,7 @@ export class ValidationError extends AppError {
  * Thrown when authentication fails or is missing
  */
 export class AuthError extends AppError {
-  /**
-   * @param {string} message - Error message
-   * @param {string} code - Specific auth error code
-   */
-  constructor(message = "Authentication required", code = ERROR_CODES.UNAUTHORIZED) {
+  constructor(message: string = "Authentication required", code: string = ERROR_CODES.UNAUTHORIZED) {
     super(message, code, HTTP_STATUS.UNAUTHORIZED, true);
   }
 }
@@ -41,10 +33,7 @@ export class AuthError extends AppError {
  * Thrown when user lacks required permissions
  */
 export class PermissionDeniedError extends AppError {
-  /**
-   * @param {string} permission - Required permission that was missing
-   */
-  constructor(permission) {
+  constructor(permission?: string) {
     const message = permission
       ? `Permission denied: ${permission}`
       : "Permission denied";
@@ -57,10 +46,7 @@ export class PermissionDeniedError extends AppError {
  * Thrown when user tries to access organization resources without permission
  */
 export class OrganizationAccessError extends AppError {
-  /**
-   * @param {string} message - Error message
-   */
-  constructor(message = "Organization access denied") {
+  constructor(message: string = "Organization access denied") {
     super(message, ERROR_CODES.ORGANIZATION_ACCESS_DENIED, HTTP_STATUS.FORBIDDEN, true);
   }
 }
@@ -70,11 +56,7 @@ export class OrganizationAccessError extends AppError {
  * Thrown when a requested resource doesn't exist
  */
 export class NotFoundError extends AppError {
-  /**
-   * @param {string} resource - Name of the resource that wasn't found
-   * @param {string|number} id - ID of the resource (optional)
-   */
-  constructor(resource = "Resource", id = null) {
+  constructor(resource: string = "Resource", id: string | number | null = null) {
     const message = id
       ? `${resource} not found: ${id}`
       : `${resource} not found`;
@@ -87,11 +69,7 @@ export class NotFoundError extends AppError {
  * Thrown when a resource already exists or conflicts with current state
  */
 export class ConflictError extends AppError {
-  /**
-   * @param {string} message - Error message
-   * @param {Object} details - Conflict details
-   */
-  constructor(message = "Resource conflict", details = null) {
+  constructor(message: string = "Resource conflict", details: ErrorDetails | null = null) {
     super(message, ERROR_CODES.CONFLICT, HTTP_STATUS.CONFLICT, true, details);
   }
 }
@@ -101,11 +79,7 @@ export class ConflictError extends AppError {
  * Thrown when rate limit is exceeded
  */
 export class RateLimitError extends AppError {
-  /**
-   * @param {string} message - Error message
-   * @param {number} retryAfter - Seconds until retry is allowed
-   */
-  constructor(message = "Rate limit exceeded", retryAfter = null) {
+  constructor(message: string = "Rate limit exceeded", retryAfter: number | null = null) {
     super(
       message,
       ERROR_CODES.RATE_LIMIT_EXCEEDED,
@@ -116,16 +90,17 @@ export class RateLimitError extends AppError {
   }
 }
 
+interface OriginalError {
+  message: string;
+  code?: string;
+}
+
 /**
  * Database Error (500)
  * Thrown when database operations fail
  */
 export class DatabaseError extends AppError {
-  /**
-   * @param {string} message - Error message
-   * @param {Error} originalError - Original database error
-   */
-  constructor(message = "Database operation failed", originalError = null) {
+  constructor(message: string = "Database operation failed", originalError: OriginalError | null = null) {
     const details = originalError ? {
       originalMessage: originalError.message,
       code: originalError.code
@@ -139,12 +114,7 @@ export class DatabaseError extends AppError {
  * Thrown when external API/service calls fail
  */
 export class ExternalServiceError extends AppError {
-  /**
-   * @param {string} service - Name of the external service
-   * @param {string} message - Error message
-   * @param {Error} originalError - Original error from service
-   */
-  constructor(service, message = "External service error", originalError = null) {
+  constructor(service: string, message: string = "External service error", originalError: Error | null = null) {
     const details = {
       service,
       originalMessage: originalError?.message
@@ -158,11 +128,7 @@ export class ExternalServiceError extends AppError {
  * Thrown when application configuration is invalid or missing
  */
 export class ConfigurationError extends AppError {
-  /**
-   * @param {string} message - Error message
-   * @param {string} configKey - Configuration key that's missing/invalid
-   */
-  constructor(message = "Configuration error", configKey = null) {
+  constructor(message: string = "Configuration error", configKey: string | null = null) {
     super(
       message,
       ERROR_CODES.CONFIGURATION_ERROR,
@@ -178,11 +144,7 @@ export class ConfigurationError extends AppError {
  * Thrown when a service is temporarily unavailable
  */
 export class ServiceUnavailableError extends AppError {
-  /**
-   * @param {string} message - Error message
-   * @param {number} retryAfter - Seconds until service might be available
-   */
-  constructor(message = "Service temporarily unavailable", retryAfter = null) {
+  constructor(message: string = "Service temporarily unavailable", retryAfter: number | null = null) {
     super(
       message,
       ERROR_CODES.SERVICE_UNAVAILABLE,
@@ -193,13 +155,16 @@ export class ServiceUnavailableError extends AppError {
   }
 }
 
+interface FieldError {
+  field: string;
+  message: string;
+}
+
 /**
  * Helper function to create a ValidationError from field errors
- * @param {Object} fieldErrors - Object mapping field names to error messages
- * @returns {ValidationError}
  */
-export function createValidationError(fieldErrors) {
-  const errors = Object.entries(fieldErrors).map(([field, message]) => ({
+export function createValidationError(fieldErrors: Record<string, string>): ValidationError {
+  const errors: FieldError[] = Object.entries(fieldErrors).map(([field, message]) => ({
     field,
     message
   }));
@@ -208,9 +173,7 @@ export function createValidationError(fieldErrors) {
 
 /**
  * Helper function to determine if an error is operational
- * @param {Error} error - Error to check
- * @returns {boolean}
  */
-export function isOperationalError(error) {
+export function isOperationalError(error: unknown): boolean {
   return AppError.isOperational(error);
 }

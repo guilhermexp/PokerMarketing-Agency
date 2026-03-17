@@ -11,7 +11,7 @@
  */
 
 import { generateTextFromMessages } from "./text-generation.mjs";
-import { withRetry } from "./retry.mjs";
+import { withRetry } from "./retry.js";
 import {
   DEFAULT_TEXT_MODEL,
   DEFAULT_FAST_TEXT_MODEL,
@@ -23,7 +23,7 @@ import {
   logAiUsage,
   createTimer,
 } from "../../helpers/usage-tracking.mjs";
-import logger from "../logger.mjs";
+import logger from "../logger.js";
 
 // Re-export model constants and Type for backward compatibility
 export { DEFAULT_TEXT_MODEL, DEFAULT_FAST_TEXT_MODEL, DEFAULT_ASSISTANT_MODEL, AI_INFLUENCER_FLASH_MODEL, Type };

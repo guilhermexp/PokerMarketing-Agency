@@ -1,7 +1,7 @@
 import { getSql } from "../lib/db.mjs";
 import { resolveUserId } from "../lib/user-resolver.mjs";
 import { logError } from "../lib/logging-helpers.mjs";
-import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 
 export function registerGenerationJobRoutes(app) {
 app.post("/api/generate/queue", async (req, res) => {

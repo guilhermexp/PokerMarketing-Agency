@@ -1,9 +1,9 @@
 import { getSql } from "../lib/db.mjs";
 import { userIdCache } from "../lib/user-resolver.mjs";
-import { generateCsrfToken } from "../lib/csrf.mjs";
+import { generateCsrfToken } from "../lib/csrf.js";
 import { requireSuperAdmin } from "../lib/auth.mjs";
-import { DatabaseError } from "../lib/errors/index.mjs";
-import logger from "../lib/logger.mjs";
+import { DatabaseError } from "../lib/errors/index.js";
+import logger from "../lib/logger.js";
 
 export function registerHealthRoutes(app) {
   app.get("/health", (req, res) => {

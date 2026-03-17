@@ -15,7 +15,7 @@ import { getSql } from "../lib/db.mjs";
 import {
   withRetry,
   sanitizeErrorForClient,
-} from "../lib/ai/retry.mjs";
+} from "../lib/ai/retry.js";
 import {
   generateTextFromMessages,
   generateStructuredContent,
@@ -41,7 +41,7 @@ import {
   createTimer,
 } from "../helpers/usage-tracking.mjs";
 import { validateContentType } from "../lib/validation/contentType.js";
-import logger from "../lib/logger.mjs";
+import logger from "../lib/logger.js";
 
 export function registerAiTextRoutes(app) {
   // -------------------------------------------------------------------------

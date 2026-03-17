@@ -44,3 +44,19 @@ export const carouselScriptSchema = z.object({
   caption: optionalNullableString,
   slides: z.array(carouselSlideSchema).optional(),
 }).passthrough();
+
+// Inferred types
+export type OptionalString = z.infer<typeof optionalString>;
+export type OptionalNullableString = z.infer<typeof optionalNullableString>;
+export type UserId = z.infer<typeof userIdSchema>;
+export type OrganizationId = z.infer<typeof organizationIdSchema>;
+export type Id = z.infer<typeof idSchema>;
+export type BooleanLike = z.infer<typeof booleanLikeSchema>;
+export type SortIndex = z.infer<typeof sortIndexSchema>;
+export type MediaUrl = z.infer<typeof mediaUrlSchema>;
+export type ImagePrompt = z.infer<typeof imagePromptSchema>;
+export type ClipScript = z.infer<typeof clipScriptSchema>;
+export type Post = z.infer<typeof postSchema>;
+export type AdCreative = z.infer<typeof adCreativeSchema>;
+export type CarouselSlide = z.infer<typeof carouselSlideSchema>;
+export type CarouselScript = z.infer<typeof carouselScriptSchema>;

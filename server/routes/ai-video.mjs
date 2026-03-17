@@ -24,7 +24,7 @@ import {
   uploadDataUrlImageToBlob,
 } from "../lib/ai/video-generation.mjs";
 import { buildVideoPrompt } from "../lib/ai/prompt-builders.mjs";
-import logger from "../lib/logger.mjs";
+import logger from "../lib/logger.js";
 
 export function registerAiVideoRoutes(app) {
   app.post("/api/ai/video", async (req, res) => {

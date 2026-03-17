@@ -14,7 +14,7 @@ const optionalEnv = z.preprocess(
   z.string().min(1).optional(),
 );
 
-const envSchema = z.object({
+export const envSchema = z.object({
   DATABASE_URL: requiredEnv,
   BETTER_AUTH_SECRET: requiredEnv,
   CSRF_SECRET: requiredEnv,
@@ -27,9 +27,11 @@ const envSchema = z.object({
   SUPER_ADMIN_EMAILS: optionalEnv,
 });
 
-let cachedEnv;
+export type Env = z.infer<typeof envSchema>;
 
-export function validateEnv() {
+let cachedEnv: Env | undefined;
+
+export function validateEnv(): Env {
   if (cachedEnv) {
     return cachedEnv;
   }

@@ -2,9 +2,9 @@ import {
   ValidationError,
   NotFoundError,
   DatabaseError,
-} from "../lib/errors/index.mjs";
+} from "../lib/errors/index.js";
 import { logError } from "../lib/logging-helpers.mjs";
-import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {
   OrganizationAccessError,
   PermissionDeniedError,

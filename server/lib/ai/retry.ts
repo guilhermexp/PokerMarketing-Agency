@@ -2,23 +2,31 @@
  * Retry logic and error sanitization for AI calls.
  */
 
-import logger from "../logger.mjs";
+import logger from "../logger.js";
+
+interface ErrorLike {
+  message?: string;
+  name?: string;
+  status?: number;
+}
 
 // Check if an error is a timeout that warrants retry/fallback
-export const isTimeoutError = (error) => {
-  const msg = String(error?.message || error || "").toLowerCase();
+export function isTimeoutError(error: unknown): boolean {
+  const errorObj = error as ErrorLike | undefined;
+  const msg = String(errorObj?.message || error || "").toLowerCase();
   return (
-    error?.name === "TimeoutError" ||
+    errorObj?.name === "TimeoutError" ||
     msg.includes("timeouterror") ||
     msg.includes("timed out") ||
     msg.includes("the operation timed out") ||
-    error?.status === 504
+    errorObj?.status === 504
   );
-};
+}
 
 // Check if an error is a quota/rate limit error that warrants fallback
-export const isQuotaOrRateLimitError = (error) => {
-  const errorString = String(error?.message || error || "").toLowerCase();
+export function isQuotaOrRateLimitError(error: unknown): boolean {
+  const errorObj = error as ErrorLike | undefined;
+  const errorString = String(errorObj?.message || error || "").toLowerCase();
   return (
     errorString.includes("resource_exhausted") ||
     errorString.includes("quota") ||
@@ -27,22 +35,27 @@ export const isQuotaOrRateLimitError = (error) => {
     errorString.includes("limit") ||
     errorString.includes("exceeded")
   );
-};
+}
 
 // Check if error is a PERMANENT quota exhaustion (limit: 0, daily cap)
 // These will NOT resolve by waiting — retrying is pointless.
-export const isPermanentQuotaError = (error) => {
-  const msg = String(error?.message || "");
+export function isPermanentQuotaError(error: unknown): boolean {
+  const errorObj = error as ErrorLike | undefined;
+  const msg = String(errorObj?.message || "");
   return (
     msg.includes("limit: 0") ||
     msg.includes("PerDayPerProject") ||
     msg.includes("free_tier")
   );
-};
+}
 
 // Sanitize error messages for client - avoid leaking technical details
-export const sanitizeErrorForClient = (error, defaultMessage = "Ocorreu um erro. Tente novamente.") => {
-  const errorString = String(error?.message || error || "").toLowerCase();
+export function sanitizeErrorForClient(
+  error: unknown,
+  defaultMessage: string = "Ocorreu um erro. Tente novamente."
+): string {
+  const errorObj = error as ErrorLike | undefined;
+  const errorString = String(errorObj?.message || error || "").toLowerCase();
 
   // Quota/rate limit errors
   if (isQuotaOrRateLimitError(error)) {
@@ -79,18 +92,23 @@ export const sanitizeErrorForClient = (error, defaultMessage = "Ocorreu um erro.
 
   // Return default message for unknown errors (don't leak technical details)
   return defaultMessage;
-};
+}
 
 // Extract retryDelay from Gemini error (e.g. "retryDelay":"57s" → 57000ms)
-const extractRetryDelay = (error) => {
-  const msg = String(error?.message || "");
+function extractRetryDelay(error: unknown): number {
+  const errorObj = error as ErrorLike | undefined;
+  const msg = String(errorObj?.message || "");
   const match = msg.match(/"retryDelay"\s*:\s*"(\d+)s?"/);
-  return match ? parseInt(match[1], 10) * 1000 : 0;
-};
+  return match ? parseInt(match[1]!, 10) * 1000 : 0;
+}
 
 // Retry helper for transient errors (503, 429/rate-limit)
-export const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
-  let lastError = null;
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000
+): Promise<T> {
+  let lastError: unknown = null;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       if (attempt > 1) {
@@ -99,21 +117,22 @@ export const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
       return await fn();
     } catch (error) {
       lastError = error;
+      const errorObj = error as ErrorLike | undefined;
       const is503 =
-        error?.message?.includes("503") ||
-        error?.message?.includes("overloaded") ||
-        error?.message?.includes("UNAVAILABLE") ||
-        error?.status === 503;
+        errorObj?.message?.includes("503") ||
+        errorObj?.message?.includes("overloaded") ||
+        errorObj?.message?.includes("UNAVAILABLE") ||
+        errorObj?.status === 503;
       const is429 =
-        error?.status === 429 ||
-        error?.message?.includes("429") ||
-        error?.message?.includes("RESOURCE_EXHAUSTED");
+        errorObj?.status === 429 ||
+        errorObj?.message?.includes("429") ||
+        errorObj?.message?.includes("RESOURCE_EXHAUSTED");
       const isTimeout =
-        error?.name === "TimeoutError" ||
-        error?.message?.includes("TimeoutError") ||
-        error?.message?.includes("timed out") ||
-        error?.message?.includes("The operation timed out") ||
-        error?.status === 504;
+        errorObj?.name === "TimeoutError" ||
+        errorObj?.message?.includes("TimeoutError") ||
+        errorObj?.message?.includes("timed out") ||
+        errorObj?.message?.includes("The operation timed out") ||
+        errorObj?.status === 504;
       // Permanent quota exhaustion (limit: 0, daily cap) — never retry
       const isPermanentQuota = is429 && isPermanentQuotaError(error);
       const isRetryable = (is503 || is429 || isTimeout) && !isPermanentQuota;
@@ -123,8 +142,8 @@ export const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
           err: error,
           attempt,
           maxRetries,
-          errorType: error.constructor.name,
-          status: error.status,
+          errorType: (error as Error)?.constructor?.name,
+          status: errorObj?.status,
           isRetryable,
         },
         `[withRetry] Erro na tentativa ${attempt}/${maxRetries}`,
@@ -143,10 +162,10 @@ export const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
       }
 
       logger.error(
-        "[withRetry] ❌ Todas as tentativas falharam ou erro não é retryable",
+        "[withRetry] Todas as tentativas falharam ou erro não é retryable",
       );
       throw error;
     }
   }
   throw lastError;
-};
+}

@@ -2,9 +2,9 @@ import {
   ValidationError,
   PermissionDeniedError,
   ExternalServiceError,
-} from "../lib/errors/index.mjs";
+} from "../lib/errors/index.js";
 import { logError } from "../lib/logging-helpers.mjs";
-import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
+import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {
   proxyBlobVideo,
   uploadBase64Asset,

@@ -10,8 +10,8 @@ import {
   updateGeneration,
   generateTopicTitle,
 } from "../helpers/video-playground.mjs";
-import { getGeminiAi } from "../lib/ai/clients.mjs";
-import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
+import { getGeminiAi } from "../lib/ai/clients.js";
+import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 
 export function registerVideoPlaygroundRoutes(
   app,

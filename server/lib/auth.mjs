@@ -14,7 +14,7 @@ import {
   hasPermission as roleHasPermission,
   OrganizationAccessError,
 } from "../helpers/organization-context.mjs";
-import logger from "./logger.mjs";
+import logger from "./logger.js";
 
 // ============================================================================
 // RATE LIMITING FOR AI ENDPOINTS

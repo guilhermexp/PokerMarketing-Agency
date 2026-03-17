@@ -17,7 +17,7 @@ import { isResponseEnvelope, sendError, sendSuccess } from "./lib/response.js";
 import { requestLogger } from "./middleware/requestLogger.mjs";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.mjs";
 import { csrfProtection } from "./middleware/csrfProtection.mjs";
-import logger from "./lib/logger.mjs";
+import logger from "./lib/logger.js";
 
 // Lib imports (used in middleware only)
 import { getSql } from "./lib/db.mjs";

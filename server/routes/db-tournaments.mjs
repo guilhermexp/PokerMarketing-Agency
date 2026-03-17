@@ -2,10 +2,10 @@ import { getSql } from "../lib/db.mjs";
 import { resolveUserId } from "../lib/user-resolver.mjs";
 import { resolveOrganizationContext } from "../lib/auth.mjs";
 import { logError } from "../lib/logging-helpers.mjs";
-import { ValidationError, DatabaseError } from "../lib/errors/index.mjs";
+import { ValidationError, DatabaseError } from "../lib/errors/index.js";
 import { OrganizationAccessError } from "../helpers/organization-context.mjs";
-import logger from "../lib/logger.mjs";
-import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
+import logger from "../lib/logger.js";
+import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 
 export function registerTournamentRoutes(app) {
 app.get("/api/db/tournaments/list", async (req, res) => {

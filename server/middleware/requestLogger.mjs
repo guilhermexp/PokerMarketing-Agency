@@ -10,7 +10,7 @@
 
 import pinoHttp from "pino-http";
 import { randomUUID } from "crypto";
-import logger from "../lib/logger.mjs";
+import logger from "../lib/logger.js";
 
 /**
  * Generate or retrieve request ID

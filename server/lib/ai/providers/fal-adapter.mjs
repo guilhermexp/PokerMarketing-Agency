@@ -10,7 +10,7 @@ import {
   editImageWithFal,
 } from "../fal-image-generation.mjs";
 import { mapAspectRatio } from "../image-generation.mjs";
-import logger from "../../logger.mjs";
+import logger from "../../logger.js";
 
 /**
  * Generate an image with FAL.ai.

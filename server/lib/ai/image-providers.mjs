@@ -4,7 +4,7 @@
  * Exports: PROVIDER_CHAIN, isProviderEnabled, runWithProviderFallback
  */
 
-import logger from "../logger.mjs";
+import logger from "../logger.js";
 
 // Lazy-loaded adapter cache (avoids importing SDKs that aren't used)
 const adapterCache = {};

@@ -11,15 +11,15 @@
  *          DEFAULT_IMAGE_MODEL, STANDARD_IMAGE_MODEL, FAL_IMAGE_MODEL
  */
 
-import { getGeminiAi } from "./clients.mjs";
-import { withRetry } from "./retry.mjs";
+import { getGeminiAi } from "./clients.js";
+import { withRetry } from "./retry.js";
 import {
   IMAGE_MODEL_PRO,
   IMAGE_MODEL_STANDARD,
 } from "./models.js";
 import { FAL_IMAGE_MODEL } from "./fal-image-generation.mjs";
 import { runWithProviderFallback } from "./image-providers.mjs";
-import logger from "../logger.mjs";
+import logger from "../logger.js";
 
 // Re-export model constants for backward compatibility
 export const DEFAULT_IMAGE_MODEL = IMAGE_MODEL_PRO;

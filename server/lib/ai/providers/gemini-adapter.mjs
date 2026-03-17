@@ -9,10 +9,10 @@
  * loop in image-providers.mjs handles cross-provider retries.
  */
 
-import { getGeminiAi } from "../clients.mjs";
-import { withRetry } from "../retry.mjs";
+import { getGeminiAi } from "../clients.js";
+import { withRetry } from "../retry.js";
 import { mapAspectRatio, DEFAULT_IMAGE_MODEL, STANDARD_IMAGE_MODEL } from "../image-generation.mjs";
-import logger from "../../logger.mjs";
+import logger from "../../logger.js";
 
 /**
  * Extract the first image from a Gemini response.

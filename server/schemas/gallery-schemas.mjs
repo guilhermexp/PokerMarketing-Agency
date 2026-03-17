@@ -7,7 +7,7 @@ import {
   optionalString,
   organizationIdSchema,
   userIdSchema,
-} from "./common.mjs";
+} from "./common.js";
 
 export const galleryListQuerySchema = z.object({
   user_id: userIdSchema,

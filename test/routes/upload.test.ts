@@ -36,7 +36,7 @@ describe("upload routes", () => {
   });
 
   it("returns validation errors from proxy-video as error envelopes", async () => {
-    const { ValidationError } = await import("../../server/lib/errors/index.mjs");
+    const { ValidationError } = await import("../../server/lib/errors/index.js");
     const proxyBlobVideoMock = vi.fn().mockRejectedValue(
       new ValidationError("Invalid URL"),
     );

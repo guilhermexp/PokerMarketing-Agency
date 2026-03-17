@@ -9,9 +9,9 @@ import { GoogleGenAI } from "@google/genai";
 import { fal } from "@fal-ai/client";
 import { put } from "@vercel/blob";
 import { validateContentType } from "../validation/contentType.js";
-import { configureFal } from "./clients.mjs";
+import { configureFal } from "./clients.js";
 import { logExternalAPI, logExternalAPIResult } from "../logging-helpers.mjs";
-import logger from "../logger.mjs";
+import logger from "../logger.js";
 
 export const parseDataUrlImage = (dataUrl) => {
   if (!dataUrl || typeof dataUrl !== "string") return null;
