@@ -55,6 +55,7 @@ import { useBrandProfileStore } from "./stores/brand-profile-store";
 import { useCampaignsStore } from "./stores/campaigns-store";
 import { useGalleryStore } from "./stores/gallery-store";
 import { useScheduledPostsStore } from "./stores/scheduled-posts-store";
+import { useChatStore } from "./stores/chat-store";
 import {
   getBrandProfile,
   createBrandProfile,
@@ -342,20 +343,27 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
     navigate(VIEW_PATHS[view]);
   }, [navigate]);
 
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [isAssistantLoading, setIsAssistantLoading] = useState(false);
-  const [chatReferenceImage, setChatReferenceImage] =
-    useState<ChatReferenceImage | null>(null);
-  const [toolImageReference, setToolImageReference] =
-    useState<ChatReferenceImage | null>(null);
-  const [lastUploadedImage, setLastUploadedImage] =
-    useState<ChatReferenceImage | null>(null);
+  // Chat/Assistant state from store
+  const isAssistantOpen = useChatStore((state) => state.isAssistantOpen);
+  const setIsAssistantOpen = useChatStore((state) => state.setIsAssistantOpen);
+  const chatHistory = useChatStore((state) => state.chatHistory);
+  const setChatHistory = useChatStore((state) => state.setChatHistory);
+  const isAssistantLoading = useChatStore((state) => state.isAssistantLoading);
+  const setIsAssistantLoading = useChatStore((state) => state.setIsAssistantLoading);
+  const chatReferenceImage = useChatStore((state) => state.chatReferenceImage);
+  const setChatReferenceImage = useChatStore((state) => state.setChatReferenceImage);
+  const toolImageReference = useChatStore((state) => state.toolImageReference);
+  const setToolImageReference = useChatStore((state) => state.setToolImageReference);
+  const lastUploadedImage = useChatStore((state) => state.lastUploadedImage);
+  const setLastUploadedImage = useChatStore((state) => state.setLastUploadedImage);
 
-  // Tool edit approval integration with AI Studio
-  const [pendingToolEdit, setPendingToolEdit] = useState<PendingToolEdit | null>(null);
-  const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
-  const [toolEditPreview, setToolEditPreview] = useState<EditPreview | null>(null);
+  // Tool edit approval from store
+  const pendingToolEdit = useChatStore((state) => state.pendingToolEdit);
+  const setPendingToolEdit = useChatStore((state) => state.setPendingToolEdit);
+  const editingImage = useChatStore((state) => state.editingImage);
+  const setEditingImage = useChatStore((state) => state.setEditingImage);
+  const toolEditPreview = useChatStore((state) => state.toolEditPreview);
+  const setToolEditPreview = useChatStore((state) => state.setToolEditPreview);
 
   const galleryImages = useGalleryStore((state) => state.galleryImages);
   const setGalleryImages = useGalleryStore((state) => state.setGalleryImages);
@@ -852,24 +860,15 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
     }
   }, [swrTournamentSchedule]);
 
-  // Track if chat has been initialized (prevents infinite loop)
-  const chatInitializedRef = useRef(false);
+  // Chat initialization - use store handler
+  const chatInitialized = useChatStore((state) => state.chatInitialized);
+  const initializeChatWithBrandProfile = useChatStore((state) => state.initializeChatWithBrandProfile);
 
   useEffect(() => {
-    if (brandProfile && !chatInitializedRef.current && chatHistory.length === 0) {
-      chatInitializedRef.current = true;
-      setChatHistory([
-        {
-          role: "model",
-          parts: [
-            {
-              text: `Olá Diretor! Sou o seu Agente Criativo de Elite. O que vamos forjar hoje?`,
-            },
-          ],
-        },
-      ]);
+    if (brandProfile && !chatInitialized && chatHistory.length === 0) {
+      initializeChatWithBrandProfile(brandProfile);
     }
-  }, [brandProfile, chatHistory.length]);
+  }, [brandProfile, chatHistory.length, chatInitialized, initializeChatWithBrandProfile]);
 
   const handleAddImageToGallery = useCallback((
     image: Omit<GalleryImage, "id">,
@@ -2231,150 +2230,37 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
   };
 
   // ========================================================================
-  // CHAT CONTEXT - Callbacks otimizados
+  // CHAT CONTEXT - Handlers from store
   // ========================================================================
 
-  const handleSetChatReference = useCallback((img: GalleryImage | ChatReferenceImage | null) => {
-    setChatReferenceImage(img ? { id: img.id, src: img.src } : null);
-    if (img && !isAssistantOpen) setIsAssistantOpen(true);
-  }, [isAssistantOpen]);
+  const handleSetChatReference = useChatStore((state) => state.handleSetChatReference);
+  const handleSetChatReferenceSilent = useChatStore((state) => state.handleSetChatReferenceSilent);
+  const handleToolEditApproved = useChatStore((state) => state.handleToolEditApproved);
+  const handleToolEditRejected = useChatStore((state) => state.handleToolEditRejected);
+  const handleCloseImageEditor = useChatStore((state) => state.handleCloseImageEditor);
 
-  const handleSetChatReferenceSilent = useCallback((img: GalleryImage | ChatReferenceImage | null) => {
-    setChatReferenceImage(img ? { id: img.id, src: img.src } : null);
-  }, []);
+  // Handlers that need galleryImages - wrap store handlers
+  const storeHandleRequestImageEdit = useChatStore((state) => state.handleRequestImageEdit);
+  const handleRequestImageEdit = useCallback(
+    (request: { toolCallId: string; toolName: string; prompt: string; imageId: string }) => {
+      storeHandleRequestImageEdit(request, galleryImages);
+    },
+    [storeHandleRequestImageEdit, galleryImages]
+  );
 
-  // Tool edit approval handlers
-  const handleRequestImageEdit = useCallback((request: {
-    toolCallId: string;
-    toolName: string;
-    prompt: string;
-    imageId: string;
-  }) => {
-    console.debug('[App] Tool edit requested:', request);
-
-    // Find image in gallery
-    const image = galleryImages.find(img => img.id === request.imageId);
-
-    if (!image) {
-      console.error('[App] Image not found:', request.imageId);
-      // Auto-reject if image not found
-      setPendingToolEdit({
-        ...request,
-        result: 'rejected',
-        error: 'Imagem não encontrada na galeria'
-      });
-      return;
-    }
-
-    // Open AI Studio with the image
-    setEditingImage(image);
-    setPendingToolEdit(request);
-  }, [galleryImages]);
-
-  const handleToolEditApproved = useCallback((toolCallId: string, imageUrl: string) => {
-    console.log('🎯 [App] Tool edit approved:', {
-      toolCallId,
-      imageUrl,
-      imageUrlType: typeof imageUrl,
-      imageUrlLength: imageUrl?.length,
-      isHttps: imageUrl?.startsWith('https://'),
-      isBlob: imageUrl?.startsWith('blob:'),
-    });
-
-    // Update pending state to mark as approved
-    setPendingToolEdit(prev => {
-      const updated = prev ? {
-        ...prev,
-        result: 'approved' as const,
-        imageUrl
-      } : null;
-      console.log('🎯 [App] Updated pendingToolEdit:', updated);
-      return updated;
-    });
-
-    // Clear states (will be handled by AssistantPanelNew after it gets the result)
-    setTimeout(() => {
-      setPendingToolEdit(null);
-      setEditingImage(null);
-      setToolEditPreview(null);
-    }, 100);
-  }, []);
-
-  const handleToolEditRejected = useCallback((toolCallId: string, reason?: string) => {
-    console.debug('[App] Tool edit rejected:', { toolCallId, reason });
-
-    // Update pending state to mark as rejected
-    setPendingToolEdit(prev => prev ? {
-      ...prev,
-      result: 'rejected',
-      error: reason || 'Edição rejeitada pelo usuário'
-    } : null);
-
-    // Clear states (will be handled by AssistantPanelNew after it gets the result)
-    setTimeout(() => {
-      setPendingToolEdit(null);
-      setEditingImage(null);
-    }, 100);
-  }, []);
-
-  const handleShowToolEditPreview = useCallback((payload: {
-    toolCallId: string;
-    imageUrl: string;
-    prompt?: string;
-    referenceImageId?: string;
-    referenceImageUrl?: string;
-  }) => {
-    const {
-      toolCallId,
-      imageUrl,
-      prompt,
-      referenceImageId,
-      referenceImageUrl,
-    } = payload;
-
-    const imageFromGallery = referenceImageId
-      ? galleryImages.find(img => img.id === referenceImageId)
-      : null;
-
-    const previewImage = imageFromGallery || (referenceImageUrl ? {
-      id: referenceImageId || `tool-edit-${toolCallId}`,
-      src: referenceImageUrl,
-      source: 'ai-tool-edit',
-      model: 'gemini-3-pro-image-preview',
-    } as GalleryImage : null);
-
-    if (!previewImage) {
-      console.warn('[App] Tool edit preview skipped: reference image not found');
-      return;
-    }
-
-    setEditingImage(previewImage);
-    setToolEditPreview({
-      dataUrl: imageUrl,
-      type: 'edit',
-      prompt,
-    });
-
-    // Preserve or create pendingToolEdit for approval flow
-    setPendingToolEdit(prev => {
-      // If there's already a pending edit with the same toolCallId, keep it
-      if (prev && prev.toolCallId === toolCallId) {
-        return prev;
-      }
-      // Otherwise create a new one from the payload
-      return {
-        toolCallId,
-        toolName: 'edit_image',
-        prompt: prompt || '',
-        imageId: previewImage.id,
-      };
-    });
-  }, [galleryImages]);
-
-  const handleCloseImageEditor = useCallback(() => {
-    setEditingImage(null);
-    setToolEditPreview(null);
-  }, []);
+  const storeHandleShowToolEditPreview = useChatStore((state) => state.handleShowToolEditPreview);
+  const handleShowToolEditPreview = useCallback(
+    (payload: {
+      toolCallId: string;
+      imageUrl: string;
+      prompt?: string;
+      referenceImageId?: string;
+      referenceImageUrl?: string;
+    }) => {
+      storeHandleShowToolEditPreview(payload, galleryImages);
+    },
+    [storeHandleShowToolEditPreview, galleryImages]
+  );
 
   const chatContextValue = useMemo(() => ({
     onSetChatReference: handleSetChatReference,
@@ -2436,10 +2322,7 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
     setCampaignCompositionAssets(null);
   }, []);
 
-  const handleToggleAssistant = useCallback(
-    () => setIsAssistantOpen((prev) => !prev),
-    [],
-  );
+  const handleToggleAssistant = useChatStore((state) => state.handleToggleAssistant);
 
   const handleThemeToggle = useCallback(
     () => setTheme((t) => (t === "light" ? "dark" : "light")),
