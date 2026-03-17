@@ -25,6 +25,7 @@ export default defineConfig({
       '**/node_modules/**',
       '**/.auto-claude/**',
       '**/dist/**',
+      '**/e2e/**',
     ],
 
     // Coverage
