@@ -24,7 +24,7 @@ import {
   galleryPatchQuerySchema,
   galleryPatchBodySchema,
   galleryDeleteQuerySchema,
-} from "../schemas/gallery-schemas.mjs";
+} from "../schemas/gallery-schemas.js";
 
 export function registerGalleryRoutes(app) {
   app.get("/api/db/gallery", validateRequest({ query: galleryListQuerySchema }), async (req, res) => {

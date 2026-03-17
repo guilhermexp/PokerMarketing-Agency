@@ -33,7 +33,7 @@ import {
   carouselPatchBodySchema,
   carouselSlidePatchQuerySchema,
   carouselSlidePatchBodySchema,
-} from "../schemas/campaigns-schemas.mjs";
+} from "../schemas/campaigns-schemas.js";
 
 export function registerCampaignRoutes(app) {
   app.get("/api/db/campaigns", validateRequest({ query: campaignsQuerySchema }), async (req, res) => {

@@ -18,6 +18,8 @@ export const brandProfileQuerySchema = z.object({
   },
 );
 
+export type BrandProfileQuery = z.infer<typeof brandProfileQuerySchema>;
+
 export const brandProfileCreateBodySchema = z.object({
   user_id: userIdSchema,
   organization_id: organizationIdSchema,
@@ -29,9 +31,13 @@ export const brandProfileCreateBodySchema = z.object({
   tone_of_voice: optionalNullableString,
 }).passthrough();
 
+export type BrandProfileCreateBody = z.infer<typeof brandProfileCreateBodySchema>;
+
 export const brandProfileUpdateQuerySchema = z.object({
   id: idSchema,
 }).passthrough();
+
+export type BrandProfileUpdateQuery = z.infer<typeof brandProfileUpdateQuerySchema>;
 
 export const brandProfileUpdateBodySchema = z.object({
   user_id: userIdSchema.optional(),
@@ -42,3 +48,5 @@ export const brandProfileUpdateBodySchema = z.object({
   secondary_color: optionalNullableString,
   tone_of_voice: optionalNullableString,
 }).passthrough();
+
+export type BrandProfileUpdateBody = z.infer<typeof brandProfileUpdateBodySchema>;

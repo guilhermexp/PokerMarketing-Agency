@@ -18,11 +18,15 @@ export const galleryListQuerySchema = z.object({
   include_src: booleanLikeSchema.optional(),
 }).passthrough();
 
+export type GalleryListQuery = z.infer<typeof galleryListQuerySchema>;
+
 export const galleryDailyFlyersQuerySchema = z.object({
   user_id: userIdSchema,
   organization_id: organizationIdSchema,
   week_schedule_id: idSchema,
 }).passthrough();
+
+export type GalleryDailyFlyersQuery = z.infer<typeof galleryDailyFlyersQuerySchema>;
 
 export const galleryCreateBodySchema = z.object({
   user_id: userIdSchema,
@@ -45,9 +49,13 @@ export const galleryCreateBodySchema = z.object({
   daily_flyer_period: optionalNullableString,
 }).passthrough();
 
+export type GalleryCreateBody = z.infer<typeof galleryCreateBodySchema>;
+
 export const galleryPatchQuerySchema = z.object({
   id: idSchema,
 }).passthrough();
+
+export type GalleryPatchQuery = z.infer<typeof galleryPatchQuerySchema>;
 
 export const galleryPatchBodySchema = z.object({
   published_at: optionalNullableString,
@@ -56,7 +64,11 @@ export const galleryPatchBodySchema = z.object({
   src_url: optionalNullableString,
 }).passthrough();
 
+export type GalleryPatchBody = z.infer<typeof galleryPatchBodySchema>;
+
 export const galleryDeleteQuerySchema = z.object({
   id: idSchema,
   user_id: userIdSchema.optional(),
 }).passthrough();
+
+export type GalleryDeleteQuery = z.infer<typeof galleryDeleteQuerySchema>;

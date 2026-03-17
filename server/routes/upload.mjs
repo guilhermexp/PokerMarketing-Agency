@@ -13,7 +13,7 @@ import { validateRequest } from "../middleware/validate.js";
 import {
   proxyVideoQuerySchema,
   uploadBodySchema,
-} from "../schemas/upload-schemas.mjs";
+} from "../schemas/upload-schemas.js";
 
 export function registerUploadRoutes(app) {
   app.get("/api/proxy-video", validateRequest({ query: proxyVideoQuerySchema }), async (req, res) => {

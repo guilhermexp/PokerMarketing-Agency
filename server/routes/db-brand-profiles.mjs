@@ -20,7 +20,7 @@ import {
   brandProfileCreateBodySchema,
   brandProfileUpdateQuerySchema,
   brandProfileUpdateBodySchema,
-} from "../schemas/brand-profiles-schemas.mjs";
+} from "../schemas/brand-profiles-schemas.js";
 
 export function registerBrandProfileRoutes(app) {
   app.get(

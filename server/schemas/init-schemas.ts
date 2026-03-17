@@ -12,3 +12,5 @@ export const initQuerySchema = z.object({
     path: ["user_id"],
   },
 );
+
+export type InitQuery = z.infer<typeof initQuerySchema>;

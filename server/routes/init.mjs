@@ -3,7 +3,7 @@ import { resolveUserId } from "../lib/user-resolver.js";
 import { logError } from "../lib/logging-helpers.js";
 import logger from "../lib/logger.js";
 import { validateRequest } from "../middleware/validate.js";
-import { initQuerySchema } from "../schemas/init-schemas.mjs";
+import { initQuerySchema } from "../schemas/init-schemas.js";
 
 export function registerInitRoutes(app) {
   app.get("/api/db/init", validateRequest({ query: initQuerySchema }), async (req, res) => {
