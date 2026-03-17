@@ -11,7 +11,7 @@ import sharp from "sharp";
 import { validateContentType } from "../lib/validation/contentType.js";
 import { isQuotaOrRateLimitError } from "../lib/ai/retry.js";
 import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
-import { logAiUsage } from "./usage-tracking.mjs";
+import { logAiUsage } from "./usage-tracking.js";
 import logger from "../lib/logger.js";
 
 // Normalize model names to match the image_model enum in the database.

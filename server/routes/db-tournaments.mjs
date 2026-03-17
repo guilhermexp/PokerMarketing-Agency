@@ -1,9 +1,9 @@
 import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
-import { resolveOrganizationContext } from "../lib/auth.mjs";
+import { resolveOrganizationContext } from "../lib/auth.js";
 import { logError } from "../lib/logging-helpers.js";
 import { ValidationError, DatabaseError } from "../lib/errors/index.js";
-import { OrganizationAccessError } from "../helpers/organization-context.mjs";
+import { OrganizationAccessError } from "../helpers/organization-context.js";
 import logger from "../lib/logger.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 

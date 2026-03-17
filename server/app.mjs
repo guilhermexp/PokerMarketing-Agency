@@ -26,8 +26,8 @@ import {
   enforceAuthenticatedIdentity,
   getRequestAuthContext,
   createRateLimitMiddleware,
-} from "./lib/auth.mjs";
-import { resourceAccessMiddleware } from "./lib/resource-access.mjs";
+} from "./lib/auth.js";
+import { resourceAccessMiddleware } from "./lib/resource-access.js";
 import { resolveUserId } from "./lib/user-resolver.js";
 import { buildImagePrompt } from "./lib/ai/prompt-builders.mjs";
 

@@ -5,14 +5,14 @@
  * Route: POST /api/ai/speech
  */
 
-import { getRequestAuthContext } from "../lib/auth.mjs";
+import { getRequestAuthContext } from "../lib/auth.js";
 import { getSql } from "../lib/db.js";
 import { getGeminiAi } from "../lib/ai/clients.js";
 import { withRetry, sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {
   logAiUsage,
   createTimer,
-} from "../helpers/usage-tracking.mjs";
+} from "../helpers/usage-tracking.js";
 import logger from "../lib/logger.js";
 
 export function registerAiSpeechRoutes(app) {

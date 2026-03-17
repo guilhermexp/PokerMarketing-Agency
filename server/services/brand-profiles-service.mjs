@@ -1,6 +1,6 @@
 import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
-import { resolveOrganizationContext } from "../lib/auth.mjs";
+import { resolveOrganizationContext } from "../lib/auth.js";
 import {
   ValidationError,
   NotFoundError,
@@ -9,7 +9,7 @@ import {
   hasPermission,
   PERMISSIONS,
   PermissionDeniedError,
-} from "../helpers/organization-context.mjs";
+} from "../helpers/organization-context.js";
 
 export async function getBrandProfile({ user_id, id, organization_id }) {
   const sql = getSql();

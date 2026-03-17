@@ -1,7 +1,7 @@
 import { del } from "@vercel/blob";
 import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
-import { resolveOrganizationContext } from "../lib/auth.mjs";
+import { resolveOrganizationContext } from "../lib/auth.js";
 import {
   ValidationError,
   NotFoundError,
@@ -10,7 +10,7 @@ import {
   hasPermission,
   PERMISSIONS,
   PermissionDeniedError,
-} from "../helpers/organization-context.mjs";
+} from "../helpers/organization-context.js";
 import logger from "../lib/logger.js";
 
 function isBlobUrl(url) {

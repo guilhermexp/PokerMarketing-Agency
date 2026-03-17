@@ -6,7 +6,7 @@ import {
 import {
   OrganizationAccessError,
   PermissionDeniedError,
-} from "../helpers/organization-context.mjs";
+} from "../helpers/organization-context.js";
 import { logError } from "../lib/logging-helpers.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {

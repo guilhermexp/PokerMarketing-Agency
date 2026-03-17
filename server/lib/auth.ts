@@ -9,11 +9,15 @@
  *          getOrgContext, resolveOrganizationContext
  */
 
+import type { Request, Response, NextFunction } from "express";
+import type { SqlClient } from "./db.js";
 import {
   createOrgContext,
   hasPermission as roleHasPermission,
   OrganizationAccessError,
-} from "../helpers/organization-context.mjs";
+  type OrgRole,
+  type Permission,
+} from "../helpers/organization-context.js";
 import logger from "./logger.js";
 
 // ============================================================================
@@ -24,26 +28,58 @@ import logger from "./logger.js";
 const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-let upstashRedis = null;
-let RatelimitClass = null;
-
-if (UPSTASH_URL && UPSTASH_TOKEN) {
-  try {
-    const { Redis } = await import("@upstash/redis");
-    const { Ratelimit } = await import("@upstash/ratelimit");
-    upstashRedis = new Redis({ url: UPSTASH_URL, token: UPSTASH_TOKEN });
-    RatelimitClass = Ratelimit;
-    logger.info("[RateLimit] Using Upstash Redis");
-  } catch (err) {
-    logger.warn({ err }, "[RateLimit] Failed to load Upstash, falling back to in-memory");
-  }
+// Types for Upstash (dynamically imported)
+interface UpstashRedisClient {
+  // Minimal interface for our needs
 }
 
+interface UpstashRateLimitResult {
+  success: boolean;
+  remaining: number;
+}
+
+interface UpstashRateLimiter {
+  limit(identifier: string): Promise<UpstashRateLimitResult>;
+}
+
+interface UpstashRatelimitClass {
+  new (config: { redis: UpstashRedisClient; limiter: unknown; prefix: string }): UpstashRateLimiter;
+  slidingWindow(tokens: number, window: string): unknown;
+}
+
+let upstashRedis: UpstashRedisClient | null = null;
+let RatelimitClass: UpstashRatelimitClass | null = null;
+
+// Async IIFE to load Upstash modules
+(async () => {
+  if (UPSTASH_URL && UPSTASH_TOKEN) {
+    try {
+      const { Redis } = await import("@upstash/redis");
+      const { Ratelimit } = await import("@upstash/ratelimit");
+      upstashRedis = new Redis({ url: UPSTASH_URL, token: UPSTASH_TOKEN }) as UpstashRedisClient;
+      RatelimitClass = Ratelimit as unknown as UpstashRatelimitClass;
+      logger.info("[RateLimit] Using Upstash Redis");
+    } catch (err) {
+      logger.warn({ err }, "[RateLimit] Failed to load Upstash, falling back to in-memory");
+    }
+  }
+})();
+
 // In-memory fallback (dev / environments without Upstash)
-const rateLimitStore = new Map();
+interface RateLimitEntry {
+  windowStart: number;
+  count: number;
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
 let maxWindowMs = 60_000;
 
-function checkAiRateLimitInMemory(identifier, maxRequests = 30, windowMs = 60_000) {
+interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+}
+
+function checkAiRateLimitInMemory(identifier: string, maxRequests = 30, windowMs = 60_000): RateLimitResult {
   const key = `ai:${identifier}`;
   const now = Date.now();
   const record = rateLimitStore.get(key);
@@ -64,8 +100,8 @@ function checkAiRateLimitInMemory(identifier, maxRequests = 30, windowMs = 60_00
   };
 }
 
-export async function checkAiRateLimit(identifier, maxRequests = 30, windowMs = 60_000) {
-  if (!upstashRedis) {
+export async function checkAiRateLimit(identifier: string, maxRequests = 30, windowMs = 60_000): Promise<RateLimitResult> {
+  if (!upstashRedis || !RatelimitClass) {
     return checkAiRateLimitInMemory(identifier, maxRequests, windowMs);
   }
 
@@ -88,7 +124,7 @@ export function createRateLimitMiddleware(maxRequests = 30, windowMs = 60_000) {
   maxWindowMs = Math.max(maxWindowMs, windowMs);
 
   // Pre-build an Upstash limiter if available (avoids creating one per request)
-  let upstashLimiter = null;
+  let upstashLimiter: UpstashRateLimiter | null = null;
   if (upstashRedis && RatelimitClass) {
     upstashLimiter = new RatelimitClass({
       redis: upstashRedis,
@@ -97,16 +133,17 @@ export function createRateLimitMiddleware(maxRequests = 30, windowMs = 60_000) {
     });
   }
 
-  return async (req, res, next) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const authContext = getRequestAuthContext(req);
     const identifier = authContext?.orgId || authContext?.userId || req.ip;
     if (!identifier) {
       logger.warn({ requestId: req.id }, "Rate limit identifier unavailable");
-      return res.status(400).json({ error: "Unable to identify request for rate limiting" });
+      res.status(400).json({ error: "Unable to identify request for rate limiting" });
+      return;
     }
 
     try {
-      let result;
+      let result: RateLimitResult;
       if (upstashLimiter) {
         const { success, remaining } = await upstashLimiter.limit(`ai:${identifier}`);
         result = { allowed: success, remaining };
@@ -118,10 +155,11 @@ export function createRateLimitMiddleware(maxRequests = 30, windowMs = 60_000) {
       res.setHeader("X-RateLimit-Remaining", result.remaining);
 
       if (!result.allowed) {
-        return res.status(429).json({
+        res.status(429).json({
           error: "Rate limit exceeded. Please wait before making more requests.",
           retryAfter: Math.ceil(windowMs / 1000),
         });
+        return;
       }
       next();
     } catch (err) {
@@ -146,9 +184,24 @@ if (!upstashRedis) {
 }
 
 /** @deprecated No longer needed — cleanup is self-managing */
-export function stopRateLimitCleanup() {}
+export function stopRateLimitCleanup(): void {}
 
-function getSessionRecord(authSession) {
+interface SessionRecord {
+  activeOrganizationId?: string;
+  active_organization_id?: string;
+  activeOrganizationRole?: string;
+  active_organization_role?: string;
+}
+
+interface AuthSession {
+  session?: SessionRecord;
+  user?: {
+    id: string;
+    email?: string;
+  };
+}
+
+function getSessionRecord(authSession: AuthSession | null | undefined): SessionRecord | null {
   if (!authSession || typeof authSession !== "object") return null;
 
   // Better Auth getSession usually returns { user, session }, but some client/server
@@ -157,10 +210,10 @@ function getSessionRecord(authSession) {
     return authSession.session;
   }
 
-  return authSession;
+  return authSession as unknown as SessionRecord;
 }
 
-function getActiveOrganizationId(authSession) {
+function getActiveOrganizationId(authSession: AuthSession | null | undefined): string | null {
   const sessionRecord = getSessionRecord(authSession);
 
   return (
@@ -170,7 +223,7 @@ function getActiveOrganizationId(authSession) {
   );
 }
 
-function getActiveOrganizationRole(authSession) {
+function getActiveOrganizationRole(authSession: AuthSession | null | undefined): string | null {
   const sessionRecord = getSessionRecord(authSession);
 
   return (
@@ -180,12 +233,17 @@ function getActiveOrganizationRole(authSession) {
   );
 }
 
+export interface AuthContext {
+  userId: string;
+  orgId: string | null;
+}
+
 /**
  * Extract auth context from request.
  * Reads from req.authSession (set by Better Auth session middleware)
  * or req.internalAuth (set by internal API token middleware).
  */
-export function getRequestAuthContext(req) {
+export function getRequestAuthContext(req: Request): AuthContext | null {
   if (req.internalAuth?.userId) {
     return {
       userId: req.internalAuth.userId,
@@ -193,7 +251,7 @@ export function getRequestAuthContext(req) {
     };
   }
 
-  const session = req.authSession;
+  const session = req.authSession as AuthSession | null | undefined;
   if (!session?.user?.id) {
     return null;
   }
@@ -204,17 +262,19 @@ export function getRequestAuthContext(req) {
   };
 }
 
-export function requireAuthenticatedRequest(req, res, next) {
+export function requireAuthenticatedRequest(req: Request, res: Response, next: NextFunction): void {
   if (req.method === "OPTIONS") {
-    return next();
+    next();
+    return;
   }
 
   const authContext = getRequestAuthContext(req);
   if (!authContext?.userId) {
-    return res.status(401).json({
+    res.status(401).json({
       error: "Authentication required",
       code: "UNAUTHORIZED",
     });
+    return;
   }
 
   req.authUserId = authContext.userId;
@@ -222,21 +282,25 @@ export function requireAuthenticatedRequest(req, res, next) {
   next();
 }
 
-export function enforceAuthenticatedIdentity(req, res, next) {
+export function enforceAuthenticatedIdentity(req: Request, res: Response, next: NextFunction): void {
   const authUserId = req.authUserId;
   const authOrgId = req.authOrgId || null;
 
   if (!authUserId) {
-    return next();
+    next();
+    return;
   }
 
-  const queryUserIds = [req.query?.user_id, req.query?.clerk_user_id, req.query?.userId]
+  const query = req.query as Record<string, unknown> | undefined;
+  const body = req.body as Record<string, unknown> | undefined;
+
+  const queryUserIds = [query?.user_id, query?.clerk_user_id, query?.userId]
     .filter(Boolean)
     .map((value) => String(value));
 
   const bodyUserIds =
-    req.body && typeof req.body === "object"
-      ? [req.body.user_id, req.body.clerk_user_id, req.body.userId]
+    body && typeof body === "object"
+      ? [body.user_id, body.clerk_user_id, body.userId]
           .filter(Boolean)
           .map((value) => String(value))
       : [];
@@ -246,19 +310,20 @@ export function enforceAuthenticatedIdentity(req, res, next) {
   );
 
   if (mismatchedUserId) {
-    return res.status(403).json({
+    res.status(403).json({
       error: "User context mismatch",
       code: "FORBIDDEN_USER_CONTEXT",
     });
+    return;
   }
 
-  const queryOrgIds = [req.query?.organization_id, req.query?.organizationId]
+  const queryOrgIds = [query?.organization_id, query?.organizationId]
     .filter((value) => value !== undefined && value !== null && value !== "")
     .map((value) => String(value));
 
   const bodyOrgIds =
-    req.body && typeof req.body === "object"
-      ? [req.body.organization_id, req.body.organizationId]
+    body && typeof body === "object"
+      ? [body.organization_id, body.organizationId]
           .filter((value) => value !== undefined && value !== null && value !== "")
           .map((value) => String(value))
       : [];
@@ -267,37 +332,39 @@ export function enforceAuthenticatedIdentity(req, res, next) {
   if (authOrgId) {
     const mismatchedOrgId = allOrgIds.find((value) => value !== authOrgId);
     if (mismatchedOrgId) {
-      return res.status(403).json({
+      res.status(403).json({
         error: "Organization context mismatch",
         code: "FORBIDDEN_ORG_CONTEXT",
       });
+      return;
     }
   } else if (allOrgIds.length > 0) {
-    return res.status(403).json({
+    res.status(403).json({
       error: "Organization context not available in authentication token",
       code: "FORBIDDEN_ORG_CONTEXT",
     });
+    return;
   }
 
-  if (req.query && typeof req.query === "object") {
-    req.query.user_id = authUserId;
-    req.query.clerk_user_id = authUserId;
-    req.query.userId = authUserId;
+  if (query && typeof query === "object") {
+    (query as Record<string, unknown>).user_id = authUserId;
+    (query as Record<string, unknown>).clerk_user_id = authUserId;
+    (query as Record<string, unknown>).userId = authUserId;
 
     if (authOrgId) {
-      req.query.organization_id = authOrgId;
-      req.query.organizationId = authOrgId;
+      (query as Record<string, unknown>).organization_id = authOrgId;
+      (query as Record<string, unknown>).organizationId = authOrgId;
     }
   }
 
-  if (req.body && typeof req.body === "object" && !Array.isArray(req.body)) {
-    req.body.user_id = authUserId;
-    req.body.clerk_user_id = authUserId;
-    req.body.userId = authUserId;
+  if (body && typeof body === "object" && !Array.isArray(body)) {
+    body.user_id = authUserId;
+    body.clerk_user_id = authUserId;
+    body.userId = authUserId;
 
     if (authOrgId) {
-      req.body.organization_id = authOrgId;
-      req.body.organizationId = authOrgId;
+      body.organization_id = authOrgId;
+      body.organizationId = authOrgId;
     }
   }
 
@@ -305,14 +372,15 @@ export function enforceAuthenticatedIdentity(req, res, next) {
 }
 
 // Middleware for AI endpoints with stricter rate limiting
-export async function requireAuthWithAiRateLimit(req, res, next) {
+export async function requireAuthWithAiRateLimit(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authCtx = getRequestAuthContext(req);
 
   if (!authCtx?.userId) {
-    return res.status(401).json({
+    res.status(401).json({
       error: "Authentication required",
       code: "UNAUTHORIZED",
     });
+    return;
   }
 
   try {
@@ -321,10 +389,11 @@ export async function requireAuthWithAiRateLimit(req, res, next) {
     res.setHeader("X-RateLimit-Remaining", rateLimit.remaining);
 
     if (!rateLimit.allowed) {
-      return res.status(429).json({
+      res.status(429).json({
         error: "AI rate limit exceeded. Please try again later.",
         code: "AI_RATE_LIMIT_EXCEEDED",
       });
+      return;
     }
   } catch (err) {
     // Fail-open: allow request if rate limiting errors
@@ -340,7 +409,7 @@ export async function requireAuthWithAiRateLimit(req, res, next) {
 // SUPER ADMIN
 // ============================================================================
 
-export const SUPER_ADMIN_EMAILS = (
+export const SUPER_ADMIN_EMAILS: string[] = (
   process.env.SUPER_ADMIN_EMAILS || process.env.VITE_SUPER_ADMIN_EMAILS || ""
 )
   .split(",")
@@ -353,12 +422,13 @@ if (SUPER_ADMIN_EMAILS.length === 0) {
   );
 }
 
-export async function requireSuperAdmin(req, res, next) {
+export async function requireSuperAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const session = req.authSession;
+    const session = req.authSession as AuthSession | null | undefined;
 
     if (!session?.user?.id) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const userEmail = session.user.email?.toLowerCase();
@@ -373,9 +443,10 @@ export async function requireSuperAdmin(req, res, next) {
         },
         "[Admin] Access denied for super admin endpoint",
       );
-      return res
+      res
         .status(403)
         .json({ error: "Access denied. Super admin only." });
+      return;
     }
 
     req.adminEmail = userEmail;
@@ -390,21 +461,32 @@ export async function requireSuperAdmin(req, res, next) {
 // ORGANIZATION CONTEXT HELPERS
 // ============================================================================
 
-export function getOrgContext(req) {
-  const session = req.authSession;
+export function getOrgContext(req: Request) {
+  const session = req.authSession as AuthSession | null | undefined;
   const userId = session?.user?.id;
   const orgId = getActiveOrganizationId(session);
   // Better Auth org roles: owner, admin, member
   // Map to org:admin / org:member for compatibility
   const rawRole = getActiveOrganizationRole(session);
-  const orgRole = rawRole === "owner" || rawRole === "admin" ? "org:admin" : rawRole === "member" ? "org:member" : null;
+  const orgRole: OrgRole = rawRole === "owner" || rawRole === "admin" ? "org:admin" : rawRole === "member" ? "org:member" : null;
   return createOrgContext({ userId, orgId, orgRole });
 }
 
 // Keep old name as alias for backward compatibility during migration
 export const getClerkOrgContext = getOrgContext;
 
-export async function resolveOrganizationContext(sql, userId, organizationId) {
+export interface ResolvedOrgContext {
+  organizationId: string | null;
+  isPersonal: boolean;
+  orgRole: OrgRole;
+  hasPermission: (permission: Permission) => boolean;
+}
+
+export async function resolveOrganizationContext(
+  sql: SqlClient,
+  userId: string,
+  organizationId: string | null | undefined
+): Promise<ResolvedOrgContext> {
   if (!organizationId) {
     return {
       organizationId: null,
@@ -421,8 +503,8 @@ export async function resolveOrganizationContext(sql, userId, organizationId) {
   if (uuidPattern.test(userId)) {
     const userRow = await sql`
       SELECT auth_provider_id FROM users WHERE id = ${userId} LIMIT 1
-    `;
-    if (userRow.length > 0 && userRow[0].auth_provider_id) {
+    ` as Array<{ auth_provider_id: string | null }>;
+    if (userRow.length > 0 && userRow[0]?.auth_provider_id) {
       memberUserId = userRow[0].auth_provider_id;
     }
   }
@@ -433,20 +515,20 @@ export async function resolveOrganizationContext(sql, userId, organizationId) {
     WHERE "organizationId" = ${organizationId}
       AND "userId" = ${memberUserId}
     LIMIT 1
-  `;
+  ` as Array<{ role: string }>;
 
   if (!membership.length) {
     throw new OrganizationAccessError("User is not a member of this organization");
   }
 
-  const rawRole = membership[0].role;
-  const orgRole =
+  const rawRole = membership[0]?.role;
+  const orgRole: OrgRole =
     rawRole === "owner" || rawRole === "admin" ? "org:admin" : "org:member";
 
   return {
     organizationId,
     isPersonal: false,
     orgRole,
-    hasPermission: (permission) => roleHasPermission(orgRole, permission),
+    hasPermission: (permission: Permission) => roleHasPermission(orgRole, permission),
   };
 }

@@ -8,11 +8,11 @@
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
-import { getRequestAuthContext } from "../lib/auth.mjs";
+import { getRequestAuthContext } from "../lib/auth.js";
 import {
   logAiUsage,
   createTimer,
-} from "../helpers/usage-tracking.mjs";
+} from "../helpers/usage-tracking.js";
 import {
   logExternalAPI,
   logExternalAPIResult,

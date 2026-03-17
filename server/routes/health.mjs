@@ -1,7 +1,7 @@
 import { getSql } from "../lib/db.js";
 import { userIdCache } from "../lib/user-resolver.js";
 import { generateCsrfToken } from "../lib/csrf.js";
-import { requireSuperAdmin } from "../lib/auth.mjs";
+import { requireSuperAdmin } from "../lib/auth.js";
 import { DatabaseError } from "../lib/errors/index.js";
 import logger from "../lib/logger.js";
 

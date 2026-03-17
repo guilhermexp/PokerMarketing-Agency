@@ -9,7 +9,7 @@
  *   POST /api/ai/convert-prompt
  */
 
-import { getRequestAuthContext } from "../lib/auth.mjs";
+import { getRequestAuthContext } from "../lib/auth.js";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.js";
 import {
@@ -39,7 +39,7 @@ import {
 import {
   logAiUsage,
   createTimer,
-} from "../helpers/usage-tracking.mjs";
+} from "../helpers/usage-tracking.js";
 import { validateContentType } from "../lib/validation/contentType.js";
 import logger from "../lib/logger.js";
 

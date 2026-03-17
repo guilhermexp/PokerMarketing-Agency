@@ -7,16 +7,16 @@
  *   POST /api/ai/assistant
  */
 
-import { getRequestAuthContext } from "../lib/auth.mjs";
+import { getRequestAuthContext } from "../lib/auth.js";
 import { getSql } from "../lib/db.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import { streamTextFromMessages } from "../lib/ai/text-generation.mjs";
 import { ASSISTANT_MODEL } from "../lib/ai/models.js";
-import { requireAuthWithAiRateLimit } from "../lib/auth.mjs";
+import { requireAuthWithAiRateLimit } from "../lib/auth.js";
 import {
   logAiUsage,
   createTimer,
-} from "../helpers/usage-tracking.mjs";
+} from "../helpers/usage-tracking.js";
 import { chatHandler } from "../api/chat/route.mjs";
 import logger from "../lib/logger.js";
 

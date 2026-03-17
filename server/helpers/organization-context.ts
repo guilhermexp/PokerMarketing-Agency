@@ -22,13 +22,16 @@ export const PERMISSIONS = {
   MANAGE_ROLES: "manage_roles",
   MANAGE_ORGANIZATION: "manage_organization",
   VIEW_ANALYTICS: "view_analytics",
-};
+} as const;
+
+export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+export type OrgRole = "org:admin" | "org:member" | null;
 
 // All permissions (for personal context and admins)
-export const ALL_PERMISSIONS = Object.values(PERMISSIONS);
+export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSIONS);
 
 // Permissions granted to org:member (limited set)
-export const MEMBER_PERMISSIONS = [
+export const MEMBER_PERMISSIONS: Permission[] = [
   PERMISSIONS.CREATE_CAMPAIGN,
   PERMISSIONS.EDIT_CAMPAIGN,
   PERMISSIONS.CREATE_FLYER,
@@ -40,11 +43,9 @@ export const MEMBER_PERMISSIONS = [
 ];
 
 /**
- * Get permissions for a Clerk role
- * @param {string|null|undefined} orgRole - Clerk role (org:admin, org:member)
- * @returns {string[]}
+ * Get permissions for an organization role
  */
-export function getPermissionsForRole(orgRole) {
+export function getPermissionsForRole(orgRole: OrgRole): Permission[] {
   // Personal context (no org) = all permissions
   if (!orgRole) return ALL_PERMISSIONS;
 
@@ -60,42 +61,30 @@ export function getPermissionsForRole(orgRole) {
 
 /**
  * Check if a role has a specific permission
- * @param {string|null|undefined} orgRole - Clerk role
- * @param {string} permission
- * @returns {boolean}
  */
-export function hasPermission(orgRole, permission) {
+export function hasPermission(orgRole: OrgRole, permission: Permission): boolean {
   const permissions = getPermissionsForRole(orgRole);
   return permissions.includes(permission);
 }
 
 /**
  * Check if a role has any of the specified permissions
- * @param {string|null|undefined} orgRole
- * @param {string[]} permissions
- * @returns {boolean}
  */
-export function hasAnyPermission(orgRole, permissions) {
+export function hasAnyPermission(orgRole: OrgRole, permissions: Permission[]): boolean {
   return permissions.some((p) => hasPermission(orgRole, p));
 }
 
 /**
  * Check if a role has all of the specified permissions
- * @param {string|null|undefined} orgRole
- * @param {string[]} permissions
- * @returns {boolean}
  */
-export function hasAllPermissions(orgRole, permissions) {
+export function hasAllPermissions(orgRole: OrgRole, permissions: Permission[]): boolean {
   return permissions.every((p) => hasPermission(orgRole, p));
 }
 
 /**
  * Require a specific permission, throwing an error if not present
- * @param {string|null|undefined} orgRole
- * @param {string} permission
- * @throws {PermissionDeniedError}
  */
-export function requirePermission(orgRole, permission) {
+export function requirePermission(orgRole: OrgRole, permission: Permission): void {
   if (!hasPermission(orgRole, permission)) {
     throw new PermissionDeniedError(permission);
   }
@@ -105,7 +94,10 @@ export function requirePermission(orgRole, permission) {
  * Custom error for permission denied
  */
 export class PermissionDeniedError extends Error {
-  constructor(permission) {
+  permission: Permission;
+  statusCode: number;
+
+  constructor(permission: Permission) {
     super(`Permission denied: ${permission}`);
     this.name = "PermissionDeniedError";
     this.permission = permission;
@@ -117,6 +109,8 @@ export class PermissionDeniedError extends Error {
  * Custom error for organization access denied
  */
 export class OrganizationAccessError extends Error {
+  statusCode: number;
+
   constructor(message = "Organization access denied") {
     super(message);
     this.name = "OrganizationAccessError";
@@ -124,12 +118,24 @@ export class OrganizationAccessError extends Error {
   }
 }
 
+export interface OrgContext {
+  userId: string | undefined;
+  organizationId: string | null;
+  isPersonal: boolean;
+  orgRole: OrgRole;
+  permissions: Permission[];
+}
+
+export interface AuthContextInput {
+  userId?: string;
+  orgId?: string | null;
+  orgRole?: OrgRole;
+}
+
 /**
  * Create organization context from auth session
- * @param {Object} auth - Auth context with userId, orgId, orgRole
- * @returns {Object} Organization context
  */
-export function createOrgContext(auth) {
+export function createOrgContext(auth: AuthContextInput | null | undefined): OrgContext {
   const { userId, orgId, orgRole } = auth || {};
 
   return {
@@ -137,24 +143,20 @@ export function createOrgContext(auth) {
     organizationId: orgId || null,
     isPersonal: !orgId,
     orgRole: orgRole || null,
-    permissions: getPermissionsForRole(orgRole),
+    permissions: getPermissionsForRole(orgRole || null),
   };
 }
 
 /**
  * Check if user is admin of current organization
- * @param {string|null|undefined} orgRole
- * @returns {boolean}
  */
-export function isAdmin(orgRole) {
+export function isAdmin(orgRole: OrgRole): boolean {
   return !orgRole || orgRole === "org:admin"; // Personal context or admin
 }
 
 /**
  * Check if this is personal context (no organization)
- * @param {string|null|undefined} orgId
- * @returns {boolean}
  */
-export function isPersonalContext(orgId) {
+export function isPersonalContext(orgId: string | null | undefined): boolean {
   return !orgId;
 }

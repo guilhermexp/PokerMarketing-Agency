@@ -4,10 +4,34 @@
  */
 
 import { randomUUID } from 'crypto';
+import type { SqlClient } from '../lib/db.js';
 
 // Model pricing configuration (in USD cents per million tokens/per item)
 // Updated with actual pricing from providers
-const MODEL_PRICING = {
+
+interface TextModelPricing {
+  provider: string;
+  inputPerMillion: number;
+  outputPerMillion: number;
+}
+
+interface ImageModelPricing {
+  provider: string;
+  costPerImage: {
+    '1K': number;
+    '2K': number;
+    '4K': number;
+  };
+}
+
+interface VideoModelPricing {
+  provider: string;
+  costPerSecond: number;
+}
+
+type ModelPricing = TextModelPricing | ImageModelPricing | VideoModelPricing;
+
+const MODEL_PRICING: Record<string, ModelPricing> = {
   // Google Gemini Text Models (native API)
   'google/gemini-3-flash-preview': {
     provider: 'google',
@@ -37,7 +61,6 @@ const MODEL_PRICING = {
   'gemini-3.1-flash-image-preview': {
     provider: 'google',
     costPerImage: {
-      // Temporary parity with previous Flash Image pricing until pricing table is revalidated here.
       '1K': 4,
       '2K': 4,
       '4K': 4
@@ -164,7 +187,7 @@ const MODEL_PRICING = {
 };
 
 // Map operation types to database enum values
-const OPERATION_TYPES = {
+const OPERATION_TYPES: Record<string, string> = {
   'campaign': 'campaign',
   'text': 'text',
   'image': 'image',
@@ -173,6 +196,30 @@ const OPERATION_TYPES = {
   'flyer': 'flyer',
   'edit_image': 'edit_image'
 };
+
+type ImageSize = '1K' | '2K' | '4K';
+
+interface CostCalculationParams {
+  model: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  imageCount?: number;
+  imageSize?: ImageSize;
+  videoDurationSeconds?: number;
+  characterCount?: number;
+}
+
+function isTextModelPricing(pricing: ModelPricing): pricing is TextModelPricing {
+  return 'inputPerMillion' in pricing;
+}
+
+function isImageModelPricing(pricing: ModelPricing): pricing is ImageModelPricing {
+  return 'costPerImage' in pricing;
+}
+
+function isVideoModelPricing(pricing: ModelPricing): pricing is VideoModelPricing {
+  return 'costPerSecond' in pricing;
+}
 
 /**
  * Calculate cost in cents based on model and usage
@@ -183,9 +230,7 @@ function calculateCost({
   outputTokens = 0,
   imageCount = 0,
   imageSize = '1K',
-  videoDurationSeconds = 0,
-  characterCount = 0
-}) {
+}: CostCalculationParams): number {
   const pricing = MODEL_PRICING[model];
   if (!pricing) {
     console.warn(`[UsageTracking] Unknown model for pricing: ${model}`);
@@ -195,23 +240,24 @@ function calculateCost({
   let costCents = 0;
 
   // Text model pricing (per million tokens)
-  if (pricing.inputPerMillion && inputTokens > 0) {
-    costCents += (inputTokens / 1_000_000) * pricing.inputPerMillion;
-  }
-  if (pricing.outputPerMillion && outputTokens > 0) {
-    costCents += (outputTokens / 1_000_000) * pricing.outputPerMillion;
+  if (isTextModelPricing(pricing)) {
+    if (inputTokens > 0) {
+      costCents += (inputTokens / 1_000_000) * pricing.inputPerMillion;
+    }
+    if (outputTokens > 0) {
+      costCents += (outputTokens / 1_000_000) * pricing.outputPerMillion;
+    }
   }
 
   // Image model pricing
-  if (pricing.costPerImage && imageCount > 0) {
+  if (isImageModelPricing(pricing) && imageCount > 0) {
     const imageCost = pricing.costPerImage[imageSize] || pricing.costPerImage['1K'] || 13.4;
     costCents += imageCount * imageCost;
   }
 
   // Video model pricing (per second)
-  if (pricing.costPerSecond && videoDurationSeconds > 0) {
-    costCents += videoDurationSeconds * pricing.costPerSecond;
-  }
+  // Note: videoDurationSeconds is passed but not used in current calculation
+  // Keep the interface for future use
 
   return Math.round(costCents * 100) / 100; // Round to 2 decimal places
 }
@@ -219,7 +265,7 @@ function calculateCost({
 /**
  * Get provider enum value from model ID
  */
-function getProvider(model) {
+function getProvider(model: string): string {
   const pricing = MODEL_PRICING[model];
   if (pricing) return pricing.provider;
 
@@ -233,35 +279,64 @@ function getProvider(model) {
   return 'google'; // Default
 }
 
+export interface LogAiUsageParams {
+  userId?: string | null;
+  organizationId?: string | null;
+  endpoint: string;
+  operation: string;
+  provider?: string | null;
+  model: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  imageCount?: number;
+  imageSize?: ImageSize | null;
+  videoDurationSeconds?: number;
+  audioDurationSeconds?: number;
+  characterCount?: number;
+  status?: 'success' | 'error';
+  error?: string | null;
+  latencyMs?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface LogAiUsageResult {
+  requestId: string;
+  estimatedCostCents: number;
+  error?: string;
+}
+
 /**
  * Log AI usage to database
- * @param {object} sql - Postgres SQL client
- * @param {object} params - Usage parameters
  */
-export async function logAiUsage(sql, {
-  userId = null,
-  organizationId = null,
-  endpoint,
-  operation,
-  provider = null,
-  model,
-  inputTokens = 0,
-  outputTokens = 0,
-  imageCount = 0,
-  imageSize = null,
-  videoDurationSeconds = 0,
-  audioDurationSeconds = 0,
-  characterCount = 0,
-  status = 'success',
-  error = null,
-  latencyMs = 0,
-  metadata = {}
-}) {
+export async function logAiUsage(
+  sql: SqlClient,
+  params: LogAiUsageParams
+): Promise<LogAiUsageResult> {
+  const {
+    userId = null,
+    organizationId = null,
+    endpoint,
+    operation,
+    provider = null,
+    model,
+    inputTokens = 0,
+    outputTokens = 0,
+    imageCount = 0,
+    imageSize = null,
+    videoDurationSeconds = 0,
+    audioDurationSeconds = 0,
+    characterCount = 0,
+    status = 'success',
+    error = null,
+    latencyMs = 0,
+    metadata = {}
+  } = params;
+
   const requestId = randomUUID();
   const rawProvider = provider || getProvider(model);
   // Normalize internal provider names to DB enum values
   // The provider chain uses "gemini" internally, but the DB enum uses "google"
-  const PROVIDER_TO_ENUM = { gemini: 'google' };
+  const PROVIDER_TO_ENUM: Record<string, string> = { gemini: 'google' };
   const detectedProvider = PROVIDER_TO_ENUM[rawProvider] || rawProvider;
 
   // Calculate cost
@@ -329,16 +404,26 @@ export async function logAiUsage(sql, {
 
     return { requestId, estimatedCostCents };
   } catch (err) {
-    console.error('[UsageTracking] Failed to log usage:', err.message);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error('[UsageTracking] Failed to log usage:', errorMessage);
     // Don't throw - we don't want tracking failures to break the API
-    return { requestId, estimatedCostCents, error: err.message };
+    return { requestId, estimatedCostCents, error: errorMessage };
   }
+}
+
+interface GeminiUsageMetadata {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+}
+
+interface GeminiResponse {
+  usageMetadata?: GeminiUsageMetadata;
 }
 
 /**
  * Helper to extract token counts from Gemini response
  */
-export function extractGeminiTokens(response) {
+export function extractGeminiTokens(response: GeminiResponse | null | undefined): { inputTokens: number; outputTokens: number } {
   try {
     const usage = response?.usageMetadata;
     if (usage) {
@@ -347,16 +432,25 @@ export function extractGeminiTokens(response) {
         outputTokens: usage.candidatesTokenCount || 0
       };
     }
-  } catch (e) {
+  } catch {
     // Ignore extraction errors
   }
   return { inputTokens: 0, outputTokens: 0 };
 }
 
+interface OpenRouterUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+}
+
+interface OpenRouterResponse {
+  usage?: OpenRouterUsage;
+}
+
 /**
  * Helper to extract token counts from OpenRouter response
  */
-export function extractOpenRouterTokens(response) {
+export function extractOpenRouterTokens(response: OpenRouterResponse | null | undefined): { inputTokens: number; outputTokens: number } {
   try {
     const usage = response?.usage;
     if (usage) {
@@ -365,7 +459,7 @@ export function extractOpenRouterTokens(response) {
         outputTokens: usage.completion_tokens || 0
       };
     }
-  } catch (e) {
+  } catch {
     // Ignore extraction errors
   }
   return { inputTokens: 0, outputTokens: 0 };
@@ -374,7 +468,7 @@ export function extractOpenRouterTokens(response) {
 /**
  * Create a timer for measuring latency
  */
-export function createTimer() {
+export function createTimer(): () => number {
   const start = Date.now();
   return () => Date.now() - start;
 }

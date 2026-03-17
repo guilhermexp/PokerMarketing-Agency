@@ -22,7 +22,7 @@ import {
 import {
   logAiUsage,
   createTimer,
-} from "../../helpers/usage-tracking.mjs";
+} from "../../helpers/usage-tracking.js";
 import logger from "../logger.js";
 
 // Re-export model constants and Type for backward compatibility

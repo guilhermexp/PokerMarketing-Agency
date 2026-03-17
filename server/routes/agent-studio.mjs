@@ -1,5 +1,5 @@
 import { getSql } from '../lib/db.mjs';
-import { getRequestAuthContext } from '../lib/auth.mjs';
+import { getRequestAuthContext } from '../lib/auth.js';
 import { resolveUserId } from '../lib/user-resolver.mjs';
 import logger from '../lib/logger.mjs';
 import { runStudioAgentStream, getPendingInteraction, resolvePendingInteraction } from '../lib/agent/claude/runner.mjs';

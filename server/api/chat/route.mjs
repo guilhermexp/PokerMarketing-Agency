@@ -9,7 +9,7 @@ import { google } from '@ai-sdk/google';
 import { systemPrompt } from '../../lib/ai/prompts.mjs';
 import { createImageTool, editImageTool, createLogoTool } from '../../lib/ai/tools/index.mjs';
 import { validateChatRequest } from './schema.mjs';
-import { getRequestAuthContext } from '../../lib/auth.mjs';
+import { getRequestAuthContext } from '../../lib/auth.js';
 
 // Chat usa Gemini nativo via @ai-sdk/google
 const googleProvider = google({

@@ -8,7 +8,7 @@ import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {
   OrganizationAccessError,
   PermissionDeniedError,
-} from "../helpers/organization-context.mjs";
+} from "../helpers/organization-context.js";
 import { validateRequest } from "../middleware/validate.js";
 import {
   listGallery,

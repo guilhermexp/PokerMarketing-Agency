@@ -5,7 +5,7 @@
  * Route: POST /api/ai/campaign
  */
 
-import { getRequestAuthContext } from "../lib/auth.mjs";
+import { getRequestAuthContext } from "../lib/auth.js";
 import { getSql } from "../lib/db.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import { generateStructuredContent } from "../lib/ai/text-generation.mjs";
@@ -21,7 +21,7 @@ import {
 import {
   logAiUsage,
   createTimer,
-} from "../helpers/usage-tracking.mjs";
+} from "../helpers/usage-tracking.js";
 import logger from "../lib/logger.js";
 
 function normalizeCarouselSlides(carousels, expectedSlides) {
