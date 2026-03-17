@@ -1,6 +1,7 @@
 import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
 import { resolveOrganizationContext } from "../lib/auth.js";
+// TODO: Update import to .js when job-queue is migrated to TypeScript (Batch 9)
 import {
   schedulePostForPublishing,
   cancelScheduledPost,
@@ -16,11 +17,45 @@ import {
 } from "../helpers/organization-context.js";
 import logger from "../lib/logger.js";
 
+export interface ScheduledPost {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  content_type: string;
+  content_id: string | null;
+  image_url: string;
+  carousel_image_urls: string[] | null;
+  caption: string;
+  hashtags: string[];
+  scheduled_date: string;
+  scheduled_time: string;
+  scheduled_timestamp: number;
+  timezone: string;
+  platforms: string;
+  instagram_content_type: string;
+  instagram_account_id: string | null;
+  instagram_media_id: string | null;
+  status: string;
+  published_at: Date | null;
+  error_message: string | null;
+  publish_attempts: number;
+  last_publish_attempt: Date | null;
+  created_from: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ListScheduledPostsParams {
+  user_id?: string;
+  organization_id?: string | null;
+  status?: string;
+}
+
 export async function listScheduledPosts({
   user_id,
   organization_id,
   status,
-}) {
+}: ListScheduledPostsParams): Promise<ScheduledPost[]> {
   if (!user_id) {
     throw new ValidationError("user_id is required");
   }
@@ -35,7 +70,7 @@ export async function listScheduledPosts({
     await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
     if (status) {
-      return await sql`
+      return (await sql`
         SELECT *
         FROM scheduled_posts
         WHERE organization_id = ${organization_id}
@@ -43,21 +78,21 @@ export async function listScheduledPosts({
           AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
           AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
         ORDER BY scheduled_timestamp ASC
-      `;
+      `) as ScheduledPost[];
     }
 
-    return await sql`
+    return (await sql`
       SELECT *
       FROM scheduled_posts
       WHERE organization_id = ${organization_id}
         AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
         AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
       ORDER BY scheduled_timestamp ASC
-    `;
+    `) as ScheduledPost[];
   }
 
   if (status) {
-    return await sql`
+    return (await sql`
       SELECT *
       FROM scheduled_posts
       WHERE user_id = ${resolvedUserId}
@@ -66,10 +101,10 @@ export async function listScheduledPosts({
         AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
         AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
       ORDER BY scheduled_timestamp ASC
-    `;
+    `) as ScheduledPost[];
   }
 
-  return await sql`
+  return (await sql`
     SELECT *
     FROM scheduled_posts
     WHERE user_id = ${resolvedUserId}
@@ -77,10 +112,28 @@ export async function listScheduledPosts({
       AND scheduled_timestamp >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '7 days')) * 1000
       AND scheduled_timestamp <= EXTRACT(EPOCH FROM (NOW() + INTERVAL '60 days')) * 1000
     ORDER BY scheduled_timestamp ASC
-  `;
+  `) as ScheduledPost[];
 }
 
-export async function createScheduledPost(payload) {
+export interface CreateScheduledPostParams {
+  user_id?: string;
+  organization_id?: string | null;
+  content_type?: string;
+  content_id?: string | null;
+  image_url?: string;
+  caption?: string;
+  hashtags?: string[];
+  scheduled_date?: string;
+  scheduled_time?: string;
+  scheduled_timestamp?: number | string;
+  timezone?: string;
+  platforms?: string;
+  instagram_content_type?: string;
+  instagram_account_id?: string | null;
+  created_from?: string | null;
+}
+
+export async function createScheduledPost(payload: CreateScheduledPostParams): Promise<ScheduledPost> {
   const {
     user_id,
     organization_id,
@@ -137,7 +190,7 @@ export async function createScheduledPost(payload) {
   const validContentId =
     content_id && uuidRegex.test(content_id) ? content_id : null;
 
-  const result = await sql`
+  const result = (await sql`
     INSERT INTO scheduled_posts (
       user_id, organization_id, content_type, content_id, image_url, caption, hashtags,
       scheduled_date, scheduled_time, scheduled_timestamp, timezone,
@@ -149,9 +202,9 @@ export async function createScheduledPost(payload) {
       ${instagram_content_type || "photo"}, ${instagram_account_id || null}, ${created_from || null}
     )
     RETURNING *
-  `;
+  `) as ScheduledPost[];
 
-  const newPost = result[0];
+  const newPost = result[0]!;
 
   try {
     await schedulePostForPublishing(newPost.id, resolvedUserId, timestampMs);
@@ -172,29 +225,40 @@ export async function createScheduledPost(payload) {
   return newPost;
 }
 
-export async function updateScheduledPost(id, updates) {
+export interface UpdateScheduledPostParams {
+  user_id?: string;
+  status?: string | null;
+  published_at?: Date | null;
+  error_message?: string | null;
+  instagram_media_id?: string | null;
+  publish_attempts?: number | null;
+  last_publish_attempt?: Date | null;
+}
+
+export async function updateScheduledPost(id: string, updates: UpdateScheduledPostParams): Promise<ScheduledPost> {
   if (!id) {
     throw new ValidationError("id is required");
   }
 
   const sql = getSql();
-  const post = await sql`
+  const post = (await sql`
     SELECT organization_id
     FROM scheduled_posts
     WHERE id = ${id}
-  `;
+  `) as Array<{ organization_id: string | null }>;
 
   if (post.length === 0) {
     throw new NotFoundError("Scheduled post");
   }
 
-  if (post[0].organization_id && updates.user_id) {
+  const postRecord = post[0]!;
+  if (postRecord.organization_id && updates.user_id) {
     const resolvedUserId = await resolveUserId(sql, updates.user_id);
     if (resolvedUserId) {
       const context = await resolveOrganizationContext(
         sql,
         resolvedUserId,
-        post[0].organization_id,
+        postRecord.organization_id,
       );
       if (!hasPermission(context.orgRole, PERMISSIONS.SCHEDULE_POST)) {
         throw new PermissionDeniedError("schedule_post");
@@ -202,7 +266,7 @@ export async function updateScheduledPost(id, updates) {
     }
   }
 
-  const result = await sql`
+  const result = (await sql`
     UPDATE scheduled_posts
     SET status = COALESCE(${updates.status || null}, status),
         published_at = COALESCE(${updates.published_at || null}, published_at),
@@ -212,9 +276,9 @@ export async function updateScheduledPost(id, updates) {
         last_publish_attempt = COALESCE(${updates.last_publish_attempt || null}, last_publish_attempt)
     WHERE id = ${id}
     RETURNING *
-  `;
+  `) as ScheduledPost[];
 
-  const updatedPost = result[0];
+  const updatedPost = result[0]!;
   if (updates.status === "cancelled") {
     try {
       await cancelScheduledPost(id);
@@ -233,29 +297,30 @@ export async function updateScheduledPost(id, updates) {
   return updatedPost;
 }
 
-export async function deleteScheduledPost(id, userId) {
+export async function deleteScheduledPost(id: string, userId?: string): Promise<void> {
   if (!id) {
     throw new ValidationError("id is required");
   }
 
   const sql = getSql();
-  const post = await sql`
+  const post = (await sql`
     SELECT organization_id
     FROM scheduled_posts
     WHERE id = ${id}
-  `;
+  `) as Array<{ organization_id: string | null }>;
 
   if (post.length === 0) {
     throw new NotFoundError("Scheduled post");
   }
 
-  if (post[0].organization_id && userId) {
+  const postRecord = post[0]!;
+  if (postRecord.organization_id && userId) {
     const resolvedUserId = await resolveUserId(sql, userId);
     if (resolvedUserId) {
       const context = await resolveOrganizationContext(
         sql,
         resolvedUserId,
-        post[0].organization_id,
+        postRecord.organization_id,
       );
       if (!hasPermission(context.orgRole, PERMISSIONS.SCHEDULE_POST)) {
         throw new PermissionDeniedError("schedule_post");
@@ -279,7 +344,7 @@ export async function deleteScheduledPost(id, userId) {
   }
 }
 
-export async function retryScheduledPost(id, userId) {
+export async function retryScheduledPost(id: string, userId: string): Promise<ScheduledPost> {
   if (!id || !userId) {
     throw new ValidationError("id and user_id are required");
   }
@@ -290,17 +355,17 @@ export async function retryScheduledPost(id, userId) {
     throw new ValidationError("User not found");
   }
 
-  const posts = await sql`
+  const posts = (await sql`
     SELECT *
     FROM scheduled_posts
     WHERE id = ${id}
     LIMIT 1
-  `;
+  `) as ScheduledPost[];
   if (posts.length === 0) {
     throw new NotFoundError("Scheduled post");
   }
 
-  const post = posts[0];
+  const post = posts[0]!;
   if (post.status !== "failed") {
     throw new ValidationError("Only failed posts can be retried");
   }
@@ -322,17 +387,17 @@ export async function retryScheduledPost(id, userId) {
       ? sql`AND organization_id = ${post.organization_id}`
       : sql`AND (organization_id IS NULL OR organization_id = '')`;
 
-    const accounts = await sql`
+    const accounts = (await sql`
       SELECT id
       FROM instagram_accounts
       WHERE is_active = TRUE
         ${orgFilter}
       ORDER BY connected_at DESC
       LIMIT 1
-    `;
+    `) as Array<{ id: string }>;
 
     if (accounts.length > 0) {
-      instagramAccountId = accounts[0].id;
+      instagramAccountId = accounts[0]!.id;
     }
   }
 
@@ -343,7 +408,7 @@ export async function retryScheduledPost(id, userId) {
   }
 
   const newTimestamp = Date.now() + 60_000;
-  const result = await sql`
+  const result = (await sql`
     UPDATE scheduled_posts
     SET status = 'scheduled',
         error_message = NULL,
@@ -353,9 +418,9 @@ export async function retryScheduledPost(id, userId) {
         scheduled_timestamp = ${newTimestamp}
     WHERE id = ${id}
     RETURNING *
-  `;
+  `) as ScheduledPost[];
 
-  const updatedPost = result[0];
+  const updatedPost = result[0]!;
 
   try {
     await schedulePostForPublishing(

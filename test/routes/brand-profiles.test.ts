@@ -14,7 +14,7 @@ describe("brand profile routes", () => {
       name: "Poker Lab",
     });
 
-    vi.doMock("../../server/services/brand-profiles-service.mjs", () => ({
+    vi.doMock("../../server/services/brand-profiles-service.js", () => ({
       getBrandProfile: getBrandProfileMock,
       createBrandProfile: vi.fn(),
       updateBrandProfile: vi.fn(),
@@ -40,7 +40,7 @@ describe("brand profile routes", () => {
       new NotFoundError("Brand profile"),
     );
 
-    vi.doMock("../../server/services/brand-profiles-service.mjs", () => ({
+    vi.doMock("../../server/services/brand-profiles-service.js", () => ({
       getBrandProfile: vi.fn(),
       createBrandProfile: vi.fn(),
       updateBrandProfile: updateBrandProfileMock,

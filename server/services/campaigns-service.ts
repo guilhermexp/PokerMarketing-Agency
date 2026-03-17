@@ -13,12 +13,133 @@ import {
 } from "../helpers/organization-context.js";
 import logger from "../lib/logger.js";
 
-function isBlobUrl(url) {
+function isBlobUrl(url: string | null | undefined): url is string {
   return Boolean(
     url &&
       (url.includes(".public.blob.vercel-storage.com/") ||
         url.includes(".blob.vercel-storage.com/")),
   );
+}
+
+export interface Campaign {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  name: string | null;
+  description: string | null;
+  brand_profile_id: string | null;
+  input_transcript: string | null;
+  generation_options: Record<string, unknown> | null;
+  status: string;
+  created_at: Date;
+  updated_at: Date;
+  deleted_at: Date | null;
+}
+
+export interface CampaignWithCounts extends Campaign {
+  clips_count: number;
+  posts_count: number;
+  ads_count: number;
+  carousels_count: number;
+  clip_preview_url: string | null;
+  post_preview_url: string | null;
+  ad_preview_url: string | null;
+  carousel_preview_url: string | null;
+}
+
+export interface VideoClipScript {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  organization_id: string | null;
+  title: string;
+  hook: string;
+  image_prompt: string | null;
+  audio_script: string | null;
+  scenes: Scene[];
+  thumbnail_url: string | null;
+  video_url: string | null;
+  sort_order: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface Scene {
+  scene: number;
+  visual: string;
+  narration: string;
+  image_url?: string | null;
+}
+
+export interface Post {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  organization_id: string | null;
+  platform: string;
+  content: string;
+  hashtags: string[];
+  image_prompt: string | null;
+  image_url: string | null;
+  sort_order: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface AdCreative {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  organization_id: string | null;
+  platform: string;
+  headline: string;
+  body: string;
+  cta: string;
+  image_prompt: string | null;
+  image_url: string | null;
+  sort_order: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CarouselSlide {
+  slide: number;
+  title: string;
+  content: string;
+  image_prompt?: string | null;
+  image_url?: string | null;
+}
+
+export interface CarouselScript {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  organization_id: string | null;
+  title: string;
+  hook: string;
+  cover_prompt: string | null;
+  cover_url: string | null;
+  caption: string | null;
+  slides: CarouselSlide[];
+  sort_order: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CampaignWithContent extends Campaign {
+  video_clip_scripts: VideoClipScript[];
+  posts: Post[];
+  ad_creatives: AdCreative[];
+  carousel_scripts: CarouselScript[];
+}
+
+export interface GetCampaignsParams {
+  user_id?: string;
+  organization_id?: string | null;
+  id?: string;
+  include_content?: string;
+  limit?: string;
+  offset?: string;
 }
 
 export async function getCampaigns({
@@ -28,17 +149,17 @@ export async function getCampaigns({
   include_content,
   limit,
   offset,
-}) {
+}: GetCampaignsParams): Promise<Campaign | CampaignWithContent | CampaignWithCounts[] | null> {
   const sql = getSql();
 
   if (id) {
-    const result = await sql`
+    const result = (await sql`
       SELECT *
       FROM campaigns
       WHERE id = ${id}
         AND deleted_at IS NULL
       LIMIT 1
-    `;
+    `) as Campaign[];
 
     if (!result[0]) {
       return null;
@@ -53,25 +174,25 @@ export async function getCampaigns({
             FROM video_clip_scripts
             WHERE campaign_id = ${id}
             ORDER BY sort_order ASC
-          `,
+          `.then(rows => rows as unknown as VideoClipScript[]),
           sql`
             SELECT *
             FROM posts
             WHERE campaign_id = ${id}
             ORDER BY sort_order ASC
-          `,
+          `.then(rows => rows as unknown as Post[]),
           sql`
             SELECT *
             FROM ad_creatives
             WHERE campaign_id = ${id}
             ORDER BY sort_order ASC
-          `,
+          `.then(rows => rows as unknown as AdCreative[]),
           sql`
             SELECT *
             FROM carousel_scripts
             WHERE campaign_id = ${id}
             ORDER BY sort_order ASC
-          `,
+          `.then(rows => rows as unknown as CarouselScript[]),
         ]);
 
       return {
@@ -95,8 +216,8 @@ export async function getCampaigns({
     return [];
   }
 
-  const parsedLimit = Number.parseInt(limit, 10);
-  const parsedOffset = Number.parseInt(offset, 10);
+  const parsedLimit = Number.parseInt(limit ?? "", 10);
+  const parsedOffset = Number.parseInt(offset ?? "", 10);
   const hasLimit = Number.isFinite(parsedLimit) && parsedLimit > 0;
   const safeOffset =
     Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
@@ -105,7 +226,7 @@ export async function getCampaigns({
     await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
     return hasLimit
-      ? await sql`
+      ? (await sql`
           SELECT
             c.id,
             c.user_id,
@@ -130,8 +251,8 @@ export async function getCampaigns({
           ORDER BY c.created_at DESC
           LIMIT ${parsedLimit}
           OFFSET ${safeOffset}
-        `
-      : await sql`
+        `) as CampaignWithCounts[]
+      : (await sql`
           SELECT
             c.id,
             c.user_id,
@@ -154,11 +275,11 @@ export async function getCampaigns({
           WHERE c.organization_id = ${organization_id}
             AND c.deleted_at IS NULL
           ORDER BY c.created_at DESC
-        `;
+        `) as CampaignWithCounts[];
   }
 
   return hasLimit
-    ? await sql`
+    ? (await sql`
         SELECT
           c.id,
           c.user_id,
@@ -184,8 +305,8 @@ export async function getCampaigns({
         ORDER BY c.created_at DESC
         LIMIT ${parsedLimit}
         OFFSET ${safeOffset}
-      `
-    : await sql`
+      `) as CampaignWithCounts[]
+    : (await sql`
         SELECT
           c.id,
           c.user_id,
@@ -209,10 +330,48 @@ export async function getCampaigns({
           AND c.organization_id IS NULL
           AND c.deleted_at IS NULL
         ORDER BY c.created_at DESC
-      `;
+      `) as CampaignWithCounts[];
 }
 
-export async function createCampaign(payload) {
+export interface CreateCampaignParams {
+  user_id?: string;
+  organization_id?: string | null;
+  name?: string | null;
+  brand_profile_id?: string | null;
+  input_transcript?: string | null;
+  generation_options?: Record<string, unknown> | null;
+  status?: string;
+  video_clip_scripts?: Array<{
+    title: string;
+    hook: string;
+    image_prompt?: string | null;
+    audio_script?: string | null;
+    scenes?: Scene[];
+  }>;
+  posts?: Array<{
+    platform: string;
+    content: string;
+    hashtags?: string[];
+    image_prompt?: string | null;
+  }>;
+  ad_creatives?: Array<{
+    platform: string;
+    headline: string;
+    body: string;
+    cta: string;
+    image_prompt?: string | null;
+  }>;
+  carousel_scripts?: Array<{
+    title: string;
+    hook: string;
+    cover_prompt?: string | null;
+    cover_url?: string | null;
+    caption?: string | null;
+    slides?: CarouselSlide[];
+  }>;
+}
+
+export async function createCampaign(payload: CreateCampaignParams): Promise<CampaignWithContent> {
   const {
     user_id,
     organization_id,
@@ -248,58 +407,58 @@ export async function createCampaign(payload) {
     }
   }
 
-  const result = await sql`
+  const result = (await sql`
     INSERT INTO campaigns (user_id, organization_id, name, brand_profile_id, input_transcript, generation_options, status)
     VALUES (${resolvedUserId}, ${organization_id || null}, ${name || null}, ${brand_profile_id || null}, ${input_transcript || null}, ${JSON.stringify(generation_options) || null}, ${status || "draft"})
     RETURNING *
-  `;
+  `) as Campaign[];
 
-  const campaign = result[0];
-  const createdVideoClipScripts = [];
+  const campaign = result[0]!;
+  const createdVideoClipScripts: VideoClipScript[] = [];
   if (Array.isArray(video_clip_scripts)) {
     for (const [index, script] of video_clip_scripts.entries()) {
-      const row = await sql`
+      const row = (await sql`
         INSERT INTO video_clip_scripts (campaign_id, user_id, organization_id, title, hook, image_prompt, audio_script, scenes, sort_order)
         VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${script.title}, ${script.hook}, ${script.image_prompt || null}, ${script.audio_script || null}, ${JSON.stringify(script.scenes || [])}, ${index})
         RETURNING *
-      `;
-      createdVideoClipScripts.push(row[0]);
+      `) as VideoClipScript[];
+      createdVideoClipScripts.push(row[0]!);
     }
   }
 
-  const createdPosts = [];
+  const createdPosts: Post[] = [];
   if (Array.isArray(posts)) {
     for (const [index, post] of posts.entries()) {
-      const row = await sql`
+      const row = (await sql`
         INSERT INTO posts (campaign_id, user_id, organization_id, platform, content, hashtags, image_prompt, sort_order)
         VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${post.platform}, ${post.content}, ${post.hashtags || []}, ${post.image_prompt || null}, ${index})
         RETURNING *
-      `;
-      createdPosts.push(row[0]);
+      `) as Post[];
+      createdPosts.push(row[0]!);
     }
   }
 
-  const createdAdCreatives = [];
+  const createdAdCreatives: AdCreative[] = [];
   if (Array.isArray(ad_creatives)) {
     for (const [index, ad] of ad_creatives.entries()) {
-      const row = await sql`
+      const row = (await sql`
         INSERT INTO ad_creatives (campaign_id, user_id, organization_id, platform, headline, body, cta, image_prompt, sort_order)
         VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${ad.platform}, ${ad.headline}, ${ad.body}, ${ad.cta}, ${ad.image_prompt || null}, ${index})
         RETURNING *
-      `;
-      createdAdCreatives.push(row[0]);
+      `) as AdCreative[];
+      createdAdCreatives.push(row[0]!);
     }
   }
 
-  const createdCarouselScripts = [];
+  const createdCarouselScripts: CarouselScript[] = [];
   if (Array.isArray(carousel_scripts)) {
     for (const [index, carousel] of carousel_scripts.entries()) {
-      const row = await sql`
+      const row = (await sql`
         INSERT INTO carousel_scripts (campaign_id, user_id, organization_id, title, hook, cover_prompt, cover_url, caption, slides, sort_order)
         VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${carousel.title}, ${carousel.hook}, ${carousel.cover_prompt || null}, ${carousel.cover_url || null}, ${carousel.caption || null}, ${JSON.stringify(carousel.slides || [])}, ${index})
         RETURNING *
-      `;
-      createdCarouselScripts.push(row[0]);
+      `) as CarouselScript[];
+      createdCarouselScripts.push(row[0]!);
     }
   }
 
@@ -312,30 +471,43 @@ export async function createCampaign(payload) {
   };
 }
 
-export async function deleteCampaign(id, userId) {
+export interface DeleteCampaignResult {
+  success: boolean;
+  deleted: {
+    campaign: number;
+    posts: number;
+    ads: number;
+    clips: number;
+    galleryImages: number;
+    files: number;
+  };
+}
+
+export async function deleteCampaign(id: string, userId?: string): Promise<DeleteCampaignResult> {
   if (!id) {
     throw new ValidationError("id is required");
   }
 
   const sql = getSql();
-  const campaign = await sql`
+  const campaign = (await sql`
     SELECT organization_id
     FROM campaigns
     WHERE id = ${id}
       AND deleted_at IS NULL
-  `;
+  `) as Array<{ organization_id: string | null }>;
 
   if (campaign.length === 0) {
     throw new NotFoundError("Campaign");
   }
 
-  if (campaign[0].organization_id && userId) {
+  const campaignRecord = campaign[0]!;
+  if (campaignRecord.organization_id && userId) {
     const resolvedUserId = await resolveUserId(sql, userId);
     if (resolvedUserId) {
       const context = await resolveOrganizationContext(
         sql,
         resolvedUserId,
-        campaign[0].organization_id,
+        campaignRecord.organization_id,
       );
       if (!hasPermission(context.orgRole, PERMISSIONS.DELETE_CAMPAIGN)) {
         throw new PermissionDeniedError("delete_campaign");
@@ -348,7 +520,7 @@ export async function deleteCampaign(id, userId) {
     "[Campaign Delete] Starting cascade delete for campaign",
   );
 
-  const campaignImages = await sql`
+  const campaignImages = (await sql`
     SELECT id, src_url
     FROM gallery_images
     WHERE (
@@ -357,23 +529,23 @@ export async function deleteCampaign(id, userId) {
       OR video_script_id IN (SELECT id FROM video_clip_scripts WHERE campaign_id = ${id})
     )
       AND deleted_at IS NULL
-  `;
+  `) as Array<{ id: string; src_url: string | null }>;
 
-  const posts = await sql`
+  const posts = (await sql`
     SELECT id, image_url
     FROM posts
     WHERE campaign_id = ${id}
-  `;
-  const ads = await sql`
+  `) as Array<{ id: string; image_url: string | null }>;
+  const ads = (await sql`
     SELECT id, image_url
     FROM ad_creatives
     WHERE campaign_id = ${id}
-  `;
-  const clips = await sql`
+  `) as Array<{ id: string; image_url: string | null }>;
+  const clips = (await sql`
     SELECT id, thumbnail_url, video_url
     FROM video_clip_scripts
     WHERE campaign_id = ${id}
-  `;
+  `) as Array<{ id: string; thumbnail_url: string | null; video_url: string | null }>;
 
   const urlsToDelete = [
     ...campaignImages.map((image) => image.src_url).filter(isBlobUrl),
@@ -417,60 +589,72 @@ export async function deleteCampaign(id, userId) {
   };
 }
 
-export async function updateCampaignClipThumbnail(clipId, thumbnailUrl) {
+export async function updateCampaignClipThumbnail(clipId: string, thumbnailUrl: string | null): Promise<VideoClipScript> {
   if (!clipId) {
     throw new ValidationError("clip_id is required");
   }
 
   const sql = getSql();
-  const result = await sql`
+  const result = (await sql`
     UPDATE video_clip_scripts
     SET thumbnail_url = ${thumbnailUrl || null},
         updated_at = NOW()
     WHERE id = ${clipId}
     RETURNING *
-  `;
+  `) as VideoClipScript[];
 
   if (result.length === 0) {
     throw new NotFoundError("Clip");
   }
 
-  return result[0];
+  return result[0]!;
 }
 
-export async function updateCampaignSceneImage(clipId, sceneNumber, imageUrl) {
+export async function updateCampaignSceneImage(clipId: string, sceneNumber: number | string, imageUrl: string | null): Promise<VideoClipScript> {
   if (!clipId || sceneNumber === undefined) {
     throw new ValidationError("clip_id and scene_number are required");
   }
 
   const sql = getSql();
-  const sceneNum = Number.parseInt(sceneNumber, 10);
-  const [clip] = await sql`
+  const sceneNum = typeof sceneNumber === "string" ? Number.parseInt(sceneNumber, 10) : sceneNumber;
+  const clips = (await sql`
     SELECT scenes
     FROM video_clip_scripts
     WHERE id = ${clipId}
-  `;
+  `) as Array<{ scenes: Scene[] }>;
 
+  const clip = clips[0];
   if (!clip) {
     throw new NotFoundError("Clip");
   }
 
-  const updatedScenes = (clip.scenes || []).map((scene) =>
+  const updatedScenes = (clip.scenes || []).map((scene: Scene) =>
     scene.scene === sceneNum ? { ...scene, image_url: imageUrl || null } : scene,
   );
 
-  const result = await sql`
+  const result = (await sql`
     UPDATE video_clip_scripts
     SET scenes = ${JSON.stringify(updatedScenes)}::jsonb,
         updated_at = NOW()
     WHERE id = ${clipId}
     RETURNING *
-  `;
+  `) as VideoClipScript[];
 
-  return result[0];
+  return result[0]!;
 }
 
-export async function getCarousels({ user_id, organization_id }) {
+export interface GetCarouselsParams {
+  user_id?: string;
+  organization_id?: string | null;
+}
+
+export interface CarouselWithDetails extends CarouselScript {
+  campaign_name: string | null;
+  gallery_images: string[];
+  slides_count: number;
+}
+
+export async function getCarousels({ user_id, organization_id }: GetCarouselsParams): Promise<CarouselWithDetails[]> {
   if (!user_id) {
     throw new ValidationError("user_id is required");
   }
@@ -483,7 +667,7 @@ export async function getCarousels({ user_id, organization_id }) {
 
   if (organization_id) {
     await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-    return await sql`
+    return (await sql`
       SELECT
         cs.id,
         cs.campaign_id,
@@ -511,10 +695,10 @@ export async function getCarousels({ user_id, organization_id }) {
       WHERE cs.organization_id = ${organization_id}
         AND c.deleted_at IS NULL
       ORDER BY cs.created_at DESC
-    `;
+    `) as CarouselWithDetails[];
   }
 
-  return await sql`
+  return (await sql`
     SELECT
       cs.id,
       cs.campaign_id,
@@ -543,10 +727,15 @@ export async function getCarousels({ user_id, organization_id }) {
       AND cs.organization_id IS NULL
       AND c.deleted_at IS NULL
     ORDER BY cs.created_at DESC
-  `;
+  `) as CarouselWithDetails[];
 }
 
-export async function updateCarousel(id, { cover_url, caption }) {
+export interface UpdateCarouselParams {
+  cover_url?: string | null;
+  caption?: string | null;
+}
+
+export async function updateCarousel(id: string, { cover_url, caption }: UpdateCarouselParams): Promise<CarouselScript> {
   if (!id) {
     throw new ValidationError("id is required");
   }
@@ -556,50 +745,51 @@ export async function updateCarousel(id, { cover_url, caption }) {
   }
 
   const sql = getSql();
-  const result = await sql`
+  const result = (await sql`
     UPDATE carousel_scripts
-    SET cover_url = COALESCE(${cover_url}, cover_url),
-        caption = COALESCE(${caption}, caption),
+    SET cover_url = COALESCE(${cover_url ?? null}, cover_url),
+        caption = COALESCE(${caption ?? null}, caption),
         updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
-  `;
+  `) as CarouselScript[];
 
   if (result.length === 0) {
     throw new NotFoundError("Carousel");
   }
 
-  return result[0];
+  return result[0]!;
 }
 
-export async function updateCarouselSlideImage(carouselId, slideNumber, imageUrl) {
+export async function updateCarouselSlideImage(carouselId: string, slideNumber: number | string, imageUrl: string | null): Promise<CarouselScript> {
   if (!carouselId || slideNumber === undefined) {
     throw new ValidationError("carousel_id and slide_number are required");
   }
 
   const sql = getSql();
-  const slideNum = Number.parseInt(slideNumber, 10);
-  const [carousel] = await sql`
+  const slideNum = typeof slideNumber === "string" ? Number.parseInt(slideNumber, 10) : slideNumber;
+  const carousels = (await sql`
     SELECT slides
     FROM carousel_scripts
     WHERE id = ${carouselId}
-  `;
+  `) as Array<{ slides: CarouselSlide[] }>;
 
+  const carousel = carousels[0];
   if (!carousel) {
     throw new NotFoundError("Carousel");
   }
 
-  const updatedSlides = (carousel.slides || []).map((slide) =>
+  const updatedSlides = (carousel.slides || []).map((slide: CarouselSlide) =>
     slide.slide === slideNum ? { ...slide, image_url: imageUrl || null } : slide,
   );
 
-  const result = await sql`
+  const result = (await sql`
     UPDATE carousel_scripts
     SET slides = ${JSON.stringify(updatedSlides)}::jsonb,
         updated_at = NOW()
     WHERE id = ${carouselId}
     RETURNING *
-  `;
+  `) as CarouselScript[];
 
-  return result[0];
+  return result[0]!;
 }

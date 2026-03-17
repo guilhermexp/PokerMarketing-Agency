@@ -16,7 +16,7 @@ import {
   createGalleryImage,
   updateGalleryImageRecord,
   deleteGalleryImageRecord,
-} from "../services/gallery-service.mjs";
+} from "../services/gallery-service.js";
 import {
   galleryListQuerySchema,
   galleryDailyFlyersQuerySchema,

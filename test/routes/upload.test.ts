@@ -16,7 +16,7 @@ describe("upload routes", () => {
       size: 123,
     });
 
-    vi.doMock("../../server/services/upload-service.mjs", () => ({
+    vi.doMock("../../server/services/upload-service.js", () => ({
       proxyBlobVideo: vi.fn(),
       uploadBase64Asset: uploadBase64AssetMock,
     }));
@@ -41,7 +41,7 @@ describe("upload routes", () => {
       new ValidationError("Invalid URL"),
     );
 
-    vi.doMock("../../server/services/upload-service.mjs", () => ({
+    vi.doMock("../../server/services/upload-service.js", () => ({
       proxyBlobVideo: proxyBlobVideoMock,
       uploadBase64Asset: vi.fn(),
     }));

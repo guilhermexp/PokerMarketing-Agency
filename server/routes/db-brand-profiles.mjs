@@ -13,7 +13,7 @@ import {
   getBrandProfile,
   createBrandProfile,
   updateBrandProfile,
-} from "../services/brand-profiles-service.mjs";
+} from "../services/brand-profiles-service.js";
 import { validateRequest } from "../middleware/validate.js";
 import {
   brandProfileQuerySchema,

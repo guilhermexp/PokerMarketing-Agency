@@ -13,7 +13,7 @@ describe("gallery routes", () => {
       { id: "img-1", src_url: "https://cdn.example.com/image.png" },
     ]);
 
-    vi.doMock("../../server/services/gallery-service.mjs", () => ({
+    vi.doMock("../../server/services/gallery-service.js", () => ({
       listGallery: listGalleryMock,
       listDailyFlyers: vi.fn(),
       createGalleryImage: vi.fn(),
@@ -41,7 +41,7 @@ describe("gallery routes", () => {
       new ValidationError("user_id, src_url, source, and model are required"),
     );
 
-    vi.doMock("../../server/services/gallery-service.mjs", () => ({
+    vi.doMock("../../server/services/gallery-service.js", () => ({
       listGallery: vi.fn(),
       listDailyFlyers: vi.fn(),
       createGalleryImage: createGalleryImageMock,

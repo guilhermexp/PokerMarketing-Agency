@@ -114,12 +114,17 @@ export class DatabaseError extends AppError {
  * Thrown when external API/service calls fail
  */
 export class ExternalServiceError extends AppError {
-  constructor(service: string, message: string = "External service error", originalError: Error | null = null) {
+  constructor(
+    service: string,
+    message: string = "External service error",
+    originalError: Error | null = null,
+    statusCode: number = HTTP_STATUS.INTERNAL_SERVER_ERROR
+  ) {
     const details = {
       service,
       originalMessage: originalError?.message
     };
-    super(message, ERROR_CODES.EXTERNAL_SERVICE_ERROR, HTTP_STATUS.INTERNAL_SERVER_ERROR, true, details);
+    super(message, ERROR_CODES.EXTERNAL_SERVICE_ERROR, statusCode, true, details);
   }
 }
 

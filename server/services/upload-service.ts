@@ -9,12 +9,18 @@ import { logExternalAPI, logExternalAPIResult } from "../lib/logging-helpers.js"
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
-export async function proxyBlobVideo(url, range) {
+export interface ProxyBlobVideoResult {
+  status: number;
+  headers: Record<string, string>;
+  body: Buffer;
+}
+
+export async function proxyBlobVideo(url: string, range?: string): Promise<ProxyBlobVideoResult> {
   if (!url) {
     throw new ValidationError("url parameter is required");
   }
 
-  let parsedUrl;
+  let parsedUrl: URL;
   try {
     parsedUrl = new URL(url);
   } catch {
@@ -32,15 +38,15 @@ export async function proxyBlobVideo(url, range) {
 
   const response = await fetch(parsedUrl.href);
   if (!response.ok) {
-    const error = new ExternalServiceError(
+    throw new ExternalServiceError(
       "Vercel Blob",
       `Failed to fetch video: ${response.statusText}`,
+      null,
+      response.status,
     );
-    error.statusCode = response.status;
-    throw error;
   }
 
-  const headers = {
+  const headers: Record<string, string> = {
     "Cross-Origin-Resource-Policy": "cross-origin",
     "Access-Control-Allow-Origin": "*",
     "Content-Type": response.headers.get("content-type") || "video/mp4",
@@ -55,7 +61,7 @@ export async function proxyBlobVideo(url, range) {
       10,
     );
     const parts = range.replace(/bytes=/, "").split("-");
-    const start = Number.parseInt(parts[0], 10);
+    const start = Number.parseInt(parts[0] || "0", 10);
     const end = parts[1]
       ? Number.parseInt(parts[1], 10)
       : contentLength - 1;
@@ -69,7 +75,20 @@ export async function proxyBlobVideo(url, range) {
   return { status, headers, body };
 }
 
-export async function uploadBase64Asset({ filename, contentType, data }) {
+export interface UploadBase64AssetParams {
+  filename: string;
+  contentType: string;
+  data: string;
+}
+
+export interface UploadBase64AssetResult {
+  success: boolean;
+  url: string;
+  filename: string;
+  size: number;
+}
+
+export async function uploadBase64Asset({ filename, contentType, data }: UploadBase64AssetParams): Promise<UploadBase64AssetResult> {
   if (!filename || !contentType || !data) {
     throw new ValidationError("Missing required fields: filename, contentType, data");
   }

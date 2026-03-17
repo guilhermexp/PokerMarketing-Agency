@@ -13,6 +13,43 @@ import {
 } from "../helpers/organization-context.js";
 import logger from "../lib/logger.js";
 
+export interface GalleryImage {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  source: string;
+  src_url: string;
+  thumbnail_url: string | null;
+  prompt: string | null;
+  model: string | null;
+  aspect_ratio: string | null;
+  image_size: string | null;
+  post_id: string | null;
+  ad_creative_id: string | null;
+  video_script_id: string | null;
+  carousel_script_id: string | null;
+  is_style_reference: boolean;
+  style_reference_name: string | null;
+  media_type: string;
+  duration: number | null;
+  week_schedule_id: string | null;
+  daily_flyer_day: string | null;
+  daily_flyer_period: string | null;
+  published_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+  deleted_at: Date | null;
+}
+
+export interface ListGalleryParams {
+  user_id?: string;
+  organization_id?: string | null;
+  source?: string;
+  limit?: string;
+  offset?: string;
+  include_src?: string;
+}
+
 export async function listGallery({
   user_id,
   organization_id,
@@ -20,7 +57,7 @@ export async function listGallery({
   limit,
   offset,
   include_src,
-}) {
+}: ListGalleryParams): Promise<GalleryImage[]> {
   if (!user_id) {
     throw new ValidationError("user_id is required");
   }
@@ -31,15 +68,15 @@ export async function listGallery({
     return [];
   }
 
-  const limitNum = Number.parseInt(limit, 10) || 50;
-  const offsetNum = Number.parseInt(offset, 10) || 0;
+  const limitNum = Number.parseInt(limit ?? "50", 10) || 50;
+  const offsetNum = Number.parseInt(offset ?? "0", 10) || 0;
 
   if (organization_id) {
     await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
     if (source) {
       return include_src === "true"
-        ? await sql`
+        ? (await sql`
             SELECT *
             FROM gallery_images
             WHERE organization_id = ${organization_id}
@@ -48,8 +85,8 @@ export async function listGallery({
             ORDER BY created_at DESC
             LIMIT ${limitNum}
             OFFSET ${offsetNum}
-          `
-        : await sql`
+          `) as GalleryImage[]
+        : (await sql`
             SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period
             FROM gallery_images
             WHERE organization_id = ${organization_id}
@@ -58,11 +95,11 @@ export async function listGallery({
             ORDER BY created_at DESC
             LIMIT ${limitNum}
             OFFSET ${offsetNum}
-          `;
+          `) as GalleryImage[];
     }
 
     return include_src === "true"
-      ? await sql`
+      ? (await sql`
           SELECT *
           FROM gallery_images
           WHERE organization_id = ${organization_id}
@@ -70,8 +107,8 @@ export async function listGallery({
           ORDER BY created_at DESC
           LIMIT ${limitNum}
           OFFSET ${offsetNum}
-        `
-      : await sql`
+        `) as GalleryImage[]
+      : (await sql`
           SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period
           FROM gallery_images
           WHERE organization_id = ${organization_id}
@@ -79,12 +116,12 @@ export async function listGallery({
           ORDER BY created_at DESC
           LIMIT ${limitNum}
           OFFSET ${offsetNum}
-        `;
+        `) as GalleryImage[];
   }
 
   if (source) {
     return include_src === "true"
-      ? await sql`
+      ? (await sql`
           SELECT *
           FROM gallery_images
           WHERE user_id = ${resolvedUserId}
@@ -94,8 +131,8 @@ export async function listGallery({
           ORDER BY created_at DESC
           LIMIT ${limitNum}
           OFFSET ${offsetNum}
-        `
-      : await sql`
+        `) as GalleryImage[]
+      : (await sql`
           SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period
           FROM gallery_images
           WHERE user_id = ${resolvedUserId}
@@ -105,11 +142,11 @@ export async function listGallery({
           ORDER BY created_at DESC
           LIMIT ${limitNum}
           OFFSET ${offsetNum}
-        `;
+        `) as GalleryImage[];
   }
 
   return include_src === "true"
-    ? await sql`
+    ? (await sql`
         SELECT *
         FROM gallery_images
         WHERE user_id = ${resolvedUserId}
@@ -118,8 +155,8 @@ export async function listGallery({
         ORDER BY created_at DESC
         LIMIT ${limitNum}
         OFFSET ${offsetNum}
-      `
-    : await sql`
+      `) as GalleryImage[]
+    : (await sql`
         SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period
         FROM gallery_images
         WHERE user_id = ${resolvedUserId}
@@ -128,14 +165,25 @@ export async function listGallery({
         ORDER BY created_at DESC
         LIMIT ${limitNum}
         OFFSET ${offsetNum}
-      `;
+      `) as GalleryImage[];
+}
+
+export interface ListDailyFlyersParams {
+  user_id?: string;
+  organization_id?: string | null;
+  week_schedule_id?: string;
+}
+
+export interface DailyFlyersResult {
+  images: GalleryImage[];
+  structured: Record<string, Record<string, GalleryImage[]>>;
 }
 
 export async function listDailyFlyers({
   user_id,
   organization_id,
   week_schedule_id,
-}) {
+}: ListDailyFlyersParams): Promise<DailyFlyersResult> {
   if (!user_id) {
     throw new ValidationError("user_id is required");
   }
@@ -154,7 +202,7 @@ export async function listDailyFlyers({
     await resolveOrganizationContext(sql, resolvedUserId, organization_id);
   }
 
-  const images = organization_id
+  const images = (organization_id
     ? await sql`
         SELECT id, user_id, organization_id, source, src_url, thumbnail_url, prompt, model, aspect_ratio, image_size, week_schedule_id, daily_flyer_day, daily_flyer_period, created_at, updated_at
         FROM gallery_images
@@ -171,9 +219,9 @@ export async function listDailyFlyers({
           AND week_schedule_id = ${week_schedule_id}
           AND deleted_at IS NULL
         ORDER BY daily_flyer_day, daily_flyer_period, created_at DESC
-      `;
+      `) as GalleryImage[];
 
-  const structured = {};
+  const structured: Record<string, Record<string, GalleryImage[]>> = {};
   for (const image of images) {
     const day = image.daily_flyer_day || "UNKNOWN";
     const period = image.daily_flyer_period || "UNKNOWN";
@@ -192,7 +240,28 @@ export async function listDailyFlyers({
   return { images, structured };
 }
 
-export async function createGalleryImage(payload) {
+export interface CreateGalleryImageParams {
+  user_id?: string;
+  organization_id?: string | null;
+  src_url?: string;
+  prompt?: string | null;
+  source?: string;
+  model?: string;
+  aspect_ratio?: string | null;
+  image_size?: string | null;
+  post_id?: string | null;
+  ad_creative_id?: string | null;
+  video_script_id?: string | null;
+  is_style_reference?: boolean;
+  style_reference_name?: string | null;
+  media_type?: string;
+  duration?: number | null;
+  week_schedule_id?: string | null;
+  daily_flyer_day?: string | null;
+  daily_flyer_period?: string | null;
+}
+
+export async function createGalleryImage(payload: CreateGalleryImageParams): Promise<GalleryImage> {
   const {
     user_id,
     organization_id,
@@ -235,7 +304,7 @@ export async function createGalleryImage(payload) {
     }
   }
 
-  const result = await sql`
+  const result = (await sql`
     INSERT INTO gallery_images (user_id, organization_id, src_url, prompt, source, model, aspect_ratio, image_size,
                                 post_id, ad_creative_id, video_script_id, is_style_reference, style_reference_name,
                                 media_type, duration, week_schedule_id, daily_flyer_day, daily_flyer_period)
@@ -246,18 +315,25 @@ export async function createGalleryImage(payload) {
             ${media_type || "image"}, ${duration || null},
             ${week_schedule_id || null}, ${daily_flyer_day || null}, ${daily_flyer_period || null})
     RETURNING *
-  `;
+  `) as GalleryImage[];
 
-  return result[0];
+  return result[0]!;
 }
 
-export async function updateGalleryImageRecord(id, updates) {
+export interface UpdateGalleryImageParams {
+  published_at?: Date | null;
+  is_style_reference?: boolean;
+  style_reference_name?: string | null;
+  src_url?: string;
+}
+
+export async function updateGalleryImageRecord(id: string, updates: UpdateGalleryImageParams): Promise<GalleryImage> {
   if (!id) {
     throw new ValidationError("id is required");
   }
 
   const sql = getSql();
-  const current = await sql`SELECT * FROM gallery_images WHERE id = ${id}`;
+  const current = (await sql`SELECT * FROM gallery_images WHERE id = ${id}`) as GalleryImage[];
   if (current.length === 0) {
     throw new NotFoundError("Gallery image");
   }
@@ -265,45 +341,47 @@ export async function updateGalleryImageRecord(id, updates) {
   const { published_at, is_style_reference, style_reference_name, src_url } =
     updates;
 
-  const result = await sql`
+  const currentImage = current[0]!;
+  const result = (await sql`
     UPDATE gallery_images
     SET
-      published_at = ${published_at !== undefined ? published_at || null : current[0].published_at},
-      is_style_reference = ${is_style_reference !== undefined ? is_style_reference : current[0].is_style_reference},
-      style_reference_name = ${style_reference_name !== undefined ? style_reference_name || null : current[0].style_reference_name},
-      src_url = ${src_url !== undefined ? src_url : current[0].src_url},
+      published_at = ${published_at !== undefined ? published_at || null : currentImage.published_at},
+      is_style_reference = ${is_style_reference !== undefined ? is_style_reference : currentImage.is_style_reference},
+      style_reference_name = ${style_reference_name !== undefined ? style_reference_name || null : currentImage.style_reference_name},
+      src_url = ${src_url !== undefined ? src_url : currentImage.src_url},
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
-  `;
+  `) as GalleryImage[];
 
-  return result[0];
+  return result[0]!;
 }
 
-export async function deleteGalleryImageRecord(id, userId) {
+export async function deleteGalleryImageRecord(id: string, userId?: string): Promise<void> {
   if (!id) {
     throw new ValidationError("id is required");
   }
 
   const sql = getSql();
-  const image = await sql`
+  const image = (await sql`
     SELECT organization_id, src_url
     FROM gallery_images
     WHERE id = ${id}
       AND deleted_at IS NULL
-  `;
+  `) as Array<{ organization_id: string | null; src_url: string | null }>;
 
   if (image.length === 0) {
     throw new NotFoundError("Image");
   }
 
-  if (image[0].organization_id && userId) {
+  const imageRecord = image[0]!;
+  if (imageRecord.organization_id && userId) {
     const resolvedUserId = await resolveUserId(sql, userId);
     if (resolvedUserId) {
       const context = await resolveOrganizationContext(
         sql,
         resolvedUserId,
-        image[0].organization_id,
+        imageRecord.organization_id,
       );
       if (!hasPermission(context.orgRole, PERMISSIONS.DELETE_GALLERY)) {
         throw new PermissionDeniedError("delete_gallery");
@@ -311,7 +389,7 @@ export async function deleteGalleryImageRecord(id, userId) {
     }
   }
 
-  const srcUrl = image[0].src_url;
+  const srcUrl = imageRecord.src_url;
   await sql`DELETE FROM gallery_images WHERE id = ${id}`;
 
   if (

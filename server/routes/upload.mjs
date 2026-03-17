@@ -8,7 +8,7 @@ import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {
   proxyBlobVideo,
   uploadBase64Asset,
-} from "../services/upload-service.mjs";
+} from "../services/upload-service.js";
 import { validateRequest } from "../middleware/validate.js";
 import {
   proxyVideoQuerySchema,

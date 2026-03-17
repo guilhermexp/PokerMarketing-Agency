@@ -18,7 +18,7 @@ import {
   getCarousels,
   updateCarousel,
   updateCarouselSlideImage,
-} from "../services/campaigns-service.mjs";
+} from "../services/campaigns-service.js";
 import { validateRequest } from "../middleware/validate.js";
 import {
   campaignsQuerySchema,

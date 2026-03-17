@@ -11,7 +11,28 @@ import {
   PermissionDeniedError,
 } from "../helpers/organization-context.js";
 
-export async function getBrandProfile({ user_id, id, organization_id }) {
+export interface BrandProfile {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  name: string;
+  description: string | null;
+  logo_url: string | null;
+  primary_color: string;
+  secondary_color: string;
+  tone_of_voice: string;
+  created_at: Date;
+  updated_at: Date;
+  deleted_at: Date | null;
+}
+
+export interface GetBrandProfileParams {
+  user_id?: string;
+  id?: string;
+  organization_id?: string | null;
+}
+
+export async function getBrandProfile({ user_id, id, organization_id }: GetBrandProfileParams): Promise<BrandProfile | null> {
   const sql = getSql();
 
   if (id) {
@@ -30,7 +51,7 @@ export async function getBrandProfile({ user_id, id, organization_id }) {
       WHERE id = ${id}
         AND deleted_at IS NULL
       LIMIT 1
-    `;
+    ` as BrandProfile[];
     const profile = result[0] || null;
     if (!profile) {
       return null;
@@ -39,7 +60,7 @@ export async function getBrandProfile({ user_id, id, organization_id }) {
     if (profile.organization_id) {
       await resolveOrganizationContext(sql, resolvedUserId, profile.organization_id);
     } else if (profile.user_id !== resolvedUserId) {
-      throw new PermissionDeniedError();
+      throw new PermissionDeniedError(PERMISSIONS.MANAGE_BRAND);
     }
 
     return profile;
@@ -54,30 +75,42 @@ export async function getBrandProfile({ user_id, id, organization_id }) {
     return null;
   }
 
-  const result = organization_id
-    ? await (async () => {
-        await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-        return sql`
-          SELECT *
-          FROM brand_profiles
-          WHERE organization_id = ${organization_id}
-            AND deleted_at IS NULL
-          LIMIT 1
-        `;
-      })()
-    : await sql`
-        SELECT *
-        FROM brand_profiles
-        WHERE user_id = ${resolvedUserId}
-          AND organization_id IS NULL
-          AND deleted_at IS NULL
-        LIMIT 1
-      `;
+  let result: BrandProfile[];
+  if (organization_id) {
+    await resolveOrganizationContext(sql, resolvedUserId, organization_id);
+    result = (await sql`
+      SELECT *
+      FROM brand_profiles
+      WHERE organization_id = ${organization_id}
+        AND deleted_at IS NULL
+      LIMIT 1
+    `) as BrandProfile[];
+  } else {
+    result = (await sql`
+      SELECT *
+      FROM brand_profiles
+      WHERE user_id = ${resolvedUserId}
+        AND organization_id IS NULL
+        AND deleted_at IS NULL
+      LIMIT 1
+    `) as BrandProfile[];
+  }
 
   return result[0] || null;
 }
 
-export async function createBrandProfile(payload) {
+export interface CreateBrandProfileParams {
+  user_id: string;
+  organization_id?: string | null;
+  name: string;
+  description?: string | null;
+  logo_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  tone_of_voice?: string | null;
+}
+
+export async function createBrandProfile(payload: CreateBrandProfileParams): Promise<BrandProfile> {
   const {
     user_id,
     organization_id,
@@ -106,7 +139,7 @@ export async function createBrandProfile(payload) {
       organization_id,
     );
     if (!hasPermission(context.orgRole, PERMISSIONS.MANAGE_BRAND)) {
-      throw new PermissionDeniedError("manage_brand");
+      throw new PermissionDeniedError(PERMISSIONS.MANAGE_BRAND);
     }
   }
 
@@ -115,12 +148,22 @@ export async function createBrandProfile(payload) {
     VALUES (${resolvedUserId}, ${organization_id || null}, ${name}, ${description || null}, ${logo_url || null},
             ${primary_color || "#FFFFFF"}, ${secondary_color || "#000000"}, ${tone_of_voice || "Profissional"})
     RETURNING *
-  `;
+  ` as BrandProfile[];
 
-  return result[0];
+  return result[0]!;
 }
 
-export async function updateBrandProfile(id, payload) {
+export interface UpdateBrandProfileParams {
+  user_id?: string;
+  name?: string | null;
+  description?: string | null;
+  logo_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  tone_of_voice?: string | null;
+}
+
+export async function updateBrandProfile(id: string, payload: UpdateBrandProfileParams): Promise<BrandProfile> {
   if (!id) {
     throw new ValidationError("id is required");
   }
@@ -141,13 +184,13 @@ export async function updateBrandProfile(id, payload) {
     FROM brand_profiles
     WHERE id = ${id}
       AND deleted_at IS NULL
-  `;
+  ` as Array<{ organization_id: string | null }>;
 
   if (existing.length === 0) {
     throw new NotFoundError("Brand profile");
   }
 
-  if (existing[0].organization_id && user_id) {
+  if (existing[0]?.organization_id && user_id) {
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (resolvedUserId) {
       const context = await resolveOrganizationContext(
@@ -156,7 +199,7 @@ export async function updateBrandProfile(id, payload) {
         existing[0].organization_id,
       );
       if (!hasPermission(context.orgRole, PERMISSIONS.MANAGE_BRAND)) {
-        throw new PermissionDeniedError("manage_brand");
+        throw new PermissionDeniedError(PERMISSIONS.MANAGE_BRAND);
       }
     }
   }
@@ -171,7 +214,7 @@ export async function updateBrandProfile(id, payload) {
         tone_of_voice = COALESCE(${tone_of_voice || null}, tone_of_voice)
     WHERE id = ${id}
     RETURNING *
-  `;
+  ` as BrandProfile[];
 
-  return result[0];
+  return result[0]!;
 }

@@ -15,7 +15,7 @@ import {
   updateScheduledPost,
   deleteScheduledPost,
   retryScheduledPost,
-} from "../services/scheduled-posts-service.mjs";
+} from "../services/scheduled-posts-service.js";
 
 export function registerScheduledPostRoutes(app) {
   app.get("/api/db/scheduled-posts", async (req, res) => {
