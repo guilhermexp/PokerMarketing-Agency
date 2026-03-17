@@ -306,7 +306,8 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
   const campaignsList = useCampaignsStore((state) => state.campaignsList);
   const setCampaignsList = useCampaignsStore((state) => state.setCampaignsList);
   const addCampaignSummary = useCampaignsStore((state) => state.addCampaignSummary);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const isGenerating = useCampaignsStore((state) => state.isGenerating);
+  const setIsGenerating = useCampaignsStore((state) => state.setIsGenerating);
 
   // Helper to save productImages to localStorage
   const saveProductImagesToStorage = (campaignId: string, images: { base64: string; mimeType: string }[] | null) => {
