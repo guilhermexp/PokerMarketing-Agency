@@ -1,5 +1,5 @@
-import { getSql } from "../lib/db.mjs";
-import { userIdCache } from "../lib/user-resolver.mjs";
+import { getSql } from "../lib/db.js";
+import { userIdCache } from "../lib/user-resolver.js";
 import { generateCsrfToken } from "../lib/csrf.js";
 import { requireSuperAdmin } from "../lib/auth.mjs";
 import { DatabaseError } from "../lib/errors/index.js";

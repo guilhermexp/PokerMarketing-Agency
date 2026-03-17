@@ -1,6 +1,6 @@
-import { getSql } from "../lib/db.mjs";
-import { resolveUserId } from "../lib/user-resolver.mjs";
-import { logError } from "../lib/logging-helpers.mjs";
+import { getSql } from "../lib/db.js";
+import { resolveUserId } from "../lib/user-resolver.js";
+import { logError } from "../lib/logging-helpers.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 
 export function registerGenerationJobRoutes(app) {

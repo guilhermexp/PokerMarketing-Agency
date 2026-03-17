@@ -1,4 +1,4 @@
-import { getSql } from "../lib/db.mjs";
+import { getSql } from "../lib/db.js";
 import { requireSuperAdmin } from "../lib/auth.mjs";
 import { generateTextFromMessages } from "../lib/ai/text-generation.mjs";
 import { withRetry } from "../lib/ai/retry.js";

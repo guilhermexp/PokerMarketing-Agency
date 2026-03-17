@@ -6,7 +6,7 @@
  */
 
 import { getSql } from "./db.mjs";
-import { resolveUserId } from "./user-resolver.mjs";
+import { resolveUserId } from "./user-resolver.js";
 import logger from "./logger.js";
 
 export const RESOURCE_ACCESS_RULES = [

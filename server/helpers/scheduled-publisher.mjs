@@ -6,7 +6,7 @@
 
 import { put } from "@vercel/blob";
 import { validateContentType } from "../lib/validation/contentType.js";
-import { getSql, DATABASE_URL } from "../lib/db.mjs";
+import { getSql, DATABASE_URL } from "../lib/db.js";
 
 const RUBE_TOKEN = process.env.RUBE_TOKEN; // Fallback for legacy posts
 const MCP_URL = 'https://rube.app/mcp';

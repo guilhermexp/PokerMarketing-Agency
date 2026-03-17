@@ -6,7 +6,7 @@
  */
 
 import { getRequestAuthContext } from "../lib/auth.mjs";
-import { getSql } from "../lib/db.mjs";
+import { getSql } from "../lib/db.js";
 import { getGeminiAi } from "../lib/ai/clients.js";
 import { withRetry, sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {

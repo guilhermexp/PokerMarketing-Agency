@@ -7,7 +7,7 @@ import {
   OrganizationAccessError,
   PermissionDeniedError,
 } from "../helpers/organization-context.mjs";
-import { logError } from "../lib/logging-helpers.mjs";
+import { logError } from "../lib/logging-helpers.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {
   getCampaigns,

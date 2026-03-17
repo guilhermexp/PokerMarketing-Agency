@@ -3,7 +3,7 @@ import {
   PermissionDeniedError,
   ExternalServiceError,
 } from "../lib/errors/index.js";
-import { logError } from "../lib/logging-helpers.mjs";
+import { logError } from "../lib/logging-helpers.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {
   proxyBlobVideo,

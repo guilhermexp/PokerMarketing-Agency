@@ -7,7 +7,7 @@
 
 import { betterAuth } from "better-auth";
 import { organization } from "better-auth/plugins/organization";
-import IORedis from "ioredis";
+import { Redis } from "ioredis";
 import pg from "pg";
 import logger from "./logger.js";
 
@@ -25,47 +25,53 @@ const TRUSTED_ORIGINS = [
   "https://sociallab.pro",
   process.env.APP_URL,
   ...(process.env.CORS_ORIGINS || "").split(",").map((origin) => origin.trim()),
-].filter(Boolean);
+].filter(Boolean) as string[];
 
 const authDatabase = new Pool({ connectionString: process.env.DATABASE_URL });
 
-function createRedisSecondaryStorage() {
+interface SecondaryStorage {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, ttl?: number): Promise<unknown>;
+  delete(key: string): Promise<void>;
+}
+
+function createRedisSecondaryStorage(): SecondaryStorage | undefined {
   if (!REDIS_URL) {
     return undefined;
   }
 
-  const redis = new IORedis(REDIS_URL, {
+  const redis = new Redis(REDIS_URL, {
     lazyConnect: true,
     enableReadyCheck: true,
     maxRetriesPerRequest: 1,
     connectTimeout: 5000,
   });
 
-  redis.on("error", (error) => {
+  redis.on("error", (error: Error) => {
     logger.warn({ err: error }, "[Better Auth] Redis secondary storage error");
   });
 
-  const ensureConnection = async () => {
+  const ensureConnection = async (): Promise<void> => {
     if (redis.status === "wait") {
       await redis.connect();
     }
   };
 
   return {
-    async get(key) {
+    async get(key: string): Promise<string | null> {
       await ensureConnection();
       return redis.get(key);
     },
-    async set(key, value, ttl) {
+    async set(key: string, value: string, ttl?: number): Promise<unknown> {
       await ensureConnection();
       if (ttl && ttl > 0) {
         return redis.set(key, value, "EX", ttl);
       }
       return redis.set(key, value);
     },
-    async delete(key) {
+    async delete(key: string): Promise<void> {
       await ensureConnection();
-      return redis.del(key);
+      await redis.del(key);
     },
   };
 }

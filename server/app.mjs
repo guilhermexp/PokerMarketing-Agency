@@ -12,7 +12,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
 import { toNodeHandler } from "better-auth/node";
-import { auth } from "./lib/better-auth.mjs";
+import { auth } from "./lib/better-auth.js";
 import { isResponseEnvelope, sendError, sendSuccess } from "./lib/response.js";
 import { requestLogger } from "./middleware/requestLogger.mjs";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.mjs";
@@ -20,7 +20,7 @@ import { csrfProtection } from "./middleware/csrfProtection.mjs";
 import logger from "./lib/logger.js";
 
 // Lib imports (used in middleware only)
-import { getSql } from "./lib/db.mjs";
+import { getSql } from "./lib/db.js";
 import {
   requireAuthenticatedRequest,
   enforceAuthenticatedIdentity,
@@ -28,7 +28,7 @@ import {
   createRateLimitMiddleware,
 } from "./lib/auth.mjs";
 import { resourceAccessMiddleware } from "./lib/resource-access.mjs";
-import { resolveUserId } from "./lib/user-resolver.mjs";
+import { resolveUserId } from "./lib/user-resolver.js";
 import { buildImagePrompt } from "./lib/ai/prompt-builders.mjs";
 
 // ---------------------------------------------------------------------------

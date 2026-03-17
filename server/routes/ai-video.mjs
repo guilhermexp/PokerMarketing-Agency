@@ -6,8 +6,8 @@
  */
 
 import { put } from "@vercel/blob";
-import { getSql } from "../lib/db.mjs";
-import { resolveUserId } from "../lib/user-resolver.mjs";
+import { getSql } from "../lib/db.js";
+import { resolveUserId } from "../lib/user-resolver.js";
 import { getRequestAuthContext } from "../lib/auth.mjs";
 import {
   logAiUsage,
@@ -17,7 +17,7 @@ import {
   logExternalAPI,
   logExternalAPIResult,
   logError,
-} from "../lib/logging-helpers.mjs";
+} from "../lib/logging-helpers.js";
 import {
   generateVideoWithGoogleVeo,
   generateVideoWithFal,

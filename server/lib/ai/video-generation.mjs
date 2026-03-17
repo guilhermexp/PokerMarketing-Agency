@@ -10,7 +10,7 @@ import { fal } from "@fal-ai/client";
 import { put } from "@vercel/blob";
 import { validateContentType } from "../validation/contentType.js";
 import { configureFal } from "./clients.js";
-import { logExternalAPI, logExternalAPIResult } from "../logging-helpers.mjs";
+import { logExternalAPI, logExternalAPIResult } from "../logging-helpers.js";
 import logger from "../logger.js";
 
 export const parseDataUrlImage = (dataUrl) => {

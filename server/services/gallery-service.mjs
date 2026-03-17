@@ -1,6 +1,6 @@
 import { del } from "@vercel/blob";
-import { getSql } from "../lib/db.mjs";
-import { resolveUserId } from "../lib/user-resolver.mjs";
+import { getSql } from "../lib/db.js";
+import { resolveUserId } from "../lib/user-resolver.js";
 import { resolveOrganizationContext } from "../lib/auth.mjs";
 import {
   ValidationError,

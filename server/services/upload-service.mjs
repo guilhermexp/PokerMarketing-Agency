@@ -5,7 +5,7 @@ import {
   ExternalServiceError,
 } from "../lib/errors/index.js";
 import { validateContentType } from "../lib/validation/contentType.js";
-import { logExternalAPI, logExternalAPIResult } from "../lib/logging-helpers.mjs";
+import { logExternalAPI, logExternalAPIResult } from "../lib/logging-helpers.js";
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 

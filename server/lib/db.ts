@@ -5,15 +5,17 @@
  * Exports: getSql, warmupDatabase, ensureGallerySourceType, isUndefinedColumnError
  */
 
-import { neon } from "@neondatabase/serverless";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import logger from "./logger.js";
 
 export const DATABASE_URL = process.env.DATABASE_URL;
 
-// SINGLETON: Reuse connection to avoid cold start on every request
-let sqlInstance = null;
+export type SqlClient = NeonQueryFunction<false, false>;
 
-export function getSql() {
+// SINGLETON: Reuse connection to avoid cold start on every request
+let sqlInstance: SqlClient | null = null;
+
+export function getSql(): SqlClient {
   if (!DATABASE_URL) {
     throw new Error("DATABASE_URL not configured");
   }
@@ -24,7 +26,7 @@ export function getSql() {
 }
 
 // WARMUP: Pre-warm database connection on server start
-export async function warmupDatabase() {
+export async function warmupDatabase(): Promise<void> {
   try {
     const start = Date.now();
     const sql = getSql();
@@ -38,7 +40,7 @@ export async function warmupDatabase() {
   }
 }
 
-export async function ensureGallerySourceType(sql) {
+export async function ensureGallerySourceType(sql: SqlClient): Promise<void> {
   try {
     const result = await sql`
       SELECT data_type, udt_name
@@ -47,7 +49,7 @@ export async function ensureGallerySourceType(sql) {
       LIMIT 1
     `;
 
-    const column = result?.[0];
+    const column = result?.[0] as { data_type: string; udt_name: string } | undefined;
     if (!column) return;
 
     const isEnum =
@@ -72,10 +74,16 @@ export async function ensureGallerySourceType(sql) {
   }
 }
 
-export function isUndefinedColumnError(error, columnName) {
+interface DatabaseError {
+  message?: string;
+  code?: string;
+}
+
+export function isUndefinedColumnError(error: unknown, columnName?: string): boolean {
   if (!error || typeof error !== "object") return false;
-  const message = typeof error.message === "string" ? error.message : "";
-  const matchesCode = error.code === "42703";
+  const dbError = error as DatabaseError;
+  const message = typeof dbError.message === "string" ? dbError.message : "";
+  const matchesCode = dbError.code === "42703";
   if (!columnName) {
     return matchesCode || message.includes('does not exist');
   }

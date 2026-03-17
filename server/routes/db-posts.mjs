@@ -1,5 +1,5 @@
-import { getSql } from "../lib/db.mjs";
-import { logError } from "../lib/logging-helpers.mjs";
+import { getSql } from "../lib/db.js";
+import { logError } from "../lib/logging-helpers.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 
 export function registerPostRoutes(app) {

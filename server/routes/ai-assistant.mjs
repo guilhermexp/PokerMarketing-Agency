@@ -8,7 +8,7 @@
  */
 
 import { getRequestAuthContext } from "../lib/auth.mjs";
-import { getSql } from "../lib/db.mjs";
+import { getSql } from "../lib/db.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import { streamTextFromMessages } from "../lib/ai/text-generation.mjs";
 import { ASSISTANT_MODEL } from "../lib/ai/models.js";

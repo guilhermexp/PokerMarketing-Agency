@@ -14,7 +14,7 @@ import { fileURLToPath } from "url";
 import express from "express";
 import app, { finalizeApp } from "./app.mjs";
 import logger from "./lib/logger.js";
-import { DATABASE_URL, getSql, warmupDatabase, ensureGallerySourceType } from "./lib/db.mjs";
+import { DATABASE_URL, getSql, warmupDatabase, ensureGallerySourceType } from "./lib/db.js";
 import { initializeScheduledPostsChecker, waitForRedis, initializeImageGenerationWorker, registerImageGenerationProcessor } from "./helpers/job-queue.mjs";
 import { checkAndPublishScheduledPosts, publishScheduledPostById } from "./helpers/scheduled-publisher.mjs";
 import { generateImageWithFallback } from "./lib/ai/image-generation.mjs";

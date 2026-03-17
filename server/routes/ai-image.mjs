@@ -10,7 +10,7 @@
 
 import { getRequestAuthContext } from "../lib/auth.mjs";
 import { put } from "@vercel/blob";
-import { getSql } from "../lib/db.mjs";
+import { getSql } from "../lib/db.js";
 import {
   withRetry,
   sanitizeErrorForClient,

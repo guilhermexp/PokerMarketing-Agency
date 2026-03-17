@@ -1,4 +1,4 @@
-import { getSql } from "../lib/db.mjs";
+import { getSql } from "../lib/db.js";
 import { ValidationError, DatabaseError } from "../lib/errors/index.js";
 
 export function registerUserRoutes(app) {

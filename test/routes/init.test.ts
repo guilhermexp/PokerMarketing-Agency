@@ -19,10 +19,10 @@ describe("init routes", () => {
     ];
     const sqlMock = vi.fn(async () => queryResults.shift() ?? []);
 
-    vi.doMock("../../server/lib/db.mjs", () => ({
+    vi.doMock("../../server/lib/db.js", () => ({
       getSql: () => sqlMock,
     }));
-    vi.doMock("../../server/lib/user-resolver.mjs", () => ({
+    vi.doMock("../../server/lib/user-resolver.js", () => ({
       resolveUserId: resolveUserIdMock,
     }));
     vi.doMock("../../server/lib/logger.js", () => ({
@@ -50,10 +50,10 @@ describe("init routes", () => {
     const resolveUserIdMock = vi.fn().mockResolvedValue(null);
     const sqlMock = vi.fn();
 
-    vi.doMock("../../server/lib/db.mjs", () => ({
+    vi.doMock("../../server/lib/db.js", () => ({
       getSql: () => sqlMock,
     }));
-    vi.doMock("../../server/lib/user-resolver.mjs", () => ({
+    vi.doMock("../../server/lib/user-resolver.js", () => ({
       resolveUserId: resolveUserIdMock,
     }));
     vi.doMock("../../server/lib/logger.js", () => ({

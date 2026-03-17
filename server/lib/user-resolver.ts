@@ -5,15 +5,19 @@
  * Owns: userIdCache
  */
 
-import { getSql } from "./db.mjs";
-import { isUndefinedColumnError } from "./db.mjs";
+import { getSql, isUndefinedColumnError, type SqlClient } from "./db.js";
 import logger from "./logger.js";
 
+interface CacheEntry {
+  userId: string;
+  timestamp: number;
+}
+
 // Cache for resolved user IDs (5 minute TTL)
-export const userIdCache = new Map();
+export const userIdCache = new Map<string, CacheEntry>();
 const USER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-export function getCachedUserId(clerkId) {
+export function getCachedUserId(clerkId: string): string | null {
   const cached = userIdCache.get(clerkId);
   if (cached && Date.now() - cached.timestamp < USER_CACHE_TTL) {
     return cached.userId;
@@ -21,7 +25,7 @@ export function getCachedUserId(clerkId) {
   return null;
 }
 
-export function setCachedUserId(clerkId, userId) {
+export function setCachedUserId(clerkId: string, userId: string): void {
   userIdCache.set(clerkId, { userId, timestamp: Date.now() });
 }
 
@@ -31,7 +35,7 @@ export function setCachedUserId(clerkId, userId) {
  * UUIDs look like: 550e8400-e29b-41d4-a716-446655440000
  * Uses caching to avoid repeated DB lookups.
  */
-export async function resolveUserId(sql, userId) {
+export async function resolveUserId(sql: SqlClient, userId: string | null | undefined): Promise<string | null> {
   if (!userId) return null;
   const normalizedUserId = String(userId).trim();
   if (!normalizedUserId) return null;
@@ -50,14 +54,14 @@ export async function resolveUserId(sql, userId) {
   }
 
   // It's a Clerk ID - look up the user by auth_provider_id
-  let result;
+  let result: Array<{ id: string }>;
   try {
     result = await sql`
       SELECT id FROM users
       WHERE auth_provider_id = ${normalizedUserId}
       AND deleted_at IS NULL
       LIMIT 1
-    `;
+    ` as Array<{ id: string }>;
   } catch (error) {
     // Backward compatibility for legacy schemas without deleted_at on users
     if (!isUndefinedColumnError(error, "deleted_at")) {
@@ -67,11 +71,11 @@ export async function resolveUserId(sql, userId) {
       SELECT id FROM users
       WHERE auth_provider_id = ${normalizedUserId}
       LIMIT 1
-    `;
+    ` as Array<{ id: string }>;
   }
 
   if (result.length > 0) {
-    const resolvedId = result[0].id;
+    const resolvedId = result[0]!.id;
     setCachedUserId(normalizedUserId, resolvedId); // Cache it!
     return resolvedId;
   }
@@ -83,3 +87,6 @@ export async function resolveUserId(sql, userId) {
   );
   return null;
 }
+
+// Re-export getSql for convenience
+export { getSql };
