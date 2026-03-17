@@ -7,9 +7,12 @@
 
 import { betterAuth } from "better-auth";
 import { organization } from "better-auth/plugins/organization";
+import IORedis from "ioredis";
 import pg from "pg";
+import logger from "./logger.mjs";
 
 const { Pool } = pg;
+const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || null;
 const AUTH_BASE_URL =
   process.env.BETTER_AUTH_BASE_URL ||
   process.env.BETTER_AUTH_URL ||
@@ -24,10 +27,56 @@ const TRUSTED_ORIGINS = [
   ...(process.env.CORS_ORIGINS || "").split(",").map((origin) => origin.trim()),
 ].filter(Boolean);
 
+const authDatabase = new Pool({ connectionString: process.env.DATABASE_URL });
+
+function createRedisSecondaryStorage() {
+  if (!REDIS_URL) {
+    return undefined;
+  }
+
+  const redis = new IORedis(REDIS_URL, {
+    lazyConnect: true,
+    enableReadyCheck: true,
+    maxRetriesPerRequest: 1,
+    connectTimeout: 5000,
+  });
+
+  redis.on("error", (error) => {
+    logger.warn({ err: error }, "[Better Auth] Redis secondary storage error");
+  });
+
+  const ensureConnection = async () => {
+    if (redis.status === "wait") {
+      await redis.connect();
+    }
+  };
+
+  return {
+    async get(key) {
+      await ensureConnection();
+      return redis.get(key);
+    },
+    async set(key, value, ttl) {
+      await ensureConnection();
+      if (ttl && ttl > 0) {
+        return redis.set(key, value, "EX", ttl);
+      }
+      return redis.set(key, value);
+    },
+    async delete(key) {
+      await ensureConnection();
+      return redis.del(key);
+    },
+  };
+}
+
+const secondaryStorage = createRedisSecondaryStorage();
+
 export const auth = betterAuth({
-  database: new Pool({ connectionString: process.env.DATABASE_URL }),
+  database: authDatabase,
   baseURL: AUTH_BASE_URL,
   emailAndPassword: { enabled: true },
+  secondaryStorage,
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // refresh daily
