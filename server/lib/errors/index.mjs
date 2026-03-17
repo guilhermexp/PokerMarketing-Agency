@@ -3,7 +3,7 @@
  * Specific error types for common error scenarios
  */
 
-import { AppError, ERROR_CODES, HTTP_STATUS } from "./AppError.mjs";
+import { AppError, ERROR_CODES, HTTP_STATUS } from "./AppError.js";
 
 // Re-export base error and constants
 export { AppError, ERROR_CODES, HTTP_STATUS };

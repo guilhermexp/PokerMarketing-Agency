@@ -13,7 +13,7 @@ import cors from "cors";
 import helmet from "helmet";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/better-auth.mjs";
-import { isResponseEnvelope, sendError, sendSuccess } from "./lib/response.mjs";
+import { isResponseEnvelope, sendError, sendSuccess } from "./lib/response.js";
 import { requestLogger } from "./middleware/requestLogger.mjs";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.mjs";
 import { csrfProtection } from "./middleware/csrfProtection.mjs";

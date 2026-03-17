@@ -58,7 +58,9 @@ export const ALLOWED_UPLOAD_CONTENT_TYPES = [
   "image/gif",
   "video/mp4",
   "video/webm",
-];
+] as const;
+
+export type AllowedContentType = (typeof ALLOWED_UPLOAD_CONTENT_TYPES)[number];
 
 /**
  * Validates a content type against the allowed upload types whitelist.
@@ -74,7 +76,7 @@ export const ALLOWED_UPLOAD_CONTENT_TYPES = [
  * - Distribute malware to application users
  * - Bypass Content Security Policy headers
  *
- * @param {string} mimeType - The MIME type to validate (e.g., "image/jpeg")
+ * @param mimeType - The MIME type to validate (e.g., "image/jpeg")
  * @throws {Error} If the content type is not in the allowed list
  *
  * @example
@@ -82,7 +84,7 @@ export const ALLOWED_UPLOAD_CONTENT_TYPES = [
  * validateContentType("text/html"); // ❌ throws Error - prevents Stored XSS
  * validateContentType("image/svg+xml"); // ❌ throws Error - SVG can contain JS
  */
-export function validateContentType(mimeType) {
+export function validateContentType(mimeType: string): void {
   // SECURITY: Reject missing/empty content types to prevent default MIME type attacks
   // Some browsers might execute unknown types as text/html or text/plain
   if (!mimeType) {
@@ -92,7 +94,7 @@ export function validateContentType(mimeType) {
   // SECURITY: Whitelist validation prevents upload of dangerous file types
   // Attackers cannot bypass this by using variations (e.g., "TEXT/HTML", "image/svg+xml")
   // because we require exact case-sensitive matches
-  if (!ALLOWED_UPLOAD_CONTENT_TYPES.includes(mimeType)) {
+  if (!(ALLOWED_UPLOAD_CONTENT_TYPES as readonly string[]).includes(mimeType)) {
     throw new Error(
       `Invalid content type: ${mimeType}. Allowed types: ${ALLOWED_UPLOAD_CONTENT_TYPES.join(", ")}`
     );

@@ -9,7 +9,7 @@ import { getRequestAuthContext } from "../lib/auth.mjs";
 import { getSql } from "../lib/db.mjs";
 import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 import { generateStructuredContent } from "../lib/ai/text-generation.mjs";
-import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.mjs";
+import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.js";
 import {
   campaignSchema,
   getToneText,

@@ -1,7 +1,7 @@
 import { getSql } from "../lib/db.mjs";
 import { resolveUserId } from "../lib/user-resolver.mjs";
 import logger from "../lib/logger.mjs";
-import { RUBE_MCP_URL, RUBE_TIMEOUT_MS } from "../lib/constants.mjs";
+import { RUBE_MCP_URL, RUBE_TIMEOUT_MS } from "../lib/constants.js";
 
 // ============================================================================
 // RUBE MCP PROXY - For Instagram Publishing (multi-tenant)

@@ -9,7 +9,7 @@
  */
 
 import logger from "../lib/logger.mjs";
-import { sendError } from "../lib/response.mjs";
+import { sendError } from "../lib/response.js";
 import { AppError, ERROR_CODES, HTTP_STATUS } from "../lib/errors/index.mjs";
 import { randomUUID } from "crypto";
 

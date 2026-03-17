@@ -18,7 +18,7 @@
  */
 
 import { getGeminiAi } from "./clients.mjs";
-import { normalizeModelId, TEXT_MODEL } from "./models.mjs";
+import { normalizeModelId, TEXT_MODEL } from "./models.js";
 import { withRetry } from "./retry.mjs";
 
 // ============================================================================

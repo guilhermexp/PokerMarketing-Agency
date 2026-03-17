@@ -22,7 +22,7 @@ import {
   DEFAULT_IMAGE_MODEL,
 } from "../lib/ai/image-generation.mjs";
 import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
-import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.mjs";
+import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.js";
 import {
   buildImagePrompt,
   convertImagePromptToJson,
@@ -32,7 +32,7 @@ import {
   createTimer,
 } from "../helpers/usage-tracking.mjs";
 import { urlToBase64 } from "../helpers/image-helpers.mjs";
-import { validateContentType } from "../lib/validation/contentType.mjs";
+import { validateContentType } from "../lib/validation/contentType.js";
 import logger from "../lib/logger.mjs";
 import {
   enqueueImageGeneration,

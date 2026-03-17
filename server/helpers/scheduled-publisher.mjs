@@ -5,7 +5,7 @@
  */
 
 import { put } from "@vercel/blob";
-import { validateContentType } from "../lib/validation/contentType.mjs";
+import { validateContentType } from "../lib/validation/contentType.js";
 import { getSql, DATABASE_URL } from "../lib/db.mjs";
 
 const RUBE_TOKEN = process.env.RUBE_TOKEN; // Fallback for legacy posts

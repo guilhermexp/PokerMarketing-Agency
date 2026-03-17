@@ -8,7 +8,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { fal } from "@fal-ai/client";
 import { put } from "@vercel/blob";
-import { validateContentType } from "../validation/contentType.mjs";
+import { validateContentType } from "../validation/contentType.js";
 import { configureFal } from "./clients.mjs";
 import { logExternalAPI, logExternalAPIResult } from "../logging-helpers.mjs";
 import logger from "../logger.mjs";

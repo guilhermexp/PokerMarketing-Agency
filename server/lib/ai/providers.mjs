@@ -16,7 +16,7 @@ import {
   normalizeModelId,
   TEXT_MODEL,
   SUPPORTED_CHAT_MODELS,
-} from './models.mjs';
+} from './models.js';
 
 // ============================================================================
 // PROVIDER INSTANCE

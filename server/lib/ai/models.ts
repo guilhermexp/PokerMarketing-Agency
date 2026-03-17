@@ -54,7 +54,9 @@ export const Type = {
   INTEGER: "INTEGER",
   BOOLEAN: "BOOLEAN",
   NUMBER: "NUMBER",
-};
+} as const;
+
+export type SchemaType = (typeof Type)[keyof typeof Type];
 
 // ============================================================================
 // HELPERS
@@ -64,17 +66,23 @@ export const Type = {
  * Normalize model ID — strips "google/" prefix from legacy OpenRouter IDs.
  * e.g. "google/gemini-3-flash-preview" → "gemini-3-flash-preview"
  */
-export function normalizeModelId(modelId) {
+export function normalizeModelId(modelId: string): string {
   return modelId.replace(/^google\//, "");
+}
+
+export interface ChatModel {
+  id: string;
+  name: string;
+  fast: boolean;
 }
 
 /**
  * Supported chat models for the Vercel AI SDK chat endpoint.
  */
-export const SUPPORTED_CHAT_MODELS = [
+export const SUPPORTED_CHAT_MODELS: readonly ChatModel[] = [
   { id: "gemini-3-flash-preview", name: "Gemini 3 Flash", fast: true },
   { id: "gemini-3-pro-preview", name: "Gemini 3 Pro", fast: false },
-];
+] as const;
 
 // ============================================================================
 // LEGACY ALIASES — used by existing code, brand profiles, prompt-builders

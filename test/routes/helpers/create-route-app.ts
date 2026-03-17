@@ -5,7 +5,7 @@ import {
   isResponseEnvelope,
   sendError,
   sendSuccess,
-} from "../../../server/lib/response.mjs";
+} from "../../../server/lib/response.js";
 
 export function createRouteApp(registerRoutes: (app: Express) => void) {
   const app = express();

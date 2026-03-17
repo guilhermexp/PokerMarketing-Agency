@@ -16,7 +16,7 @@ import { withRetry } from "./retry.mjs";
 import {
   IMAGE_MODEL_PRO,
   IMAGE_MODEL_STANDARD,
-} from "./models.mjs";
+} from "./models.js";
 import { FAL_IMAGE_MODEL } from "./fal-image-generation.mjs";
 import { runWithProviderFallback } from "./image-providers.mjs";
 import logger from "../logger.mjs";

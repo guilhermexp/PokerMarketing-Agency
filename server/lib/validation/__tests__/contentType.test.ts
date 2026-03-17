@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   validateContentType,
   ALLOWED_UPLOAD_CONTENT_TYPES,
-} from '../contentType.mjs';
+} from '../contentType.js';
 
 describe('contentType validation', () => {
   describe('ALLOWED_UPLOAD_CONTENT_TYPES', () => {
@@ -107,13 +107,13 @@ describe('contentType validation', () => {
 
     describe('edge cases', () => {
       it('should reject null content type', () => {
-        expect(() => validateContentType(null)).toThrow(
+        expect(() => validateContentType(null as unknown as string)).toThrow(
           'Content type is required'
         );
       });
 
       it('should reject undefined content type', () => {
-        expect(() => validateContentType(undefined)).toThrow(
+        expect(() => validateContentType(undefined as unknown as string)).toThrow(
           'Content type is required'
         );
       });
@@ -129,10 +129,10 @@ describe('contentType validation', () => {
           validateContentType('text/html');
           expect.fail('Expected validateContentType to throw');
         } catch (error) {
-          expect(error.message).toContain('Invalid content type: text/html');
-          expect(error.message).toContain('Allowed types:');
-          expect(error.message).toContain('image/jpeg');
-          expect(error.message).toContain('image/png');
+          expect((error as Error).message).toContain('Invalid content type: text/html');
+          expect((error as Error).message).toContain('Allowed types:');
+          expect((error as Error).message).toContain('image/jpeg');
+          expect((error as Error).message).toContain('image/png');
         }
       });
     });

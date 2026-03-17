@@ -11,7 +11,7 @@ import { getRequestAuthContext } from "../lib/auth.mjs";
 import { getSql } from "../lib/db.mjs";
 import { sanitizeErrorForClient } from "../lib/ai/retry.mjs";
 import { streamTextFromMessages } from "../lib/ai/text-generation.mjs";
-import { ASSISTANT_MODEL } from "../lib/ai/models.mjs";
+import { ASSISTANT_MODEL } from "../lib/ai/models.js";
 import { requireAuthWithAiRateLimit } from "../lib/auth.mjs";
 import {
   logAiUsage,

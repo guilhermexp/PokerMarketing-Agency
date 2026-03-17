@@ -4,7 +4,7 @@ import {
   PermissionDeniedError,
   ExternalServiceError,
 } from "../lib/errors/index.mjs";
-import { validateContentType } from "../lib/validation/contentType.mjs";
+import { validateContentType } from "../lib/validation/contentType.js";
 import { logExternalAPI, logExternalAPIResult } from "../lib/logging-helpers.mjs";
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;

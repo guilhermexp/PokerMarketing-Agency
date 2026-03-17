@@ -43,7 +43,9 @@ export const ERROR_CODES = {
 
   // Service Unavailable (503)
   SERVICE_UNAVAILABLE: "SERVICE_UNAVAILABLE",
-};
+} as const;
+
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
 
 /**
  * HTTP status codes
@@ -61,27 +63,43 @@ export const HTTP_STATUS = {
   TOO_MANY_REQUESTS: 429,
   INTERNAL_SERVER_ERROR: 500,
   SERVICE_UNAVAILABLE: 503,
-};
+} as const;
+
+export type HttpStatus = (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS];
+
+export interface ErrorDetails {
+  [key: string]: unknown;
+}
+
+export interface AppErrorJSON {
+  error: {
+    name: string;
+    message: string;
+    code: string;
+    statusCode: number;
+    timestamp: string;
+    details?: ErrorDetails;
+    stack?: string;
+  };
+}
 
 /**
  * Base Application Error
  * All custom errors should extend this class
  */
 export class AppError extends Error {
-  /**
-   * Create a new application error
-   * @param {string} message - Human-readable error message
-   * @param {string} code - Error code from ERROR_CODES
-   * @param {number} statusCode - HTTP status code from HTTP_STATUS
-   * @param {boolean} isOperational - Whether this is an operational error (expected) vs programming error (bug)
-   * @param {Object} details - Additional error details (validation errors, context, etc.)
-   */
+  readonly code: string;
+  readonly statusCode: number;
+  readonly isOperational: boolean;
+  readonly details: ErrorDetails | null;
+  readonly timestamp: string;
+
   constructor(
-    message,
-    code = ERROR_CODES.INTERNAL_SERVER_ERROR,
-    statusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR,
-    isOperational = true,
-    details = null
+    message: string,
+    code: string = ERROR_CODES.INTERNAL_SERVER_ERROR,
+    statusCode: number = HTTP_STATUS.INTERNAL_SERVER_ERROR,
+    isOperational: boolean = true,
+    details: ErrorDetails | null = null
   ) {
     super(message);
 
@@ -98,11 +116,9 @@ export class AppError extends Error {
 
   /**
    * Convert error to JSON for API responses
-   * @param {boolean} includeStack - Whether to include stack trace (dev only)
-   * @returns {Object}
    */
-  toJSON(includeStack = false) {
-    const json = {
+  toJSON(includeStack: boolean = false): AppErrorJSON {
+    const json: AppErrorJSON = {
       error: {
         name: this.name,
         message: this.message,
@@ -125,9 +141,8 @@ export class AppError extends Error {
 
   /**
    * Check if this is an operational error
-   * @returns {boolean}
    */
-  static isOperational(error) {
+  static isOperational(error: unknown): boolean {
     if (error instanceof AppError) {
       return error.isOperational;
     }

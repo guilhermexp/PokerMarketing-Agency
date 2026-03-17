@@ -19,7 +19,7 @@ import { initializeScheduledPostsChecker, waitForRedis, initializeImageGeneratio
 import { checkAndPublishScheduledPosts, publishScheduledPostById } from "./helpers/scheduled-publisher.mjs";
 import { generateImageWithFallback } from "./lib/ai/image-generation.mjs";
 import { put } from "@vercel/blob";
-import { validateContentType } from "./lib/validation/contentType.mjs";
+import { validateContentType } from "./lib/validation/contentType.js";
 
 validateEnv();
 

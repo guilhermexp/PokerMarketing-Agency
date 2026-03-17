@@ -18,7 +18,7 @@ import {
   DEFAULT_ASSISTANT_MODEL,
   AI_INFLUENCER_FLASH_MODEL,
   Type,
-} from "./models.mjs";
+} from "./models.js";
 import {
   logAiUsage,
   createTimer,

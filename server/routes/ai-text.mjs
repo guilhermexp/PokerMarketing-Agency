@@ -28,7 +28,7 @@ import { runWithProviderFallback } from "../lib/ai/image-providers.mjs";
 import {
   DEFAULT_TEXT_MODEL,
   DEFAULT_FAST_TEXT_MODEL,
-} from "../lib/ai/models.mjs";
+} from "../lib/ai/models.js";
 import {
   buildFlyerPrompt,
   buildQuickPostPrompt,
@@ -40,7 +40,7 @@ import {
   logAiUsage,
   createTimer,
 } from "../helpers/usage-tracking.mjs";
-import { validateContentType } from "../lib/validation/contentType.mjs";
+import { validateContentType } from "../lib/validation/contentType.js";
 import logger from "../lib/logger.mjs";
 
 export function registerAiTextRoutes(app) {
