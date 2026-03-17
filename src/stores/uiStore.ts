@@ -17,6 +17,8 @@ import { parseApiError } from '../utils/errorMessages';
 // Types
 // =============================================================================
 
+export type Theme = 'light' | 'dark';
+
 export type ModalType =
   | 'imagePreview'
   | 'exportVideo'
@@ -58,6 +60,12 @@ export interface UiState {
   // View state
   currentView: string;
 
+  // Theme
+  theme: Theme;
+
+  // Error state (global error notification)
+  error: string | null;
+
   // Actions
   openModal: (modal: ModalType, data?: Record<string, unknown> | null) => void;
   closeModal: () => void;
@@ -68,6 +76,10 @@ export interface UiState {
   removeToast: (id: string) => void;
   clearToasts: () => void;
   setCurrentView: (view: string) => void;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
+  setError: (error: string | null) => void;
+  clearError: () => void;
 }
 
 // =============================================================================
@@ -86,6 +98,8 @@ export const useUiStore = create<UiState>()(
       loadingMessage: null,
       toasts: [],
       currentView: 'dashboard',
+      theme: 'dark',
+      error: null,
 
       // Modal actions
       openModal: (modal, data = null) => {
@@ -175,6 +189,26 @@ export const useUiStore = create<UiState>()(
       setCurrentView: (view) => {
         set({ currentView: view });
       },
+
+      // Theme actions
+      setTheme: (theme) => {
+        set({ theme });
+      },
+
+      toggleTheme: () => {
+        set((state) => ({
+          theme: state.theme === 'light' ? 'dark' : 'light',
+        }));
+      },
+
+      // Error actions
+      setError: (error) => {
+        set({ error });
+      },
+
+      clearError: () => {
+        set({ error: null });
+      },
     }),
     { name: 'UiStore' }
   )
@@ -189,6 +223,8 @@ export const selectModalData = (state: UiState) => state.modalData;
 export const selectSidebarOpen = (state: UiState) => state.sidebarOpen;
 export const selectGlobalLoading = (state: UiState) => state.globalLoading;
 export const selectToasts = (state: UiState) => state.toasts;
+export const selectTheme = (state: UiState) => state.theme;
+export const selectError = (state: UiState) => state.error;
 
 // =============================================================================
 // Hooks for common patterns

@@ -29,7 +29,6 @@ import type {
   MarketingCampaign,
   ContentInput,
   ChatMessage,
-  Theme,
   TournamentEvent,
   GalleryImage,
   ChatReferenceImage,
@@ -57,6 +56,7 @@ import { useGalleryStore } from "./stores/gallery-store";
 import { useScheduledPostsStore } from "./stores/scheduled-posts-store";
 import { useChatStore } from "./stores/chat-store";
 import { useTournamentStore, type TimePeriod } from "./stores/tournament-store";
+import { useUiStore } from "./stores/uiStore";
 import {
   getBrandProfile,
   createBrandProfile,
@@ -334,7 +334,10 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
     }
     return null;
   };
-  const [error, setError] = useState<string | null>(null);
+  // Error state from UI store
+  const error = useUiStore((state) => state.error);
+  const setError = useUiStore((state) => state.setError);
+
   const handleViewChange = useCallback((view: ViewType) => {
     navigate(VIEW_PATHS[view]);
   }, [navigate]);
@@ -611,7 +614,9 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
   const hasAutoLoadedSchedule = useTournamentStore((state) => state.hasAutoLoadedSchedule);
   const setHasAutoLoadedSchedule = useTournamentStore((state) => state.setHasAutoLoadedSchedule);
 
-  const [theme, setTheme] = useState<Theme>("dark");
+  // Theme from UI store
+  const theme = useUiStore((state) => state.theme);
+  const setTheme = useUiStore((state) => state.setTheme);
 
   useEffect(() => {
     const previous = initScopeRef.current;
@@ -2318,10 +2323,7 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
 
   const handleToggleAssistant = useChatStore((state) => state.handleToggleAssistant);
 
-  const handleThemeToggle = useCallback(
-    () => setTheme((t) => (t === "light" ? "dark" : "light")),
-    [],
-  );
+  const handleThemeToggle = useUiStore((state) => state.toggleTheme);
 
   const handleAddTournamentEvent = useTournamentStore((state) => state.addTournamentEvent);
 
