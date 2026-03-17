@@ -155,18 +155,18 @@ export function useGalleryHandlers({
 
   const handleUpdateGalleryImage = useCallback(
     (imageId: string, newImageSrc: string) => {
-      console.log("[Gallery] handleUpdateGalleryImage called:", {
+      console.debug("[Gallery] handleUpdateGalleryImage called:", {
         imageId,
         newSrc: newImageSrc.substring(0, 50),
       });
 
       // Update SWR cache immediately (optimistic update)
       swrUpdateGalleryImage(imageId, { src_url: newImageSrc });
-      console.log("[Gallery] SWR cache updated");
+      console.debug("[Gallery] SWR cache updated");
 
       if (toolImageReference?.id === imageId) {
         setToolImageReference({ id: imageId, src: newImageSrc });
-        console.log("[Gallery] toolImageReference updated");
+        console.debug("[Gallery] toolImageReference updated");
       }
 
       // Skip temp images, synthetic IDs (like thumbnail-xxx), and other non-database IDs
@@ -175,7 +175,7 @@ export function useGalleryHandlers({
         imageId.startsWith("thumbnail-") ||
         imageId.includes("-cover")
       ) {
-        console.log("[Gallery] Skipping synthetic/temp image ID:", imageId);
+        console.debug("[Gallery] Skipping synthetic/temp image ID:", imageId);
         return;
       }
 
@@ -186,20 +186,20 @@ export function useGalleryHandlers({
             ? await uploadDataUrlToBlob(newImageSrc)
             : newImageSrc;
 
-          console.log("[Gallery] Updating database with:", {
+          console.debug("[Gallery] Updating database with:", {
             imageId,
             srcUrl: srcUrl.substring(0, 50),
           });
 
           await updateGalleryImage(imageId, { src_url: srcUrl });
-          console.log("[Gallery] Database updated successfully");
+          console.debug("[Gallery] Database updated successfully");
 
           // Update cache with final Blob URL
           if (srcUrl !== newImageSrc) {
             swrUpdateGalleryImage(imageId, { src_url: srcUrl });
             if (toolImageReference?.id === imageId)
               setToolImageReference({ id: imageId, src: srcUrl });
-            console.log("[Gallery] Cache updated with blob URL");
+            console.debug("[Gallery] Cache updated with blob URL");
           }
 
           // Refresh gallery to ensure UI reflects the edit

@@ -9,7 +9,6 @@ import type {
 } from "@/types";
 import type { InstagramContext } from "@/services/rubeService";
 import type { Currency, TimePeriod } from "@/types/flyer.types";
-import { Button } from "../common/Button";
 import { Loader } from "../common/Loader";
 import { Icon } from "../common/Icon";
 import { generateFlyer } from "../../services/geminiService";
@@ -268,7 +267,7 @@ export const PeriodCardRow: React.FC<{
                 lastNotifiedFlyerIdRef.current = newSelectedId;
                 onExternalSelectFlyer(newSelectedId);
             }
-        }, [generatedFlyers, selectedFlyerId]);
+        }, [generatedFlyers, onExternalSelectFlyer, selectedFlyerId]);
 
         const handleGenerate = useCallback(
             async (forced: boolean = false) => {
@@ -415,8 +414,6 @@ export const PeriodCardRow: React.FC<{
                 collabLogos,
                 imageSize,
                 compositionAssets,
-                userId,
-                jobContext,
                 dayInfo,
                 selectedDay,
                 onAddImageToGallery,

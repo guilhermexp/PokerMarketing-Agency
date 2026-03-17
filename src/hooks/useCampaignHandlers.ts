@@ -18,7 +18,6 @@ import type {
   GenerationOptions,
   GalleryImage,
   CarouselScript,
-  CampaignSummary,
 } from "@/types";
 import type { DbCampaign } from "@/services/apiClient";
 import {

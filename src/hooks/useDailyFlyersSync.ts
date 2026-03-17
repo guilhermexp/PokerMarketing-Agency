@@ -51,7 +51,7 @@ export function useDailyFlyersSync({
 }: UseDailyFlyersSyncParams): void {
   // Load daily flyers from database
   useEffect(() => {
-    console.log("[DailyFlyers] useEffect triggered:", {
+    console.debug("[DailyFlyers] useEffect triggered:", {
       userId: !!userId,
       currentScheduleId,
       organizationId,
@@ -60,7 +60,7 @@ export function useDailyFlyersSync({
     });
 
     if (!userId || !currentScheduleId) {
-      console.log("[DailyFlyers] Skipping: missing userId or currentScheduleId");
+      console.debug("[DailyFlyers] Skipping: missing userId or currentScheduleId");
       return;
     }
 
@@ -71,30 +71,30 @@ export function useDailyFlyersSync({
       hasRestoredDailyFlyers &&
       !orgChanged
     ) {
-      console.log("[DailyFlyers] Skipping: already loaded for this schedule+org");
+      console.debug("[DailyFlyers] Skipping: already loaded for this schedule+org");
       return;
     }
 
     if (orgChanged) {
-      console.log("[DailyFlyers] Organization changed, forcing reload");
+      console.debug("[DailyFlyers] Organization changed, forcing reload");
       setHasRestoredDailyFlyers(false);
     }
 
     const loadDailyFlyers = async () => {
       try {
-        console.log("[DailyFlyers] Loading from database:", {
+        console.debug("[DailyFlyers] Loading from database:", {
           currentScheduleId,
           userId,
           organizationId,
         });
         const result = await getDailyFlyers(userId, currentScheduleId, organizationId);
-        console.log("[DailyFlyers] Result:", {
+        console.debug("[DailyFlyers] Result:", {
           imagesCount: result.images?.length || 0,
           structuredKeys: Object.keys(result.structured || {}),
         });
 
         if (!result.structured || Object.keys(result.structured).length === 0) {
-          console.log("[DailyFlyers] No flyers found in database");
+          console.debug("[DailyFlyers] No flyers found in database");
           setHasRestoredDailyFlyers(true);
           setLastLoadedScheduleId(currentScheduleId);
           setLastLoadedOrgId(organizationId);
@@ -157,7 +157,7 @@ export function useDailyFlyersSync({
             });
             return merged;
           });
-          console.log("[DailyFlyers] Merged state from database:", Object.keys(restoredState));
+          console.debug("[DailyFlyers] Merged state from database:", Object.keys(restoredState));
         }
 
         setHasRestoredDailyFlyers(true);

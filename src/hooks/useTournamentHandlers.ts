@@ -160,7 +160,7 @@ export function useTournamentHandlers({
 
         // Only clear daily flyer state when SWITCHING schedules (not on initial load or reload)
         if (isSwitchingSchedule) {
-          console.log(
+          console.debug(
             "[Tournament] Switching schedules, clearing flyer state"
           );
           setDailyFlyerState({});
