@@ -148,6 +148,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       chunkSizeWarningLimit: 800,
+      // PERF-01: lucide-react barrel imports bundled into ~924KB chunk. Vite tree-shakes used icons but chunk is still large. Consider converting to direct imports (lucide-react/dist/esm/icons/x) in a future optimization pass.
     },
   };
 });
