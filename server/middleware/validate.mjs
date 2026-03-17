@@ -23,7 +23,12 @@ export function validateRequest(schemas = {}) {
         });
       }
 
-      req[key] = result.data;
+      Object.defineProperty(req, key, {
+        configurable: true,
+        enumerable: true,
+        value: result.data,
+        writable: true,
+      });
     }
 
     next();
