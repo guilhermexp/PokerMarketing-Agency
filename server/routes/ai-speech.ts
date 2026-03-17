@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 /**
  * AI Speech Generation (TTS) Route
  * Extracted from server/index.mjs

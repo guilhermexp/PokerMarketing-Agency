@@ -14,7 +14,7 @@ describe("/api/upload security", () => {
   let apiBaseUrl = "";
 
   beforeAll(async () => {
-    const { registerUploadRoutes } = await import("../../server/routes/upload.mjs");
+    const { registerUploadRoutes } = await import("../../server/routes/upload.js");
     const app = createRouteApp(registerUploadRoutes);
 
     server = await new Promise((resolve) => {

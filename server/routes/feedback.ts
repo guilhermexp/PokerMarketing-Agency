@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 /**
  * Feedback API route
  *
@@ -6,7 +8,7 @@
  */
 
 import { Router } from 'express';
-import logger from '../lib/logger.mjs';
+import logger from '../lib/logger.js';
 
 const NOTES_API_URL = process.env.NOTES_API_URL || 'https://suna-api.claudedokploy.com';
 const NOTES_API_KEY = process.env.NOTES_API_KEY;

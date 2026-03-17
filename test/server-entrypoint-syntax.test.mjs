@@ -5,7 +5,7 @@ describe("server entrypoint syntax", () => {
   it("parses without duplicate declarations", () => {
     const result = spawnSync(
       process.execPath,
-      ["--check", "server/index.mjs"],
+      ["--import", "tsx", "--check", "server/index.ts"],
       {
         cwd: process.cwd(),
         encoding: "utf8",

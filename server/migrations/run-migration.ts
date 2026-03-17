@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 import { neon } from '@neondatabase/serverless';
 import { config } from 'dotenv';
 import { readFileSync } from 'fs';

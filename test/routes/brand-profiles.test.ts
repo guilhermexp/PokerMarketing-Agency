@@ -21,7 +21,7 @@ describe("brand profile routes", () => {
     }));
 
     const { registerBrandProfileRoutes } = await import(
-      "../../server/routes/db-brand-profiles.mjs"
+      "../../server/routes/db-brand-profiles.js"
     );
     const app = createRouteApp(registerBrandProfileRoutes);
 
@@ -47,7 +47,7 @@ describe("brand profile routes", () => {
     }));
 
     const { registerBrandProfileRoutes } = await import(
-      "../../server/routes/db-brand-profiles.mjs"
+      "../../server/routes/db-brand-profiles.js"
     );
     const app = createRouteApp(registerBrandProfileRoutes);
 

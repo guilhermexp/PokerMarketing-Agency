@@ -21,7 +21,7 @@ describe("upload routes", () => {
       uploadBase64Asset: uploadBase64AssetMock,
     }));
 
-    const { registerUploadRoutes } = await import("../../server/routes/upload.mjs");
+    const { registerUploadRoutes } = await import("../../server/routes/upload.js");
     const app = createRouteApp(registerUploadRoutes);
 
     const response = await request(app).post("/api/upload").send({
@@ -46,7 +46,7 @@ describe("upload routes", () => {
       uploadBase64Asset: vi.fn(),
     }));
 
-    const { registerUploadRoutes } = await import("../../server/routes/upload.mjs");
+    const { registerUploadRoutes } = await import("../../server/routes/upload.js");
     const app = createRouteApp(registerUploadRoutes);
 
     const response = await request(app).get("/api/proxy-video").query({

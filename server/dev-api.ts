@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 /**
  * Dev API bootstrap.
  *
@@ -5,4 +7,4 @@
  * while delegating to the unified server implementation in `index.mjs`.
  */
 
-import "./index.mjs";
+import "./index.js";

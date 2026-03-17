@@ -3,8 +3,8 @@
 import { z } from 'zod';
 import { tool } from '@anthropic-ai/claude-agent-sdk';
 import { put } from '@vercel/blob';
-import { getGeminiAi } from '../../ai/clients.mjs';
-import { generateStructuredContent } from '../../ai/text-generation.mjs';
+import { getGeminiAi } from '../../ai/clients.js';
+import { generateStructuredContent } from '../../ai/text-generation.js';
 import {
   buildVideoPrompt,
   buildImagePrompt,
@@ -13,17 +13,17 @@ import {
   campaignSchema,
   quickPostSchema,
   DEFAULT_TEXT_MODEL,
-} from '../../ai/prompt-builders.mjs';
+} from '../../ai/prompt-builders.js';
 import {
   generateImageWithFallback,
-} from '../../ai/image-generation.mjs';
+} from '../../ai/image-generation.js';
 import {
   generateVideoWithFal,
   generateVideoWithGoogleVeo,
   uploadDataUrlImageToBlob,
-} from '../../ai/video-generation.mjs';
+} from '../../ai/video-generation.js';
 import { urlToBase64 } from '../../../helpers/image-helpers.js';
-import { withRetry } from '../../ai/retry.mjs';
+import { withRetry } from '../../ai/retry.js';
 import {
   getTopics as getImageTopics,
   createTopic as createImageTopic,

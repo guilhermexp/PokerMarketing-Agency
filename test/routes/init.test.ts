@@ -29,7 +29,7 @@ describe("init routes", () => {
       default: { debug: vi.fn() },
     }));
 
-    const { registerInitRoutes } = await import("../../server/routes/init.mjs");
+    const { registerInitRoutes } = await import("../../server/routes/init.js");
     const app = createRouteApp(registerInitRoutes);
 
     const response = await request(app).get("/api/db/init").query({
@@ -60,7 +60,7 @@ describe("init routes", () => {
       default: { debug: vi.fn() },
     }));
 
-    const { registerInitRoutes } = await import("../../server/routes/init.mjs");
+    const { registerInitRoutes } = await import("../../server/routes/init.js");
     const app = createRouteApp(registerInitRoutes);
 
     const response = await request(app).get("/api/db/init").query({

@@ -3,13 +3,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { createStudioMcpServer } from './mcp-bridge.mjs';
-import { buildClaudeRuntimeEnv, getKimiProfilePath } from './kimi-profile.mjs';
-import { translateSdkMessage } from './message-translator.mjs';
+import { createStudioMcpServer } from './mcp-bridge.js';
+import { buildClaudeRuntimeEnv, getKimiProfilePath } from './kimi-profile.js';
+import { translateSdkMessage } from './message-translator.js';
 import {
   appendThreadMessage,
   updateThreadSessionId,
-} from './session-store.mjs';
+} from './session-store.js';
 
 const BLOCKED_NATIVE_TOOLS = [
   'Read',

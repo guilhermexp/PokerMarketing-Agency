@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 /**
  * Server entrypoint (dev + production).
  *
@@ -12,7 +14,7 @@ import { validateEnv } from "./lib/env.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
-import app, { finalizeApp } from "./app.mjs";
+import app, { finalizeApp } from "./app.js";
 import logger from "./lib/logger.js";
 import { DATABASE_URL, getSql, warmupDatabase, ensureGallerySourceType } from "./lib/db.js";
 import { initializeScheduledPostsChecker, waitForRedis, initializeImageGenerationWorker, registerImageGenerationProcessor } from "./helpers/job-queue.js";
@@ -118,7 +120,7 @@ const startup = async () => {
 
         // Build prompt with brand context
         const { buildImagePrompt, convertImagePromptToJson } = await import("./lib/ai/prompt-builders.js");
-        const { getSql } = await import("./lib/db.mjs");
+        const { getSql } = await import("./lib/db.js");
         const sql = getSql();
         
         const jsonPrompt = await convertImagePromptToJson(

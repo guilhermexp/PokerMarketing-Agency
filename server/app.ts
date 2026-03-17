@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 /**
  * Express app factory.
  *
@@ -34,30 +36,30 @@ import { buildImagePrompt } from "./lib/ai/prompt-builders.js";
 // ---------------------------------------------------------------------------
 // Route modules
 // ---------------------------------------------------------------------------
-import { registerHealthRoutes } from "./routes/health.mjs";
-import { registerAdminRoutes } from "./routes/admin.mjs";
-import { registerInitRoutes } from "./routes/init.mjs";
-import { registerUserRoutes } from "./routes/db-users.mjs";
-import { registerBrandProfileRoutes } from "./routes/db-brand-profiles.mjs";
-import { registerGalleryRoutes } from "./routes/db-gallery.mjs";
-import { registerPostRoutes } from "./routes/db-posts.mjs";
-import { registerScheduledPostRoutes } from "./routes/db-scheduled-posts.mjs";
-import { registerCampaignRoutes } from "./routes/db-campaigns.mjs";
-import { registerTournamentRoutes } from "./routes/db-tournaments.mjs";
-import { registerGenerationJobRoutes } from "./routes/generation-jobs.mjs";
-import { registerUploadRoutes } from "./routes/upload.mjs";
-import { registerAiCampaignRoutes } from "./routes/ai-campaign.mjs";
-import { registerAiTextRoutes } from "./routes/ai-text.mjs";
-import { registerAiImageRoutes } from "./routes/ai-image.mjs";
-import { registerAiSpeechRoutes } from "./routes/ai-speech.mjs";
-import { registerAiAssistantRoutes } from "./routes/ai-assistant.mjs";
-import { registerAiVideoRoutes } from "./routes/ai-video.mjs";
-import { registerInstagramRoutes } from "./routes/db-instagram.mjs";
-import { registerRubeRoutes } from "./routes/rube.mjs";
-import { registerImagePlaygroundRoutes } from "./routes/image-playground.mjs";
-import { registerVideoPlaygroundRoutes } from "./routes/video-playground.mjs";
-import { registerAgentStudioRoutes } from "./routes/agent-studio.mjs";
-import { registerFeedbackRoutes } from "./routes/feedback.mjs";
+import { registerHealthRoutes } from "./routes/health.js";
+import { registerAdminRoutes } from "./routes/admin.js";
+import { registerInitRoutes } from "./routes/init.js";
+import { registerUserRoutes } from "./routes/db-users.js";
+import { registerBrandProfileRoutes } from "./routes/db-brand-profiles.js";
+import { registerGalleryRoutes } from "./routes/db-gallery.js";
+import { registerPostRoutes } from "./routes/db-posts.js";
+import { registerScheduledPostRoutes } from "./routes/db-scheduled-posts.js";
+import { registerCampaignRoutes } from "./routes/db-campaigns.js";
+import { registerTournamentRoutes } from "./routes/db-tournaments.js";
+import { registerGenerationJobRoutes } from "./routes/generation-jobs.js";
+import { registerUploadRoutes } from "./routes/upload.js";
+import { registerAiCampaignRoutes } from "./routes/ai-campaign.js";
+import { registerAiTextRoutes } from "./routes/ai-text.js";
+import { registerAiImageRoutes } from "./routes/ai-image.js";
+import { registerAiSpeechRoutes } from "./routes/ai-speech.js";
+import { registerAiAssistantRoutes } from "./routes/ai-assistant.js";
+import { registerAiVideoRoutes } from "./routes/ai-video.js";
+import { registerInstagramRoutes } from "./routes/db-instagram.js";
+import { registerRubeRoutes } from "./routes/rube.js";
+import { registerImagePlaygroundRoutes } from "./routes/image-playground.js";
+import { registerVideoPlaygroundRoutes } from "./routes/video-playground.js";
+import { registerAgentStudioRoutes } from "./routes/agent-studio.js";
+import { registerFeedbackRoutes } from "./routes/feedback.js";
 
 // ---------------------------------------------------------------------------
 // App creation

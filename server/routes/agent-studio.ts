@@ -1,7 +1,9 @@
-import { getSql } from '../lib/db.mjs';
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
+import { getSql } from '../lib/db.js';
 import { getRequestAuthContext } from '../lib/auth.js';
-import { resolveUserId } from '../lib/user-resolver.mjs';
-import logger from '../lib/logger.mjs';
+import { resolveUserId } from '../lib/user-resolver.js';
+import logger from '../lib/logger.js';
 import { runStudioAgentStream, getPendingInteraction, resolvePendingInteraction } from '../lib/agent/claude/runner.js';
 import { promisify } from 'node:util';
 import { execFile as execFileCb } from 'node:child_process';

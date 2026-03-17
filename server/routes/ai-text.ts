@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 /**
  * AI Text Generation Routes
  * Extracted from server/index.mjs

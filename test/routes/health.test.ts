@@ -5,7 +5,7 @@ import { createRouteApp } from "./helpers/create-route-app";
 const sqlMock = vi.fn();
 const getSqlMock = vi.fn(() => sqlMock);
 
-vi.mock("../../server/lib/db.mjs", () => ({
+vi.mock("../../server/lib/db.js", () => ({
   getSql: getSqlMock,
 }));
 
@@ -17,7 +17,7 @@ describe("health routes", () => {
   });
 
   it("returns health payload for /health", async () => {
-    const { registerHealthRoutes } = await import("../../server/routes/health.mjs");
+    const { registerHealthRoutes } = await import("../../server/routes/health.js");
     const app = createRouteApp(registerHealthRoutes);
 
     const response = await request(app).get("/health");
@@ -31,7 +31,7 @@ describe("health routes", () => {
   it("returns database health error envelope when sql fails", async () => {
     sqlMock.mockRejectedValueOnce(new Error("db down"));
 
-    const { registerHealthRoutes } = await import("../../server/routes/health.mjs");
+    const { registerHealthRoutes } = await import("../../server/routes/health.js");
     const app = createRouteApp(registerHealthRoutes);
 
     const response = await request(app).get("/api/db/health");

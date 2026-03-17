@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 import { getSql } from "../lib/db.js";
 import { userIdCache } from "../lib/user-resolver.js";
 import { generateCsrfToken } from "../lib/csrf.js";

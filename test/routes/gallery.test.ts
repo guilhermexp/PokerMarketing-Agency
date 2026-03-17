@@ -21,7 +21,7 @@ describe("gallery routes", () => {
       deleteGalleryImageRecord: vi.fn(),
     }));
 
-    const { registerGalleryRoutes } = await import("../../server/routes/db-gallery.mjs");
+    const { registerGalleryRoutes } = await import("../../server/routes/db-gallery.js");
     const app = createRouteApp(registerGalleryRoutes);
 
     const response = await request(app).get("/api/db/gallery").query({
@@ -49,7 +49,7 @@ describe("gallery routes", () => {
       deleteGalleryImageRecord: vi.fn(),
     }));
 
-    const { registerGalleryRoutes } = await import("../../server/routes/db-gallery.mjs");
+    const { registerGalleryRoutes } = await import("../../server/routes/db-gallery.js");
     const app = createRouteApp(registerGalleryRoutes);
 
     const response = await request(app).post("/api/db/gallery").send({

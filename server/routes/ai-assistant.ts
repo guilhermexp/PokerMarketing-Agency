@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 /**
  * AI Assistant & Chat Routes
  * Extracted from server/index.mjs
@@ -17,7 +19,7 @@ import {
   logAiUsage,
   createTimer,
 } from "../helpers/usage-tracking.js";
-import { chatHandler } from "../api/chat/route.mjs";
+import { chatHandler } from "../api/chat/route.js";
 import logger from "../lib/logger.js";
 
 export function registerAiAssistantRoutes(app) {

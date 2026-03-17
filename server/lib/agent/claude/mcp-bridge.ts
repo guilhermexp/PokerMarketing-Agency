@@ -1,7 +1,7 @@
 // @ts-nocheck
 // TODO: Add proper type annotations to this file
 import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
-import { buildStudioToolDefinitions } from './tool-registry.mjs';
+import { buildStudioToolDefinitions } from './tool-registry.js';
 
 export function createStudioMcpServer({ sql, userId, organizationId, logger }) {
   const tools = buildStudioToolDefinitions({ sql, userId, organizationId, logger });
