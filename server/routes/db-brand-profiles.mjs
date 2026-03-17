@@ -14,9 +14,19 @@ import {
   createBrandProfile,
   updateBrandProfile,
 } from "../services/brand-profiles-service.mjs";
+import { validateRequest } from "../middleware/validate.mjs";
+import {
+  brandProfileQuerySchema,
+  brandProfileCreateBodySchema,
+  brandProfileUpdateQuerySchema,
+  brandProfileUpdateBodySchema,
+} from "../schemas/brand-profiles-schemas.mjs";
 
 export function registerBrandProfileRoutes(app) {
-  app.get("/api/db/brand-profiles", async (req, res) => {
+  app.get(
+    "/api/db/brand-profiles",
+    validateRequest({ query: brandProfileQuerySchema }),
+    async (req, res) => {
     try {
       const result = await getBrandProfile(req.query);
       return res.json(result);
@@ -30,9 +40,13 @@ export function registerBrandProfileRoutes(app) {
       }
       throw new DatabaseError("Failed to fetch brand profile", error);
     }
-  });
+    },
+  );
 
-  app.post("/api/db/brand-profiles", async (req, res) => {
+  app.post(
+    "/api/db/brand-profiles",
+    validateRequest({ body: brandProfileCreateBodySchema }),
+    async (req, res) => {
     try {
       const result = await createBrandProfile(req.body);
       res.status(201).json(result);
@@ -47,9 +61,16 @@ export function registerBrandProfileRoutes(app) {
       }
       throw new DatabaseError("Failed to create brand profile", error);
     }
-  });
+    },
+  );
 
-  app.put("/api/db/brand-profiles", async (req, res) => {
+  app.put(
+    "/api/db/brand-profiles",
+    validateRequest({
+      query: brandProfileUpdateQuerySchema,
+      body: brandProfileUpdateBodySchema,
+    }),
+    async (req, res) => {
     try {
       const result = await updateBrandProfile(req.query.id, req.body);
       res.json(result);
@@ -69,5 +90,6 @@ export function registerBrandProfileRoutes(app) {
       logError("Brand Profiles API", error);
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
-  });
+    },
+  );
 }

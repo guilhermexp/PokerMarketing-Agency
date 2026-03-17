@@ -2,9 +2,11 @@ import { getSql } from "../lib/db.mjs";
 import { resolveUserId } from "../lib/user-resolver.mjs";
 import { logError } from "../lib/logging-helpers.mjs";
 import logger from "../lib/logger.mjs";
+import { validateRequest } from "../middleware/validate.mjs";
+import { initQuerySchema } from "../schemas/init-schemas.mjs";
 
 export function registerInitRoutes(app) {
-  app.get("/api/db/init", async (req, res) => {
+  app.get("/api/db/init", validateRequest({ query: initQuerySchema }), async (req, res) => {
     const start = Date.now();
 
     try {

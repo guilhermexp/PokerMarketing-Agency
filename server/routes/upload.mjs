@@ -9,9 +9,14 @@ import {
   proxyBlobVideo,
   uploadBase64Asset,
 } from "../services/upload-service.mjs";
+import { validateRequest } from "../middleware/validate.mjs";
+import {
+  proxyVideoQuerySchema,
+  uploadBodySchema,
+} from "../schemas/upload-schemas.mjs";
 
 export function registerUploadRoutes(app) {
-  app.get("/api/proxy-video", async (req, res) => {
+  app.get("/api/proxy-video", validateRequest({ query: proxyVideoQuerySchema }), async (req, res) => {
     try {
       const result = await proxyBlobVideo(req.query.url, req.headers.range);
       res.status(result.status);
@@ -34,7 +39,7 @@ export function registerUploadRoutes(app) {
     }
   });
 
-  app.post("/api/upload", async (req, res) => {
+  app.post("/api/upload", validateRequest({ body: uploadBodySchema }), async (req, res) => {
     try {
       const result = await uploadBase64Asset(req.body);
       return res.status(200).json(result);

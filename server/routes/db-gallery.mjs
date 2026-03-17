@@ -9,6 +9,7 @@ import {
   OrganizationAccessError,
   PermissionDeniedError,
 } from "../helpers/organization-context.mjs";
+import { validateRequest } from "../middleware/validate.mjs";
 import {
   listGallery,
   listDailyFlyers,
@@ -16,9 +17,17 @@ import {
   updateGalleryImageRecord,
   deleteGalleryImageRecord,
 } from "../services/gallery-service.mjs";
+import {
+  galleryListQuerySchema,
+  galleryDailyFlyersQuerySchema,
+  galleryCreateBodySchema,
+  galleryPatchQuerySchema,
+  galleryPatchBodySchema,
+  galleryDeleteQuerySchema,
+} from "../schemas/gallery-schemas.mjs";
 
 export function registerGalleryRoutes(app) {
-  app.get("/api/db/gallery", async (req, res) => {
+  app.get("/api/db/gallery", validateRequest({ query: galleryListQuerySchema }), async (req, res) => {
     try {
       const result = await listGallery(req.query);
       res.json(result);
@@ -33,7 +42,10 @@ export function registerGalleryRoutes(app) {
     }
   });
 
-  app.get("/api/db/gallery/daily-flyers", async (req, res) => {
+  app.get(
+    "/api/db/gallery/daily-flyers",
+    validateRequest({ query: galleryDailyFlyersQuerySchema }),
+    async (req, res) => {
     try {
       const result = await listDailyFlyers(req.query);
       res.json(result);
@@ -47,9 +59,10 @@ export function registerGalleryRoutes(app) {
       logError("Gallery Daily Flyers API GET", error);
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
-  });
+    },
+  );
 
-  app.post("/api/db/gallery", async (req, res) => {
+  app.post("/api/db/gallery", validateRequest({ body: galleryCreateBodySchema }), async (req, res) => {
     try {
       const result = await createGalleryImage(req.body);
       res.status(201).json(result);
@@ -68,7 +81,13 @@ export function registerGalleryRoutes(app) {
     }
   });
 
-  app.patch("/api/db/gallery", async (req, res) => {
+  app.patch(
+    "/api/db/gallery",
+    validateRequest({
+      query: galleryPatchQuerySchema,
+      body: galleryPatchBodySchema,
+    }),
+    async (req, res) => {
     try {
       const result = await updateGalleryImageRecord(req.query.id, req.body);
       return res.status(200).json(result);
@@ -82,9 +101,13 @@ export function registerGalleryRoutes(app) {
       logError("Gallery API PATCH", error);
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
-  });
+    },
+  );
 
-  app.delete("/api/db/gallery", async (req, res) => {
+  app.delete(
+    "/api/db/gallery",
+    validateRequest({ query: galleryDeleteQuerySchema }),
+    async (req, res) => {
     try {
       await deleteGalleryImageRecord(req.query.id, req.query.user_id);
       res.status(204).end();
@@ -104,5 +127,6 @@ export function registerGalleryRoutes(app) {
       logError("Gallery API", error);
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
-  });
+    },
+  );
 }
