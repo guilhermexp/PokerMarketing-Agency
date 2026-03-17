@@ -2,7 +2,7 @@ import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
 import { logError } from "../lib/logging-helpers.js";
 import logger from "../lib/logger.js";
-import { validateRequest } from "../middleware/validate.mjs";
+import { validateRequest } from "../middleware/validate.js";
 import { initQuerySchema } from "../schemas/init-schemas.mjs";
 
 export function registerInitRoutes(app) {

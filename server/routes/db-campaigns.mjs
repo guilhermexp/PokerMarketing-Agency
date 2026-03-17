@@ -19,7 +19,7 @@ import {
   updateCarousel,
   updateCarouselSlideImage,
 } from "../services/campaigns-service.mjs";
-import { validateRequest } from "../middleware/validate.mjs";
+import { validateRequest } from "../middleware/validate.js";
 import {
   campaignsQuerySchema,
   campaignCreateBodySchema,

@@ -1,6 +1,6 @@
 import cookieParser from "cookie-parser";
 import express, { type Express } from "express";
-import { errorHandler } from "../../../server/middleware/errorHandler.mjs";
+import { errorHandler } from "../../../server/middleware/errorHandler.js";
 import {
   isResponseEnvelope,
   sendError,

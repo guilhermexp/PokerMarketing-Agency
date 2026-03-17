@@ -9,7 +9,7 @@ import {
   proxyBlobVideo,
   uploadBase64Asset,
 } from "../services/upload-service.mjs";
-import { validateRequest } from "../middleware/validate.mjs";
+import { validateRequest } from "../middleware/validate.js";
 import {
   proxyVideoQuerySchema,
   uploadBodySchema,

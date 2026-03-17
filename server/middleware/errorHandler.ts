@@ -8,19 +8,41 @@
  * - Environment-specific error details (stack traces in dev only)
  */
 
+import type { Request, Response, NextFunction } from "express";
 import logger from "../lib/logger.js";
 import { sendError } from "../lib/response.js";
 import { AppError, ERROR_CODES, HTTP_STATUS } from "../lib/errors/index.js";
 import { randomUUID } from "crypto";
 
+interface ErrorWithCode extends Error {
+  code?: string;
+  statusCode?: number;
+}
+
+interface ConnectionWithRemoteAddress {
+  remoteAddress?: string;
+}
+
+interface ErrorResponsePayload {
+  error: {
+    name: string;
+    message: string;
+    code: string;
+    statusCode: number;
+    requestId: string;
+    timestamp: string;
+    details?: Record<string, unknown>;
+    stack?: string;
+  };
+}
+
 /**
  * Detect client disconnect errors (ECONNABORTED, ECONNRESET, EPIPE)
- * @param {Error} error
- * @returns {boolean}
  */
-export function isClientDisconnectError(error) {
+export function isClientDisconnectError(error: Error | null | undefined): boolean {
   if (!error) return false;
-  const code = error.code || "";
+  const errorWithCode = error as ErrorWithCode;
+  const code = errorWithCode.code || "";
   const message = error.message || "";
   return (
     /ECONNABORTED|ECONNRESET|EPIPE/.test(code) ||
@@ -30,32 +52,33 @@ export function isClientDisconnectError(error) {
 
 /**
  * Generate or retrieve request ID for error tracking
- * @param {Object} req - Express request object
- * @returns {string}
  */
-function getRequestId(req) {
+function getRequestId(req: Request): string {
   // Use existing request ID if available, otherwise generate new one
-  return req.id || req.headers["x-request-id"] || randomUUID();
+  if (req.id) {
+    return String(req.id);
+  }
+  const xRequestId = req.headers["x-request-id"];
+  if (typeof xRequestId === "string") {
+    return xRequestId;
+  }
+  return randomUUID();
 }
 
 /**
  * Determine if we should include stack traces in response
- * @returns {boolean}
  */
-function shouldIncludeStack() {
+function shouldIncludeStack(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
 /**
  * Format error response for API
- * @param {Error} error - Error object
- * @param {string} requestId - Request ID for tracking
- * @returns {Object}
  */
-function formatErrorResponse(error, requestId) {
+function formatErrorResponse(error: Error, requestId: string): ErrorResponsePayload {
   // Handle AppError instances
   if (error instanceof AppError) {
-    const response = {
+    const response: ErrorResponsePayload = {
       error: {
         name: error.name,
         message: error.message,
@@ -80,8 +103,9 @@ function formatErrorResponse(error, requestId) {
   }
 
   // Handle generic errors
-  const statusCode = error.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
-  const response = {
+  const errorWithCode = error as ErrorWithCode;
+  const statusCode = errorWithCode.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
+  const response: ErrorResponsePayload = {
     error: {
       name: error.name || "Error",
       message: error.message || "An unexpected error occurred",
@@ -102,11 +126,10 @@ function formatErrorResponse(error, requestId) {
 
 /**
  * Log error with appropriate level based on severity
- * @param {Error} error - Error object
- * @param {Object} req - Express request object
- * @param {string} requestId - Request ID for tracking
  */
-function logError(error, req, requestId) {
+function logError(error: Error, req: Request, requestId: string): void {
+  const connection = req.connection as ConnectionWithRemoteAddress | undefined;
+  const xForwardedFor = req.headers["x-forwarded-for"];
   const context = {
     requestId,
     method: req.method,
@@ -114,7 +137,7 @@ function logError(error, req, requestId) {
     path: req.path,
     userId: req.authUserId || req.internalAuth?.userId,
     organizationId: req.authOrgId || req.internalAuth?.orgId || null,
-    ip: req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress,
+    ip: req.ip || (typeof xForwardedFor === "string" ? xForwardedFor : undefined) || connection?.remoteAddress,
   };
 
   // Client disconnect — log as warn, not error
@@ -180,13 +203,13 @@ function logError(error, req, requestId) {
 /**
  * Global error handler middleware
  * Must be registered LAST in middleware chain
- *
- * @param {Error} err - Error object
- * @param {Object} req - Express request
- * @param {Object} res - Express response
- * @param {Function} next - Next middleware (required by Express even if unused)
  */
-export function errorHandler(err, req, res, next) {
+export function errorHandler(
+  err: Error,
+  req: Request,
+  res: Response,
+  _next: NextFunction
+): void {
   // Generate request ID for tracking
   const requestId = getRequestId(req);
 
@@ -199,10 +222,11 @@ export function errorHandler(err, req, res, next) {
   }
 
   // Determine status code
+  const errorWithCode = err as ErrorWithCode;
   const statusCode =
     err instanceof AppError
       ? err.statusCode
-      : err.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
+      : errorWithCode.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
 
   // Format and send error response
   const errorResponse = formatErrorResponse(err, requestId);
@@ -220,12 +244,8 @@ export function errorHandler(err, req, res, next) {
 /**
  * 404 Not Found handler
  * Call this before the error handler to catch undefined routes
- *
- * @param {Object} req - Express request
- * @param {Object} res - Express response
- * @param {Function} next - Next middleware
  */
-export function notFoundHandler(req, res, next) {
+export function notFoundHandler(req: Request, _res: Response, next: NextFunction): void {
   const error = new AppError(
     `Route not found: ${req.method} ${req.path}`,
     ERROR_CODES.ROUTE_NOT_FOUND,
@@ -241,21 +261,15 @@ export function notFoundHandler(req, res, next) {
   next(error);
 }
 
+type AsyncRouteHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
+type RouteHandler = (req: Request, res: Response, next: NextFunction) => void;
+
 /**
  * Async handler wrapper to catch errors in async route handlers
  * Use this to wrap async route handlers to avoid try-catch blocks
- *
- * @param {Function} fn - Async route handler function
- * @returns {Function} Wrapped handler that catches errors
- *
- * @example
- * app.get('/api/campaigns', asyncHandler(async (req, res) => {
- *   const campaigns = await getCampaigns();
- *   res.json(campaigns);
- * }));
  */
-export function asyncHandler(fn) {
-  return (req, res, next) => {
+export function asyncHandler(fn: AsyncRouteHandler): RouteHandler {
+  return (req: Request, res: Response, next: NextFunction): void => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 }

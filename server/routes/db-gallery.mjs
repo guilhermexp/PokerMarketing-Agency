@@ -9,7 +9,7 @@ import {
   OrganizationAccessError,
   PermissionDeniedError,
 } from "../helpers/organization-context.mjs";
-import { validateRequest } from "../middleware/validate.mjs";
+import { validateRequest } from "../middleware/validate.js";
 import {
   listGallery,
   listDailyFlyers,

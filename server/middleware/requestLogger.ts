@@ -8,27 +8,49 @@
  * - Integrates with global logger configuration
  */
 
-import pinoHttp from "pino-http";
+import type { Request, Response, NextFunction, Handler } from "express";
+import type { Logger } from "pino";
+import type { IncomingMessage, ServerResponse } from "http";
+import { pinoHttp } from "pino-http";
 import { randomUUID } from "crypto";
 import logger from "../lib/logger.js";
 
+interface SerializedRequest {
+  id?: string | number | object;
+  method: string;
+  url: string;
+  query: Record<string, unknown>;
+  userId?: string;
+  organizationId?: string | null;
+  ip?: string;
+  userAgent?: string;
+}
+
+interface SerializedResponse {
+  statusCode: number;
+}
+
+interface ConnectionWithRemoteAddress {
+  remoteAddress?: string;
+}
+
 /**
  * Generate or retrieve request ID
- * @param {Object} req - Express request object
- * @returns {string}
  */
-function generateRequestId(req) {
+function generateRequestId(req: Request): string {
   // Use existing request ID from header if available, otherwise generate new one
-  return req.headers["x-request-id"] || randomUUID();
+  const xRequestId = req.headers["x-request-id"];
+  if (typeof xRequestId === "string") {
+    return xRequestId;
+  }
+  return randomUUID();
 }
 
 /**
  * Determine if we should log this request
  * Skip health checks and other noisy endpoints in production
- * @param {Object} req - Express request object
- * @returns {boolean}
  */
-function shouldLogRequest(req) {
+function shouldLogRequest(req: Request): boolean {
   const isDevelopment = process.env.NODE_ENV !== "production";
   const isHealthCheck = req.path === "/api/db/health" || req.path === "/health";
 
@@ -44,29 +66,30 @@ function shouldLogRequest(req) {
 /**
  * Custom request serializer
  * Includes relevant request information without sensitive data
- * @param {Object} req - Express request object
- * @returns {Object}
  */
-function customRequestSerializer(req) {
+function customRequestSerializer(req: Request): SerializedRequest {
+  const connection = req.connection as ConnectionWithRemoteAddress | undefined;
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  const ip = req.ip || (typeof xForwardedFor === "string" ? xForwardedFor : undefined) || connection?.remoteAddress;
+  const userAgent = req.headers["user-agent"];
+
   return {
     id: req.id,
     method: req.method,
     url: req.url,
-    query: req.query,
+    query: req.query as Record<string, unknown>,
     userId: req.authUserId || req.internalAuth?.userId,
     organizationId: req.authOrgId || req.internalAuth?.orgId || null,
-    ip: req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress,
-    userAgent: req.headers["user-agent"],
+    ip,
+    userAgent,
   };
 }
 
 /**
  * Custom response serializer
  * Includes response status and timing information
- * @param {Object} res - Express response object (or serialized version)
- * @returns {Object}
  */
-function customResponseSerializer(res) {
+function customResponseSerializer(res: Response): SerializedResponse {
   return {
     statusCode: res.statusCode,
   };
@@ -76,31 +99,31 @@ function customResponseSerializer(res) {
  * Create pino-http middleware instance
  * This middleware automatically logs all HTTP requests and responses
  */
-export const requestLogger = pinoHttp({
+export const requestLogger: Handler = pinoHttp({
   // Use our base logger instance
   logger,
 
   // Generate unique request ID for each request
-  genReqId: generateRequestId,
+  genReqId: (req: IncomingMessage) => generateRequestId(req as Request),
 
   // Custom serializers for request and response
   serializers: {
-    req: customRequestSerializer,
-    res: customResponseSerializer,
+    req: (req: IncomingMessage) => customRequestSerializer(req as Request),
+    res: (res: ServerResponse) => customResponseSerializer(res as unknown as Response),
   },
 
   // Customize log message format
-  customSuccessMessage: (req, res, responseTime) => {
+  customSuccessMessage: (req: IncomingMessage, res: ServerResponse, responseTime: number) => {
     const time = responseTime != null ? ` ${Math.round(responseTime)}ms` : "";
     return `${req.method} ${req.url} ${res.statusCode}${time}`;
   },
 
-  customErrorMessage: (req, res, err) => {
+  customErrorMessage: (req: IncomingMessage, res: ServerResponse, err: Error) => {
     return `${req.method} ${req.url} ${res.statusCode} - ${err.message}`;
   },
 
   // Custom log level based on response status
-  customLogLevel: (req, res, err) => {
+  customLogLevel: (_req: IncomingMessage, res: ServerResponse, err?: Error) => {
     if (err || res.statusCode >= 500) {
       return "error";
     }
@@ -116,7 +139,7 @@ export const requestLogger = pinoHttp({
   // Determine whether to log this request
   autoLogging: {
     // Use custom function to determine if we should log
-    ignore: (req) => !shouldLogRequest(req),
+    ignore: (req: IncomingMessage) => !shouldLogRequest(req as Request),
   },
 
   // Include response time in logs
@@ -128,7 +151,7 @@ export const requestLogger = pinoHttp({
   },
 
   // No customReceivedMessage — only log on response completion (cuts 50% of log noise)
-});
+}) as Handler;
 
 /**
  * Middleware to attach request ID to the request object
@@ -136,16 +159,8 @@ export const requestLogger = pinoHttp({
  *
  * Note: This middleware should be used BEFORE requestLogger
  * to ensure the request ID is available when logging
- *
- * @param {Object} req - Express request
- * @param {Object} res - Express response
- * @param {Function} next - Next middleware
- *
- * @example
- * app.use(attachRequestId);
- * app.use(requestLogger);
  */
-export function attachRequestId(req, res, next) {
+export function attachRequestId(req: Request, res: Response, next: NextFunction): void {
   // Generate or retrieve request ID
   req.id = generateRequestId(req);
 
@@ -158,14 +173,7 @@ export function attachRequestId(req, res, next) {
 /**
  * Create child logger for a specific request
  * Useful for adding request context to logs throughout the request lifecycle
- *
- * @param {Object} req - Express request object
- * @returns {Object} Child logger with request context
- *
- * @example
- * const reqLogger = getRequestLogger(req);
- * reqLogger.info('Processing campaign creation');
  */
-export function getRequestLogger(req) {
+export function getRequestLogger(req: Request): Logger {
   return req.log || logger.child({ requestId: req.id });
 }

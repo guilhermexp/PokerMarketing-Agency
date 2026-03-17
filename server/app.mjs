@@ -14,9 +14,9 @@ import helmet from "helmet";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/better-auth.js";
 import { isResponseEnvelope, sendError, sendSuccess } from "./lib/response.js";
-import { requestLogger } from "./middleware/requestLogger.mjs";
-import { errorHandler, notFoundHandler } from "./middleware/errorHandler.mjs";
-import { csrfProtection } from "./middleware/csrfProtection.mjs";
+import { requestLogger } from "./middleware/requestLogger.js";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
+import { csrfProtection } from "./middleware/csrfProtection.js";
 import logger from "./lib/logger.js";
 
 // Lib imports (used in middleware only)

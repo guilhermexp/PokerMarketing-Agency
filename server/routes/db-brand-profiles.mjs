@@ -14,7 +14,7 @@ import {
   createBrandProfile,
   updateBrandProfile,
 } from "../services/brand-profiles-service.mjs";
-import { validateRequest } from "../middleware/validate.mjs";
+import { validateRequest } from "../middleware/validate.js";
 import {
   brandProfileQuerySchema,
   brandProfileCreateBodySchema,
