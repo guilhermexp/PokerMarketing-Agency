@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback, useTransition } from "react";
+import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { BrandProfileSetup } from "./components/brand/BrandProfileSetup";
 import { OnboardingModal } from "./components/brand/OnboardingModal";
@@ -234,7 +235,23 @@ const getTruncatedHistory = (
   });
 };
 
-export function MainAppController() {
+const VIEW_PATHS: Record<ViewType, string> = {
+  campaign: "/campaign",
+  campaigns: "/campaigns",
+  carousels: "/carousels",
+  flyer: "/flyer",
+  gallery: "/gallery",
+  calendar: "/calendar",
+  playground: "/playground",
+  "image-playground": "/image-playground",
+};
+
+interface MainAppControllerProps {
+  routeView: ViewType;
+}
+
+export function MainAppController({ routeView }: MainAppControllerProps) {
+  const navigate = useNavigate();
   const {
     userId,
     clerkUserId,
@@ -321,11 +338,9 @@ export function MainAppController() {
     return null;
   };
   const [error, setError] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<ViewType>("campaign");
-  const [, startViewTransition] = useTransition();
   const handleViewChange = useCallback((view: ViewType) => {
-    startViewTransition(() => setActiveView(view));
-  }, []);
+    navigate(VIEW_PATHS[view]);
+  }, [navigate]);
 
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -2699,7 +2714,7 @@ export function MainAppController() {
                 setDailyFlyerState={setDailyFlyerState}
                 selectedDailyFlyerIds={selectedDailyFlyerIds}
                 setSelectedDailyFlyerIds={setSelectedDailyFlyerIds}
-                activeView={activeView}
+                activeView={routeView}
                 onViewChange={handleViewChange}
                 onPublishToCampaign={handlePublishFlyerToCampaign}
                 styleReferences={styleReferences}

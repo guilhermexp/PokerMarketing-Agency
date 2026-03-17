@@ -1,23 +1,27 @@
 import { AuthWrapper, useAuth } from "./components/auth/AuthWrapper";
 import { BackgroundJobsProvider } from "./hooks/useBackgroundJobs";
 import { authClient } from "./lib/auth-client";
-import { MainAppController } from "./main-app-controller";
+import { MainAppController, type ViewType } from "./main-app-controller";
 
-function AppWithBackgroundJobs() {
+interface AppProps {
+  routeView: ViewType;
+}
+
+function AppWithBackgroundJobs({ routeView }: AppProps) {
   const { userId } = useAuth();
   const { data: activeOrg } = authClient.useActiveOrganization();
 
   return (
     <BackgroundJobsProvider userId={userId} organizationId={activeOrg?.id}>
-      <MainAppController />
+      <MainAppController routeView={routeView} />
     </BackgroundJobsProvider>
   );
 }
 
-export function App() {
+export function App({ routeView }: AppProps) {
   return (
     <AuthWrapper>
-      <AppWithBackgroundJobs />
+      <AppWithBackgroundJobs routeView={routeView} />
     </AuthWrapper>
   );
 }
