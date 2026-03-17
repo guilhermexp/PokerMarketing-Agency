@@ -31,7 +31,7 @@ import {
   logAiUsage,
   createTimer,
 } from "../helpers/usage-tracking.js";
-import { urlToBase64 } from "../helpers/image-helpers.mjs";
+import { urlToBase64 } from "../helpers/image-helpers.js";
 import { validateContentType } from "../lib/validation/contentType.js";
 import logger from "../lib/logger.js";
 import {
@@ -40,7 +40,7 @@ import {
   getImageGenerationJobStatus,
   getUserImageGenerationJobs,
   cancelImageGenerationJob,
-} from "../helpers/job-queue.mjs";
+} from "../helpers/job-queue.js";
 
 const SUPPORTED_IMAGE_MODELS = new Set([
   "gemini-3-pro-image-preview",

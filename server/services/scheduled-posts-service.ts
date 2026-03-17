@@ -1,11 +1,10 @@
 import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
 import { resolveOrganizationContext } from "../lib/auth.js";
-// TODO: Update import to .js when job-queue is migrated to TypeScript (Batch 9)
 import {
   schedulePostForPublishing,
   cancelScheduledPost,
-} from "../helpers/job-queue.mjs";
+} from "../helpers/job-queue.js";
 import {
   ValidationError,
   NotFoundError,

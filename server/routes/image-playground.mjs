@@ -1,4 +1,4 @@
-import { urlToBase64 } from "../helpers/image-helpers.mjs";
+import { urlToBase64 } from "../helpers/image-helpers.js";
 import { getGeminiAi } from "../lib/ai/clients.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import { expandAiInfluencerPrompt, expandProductHeroPrompt, expandExplodedProductPrompt, expandBrandIdentityPrompt } from "../lib/ai/prompt-builders.js";
@@ -13,7 +13,7 @@ import {
   getGenerationStatus,
   createImageBatch,
   generateTopicTitle,
-} from "../helpers/image-playground.mjs";
+} from "../helpers/image-playground.js";
 
 export function registerImagePlaygroundRoutes(
   app,

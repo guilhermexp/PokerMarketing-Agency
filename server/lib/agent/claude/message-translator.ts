@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 function stripMcpPrefix(toolName = '') {
   if (typeof toolName !== 'string') return toolName;
   return toolName.replace(/^mcp__[^_]+__/, '');

@@ -17,7 +17,7 @@ import {
 import {
   buildCampaignPrompt,
   buildQuantityInstructions,
-} from "../helpers/campaign-prompts.mjs";
+} from "../helpers/campaign-prompts.js";
 import {
   logAiUsage,
   createTimer,

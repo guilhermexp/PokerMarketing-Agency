@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 import { getSql } from '../../db.mjs';
 
 function normalizeOrgId(orgId) {

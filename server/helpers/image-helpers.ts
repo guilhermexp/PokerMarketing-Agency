@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 /**
  * Helper: Convert URL or data URL to base64 string
  * - If already base64 or data URL, extracts the base64 part

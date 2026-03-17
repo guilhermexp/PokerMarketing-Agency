@@ -9,7 +9,7 @@ import {
   deleteGeneration,
   updateGeneration,
   generateTopicTitle,
-} from "../helpers/video-playground.mjs";
+} from "../helpers/video-playground.js";
 import { getGeminiAi } from "../lib/ai/clients.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 

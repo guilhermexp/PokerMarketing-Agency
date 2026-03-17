@@ -2,7 +2,7 @@ import { getSql } from '../lib/db.mjs';
 import { getRequestAuthContext } from '../lib/auth.js';
 import { resolveUserId } from '../lib/user-resolver.mjs';
 import logger from '../lib/logger.mjs';
-import { runStudioAgentStream, getPendingInteraction, resolvePendingInteraction } from '../lib/agent/claude/runner.mjs';
+import { runStudioAgentStream, getPendingInteraction, resolvePendingInteraction } from '../lib/agent/claude/runner.js';
 import { promisify } from 'node:util';
 import { execFile as execFileCb } from 'node:child_process';
 import {
@@ -11,7 +11,7 @@ import {
   getThreadByTopic,
   listThreadMessages,
   resetThread,
-} from '../lib/agent/claude/session-store.mjs';
+} from '../lib/agent/claude/session-store.js';
 const execFile = promisify(execFileCb);
 
 const CONTENT_MENTION_REGEX = /(?:^|\s)@(gallery|campaign|clip|carousel):([^\s]+)/g;

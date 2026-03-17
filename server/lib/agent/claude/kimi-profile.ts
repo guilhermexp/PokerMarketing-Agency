@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { homedir } from 'node:os';

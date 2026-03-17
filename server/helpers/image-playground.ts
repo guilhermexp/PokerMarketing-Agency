@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 /**
  * Image Playground API Helpers
  * Handles CRUD operations for topics, batches, and generations

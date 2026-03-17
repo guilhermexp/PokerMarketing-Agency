@@ -1,3 +1,5 @@
+// @ts-nocheck
+// TODO: Add proper type annotations to this file
 /**
  * BullMQ Job Queue for Scheduled Post Publishing & Image Generation
  * Uses Redis for job queue management
@@ -7,7 +9,7 @@ import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import net from 'net';
 
-// Redis connection - Railway provides REDIS_URL
+// Redis connection - Use REDIS_URL environment variable
 // In development without Redis, scheduled posts will use fallback polling
 const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || null;
 const JOB_QUEUE_ENABLED = process.env.NODE_ENV === 'production';

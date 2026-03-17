@@ -5,10 +5,12 @@ const runJobQueueProbe = (env) =>
   spawnSync(
     process.execPath,
     [
+      "--import",
+      "tsx",
       "--input-type=module",
       "-e",
       `
-        const mod = await import("./server/helpers/job-queue.mjs");
+        const mod = await import("./server/helpers/job-queue.js");
         const result = await mod.waitForRedis(50);
         console.log("RESULT=" + JSON.stringify({
           waitForRedis: result,
