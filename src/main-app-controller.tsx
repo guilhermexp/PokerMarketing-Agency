@@ -56,6 +56,7 @@ import { useCampaignsStore } from "./stores/campaigns-store";
 import { useGalleryStore } from "./stores/gallery-store";
 import { useScheduledPostsStore } from "./stores/scheduled-posts-store";
 import { useChatStore } from "./stores/chat-store";
+import { useTournamentStore, type TimePeriod } from "./stores/tournament-store";
 import {
   getBrandProfile,
   createBrandProfile,
@@ -88,12 +89,7 @@ import {
 } from "./hooks/useAppData";
 import type { CampaignSummary } from "./types";
 
-export type TimePeriod =
-  | "ALL"
-  | "MORNING"
-  | "AFTERNOON"
-  | "NIGHT"
-  | "HIGHLIGHTS";
+// TimePeriod type is now exported from tournament-store.ts
 export type ViewType =
   | "campaign"
   | "campaigns"
@@ -469,10 +465,11 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
     return undefined;
   }, [instagramAccounts, userId, organizationId]);
 
-  const [tournamentEvents, setTournamentEvents] = useState<TournamentEvent[]>(
-    [],
-  );
-  const [allSchedules, setAllSchedules] = useState<WeekScheduleWithCount[]>([]);
+  // Tournament state from store
+  const tournamentEvents = useTournamentStore((state) => state.tournamentEvents);
+  const setTournamentEvents = useTournamentStore((state) => state.setTournamentEvents);
+  const allSchedules = useTournamentStore((state) => state.allSchedules);
+  const setAllSchedules = useTournamentStore((state) => state.setAllSchedules);
 
   const mapDbEventToTournamentEvent = (e: DbTournamentEvent): TournamentEvent => ({
     id: e.id,
@@ -590,27 +587,29 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [swrAllSchedules]);
 
-  // Local state for non-cached data
-  const [weekScheduleInfo, setWeekScheduleInfo] =
-    useState<WeekScheduleInfo | null>(null);
-  const [currentScheduleId, setCurrentScheduleId] = useState<string | null>(
-    null,
-  );
-  const [isWeekExpired, setIsWeekExpired] = useState(false);
-  const [flyerState, setFlyerState] = useState<
-    Record<string, (GalleryImage | "loading")[]>
-  >({});
-  // Daily flyer state: { DAY: { PERIOD: [flyers] } }
-  // Loaded from database via getDailyFlyers() when schedule is selected/auto-loaded
-  const [dailyFlyerState, setDailyFlyerState] = useState<
-    Record<string, Record<TimePeriod, (GalleryImage | "loading")[]>>
-  >({});
+  // Tournament schedule state from store
+  const weekScheduleInfo = useTournamentStore((state) => state.weekScheduleInfo);
+  const setWeekScheduleInfo = useTournamentStore((state) => state.setWeekScheduleInfo);
+  const currentScheduleId = useTournamentStore((state) => state.currentScheduleId);
+  const setCurrentScheduleId = useTournamentStore((state) => state.setCurrentScheduleId);
+  const isWeekExpired = useTournamentStore((state) => state.isWeekExpired);
+  const setIsWeekExpired = useTournamentStore((state) => state.setIsWeekExpired);
+  const flyerState = useTournamentStore((state) => state.flyerState);
+  const setFlyerState = useTournamentStore((state) => state.setFlyerState);
+  const dailyFlyerState = useTournamentStore((state) => state.dailyFlyerState);
+  const setDailyFlyerState = useTournamentStore((state) => state.setDailyFlyerState);
+  const selectedDailyFlyerIds = useTournamentStore((state) => state.selectedDailyFlyerIds);
+  const setSelectedDailyFlyerIds = useTournamentStore((state) => state.setSelectedDailyFlyerIds);
 
-  // Selected flyer ID per day/period: { DAY: { PERIOD: flyerId } }
-  // Used to track which flyer is selected when multiple are generated
-  const [selectedDailyFlyerIds, setSelectedDailyFlyerIds] = useState<
-    Record<string, Record<TimePeriod, string | null>>
-  >({});
+  // Restoration tracking from store (converted from refs)
+  const hasRestoredDailyFlyers = useTournamentStore((state) => state.hasRestoredDailyFlyers);
+  const setHasRestoredDailyFlyers = useTournamentStore((state) => state.setHasRestoredDailyFlyers);
+  const lastLoadedScheduleId = useTournamentStore((state) => state.lastLoadedScheduleId);
+  const setLastLoadedScheduleId = useTournamentStore((state) => state.setLastLoadedScheduleId);
+  const lastLoadedOrgId = useTournamentStore((state) => state.lastLoadedOrgId);
+  const setLastLoadedOrgId = useTournamentStore((state) => state.setLastLoadedOrgId);
+  const hasAutoLoadedSchedule = useTournamentStore((state) => state.hasAutoLoadedSchedule);
+  const setHasAutoLoadedSchedule = useTournamentStore((state) => state.setHasAutoLoadedSchedule);
 
   const [theme, setTheme] = useState<Theme>("dark");
 
@@ -683,11 +682,6 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
       }));
   }, [swrGalleryImages]);
 
-  // Track if we've already restored from database to avoid re-running
-  const hasRestoredDailyFlyersRef = useRef(false);
-  const lastLoadedScheduleIdRef = useRef<string | null>(null);
-  const lastLoadedOrgIdRef = useRef<string | null | undefined>(undefined);
-
   // Load daily flyers from database (gallery_images with week_schedule_id)
   // Uses currentScheduleId which is set by handleSelectSchedule or auto-load
   useEffect(() => {
@@ -695,8 +689,8 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
       userId: !!userId,
       currentScheduleId,
       organizationId,
-      hasRestored: hasRestoredDailyFlyersRef.current,
-      lastLoadedScheduleId: lastLoadedScheduleIdRef.current,
+      hasRestored: hasRestoredDailyFlyers,
+      lastLoadedScheduleId,
     });
 
     if (!userId || !currentScheduleId) {
@@ -706,10 +700,10 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
 
     // Only load once per schedule + organization combination
     // Re-load if organization changed (e.g., from null to a value after org loads)
-    const orgChanged = lastLoadedOrgIdRef.current !== undefined && lastLoadedOrgIdRef.current !== organizationId;
+    const orgChanged = lastLoadedOrgId !== undefined && lastLoadedOrgId !== organizationId;
     if (
-      lastLoadedScheduleIdRef.current === currentScheduleId &&
-      hasRestoredDailyFlyersRef.current &&
+      lastLoadedScheduleId === currentScheduleId &&
+      hasRestoredDailyFlyers &&
       !orgChanged
     ) {
       console.log('⏭️ [DailyFlyers] Skipping: already loaded for this schedule+org');
@@ -719,7 +713,7 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
     // If org changed, reset the restored flag to force reload
     if (orgChanged) {
       console.log('🔄 [DailyFlyers] Organization changed, forcing reload');
-      hasRestoredDailyFlyersRef.current = false;
+      setHasRestoredDailyFlyers(false);
     }
 
     const loadDailyFlyers = async () => {
@@ -737,9 +731,9 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
 
         if (!result.structured || Object.keys(result.structured).length === 0) {
           console.log('⚠️ [DailyFlyers] No flyers found in database');
-          hasRestoredDailyFlyersRef.current = true;
-          lastLoadedScheduleIdRef.current = currentScheduleId;
-          lastLoadedOrgIdRef.current = organizationId;
+          setHasRestoredDailyFlyers(true);
+          setLastLoadedScheduleId(currentScheduleId);
+          setLastLoadedOrgId(organizationId);
           return;
         }
 
@@ -807,29 +801,30 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
           console.log('✅ [DailyFlyers] Merged state from database:', Object.keys(restoredState));
         }
 
-        hasRestoredDailyFlyersRef.current = true;
-        lastLoadedScheduleIdRef.current = currentScheduleId;
-        lastLoadedOrgIdRef.current = organizationId;
+        setHasRestoredDailyFlyers(true);
+        setLastLoadedScheduleId(currentScheduleId);
+        setLastLoadedOrgId(organizationId);
       } catch (err) {
         console.error('[App] Failed to load daily flyers from database:', err);
       }
     };
 
     loadDailyFlyers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, currentScheduleId, organizationId]);
 
   // Reset restoration flag when schedule changes
   // Note: handleSelectSchedule also clears state, this handles edge cases
   useEffect(() => {
     // Only clear state when actually switching to a DIFFERENT schedule
-    // Don't clear on initial load (when lastLoadedScheduleIdRef.current is null)
+    // Don't clear on initial load (when lastLoadedScheduleId is null)
     if (
       currentScheduleId &&
-      lastLoadedScheduleIdRef.current &&
-      currentScheduleId !== lastLoadedScheduleIdRef.current
+      lastLoadedScheduleId &&
+      currentScheduleId !== lastLoadedScheduleId
     ) {
       console.debug('[App] Schedule changed, clearing daily flyer state');
-      hasRestoredDailyFlyersRef.current = false;
+      setHasRestoredDailyFlyers(false);
       setDailyFlyerState({});
     }
   }, [currentScheduleId]);
@@ -1744,7 +1739,7 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
       if (isSwitchingSchedule) {
         console.log('🔄 [handleSelectSchedule] Switching schedules, clearing flyer state');
         setDailyFlyerState({});
-        hasRestoredDailyFlyersRef.current = false;
+        setHasRestoredDailyFlyers(false);
 
         // Clear schedule-specific localStorage items for a fresh start
         localStorage.removeItem("dailyFlyerMapping");
@@ -1781,17 +1776,16 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
 
   // Auto-load the most recent schedule when page loads
   // This ensures daily flyers are shown after refresh/login
-  const hasAutoLoadedScheduleRef = useRef(false);
   useEffect(() => {
     // Only auto-load once per session, when we have schedules but no current selection
     if (
-      !hasAutoLoadedScheduleRef.current &&
+      !hasAutoLoadedSchedule &&
       swrAllSchedules &&
       swrAllSchedules.length > 0 &&
       !currentScheduleId &&
       userId
     ) {
-      hasAutoLoadedScheduleRef.current = true;
+      setHasAutoLoadedSchedule(true);
       console.log('🔄 [AutoLoad] Loading most recent schedule:', swrAllSchedules[0].id);
       // Load the most recent schedule (first in list, sorted by created_at DESC)
       handleSelectSchedule(swrAllSchedules[0]);
@@ -2329,10 +2323,7 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
     [],
   );
 
-  const handleAddTournamentEvent = useCallback(
-    (ev: TournamentEvent) => setTournamentEvents((p) => [ev, ...p]),
-    [],
-  );
+  const handleAddTournamentEvent = useTournamentStore((state) => state.addTournamentEvent);
 
   const handleDeleteSchedule = useCallback(async (scheduleId: string) => {
     if (!userId) return;
