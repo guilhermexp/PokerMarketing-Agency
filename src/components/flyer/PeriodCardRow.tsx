@@ -246,13 +246,14 @@ export const PeriodCardRow: React.FC<{
             const firstFlyer = generatedFlyers.find((f) => f !== "loading") as GalleryImage | undefined;
             const currentSelectedExists = selectedFlyerId && generatedFlyers.some(f => f !== "loading" && f.id === selectedFlyerId);
 
-            let newSelectedId: string | null = null;
+            const newSelectedId =
+                firstFlyer && !currentSelectedExists
+                    ? firstFlyer.id
+                    : !firstFlyer
+                      ? null
+                      : undefined;
 
-            if (firstFlyer && !currentSelectedExists) {
-                newSelectedId = firstFlyer.id;
-            } else if (!firstFlyer) {
-                newSelectedId = null;
-            } else {
+            if (newSelectedId === undefined) {
                 // Keep current selection
                 return;
             }

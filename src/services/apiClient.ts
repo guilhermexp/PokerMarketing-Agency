@@ -1483,6 +1483,7 @@ async function fetchAiApi<T>(
     if (error instanceof TypeError) {
       throw new Error(
         "Nao foi possivel conectar ao servidor de IA. Verifique se a API local (porta 3002) esta ativa.",
+        { cause: error },
       );
     }
     throw error;
@@ -1760,6 +1761,7 @@ export async function generateVideo(params: {
     ) {
       throw new Error(
         "Servidor de video indisponivel no momento. Verifique se a API local esta rodando na porta 3002.",
+        { cause: error },
       );
     }
     throw error;

@@ -6,7 +6,7 @@ Este documento serve como o guia mestre para engenheiros e designers. Ele detalh
 
 ## 1. Arquitetura do Sistema
 
-O DirectorAi e uma aplicacao full-stack com frontend React e backend Express, otimizada para deploy em Railway.
+O DirectorAi e uma aplicacao full-stack com frontend React e backend Express.
 
 ### Stack Tecnologico
 
@@ -21,7 +21,7 @@ O DirectorAi e uma aplicacao full-stack com frontend React e backend Express, ot
 | **IA - Imagem** | Google Gemini API | Geracao e edicao de imagens |
 | **IA - Video** | Veo 3.1 + Fal.ai (Sora 2) | Geracao de videos a partir de imagens |
 | **IA - Audio** | Gemini TTS (Zephyr) | Narracao em portugues brasileiro |
-| **Deploy** | Railway | Container Docker com Redis integrado |
+| **Deploy** | Dokploy | Container Docker com Redis |
 
 ### Diagrama de Fluxo
 
@@ -53,7 +53,7 @@ O DirectorAi e uma aplicacao full-stack com frontend React e backend Express, ot
 O frontend usava o SDK `@google/genai` diretamente no navegador, o que:
 - Exigia que a API key estivesse exposta no cliente
 - Limitava o uso a ambientes que suportam ESM no browser
-- Impedia deploy em plataformas que nao suportam serverless functions (ex: Railway)
+- Impedia deploy em plataformas que nao suportam serverless functions
 
 ### Solucao Atual
 Todas as chamadas de IA agora passam por endpoints no Express server:
@@ -96,7 +96,7 @@ Geracao de imagens pode levar 10-30 segundos. Para melhor UX, implementamos proc
 
 ### Tecnologias
 - **BullMQ**: Biblioteca de filas baseada em Redis
-- **Redis**: Armazenamento de estado dos jobs (via Railway)
+- **Redis**: Armazenamento de estado dos jobs
 - **Worker**: Processa jobs em paralelo (concurrency: 2)
 
 ### Tipos de Jobs
@@ -170,8 +170,7 @@ onJobComplete((job) => {
 │   ├── schema.sql             # Schema completo do PostgreSQL
 │   └── run-migration.mjs      # Script de migracao
 │
-├── Dockerfile                 # Build para Railway
-├── railway.toml               # Configuracao Railway
+├── Dockerfile                 # Build para deploy
 └── vite.config.ts             # Build do frontend
 ```
 
@@ -193,7 +192,7 @@ onJobComplete((job) => {
 
 | Variavel | Descricao |
 |----------|-----------|
-| `REDIS_URL` ou `REDIS_PRIVATE_URL` | URL do Redis (Railway) |
+| `REDIS_URL` | URL do Redis |
 | `FAL_KEY` | Chave da API Fal.ai (Sora 2) |
 | `OPENROUTER_API_KEY` | Chave OpenRouter (modelos alternativos) |
 | `RUBE_TOKEN` | Token para API Rube (video) |
@@ -266,7 +265,7 @@ Isso permite recuperar imagens ao recarregar a pagina.
 ### Jobs Travados
 1. Verifique o indicador de "Jobs em Background"
 2. Use o botao "Cancelar" ou "Cancelar Todos"
-3. Verifique logs do Railway: `railway logs`
+3. Verifique logs do servidor
 
 ### Imagens Nao Persistem
 1. Verifique se esta usando `httpUrl` (blob) e nao `dataUrl`
@@ -274,9 +273,9 @@ Isso permite recuperar imagens ao recarregar a pagina.
 3. Verifique se a galeria esta carregando: `console.log(galleryImages)`
 
 ### Erros de API
-1. Verifique variaveis de ambiente no Railway
-2. Teste endpoint direto: `curl https://seu-app.up.railway.app/api/health`
-3. Verifique logs: `railway logs --tail 50`
+1. Verifique variaveis de ambiente
+2. Teste endpoint direto: `curl https://seu-app/api/health`
+3. Verifique logs do servidor
 
 ### Migracao de Banco
 ```bash
@@ -289,37 +288,7 @@ node db/run-context-migration.mjs
 
 ---
 
-## 10. Deploy no Railway
-
-### Passo a Passo
-
-1. Crie projeto no Railway
-2. Adicione servico Redis
-3. Configure variaveis de ambiente
-4. Conecte repositorio GitHub ou use CLI:
-   ```bash
-   railway link
-   railway up
-   ```
-
-### Dockerfile
-
-O Dockerfile faz build do frontend (Vite) e inicia o server Express:
-
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-EXPOSE 8080
-CMD ["node", "server/index.mjs"]
-```
-
----
-
-## 11. Desenvolvimento Local
+## 10. Desenvolvimento Local
 
 ### Modos de Desenvolvimento
 
@@ -327,19 +296,18 @@ A aplicacao tem dois modos de desenvolvimento:
 
 | Modo | Comando | Redis | Descricao |
 |------|---------|-------|-----------|
-| **Padrao** | `npm run dev` | Railway (remoto) | Usa Redis do Railway, recomendado |
+| **Padrao** | `npm run dev` | Remoto (se configurado) | Usa Redis remoto, recomendado |
 | **Local** | `npm run dev:local` | Docker (local) | Usa Redis local, funciona offline |
 
-### Modo Padrao (Railway Redis)
+### Modo Padrao
 
 ```bash
 npm run dev
 ```
 
 - Roda `dev-api.mjs` (porta 3002) + Vite (porta 5173)
-- Usa Redis do Railway (mesmo da producao)
+- Usa Redis remoto se `REDIS_URL` estiver configurado
 - Jobs em background funcionam normalmente
-- Requer `REDIS_URL` ou `REDIS_PRIVATE_URL` no `.env`
 
 ### Modo Local (Docker Redis)
 
@@ -370,10 +338,9 @@ npm run dev:stop
 
 ---
 
-## 12. Documentacao Adicional
+## 11. Documentacao Adicional
 
 - `docs/DEVELOPMENT.md` - Guia completo de desenvolvimento local
-- `docs/DEPLOYMENT.md` - Guia de deploy no Railway
 - `docs/DEBUGGING.md` - Guia de depuracao
 - `docs/MODEL_DOCUMENTATION.md` - Detalhes dos modelos de IA
 

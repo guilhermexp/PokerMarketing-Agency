@@ -207,7 +207,9 @@ export const callRubeMCP = async (
     });
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('Serviço Rube não respondeu (timeout). Tente novamente mais tarde.');
+      throw new Error('Serviço Rube não respondeu (timeout). Tente novamente mais tarde.', {
+        cause: err,
+      });
     }
     throw err;
   } finally {

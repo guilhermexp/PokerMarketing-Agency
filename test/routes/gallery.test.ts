@@ -65,4 +65,29 @@ describe("gallery routes", () => {
       "user_id, src_url, source, and model are required",
     );
   });
+
+  it("returns an error envelope when the service payload breaks the output contract", async () => {
+    const listGalleryMock = vi.fn().mockResolvedValue({
+      invalid: true,
+    });
+
+    vi.doMock("../../server/services/gallery-service.js", () => ({
+      listGallery: listGalleryMock,
+      listDailyFlyers: vi.fn(),
+      createGalleryImage: vi.fn(),
+      updateGalleryImageRecord: vi.fn(),
+      deleteGalleryImageRecord: vi.fn(),
+    }));
+
+    const { registerGalleryRoutes } = await import("../../server/routes/db-gallery.js");
+    const app = createRouteApp(registerGalleryRoutes);
+
+    const response = await request(app).get("/api/db/gallery").query({
+      user_id: "auth-user-1",
+    });
+
+    expect(response.status).toBe(500);
+    expect(response.body.data).toBeNull();
+    expect(response.body.error.message).toBe("Failed to fetch gallery images");
+  });
 });

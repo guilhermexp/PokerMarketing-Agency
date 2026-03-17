@@ -135,7 +135,7 @@ export async function streamStudioAgent(
     mentions?: StudioAgentMention[];
   },
   onEvent: (event: StudioAgentEvent) => void,
-  signal?: AbortSignal,
+  signal?: globalThis.AbortSignal,
 ): Promise<void> {
   let headers = await buildHeaders('POST');
   let response = await fetch(`${API_BASE}/stream`, {
@@ -173,7 +173,7 @@ export async function answerStudioAgent(
     interactionId: string;
     answer: string | { optionId?: string; text?: string; approved?: boolean; answers?: Record<string, string> };
   },
-  signal?: AbortSignal,
+  signal?: globalThis.AbortSignal,
 ): Promise<{ ok: boolean }> {
   let headers = await buildHeaders('POST');
   let response = await fetch(`${API_BASE}/answer`, {

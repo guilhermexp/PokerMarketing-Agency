@@ -75,6 +75,7 @@ export const initFFmpeg = async (
     ffmpegInstance = null;
     throw new Error(
       `Falha ao carregar FFmpeg: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+      { cause: error },
     );
   }
 };
@@ -100,6 +101,7 @@ export const loadBlobAsUint8Array = async (blobUrl: string): Promise<Uint8Array>
     const urlPreview = blobUrl.length > 80 ? `${blobUrl.substring(0, 80)}...` : blobUrl;
     throw new Error(
       `Falha ao carregar vídeo (${urlPreview}): ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+      { cause: error },
     );
   }
 };

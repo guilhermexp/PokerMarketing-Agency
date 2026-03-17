@@ -16,7 +16,7 @@ DirectorAi é um kit de crescimento com IA projetado para criadores, com foco em
 
 ## Arquitetura
 
-A aplicação é uma SPA React com backend Express, otimizada para deploy em Railway.
+A aplicação é uma SPA React com backend Express.
 
 ### Stack Tecnológico
 
@@ -31,7 +31,7 @@ A aplicação é uma SPA React com backend Express, otimizada para deploy em Rai
 | **IA - Imagem** | Google Gemini API | Geração e edição de imagens |
 | **IA - Vídeo** | Veo 3.1 + Fal.ai (Sora 2) | Geração de vídeos |
 | **IA - Áudio** | Gemini TTS (Zephyr) | Narração em português brasileiro |
-| **Deploy** | Railway | Container Docker com Redis integrado |
+| **Deploy** | Dokploy | Container Docker com Redis |
 
 ### Diagrama de Fluxo
 
@@ -91,8 +91,7 @@ A aplicação é uma SPA React com backend Express, otimizada para deploy em Rai
 │   ├── schema.sql             # Schema completo do PostgreSQL
 │   └── run-migration.mjs      # Script de migração
 │
-├── Dockerfile                 # Build para Railway
-├── railway.toml               # Configuração Railway
+├── Dockerfile                 # Build para deploy
 └── vite.config.ts             # Build do frontend
 ```
 
@@ -112,7 +111,7 @@ A aplicação é uma SPA React com backend Express, otimizada para deploy em Rai
 
 | Variável | Descrição |
 |----------|-----------|
-| `REDIS_URL` ou `REDIS_PRIVATE_URL` | URL do Redis (Railway) |
+| `REDIS_URL` | URL do Redis |
 | `FAL_KEY` | Chave da API Fal.ai (Sora 2) |
 | `OPENROUTER_API_KEY` | Chave OpenRouter (modelos alternativos) |
 | `RUBE_TOKEN` | Token para API Rube (vídeo) |
@@ -136,9 +135,9 @@ npm install
 
 # Configurar variáveis de ambiente
 cp .env.example .env
-# Editar .env com suas chaves (incluindo REDIS_URL do Railway)
+# Editar .env com suas chaves
 
-# Modo padrao (Railway Redis)
+# Modo padrao
 npm run dev
 
 # Modo local (Docker Redis, funciona offline)
@@ -147,24 +146,14 @@ npm run dev:local
 
 Veja [DEVELOPMENT.md](./DEVELOPMENT.md) para detalhes sobre os modos de desenvolvimento.
 
-## Deploy no Railway
+## Deploy
 
-1. Crie projeto no Railway
-2. Adicione serviço Redis
-3. Configure variáveis de ambiente
-4. Conecte repositório GitHub ou use CLI:
-   ```bash
-   railway link
-   railway up
-   ```
-
-Veja [DEPLOYMENT.md](./DEPLOYMENT.md) para instruções detalhadas.
+O deploy é feito via Dokploy. Veja a documentação do Dokploy para instruções.
 
 ## Documentação Adicional
 
 - [DOCUMENTATION.md](../DOCUMENTATION.md) - Documentação técnica completa
 - [DEVELOPMENT.md](./DEVELOPMENT.md) - Guia de desenvolvimento local
-- [DEPLOYMENT.md](./DEPLOYMENT.md) - Guia de deploy no Railway
 - [DEBUGGING.md](./DEBUGGING.md) - Guia de depuração
 - [MODEL_DOCUMENTATION.md](./MODEL_DOCUMENTATION.md) - Detalhes dos modelos de IA
 

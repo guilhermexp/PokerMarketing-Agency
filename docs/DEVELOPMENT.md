@@ -10,13 +10,12 @@ Este documento explica como configurar e rodar o DirectorAi localmente.
 - Conta no Vercel (Blob Storage)
 - Conta no Clerk (Autenticacao)
 - Chave da API do Google Gemini
-- Acesso ao Railway (para Redis em desenvolvimento)
 
 ## Modos de Desenvolvimento
 
 O DirectorAi tem **dois modos de desenvolvimento**:
 
-### 1. Modo Padrao - Railway Redis (`npm run dev`)
+### 1. Modo Padrao (`npm run dev`)
 
 ```bash
 npm run dev
@@ -24,12 +23,12 @@ npm run dev
 
 **Caracteristicas:**
 - Roda `dev-api.mjs` (porta 3002) + Vite (porta 5173)
-- Usa Redis do **Railway** (mesmo da producao)
+- Usa Redis remoto se `REDIS_URL` estiver configurado
 - Jobs em background funcionam normalmente
 - Recomendado para desenvolvimento padrao
 
 **Requerimentos:**
-- `REDIS_URL` ou `REDIS_PRIVATE_URL` configurado no `.env` (URL do Redis Railway)
+- `REDIS_URL` configurado no `.env` (opcional, para jobs em background)
 
 ### 2. Modo Local - Docker Redis (`npm run dev:local`)
 
@@ -76,13 +75,12 @@ FAL_KEY="sua-chave-fal"
 npm install
 ```
 
-### 3. Configurar Redis
+### 3. Configurar Redis (Opcional)
 
-O modo padrao (`npm run dev`) usa Redis do Railway. Para isso, adicione no `.env`:
+Para jobs em background, adicione no `.env`:
 
 ```bash
-REDIS_URL="redis://default:xxx@xxx.railway.internal:6379"
-# ou use REDIS_PRIVATE_URL se disponivel
+REDIS_URL="redis://user:password@host:6379"
 ```
 
 Para usar Redis local (`npm run dev:local`), nao e necessario configurar - o Docker Compose cuida disso.
@@ -101,7 +99,7 @@ sudo systemctl start redis
 ### 4. Iniciar Aplicacao
 
 ```bash
-# Modo padrao (Railway Redis)
+# Modo padrao
 npm run dev
 
 # Modo local (Docker Redis)
@@ -117,7 +115,7 @@ npm run dev:local
 | Geracao de imagens (sync) | OK | OK |
 | Geracao de imagens (fila) | OK | OK |
 | Jobs em background | OK | OK |
-| Redis | Railway (remoto) | Docker (local) |
+| Redis | Remoto (se configurado) | Docker (local) |
 | Requer Docker | Nao | Sim |
 | Funciona offline | Nao | Sim |
 
@@ -134,7 +132,7 @@ npm run dev:local
 ### dev-api.mjs (Desenvolvimento)
 
 - Servidor de desenvolvimento com todas as APIs
-- Conecta ao Redis (Railway ou local via Docker)
+- Conecta ao Redis (remoto ou local via Docker)
 - Processa jobs em background via BullMQ
 - Hot reload para desenvolvimento rapido
 
@@ -143,12 +141,11 @@ npm run dev:local
 - Servidor completo para deploy
 - Serve frontend buildado + APIs
 - Identico comportamento de jobs
-- Usado no Railway
 
 ## Comandos Uteis
 
 ```bash
-# Desenvolvimento padrao (Railway Redis)
+# Desenvolvimento padrao
 npm run dev
 
 # Desenvolvimento local (Docker Redis)
