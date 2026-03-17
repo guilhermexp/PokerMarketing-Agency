@@ -3,6 +3,12 @@
  * Provides typed methods for all database entities
  */
 
+import {
+  getApiErrorMessage,
+  parseApiResponse,
+  unwrapApiData,
+} from "./api/response";
+
 const API_BASE = "/api/db";
 const DEV_API_ORIGIN =
   import.meta.env.DEV && import.meta.env.VITE_API_ORIGIN
@@ -36,7 +42,9 @@ export async function getCsrfToken(): Promise<string | null> {
       return null;
     }
 
-    const data = await response.json();
+    const data = unwrapApiData<{ csrfToken?: string }>(
+      await response.json().catch(() => ({})),
+    );
     if (data.csrfToken) {
       csrfToken = data.csrfToken;
       return csrfToken;
@@ -151,22 +159,20 @@ async function fetchApi<T>(
       });
 
       if (!response.ok) {
-        const error = await response
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
+        const error = await response.json().catch(() => ({ error: "Unknown error" }));
 
         // If CSRF validation failed, clear the token for next time
         if (response.status === 403 && requiresCsrf) {
           clearCsrfToken();
         }
 
-        throw new Error(error.error || `HTTP ${response.status}`);
+        throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
       }
 
       if (response.status === 204 || response.headers.get("content-length") === "0") {
         return undefined as T;
       }
-      return response.json();
+      return parseApiResponse<T>(response);
     } catch (error) {
       lastError = error;
       if (!canRetry || attempt === maxAttempts) {
@@ -896,7 +902,9 @@ export async function removeDailyFlyer(
 export async function checkDatabaseHealth(): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE}/health`);
-    const data = await response.json();
+    const data = unwrapApiData<{ status?: string }>(
+      await response.json().catch(() => ({})),
+    );
     return data.status === "healthy";
   } catch {
     return false;
@@ -967,13 +975,11 @@ export async function uploadToBlob(
     if (response.status === 403) {
       clearCsrfToken();
     }
-    const error = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
   }
 
-  return response.json();
+  return parseApiResponse<UploadResult>(response);
 }
 
 /**
@@ -1236,13 +1242,11 @@ export async function queueGenerationJob(
     if (response.status === 403) {
       clearCsrfToken();
     }
-    const error = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
   }
 
-  return response.json();
+  return parseApiResponse<QueueJobResult>(response);
 }
 
 /**
@@ -1282,26 +1286,6 @@ export interface ImageJobConfig {
   systemPrompt?: string;
 }
 
-function getApiErrorMessage(payload: unknown, status: number): string {
-  if (payload && typeof payload === "object") {
-    const maybeError = (payload as { error?: unknown }).error;
-    if (typeof maybeError === "string" && maybeError.trim()) {
-      return maybeError;
-    }
-    if (maybeError && typeof maybeError === "object") {
-      const nestedMessage = (maybeError as { message?: unknown }).message;
-      if (typeof nestedMessage === "string" && nestedMessage.trim()) {
-        return nestedMessage;
-      }
-    }
-    const maybeMessage = (payload as { message?: unknown }).message;
-    if (typeof maybeMessage === "string" && maybeMessage.trim()) {
-      return maybeMessage;
-    }
-  }
-  return `HTTP ${status}`;
-}
-
 /**
  * Queue an image generation job for background processing
  * Returns immediately, job runs in background via BullMQ
@@ -1334,13 +1318,11 @@ export async function getGenerationJobStatus(
   });
 
   if (!response.ok) {
-    const errorPayload = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
+    const errorPayload = await response.json().catch(() => ({ error: "Unknown error" }));
     throw new Error(getApiErrorMessage(errorPayload, response.status));
   }
 
-  return response.json();
+  return parseApiResponse<GenerationJob>(response);
 }
 
 /**
@@ -1361,13 +1343,11 @@ export async function getGenerationJobs(
   });
 
   if (!response.ok) {
-    const errorPayload = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
+    const errorPayload = await response.json().catch(() => ({ error: "Unknown error" }));
     throw new Error(getApiErrorMessage(errorPayload, response.status));
   }
 
-  return response.json();
+  return parseApiResponse<{ jobs: GenerationJob[]; total: number }>(response);
 }
 
 /**
@@ -1423,9 +1403,7 @@ export async function cancelGenerationJob(jobId: string): Promise<void> {
     if (response.status === 403) {
       clearCsrfToken();
     }
-    const errorPayload = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
+    const errorPayload = await response.json().catch(() => ({ error: "Unknown error" }));
     throw new Error(getApiErrorMessage(errorPayload, response.status));
   }
 }
@@ -1454,13 +1432,11 @@ export async function cancelAllGenerationJobs(userId: string): Promise<number> {
     if (response.status === 403) {
       clearCsrfToken();
     }
-    const error = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
   }
 
-  const result = await response.json();
+  const result = await parseApiResponse<{ cancelledCount: number }>(response);
   return result.cancelledCount;
 }
 
@@ -1517,13 +1493,11 @@ async function fetchAiApi<T>(
     if (response.status === 403 && requiresCsrf) {
       clearCsrfToken();
     }
-    const error = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
   }
 
-  return response.json();
+  return parseApiResponse<T>(response);
 }
 
 // AI Types

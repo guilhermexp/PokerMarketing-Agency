@@ -5,6 +5,7 @@
  */
 
 import { getCsrfToken, getCurrentCsrfToken } from '../apiClient';
+import { getApiErrorMessage, parseApiResponse } from './response';
 
 // =============================================================================
 // Types
@@ -69,13 +70,11 @@ export async function uploadToBlob(
   });
 
   if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
   }
 
-  return response.json();
+  return parseApiResponse<UploadResult>(response);
 }
 
 /**

@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { unwrapApiData } from '../../../services/api/response';
 import { DataTable, Column } from '../common/DataTable';
 import { Pagination } from '../common/Pagination';
 import { SearchInput } from '../common/SearchInput';
@@ -128,7 +129,11 @@ export function LogsPage() {
 
       if (!res.ok) throw new Error('Falha ao carregar logs');
 
-      const data = await res.json();
+      const data = unwrapApiData<{
+        logs: ActivityLog[];
+        pagination: PaginationInfo;
+        filters?: { categories?: string[]; recentErrorCount?: number };
+      }>(await res.json());
       setLogs(data.logs);
       setPagination(data.pagination);
       setCategories(data.filters?.categories || []);
@@ -157,7 +162,7 @@ export function LogsPage() {
 
       if (!res.ok) throw new Error('Falha ao carregar detalhes do log');
 
-      const data = await res.json();
+      const data = unwrapApiData<LogDetail>(await res.json());
       setSelectedLog(data);
       setIsModalOpen(true);
     } catch (err) {
@@ -437,4 +442,3 @@ export function LogsPage() {
     </div>
   );
 }
-

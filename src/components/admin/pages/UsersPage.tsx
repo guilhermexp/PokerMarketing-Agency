@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { unwrapApiData } from '../../../services/api/response';
 import { DataTable, Column } from '../common/DataTable';
 import { Pagination } from '../common/Pagination';
 import { SearchInput } from '../common/SearchInput';
@@ -61,7 +62,10 @@ export function UsersPage() {
 
       if (!res.ok) throw new Error('Falha ao carregar usuários');
 
-      const data = await res.json();
+      const data = unwrapApiData<{
+        users: User[];
+        pagination: PaginationInfo;
+      }>(await res.json());
       setUsers(data.users);
       setPagination(data.pagination);
       setError(null);
@@ -220,4 +224,3 @@ export function UsersPage() {
     </div>
   );
 }
-

@@ -44,6 +44,7 @@ import {
 
 const loadFfmpegService = () => import("../../../services/ffmpegService");
 import { uploadVideo, getVideoDisplayUrl, getCsrfToken, getCurrentCsrfToken } from "../../../services/apiClient";
+import { unwrapApiData } from "../../../services/api/response";
 import {
   useBackgroundJobs,
 } from "../../../hooks/useBackgroundJobs";
@@ -1818,7 +1819,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
         });
 
         if (response.ok) {
-          const result = await response.json();
+          const result = unwrapApiData<{ url: string }>(await response.json());
           persistedUrl = result.url;
 
           // Get audio duration

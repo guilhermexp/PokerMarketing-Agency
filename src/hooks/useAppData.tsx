@@ -29,6 +29,7 @@ import {
   type TournamentData,
   type WeekScheduleWithCount,
 } from "../services/apiClient";
+import { getApiErrorMessage, unwrapApiData } from "../services/api/response";
 
 // Global SWR config to minimize refetches
 const defaultConfig: SWRConfiguration = {
@@ -220,9 +221,12 @@ export function useGalleryImages(
       }
 
       const response = await fetch(`/api/db/gallery?${params}`);
-      if (!response.ok) throw new Error('Failed to load more images');
+      const payload = await response.json().catch(() => ({ error: 'Failed to load more images' }));
+      if (!response.ok) {
+        throw new Error(getApiErrorMessage(payload, 'Failed to load more images'));
+      }
 
-      const newImages: DbGalleryImage[] = await response.json();
+      const newImages = unwrapApiData<DbGalleryImage[]>(payload);
 
       // If we got fewer than 50, there are no more images
       if (newImages.length < 50) {

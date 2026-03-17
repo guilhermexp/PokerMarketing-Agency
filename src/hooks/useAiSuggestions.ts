@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from 'react';
 import { getCsrfToken, getCurrentCsrfToken } from '../services/apiClient';
+import { getApiErrorMessage, unwrapApiData } from '../services/api/response';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -58,10 +59,12 @@ export function useAiSuggestions(logId: string | null) {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
-        throw new Error(errorData.error || `Erro ${response.status}`);
+        throw new Error(getApiErrorMessage(errorData, `Erro ${response.status}`));
       }
 
-      const data = await response.json();
+      const data = unwrapApiData<{ suggestions: string; cached?: boolean }>(
+        await response.json(),
+      );
 
       setState({
         suggestions: data.suggestions,
@@ -95,4 +98,3 @@ export function useAiSuggestions(logId: string | null) {
     reset,
   };
 }
-

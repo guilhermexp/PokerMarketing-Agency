@@ -9,6 +9,7 @@
  */
 
 import logger from "../lib/logger.mjs";
+import { sendError } from "../lib/response.mjs";
 import { AppError, ERROR_CODES, HTTP_STATUS } from "../lib/errors/index.mjs";
 import { randomUUID } from "crypto";
 
@@ -213,8 +214,7 @@ export function errorHandler(err, req, res, next) {
   // Add request ID to response headers for client-side tracking
   res.setHeader("X-Request-ID", requestId);
 
-  // Send error response
-  res.json(errorResponse);
+  sendError(res, errorResponse);
 }
 
 /**

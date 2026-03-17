@@ -5,6 +5,7 @@
 
 import type { GalleryImage } from '../../../types';
 import { getCsrfToken, getCurrentCsrfToken } from '../../../services/apiClient';
+import { unwrapApiData } from '../../../services/api/response';
 
 interface EditOptions {
   brightness?: number;
@@ -53,7 +54,7 @@ export const imageEditApi = {
         credentials: 'include',
         body: JSON.stringify({ imageUrl, ...options }),
       });
-      return await response.json();
+      return unwrapApiData<ApiResponse<{ editedUrl: string }>>(await response.json());
     } catch (error) {
       return { success: false, error: String(error) };
     }
@@ -77,7 +78,7 @@ export const imageEditApi = {
         credentials: 'include',
         body: JSON.stringify({ imageUrl, enhanceType }),
       });
-      return await response.json();
+      return unwrapApiData<ApiResponse<{ enhancedUrl: string }>>(await response.json());
     } catch (error) {
       return { success: false, error: String(error) };
     }
@@ -101,7 +102,7 @@ export const imageEditApi = {
         credentials: 'include',
         body: JSON.stringify({ imageUrl, count }),
       });
-      return await response.json();
+      return unwrapApiData<ApiResponse<{ variations: string[] }>>(await response.json());
     } catch (error) {
       return { success: false, error: String(error) };
     }
@@ -124,7 +125,7 @@ export const imageEditApi = {
         credentials: 'include',
         body: JSON.stringify({ imageUrl }),
       });
-      return await response.json();
+      return unwrapApiData<ApiResponse<{ noBgUrl: string }>>(await response.json());
     } catch (error) {
       return { success: false, error: String(error) };
     }
@@ -150,7 +151,7 @@ export const imageEditApi = {
 
       xhr.addEventListener('load', () => {
         try {
-          const response = JSON.parse(xhr.responseText);
+          const response = unwrapApiData(JSON.parse(xhr.responseText));
           resolve({ success: true, data: response });
         } catch {
           resolve({ success: false, error: 'Invalid response' });

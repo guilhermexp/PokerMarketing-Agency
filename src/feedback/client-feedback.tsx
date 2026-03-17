@@ -4,6 +4,7 @@ import { generateMarkdown, downloadMarkdown, copyMarkdownToClipboard } from './g
 import { FeedbackPanel } from './feedback-panel';
 import { useFeedbackStore } from '../stores/feedbackStore';
 import { getCsrfToken } from '../services/apiClient';
+import { getApiErrorMessage } from '../services/api/response';
 
 interface Annotation {
   id: string;
@@ -134,6 +135,8 @@ export function ClientFeedback({
         if (sendTimeoutRef.current) clearTimeout(sendTimeoutRef.current);
         sendTimeoutRef.current = setTimeout(() => setSendStatus('idle'), 3000);
       } else {
+        const payload = await response.json().catch(() => ({ error: 'Falha ao enviar feedback' }));
+        console.error('[ClientFeedback]', getApiErrorMessage(payload, 'Falha ao enviar feedback'));
         setSendStatus('error');
       }
     } catch {

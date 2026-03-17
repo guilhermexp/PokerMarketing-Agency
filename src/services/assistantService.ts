@@ -5,6 +5,7 @@
 
 import type { BrandProfile, ChatMessage, AssistantFunctionCall } from '../types';
 import { getCsrfToken, getCurrentCsrfToken } from './apiClient';
+import { getApiErrorMessage } from './api/response';
 
 /**
  * Run assistant conversation with streaming via server-side endpoint
@@ -43,7 +44,7 @@ export async function* runAssistantConversationStream(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: response.statusText }));
-    throw new Error(error.error || `API call failed: ${response.status}`);
+    throw new Error(getApiErrorMessage(error, `API call failed: ${response.status}`));
   }
 
   // Read the stream

@@ -4,6 +4,7 @@
  */
 
 import { getCsrfToken, getCurrentCsrfToken } from "./apiClient";
+import { getApiErrorMessage, unwrapApiData } from "./api/response";
 
 /**
  * Check if Blob upload is available (always true, server handles token)
@@ -48,10 +49,10 @@ export const uploadImageToBlob = async (
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: response.statusText }));
-    throw new Error(error.error || `Upload failed: ${response.status}`);
+    throw new Error(getApiErrorMessage(error, `Upload failed: ${response.status}`));
   }
 
-  const result = await response.json();
+  const result = unwrapApiData<{ url: string }>(await response.json());
   console.debug(`[Blob Service] Image uploaded: ${result.url}`);
   return result.url;
 };

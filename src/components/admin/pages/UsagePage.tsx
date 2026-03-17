@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { unwrapApiData } from '../../../services/api/response';
 import { StatsCard } from '../common/StatsCard';
 import {
   AreaChart,
@@ -84,7 +85,12 @@ export function UsagePage() {
 
       if (!res.ok) throw new Error('Falha ao carregar dados de uso');
 
-      const data = await res.json();
+      const data = unwrapApiData<{
+        totals: UsageTotals;
+        timeline?: TimelineItem[];
+        topUsers?: TopUser[];
+        topOrganizations?: TopOrganization[];
+      }>(await res.json());
       setTotals(data.totals);
       setTimeline(data.timeline || []);
       setTopUsers(data.topUsers || []);
@@ -380,4 +386,3 @@ export function UsagePage() {
     </div>
   );
 }
-

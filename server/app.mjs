@@ -13,6 +13,7 @@ import cors from "cors";
 import helmet from "helmet";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/better-auth.mjs";
+import { isResponseEnvelope, sendError, sendSuccess } from "./lib/response.mjs";
 import { requestLogger } from "./middleware/requestLogger.mjs";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.mjs";
 import { csrfProtection } from "./middleware/csrfProtection.mjs";
@@ -175,6 +176,27 @@ app.use((req, res, next) => {
 });
 
 app.use(requestLogger);
+
+app.use((req, res, next) => {
+  const rawJson = res.json.bind(res);
+  res._rawJson = rawJson;
+  res.sendSuccess = (data, meta) => sendSuccess(res, data, meta);
+  res.sendError = (error) => sendError(res, error);
+
+  res.json = (payload) => {
+    if (res.locals.skipResponseEnvelope || isResponseEnvelope(payload)) {
+      return rawJson(payload);
+    }
+
+    if (res.statusCode >= 400 || (payload && typeof payload === "object" && "error" in payload)) {
+      return sendError(res, payload);
+    }
+
+    return sendSuccess(res, payload);
+  };
+
+  next();
+});
 
 // Auth + CSRF protection on all protected API prefixes
 const PROTECTED_API_PREFIXES = [

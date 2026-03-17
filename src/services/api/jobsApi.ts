@@ -6,6 +6,7 @@
  */
 
 import { getCsrfToken, getCurrentCsrfToken, clearCsrfToken } from '../apiClient';
+import { getApiErrorMessage, parseApiResponse } from './response';
 
 // =============================================================================
 // Types
@@ -132,13 +133,11 @@ export async function queueGenerationJob(
   });
 
   if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
   }
 
-  return response.json();
+  return parseApiResponse<QueueJobResult>(response);
 }
 
 /**
@@ -196,13 +195,11 @@ export async function getGenerationJobStatus(
   const response = await fetchWithAuth(`/api/generate/status?jobId=${jobId}`);
 
   if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
   }
 
-  return response.json();
+  return parseApiResponse<GenerationJob>(response);
 }
 
 /**
@@ -221,13 +218,11 @@ export async function getGenerationJobs(
   const response = await fetchWithAuth(`/api/generate/status?${params}`);
 
   if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
   }
 
-  return response.json();
+  return parseApiResponse<{ jobs: GenerationJob[]; total: number }>(response);
 }
 
 /**
@@ -292,12 +287,10 @@ export async function cancelAllGenerationJobs(userId: string): Promise<number> {
   });
 
   if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
   }
 
-  const result = await response.json();
+  const result = await parseApiResponse<{ cancelledCount: number }>(response);
   return result.cancelledCount;
 }

@@ -9,6 +9,7 @@ import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 import { getCsrfToken, getCurrentCsrfToken } from '../../services/apiClient';
+import { getApiErrorMessage, unwrapApiData } from '../../services/api/response';
 
 interface InstagramAccount {
   id: string;
@@ -75,12 +76,13 @@ export function ConnectInstagramModal({
         })
       });
 
-      const data = await response.json();
+      const payload = await response.json().catch(() => ({ error: 'Erro ao conectar conta' }));
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao conectar conta');
+        throw new Error(getApiErrorMessage(payload, 'Erro ao conectar conta'));
       }
 
+      const data = unwrapApiData<{ account: InstagramAccount }>(payload);
       onAccountConnected(data.account);
       setToken('');
       setStep(1);
@@ -252,12 +254,13 @@ export function useInstagramAccounts(userId: string, organizationId?: string | n
       }
 
       const response = await fetch(`/api/db/instagram-accounts?${params}`);
-      const data = await response.json();
+      const payload = await response.json().catch(() => ({ error: 'Erro ao carregar contas' }));
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao carregar contas');
+        throw new Error(getApiErrorMessage(payload, 'Erro ao carregar contas'));
       }
 
+      const data = unwrapApiData<InstagramAccount[]>(payload);
       setAccounts(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
@@ -302,8 +305,8 @@ export function useInstagramAccounts(userId: string, organizationId?: string | n
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Erro ao desconectar conta');
+        const data = await response.json().catch(() => ({ error: 'Erro ao desconectar conta' }));
+        throw new Error(getApiErrorMessage(data, 'Erro ao desconectar conta'));
       }
 
       setAccounts(prev => prev.filter(a => a.id !== accountId));

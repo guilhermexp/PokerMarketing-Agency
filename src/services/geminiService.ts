@@ -15,6 +15,7 @@ import type {
   Post,
 } from "../types";
 import { generateVideo as generateServerVideo, type ApiVideoModel, getCsrfToken, getCurrentCsrfToken, clearCsrfToken } from "./apiClient";
+import { getApiErrorMessage, parseApiResponse } from "./api/response";
 import { uploadImageToBlob } from "./blobService";
 import { buildLogoPrompt } from "@/ai-prompts";
 
@@ -27,7 +28,7 @@ const toApiVideoModel = (model: VideoModel): ApiVideoModel => {
 const API_BASE = "";
 
 // Helper to make authenticated API calls
-const apiCall = async (endpoint: string, body: unknown) => {
+const apiCall = async <T>(endpoint: string, body: unknown): Promise<T> => {
   // Ensure CSRF token is available for state-changing requests
   if (!getCurrentCsrfToken()) {
     await getCsrfToken();
@@ -61,13 +62,11 @@ const apiCall = async (endpoint: string, body: unknown) => {
   }
 
   if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: response.statusText }));
-    throw new Error(error.error || `API call failed: ${response.status}`);
+    const error = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(getApiErrorMessage(error, `API call failed: ${response.status}`));
   }
 
-  return response.json();
+  return parseApiResponse<T>(response);
 };
 
 export const generateCampaign = async (
@@ -76,7 +75,7 @@ export const generateCampaign = async (
   options: GenerationOptions,
 ): Promise<MarketingCampaign> => {
   // Use the dedicated campaign endpoint which has the correct schema
-  const response = await apiCall("/api/ai/campaign", {
+  const response = await apiCall<{ campaign: MarketingCampaign; model: string }>("/api/ai/campaign", {
     brandProfile: {
       name: brandProfile.name,
       description: brandProfile.description,
@@ -113,7 +112,7 @@ export const generateQuickPostText = async (
     }
     : undefined;
 
-  const response = await apiCall("/api/ai/text", {
+  const response = await apiCall<{ result: Post }>("/api/ai/text", {
     type: "quickPost",
     brandProfile,
     context,
@@ -127,7 +126,7 @@ export const enhancePrompt = async (
   prompt: string,
   brandProfile?: BrandProfile,
 ): Promise<string> => {
-  const response = await apiCall("/api/ai/enhance-prompt", {
+  const response = await apiCall<{ enhancedPrompt: string }>("/api/ai/enhance-prompt", {
     prompt,
     brandProfile: brandProfile ? {
       name: brandProfile.name,
@@ -152,7 +151,7 @@ export const generateImage = async (
     compositionAssets?: ImageFile[];
   },
 ): Promise<string> => {
-  const response = await apiCall("/api/ai/image", {
+  const response = await apiCall<{ imageUrl: string }>("/api/ai/image", {
     prompt,
     brandProfile,
     aspectRatio: options.aspectRatio,
@@ -175,7 +174,7 @@ export const editImage = async (
   referenceImage?: { base64: string; mimeType: string },
   maskRegion?: { x: number; y: number; width: number; height: number; imageWidth: number; imageHeight: number },
 ): Promise<string> => {
-  const response = await apiCall("/api/ai/edit-image", {
+  const response = await apiCall<{ imageUrl: string }>("/api/ai/edit-image", {
     image: { base64: base64ImageData, mimeType },
     prompt,
     mask,
@@ -197,7 +196,7 @@ export const generateFlyer = async (
   imageSize?: ImageSize,
   compositionAssets?: { base64: string; mimeType: string }[],
 ): Promise<string> => {
-  const response = await apiCall("/api/ai/flyer", {
+  const response = await apiCall<{ imageUrl: string }>("/api/ai/flyer", {
     prompt,
     brandProfile,
     logo,
@@ -218,7 +217,11 @@ export const extractColorsFromLogo = async (
   secondaryColor: string | null;
   tertiaryColor: string | null;
 }> => {
-  const response = await apiCall("/api/ai/extract-colors", {
+  const response = await apiCall<{
+    primaryColor: string;
+    secondaryColor: string | null;
+    tertiaryColor: string | null;
+  }>("/api/ai/extract-colors", {
     logo,
   });
 
@@ -228,7 +231,7 @@ export const extractColorsFromLogo = async (
 export const generateLogo = async (
   prompt: string,
 ): Promise<string> => {
-  const response = await apiCall("/api/ai/image", {
+  const response = await apiCall<{ imageUrl: string }>("/api/ai/image", {
     prompt: buildLogoPrompt(prompt),
     brandProfile: {
       name: "Logo",
@@ -244,7 +247,7 @@ export const generateLogo = async (
 };
 
 export const generateSpeech = async (script: string): Promise<string> => {
-  const response = await apiCall("/api/ai/speech", {
+  const response = await apiCall<{ audioBase64: string }>("/api/ai/speech", {
     script,
     voiceName: "Orus",
   });
@@ -287,7 +290,7 @@ export const convertToJsonPrompt = async (
   duration: number,
   aspectRatio: "16:9" | "9:16",
 ): Promise<string> => {
-  const response = await apiCall("/api/ai/convert-prompt", {
+  const response = await apiCall<{ result: unknown }>("/api/ai/convert-prompt", {
     prompt: genericPrompt,
     duration,
     aspectRatio,

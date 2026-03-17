@@ -6,6 +6,7 @@
 
 import { fetchApi } from './client';
 import { getCsrfToken, getCurrentCsrfToken } from '../apiClient';
+import { parseApiResponse } from './response';
 import type { GalleryImage } from '@/types';
 import type { WeekScheduleInfo, TournamentEvent } from '@/types';
 import type { TimePeriod } from '@/types/flyer.types';
@@ -117,7 +118,7 @@ export const createSchedule = async (file: File): Promise<WeekScheduleInfo> => {
   if (!response.ok) {
     throw new Error('Failed to create schedule');
   }
-  return response.json();
+  return parseApiResponse<WeekScheduleInfo>(response);
 };
 
 /**
@@ -152,7 +153,7 @@ export const uploadScheduleFile = async (
   if (!response.ok) {
     throw new Error('Failed to upload schedule');
   }
-  return response.json();
+  return parseApiResponse<{ tournaments: TournamentEvent[]; scheduleInfo: WeekScheduleInfo }>(response);
 };
 
 // =============================================================================
