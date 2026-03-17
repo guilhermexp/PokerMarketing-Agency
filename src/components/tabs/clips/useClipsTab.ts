@@ -34,7 +34,7 @@ export const useClipsTab = ({
     videoClipScripts,
     brandProfile,
     galleryImages,
-    userId,
+    userId: _userId,
     onAddImageToGallery,
     onUpdateGalleryImage,
     productImages,
@@ -69,7 +69,7 @@ export const useClipsTab = ({
                         (img) => img.source === "Clipe" && img.video_script_id === clip.id
                     );
                     if (exactMatch) {
-                        console.log('🔄 [useClipsTab] Found exact match in gallery for clip:', {
+                        console.debug('🔄 [useClipsTab] Found exact match in gallery for clip:', {
                             clipId: clip.id,
                             imageSrc: exactMatch.src.substring(0, 50),
                         });
@@ -81,7 +81,7 @@ export const useClipsTab = ({
                 const existingThumbnail = prevThumbnails[index];
                 if (existingThumbnail && existingThumbnail.src) {
                     if (existingThumbnail.video_script_id === clip.id) {
-                        console.log('🔄 [useClipsTab] Using existing thumbnail for clip:', {
+                        console.debug('🔄 [useClipsTab] Using existing thumbnail for clip:', {
                             clipId: clip.id,
                             thumbnailSrc: existingThumbnail.src.substring(0, 50),
                         });
@@ -90,7 +90,7 @@ export const useClipsTab = ({
                 }
 
                 if (clip.thumbnail_url) {
-                    console.log('🔄 [useClipsTab] Creating thumbnail from clip.thumbnail_url:', {
+                    console.debug('🔄 [useClipsTab] Creating thumbnail from clip.thumbnail_url:', {
                         clipId: clip.id,
                         thumbnailUrl: clip.thumbnail_url.substring(0, 50),
                     });
@@ -112,7 +112,7 @@ export const useClipsTab = ({
                             img.prompt === clip.image_prompt
                     );
                     if (legacyMatch) {
-                        console.log('🔄 [useClipsTab] Found legacy match for clip:', {
+                        console.debug('🔄 [useClipsTab] Found legacy match for clip:', {
                             clipId: clip.id,
                             imageSrc: legacyMatch.src.substring(0, 50),
                         });
@@ -120,7 +120,7 @@ export const useClipsTab = ({
                     }
                 }
 
-                console.log('🔄 [useClipsTab] No thumbnail found for clip:', clip.id);
+                console.debug('🔄 [useClipsTab] No thumbnail found for clip:', clip.id);
                 return null;
             });
         });
@@ -369,7 +369,6 @@ export const useClipsTab = ({
         },
         [
             videoClipScripts,
-            userId,
             brandProfile,
             onAddImageToGallery,
             productImages,

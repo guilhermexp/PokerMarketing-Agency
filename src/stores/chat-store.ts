@@ -204,7 +204,7 @@ export const useChatStore = create<ChatState>()(
       },
 
       handleToolEditApproved: (toolCallId, imageUrl) => {
-        console.log("[ChatStore] Tool edit approved:", {
+        console.debug("[ChatStore] Tool edit approved:", {
           toolCallId,
           imageUrl,
           imageUrlType: typeof imageUrl,

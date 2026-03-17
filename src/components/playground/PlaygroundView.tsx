@@ -7,9 +7,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AlertCircle,
   Check,
-  Clapperboard,
   Edit3,
   Film,
   Loader2,
@@ -22,7 +20,6 @@ import {
   X,
   Monitor,
   Smartphone,
-  ChevronDown,
 } from 'lucide-react';
 import { OverlayPortal } from '../common/OverlayPortal';
 import { VideoCard } from './VideoCard';
@@ -37,7 +34,6 @@ import type { BrandProfile, GalleryImage } from '../../types';
 import { useShallow } from 'zustand/react/shallow';
 import {
   useVideoPlaygroundStore,
-  videoPlaygroundSelectors,
   type VideoModel,
   type VideoAspectRatio,
   type VideoResolution,
@@ -146,8 +142,6 @@ const ConfigPanel: React.FC = () => {
   const clearReferenceImage = useCallback(() => {
     setReferenceImage(null);
   }, [setReferenceImage]);
-
-  const activeModel = MODEL_OPTIONS.find((o) => o.value === model);
 
   return (
     <div className="h-full flex flex-col bg-black/30 backdrop-blur-2xl">
@@ -564,12 +558,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ brandProfile, onAddImageToGallery
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [mode, setMode] = useState<'direct' | 'agent'>('direct');
 
-  const { prompt, setPrompt, activeTopicId, model, resolution } = useVideoPlaygroundStore(useShallow((s) => ({
+  const { prompt, setPrompt, activeTopicId } = useVideoPlaygroundStore(useShallow((s) => ({
     prompt: s.prompt,
     setPrompt: s.setPrompt,
     activeTopicId: s.activeTopicId,
-    model: s.model,
-    resolution: s.resolution,
   })));
   const { sessions, isLoading: sessionsLoading } = useVideoPlaygroundSessions(activeTopicId);
   const { createTopic } = useVideoPlaygroundTopics();
@@ -812,4 +804,3 @@ export const PlaygroundView: React.FC<PlaygroundViewProps> = ({
     </div>
   );
 };
-

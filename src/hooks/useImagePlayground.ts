@@ -3,12 +3,12 @@
  * Custom hooks for managing image playground state and data fetching
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import useSWR from 'swr';
 import { useShallow } from 'zustand/react/shallow';
 import { useImagePlaygroundStore, imagePlaygroundSelectors } from '../stores/imagePlaygroundStore';
 import * as api from '../services/api/imagePlayground';
-import type { GenerationBatch, AsyncTaskStatus } from '../stores/imagePlaygroundStore';
+import type { AsyncTaskStatus } from '../stores/imagePlaygroundStore';
 import { useApiErrorHandler } from './useApiErrorHandler';
 
 // =============================================================================
@@ -27,7 +27,7 @@ export function useImagePlaygroundTopics() {
       activeTopicId: s.activeTopicId,
     })));
 
-  const { data, error, isLoading, mutate } = useSWR(
+  const { error, isLoading, mutate } = useSWR(
     'image-playground-topics',
     () => api.getTopics(),
     {
@@ -90,10 +90,9 @@ export function useImagePlaygroundTopics() {
 // =============================================================================
 
 export function useImagePlaygroundBatches(topicId: string | null) {
-  const { setBatches, addBatch, removeBatch, removeGeneration, batchesMap, loadedTopicIds } =
+  const { setBatches, removeBatch, removeGeneration, batchesMap, loadedTopicIds } =
     useImagePlaygroundStore(useShallow((s) => ({
       setBatches: s.setBatches,
-      addBatch: s.addBatch,
       removeBatch: s.removeBatch,
       removeGeneration: s.removeGeneration,
       batchesMap: s.batchesMap,
@@ -103,7 +102,7 @@ export function useImagePlaygroundBatches(topicId: string | null) {
   const batches = topicId ? batchesMap[topicId] || [] : [];
   const isLoaded = topicId ? loadedTopicIds.includes(topicId) : false;
 
-  const { data, error, isLoading, mutate } = useSWR(
+  const { error, isLoading, mutate } = useSWR(
     topicId ? ['image-playground-batches', topicId] : null,
     () => api.getBatches(topicId!),
     {
@@ -170,7 +169,6 @@ export function useGenerationPolling(
   const [attempts, setAttempts] = useState(0);
   const isCompleteRef = useRef(false);
 
-  const MIN_INTERVAL = 1000; // 1s
   const MAX_INTERVAL = 30000; // 30s
 
   const { data, error } = useSWR(

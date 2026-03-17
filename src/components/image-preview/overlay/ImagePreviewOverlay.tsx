@@ -129,7 +129,7 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
 
   // Log when image.src changes
   useEffect(() => {
-    console.log('🎨 [ImagePreviewOverlay] image.src changed:', {
+    console.debug('🎨 [ImagePreviewOverlay] image.src changed:', {
       imageId: image.id,
       src: image.src.substring(0, 50),
     });

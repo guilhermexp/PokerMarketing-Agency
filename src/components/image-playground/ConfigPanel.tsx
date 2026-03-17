@@ -6,7 +6,6 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ImagePlus,
   Plus,
   X,
   Palette,
@@ -868,4 +867,3 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
     </div>
   );
 };
-

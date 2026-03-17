@@ -25,7 +25,7 @@ export function useImageCanvas({ imageSrc }: UseImageCanvasProps): UseImageCanva
 
   // Log when imageSrc changes
   useEffect(() => {
-    console.log('🖌️ [useImageCanvas] imageSrc changed:', imageSrc.substring(0, 50));
+    console.debug('🖌️ [useImageCanvas] imageSrc changed:', imageSrc.substring(0, 50));
   }, [imageSrc]);
 
   // Calculate display dimensions based on container size and natural image size

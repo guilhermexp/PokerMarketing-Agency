@@ -24,7 +24,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
   onUpdateGalleryImage,
   onSetChatReference,
   selectedDay = "MONDAY",
-  weekScheduleInfo,
+  weekScheduleInfo: _weekScheduleInfo,
   selectedDailyFlyerIds,
 }) => {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);

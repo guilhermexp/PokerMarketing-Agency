@@ -233,7 +233,7 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
   onRemoveStyleReference,
   selectedStyleReference,
   compositionAssets,
-  userId,
+  userId: _userId,
   galleryImages,
   campaignId,
   onQuickPost,

@@ -295,7 +295,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       return;
     }
 
-    console.log(`[AssistantPanel] Trimming messages: ${messages.length} -> ${MAX_MESSAGES}`);
+    console.debug(`[AssistantPanel] Trimming messages: ${messages.length} -> ${MAX_MESSAGES}`);
 
     // Manter apenas as últimas MAX_MESSAGES mensagens
     const trimmedMessages = messages.slice(-MAX_MESSAGES).map((msg, index, arr) => {
@@ -318,7 +318,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
 
     lastTrimmedLengthRef.current = trimmedMessages.length;
     setMessages(trimmedMessages);
-  }, [messages.length, setMessages]);
+  }, [messages, setMessages]);
 
   // ========================================================================
   // SINCRONIZAÇÃO AUTOMÁTICA DE IMAGENS
@@ -365,8 +365,8 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       }))
     );
 
-    console.log('🔍 [AssistantPanel] All tool calls in messages:', allToolCalls);
-    console.log('🔍 [AssistantPanel] Looking for toolCallId:', toolCallId);
+    console.debug('🔍 [AssistantPanel] All tool calls in messages:', allToolCalls);
+    console.debug('🔍 [AssistantPanel] Looking for toolCallId:', toolCallId);
 
     const toolCallExists = allToolCalls.some(tc => tc.id === toolCallId);
 
@@ -391,10 +391,10 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       return;
     }
 
-    console.log('✅ [AssistantPanel] Tool call found! Proceeding with approval/rejection');
+    console.debug('✅ [AssistantPanel] Tool call found! Proceeding with approval/rejection');
 
     if (result === 'approved' && imageUrl) {
-      console.log('✅ [AssistantPanel] Auto-approving tool edit:', {
+      console.debug('✅ [AssistantPanel] Auto-approving tool edit:', {
         toolCallId,
         imageUrl,
         imageUrlType: typeof imageUrl,
@@ -405,7 +405,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       handledEditResultsRef.current.add(toolCallId);
 
       // Notificar o agente que a edição foi aprovada
-      console.log('✅ [AssistantPanel] Calling addToolApprovalResponse with:', {
+      console.debug('✅ [AssistantPanel] Calling addToolApprovalResponse with:', {
         id: toolCallId,
         approved: true,
         reason: imageUrl
@@ -417,7 +417,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
         reason: imageUrl
       });
 
-      console.log('✅ [AssistantPanel] addToolApprovalResponse completed');
+      console.debug('✅ [AssistantPanel] addToolApprovalResponse completed');
     } else if (result === 'rejected') {
       console.debug('[AssistantPanel] Auto-denying tool edit:', { toolCallId, error });
 

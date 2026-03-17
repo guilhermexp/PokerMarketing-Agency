@@ -70,7 +70,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
   onUpdateGalleryImage,
   onSetChatReference,
   onPublishToCampaign,
-  userId,
+  userId: _userId,
   instagramContext,
   galleryImages = [],
   onSchedulePost,
@@ -200,7 +200,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [event, brandProfile, currency, model, aspectRatio, imageSize, collabLogos, styleReference, compositionAssets, userId, jobContext, setGeneratedFlyers]);
+  }, [event, brandProfile, currency, model, aspectRatio, imageSize, collabLogos, styleReference, compositionAssets, setGeneratedFlyers]);
 
   const handleQuickPost = (flyer: GalleryImage) => {
     setQuickPostFlyer(flyer);

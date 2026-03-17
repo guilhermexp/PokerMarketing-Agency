@@ -27,7 +27,6 @@ import { Icon } from "../common/Icon";
 import type { TimePeriod } from "../flyer/FlyerGenerator";
 import { QuickPostModal } from "../common/QuickPostModal";
 import { FloatingSidebar } from "../layout/FloatingSidebar";
-import { Zap, Layers, Image, Calendar, LayoutGrid, Video } from "lucide-react";
 import type { ScheduledPost } from "../../types";
 import { GeneratingLoader } from "../ui/quantum-pulse-loade";
 import { PublishedStoriesWidget } from "../ui/published-stories-widget";
@@ -261,8 +260,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     isGenerating,
     onEditProfile,
     onResetCampaign,
-    isAssistantOpen,
-    onToggleAssistant,
+    isAssistantOpen: _isAssistantOpen,
+    onToggleAssistant: _onToggleAssistant,
     assistantHistory,
     isAssistantLoading,
     onAssistantSendMessage,

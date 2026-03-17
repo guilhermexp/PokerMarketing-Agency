@@ -28,7 +28,7 @@ export const FacebookPostPreview: React.FC<FacebookPostPreviewProps> = ({
   onImageClick,
   imagePrompt,
   error,
-  galleryImage,
+  galleryImage: _galleryImage,
 }) => {
   const [isImageLoading, setIsImageLoading] = React.useState(false);
   const [loadedImage, setLoadedImage] = React.useState<string | null>(null);

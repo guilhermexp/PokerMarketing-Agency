@@ -100,7 +100,7 @@ export const PeriodCardRow: React.FC<{
     onCloneStyle,
     collabLogos,
     onPublishToCampaign,
-    userId,
+    userId: _userId,
     instagramContext,
     galleryImages = [],
     onSchedulePost,

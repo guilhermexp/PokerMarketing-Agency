@@ -13,7 +13,6 @@ import {
   Check,
   X,
   Loader2,
-  Film,
 } from 'lucide-react';
 import { useImagePlaygroundTopics } from '../../hooks/useImagePlayground';
 import { useImagePlaygroundStore } from '../../stores/imagePlaygroundStore';
@@ -225,4 +224,3 @@ const TopicItem: React.FC<TopicItemProps> = ({
     </div>
   );
 };
-

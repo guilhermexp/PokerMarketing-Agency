@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import type {
   VideoClipScript,
   BrandProfile,
@@ -140,7 +140,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
   isGeneratingAllClipImages,
   onQuickPost,
   onSchedulePost,
-  userId,
+  userId: _userId,
   productImages,
 }) => {
   // Background jobs for video generation
@@ -178,14 +178,6 @@ export const ClipCard: React.FC<ClipCardProps> = ({
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [editingThumbnail, setEditingThumbnail] = useState<GalleryImage | null>(
     null,
-  );
-
-  const productImageDataUrls = useMemo(
-    () =>
-      (productImages || []).map(
-        (img) => `data:${img.mimeType};base64,${img.base64}`,
-      ),
-    [productImages],
   );
 
   const buildProductImages = useCallback(async () => {
@@ -259,7 +251,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
   // Debug: Log when thumbnail prop changes
   useEffect(() => {
-    console.log('📸 [ClipCard] thumbnail prop changed:', {
+    console.debug('📸 [ClipCard] thumbnail prop changed:', {
       clipId: clip.id,
       thumbnailId: thumbnail?.id,
       thumbnailSrc: thumbnail?.src.substring(0, 50),
@@ -268,7 +260,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
   // Debug: Log when editingThumbnail state changes
   useEffect(() => {
-    console.log('✏️ [ClipCard] editingThumbnail state changed:', {
+    console.debug('✏️ [ClipCard] editingThumbnail state changed:', {
       clipId: clip.id,
       editingId: editingThumbnail?.id,
       editingSrc: editingThumbnail?.src.substring(0, 50),
@@ -1443,7 +1435,6 @@ export const ClipCard: React.FC<ClipCardProps> = ({
       sceneImages,
       onAddImageToGallery,
       clip.id,
-      userId,
       includeNarration,
       useFrameInterpolation,
       videoStates,
@@ -1766,12 +1757,10 @@ export const ClipCard: React.FC<ClipCardProps> = ({
   }, [
     thumbnail,
     scenes,
-    userId,
     clip.id,
     brandProfile,
     getSceneSource,
     onAddImageToGallery,
-    productImageDataUrls,
     buildProductImages,
     selectedImageModel,
   ]);
@@ -1872,7 +1861,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
 
   const handleThumbnailUpdate = async (newSrc: string) => {
     if (thumbnail) {
-      console.log('🔄 [ClipCard] handleThumbnailUpdate called:', {
+      console.debug('🔄 [ClipCard] handleThumbnailUpdate called:', {
         thumbnailId: thumbnail.id,
         oldSrc: thumbnail.src.substring(0, 50),
         newSrc: newSrc.substring(0, 50),
@@ -1881,7 +1870,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
       onUpdateGalleryImage(thumbnail.id, newSrc);
       setEditingThumbnail((prev) => {
         const updated = prev ? { ...prev, src: newSrc } : null;
-        console.log('🔄 [ClipCard] setEditingThumbnail updated:', {
+        console.debug('🔄 [ClipCard] setEditingThumbnail updated:', {
           prevSrc: prev?.src.substring(0, 50),
           updatedSrc: updated?.src.substring(0, 50),
         });

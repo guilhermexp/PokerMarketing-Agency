@@ -244,7 +244,7 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
   onRemoveStyleReference,
   selectedStyleReference,
   compositionAssets,
-  userId,
+  userId: _userId,
   galleryImages,
   campaignId,
   onQuickPost,

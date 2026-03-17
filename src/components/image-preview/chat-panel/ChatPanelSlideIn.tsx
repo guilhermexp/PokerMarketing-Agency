@@ -11,7 +11,7 @@ interface ChatPanelSlideInProps {
 
 export const ChatPanelSlideIn = ({
   open,
-  image,
+  image: _image,
   onClose,
   chatComponent,
 }: ChatPanelSlideInProps) => {

@@ -167,7 +167,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
     }
 
     syncUser();
-  }, [isPending, isSignedIn, betterAuthUserId, userEmail, userName, userImage]);
+  }, [isPending, isSignedIn, betterAuthUserId, userEmail, userName, userImage, sessionData?.session]);
 
   const contextValue: AuthContextType = {
     dbUser,
