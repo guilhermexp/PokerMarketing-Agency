@@ -74,7 +74,13 @@ export async function uploadBase64Asset({ filename, contentType, data }) {
     throw new ValidationError("Missing required fields: filename, contentType, data");
   }
 
-  validateContentType(contentType);
+  try {
+    validateContentType(contentType);
+  } catch (error) {
+    throw new ValidationError(
+      error instanceof Error ? error.message : "Invalid content type",
+    );
+  }
 
   const buffer = Buffer.from(data, "base64");
   if (buffer.length > MAX_FILE_SIZE) {
