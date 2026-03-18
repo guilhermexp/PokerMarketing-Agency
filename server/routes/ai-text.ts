@@ -47,6 +47,17 @@ import {
 type ImageSize = NonNullable<LogAiUsageParams['imageSize']>;
 import { validateContentType } from "../lib/validation/contentType.js";
 import logger from "../lib/logger.js";
+import { validateRequest } from "../middleware/validate.js";
+import {
+  type AiConvertPromptBody,
+  type AiEnhancePromptBody,
+  type AiFlyerBody,
+  type AiTextBody,
+  aiConvertPromptBodySchema,
+  aiEnhancePromptBodySchema,
+  aiFlyerBodySchema,
+  aiTextBodySchema,
+} from "../schemas/ai-schemas.js";
 
 // ============================================================================
 // TYPES
@@ -117,43 +128,6 @@ function normalizeImageSize(size: string | undefined): ImageSize {
 // ============================================================================
 
 /** Request body for /api/ai/flyer */
-interface FlyerRequestBody {
-  prompt: string;
-  brandProfile: BrandProfile;
-  logo?: ImageData;
-  referenceImage?: ImageData;
-  aspectRatio?: string;
-  collabLogo?: ImageData;
-  collabLogos?: ImageData[];
-  imageSize?: string;
-  compositionAssets?: CompositionAsset[];
-}
-
-/** Request body for /api/ai/text */
-interface TextRequestBody {
-  type?: string;
-  brandProfile: BrandProfile;
-  context?: string;
-  systemPrompt?: string;
-  userPrompt?: string;
-  image?: ImageData;
-  temperature?: number;
-  responseSchema?: Record<string, unknown>;
-}
-
-/** Request body for /api/ai/enhance-prompt */
-interface EnhancePromptRequestBody {
-  prompt: string;
-  brandProfile?: BrandProfile;
-}
-
-/** Request body for /api/ai/convert-prompt */
-interface ConvertPromptRequestBody {
-  prompt: string;
-  duration?: number;
-  aspectRatio?: string;
-}
-
 // ============================================================================
 // ROUTES
 // ============================================================================
@@ -162,7 +136,7 @@ export function registerAiTextRoutes(app: Application): void {
   // -------------------------------------------------------------------------
   // POST /api/ai/flyer
   // -------------------------------------------------------------------------
-  app.post("/api/ai/flyer", async (req: Request, res: Response) => {
+  app.post("/api/ai/flyer", validateRequest({ body: aiFlyerBodySchema }), async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
@@ -179,17 +153,10 @@ export function registerAiTextRoutes(app: Application): void {
         collabLogos, // Frontend sends array
         imageSize = "1K",
         compositionAssets,
-      } = req.body as FlyerRequestBody;
+      } = req.body as AiFlyerBody;
 
-      // Support both singular and array format for collab logos
       const collabLogo =
         collabLogoSingular || (collabLogos && collabLogos[0]) || null;
-
-      if (!prompt || !brandProfile) {
-        return res
-          .status(400)
-          .json({ error: "prompt and brandProfile are required" });
-      }
 
       logger.info(
         {
@@ -472,7 +439,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
   // -------------------------------------------------------------------------
   // POST /api/ai/text
   // -------------------------------------------------------------------------
-  app.post("/api/ai/text", async (req: Request, res: Response) => {
+  app.post("/api/ai/text", validateRequest({ body: aiTextBodySchema }), async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
@@ -488,11 +455,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         image,
         temperature = 0.7,
         responseSchema,
-      } = req.body as TextRequestBody;
-
-      if (!brandProfile) {
-        return res.status(400).json({ error: "brandProfile is required" });
-      }
+      } = req.body as AiTextBody;
 
       logger.info({ type }, "[Text API] Generating text");
 
@@ -503,12 +466,6 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
       let result;
 
       if (type === "quickPost") {
-        if (!context) {
-          return res
-            .status(400)
-            .json({ error: "context is required for quickPost" });
-        }
-
         const prompt = buildQuickPostPrompt(brandProfile, context);
         const parts: ContentPart[] = [{ text: prompt }];
         if (image) {
@@ -526,12 +483,6 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           temperature,
         );
       } else {
-        if (!systemPrompt && !userPrompt) {
-          return res.status(400).json({
-            error: "systemPrompt or userPrompt is required for custom text",
-          });
-        }
-
         const parts: ContentPart[] = [];
         if (userPrompt) {
           parts.push({ text: userPrompt });
@@ -577,7 +528,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
       });
     } catch (error) {
       const err = error as Error;
-      const body = req.body as TextRequestBody | undefined;
+      const body = req.body as AiTextBody | undefined;
       logger.error({ err }, "[Text API] Error");
       await logAiUsage(sql, {
         organizationId,
@@ -597,7 +548,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
   // -------------------------------------------------------------------------
   // POST /api/ai/enhance-prompt
   // -------------------------------------------------------------------------
-  app.post("/api/ai/enhance-prompt", async (req: Request, res: Response) => {
+  app.post("/api/ai/enhance-prompt", validateRequest({ body: aiEnhancePromptBodySchema }), async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
@@ -605,11 +556,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
     const sql = getSql();
 
     try {
-      const { prompt, brandProfile } = req.body as EnhancePromptRequestBody;
-
-      if (!prompt || !prompt.trim()) {
-        return res.status(400).json({ error: "prompt is required" });
-      }
+      const { prompt, brandProfile } = req.body as AiEnhancePromptBody;
 
       logger.info({}, "[Enhance Prompt API] Enhancing prompt with Gemini");
 
@@ -730,18 +677,14 @@ REGRAS:
   // -------------------------------------------------------------------------
   // POST /api/ai/convert-prompt
   // -------------------------------------------------------------------------
-  app.post("/api/ai/convert-prompt", async (req: Request, res: Response) => {
+  app.post("/api/ai/convert-prompt", validateRequest({ body: aiConvertPromptBodySchema }), async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
-      const { prompt, duration = 5, aspectRatio = "16:9" } = req.body as ConvertPromptRequestBody;
-
-      if (!prompt) {
-        return res.status(400).json({ error: "prompt is required" });
-      }
+      const { prompt, duration = 5, aspectRatio = "16:9" } = req.body as AiConvertPromptBody;
 
       logger.info(
         { durationSeconds: duration },

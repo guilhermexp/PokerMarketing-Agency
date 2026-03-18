@@ -16,6 +16,23 @@ import {
 } from "../helpers/video-playground.js";
 import { getGeminiAi } from "../lib/ai/clients.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
+import { validateRequest } from "../middleware/validate.js";
+import {
+  type PlaygroundGenerateTitleBody,
+  type PlaygroundIdParams,
+  type PlaygroundTopicBody,
+  type PlaygroundTopicUpdateBody,
+  type VideoPlaygroundGenerationUpdateBody,
+  type VideoPlaygroundGenerateBody,
+  type VideoPlaygroundSessionsQuery,
+  playgroundGenerateTitleBodySchema,
+  playgroundIdParamsSchema,
+  playgroundTopicBodySchema,
+  playgroundTopicUpdateBodySchema,
+  videoPlaygroundGenerationUpdateBodySchema,
+  videoPlaygroundGenerateBodySchema,
+  videoPlaygroundSessionsQuerySchema,
+} from "../schemas/playground-schemas.js";
 
 // =============================================================================
 // Dependencies Interface
@@ -124,7 +141,7 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Create topic
-  app.post("/api/video-playground/topics", async (req: Request, res: Response) => {
+  app.post("/api/video-playground/topics", validateRequest({ body: playgroundTopicBodySchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
@@ -134,7 +151,7 @@ export function registerVideoPlaygroundRoutes(
         return;
       }
 
-      const { title } = req.body as CreateTopicBody;
+      const { title } = req.body as PlaygroundTopicBody;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
@@ -151,7 +168,7 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Update topic
-  app.patch("/api/video-playground/topics/:id", async (req: Request, res: Response) => {
+  app.patch("/api/video-playground/topics/:id", validateRequest({ params: playgroundIdParamsSchema, body: playgroundTopicUpdateBodySchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
@@ -161,12 +178,8 @@ export function registerVideoPlaygroundRoutes(
         return;
       }
 
-      const id = String(req.params.id);
-      const { title, coverUrl } = req.body as UpdateTopicBody;
-      if (coverUrl && coverUrl.startsWith('data:')) {
-        res.status(400).json({ error: "Base64 data URLs not allowed; upload to blob storage first" });
-        return;
-      }
+      const { id } = req.params as PlaygroundIdParams;
+      const { title, coverUrl } = req.body as PlaygroundTopicUpdateBody;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
@@ -189,7 +202,7 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Delete topic
-  app.delete("/api/video-playground/topics/:id", async (req: Request, res: Response) => {
+  app.delete("/api/video-playground/topics/:id", validateRequest({ params: playgroundIdParamsSchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
@@ -199,7 +212,7 @@ export function registerVideoPlaygroundRoutes(
         return;
       }
 
-      const id = String(req.params.id);
+      const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
@@ -216,7 +229,7 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Get sessions for topic
-  app.get("/api/video-playground/sessions", async (req: Request, res: Response) => {
+  app.get("/api/video-playground/sessions", validateRequest({ query: videoPlaygroundSessionsQuerySchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
@@ -226,13 +239,7 @@ export function registerVideoPlaygroundRoutes(
         return;
       }
 
-      const topicId = String(req.query.topicId || "");
-      if (!topicId) {
-        res.status(400).json({ error: "topicId required" });
-        return;
-      }
-      const requestedLimit = Number.parseInt(String(req.query.limit || ""), 10);
-      const limit = Number.isFinite(requestedLimit) ? requestedLimit : 100;
+      const { topicId, limit } = req.query as VideoPlaygroundSessionsQuery;
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
@@ -265,7 +272,7 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Create video generation session (just the record, actual generation uses /api/ai/video)
-  app.post("/api/video-playground/generate", async (req: Request, res: Response) => {
+  app.post("/api/video-playground/generate", validateRequest({ body: videoPlaygroundGenerateBodySchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
@@ -275,16 +282,7 @@ export function registerVideoPlaygroundRoutes(
         return;
       }
 
-      const { topicId, model, prompt, aspectRatio, resolution, referenceImageUrl } = req.body as GenerateSessionBody;
-      if (!topicId || !model || !prompt) {
-        res.status(400).json({ error: "Missing required fields" });
-        return;
-      }
-      if (referenceImageUrl && referenceImageUrl.startsWith('data:')) {
-        res.status(400).json({ error: "Base64 data URLs not allowed; upload to blob storage first" });
-        return;
-      }
-
+      const { topicId, model, prompt, aspectRatio, resolution, referenceImageUrl } = req.body as VideoPlaygroundGenerateBody;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
@@ -307,7 +305,7 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Delete session
-  app.delete("/api/video-playground/sessions/:id", async (req: Request, res: Response) => {
+  app.delete("/api/video-playground/sessions/:id", validateRequest({ params: playgroundIdParamsSchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
@@ -317,7 +315,7 @@ export function registerVideoPlaygroundRoutes(
         return;
       }
 
-      const id = String(req.params.id);
+      const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
@@ -334,7 +332,7 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Delete generation
-  app.delete("/api/video-playground/generations/:id", async (req: Request, res: Response) => {
+  app.delete("/api/video-playground/generations/:id", validateRequest({ params: playgroundIdParamsSchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
@@ -344,7 +342,7 @@ export function registerVideoPlaygroundRoutes(
         return;
       }
 
-      const id = String(req.params.id);
+      const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
@@ -361,7 +359,7 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Update generation (set video URL and status after generation completes)
-  app.patch("/api/video-playground/generations/:id", async (req: Request, res: Response) => {
+  app.patch("/api/video-playground/generations/:id", validateRequest({ params: playgroundIdParamsSchema, body: videoPlaygroundGenerationUpdateBodySchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
@@ -371,13 +369,8 @@ export function registerVideoPlaygroundRoutes(
         return;
       }
 
-      const id = String(req.params.id);
-      const { status, videoUrl, duration, errorMessage } = req.body as UpdateGenerationBody;
-
-      if (videoUrl && videoUrl.startsWith('data:')) {
-        res.status(400).json({ error: "Base64 data URLs not allowed; upload to blob storage first" });
-        return;
-      }
+      const { id } = req.params as PlaygroundIdParams;
+      const { status, videoUrl, duration, errorMessage } = req.body as VideoPlaygroundGenerationUpdateBody;
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
@@ -395,7 +388,7 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Generate topic title
-  app.post("/api/video-playground/generate-title", async (req: Request, res: Response) => {
+  app.post("/api/video-playground/generate-title", validateRequest({ body: playgroundGenerateTitleBodySchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
@@ -404,11 +397,7 @@ export function registerVideoPlaygroundRoutes(
         return;
       }
 
-      const { prompts } = req.body as GenerateTitleBody;
-      if (!prompts || !Array.isArray(prompts)) {
-        res.status(400).json({ error: "prompts array required" });
-        return;
-      }
+      const { prompts } = req.body as PlaygroundGenerateTitleBody;
 
       const genai = getGeminiAi();
       const title = await generateTopicTitle(prompts, genai);

@@ -24,6 +24,11 @@ import {
   createTimer,
 } from "../helpers/usage-tracking.js";
 import logger from "../lib/logger.js";
+import { validateRequest } from "../middleware/validate.js";
+import {
+  type AiCampaignBody,
+  aiCampaignBodySchema,
+} from "../schemas/ai-schemas.js";
 
 // ============================================================================
 // TYPES
@@ -71,17 +76,6 @@ interface CampaignOptions {
 }
 
 /** Request body for /api/ai/campaign */
-interface CampaignRequestBody {
-  brandProfile: BrandProfile;
-  transcript: string;
-  options: CampaignOptions;
-  productImages?: ImageData[];
-  inspirationImages?: ImageData[];
-  collabLogo?: ImageData;
-  compositionAssets?: ImageData[];
-  toneOfVoiceOverride?: string;
-}
-
 /** Carousel slide structure */
 interface CarouselSlide {
   slide: number;
@@ -198,7 +192,7 @@ function normalizeCarouselSlides(carousels: unknown, expectedSlides: number): Ca
 }
 
 export function registerAiCampaignRoutes(app: Application): void {
-  app.post("/api/ai/campaign", async (req: Request, res: Response) => {
+  app.post("/api/ai/campaign", validateRequest({ body: aiCampaignBodySchema }), async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
@@ -214,13 +208,7 @@ export function registerAiCampaignRoutes(app: Application): void {
         collabLogo,
         compositionAssets,
         toneOfVoiceOverride,
-      } = req.body as CampaignRequestBody;
-
-      if (!brandProfile || !transcript || !options) {
-        return res.status(400).json({
-          error: "brandProfile, transcript, and options are required",
-        });
-      }
+      } = req.body as AiCampaignBody;
 
       logger.info(
         {
@@ -395,7 +383,7 @@ export function registerAiCampaignRoutes(app: Application): void {
       const err = error as Error;
       logger.error({ err }, "[Campaign API] Error");
       // Log failed usage
-      const body = req.body as CampaignRequestBody | undefined;
+      const body = req.body as AiCampaignBody | undefined;
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/campaign",

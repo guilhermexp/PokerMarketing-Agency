@@ -3,6 +3,38 @@ import {
   OpenAPIRegistry,
 } from "@asteasolutions/zod-to-openapi";
 import { z, type ZodType } from "zod";
+import { chatBodySchema } from "../api/chat/schema.js";
+import {
+  adminLogParamsSchema,
+  adminLogsQuerySchema,
+  adminOrganizationsQuerySchema,
+  adminUsageQuerySchema,
+  adminUsersQuerySchema,
+} from "./admin-schemas.js";
+import {
+  aiAssistantBodySchema,
+  aiCampaignBodySchema,
+  aiConvertPromptBodySchema,
+  aiEditImageBodySchema,
+  aiEnhancePromptBodySchema,
+  aiExtractColorsBodySchema,
+  aiFlyerBodySchema,
+  aiImageAsyncBatchBodySchema,
+  aiImageAsyncBodySchema,
+  aiImageAsyncJobsQuerySchema,
+  aiImageBodySchema,
+  aiImageJobIdParamsSchema,
+  aiTextBodySchema,
+  aiVideoBodySchema,
+} from "./ai-schemas.js";
+import {
+  studioAnswerBodySchema,
+  studioContentSearchQuerySchema,
+  studioFilesQuerySchema,
+  studioHistoryQuerySchema,
+  studioResetBodySchema,
+  studioStreamBodySchema,
+} from "./agent-studio-schemas.js";
 import {
   brandProfileCreateBodySchema,
   brandProfileQuerySchema,
@@ -33,6 +65,19 @@ import {
   galleryPatchQuerySchema,
 } from "./gallery-schemas.js";
 import { initQuerySchema } from "./init-schemas.js";
+import {
+  imagePlaygroundBatchesQuerySchema,
+  imagePlaygroundGenerateBodySchema,
+  imagePlaygroundStatusParamsSchema,
+  imagePlaygroundStatusQuerySchema,
+  playgroundGenerateTitleBodySchema,
+  playgroundIdParamsSchema,
+  playgroundTopicBodySchema,
+  playgroundTopicUpdateBodySchema,
+  videoPlaygroundGenerationUpdateBodySchema,
+  videoPlaygroundGenerateBodySchema,
+  videoPlaygroundSessionsQuerySchema,
+} from "./playground-schemas.js";
 import { proxyVideoQuerySchema, uploadBodySchema } from "./upload-schemas.js";
 
 export type ApiRouteMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -87,15 +132,27 @@ export interface ApiRouteContract {
 
 const isoDateSchema = z.union([z.date(), z.string().trim().min(1)]);
 const optionalNullableIsoDateSchema = isoDateSchema.nullable().optional();
-const genericRecordSchema = z.record(z.string(), z.unknown());
-const genericEntitySchema = z.object({ id: idSchema.optional() }).passthrough();
+const jsonScalarSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const jsonPrimitiveArraySchema = z.union([
+  z.array(z.string()),
+  z.array(z.number()),
+  z.array(z.boolean()),
+]);
+const jsonObjectSchema = z.record(
+  z.string(),
+  z.union([jsonScalarSchema, jsonPrimitiveArraySchema]),
+);
+const jsonLikeSchema = z.union([jsonScalarSchema, jsonPrimitiveArraySchema, jsonObjectSchema]);
+// Dynamic API payloads that vary by provider/model stay explicit and OpenAPI-safe.
+const genericRecordSchema = z.record(z.string(), jsonLikeSchema);
+const genericEntitySchema = z.object({ id: idSchema.optional() }).catchall(jsonLikeSchema);
 const genericListSchema = z.array(genericEntitySchema);
 const genericSuccessSchema = z
   .object({
     success: z.boolean(),
     message: z.string().trim().min(1).optional(),
   })
-  .passthrough();
+  .catchall(jsonLikeSchema);
 const simpleIdParamsSchema = z.object({
   id: z.string().trim().min(1),
 });
@@ -105,6 +162,7 @@ const jobIdParamsSchema = z.object({
 const generationIdParamsSchema = z.object({
   generationId: z.string().trim().min(1),
 });
+const emptyQuerySchema = z.object({});
 
 const healthOutputSchema = z.object({
   status: z.string().trim().min(1),
@@ -135,7 +193,7 @@ const brandProfileOutputSchema = z
     updated_at: optionalNullableIsoDateSchema,
     deleted_at: optionalNullableIsoDateSchema,
   })
-  .passthrough();
+  .catchall(jsonLikeSchema);
 
 const galleryImageOutputSchema = z
   .object({
@@ -158,7 +216,7 @@ const galleryImageOutputSchema = z
     updated_at: optionalNullableIsoDateSchema,
     deleted_at: optionalNullableIsoDateSchema,
   })
-  .passthrough();
+  .catchall(jsonLikeSchema);
 
 const dailyFlyersOutputSchema = z.object({
   images: z.array(galleryImageOutputSchema),
@@ -175,7 +233,7 @@ const scheduledPostOutputSchema = z
     scheduled_timestamp: z.union([z.number(), z.string().trim().min(1)]).optional(),
     status: z.string().trim().min(1).optional(),
   })
-  .passthrough();
+  .catchall(jsonLikeSchema);
 
 const campaignOutputSchema = z
   .object({
@@ -188,7 +246,7 @@ const campaignOutputSchema = z
     created_at: optionalNullableIsoDateSchema,
     updated_at: optionalNullableIsoDateSchema,
   })
-  .passthrough();
+  .catchall(jsonLikeSchema);
 
 const campaignWithContentOutputSchema = campaignOutputSchema.extend({
   video_clip_scripts: z.array(genericEntitySchema).optional(),
@@ -211,7 +269,7 @@ const carouselOutputSchema = z
     caption: z.string().nullable().optional(),
     cover_url: z.string().nullable().optional(),
   })
-  .passthrough();
+  .catchall(jsonLikeSchema);
 
 const uploadOutputSchema = z.object({
   success: z.boolean(),
@@ -220,14 +278,20 @@ const uploadOutputSchema = z.object({
   size: z.number().nonnegative(),
 });
 
+const extractColorsOutputSchema = z.object({
+  primaryColor: z.string().trim().min(1),
+  secondaryColor: z.string().trim().min(1).nullable(),
+  tertiaryColor: z.string().trim().min(1).nullable().optional(),
+});
+
 const initOutputSchema = z
   .object({
     brandProfile: brandProfileOutputSchema.nullable(),
     gallery: z.array(galleryImageOutputSchema),
     scheduledPosts: z.array(scheduledPostOutputSchema),
     campaigns: z.array(campaignOutputSchema),
-    tournamentSchedule: z.unknown().nullable(),
-    tournamentEvents: z.array(z.unknown()),
+    tournamentSchedule: genericRecordSchema.nullable(),
+    tournamentEvents: z.array(genericRecordSchema),
     schedulesList: z.array(genericEntitySchema),
     _meta: z
       .object({
@@ -237,10 +301,10 @@ const initOutputSchema = z
         userNotFound: z.boolean().optional(),
       })
       .partial()
-      .passthrough()
+      .catchall(jsonLikeSchema)
       .optional(),
   })
-  .passthrough();
+  .catchall(jsonLikeSchema);
 
 const userOutputSchema = z
   .object({
@@ -249,7 +313,7 @@ const userOutputSchema = z
     name: z.string().trim().min(1).optional(),
     avatar_url: z.string().nullable().optional(),
   })
-  .passthrough();
+  .catchall(jsonLikeSchema);
 
 const instagramAccountOutputSchema = z
   .object({
@@ -258,7 +322,7 @@ const instagramAccountOutputSchema = z
     instagram_username: z.string().trim().min(1).optional(),
     is_active: z.boolean().optional(),
   })
-  .passthrough();
+  .catchall(jsonLikeSchema);
 
 const instagramConnectOutputSchema = z
   .object({
@@ -266,39 +330,39 @@ const instagramConnectOutputSchema = z
     account: instagramAccountOutputSchema,
     message: z.string().trim().min(1),
   })
-  .passthrough();
+  .catchall(jsonLikeSchema);
 
 const feedbackOutputSchema = z
   .object({
     success: z.boolean(),
-    data: z.unknown(),
+    data: z.record(z.string(), jsonLikeSchema),
     annotationsCount: z.number().int().nonnegative(),
   })
-  .passthrough();
+  .catchall(jsonLikeSchema);
 
 const topicsOutputSchema = z.object({
-  topics: z.array(z.unknown()),
+  topics: z.array(genericRecordSchema),
 });
 
 const sessionsOutputSchema = z.object({
-  sessions: z.array(z.unknown()),
+  sessions: z.array(genericRecordSchema),
 });
 
 const batchesOutputSchema = z.object({
-  batches: z.array(z.unknown()),
+  batches: z.array(genericRecordSchema),
 });
 
 const filesOutputSchema = z.object({
-  files: z.array(z.unknown()),
+  files: z.array(z.string().trim().min(1)),
 });
 
 const resultsOutputSchema = z.object({
-  results: z.array(z.unknown()),
+  results: z.array(genericRecordSchema),
 });
 
 const threadHistoryOutputSchema = z.object({
-  thread: z.unknown().nullable(),
-  messages: z.array(z.unknown()),
+  thread: genericRecordSchema.nullable(),
+  messages: z.array(genericRecordSchema),
 });
 
 const titleOutputSchema = z.object({
@@ -306,17 +370,17 @@ const titleOutputSchema = z.object({
 });
 
 const jobsOutputSchema = z.object({
-  jobs: z.array(z.unknown()),
+  jobs: z.array(genericRecordSchema),
   total: z.number().int().nonnegative().optional(),
 });
 
 const tournamentsListOutputSchema = z.object({
-  schedules: z.array(z.unknown()),
+  schedules: z.array(genericRecordSchema),
 });
 
 const tournamentsOutputSchema = z.object({
-  schedule: z.unknown().nullable(),
-  events: z.array(z.unknown()),
+  schedule: genericRecordSchema.nullable(),
+  events: z.array(genericRecordSchema),
 });
 
 export const routeContracts: ApiRouteContract[] = [
@@ -901,6 +965,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/admin/usage",
+    request: { query: adminUsageQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -913,6 +978,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/admin/users",
+    request: { query: adminUsersQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -925,6 +991,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/admin/organizations",
+    request: { query: adminOrganizationsQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -937,6 +1004,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/admin/logs",
+    request: { query: adminLogsQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -949,7 +1017,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/admin/logs/:id",
-    request: { params: simpleIdParamsSchema },
+    request: { params: adminLogParamsSchema },
     response: {
       kind: "json",
       status: 200,
@@ -962,7 +1030,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/admin/logs/:id/ai-suggestions",
-    request: { params: simpleIdParamsSchema },
+    request: { params: adminLogParamsSchema },
     response: {
       kind: "json",
       status: 200,
@@ -975,6 +1043,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/agent/studio/stream",
+    request: { body: studioStreamBodySchema },
     response: {
       kind: "stream",
       status: 200,
@@ -987,6 +1056,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/agent/studio/answer",
+    request: { body: studioAnswerBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -999,6 +1069,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/agent/studio/history",
+    request: { query: studioHistoryQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1011,6 +1082,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/agent/studio/content-search",
+    request: { query: studioContentSearchQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1023,6 +1095,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/agent/studio/files",
+    request: { query: studioFilesQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1035,6 +1108,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/agent/studio/reset",
+    request: { body: studioResetBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1049,6 +1123,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/ai/campaign",
+    request: { body: aiCampaignBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1061,6 +1136,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/ai/image",
+    request: { body: aiImageBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1073,6 +1149,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/ai/edit-image",
+    request: { body: aiEditImageBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1085,10 +1162,11 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/ai/extract-colors",
+    request: { body: aiExtractColorsBodySchema },
     response: {
       kind: "json",
       status: 200,
-      schema: z.array(z.unknown()),
+      schema: extractColorsOutputSchema,
       description: "Extracted colors",
     },
     summary: "Extract colors",
@@ -1097,6 +1175,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/ai/image/async",
+    request: { body: aiImageAsyncBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1109,6 +1188,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/ai/image/async/batch",
+    request: { body: aiImageAsyncBatchBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1134,6 +1214,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/ai/image/async/jobs",
+    request: { query: aiImageAsyncJobsQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1171,6 +1252,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/ai/flyer",
+    request: { body: aiFlyerBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1183,6 +1265,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/ai/text",
+    request: { body: aiTextBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1195,6 +1278,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/ai/enhance-prompt",
+    request: { body: aiEnhancePromptBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1207,6 +1291,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/ai/convert-prompt",
+    request: { body: aiConvertPromptBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1231,6 +1316,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/chat",
+    request: { body: chatBodySchema },
     response: {
       kind: "stream",
       status: 200,
@@ -1243,6 +1329,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/ai/assistant",
+    request: { body: aiAssistantBodySchema },
     response: {
       kind: "stream",
       status: 200,
@@ -1303,6 +1390,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/image-playground/topics",
+    request: { query: emptyQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1315,10 +1403,11 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/image-playground/topics",
+    request: { body: playgroundTopicBodySchema },
     response: {
       kind: "json",
       status: 200,
-      schema: genericSuccessSchema.extend({ topic: z.unknown().optional() }),
+      schema: genericSuccessSchema.extend({ topic: genericRecordSchema.optional() }),
       description: "Created image topic",
     },
     summary: "Create image topic",
@@ -1327,11 +1416,11 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "PATCH",
     path: "/api/image-playground/topics/:id",
-    request: { params: simpleIdParamsSchema },
+    request: { params: playgroundIdParamsSchema, body: playgroundTopicUpdateBodySchema },
     response: {
       kind: "json",
       status: 200,
-      schema: genericSuccessSchema.extend({ topic: z.unknown().optional() }),
+      schema: genericSuccessSchema.extend({ topic: genericRecordSchema.optional() }),
       description: "Updated image topic",
     },
     summary: "Update image topic",
@@ -1340,7 +1429,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "DELETE",
     path: "/api/image-playground/topics/:id",
-    request: { params: simpleIdParamsSchema },
+    request: { params: playgroundIdParamsSchema },
     response: {
       kind: "json",
       status: 200,
@@ -1353,6 +1442,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/image-playground/batches",
+    request: { query: imagePlaygroundBatchesQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1365,7 +1455,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "DELETE",
     path: "/api/image-playground/batches/:id",
-    request: { params: simpleIdParamsSchema },
+    request: { params: playgroundIdParamsSchema },
     response: {
       kind: "json",
       status: 200,
@@ -1378,10 +1468,11 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/image-playground/generate",
+    request: { body: imagePlaygroundGenerateBodySchema },
     response: {
       kind: "json",
       status: 200,
-      schema: genericSuccessSchema.extend({ data: z.unknown().optional() }),
+      schema: genericSuccessSchema.extend({ data: genericRecordSchema.optional() }),
       description: "Image generation result",
     },
     summary: "Generate image",
@@ -1390,7 +1481,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/image-playground/status/:generationId",
-    request: { params: generationIdParamsSchema },
+    request: { params: imagePlaygroundStatusParamsSchema, query: imagePlaygroundStatusQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1403,7 +1494,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "DELETE",
     path: "/api/image-playground/generations/:id",
-    request: { params: simpleIdParamsSchema },
+    request: { params: playgroundIdParamsSchema },
     response: {
       kind: "json",
       status: 200,
@@ -1416,6 +1507,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/image-playground/generate-title",
+    request: { body: playgroundGenerateTitleBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1428,6 +1520,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/video-playground/topics",
+    request: { query: emptyQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1440,10 +1533,11 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/video-playground/topics",
+    request: { body: playgroundTopicBodySchema },
     response: {
       kind: "json",
       status: 200,
-      schema: genericSuccessSchema.extend({ topic: z.unknown().optional() }),
+      schema: genericSuccessSchema.extend({ topic: genericRecordSchema.optional() }),
       description: "Created video topic",
     },
     summary: "Create video topic",
@@ -1452,11 +1546,11 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "PATCH",
     path: "/api/video-playground/topics/:id",
-    request: { params: simpleIdParamsSchema },
+    request: { params: playgroundIdParamsSchema, body: playgroundTopicUpdateBodySchema },
     response: {
       kind: "json",
       status: 200,
-      schema: genericSuccessSchema.extend({ topic: z.unknown().optional() }),
+      schema: genericSuccessSchema.extend({ topic: genericRecordSchema.optional() }),
       description: "Updated video topic",
     },
     summary: "Update video topic",
@@ -1465,7 +1559,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "DELETE",
     path: "/api/video-playground/topics/:id",
-    request: { params: simpleIdParamsSchema },
+    request: { params: playgroundIdParamsSchema },
     response: {
       kind: "json",
       status: 200,
@@ -1478,6 +1572,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "GET",
     path: "/api/video-playground/sessions",
+    request: { query: videoPlaygroundSessionsQuerySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1490,10 +1585,11 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/video-playground/generate",
+    request: { body: videoPlaygroundGenerateBodySchema },
     response: {
       kind: "json",
       status: 200,
-      schema: genericSuccessSchema.extend({ data: z.unknown().optional() }),
+      schema: genericSuccessSchema.extend({ data: genericRecordSchema.optional() }),
       description: "Created video session",
     },
     summary: "Create video session",
@@ -1502,7 +1598,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "DELETE",
     path: "/api/video-playground/sessions/:id",
-    request: { params: simpleIdParamsSchema },
+    request: { params: playgroundIdParamsSchema },
     response: {
       kind: "json",
       status: 200,
@@ -1515,7 +1611,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "DELETE",
     path: "/api/video-playground/generations/:id",
-    request: { params: simpleIdParamsSchema },
+    request: { params: playgroundIdParamsSchema },
     response: {
       kind: "json",
       status: 200,
@@ -1528,11 +1624,11 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "PATCH",
     path: "/api/video-playground/generations/:id",
-    request: { params: simpleIdParamsSchema },
+    request: { params: playgroundIdParamsSchema, body: videoPlaygroundGenerationUpdateBodySchema },
     response: {
       kind: "json",
       status: 200,
-      schema: genericSuccessSchema.extend({ generation: z.unknown().optional() }),
+      schema: genericSuccessSchema.extend({ generation: genericRecordSchema.optional() }),
       description: "Updated video generation",
     },
     summary: "Update video generation",
@@ -1541,6 +1637,7 @@ export const routeContracts: ApiRouteContract[] = [
   {
     method: "POST",
     path: "/api/video-playground/generate-title",
+    request: { body: playgroundGenerateTitleBodySchema },
     response: {
       kind: "json",
       status: 200,
@@ -1669,6 +1766,60 @@ function registerContractPath(
 let openApiDocumentCache: ReturnType<OpenApiGeneratorV3["generateDocument"]> | null =
   null;
 
+function buildFallbackOpenApiDocument() {
+  const paths: Record<string, Record<string, unknown>> = {};
+
+  for (const contract of routeContracts) {
+    const normalizedPath = normalizeOpenApiPath(contract.path);
+    const method = contract.method.toLowerCase();
+    const existingPath = paths[normalizedPath] ?? {};
+    const requestBody = contract.request?.body
+      ? {
+          content: {
+            "application/json": {
+              schema: {},
+            },
+          },
+        }
+      : undefined;
+
+    const responseContent =
+      contract.response.kind === "json"
+        ? { "application/json": { schema: {} } }
+        : contract.response.kind === "empty"
+          ? undefined
+          : {
+              [contract.response.contentType]: {
+                schema: { type: "string" },
+              },
+            };
+
+    existingPath[method] = {
+      summary: contract.summary,
+      tags: contract.tags,
+      ...(requestBody ? { requestBody } : {}),
+      responses: {
+        [contract.response.status]: {
+          description: contract.response.description,
+          ...(responseContent ? { content: responseContent } : {}),
+        },
+      },
+    };
+    paths[normalizedPath] = existingPath;
+  }
+
+  return {
+    openapi: "3.0.0",
+    info: {
+      title: "Poker Marketing Agency API",
+      version: "1.0.0",
+      description: "OpenAPI contracts generated from the server route schemas.",
+    },
+    servers: [{ url: "/" }],
+    paths,
+  };
+}
+
 export function getOpenApiDocument(): ReturnType<OpenApiGeneratorV3["generateDocument"]> {
   if (openApiDocumentCache) {
     return openApiDocumentCache;
@@ -1679,16 +1830,25 @@ export function getOpenApiDocument(): ReturnType<OpenApiGeneratorV3["generateDoc
     registerContractPath(registry, contract);
   }
 
-  const generator = new OpenApiGeneratorV3(registry.definitions);
-  openApiDocumentCache = generator.generateDocument({
-    openapi: "3.0.0",
-    info: {
-      title: "Poker Marketing Agency API",
-      version: "1.0.0",
-      description: "OpenAPI contracts generated from the server route schemas.",
-    },
-    servers: [{ url: "/" }],
-  });
+  try {
+    const generator = new OpenApiGeneratorV3(registry.definitions);
+    openApiDocumentCache = generator.generateDocument({
+      openapi: "3.0.0",
+      info: {
+        title: "Poker Marketing Agency API",
+        version: "1.0.0",
+        description: "OpenAPI contracts generated from the server route schemas.",
+      },
+      servers: [{ url: "/" }],
+    });
+  } catch (error) {
+    if (error instanceof RangeError) {
+      openApiDocumentCache =
+        buildFallbackOpenApiDocument() as ReturnType<OpenApiGeneratorV3["generateDocument"]>;
+    } else {
+      throw error;
+    }
+  }
 
   return openApiDocumentCache;
 }

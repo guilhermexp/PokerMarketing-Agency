@@ -9,6 +9,7 @@
  */
 
 import type { Application, Request, Response } from "express";
+import { z } from "zod";
 import { getRequestAuthContext } from "../lib/auth.js";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.js";
@@ -43,13 +44,21 @@ import {
   getUserImageGenerationJobs,
   cancelImageGenerationJob,
 } from "../helpers/job-queue.js";
-import type {
-  AiImageBody,
-  AiEditImageBody,
-  AiExtractColorsBody,
-  AiImageAsyncBody,
-  AiImageAsyncBatchBody,
+import {
+  aiEditImageBodySchema,
+  aiExtractColorsBodySchema,
+  aiImageAsyncBodySchema,
+  aiImageAsyncBatchBodySchema,
+  aiImageAsyncJobsQuerySchema,
+  aiImageBodySchema,
+  type AiEditImageBody,
+  type AiExtractColorsBody,
+  type AiImageAsyncBatchBody,
+  type AiImageAsyncBody,
+  type AiImageAsyncJobsQuery,
+  type AiImageBody,
 } from "../schemas/ai-schemas.js";
+import { validateRequest } from "../middleware/validate.js";
 
 /** Image size values accepted by logAiUsage */
 type ImageSize = '1K' | '2K' | '4K';
@@ -101,7 +110,7 @@ export function registerAiImageRoutes(app: Application): void {
   // -------------------------------------------------------------------------
   // POST /api/ai/image
   // -------------------------------------------------------------------------
-  app.post("/api/ai/image", async (req: Request, res: Response) => {
+  app.post("/api/ai/image", validateRequest({ body: aiImageBodySchema }), async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
@@ -145,15 +154,6 @@ export function registerAiImageRoutes(app: Application): void {
         },
         "[Image API] Parâmetros recebidos",
       );
-
-      if (!prompt || !brandProfile) {
-        logger.error(
-          "[Image API] Validacao falhou: prompt ou brandProfile ausente",
-        );
-        return res
-          .status(400)
-          .json({ error: "prompt and brandProfile are required" });
-      }
 
       // Prepare product images array, including brand logo if available
       const allProductImages: ImageReference[] = productImages ? [...productImages] : [];
@@ -390,7 +390,7 @@ export function registerAiImageRoutes(app: Application): void {
   // -------------------------------------------------------------------------
   // POST /api/ai/edit-image
   // -------------------------------------------------------------------------
-  app.post("/api/ai/edit-image", async (req: Request, res: Response) => {
+  app.post("/api/ai/edit-image", validateRequest({ body: aiEditImageBodySchema }), async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
@@ -501,7 +501,7 @@ export function registerAiImageRoutes(app: Application): void {
   // -------------------------------------------------------------------------
   // POST /api/ai/extract-colors
   // -------------------------------------------------------------------------
-  app.post("/api/ai/extract-colors", async (req: Request, res: Response) => {
+  app.post("/api/ai/extract-colors", validateRequest({ body: aiExtractColorsBodySchema }), async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
@@ -599,7 +599,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
   // -------------------------------------------------------------------------
   // POST /api/ai/image/async - Queue a single image generation
   // -------------------------------------------------------------------------
-  app.post("/api/ai/image/async", async (req: Request, res: Response) => {
+  app.post("/api/ai/image/async", validateRequest({ body: aiImageAsyncBodySchema }), async (req: Request, res: Response) => {
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
     const organizationId = authCtx?.orgId || null;
@@ -623,10 +623,6 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
       } = body;
 
       const model = normalizeRequestedImageModel(requestedModel);
-
-      if (!prompt || !brandProfile) {
-        return res.status(400).json({ error: "prompt and brandProfile are required" });
-      }
 
       // Convert image references to data URLs for queue storage
       const serializedProductImages = productImages?.map(
@@ -680,7 +676,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
   // -------------------------------------------------------------------------
   // POST /api/ai/image/async/batch - Queue multiple images
   // -------------------------------------------------------------------------
-  app.post("/api/ai/image/async/batch", async (req: Request, res: Response) => {
+  app.post("/api/ai/image/async/batch", validateRequest({ body: aiImageAsyncBatchBodySchema }), async (req: Request, res: Response) => {
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
     const organizationId = authCtx?.orgId || null;
@@ -692,14 +688,6 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     try {
       const body = req.body as AiImageAsyncBatchBody;
       const { jobs, priority } = body;
-
-      if (!Array.isArray(jobs) || jobs.length === 0) {
-        return res.status(400).json({ error: "jobs array is required" });
-      }
-
-      if (jobs.length > 10) {
-        return res.status(400).json({ error: "Maximum 10 images per batch" });
-      }
 
       // Add user context and serialize image references for each job
       const jobsWithContext = jobs.map(job => {
@@ -759,7 +747,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
   // -------------------------------------------------------------------------
   // GET /api/ai/image/async/status/:jobId - Check job status
   // -------------------------------------------------------------------------
-  app.get("/api/ai/image/async/status/:jobId", async (req: Request, res: Response) => {
+  app.get("/api/ai/image/async/status/:jobId", validateRequest({ params: z.object({ jobId: z.string().trim().min(1) }) }), async (req: Request, res: Response) => {
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
 
@@ -768,10 +756,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     }
 
     try {
-      const jobId = req.params.jobId;
-      if (typeof jobId !== "string") {
-        return res.status(400).json({ error: "Invalid job ID" });
-      }
+      const { jobId } = req.params as { jobId: string };
 
       const status = await getImageGenerationJobStatus(jobId);
 
@@ -795,7 +780,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
   // -------------------------------------------------------------------------
   // GET /api/ai/image/async/jobs - List user's jobs
   // -------------------------------------------------------------------------
-  app.get("/api/ai/image/async/jobs", async (req: Request, res: Response) => {
+  app.get("/api/ai/image/async/jobs", validateRequest({ query: aiImageAsyncJobsQuerySchema }), async (req: Request, res: Response) => {
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
     const organizationId = authCtx?.orgId ?? undefined;
@@ -805,9 +790,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     }
 
     try {
-      const limitParam = req.query.limit;
-      const limitValue = typeof limitParam === "string" ? parseInt(limitParam, 10) : 20;
-      const limit = Math.min(isNaN(limitValue) ? 20 : limitValue, 100);
+      const { limit } = req.query as AiImageAsyncJobsQuery;
       const jobs = await getUserImageGenerationJobs(userId, organizationId, limit);
 
       res.json({ jobs });
@@ -821,7 +804,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
   // -------------------------------------------------------------------------
   // DELETE /api/ai/image/async/cancel/:jobId - Cancel a job
   // -------------------------------------------------------------------------
-  app.delete("/api/ai/image/async/cancel/:jobId", async (req: Request, res: Response) => {
+  app.delete("/api/ai/image/async/cancel/:jobId", validateRequest({ params: z.object({ jobId: z.string().trim().min(1) }) }), async (req: Request, res: Response) => {
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
 
@@ -830,10 +813,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     }
 
     try {
-      const jobId = req.params.jobId;
-      if (typeof jobId !== "string") {
-        return res.status(400).json({ error: "Invalid job ID" });
-      }
+      const { jobId } = req.params as { jobId: string };
 
       // Verify ownership first
       const status = await getImageGenerationJobStatus(jobId);

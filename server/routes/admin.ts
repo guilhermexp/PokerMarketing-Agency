@@ -5,6 +5,19 @@ import { generateTextFromMessages } from "../lib/ai/text-generation.js";
 import { withRetry } from "../lib/ai/retry.js";
 import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.js";
 import logger from "../lib/logger.js";
+import { validateRequest } from "../middleware/validate.js";
+import {
+  type AdminLogParams,
+  type AdminLogsQuery,
+  type AdminOrganizationsQuery,
+  type AdminUsageQuery,
+  type AdminUsersQuery,
+  adminLogParamsSchema,
+  adminLogsQuerySchema,
+  adminOrganizationsQuerySchema,
+  adminUsageQuerySchema,
+  adminUsersQuerySchema,
+} from "../schemas/admin-schemas.js";
 
 // ----------------------------------------------------------------------------
 // SQL Query Result Interfaces
@@ -236,17 +249,10 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   // Admin: Get AI usage analytics
-  app.get("/api/admin/usage", requireSuperAdmin, async (req: Request, res: Response) => {
+  app.get("/api/admin/usage", requireSuperAdmin, validateRequest({ query: adminUsageQuerySchema }), async (req: Request, res: Response) => {
     try {
       const sql = getSql();
-      const normalizedGroupBy = String(req.query?.groupBy || "day").toLowerCase();
-      const groupBy = ["day", "provider", "model", "operation"].includes(normalizedGroupBy)
-        ? normalizedGroupBy
-        : "day";
-      const parsedDays = Number.parseInt(String(req.query?.days || "30"), 10);
-      const days = Number.isFinite(parsedDays)
-        ? Math.min(Math.max(parsedDays, 1), 365)
-        : 30;
+      const { groupBy, days } = req.query as AdminUsageQuery;
 
       const totalsResult = await sql`
         SELECT
@@ -403,14 +409,10 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   // Admin: Get users list
-  app.get("/api/admin/users", requireSuperAdmin, async (req: Request, res: Response) => {
+  app.get("/api/admin/users", requireSuperAdmin, validateRequest({ query: adminUsersQuerySchema }), async (req: Request, res: Response) => {
     try {
       const sql = getSql();
-      const limitParam = parseInt(String(req.query.limit || "20"), 10);
-      const pageParam = parseInt(String(req.query.page || "1"), 10);
-      const searchParam = String(req.query.search || "");
-      const safeLimit = Math.min(Math.max(limitParam, 1), 100);
-      const safePage = Math.max(pageParam, 1);
+      const { limit: safeLimit, page: safePage, search: searchParam = "" } = req.query as AdminUsersQuery;
       const offset = (safePage - 1) * safeLimit;
 
       const searchFilter = searchParam ? `%${searchParam}%` : null;
@@ -460,13 +462,10 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   // Admin: Get organizations list (from Clerk org IDs in brand_profiles/campaigns/usage tables)
-  app.get("/api/admin/organizations", requireSuperAdmin, async (req: Request, res: Response) => {
+  app.get("/api/admin/organizations", requireSuperAdmin, validateRequest({ query: adminOrganizationsQuerySchema }), async (req: Request, res: Response) => {
     try {
       const sql = getSql();
-      const limitParam = parseInt(String(req.query.limit || "20"), 10);
-      const pageParam = parseInt(String(req.query.page || "1"), 10);
-      const safeLimit = Math.min(Math.max(limitParam, 1), 100);
-      const safePage = Math.max(pageParam, 1);
+      const { limit: safeLimit, page: safePage } = req.query as AdminOrganizationsQuery;
       const offset = (safePage - 1) * safeLimit;
 
       // Get organization base data with counts from various tables
@@ -625,16 +624,16 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   // Admin: Get activity logs
-  app.get("/api/admin/logs", requireSuperAdmin, async (req: Request, res: Response) => {
+  app.get("/api/admin/logs", requireSuperAdmin, validateRequest({ query: adminLogsQuerySchema }), async (req: Request, res: Response) => {
     try {
       const sql = getSql();
-      const limitParam = parseInt(String(req.query.limit || "100"), 10);
-      const pageParam = parseInt(String(req.query.page || "1"), 10);
-      const actionParam = String(req.query.action || "");
-      const categoryParam = String(req.query.category || "");
-      const severityParam = String(req.query.severity || "");
-      const safeLimit = Math.min(Math.max(limitParam || 100, 1), 200);
-      const safePage = Math.max(pageParam || 1, 1);
+      const {
+        limit: safeLimit,
+        page: safePage,
+        action: actionParam = "",
+        category: categoryParam = "",
+        severity: severityParam,
+      } = req.query as AdminLogsQuery;
       const offset = (safePage - 1) * safeLimit;
       const actionFilter = actionParam ? `%${actionParam}%` : null;
       const categoryFilter = categoryParam || null;
@@ -702,10 +701,10 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   // Admin: Get single log details
-  app.get("/api/admin/logs/:id", requireSuperAdmin, async (req: Request, res: Response) => {
+  app.get("/api/admin/logs/:id", requireSuperAdmin, validateRequest({ params: adminLogParamsSchema }), async (req: Request, res: Response) => {
     try {
       const sql = getSql();
-      const { id } = req.params;
+      const { id } = req.params as AdminLogParams;
 
       const logs = await sql`
         SELECT id, request_id, user_id, organization_id,
@@ -734,10 +733,11 @@ export function registerAdminRoutes(app: Express): void {
   app.post(
     "/api/admin/logs/:id/ai-suggestions",
     requireSuperAdmin,
+    validateRequest({ params: adminLogParamsSchema }),
     async (req: Request, res: Response) => {
       try {
         const sql = getSql();
-        const { id } = req.params;
+        const { id } = req.params as AdminLogParams;
 
         // Check cache first
         const cacheKey = `suggestions_${id}`;

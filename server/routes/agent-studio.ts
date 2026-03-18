@@ -14,6 +14,21 @@ import {
   listThreadMessages,
   resetThread,
 } from '../lib/agent/claude/session-store.js';
+import { validateRequest } from "../middleware/validate.js";
+import {
+  type StudioAnswerBody,
+  type StudioContentSearchQuery,
+  type StudioFilesQuery,
+  type StudioHistoryQuery,
+  type StudioResetBody,
+  type StudioStreamBody,
+  studioAnswerBodySchema,
+  studioContentSearchQuerySchema,
+  studioFilesQuerySchema,
+  studioHistoryQuerySchema,
+  studioResetBodySchema,
+  studioStreamBodySchema,
+} from "../schemas/agent-studio-schemas.js";
 
 const execFile = promisify(execFileCb);
 
@@ -34,48 +49,6 @@ interface Attachment {
 
 interface Mention {
   path: string;
-}
-
-interface StreamRequestBody {
-  studioType?: string;
-  topicId?: string;
-  message?: string;
-  threadId?: string;
-  attachments?: unknown[];
-  mentions?: unknown[];
-}
-
-interface AnswerRequestBody {
-  threadId?: string;
-  interactionId?: string;
-  answer?: string | {
-    approved?: boolean;
-    optionId?: string;
-    text?: string;
-    answers?: Record<string, string>;
-  };
-}
-
-interface ResetRequestBody {
-  threadId?: string;
-  studioType?: string;
-  topicId?: string;
-}
-
-interface HistoryQuery {
-  studioType?: string;
-  topicId?: string;
-}
-
-interface ContentSearchQuery {
-  type?: string;
-  query?: string;
-  limit?: string | number;
-}
-
-interface FilesQuery {
-  query?: string;
-  limit?: string | number;
 }
 
 interface ContentSearchResult {
@@ -276,7 +249,7 @@ function normalizeMention(item: unknown): Mention | null {
 
 export function registerAgentStudioRoutes(app: Application): void {
   // POST /api/agent/studio/stream - Main streaming endpoint for agent interactions
-  app.post('/api/agent/studio/stream', async (req: Request, res: Response): Promise<void> => {
+  app.post('/api/agent/studio/stream', validateRequest({ body: studioStreamBodySchema }), async (req: Request, res: Response): Promise<void> => {
     const auth = getRequestAuthContext(req);
     const clerkUserId = auth?.userId || null;
     const organizationId = auth?.orgId || null;
@@ -286,35 +259,11 @@ export function registerAgentStudioRoutes(app: Application): void {
       return;
     }
 
-    const body = (req.body || {}) as StreamRequestBody;
+    const body = req.body as StudioStreamBody;
     const { studioType, topicId, message, threadId, attachments, mentions } = body;
-
-    if (!isValidStudioType(studioType)) {
-      res.status(400).json({ error: 'studioType inválido. Use image|video.' });
-      return;
-    }
-
-    if (!topicId || typeof topicId !== 'string') {
-      res.status(400).json({ error: 'topicId é obrigatório.' });
-      return;
-    }
-
-    const safeMessage = typeof message === 'string' ? message.trim() : '';
-    const safeAttachments: Attachment[] = Array.isArray(attachments)
-      ? attachments
-          .map(normalizeAttachment)
-          .filter((item): item is Attachment => item !== null)
-      : [];
-    const safeMentions: Mention[] = Array.isArray(mentions)
-      ? mentions
-          .map(normalizeMention)
-          .filter((item): item is Mention => item !== null)
-      : [];
-
-    if (!safeMessage && safeAttachments.length === 0) {
-      res.status(400).json({ error: 'message ou attachments é obrigatório.' });
-      return;
-    }
+    const safeMessage = message?.trim() ?? '';
+    const safeAttachments: Attachment[] = attachments ?? [];
+    const safeMentions: Mention[] = mentions ?? [];
 
     const sql = getSql();
     const userId = await resolveUserId(sql, clerkUserId);
@@ -372,7 +321,7 @@ export function registerAgentStudioRoutes(app: Application): void {
   });
 
   // POST /api/agent/studio/answer - Respond to pending agent questions
-  app.post('/api/agent/studio/answer', async (req: Request, res: Response): Promise<void> => {
+  app.post('/api/agent/studio/answer', validateRequest({ body: studioAnswerBodySchema }), async (req: Request, res: Response): Promise<void> => {
     const auth = getRequestAuthContext(req);
     const clerkUserId = auth?.userId || null;
     const organizationId = auth?.orgId || null;
@@ -382,18 +331,8 @@ export function registerAgentStudioRoutes(app: Application): void {
       return;
     }
 
-    const body = (req.body || {}) as AnswerRequestBody;
+    const body = req.body as StudioAnswerBody;
     const { threadId, interactionId, answer } = body;
-
-    if (!threadId || typeof threadId !== 'string') {
-      res.status(400).json({ error: 'threadId é obrigatório.' });
-      return;
-    }
-
-    if (!interactionId || typeof interactionId !== 'string') {
-      res.status(400).json({ error: 'interactionId é obrigatório.' });
-      return;
-    }
 
     const sql = getSql();
     const userId = await resolveUserId(sql, clerkUserId);
@@ -485,7 +424,7 @@ export function registerAgentStudioRoutes(app: Application): void {
   });
 
   // GET /api/agent/studio/history - Retrieve conversation history for a thread
-  app.get('/api/agent/studio/history', async (req: Request, res: Response): Promise<void> => {
+  app.get('/api/agent/studio/history', validateRequest({ query: studioHistoryQuerySchema }), async (req: Request, res: Response): Promise<void> => {
     const auth = getRequestAuthContext(req);
     const clerkUserId = auth?.userId || null;
     const organizationId = auth?.orgId || null;
@@ -495,19 +434,7 @@ export function registerAgentStudioRoutes(app: Application): void {
       return;
     }
 
-    const query = req.query as HistoryQuery;
-    const studioType = String(query.studioType || '');
-    const topicId = String(query.topicId || '');
-
-    if (!isValidStudioType(studioType)) {
-      res.status(400).json({ error: 'studioType inválido. Use image|video.' });
-      return;
-    }
-
-    if (!topicId) {
-      res.status(400).json({ error: 'topicId é obrigatório.' });
-      return;
-    }
+    const { studioType, topicId } = req.query as StudioHistoryQuery;
 
     const sql = getSql();
     const userId = await resolveUserId(sql, clerkUserId);
@@ -534,7 +461,7 @@ export function registerAgentStudioRoutes(app: Application): void {
   });
 
   // GET /api/agent/studio/content-search - Search for content by type
-  app.get('/api/agent/studio/content-search', async (req: Request, res: Response): Promise<void> => {
+  app.get('/api/agent/studio/content-search', validateRequest({ query: studioContentSearchQuerySchema }), async (req: Request, res: Response): Promise<void> => {
     const auth = getRequestAuthContext(req);
     const clerkUserId = auth?.userId || null;
     const organizationId = auth?.orgId || null;
@@ -544,16 +471,7 @@ export function registerAgentStudioRoutes(app: Application): void {
       return;
     }
 
-    const queryParams = req.query as ContentSearchQuery;
-    const type = String(queryParams.type || '').trim();
-    const searchQuery = String(queryParams.query || '').trim();
-    const rawLimit = Number(queryParams.limit || 10);
-    const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(rawLimit, 30)) : 10;
-
-    if (!isValidContentType(type)) {
-      res.status(400).json({ error: `type inválido. Use: gallery, campaign, post, clip, carousel` });
-      return;
-    }
+    const { type, query: searchQuery = "", limit } = req.query as StudioContentSearchQuery;
 
     const sql = getSql();
     const userId = await resolveUserId(sql, clerkUserId);
@@ -626,17 +544,15 @@ export function registerAgentStudioRoutes(app: Application): void {
   });
 
   // GET /api/agent/studio/files - List project files for mentions
-  app.get('/api/agent/studio/files', async (req: Request, res: Response): Promise<void> => {
+  app.get('/api/agent/studio/files', validateRequest({ query: studioFilesQuerySchema }), async (req: Request, res: Response): Promise<void> => {
     const auth = getRequestAuthContext(req);
     if (!auth?.userId) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    const queryParams = req.query as FilesQuery;
-    const searchQuery = String(queryParams.query || '').trim().toLowerCase();
-    const rawLimit = Number(queryParams.limit || 20);
-    const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(rawLimit, 50)) : 20;
+    const { query: rawQuery = "", limit } = req.query as StudioFilesQuery;
+    const searchQuery = rawQuery.trim().toLowerCase();
 
     try {
       // Try rg first, fall back to find
@@ -672,7 +588,7 @@ export function registerAgentStudioRoutes(app: Application): void {
   });
 
   // POST /api/agent/studio/reset - Reset a thread conversation
-  app.post('/api/agent/studio/reset', async (req: Request, res: Response): Promise<void> => {
+  app.post('/api/agent/studio/reset', validateRequest({ body: studioResetBodySchema }), async (req: Request, res: Response): Promise<void> => {
     const auth = getRequestAuthContext(req);
     const clerkUserId = auth?.userId || null;
     const organizationId = auth?.orgId || null;
@@ -682,7 +598,7 @@ export function registerAgentStudioRoutes(app: Application): void {
       return;
     }
 
-    const body = (req.body || {}) as ResetRequestBody;
+    const body = req.body as StudioResetBody;
     const { threadId, studioType, topicId } = body;
 
     const sql = getSql();

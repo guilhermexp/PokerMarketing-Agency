@@ -19,7 +19,13 @@ import {
   createTimer,
 } from "../helpers/usage-tracking.js";
 import { chatHandler } from "../api/chat/route.js";
+import { chatBodySchema } from "../api/chat/schema.js";
 import logger from "../lib/logger.js";
+import { validateRequest } from "../middleware/validate.js";
+import {
+  type AiAssistantBody,
+  aiAssistantBodySchema,
+} from "../schemas/ai-schemas.js";
 
 // ============================================================================
 // REQUEST BODY INTERFACES
@@ -53,11 +59,6 @@ interface BrandProfile {
   description?: string;
 }
 
-interface AssistantRequestBody {
-  history?: GeminiHistoryMessage[];
-  brandProfile?: BrandProfile;
-}
-
 interface TextContent {
   type: "text";
   text: string;
@@ -80,7 +81,11 @@ export function registerAiAssistantRoutes(app: Application): void {
   // -------------------------------------------------------------------------
   // POST /api/chat - Vercel AI SDK Chat Endpoint (Feature Flag)
   // -------------------------------------------------------------------------
-  app.post("/api/chat", requireAuthWithAiRateLimit, async (req: Request, res: Response): Promise<void> => {
+  app.post(
+    "/api/chat",
+    requireAuthWithAiRateLimit,
+    validateRequest({ body: chatBodySchema }),
+    async (req: Request, res: Response): Promise<void> => {
     // Feature flag: only enable if VITE_USE_VERCEL_AI_SDK=true
     if (process.env.VITE_USE_VERCEL_AI_SDK !== "true") {
       res.status(404).json({ error: "Endpoint not available" });
@@ -88,24 +93,20 @@ export function registerAiAssistantRoutes(app: Application): void {
     }
 
     await chatHandler(req, res);
-  });
+    },
+  );
 
   // -------------------------------------------------------------------------
   // POST /api/ai/assistant - AI Assistant Streaming Endpoint (Legacy)
   // -------------------------------------------------------------------------
-  app.post("/api/ai/assistant", async (req: Request, res: Response): Promise<void> => {
+  app.post("/api/ai/assistant", validateRequest({ body: aiAssistantBodySchema }), async (req: Request, res: Response): Promise<void> => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId ?? null;
     const sql = getSql();
 
     try {
-      const { history, brandProfile } = req.body as AssistantRequestBody;
-
-      if (!history) {
-        res.status(400).json({ error: "history is required" });
-        return;
-      }
+      const { history, brandProfile } = req.body as AiAssistantBody;
 
       logger.info({}, "[Assistant API] Starting streaming conversation");
 

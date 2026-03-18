@@ -19,6 +19,25 @@ import {
   createImageBatch,
   generateTopicTitle,
 } from "../helpers/image-playground.js";
+import { validateRequest } from "../middleware/validate.js";
+import {
+  type ImagePlaygroundBatchesQuery,
+  type ImagePlaygroundGenerateBody,
+  type ImagePlaygroundStatusParams,
+  type ImagePlaygroundStatusQuery,
+  type PlaygroundGenerateTitleBody,
+  type PlaygroundIdParams,
+  type PlaygroundTopicBody,
+  type PlaygroundTopicUpdateBody,
+  imagePlaygroundBatchesQuerySchema,
+  imagePlaygroundGenerateBodySchema,
+  imagePlaygroundStatusParamsSchema,
+  imagePlaygroundStatusQuerySchema,
+  playgroundGenerateTitleBodySchema,
+  playgroundIdParamsSchema,
+  playgroundTopicBodySchema,
+  playgroundTopicUpdateBodySchema,
+} from "../schemas/playground-schemas.js";
 
 // =============================================================================
 // Types
@@ -311,14 +330,14 @@ ${userPrompt}`;
   });
 
   // Create topic
-  app.post("/api/image-playground/topics", async (req: Request, res: Response) => {
+  app.post("/api/image-playground/topics", validateRequest({ body: playgroundTopicBodySchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { title } = req.body as CreateTopicBody;
+      const { title } = req.body as PlaygroundTopicBody;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       const topic = await createTopic(sql, resolvedUserId, orgId, title);
@@ -331,15 +350,15 @@ ${userPrompt}`;
   });
 
   // Update topic
-  app.patch("/api/image-playground/topics/:id", async (req: Request, res: Response) => {
+  app.patch("/api/image-playground/topics/:id", validateRequest({ params: playgroundIdParamsSchema, body: playgroundTopicUpdateBodySchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const id = String(req.params.id);
-      const { title, coverUrl } = req.body as UpdateTopicBody;
+      const { id } = req.params as PlaygroundIdParams;
+      const { title, coverUrl } = req.body as PlaygroundTopicUpdateBody;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       const topic = await updateTopic(
@@ -358,14 +377,14 @@ ${userPrompt}`;
   });
 
   // Delete topic
-  app.delete("/api/image-playground/topics/:id", async (req: Request, res: Response) => {
+  app.delete("/api/image-playground/topics/:id", validateRequest({ params: playgroundIdParamsSchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const id = String(req.params.id);
+      const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       await deleteTopic(sql, id, resolvedUserId, orgId);
@@ -378,17 +397,14 @@ ${userPrompt}`;
   });
 
   // Get batches for topic
-  app.get("/api/image-playground/batches", async (req: Request, res: Response) => {
+  app.get("/api/image-playground/batches", validateRequest({ query: imagePlaygroundBatchesQuerySchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const topicId = String(req.query.topicId || "");
-      if (!topicId) return res.status(400).json({ error: "topicId required" });
-      const requestedLimit = Number.parseInt(String(req.query.limit || ""), 10);
-      const limit = Number.isFinite(requestedLimit) ? requestedLimit : 100;
+      const { topicId, limit } = req.query as ImagePlaygroundBatchesQuery;
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
@@ -426,14 +442,14 @@ ${userPrompt}`;
   });
 
   // Delete batch
-  app.delete("/api/image-playground/batches/:id", async (req: Request, res: Response) => {
+  app.delete("/api/image-playground/batches/:id", validateRequest({ params: playgroundIdParamsSchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const id = String(req.params.id);
+      const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       await deleteBatch(sql, id, resolvedUserId, orgId);
@@ -446,17 +462,14 @@ ${userPrompt}`;
   });
 
   // Create image generation
-  app.post("/api/image-playground/generate", async (req: Request, res: Response) => {
+  app.post("/api/image-playground/generate", validateRequest({ body: imagePlaygroundGenerateBodySchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { topicId, provider, model, imageNum, params } = req.body as GenerateBody;
-      if (!topicId || !provider || !model || !params?.prompt) {
-        return res.status(400).json({ error: "Missing required fields" });
-      }
+      const { topicId, provider, model, imageNum, params } = req.body as ImagePlaygroundGenerateBody;
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
@@ -752,14 +765,14 @@ ${userPrompt}`;
   });
 
   // Get generation status (for polling)
-  app.get("/api/image-playground/status/:generationId", async (req: Request, res: Response) => {
+  app.get("/api/image-playground/status/:generationId", validateRequest({ params: imagePlaygroundStatusParamsSchema, query: imagePlaygroundStatusQuerySchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const generationId = String(req.params.generationId);
-      const asyncTaskId = req.query.asyncTaskId as string | undefined;
+      const { generationId } = req.params as ImagePlaygroundStatusParams;
+      const { asyncTaskId } = req.query as ImagePlaygroundStatusQuery;
 
       const sql = getSql();
       const status = await getGenerationStatus(sql, generationId, asyncTaskId);
@@ -772,14 +785,14 @@ ${userPrompt}`;
   });
 
   // Delete generation
-  app.delete("/api/image-playground/generations/:id", async (req: Request, res: Response) => {
+  app.delete("/api/image-playground/generations/:id", validateRequest({ params: playgroundIdParamsSchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const id = String(req.params.id);
+      const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
@@ -796,16 +809,13 @@ ${userPrompt}`;
   });
 
   // Generate topic title
-  app.post("/api/image-playground/generate-title", async (req: Request, res: Response) => {
+  app.post("/api/image-playground/generate-title", validateRequest({ body: playgroundGenerateTitleBodySchema }), async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { prompts } = req.body as GenerateTitleBody;
-      if (!prompts || !Array.isArray(prompts)) {
-        return res.status(400).json({ error: "prompts array required" });
-      }
+      const { prompts } = req.body as PlaygroundGenerateTitleBody;
 
       const genai = getGeminiAi();
       const title = await generateTopicTitle(prompts, genai);

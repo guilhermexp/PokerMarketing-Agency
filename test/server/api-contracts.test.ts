@@ -37,6 +37,16 @@ describe("API contracts", () => {
     ).toThrow();
   });
 
+  it("accepts the structured colors payload returned by /api/ai/extract-colors", () => {
+    expect(() =>
+      validateRouteOutput("POST", "/api/ai/extract-colors", {
+        primaryColor: "#112233",
+        secondaryColor: null,
+        tertiaryColor: "#445566",
+      }),
+    ).not.toThrow();
+  });
+
   it("generates an OpenAPI document with JSON and streaming routes", () => {
     const document = getOpenApiDocument();
 
