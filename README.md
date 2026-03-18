@@ -22,9 +22,11 @@ Para mais detalhes técnicos e guias de uso, consulte o diretório [docs/](./doc
 A aplicação é um Single Page Application (SPA) construído com as seguintes tecnologias:
 
 - **Frontend:**
-  - **React:** Biblioteca principal para a construção da interface de usuário.
-  - **TypeScript:** Para tipagem estática e um desenvolvimento mais robusto.
-  - **Tailwind CSS:** Para estilização rápida e consistente.
+  - **React 19 + Vite 7:** Base da SPA e pipeline de build.
+  - **React Router 7:** Roteamento client-side das views principais.
+  - **TypeScript:** Tipagem estática para UI e backend.
+  - **Tailwind CSS 4:** Estilização utilitária.
+  - **PWA (`vite-plugin-pwa`):** Manifest e service worker para instalação e cache básico.
 
 - **Serviços de IA e Backend:**
   - **Google Gemini API (`@google/genai`):**
@@ -48,6 +50,7 @@ A aplicação é um Single Page Application (SPA) construído com as seguintes t
 │   │   ├── dashboard/    # Componentes da dashboard
 │   │   ├── flyer/        # Gerador de flyers
 │   │   └── ...
+│   ├── main-app-controller.tsx # Orquestra estado, rotas e integrações
 │   ├── services/         # Serviços (API clients, lógica de IA)
 │   ├── types.ts          # Definições de tipos
 │   ├── App.tsx           # Componente raiz
@@ -66,6 +69,7 @@ Para rodar esta aplicação, o ambiente de execução precisa ter as variáveis 
 - `GEMINI_API_KEY`: Sua chave de API do Google AI Studio para acessar os modelos Gemini.
 - `DATABASE_URL`: conexão com PostgreSQL.
 - `BETTER_AUTH_SECRET` e `CSRF_SECRET`: segredos do backend.
+- `BLOB_READ_WRITE_TOKEN`: upload e persistência de assets no Vercel Blob.
 
 ### Dev com npm
 

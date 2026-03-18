@@ -14,17 +14,20 @@
 
 import crypto from 'crypto';
 
-// CSRF secret key for HMAC signing
-// In production, this should be loaded from environment variable
-const CSRF_SECRET = process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production';
+function resolveCsrfSecret(): string {
+  const envSecret = process.env.CSRF_SECRET?.trim();
+  if (envSecret) {
+    return envSecret;
+  }
 
-// Validate CSRF_SECRET in production
-if (process.env.NODE_ENV === 'production' && CSRF_SECRET === 'default-csrf-secret-change-in-production') {
   throw new Error(
-    'CSRF_SECRET environment variable must be set in production. ' +
+    'CSRF_SECRET environment variable must be set. ' +
     'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"'
   );
 }
+
+// CSRF secret key for HMAC signing
+const CSRF_SECRET = resolveCsrfSecret();
 
 // Token length in bytes (32 bytes = 256 bits)
 const TOKEN_LENGTH = 32;
