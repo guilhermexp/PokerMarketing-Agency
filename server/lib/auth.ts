@@ -163,9 +163,12 @@ export function createRateLimitMiddleware(maxRequests = 30, windowMs = 60_000) {
       }
       next();
     } catch (err) {
-      // If Upstash fails, allow the request (fail-open)
-      logger.warn({ err, identifier }, "[RateLimit] Upstash error, allowing request");
-      next();
+      // Fail-closed: deny request when rate limiter errors (security best practice)
+      logger.error({ err, identifier }, "[RateLimit] Rate limiting service error, denying request");
+      res.status(503).json({
+        error: "Rate limiting service temporarily unavailable. Please try again.",
+        retryAfter: 5,
+      });
     }
   };
 }
@@ -396,8 +399,14 @@ export async function requireAuthWithAiRateLimit(req: Request, res: Response, ne
       return;
     }
   } catch (err) {
-    // Fail-open: allow request if rate limiting errors
-    logger.warn({ err, userId: authCtx.userId }, "[RateLimit] Error in requireAuthWithAiRateLimit");
+    // Fail-closed: deny request when rate limiter errors (security best practice)
+    logger.error({ err, userId: authCtx.userId }, "[RateLimit] Rate limiting service error, denying request");
+    res.status(503).json({
+      error: "Rate limiting service temporarily unavailable. Please try again.",
+      code: "RATE_LIMIT_SERVICE_ERROR",
+      retryAfter: 5,
+    });
+    return;
   }
 
   req.authUserId = authCtx.userId;
