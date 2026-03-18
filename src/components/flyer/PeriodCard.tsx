@@ -298,6 +298,7 @@ export const PeriodCard: React.FC<{
                               <div className="w-6 h-6 rounded-lg overflow-hidden border border-white/[0.08] flex-shrink-0">
                                   <img
                                       src={styleReference.src}
+                                      alt={styleReference.prompt || styleReference.source || "Referência de estilo"}
                                       className="w-full h-full object-cover"
                                   />
                               </div>

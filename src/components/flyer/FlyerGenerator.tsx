@@ -305,10 +305,10 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
                 </p>
               </div>
               <div className="flex items-center gap-2 lg:hidden">
-                <button onClick={() => setIsMobilePanelOpen(true)} className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white/40 flex items-center justify-center transition-all active:scale-95 hover:bg-white/[0.08] hover:text-white/60" title="Galeria">
+                <button onClick={() => setIsMobilePanelOpen(true)} aria-label="Abrir galeria" className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white/40 flex items-center justify-center transition-all active:scale-95 hover:bg-white/[0.08] hover:text-white/60" title="Galeria">
                   <Icon name="image" className="w-4 h-4" />
                 </button>
-                <button onClick={() => setIsSettingsModalOpen(true)} className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white/40 flex items-center justify-center transition-all active:scale-95 hover:bg-white/[0.08] hover:text-white/60" title="Configurações">
+                <button onClick={() => setIsSettingsModalOpen(true)} aria-label="Abrir configurações" className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white/40 flex items-center justify-center transition-all active:scale-95 hover:bg-white/[0.08] hover:text-white/60" title="Configurações">
                   <Icon name="settings" className="w-4 h-4" />
                 </button>
               </div>
@@ -368,7 +368,7 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
                 <span className="hidden sm:inline">{isBatchGenerating ? "Gerando..." : "Gerar Grade"}</span>
                 <span className="sm:hidden">{isBatchGenerating ? "..." : "Grade"}</span>
               </button>
-              <button onClick={() => setIsSettingsModalOpen(true)} className="hidden lg:flex w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/40 items-center justify-center transition-all active:scale-95 hover:bg-white/[0.06] hover:text-white/60" title="Configurações">
+              <button onClick={() => setIsSettingsModalOpen(true)} aria-label="Abrir configurações" className="hidden lg:flex w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/40 items-center justify-center transition-all active:scale-95 hover:bg-white/[0.06] hover:text-white/60" title="Configurações">
                 <Icon name="settings" className="w-4 h-4" />
               </button>
             </div>
@@ -379,7 +379,7 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
             <div className="flex items-center justify-between gap-3 px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/[0.1] flex-shrink-0">
-                  <img src={selectedStyleReference.src} className="w-full h-full object-cover" />
+                  <img src={selectedStyleReference.src} alt={selectedStyleReference.name || "Referência de estilo selecionada"} className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <p className="text-[10px] font-black text-white/80 uppercase tracking-wide">Referência Ativa</p>
@@ -458,7 +458,7 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
                     {collabLogos.map((logo, index) => (
                       <div key={index} className="relative group">
                         <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white/[0.04] border border-white/[0.12] flex items-center justify-center overflow-hidden">
-                          <img src={logo} className="w-full h-full object-contain" />
+                          <img src={logo} alt="Logo colaborativa" className="w-full h-full object-contain" />
                         </div>
                         <button onClick={() => setCollabLogos(prev => prev.filter((_, i) => i !== index))}
                           className="absolute -top-1 -right-1 w-4 h-4 rounded-md bg-red-500/80 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">×</button>
@@ -481,7 +481,7 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
                 {/* Style reference */}
                 <label className="relative cursor-pointer group flex flex-col items-center gap-1">
                   <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white/[0.04] border ${manualStyleRef ? 'border-white/[0.2]' : 'border-white/[0.06]'} text-white/40 flex items-center justify-center transition-all active:scale-95 hover:bg-white/[0.08] hover:text-white/60 hover:border-white/[0.12]`}>
-                    {manualStyleRef ? <img src={manualStyleRef} className="w-6 h-6 sm:w-7 sm:h-7 object-cover rounded" /> : <Icon name="image" className="w-5 h-5" />}
+                    {manualStyleRef ? <img src={manualStyleRef} alt="Referência manual selecionada" className="w-6 h-6 sm:w-7 sm:h-7 object-cover rounded" /> : <Icon name="image" className="w-5 h-5" />}
                   </div>
                   <span className="text-[9px] sm:text-[10px] font-medium text-white/30 group-hover:text-white/50 transition-colors">Estilo</span>
                   <input type="file" className="hidden" accept="image/*" onChange={async (e) => {

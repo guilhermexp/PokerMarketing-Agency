@@ -5,6 +5,7 @@
 
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Loader } from './components/common/Loader';
 
 // Lazy load admin panel for code splitting
@@ -75,35 +76,35 @@ export function Router() {
         <Route path="/" element={<Navigate to="/campaign" replace />} />
         <Route
           path="/campaign"
-          element={<MainRoute><CampaignView /></MainRoute>}
+          element={<MainRoute fallbackLabel="Campanha"><CampaignView /></MainRoute>}
         />
         <Route
           path="/campaigns"
-          element={<MainRoute><CampaignsView /></MainRoute>}
+          element={<MainRoute fallbackLabel="Campanhas"><CampaignsView /></MainRoute>}
         />
         <Route
           path="/carousels"
-          element={<MainRoute><CarouselsView /></MainRoute>}
+          element={<MainRoute fallbackLabel="Carrosséis"><CarouselsView /></MainRoute>}
         />
         <Route
           path="/flyer"
-          element={<MainRoute><FlyerView /></MainRoute>}
+          element={<MainRoute fallbackLabel="Flyers"><FlyerView /></MainRoute>}
         />
         <Route
           path="/gallery"
-          element={<MainRoute><GalleryView /></MainRoute>}
+          element={<MainRoute fallbackLabel="Galeria"><GalleryView /></MainRoute>}
         />
         <Route
           path="/calendar"
-          element={<MainRoute><CalendarView /></MainRoute>}
+          element={<MainRoute fallbackLabel="Calendário"><CalendarView /></MainRoute>}
         />
         <Route
           path="/playground"
-          element={<MainRoute><PlaygroundView /></MainRoute>}
+          element={<MainRoute fallbackLabel="Playground"><PlaygroundView /></MainRoute>}
         />
         <Route
           path="/image-playground"
-          element={<MainRoute><ImagePlaygroundView /></MainRoute>}
+          element={<MainRoute fallbackLabel="Image Playground"><ImagePlaygroundView /></MainRoute>}
         />
         <Route path="*" element={<Navigate to="/campaign" replace />} />
       </Routes>
@@ -111,11 +112,57 @@ export function Router() {
   );
 }
 
-function MainRoute({ children }: { children: React.ReactNode }) {
+function MainRoute({
+  children,
+  fallbackLabel,
+}: {
+  children: React.ReactNode;
+  fallbackLabel: string;
+}) {
   return (
-    <Suspense fallback={<AdminLoadingFallback />}>
-      {children}
-    </Suspense>
+    <ErrorBoundary
+      fallback={
+        <div className="min-h-screen bg-[var(--color-bg-primary)] flex items-center justify-center">
+          <span className="text-sm text-muted-foreground">
+            Falha ao carregar a view.
+          </span>
+        </div>
+      }
+    >
+      <Suspense fallback={<ViewLoadingFallback label={fallbackLabel} />}>
+        {children}
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
+function ViewLoadingFallback({ label }: { label: string }) {
+  return (
+    <div className="min-h-screen bg-[var(--color-bg-primary)] px-4 py-6">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-3">
+            <div className="h-3 w-28 animate-pulse rounded-full bg-white/10" />
+            <div className="h-8 w-56 animate-pulse rounded-full bg-white/15" />
+          </div>
+          <div className="h-10 w-24 animate-pulse rounded-2xl bg-white/10" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-[320px_1fr]">
+          <div className="h-[480px] animate-pulse rounded-[28px] border border-white/10 bg-white/5" />
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="h-32 animate-pulse rounded-[24px] border border-white/10 bg-white/5" />
+              <div className="h-32 animate-pulse rounded-[24px] border border-white/10 bg-white/5" />
+              <div className="h-32 animate-pulse rounded-[24px] border border-white/10 bg-white/5" />
+            </div>
+            <div className="h-[344px] animate-pulse rounded-[32px] border border-white/10 bg-white/5" />
+          </div>
+        </div>
+        <span className="text-sm text-muted-foreground">
+          Carregando {label.toLowerCase()}...
+        </span>
+      </div>
+    </div>
   );
 }
 

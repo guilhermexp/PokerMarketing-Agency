@@ -67,7 +67,11 @@ export const ExportVideoModal: React.FC<ExportVideoModalProps> = ({
             </div>
           </div>
           {canClose && (
-            <button onClick={onClose} className="text-muted-foreground hover:text-white transition-colors">
+            <button
+              onClick={onClose}
+              aria-label="Fechar exportação de vídeo"
+              className="text-muted-foreground hover:text-white transition-colors"
+            >
               <Icon name="x" className="w-5 h-5" />
             </button>
           )}

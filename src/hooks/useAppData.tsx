@@ -37,7 +37,7 @@ const defaultConfig: SWRConfiguration = {
   revalidateOnFocus: false, // Don't refetch when tab gets focus
   revalidateOnReconnect: false, // Don't refetch on reconnect
   revalidateIfStale: false, // Don't auto-refetch stale data
-  dedupingInterval: 300000, // Dedupe requests within 5 minutes (increased!)
+  dedupingInterval: 60000, // Dedupe requests within 60 seconds
   errorRetryCount: 2, // Only retry twice on error
 };
 
@@ -164,7 +164,7 @@ export function useInitialData(
     },
     {
       ...defaultConfig,
-      dedupingInterval: 600000, // 10 minutes for initial data
+      dedupingInterval: 60000,
     },
   );
 
