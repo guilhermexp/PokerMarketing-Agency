@@ -471,7 +471,7 @@ export function registerAgentStudioRoutes(app: Application): void {
       return;
     }
 
-    const { type, query: searchQuery = "", limit } = req.query as StudioContentSearchQuery;
+    const { type, query: searchQuery = "", limit } = req.query as unknown as StudioContentSearchQuery;
 
     const sql = getSql();
     const userId = await resolveUserId(sql, clerkUserId);
@@ -551,7 +551,7 @@ export function registerAgentStudioRoutes(app: Application): void {
       return;
     }
 
-    const { query: rawQuery = "", limit } = req.query as StudioFilesQuery;
+    const { query: rawQuery = "", limit } = req.query as unknown as StudioFilesQuery;
     const searchQuery = rawQuery.trim().toLowerCase();
 
     try {

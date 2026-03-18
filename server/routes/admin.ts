@@ -252,7 +252,7 @@ export function registerAdminRoutes(app: Express): void {
   app.get("/api/admin/usage", requireSuperAdmin, validateRequest({ query: adminUsageQuerySchema }), async (req: Request, res: Response) => {
     try {
       const sql = getSql();
-      const { groupBy, days } = req.query as AdminUsageQuery;
+      const { groupBy, days } = req.query as unknown as AdminUsageQuery;
 
       const totalsResult = await sql`
         SELECT
@@ -412,7 +412,7 @@ export function registerAdminRoutes(app: Express): void {
   app.get("/api/admin/users", requireSuperAdmin, validateRequest({ query: adminUsersQuerySchema }), async (req: Request, res: Response) => {
     try {
       const sql = getSql();
-      const { limit: safeLimit, page: safePage, search: searchParam = "" } = req.query as AdminUsersQuery;
+      const { limit: safeLimit, page: safePage, search: searchParam = "" } = req.query as unknown as AdminUsersQuery;
       const offset = (safePage - 1) * safeLimit;
 
       const searchFilter = searchParam ? `%${searchParam}%` : null;
@@ -465,7 +465,7 @@ export function registerAdminRoutes(app: Express): void {
   app.get("/api/admin/organizations", requireSuperAdmin, validateRequest({ query: adminOrganizationsQuerySchema }), async (req: Request, res: Response) => {
     try {
       const sql = getSql();
-      const { limit: safeLimit, page: safePage } = req.query as AdminOrganizationsQuery;
+      const { limit: safeLimit, page: safePage } = req.query as unknown as AdminOrganizationsQuery;
       const offset = (safePage - 1) * safeLimit;
 
       // Get organization base data with counts from various tables
@@ -633,7 +633,7 @@ export function registerAdminRoutes(app: Express): void {
         action: actionParam = "",
         category: categoryParam = "",
         severity: severityParam,
-      } = req.query as AdminLogsQuery;
+      } = req.query as unknown as AdminLogsQuery;
       const offset = (safePage - 1) * safeLimit;
       const actionFilter = actionParam ? `%${actionParam}%` : null;
       const categoryFilter = categoryParam || null;

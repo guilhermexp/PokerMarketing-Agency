@@ -466,7 +466,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
       let result;
 
       if (type === "quickPost") {
-        const prompt = buildQuickPostPrompt(brandProfile, context);
+        const prompt = buildQuickPostPrompt(brandProfile, context ?? "");
         const parts: ContentPart[] = [{ text: prompt }];
         if (image) {
           parts.push({

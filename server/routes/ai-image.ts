@@ -790,7 +790,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     }
 
     try {
-      const { limit } = req.query as AiImageAsyncJobsQuery;
+      const { limit } = req.query as unknown as AiImageAsyncJobsQuery;
       const jobs = await getUserImageGenerationJobs(userId, organizationId, limit);
 
       res.json({ jobs });

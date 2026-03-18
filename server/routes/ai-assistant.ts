@@ -124,13 +124,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
       messages.push({ role: "system", content: systemInstruction });
 
       for (const message of history) {
-        const parts = (message.parts ?? []).filter(
-          (part): part is GeminiPart => {
-            const textPart = part as GeminiTextPart;
-            const dataPart = part as GeminiInlineDataPart;
-            return Boolean(textPart.text) || Boolean(dataPart.inlineData);
-          },
-        );
+        const parts = message.parts ?? [];
         if (!parts.length) continue;
 
         const role: "user" | "assistant" = message.role === "model" ? "assistant" : "user";

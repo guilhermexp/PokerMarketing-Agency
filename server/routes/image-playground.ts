@@ -404,7 +404,7 @@ ${userPrompt}`;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { topicId, limit } = req.query as ImagePlaygroundBatchesQuery;
+      const { topicId, limit } = req.query as unknown as ImagePlaygroundBatchesQuery;
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);

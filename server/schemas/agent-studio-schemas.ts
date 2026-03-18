@@ -4,7 +4,7 @@ const studioTypeSchema = z.enum(["image", "video"]);
 const contentTypeSchema = z.enum(["gallery", "campaign", "post", "clip", "carousel"]);
 
 const attachmentSchema = z.object({
-  type: z.enum(["image", "video", "file"]).optional(),
+  type: z.enum(["image", "video", "file"]).default("file"),
   url: z.string().trim().min(1),
   name: z.string().default(""),
   mimeType: z.string().default(""),

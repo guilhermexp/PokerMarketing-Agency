@@ -239,7 +239,7 @@ export function registerVideoPlaygroundRoutes(
         return;
       }
 
-      const { topicId, limit } = req.query as VideoPlaygroundSessionsQuery;
+      const { topicId, limit } = req.query as unknown as VideoPlaygroundSessionsQuery;
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
