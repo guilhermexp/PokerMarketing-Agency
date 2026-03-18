@@ -221,11 +221,22 @@ export function BrandProfileController({
     setBrandProfile,
   });
 
+  // Keep showing the loader until we know for sure whether the user has a
+  // brand profile.  Three situations must be covered:
+  //   1. Auth / org / initial-data still loading → obvious loading state
+  //   2. initialData arrived with a brand profile but the store hasn't been
+  //      hydrated yet (the useEffect that calls setBrandProfile runs *after*
+  //      this render)
+  //   3. Context (user/org) just changed → stale data, wait for refresh
+  //   4. The clear-on-org-switch effect ran but the hydration effect hasn't
+  //      re-populated the store yet — without this guard the UI briefly
+  //      flashes the brand-creation screen.
   const isAppLoading =
     authLoading ||
     isInitialLoading ||
     !isOrgReady ||
-    !!(initialData?.brandProfile && !brandProfile) ||
+    !initialData ||
+    !!(initialData.brandProfile && !brandProfile) ||
     isContextChanging ||
     isInitialMount;
 
