@@ -132,7 +132,7 @@ export interface ApiRouteContract {
 
 const isoDateSchema = z.union([z.date(), z.string().trim().min(1)]);
 const optionalNullableIsoDateSchema = isoDateSchema.nullable().optional();
-const jsonScalarSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const jsonScalarSchema = z.union([z.string(), z.number(), z.boolean(), z.null(), z.date()]);
 const jsonPrimitiveArraySchema = z.union([
   z.array(z.string()),
   z.array(z.number()),
