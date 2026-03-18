@@ -71,102 +71,40 @@ export async function listGallery({
   const limitNum = Number.parseInt(String(limit ?? "50"), 10) || 50;
   const offsetNum = Number.parseInt(String(offset ?? "0"), 10) || 0;
   const includeSrc = include_src === true || include_src === "true";
+  const selectedColumns = includeSrc
+    ? "*"
+    : "id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period";
+  const queryConditions: string[] = ["deleted_at IS NULL"];
+  const queryParams: Array<string | number> = [];
 
   if (organization_id) {
     await resolveOrganizationContext(sql, resolvedUserId, organization_id);
-
-    if (source) {
-      return includeSrc
-        ? (await sql`
-            SELECT *
-            FROM gallery_images
-            WHERE deleted_at IS NULL
-              AND organization_id = ${organization_id}
-              AND source = ${source}
-            ORDER BY created_at DESC
-            LIMIT ${limitNum}
-            OFFSET ${offsetNum}
-          `) as GalleryImage[]
-        : (await sql`
-            SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period
-            FROM gallery_images
-            WHERE deleted_at IS NULL
-              AND organization_id = ${organization_id}
-              AND source = ${source}
-            ORDER BY created_at DESC
-            LIMIT ${limitNum}
-            OFFSET ${offsetNum}
-          `) as GalleryImage[];
-    }
-
-    return includeSrc
-      ? (await sql`
-          SELECT *
-          FROM gallery_images
-          WHERE deleted_at IS NULL
-            AND organization_id = ${organization_id}
-          ORDER BY created_at DESC
-          LIMIT ${limitNum}
-          OFFSET ${offsetNum}
-        `) as GalleryImage[]
-      : (await sql`
-          SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period
-          FROM gallery_images
-          WHERE deleted_at IS NULL
-            AND organization_id = ${organization_id}
-          ORDER BY created_at DESC
-          LIMIT ${limitNum}
-          OFFSET ${offsetNum}
-        `) as GalleryImage[];
+    queryParams.push(organization_id);
+    queryConditions.push(`organization_id = $${queryParams.length}`);
+  } else {
+    queryParams.push(resolvedUserId);
+    queryConditions.push(`user_id = $${queryParams.length}`);
+    queryConditions.push("organization_id IS NULL");
   }
 
   if (source) {
-    return includeSrc
-      ? (await sql`
-          SELECT *
-          FROM gallery_images
-          WHERE deleted_at IS NULL
-            AND user_id = ${resolvedUserId}
-            AND organization_id IS NULL
-            AND source = ${source}
-          ORDER BY created_at DESC
-          LIMIT ${limitNum}
-          OFFSET ${offsetNum}
-        `) as GalleryImage[]
-      : (await sql`
-          SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period
-          FROM gallery_images
-          WHERE deleted_at IS NULL
-            AND user_id = ${resolvedUserId}
-            AND organization_id IS NULL
-            AND source = ${source}
-          ORDER BY created_at DESC
-          LIMIT ${limitNum}
-          OFFSET ${offsetNum}
-        `) as GalleryImage[];
+    queryParams.push(source);
+    queryConditions.push(`source = $${queryParams.length}`);
   }
 
-  return includeSrc
-    ? (await sql`
-        SELECT *
-        FROM gallery_images
-        WHERE deleted_at IS NULL
-          AND user_id = ${resolvedUserId}
-          AND organization_id IS NULL
-        ORDER BY created_at DESC
-        LIMIT ${limitNum}
-        OFFSET ${offsetNum}
-      `) as GalleryImage[]
-    : (await sql`
-        SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period
-        FROM gallery_images
-        WHERE deleted_at IS NULL
-          AND user_id = ${resolvedUserId}
-          AND organization_id IS NULL
-        ORDER BY created_at DESC
-        LIMIT ${limitNum}
-        OFFSET ${offsetNum}
-      `) as GalleryImage[];
+  queryParams.push(limitNum, offsetNum);
+
+  return (await sql.query(
+    `
+      SELECT ${selectedColumns}
+      FROM gallery_images
+      WHERE ${queryConditions.join(" AND ")}
+      ORDER BY created_at DESC
+      LIMIT $${queryParams.length - 1}
+      OFFSET $${queryParams.length}
+    `,
+    queryParams,
+  )) as GalleryImage[];
 }
 
 export interface ListDailyFlyersParams {

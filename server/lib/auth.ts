@@ -440,6 +440,22 @@ if (SUPER_ADMIN_EMAILS.length === 0) {
   );
 }
 
+function getAdminAuditContext(
+  req: Request,
+  adminAction: string,
+  session: AuthSession | null | undefined,
+) {
+  return {
+    adminAction,
+    adminEmail: session?.user?.email?.toLowerCase() ?? null,
+    adminUserId: session?.user?.id ?? null,
+    method: req.method,
+    path: req.path,
+    requestId: req.id,
+    happenedAt: new Date().toISOString(),
+  };
+}
+
 export async function requireSuperAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const session = req.authSession as AuthSession | null | undefined;
@@ -454,9 +470,7 @@ export async function requireSuperAdmin(req: Request, res: Response, next: NextF
     if (!userEmail || !SUPER_ADMIN_EMAILS.includes(userEmail)) {
       logger.warn(
         {
-          requestId: req.id,
-          userId: session.user.id ? `${session.user.id.slice(0, 8)}...` : null,
-          userEmail: userEmail ? userEmail.replace(/^[^@]+/, "***") : null,
+          ...getAdminAuditContext(req, "admin.access.denied", session),
           superAdminCount: SUPER_ADMIN_EMAILS.length,
         },
         "[Admin] Access denied for super admin endpoint",

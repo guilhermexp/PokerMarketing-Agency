@@ -75,8 +75,12 @@ describe("admin routes", () => {
     expect(response.body.error.message).toBe("Access denied. Super admin only.");
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({
-        userId: "user-2...",
-        userEmail: "***@example.com",
+        adminAction: "admin.access.denied",
+        adminEmail: "member@example.com",
+        adminUserId: "user-2",
+        method: "GET",
+        path: "/admin-probe",
+        happenedAt: expect.any(String),
       }),
       "[Admin] Access denied for super admin endpoint",
     );
