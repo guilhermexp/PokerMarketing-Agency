@@ -10,18 +10,18 @@ export interface ImageGenerationModelOption {
 
 export const IMAGE_GENERATION_MODEL_OPTIONS: ImageGenerationModelOption[] = [
   {
-    provider: 'replicate',
+    provider: 'gemini',
     model: 'nano-banana-2',
     label: 'Nano Banana 2',
     color: '#34A853',
-    desc: 'Flash Image 3.1 (rapido)',
+    desc: 'Gemini Flash — rápido e econômico',
   },
   {
-    provider: 'replicate',
+    provider: 'gemini',
     model: 'nano-banana-pro',
-    label: 'Pro',
+    label: 'Nano Banana Pro',
     color: '#4285F4',
-    desc: 'Melhor qualidade',
+    desc: 'Gemini Pro — melhor qualidade',
   },
 ];
 

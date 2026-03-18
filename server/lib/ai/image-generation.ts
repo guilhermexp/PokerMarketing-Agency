@@ -62,18 +62,13 @@ interface GeminiResponse {
 // ============================================================================
 
 export function mapAspectRatio(ratio: string): string {
-  const map: Record<string, string> = {
-    "1:1": "1:1",
-    "9:16": "9:16",
-    "16:9": "16:9",
-    "1.91:1": "16:9",
-    "4:5": "4:5",
-    "3:4": "3:4",
-    "4:3": "4:3",
-    "2:3": "2:3",
-    "3:2": "3:2",
-  };
-  return map[ratio] || "1:1";
+  const supported = new Set([
+    "1:1", "1:4", "1:8", "2:3", "3:2", "3:4",
+    "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9",
+  ]);
+  // Map legacy/alternate names
+  if (ratio === "1.91:1") return "16:9";
+  return supported.has(ratio) ? ratio : "1:1";
 }
 
 // ============================================================================
@@ -147,6 +142,7 @@ export async function generateGeminiImage(
         model,
         contents: { parts },
         config: {
+          responseModalities: ["TEXT", "IMAGE"],
           temperature: 0.7,
           imageConfig: {
             aspectRatio: mapAspectRatio(aspectRatio),

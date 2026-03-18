@@ -15,6 +15,7 @@ import {
   getBatches,
   deleteBatch,
   deleteGeneration,
+  retryGeneration,
   getGenerationStatus,
   createImageBatch,
   generateTopicTitle,
@@ -477,17 +478,18 @@ ${userPrompt}`;
       // Enhanced params to pass to helper
       let enhancedParams: GenerationParams = { ...params };
 
-      // Instagram Post Mode: apply composition context + force brand + 1:1
+      // Instagram Post Mode: apply composition context + force brand
+      // Aspect ratio default (1:1) is set by the frontend toggle;
+      // if the user changes it afterward, respect their choice.
       if (params.useInstagramMode) {
         enhancedParams.useBrandProfile = true;
-        enhancedParams.aspectRatio = '1:1';
         enhancedParams.prompt = buildInstagramPostPrompt(params.prompt);
         logger.info({}, "[ImagePlayground] Instagram Post mode enabled");
       }
 
-      // AI Influencer Mode: expand prompt via Gemini Flash agent + 4:5
+      // AI Influencer Mode: expand prompt via Gemini Flash agent
+      // Aspect ratio default (4:5) is set by the frontend toggle.
       if (params.useAiInfluencerMode) {
-        enhancedParams.aspectRatio = '4:5';
         const hasRefImages = Array.isArray(params.referenceImages) && params.referenceImages.length > 0;
 
         logger.info(
@@ -515,9 +517,9 @@ ${userPrompt}`;
         }
       }
 
-      // Product Hero Shot Mode: expand prompt via Flash agent + 1:1
+      // Product Hero Shot Mode: expand prompt via Flash agent
+      // Aspect ratio default (1:1) is set by the frontend toggle.
       if (params.useProductHeroMode) {
-        enhancedParams.aspectRatio = '1:1';
         const hasRefImages = Array.isArray(params.referenceImages) && params.referenceImages.length > 0;
 
         logger.info(
@@ -545,9 +547,9 @@ ${userPrompt}`;
         }
       }
 
-      // Exploded Product Mode: expand prompt via Flash agent + 9:16
+      // Exploded Product Mode: expand prompt via Flash agent
+      // Aspect ratio default (9:16) is set by the frontend toggle.
       if (params.useExplodedProductMode) {
-        enhancedParams.aspectRatio = '9:16';
         const hasRefImages = Array.isArray(params.referenceImages) && params.referenceImages.length > 0;
 
         logger.info(
@@ -575,9 +577,9 @@ ${userPrompt}`;
         }
       }
 
-      // Brand Identity Mode: expand prompt via Flash agent + 4:5 + force brand
+      // Brand Identity Mode: expand prompt via Flash agent + force brand
+      // Aspect ratio default (4:5) is set by the frontend toggle.
       if (params.useBrandIdentityMode) {
-        enhancedParams.aspectRatio = '4:5';
         enhancedParams.useBrandProfile = true;
         const hasRefImages = Array.isArray(params.referenceImages) && params.referenceImages.length > 0;
 
@@ -777,7 +779,19 @@ ${userPrompt}`;
       const sql = getSql();
       const status = await getGenerationStatus(sql, generationId, asyncTaskId);
 
-      res.json(status);
+      // Disable caching on polling endpoints — stale ETags cause 304 loops
+      // that prevent the frontend from ever seeing 'success' status
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.set("ETag", "");
+      // Use sendSuccess directly to prevent the response middleware from
+      // treating the GenerationStatus.error field as an HTTP error.
+      // The status object always goes in data — even when generation failed.
+      res.locals.skipResponseEnvelope = true;
+      (res as unknown as { _rawJson: (p: unknown) => void })._rawJson({
+        data: status,
+        error: null,
+        meta: null,
+      });
     } catch (error) {
       logger.error({ err: error }, "[ImagePlayground] Get status error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -804,6 +818,32 @@ ${userPrompt}`;
       res.json({ success: true });
     } catch (error) {
       logger.error({ err: error }, "[ImagePlayground] Delete generation error");
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
+    }
+  });
+
+  // Retry a failed generation in-place
+  app.post("/api/image-playground/generations/:id/retry", validateRequest({ params: playgroundIdParamsSchema }), async (req: Request, res: Response) => {
+    try {
+      const auth = getRequestAuthContext(req);
+      const userId = auth?.userId || null;
+      const orgId = auth?.orgId || null;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { id } = req.params as PlaygroundIdParams;
+      const sql = getSql();
+      const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
+
+      const genai = getGeminiAi();
+      const generation = await retryGeneration(sql, id, resolvedUserId, orgId, genai);
+
+      res.json({ success: true, generation });
+    } catch (error) {
+      logger.error({ err: error }, "[ImagePlayground] Retry generation error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });

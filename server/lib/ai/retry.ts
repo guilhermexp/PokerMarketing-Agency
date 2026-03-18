@@ -129,7 +129,10 @@ export async function withRetry<T>(
         errorObj?.message?.includes("RESOURCE_EXHAUSTED");
       const isTimeout =
         errorObj?.name === "TimeoutError" ||
+        errorObj?.name === "AbortError" ||
         errorObj?.message?.includes("TimeoutError") ||
+        errorObj?.message?.includes("AbortError") ||
+        errorObj?.message?.includes("aborted") ||
         errorObj?.message?.includes("timed out") ||
         errorObj?.message?.includes("The operation timed out") ||
         errorObj?.status === 504;

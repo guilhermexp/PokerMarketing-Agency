@@ -719,12 +719,13 @@ export async function createImageBatch(
 ): Promise<CreateImageBatchResult> {
   const { topicId, provider, model, imageNum, params } = input;
 
-  // Use provided values first, fallback to calculated values
-  const width = params.width || 1024;
-  const height = params.height || 1024;
+  // Resolve aspect ratio and image size first, then derive dimensions
   const aspectRatio =
-    params.aspectRatio || getAspectRatioFromDimensions(width, height);
-  const imageSize = params.imageSize || getImageSizeFromWidth(width);
+    params.aspectRatio || getAspectRatioFromDimensions(params.width || 1024, params.height || 1024);
+  const imageSize = params.imageSize || getImageSizeFromWidth(params.width || 1024);
+  const dims = getActualDimensions(aspectRatio, imageSize);
+  const width = params.width || dims.width;
+  const height = params.height || dims.height;
   const generationParams = { ...params, aspectRatio, imageSize, model };
   const storedParams = compactForStorage(generationParams as unknown as CompactValue);
   const displayPrompt =
@@ -1247,6 +1248,106 @@ interface GeminiTitleResponse {
       }>;
     };
   }>;
+}
+
+/**
+ * Retry a failed generation in-place.
+ * Creates a new async task, updates the generation to point to it,
+ * and re-triggers processImageGeneration() with the original params.
+ */
+export async function retryGeneration(
+  sql: SqlClient,
+  generationId: string,
+  userId: string | null,
+  organizationId: string | null,
+  genai: GoogleGenAI,
+): Promise<GenerationJson> {
+  const orgId = organizationId || null;
+
+  // 1. Find the generation + its batch (with ownership check)
+  const rows = orgId
+    ? await sql`
+        SELECT g.id, g.batch_id, g.user_id, g.async_task_id, g.seed, g.created_at,
+               b.provider, b.model, b.config
+        FROM image_generations g
+        JOIN image_generation_batches b ON b.id = g.batch_id
+        WHERE g.id = ${generationId} AND b.organization_id = ${orgId}
+      `
+    : await sql`
+        SELECT g.id, g.batch_id, g.user_id, g.async_task_id, g.seed, g.created_at,
+               b.provider, b.model, b.config
+        FROM image_generations g
+        JOIN image_generation_batches b ON b.id = g.batch_id
+        WHERE g.id = ${generationId} AND g.user_id = ${userId}
+      `;
+
+  const row = rows[0] as {
+    id: string;
+    batch_id: string;
+    user_id: string;
+    async_task_id: string | null;
+    seed: number | null;
+    created_at: string;
+    provider: string;
+    model: string;
+    config: Record<string, unknown>;
+  } | undefined;
+
+  if (!row) {
+    throw new Error("Generation not found");
+  }
+
+  // 2. Reconstruct params from batch config
+  const params = row.config as GenerationParams;
+  const generationParams: GenerationParams = {
+    ...params,
+    model: row.model,
+    seed: row.seed || Math.floor(Math.random() * 1000000),
+  };
+
+  // 3. Create a NEW async task
+  const taskRows = (await sql`
+    INSERT INTO image_async_tasks (
+      user_id, type, status, metadata
+    )
+    VALUES (
+      ${row.user_id}, 'image_generation', 'pending',
+      ${JSON.stringify({
+        batchId: row.batch_id,
+        provider: row.provider,
+        model: row.model,
+        params: generationParams,
+        retry: true,
+      })}
+    )
+    RETURNING *
+  `) as AsyncTaskRow[];
+  const task = taskRows[0];
+  if (!task) {
+    throw new Error("Failed to create retry task");
+  }
+
+  // 4. Update generation: clear asset, point to new task
+  await sql`
+    UPDATE image_generations
+    SET async_task_id = ${task.id}, asset = NULL
+    WHERE id = ${generationId}
+  `;
+
+  // 5. Fire processImageGeneration in background
+  processImageGeneration(sql, task.id, generationId, generationParams, genai).catch((err) => {
+    logger.error("[ImagePlayground] Background retry generation failed:", err);
+  });
+
+  return {
+    id: row.id,
+    batchId: row.batch_id,
+    userId: row.user_id,
+    asyncTaskId: task.id,
+    seed: generationParams.seed || row.seed,
+    asset: null,
+    createdAt: row.created_at,
+  };
 }
 
 export async function generateTopicTitle(

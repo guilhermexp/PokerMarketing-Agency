@@ -226,6 +226,19 @@ export async function deleteGeneration(generationId: string): Promise<void> {
   });
 }
 
+/**
+ * Retry a failed generation in-place (same card, new async task)
+ */
+export async function retryGeneration(generationId: string): Promise<{
+  success: boolean;
+  generation: Generation;
+}> {
+  const response = await fetchWithAuth(`${API_BASE}/generations/${generationId}/retry`, {
+    method: 'POST',
+  });
+  return response.json();
+}
+
 // =============================================================================
 // Utility API
 // =============================================================================

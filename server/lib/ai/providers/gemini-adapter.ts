@@ -135,6 +135,7 @@ export async function generate({
         model,
         contents: { parts },
         config: {
+          responseModalities: ["TEXT", "IMAGE"],
           temperature: 0.7,
           imageConfig: {
             aspectRatio: mapAspectRatio(aspectRatio),
@@ -184,6 +185,7 @@ export async function edit({
         model,
         contents: { parts },
         config: {
+          responseModalities: ["TEXT", "IMAGE"],
           temperature: 0.7,
           imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
         },
