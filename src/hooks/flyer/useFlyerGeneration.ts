@@ -11,7 +11,7 @@ import { urlToBase64 } from '@/utils/imageHelpers';
 import {
   buildBackgroundFlyerPrompt,
   buildSingleEventFlyerPrompt,
-} from '@/ai-prompts';
+} from '@/ai-prompts/flyerPrompts';
 import type { BrandProfile, GalleryImage, ImageSize, TournamentEvent } from '@/types';
 import type { GenerationJobConfig } from '@/services/apiClient';
 

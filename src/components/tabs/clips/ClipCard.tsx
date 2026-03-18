@@ -23,7 +23,7 @@ import {
   buildClipSceneImagePrompt,
   buildSoraScenePrompt,
   buildVeoScenePrompt,
-} from "@/ai-prompts";
+} from "@/ai-prompts/clipsPrompts";
 import {
   generateVideo as generateServerVideo,
   updateClipThumbnail,

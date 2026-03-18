@@ -17,7 +17,7 @@ import type {
 import { generateVideo as generateServerVideo, type ApiVideoModel, getCsrfToken, getCurrentCsrfToken, clearCsrfToken } from "./apiClient";
 import { getApiErrorMessage, parseApiResponse } from "./api/response";
 import { uploadImageToBlob } from "./blobService";
-import { buildLogoPrompt } from "@/ai-prompts";
+import { buildLogoPrompt } from "@/ai-prompts/logoPrompts";
 
 // Convert VideoModel to ApiVideoModel for server calls
 const toApiVideoModel = (model: VideoModel): ApiVideoModel => {

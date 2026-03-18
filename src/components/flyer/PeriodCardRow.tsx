@@ -12,7 +12,7 @@ import type { Currency, TimePeriod } from "@/types/flyer.types";
 import { Loader } from "../common/Loader";
 import { Icon } from "../common/Icon";
 import { generateFlyer } from "../../services/geminiService";
-import { buildDailyFlyerPromptCompact } from "@/ai-prompts";
+import { buildDailyFlyerPromptCompact } from "@/ai-prompts/flyerPrompts";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import { QuickPostModal } from "../common/QuickPostModal";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";

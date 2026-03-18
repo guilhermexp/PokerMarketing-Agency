@@ -4,7 +4,7 @@
 
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { CarouselScript } from '../../../types';
-import { updateCarouselCover, updateCarouselSlideImage } from '../../../services/api';
+import { updateCarouselCover, updateCarouselSlideImage } from '../../../services/api/campaignsApi';
 import { toCarouselScript } from '../utils';
 
 interface UpdateParams {

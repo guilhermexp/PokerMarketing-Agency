@@ -11,7 +11,7 @@ import { updateClipThumbnail } from "../../../services/apiClient";
 import { uploadImageToBlob } from "../../../services/blobService";
 import { urlToBase64 } from "../../../utils/imageHelpers";
 import { getErrorMessage } from "../../../utils/errorMessages";
-import { buildThumbnailPrompt } from "@/ai-prompts";
+import { buildThumbnailPrompt } from "@/ai-prompts/clipsPrompts";
 import { DEFAULT_CAMPAIGN_IMAGE_MODEL } from "../../../config/imageGenerationModelOptions";
 
 const CLIP_ASPECT_RATIO = "9:16" as const;

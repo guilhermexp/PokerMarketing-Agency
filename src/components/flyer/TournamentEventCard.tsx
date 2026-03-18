@@ -16,7 +16,7 @@ import { SchedulePostModal } from '@/components/calendar/SchedulePostModal';
 import { useBackgroundJobs, type ActiveJob } from '@/hooks/useBackgroundJobs';
 import { urlToBase64 } from '@/utils/imageHelpers';
 import { generateFlyer } from '@/services/geminiService';
-import { buildSingleEventFlyerPromptExtended } from '@/ai-prompts';
+import { buildSingleEventFlyerPromptExtended } from '@/ai-prompts/flyerPrompts';
 import type { BrandProfile, TournamentEvent, GalleryImage, ImageModel, ImageSize, ImageFile } from '@/types';
 import type { Currency } from '@/types/flyer.types';
 import type { InstagramContext } from '@/services/rubeService';

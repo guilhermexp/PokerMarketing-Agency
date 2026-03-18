@@ -6,7 +6,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { BrandProfile, GalleryImage, ImageFile, VideoClipScript, ChatReferenceImage, StyleReference, ImageModel } from '../../../types';
 import { generateImage } from '../../../services/geminiService';
 import { uploadImageToBlob } from '../../../services/blobService';
-import { buildCarouselSlide4x5Prompt } from '@/ai-prompts';
+import { buildCarouselSlide4x5Prompt } from '@/ai-prompts/carouselPrompts';
 import { urlToBase64 } from '../../../utils/imageHelpers';
 import {
   getCarrosselSource,

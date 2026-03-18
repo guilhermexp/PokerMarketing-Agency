@@ -223,10 +223,10 @@ const CarouselsList = lazy(() =>
   import("../campaigns/CarouselsList").then((m) => ({ default: m.CarouselsList })),
 );
 const PlaygroundView = lazy(() =>
-  import("../playground").then((m) => ({ default: m.PlaygroundView })),
+  import("../playground/PlaygroundView").then((m) => ({ default: m.PlaygroundView })),
 );
 const ImagePlaygroundPage = lazy(() =>
-  import("../image-playground").then((m) => ({
+  import("../image-playground/ImagePlaygroundPage").then((m) => ({
     default: m.ImagePlaygroundPage,
   })),
 );

@@ -9,13 +9,13 @@ import { uploadImageToBlob } from '../../../services/blobService';
 import {
   buildCarouselCampaignSlidePrompt,
   buildCarouselCoverPrompt,
-} from '@/ai-prompts';
+} from '@/ai-prompts/carouselPrompts';
 import { urlToBase64 } from '../../../utils/imageHelpers';
 import {
   updateCarouselCover,
   updateCarouselSlideImage,
   type DbCarouselScript,
-} from '../../../services/api';
+} from '../../../services/api/campaignsApi';
 import { toCarouselScript } from '../utils';
 
 interface GenerationContext {

@@ -3,7 +3,7 @@
  */
 
 import type { CarouselScript, GalleryImage } from '../../types';
-import type { DbCarouselScript } from '../../services/api';
+import type { DbCarouselScript } from '../../services/api/campaignsApi';
 import type { VideoClipScript } from '../../types';
 
 export const toCarouselScript = (db: DbCarouselScript): CarouselScript => ({
