@@ -187,8 +187,8 @@ PORT=3000
 # Instalar dependências
 npm install
 
-# Ou com bun (recomendado)
-bun install
+# Instalação padrão
+npm install
 ```
 
 ---
@@ -198,12 +198,12 @@ bun install
 ```json
 {
   "scripts": {
-    "dev": "concurrently -n api,vite \"bun run dev:api\" \"vite\"",
-    "dev:api": "node server/dev-api.mjs",
+    "dev": "concurrently -n api,vite \"npm run dev:api\" \"vite\"",
+    "dev:api": "node --import tsx server/dev-api.ts",
     "dev:vite": "vite",
     "build": "vite build",
-    "start": "node server/index.mjs",
-    "typecheck": "tsc --noEmit"
+    "start": "node --import tsx server/index.ts",
+    "typecheck": "tsc --noEmit && tsc -p server --noEmit"
   }
 }
 ```

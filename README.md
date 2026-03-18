@@ -61,19 +61,17 @@ A aplicação é um Single Page Application (SPA) construído com as seguintes t
 
 ## 🏁 Como Começar
 
-Para rodar esta aplicação, o ambiente de execução precisa ter a seguinte variável de ambiente configurada:
+Para rodar esta aplicação, o ambiente de execução precisa ter as variáveis de ambiente do backend configuradas em `.env`, com destaque para:
 
-- `API_KEY`: Sua chave de API do Google AI Studio para acessar os modelos Gemini.
+- `GEMINI_API_KEY`: Sua chave de API do Google AI Studio para acessar os modelos Gemini.
+- `DATABASE_URL`: conexão com PostgreSQL.
+- `BETTER_AUTH_SECRET` e `CSRF_SECRET`: segredos do backend.
 
-A chave da API da Fal.ai para o modelo Bytedance está atualmente hardcoded em `src/services/geminiService.ts`, mas idealmente também seria gerenciada via variáveis de ambiente.
-
-A aplicação utiliza um `importmap` em `index.html` para carregar as dependências (React, @google/genai, etc.) diretamente de um CDN, simplificando o processo de build.
-
-### Dev com Bun
+### Dev com npm
 
 ```sh
-bun install
-bun run dev
+npm install
+npm run dev
 ```
 
 ### Migrar imagens base64 da galeria
