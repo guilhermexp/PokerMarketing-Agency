@@ -404,24 +404,25 @@ Automação de criação de conteúdo visual e textual para marketing de poker u
 ### Runtime Health Check — 2026-03-18
 
 > Ambiente testado: `npm run dev` em `http://localhost:3002`
-> Observação: não havia `E2E_TEST_EMAIL` nem `E2E_TEST_PASSWORD` carregados no ambiente, então os endpoints protegidos foram validados apenas quanto ao guard de autenticação.
+> Frontend validado via Chrome CDP na aba autenticada `http://localhost:3010/campaign`
+> Observação: os `curl`/requests sem sessão ou sem `user_id` geraram falsos negativos. A matriz abaixo prioriza o resultado real obtido a partir da sessão autenticada do navegador.
 
 | # | Feature | Request real | Resultado | Shape verificado | Status | Notas |
 |---|---------|--------------|-----------|------------------|--------|-------|
 | 1 | Auth Init / CSRF | `GET /api/csrf-token` | `200` | Envelope `{ data, error, meta }`, `data.csrfToken`, header `X-CSRF-Token`, cookie `csrf_token` | 🟢 OK | Endpoint público respondeu corretamente e emitiu token/cookie |
-| 2 | Campaign List | `GET /api/db/campaigns` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Guard de auth funcionou; sem usuário E2E não foi possível listar campanhas |
-| 3 | Gallery List | `GET /api/db/gallery` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Endpoint protegido corretamente |
-| 4 | Image Generation | `POST /api/ai/image` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Feature core não pôde ser validada sem sessão |
-| 5 | Image Playground Topics | `GET /api/image-playground/topics` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Proteção consistente |
-| 6 | Brand Profiles | `GET /api/db/brand-profiles` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Proteção consistente |
-| 7 | Scheduled Posts | `GET /api/db/scheduled-posts` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Endpoint protegido corretamente |
-| 8 | Admin Stats | `GET /api/admin/stats` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Sem sessão não chegou ao check de super admin; não houve `403` |
+| 2 | Campaign List | `GET /api/db/campaigns?user_id=<authUserId>` | `200` | `{ data: [], error: null, meta: null }` | 🟡 PARCIAL | Endpoint funciona com sessão + `user_id`, mas a conta testada não tem campanhas |
+| 3 | Gallery List | `GET /api/db/gallery?user_id=<authUserId>` | `200` | `{ data: [], error: null, meta: null }` | 🟡 PARCIAL | Endpoint funciona, mas retornou galeria vazia |
+| 4 | Image Generation | `POST /api/ai/image` com `brandProfile: {}` | `200` | `{ data: { success, imageUrl, model }, error: null, meta: null }` | 🟢 OK | Geração concluiu e retornou URL pública em Blob |
+| 5 | Image Playground Topics | `GET /api/image-playground/topics` | `200` | `{ data: { topics }, error: null, meta: null }` | 🟢 OK | Tópicos existentes retornaram dados reais |
+| 6 | Brand Profiles | `GET /api/db/brand-profiles?user_id=<authUserId>` | `200` | `{ data: null, error: null, meta: null }` | 🟡 PARCIAL | Endpoint funciona, mas o usuário testado não tem brand profile configurado |
+| 7 | Scheduled Posts | `GET /api/db/scheduled-posts?user_id=<authUserId>` | `200` | `{ data: [], error: null, meta: null }` | 🟡 PARCIAL | Endpoint funciona, mas sem posts agendados para validar payload real |
+| 8 | Admin Stats | `GET /api/admin/stats` | `403` | `{ data: null, error: { message }, meta: null }` | 🟢 OK | Com sessão autenticada de usuário comum, o guard de super admin respondeu corretamente |
 | 9 | Health Check | `GET /health` | `200` | Envelope `{ data, error, meta }` com `data.status = "ok"` | 🟢 OK | Startup validado e rota pública saudável |
-| 10 | DB Health | `GET /api/db/health` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Health do banco existe, mas está atrás de auth |
-| 11 | Upload | `POST /api/upload` multipart | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Upload bloqueado corretamente sem sessão |
-| 12 | Video Playground Topics | `GET /api/video-playground/topics` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Proteção consistente |
-| 13 | Tournament Schedules | `GET /api/db/tournaments/list` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Proteção consistente |
-| 14 | Init Data | `GET /api/db/init` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Não foi possível validar preload inicial |
+| 10 | DB Health | `GET /api/db/health` | `200` | `{ data: { status, timestamp }, error: null, meta: null }` | 🟢 OK | Banco respondeu como `healthy` na sessão autenticada |
+| 11 | Upload | `POST /api/upload` multipart | `200` para PNG válido; `400` para `.txt` | `{ data: { success, url, filename, size }, error: null, meta: null }` | 🟢 OK | Upload funciona para MIME aceito e rejeita `text/plain` com erro claro |
+| 12 | Video Playground Topics | `GET /api/video-playground/topics` | `200` | `{ data: { topics: [] }, error: null, meta: null }` | 🟡 PARCIAL | Endpoint funciona, mas sem tópicos para validar listagem real |
+| 13 | Tournament Schedules | `GET /api/db/tournaments/list?user_id=<authUserId>` | `200` | `{ data: { schedules: [] }, error: null, meta: null }` | 🟡 PARCIAL | Contrato correto, mas sem schedules na conta testada |
+| 14 | Init Data | `GET /api/db/init?clerk_user_id=<authUserId>` | `200` | `{ data: { brandProfile, gallery, scheduledPosts, campaigns, ... }, error: null, meta: null }` | 🟡 PARCIAL | Shape correto, porém todos os coletores vieram vazios/nulos |
 | 15 | Runtime Infra | Boot do `npm run dev` | Server sobe; DB aquece; Redis indisponível | Logs reais de startup | 🟡 PARCIAL | App sobe sem crash, mas `scheduled posts` ficam em polling e a fila async de imagem fica desativada |
 
 ---
@@ -429,7 +430,7 @@ Automação de criação de conteúdo visual e textual para marketing de poker u
 ## 4. Issues Funcionais
 
 ### P0 — Core Quebrado
-**Nenhum P0 confirmado neste check.** O app subiu sem crash e os guards públicos/de autenticação responderam como esperado, mas as features core autenticadas não puderam ser executadas end-to-end.
+**Nenhum P0 confirmado neste check.** O app sobe, autentica, gera imagem e faz upload com arquivo aceito.
 
 ### P1 — Importante (Atenção)
 
@@ -439,16 +440,16 @@ Automação de criação de conteúdo visual e textual para marketing de poker u
 | P1-2 | Baseline antigo sobre `src/components/tabs/clips/ClipCard.tsx` ficou obsoleto: o arquivo hoje é um barrel de 4 linhas | Frontend | O “componente gigante” não existe mais nesse path | Remover esse item como debt funcional aberto |
 | P1-3 | Baseline antigo sobre `src/services/apiClient.ts` ficou obsoleto: o arquivo hoje tem 111 linhas e faz re-export modular | Frontend | O problema de arquivo monolítico foi substancialmente resolvido | Manter a API modular e evitar regressão para barrel inchado |
 | P1-4 | O item “66+ usos de any” também ficou desatualizado: no código de app/servidor fora de testes restou 1 uso explícito justificado em `server/lib/agent/claude/tool-registry.ts` | Frontend/Backend | Debt de type safety caiu muito, mas não zerou | Encerrar o issue antigo e decidir se esse `any` residual será removido ou documentado como exceção |
-| P1-5 | Não há credenciais E2E (`E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`) carregadas no ambiente | QA/Auth | Bloqueia validação real das features core autenticadas | Provisionar usuário E2E estável e repetir o health check autenticado |
+| P1-5 | Vários endpoints autenticados ainda exigem `user_id`/`clerk_user_id` explícito no contrato e retornam `400 Validation failed` quando ele não é enviado | API/Auth | Request “natural” com sessão válida pode falhar mesmo autenticado | Reduzir dependência de `user_id` vindo do client ou inferir da sessão no backend |
 | P1-6 | Redis indisponível no boot; app entra em fallback para polling e desliga fila async de imagem | Infra | Degrada scheduled posts e qualquer fluxo que dependa de fila | Subir Redis no ambiente de QA/dev antes da próxima bateria |
 
 ### P2 — Edge Cases
 
 | # | Issue | Área | Impacto | Ação |
 |---|-------|------|---------|------|
-| P2-1 | `GET /api/db/health` está atrás de autenticação | Infra/Observability | Monitor externo sem sessão não consegue validar banco | Decidir se isso é intencional ou se deve existir um DB health público/sintético |
-| P2-2 | `GET /api/admin/stats` retornou `401` sem sessão, então neste check não foi possível confirmar o comportamento esperado `403` para usuário autenticado não-admin | Admin/Auth | Cobertura parcial do caso de permissão | Repetir com usuário comum e com super admin |
-| P2-3 | O envelope de resposta está consistente (`data/error/meta`) inclusive em erro | API | Ponto positivo, mas precisa ser validado também nos fluxos 200 autenticados | Revalidar após provisionar credenciais E2E |
+| P2-1 | A conta autenticada usada no navegador está vazia em campanhas, galeria, scheduled posts, torneios e brand profile | Produto/QA | Vários endpoints responderam `200`, mas sem massa real para validar comportamento completo | Criar seed de QA com dados representativos |
+| P2-2 | `POST /api/upload` rejeita corretamente `text/plain`; o exemplo de teste com `.txt` mede validação, não sucesso funcional de upload | API/QA | Pode gerar interpretação errada do health check | Trocar o fixture padrão para um PNG/JPG mínimo quando a meta for validar sucesso |
+| P2-3 | O envelope de resposta está consistente (`data/error/meta`) tanto em sucesso quanto em erro | API | Ponto positivo, mas ainda precisa ser observado com datasets mais ricos | Repetir o check com seed populado |
 
 ### P3 — Cosmético / Debt
 
@@ -469,11 +470,11 @@ Automação de criação de conteúdo visual e textual para marketing de poker u
 
 ## 6. Parecer do Agente
 
-O app sobe de verdade, conecta no banco, responde em `http://localhost:3002` e expõe um `GET /health` saudável. O endpoint público de CSRF também funciona corretamente, com envelope consistente, header `X-CSRF-Token` e cookie `csrf_token`.
+O app sobe de verdade, conecta no banco, responde em `http://localhost:3002` e expõe `GET /health`, `GET /api/db/health` e `GET /api/csrf-token` saudáveis. Pela sessão autenticada já aberta no Chrome em `http://localhost:3010/campaign`, foi possível validar o comportamento real do usuário comum sem depender de credenciais E2E nas envs.
 
-O problema do baseline anterior é que ele tratava presença de handler como evidência de feature funcionando. Neste check isso não se sustentou. Sem `E2E_TEST_EMAIL` e `E2E_TEST_PASSWORD`, todas as features core protegidas por sessão ficaram inacessíveis com `401 Authentication required`, então não existe evidência runtime suficiente para afirmar que campanhas, gallery, image generation, upload, init data ou tópicos de playground estejam funcionais end-to-end.
+O resultado mudou bastante em relação ao primeiro passe: campanhas, gallery, scheduled posts, tournaments e init data responderam `200` quando chamados com `user_id` ou `clerk_user_id`; image generation e upload também responderam `200` com payload válido; e `admin/stats` retornou `403`, o que confirma corretamente a proteção de super admin. O principal problema funcional encontrado não é auth, e sim contrato: vários endpoints autenticados ainda exigem `user_id` explícito, então uma request com sessão válida mas sem esse parâmetro cai em `400 Validation failed`.
 
-Há ainda um ponto de degradação de ambiente: o boot registrou Redis indisponível, então scheduled posts operam em fallback por polling e a fila assíncrona de imagem não entra no modo nominal. Veredicto honesto: o servidor está saudável para subir e proteger recursos, mas o produto ainda não está funcionalmente comprovado em runtime. A próxima rodada precisa de usuário E2E válido e Redis ativo.
+Há ainda um ponto claro de degradação de ambiente: o boot registrou Redis indisponível, então scheduled posts operam em fallback por polling e a fila assíncrona de imagem não entra no modo nominal. Veredicto honesto: o app está funcional em runtime para os fluxos básicos testados, mas segue em estado `🟡` porque a conta usada está quase vazia e a infraestrutura de fila não está no modo normal.
 
 ---
 
@@ -513,19 +514,19 @@ mindmap
     Publico 🟢
       Health 🟢
       CSRF token 🟢
-    Protegido por Auth ⚫
-      Campaign list ⚫
-      Gallery list ⚫
-      Image generation ⚫
-      Image playground topics ⚫
-      Brand profiles ⚫
-      Scheduled posts ⚫
-      Admin stats ⚫
-      DB health ⚫
-      Upload ⚫
-      Video playground topics ⚫
-      Tournament schedules ⚫
-      Init data ⚫
+    Dados e recursos
+      Campaign list 🟡
+      Gallery list 🟡
+      Brand profiles 🟡
+      Scheduled posts 🟡
+      Tournament schedules 🟡
+      Init data 🟡
+      Video playground topics 🟡
+      Image playground topics 🟢
+      Image generation 🟢
+      Upload 🟢
+      Admin stats 🟢
+      DB health 🟢
     Infra 🟡
       Server sobe 🟢
       Banco responde no boot 🟢
@@ -541,6 +542,7 @@ flowchart LR
   U[Usuário real] --> FE[Frontend Vite + React]
   FE -->|cookies + X-CSRF-Token| BE[Express API]
   BE --> MW[Auth guard + CSRF + envelope data/error/meta]
+  MW --> PARAMS[user_id ou clerk_user_id em vários endpoints]
   MW --> DB[(PostgreSQL / Neon)]
   MW --> AUTH[Better Auth]
   MW --> BLOB[Vercel Blob]
