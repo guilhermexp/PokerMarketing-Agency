@@ -1,9 +1,16 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Logger } from "pino";
 import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import { buildStudioToolDefinitions } from './tool-registry.js';
+import type { SqlClient } from '../../db.js';
 
-export function createStudioMcpServer({ sql, userId, organizationId, logger }) {
+type StudioMcpServerInput = {
+  logger: Logger;
+  organizationId: string | null;
+  sql: SqlClient;
+  userId: string;
+};
+
+export function createStudioMcpServer({ sql, userId, organizationId, logger }: StudioMcpServerInput) {
   const tools = buildStudioToolDefinitions({ sql, userId, organizationId, logger });
 
   return createSdkMcpServer({

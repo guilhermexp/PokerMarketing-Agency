@@ -45,9 +45,9 @@ export interface ListGalleryParams {
   user_id?: string;
   organization_id?: string | null;
   source?: string;
-  limit?: string;
-  offset?: string;
-  include_src?: string;
+  limit?: string | number;
+  offset?: string | number;
+  include_src?: string | boolean;
 }
 
 export async function listGallery({
@@ -68,14 +68,14 @@ export async function listGallery({
     return [];
   }
 
-  const limitNum = Number.parseInt(limit ?? "50", 10) || 50;
-  const offsetNum = Number.parseInt(offset ?? "0", 10) || 0;
+  const limitNum = Number.parseInt(String(limit ?? "50"), 10) || 50;
+  const offsetNum = Number.parseInt(String(offset ?? "0"), 10) || 0;
 
   if (organization_id) {
     await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
     if (source) {
-      return include_src === "true"
+      return include_src === true || include_src === "true"
         ? (await sql`
             SELECT *
             FROM gallery_images
@@ -98,7 +98,7 @@ export async function listGallery({
           `) as GalleryImage[];
     }
 
-    return include_src === "true"
+    return include_src === true || include_src === "true"
       ? (await sql`
           SELECT *
           FROM gallery_images
@@ -120,7 +120,7 @@ export async function listGallery({
   }
 
   if (source) {
-    return include_src === "true"
+    return include_src === true || include_src === "true"
       ? (await sql`
           SELECT *
           FROM gallery_images
@@ -145,7 +145,7 @@ export async function listGallery({
         `) as GalleryImage[];
   }
 
-  return include_src === "true"
+  return include_src === true || include_src === "true"
     ? (await sql`
         SELECT *
         FROM gallery_images

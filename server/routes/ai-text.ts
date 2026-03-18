@@ -1,5 +1,3 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * AI Text Generation Routes
  * Extracted from server/index.mjs
@@ -11,6 +9,7 @@
  *   POST /api/ai/convert-prompt
  */
 
+import type { Application, Request, Response } from "express";
 import { getRequestAuthContext } from "../lib/auth.js";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.js";
@@ -45,11 +44,110 @@ import {
 import { validateContentType } from "../lib/validation/contentType.js";
 import logger from "../lib/logger.js";
 
-export function registerAiTextRoutes(app) {
+// ============================================================================
+// TYPES
+// ============================================================================
+
+/** Base64-encoded image data */
+interface ImageData {
+  base64: string;
+  mimeType: string;
+}
+
+/** Brand profile for AI generation */
+interface BrandProfile {
+  name?: string;
+  description?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  toneOfVoice?: string;
+  creativeModel?: string;
+  [key: string]: unknown;
+}
+
+/** Composition asset for flyers */
+interface CompositionAsset {
+  base64: string;
+  mimeType: string;
+}
+
+/** Text part for Gemini API */
+interface TextPart {
+  text: string;
+}
+
+/** Inline data part for Gemini API */
+interface InlineDataPart {
+  inlineData: {
+    data: string;
+    mimeType: string;
+  };
+}
+
+/** Union type for Gemini content parts */
+type ContentPart = TextPart | InlineDataPart;
+
+/** Type guard for TextPart */
+function isTextPart(part: ContentPart): part is TextPart {
+  return "text" in part;
+}
+
+/** Type guard for InlineDataPart */
+function isInlineDataPart(part: ContentPart): part is InlineDataPart {
+  return "inlineData" in part;
+}
+
+// ============================================================================
+// REQUEST BODY INTERFACES
+// ============================================================================
+
+/** Request body for /api/ai/flyer */
+interface FlyerRequestBody {
+  prompt: string;
+  brandProfile: BrandProfile;
+  logo?: ImageData;
+  referenceImage?: ImageData;
+  aspectRatio?: string;
+  collabLogo?: ImageData;
+  collabLogos?: ImageData[];
+  imageSize?: string;
+  compositionAssets?: CompositionAsset[];
+}
+
+/** Request body for /api/ai/text */
+interface TextRequestBody {
+  type?: string;
+  brandProfile: BrandProfile;
+  context?: string;
+  systemPrompt?: string;
+  userPrompt?: string;
+  image?: ImageData;
+  temperature?: number;
+  responseSchema?: Record<string, unknown>;
+}
+
+/** Request body for /api/ai/enhance-prompt */
+interface EnhancePromptRequestBody {
+  prompt: string;
+  brandProfile?: BrandProfile;
+}
+
+/** Request body for /api/ai/convert-prompt */
+interface ConvertPromptRequestBody {
+  prompt: string;
+  duration?: number;
+  aspectRatio?: string;
+}
+
+// ============================================================================
+// ROUTES
+// ============================================================================
+
+export function registerAiTextRoutes(app: Application): void {
   // -------------------------------------------------------------------------
   // POST /api/ai/flyer
   // -------------------------------------------------------------------------
-  app.post("/api/ai/flyer", async (req, res) => {
+  app.post("/api/ai/flyer", async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
@@ -66,7 +164,7 @@ export function registerAiTextRoutes(app) {
         collabLogos, // Frontend sends array
         imageSize = "1K",
         compositionAssets,
-      } = req.body;
+      } = req.body as FlyerRequestBody;
 
       // Support both singular and array format for collab logos
       const collabLogo =
@@ -90,7 +188,7 @@ export function registerAiTextRoutes(app) {
       // const ai = getGeminiAi(); // Gemini image temporarily disabled
       const brandingInstruction = buildFlyerPrompt(brandProfile);
 
-      const parts = [
+      const parts: ContentPart[] = [
         { text: brandingInstruction },
         { text: `DADOS DO FLYER PARA INSERIR NA ARTE:\n${prompt}` },
       ];
@@ -212,7 +310,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
       }
 
       if (compositionAssets) {
-        compositionAssets.forEach((asset, i) => {
+        compositionAssets.forEach((asset: CompositionAsset, i: number) => {
           parts.push({ text: `Ativo de composição ${i + 1}:` });
           parts.push({
             inlineData: { data: asset.base64, mimeType: asset.mimeType },
@@ -222,13 +320,13 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
 
       // Build text prompt (combine all text parts)
       const textPrompt = parts
-        .filter((p) => p.text)
+        .filter(isTextPart)
         .map((p) => p.text)
         .join("\n\n");
 
       // Collect image inputs (logos, reference images)
       const imageInputs = parts
-        .filter((p) => p.inlineData)
+        .filter(isInlineDataPart)
         .map((p) => ({
           base64: p.inlineData.data,
           mimeType: p.inlineData.mimeType,
@@ -339,7 +437,8 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         imageUrl: imageDataUrl,
       });
     } catch (error) {
-      logger.error({ err: error }, "[Flyer API] Error");
+      const err = error as Error;
+      logger.error({ err }, "[Flyer API] Error");
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/flyer",
@@ -347,8 +446,8 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         model: DEFAULT_IMAGE_MODEL,
         latencyMs: timer(),
         status: "failed",
-        error: error.message,
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       return res
         .status(500)
         .json({ error: sanitizeErrorForClient(error) });
@@ -358,7 +457,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
   // -------------------------------------------------------------------------
   // POST /api/ai/text
   // -------------------------------------------------------------------------
-  app.post("/api/ai/text", async (req, res) => {
+  app.post("/api/ai/text", async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
@@ -374,7 +473,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         image,
         temperature = 0.7,
         responseSchema,
-      } = req.body;
+      } = req.body as TextRequestBody;
 
       if (!brandProfile) {
         return res.status(400).json({ error: "brandProfile is required" });
@@ -396,7 +495,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         }
 
         const prompt = buildQuickPostPrompt(brandProfile, context);
-        const parts = [{ text: prompt }];
+        const parts: ContentPart[] = [{ text: prompt }];
         if (image) {
           parts.push({
             inlineData: {
@@ -418,7 +517,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
           });
         }
 
-        const parts = [];
+        const parts: ContentPart[] = [];
         if (userPrompt) {
           parts.push({ text: userPrompt });
         }
@@ -462,16 +561,18 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         model,
       });
     } catch (error) {
-      logger.error({ err: error }, "[Text API] Error");
+      const err = error as Error;
+      const body = req.body as TextRequestBody | undefined;
+      logger.error({ err }, "[Text API] Error");
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/text",
         operation: "text",
-        model: req.body?.brandProfile?.creativeModel || DEFAULT_TEXT_MODEL,
+        model: body?.brandProfile?.creativeModel || DEFAULT_TEXT_MODEL,
         latencyMs: timer(),
         status: "failed",
-        error: error.message,
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       return res
         .status(500)
         .json({ error: sanitizeErrorForClient(error) });
@@ -481,7 +582,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
   // -------------------------------------------------------------------------
   // POST /api/ai/enhance-prompt
   // -------------------------------------------------------------------------
-  app.post("/api/ai/enhance-prompt", async (req, res) => {
+  app.post("/api/ai/enhance-prompt", async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
@@ -489,7 +590,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
     const sql = getSql();
 
     try {
-      const { prompt, brandProfile } = req.body;
+      const { prompt, brandProfile } = req.body as EnhancePromptRequestBody;
 
       if (!prompt || !prompt.trim()) {
         return res.status(400).json({ error: "prompt is required" });
@@ -594,7 +695,8 @@ REGRAS:
 
       res.json({ enhancedPrompt });
     } catch (error) {
-      logger.error({ err: error }, "[Enhance Prompt API] Error");
+      const err = error as Error;
+      logger.error({ err }, "[Enhance Prompt API] Error");
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/enhance-prompt",
@@ -602,8 +704,8 @@ REGRAS:
         model: DEFAULT_FAST_TEXT_MODEL,
         latencyMs: timer(),
         status: "failed",
-        error: error.message,
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       return res
         .status(500)
         .json({ error: sanitizeErrorForClient(error) });
@@ -613,14 +715,14 @@ REGRAS:
   // -------------------------------------------------------------------------
   // POST /api/ai/convert-prompt
   // -------------------------------------------------------------------------
-  app.post("/api/ai/convert-prompt", async (req, res) => {
+  app.post("/api/ai/convert-prompt", async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
-      const { prompt, duration = 5, aspectRatio = "16:9" } = req.body;
+      const { prompt, duration = 5, aspectRatio = "16:9" } = req.body as ConvertPromptRequestBody;
 
       if (!prompt) {
         return res.status(400).json({ error: "prompt is required" });
@@ -677,7 +779,8 @@ REGRAS:
         result,
       });
     } catch (error) {
-      logger.error({ err: error }, "[Convert Prompt API] Error");
+      const err = error as Error;
+      logger.error({ err }, "[Convert Prompt API] Error");
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/convert-prompt",
@@ -685,8 +788,8 @@ REGRAS:
         model: DEFAULT_FAST_TEXT_MODEL,
         latencyMs: timer(),
         status: "failed",
-        error: error.message,
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       return res
         .status(500)
         .json({ error: sanitizeErrorForClient(error) });

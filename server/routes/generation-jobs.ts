@@ -1,12 +1,22 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express } from "express";
 import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
 import { logError } from "../lib/logging-helpers.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
+import { validateRequest } from "../middleware/validate.js";
+import {
+  type GenerationCancelAllBody,
+  type GenerationStatusQuery,
+  generationCancelAllBodySchema,
+  generationStatusQuerySchema,
+} from "../schemas/generation-jobs-schemas.js";
 
-export function registerGenerationJobRoutes(app) {
-app.post("/api/generate/queue", async (req, res) => {
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+export function registerGenerationJobRoutes(app: Express): void {
+app.post("/api/generate/queue", async (_req, res) => {
   return res.status(503).json({
     error:
       "Background job queue is disabled. Use synchronous image generation.",
@@ -14,7 +24,7 @@ app.post("/api/generate/queue", async (req, res) => {
   });
 });
 
-app.get("/api/generate/status", async (req, res) => {
+app.get("/api/generate/status", validateRequest({ query: generationStatusQuerySchema }), async (req, res) => {
   try {
     const sql = getSql();
     const {
@@ -23,7 +33,7 @@ app.get("/api/generate/status", async (req, res) => {
       organizationId,
       status: filterStatus,
       limit,
-    } = req.query;
+    } = req.query as GenerationStatusQuery;
 
     // Single job query
     if (jobId) {
@@ -143,23 +153,17 @@ app.get("/api/generate/status", async (req, res) => {
 
       return res.json({ jobs, total: jobs.length });
     }
-
-    return res.status(400).json({ error: "jobId or userId is required" });
   } catch (error) {
-    logError("Generate Status", error);
+    logError("Generate Status", toError(error));
     res.status(500).json({ error: sanitizeErrorForClient(error) });
   }
 });
 
 // Cancel all pending/queued jobs for a user
-app.post("/api/generate/cancel-all", async (req, res) => {
+app.post("/api/generate/cancel-all", validateRequest({ body: generationCancelAllBodySchema }), async (req, res) => {
   try {
     const sql = getSql();
-    const { userId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: "userId is required" });
-    }
+    const { userId } = req.body as GenerationCancelAllBody;
 
     // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, userId);
@@ -183,7 +187,7 @@ app.post("/api/generate/cancel-all", async (req, res) => {
       message: `${cancelledCount} job(s) cancelled`,
     });
   } catch (error) {
-    logError("Cancel All Jobs API", error);
+    logError("Cancel All Jobs API", toError(error));
     res.status(500).json({ error: sanitizeErrorForClient(error) });
   }
 });

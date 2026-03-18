@@ -1,31 +1,62 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
-function stripMcpPrefix(toolName = '') {
-  if (typeof toolName !== 'string') return toolName;
+type SdkToolUseBlock = {
+  id?: string;
+  input?: Record<string, unknown>;
+  name?: string;
+  type?: string;
+};
+
+type SdkStreamEvent = {
+  content_block?: SdkToolUseBlock;
+  delta?: {
+    text?: string;
+    type?: string;
+  };
+  type?: string;
+};
+
+type SdkMessage = {
+  error?: string;
+  errors?: unknown;
+  event?: SdkStreamEvent;
+  is_error?: boolean;
+  message?: {
+    content?: SdkToolUseBlock[];
+  };
+  result?: unknown;
+  session_id?: string | null;
+  status?: string;
+  subtype?: string;
+  tool_name?: string;
+  tool_use_id?: string;
+  type?: string;
+  usage?: unknown;
+};
+
+type StudioEvent =
+  | { type: 'text_delta'; content: string; sessionId: string | null }
+  | { type: 'tool_started'; tool_call_id?: string; tool_name: string; arguments: Record<string, unknown>; sessionId: string | null }
+  | { type: 'status'; status?: string; tool_call_id?: string; tool_name?: string; elapsed_seconds?: number; sessionId: string | null }
+  | { type: 'response_end'; is_error: boolean; subtype?: string; result: unknown; errors: unknown; usage: unknown; sessionId: string | null }
+  | { type: 'error'; error: string; sessionId: string | null };
+
+function stripMcpPrefix(toolName = ''): string {
+  if (typeof toolName !== 'string') return '';
   return toolName.replace(/^mcp__[^_]+__/, '');
 }
 
-function safeString(value) {
-  if (typeof value === 'string') return value;
-  if (value == null) return '';
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
-export function translateSdkMessage(message) {
-  const events = [];
+export function translateSdkMessage(message: unknown): StudioEvent[] {
+  const events: StudioEvent[] = [];
 
   if (!message || typeof message !== 'object') {
     return events;
   }
 
-  const sessionId = message.session_id || null;
+  const sdkMessage = message as SdkMessage;
 
-  if (message.type === 'stream_event') {
-    const evt = message.event;
+  const sessionId = sdkMessage.session_id || null;
+
+  if (sdkMessage.type === 'stream_event') {
+    const evt = sdkMessage.event;
     const evtType = evt?.type;
 
     if (evtType === 'content_block_delta' && evt?.delta?.type === 'text_delta') {
@@ -47,9 +78,9 @@ export function translateSdkMessage(message) {
     return events;
   }
 
-  if (message.type === 'assistant') {
-    const contentBlocks = Array.isArray(message.message?.content)
-      ? message.message.content
+  if (sdkMessage.type === 'assistant') {
+    const contentBlocks = Array.isArray(sdkMessage.message?.content)
+      ? sdkMessage.message.content
       : [];
 
     for (const block of contentBlocks) {
@@ -70,38 +101,40 @@ export function translateSdkMessage(message) {
     return events;
   }
 
-  if (message.type === 'tool_progress') {
+  if (sdkMessage.type === 'tool_progress') {
     events.push({
       type: 'status',
       status: 'tool_progress',
-      tool_call_id: message.tool_use_id,
-      tool_name: stripMcpPrefix(message.tool_name),
-      elapsed_seconds: message.elapsed_time_seconds,
+      tool_call_id: sdkMessage.tool_use_id,
+      tool_name: stripMcpPrefix(sdkMessage.tool_name),
+      elapsed_seconds: typeof (sdkMessage as Record<string, unknown>).elapsed_time_seconds === 'number'
+        ? ((sdkMessage as Record<string, unknown>).elapsed_time_seconds as number)
+        : undefined,
       sessionId,
     });
     return events;
   }
 
-  if (message.type === 'system' && message.subtype === 'status') {
-    events.push({ type: 'status', status: message.status, sessionId });
+  if (sdkMessage.type === 'system' && sdkMessage.subtype === 'status') {
+    events.push({ type: 'status', status: sdkMessage.status, sessionId });
     return events;
   }
 
-  if (message.type === 'result') {
+  if (sdkMessage.type === 'result') {
     events.push({
       type: 'response_end',
-      is_error: Boolean(message.is_error),
-      subtype: message.subtype,
-      result: message.result || null,
-      errors: message.errors || null,
-      usage: message.usage || null,
+      is_error: Boolean(sdkMessage.is_error),
+      subtype: sdkMessage.subtype,
+      result: sdkMessage.result || null,
+      errors: sdkMessage.errors || null,
+      usage: sdkMessage.usage || null,
       sessionId,
     });
     return events;
   }
 
-  if (message.type === 'auth_status' && message.error) {
-    events.push({ type: 'error', error: message.error, sessionId });
+  if (sdkMessage.type === 'auth_status' && sdkMessage.error) {
+    events.push({ type: 'error', error: sdkMessage.error, sessionId });
   }
 
   return events;

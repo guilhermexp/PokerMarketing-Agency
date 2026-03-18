@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express } from "express";
 import {
   ValidationError,
   NotFoundError,
@@ -18,19 +17,34 @@ import {
 } from "../services/brand-profiles-service.js";
 import { validateRequest } from "../middleware/validate.js";
 import {
+  type BrandProfileCreateBody,
+  type BrandProfileQuery,
+  type BrandProfileUpdateBody,
+  type BrandProfileUpdateQuery,
   brandProfileQuerySchema,
   brandProfileCreateBodySchema,
   brandProfileUpdateQuerySchema,
   brandProfileUpdateBodySchema,
 } from "../schemas/brand-profiles-schemas.js";
 
-export function registerBrandProfileRoutes(app) {
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function toDatabaseError(message: string, error: unknown): DatabaseError {
+  if (error instanceof Error) {
+    return new DatabaseError(message, error);
+  }
+  return new DatabaseError(message);
+}
+
+export function registerBrandProfileRoutes(app: Express): void {
   app.get(
     "/api/db/brand-profiles",
     validateRequest({ query: brandProfileQuerySchema }),
     async (req, res) => {
     try {
-      const result = await getBrandProfile(req.query);
+      const result = await getBrandProfile(req.query as BrandProfileQuery);
       return res.json(result);
     } catch (error) {
       if (
@@ -40,7 +54,7 @@ export function registerBrandProfileRoutes(app) {
       ) {
         throw error;
       }
-      throw new DatabaseError("Failed to fetch brand profile", error);
+      throw toDatabaseError("Failed to fetch brand profile", error);
     }
     },
   );
@@ -50,7 +64,7 @@ export function registerBrandProfileRoutes(app) {
     validateRequest({ body: brandProfileCreateBodySchema }),
     async (req, res) => {
     try {
-      const result = await createBrandProfile(req.body);
+      const result = await createBrandProfile(req.body as BrandProfileCreateBody);
       res.status(201).json(result);
     } catch (error) {
       if (
@@ -61,7 +75,7 @@ export function registerBrandProfileRoutes(app) {
       ) {
         throw error;
       }
-      throw new DatabaseError("Failed to create brand profile", error);
+      throw toDatabaseError("Failed to create brand profile", error);
     }
     },
   );
@@ -74,7 +88,9 @@ export function registerBrandProfileRoutes(app) {
     }),
     async (req, res) => {
     try {
-      const result = await updateBrandProfile(req.query.id, req.body);
+      const { id } = req.query as BrandProfileUpdateQuery;
+      const body = req.body as BrandProfileUpdateBody;
+      const result = await updateBrandProfile(id, body);
       res.json(result);
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -89,7 +105,7 @@ export function registerBrandProfileRoutes(app) {
       ) {
         return res.status(403).json({ error: error.message });
       }
-      logError("Brand Profiles API", error);
+      logError("Brand Profiles API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
     },

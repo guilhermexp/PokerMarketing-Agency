@@ -1,5 +1,3 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * AI Image Generation Routes
  * Extracted from server/index.mjs
@@ -10,6 +8,7 @@
  *   POST /api/ai/extract-colors
  */
 
+import type { Application, Request, Response } from "express";
 import { getRequestAuthContext } from "../lib/auth.js";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.js";
@@ -22,6 +21,7 @@ import { generateTextFromMessages } from "../lib/ai/text-generation.js";
 import {
   generateImageWithFallback,
   DEFAULT_IMAGE_MODEL,
+  type ImageReference,
 } from "../lib/ai/image-generation.js";
 import { runWithProviderFallback } from "../lib/ai/image-providers.js";
 import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.js";
@@ -43,6 +43,13 @@ import {
   getUserImageGenerationJobs,
   cancelImageGenerationJob,
 } from "../helpers/job-queue.js";
+import type {
+  AiImageBody,
+  AiEditImageBody,
+  AiExtractColorsBody,
+  AiImageAsyncBody,
+  AiImageAsyncBatchBody,
+} from "../schemas/ai-schemas.js";
 
 const SUPPORTED_IMAGE_MODELS = new Set([
   "gemini-3-pro-image-preview",
@@ -57,7 +64,7 @@ const SUPPORTED_IMAGE_MODELS = new Set([
   "google/nano-banana-pro",
 ]);
 
-function normalizeRequestedImageModel(model) {
+function normalizeRequestedImageModel(model: unknown): string {
   if (typeof model !== "string") return DEFAULT_IMAGE_MODEL;
   const normalized = model.trim().toLowerCase();
   if (!SUPPORTED_IMAGE_MODELS.has(normalized)) {
@@ -78,11 +85,11 @@ function normalizeRequestedImageModel(model) {
   return normalized;
 }
 
-export function registerAiImageRoutes(app) {
+export function registerAiImageRoutes(app: Application): void {
   // -------------------------------------------------------------------------
   // POST /api/ai/image
   // -------------------------------------------------------------------------
-  app.post("/api/ai/image", async (req, res) => {
+  app.post("/api/ai/image", async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
@@ -96,6 +103,7 @@ export function registerAiImageRoutes(app) {
     );
 
     try {
+      const body = req.body as AiImageBody;
       const {
         prompt,
         brandProfile,
@@ -105,7 +113,7 @@ export function registerAiImageRoutes(app) {
         productImages,
         styleReferenceImage,
         personReferenceImage,
-      } = req.body;
+      } = body;
       const model = normalizeRequestedImageModel(requestedModel);
       selectedModelForLogs = model;
 
@@ -128,7 +136,7 @@ export function registerAiImageRoutes(app) {
 
       if (!prompt || !brandProfile) {
         logger.error(
-          "[Image API] ❌ Validação falhou: prompt ou brandProfile ausente",
+          "[Image API] Validacao falhou: prompt ou brandProfile ausente",
         );
         return res
           .status(400)
@@ -136,7 +144,7 @@ export function registerAiImageRoutes(app) {
       }
 
       // Prepare product images array, including brand logo if available
-      let allProductImages = productImages ? [...productImages] : [];
+      const allProductImages: ImageReference[] = productImages ? [...productImages] : [];
 
       // Auto-include brand logo as reference if it's an HTTP URL
       // (Frontend handles data URLs, server handles HTTP URLs)
@@ -155,8 +163,9 @@ export function registerAiImageRoutes(app) {
             allProductImages.unshift({ base64: logoBase64, mimeType });
           }
         } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
           logger.warn(
-            { errorMessage: err.message },
+            { errorMessage },
             "[Image API] Failed to include brand logo",
           );
         }
@@ -327,14 +336,15 @@ export function registerAiImageRoutes(app) {
       });
     } catch (error) {
       const elapsedTime = timer();
+      const err = error instanceof Error ? error : new Error(String(error));
       logger.error(
         {
-          err: error,
+          err,
           elapsedTime,
-          errorType: error.constructor.name,
-          stack: error.stack,
+          errorType: err.constructor.name,
+          stack: err.stack,
         },
-        `[Image API] ❌ ERRO após ${elapsedTime}ms`,
+        `[Image API] ERRO apos ${elapsedTime}ms`,
       );
 
       await logAiUsage(sql, {
@@ -344,29 +354,30 @@ export function registerAiImageRoutes(app) {
         model: selectedModelForLogs,
         latencyMs: elapsedTime,
         status: "failed",
-        error: error.message,
+        error: err.message,
       }).catch((logError) => {
         logger.error({ err: logError }, "[Image API] Falha ao logar erro no DB");
       });
 
-      const statusCode = isQuotaOrRateLimitError(error) ? 429 : 500;
+      const statusCode = isQuotaOrRateLimitError(err) ? 429 : 500;
       return res
         .status(statusCode)
-        .json({ error: sanitizeErrorForClient(error, "Falha ao gerar imagem. Tente novamente.") });
+        .json({ error: sanitizeErrorForClient(err, "Falha ao gerar imagem. Tente novamente.") });
     }
   });
 
   // -------------------------------------------------------------------------
   // POST /api/ai/edit-image
   // -------------------------------------------------------------------------
-  app.post("/api/ai/edit-image", async (req, res) => {
+  app.post("/api/ai/edit-image", async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
-      const { image, prompt, mask, referenceImage } = req.body;
+      const body = req.body as AiEditImageBody;
+      const { image, prompt, mask, referenceImage } = body;
 
       if (!image || !prompt) {
         return res.status(400).json({ error: "image and prompt are required" });
@@ -374,9 +385,9 @@ export function registerAiImageRoutes(app) {
 
       logger.info(
         {
-          imageSize: image?.base64?.length,
-          mimeType: image?.mimeType,
-          promptLength: prompt?.length,
+          imageSize: image.base64?.length,
+          mimeType: image.mimeType,
+          promptLength: prompt.length,
           hasMask: !!mask,
           hasReference: !!referenceImage,
         },
@@ -388,7 +399,7 @@ export function registerAiImageRoutes(app) {
       // Validate and clean base64 data
       let cleanBase64 = image.base64;
       if (cleanBase64.startsWith("data:")) {
-        cleanBase64 = cleanBase64.split(",")[1];
+        cleanBase64 = cleanBase64.split(",")[1] ?? cleanBase64;
       }
       if (cleanBase64.length % 4 !== 0) {
         cleanBase64 = cleanBase64.padEnd(
@@ -448,7 +459,8 @@ export function registerAiImageRoutes(app) {
         imageUrl: imageDataUrl,
       });
     } catch (error) {
-      logger.error({ err: error }, "[Edit Image API] Error");
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err }, "[Edit Image API] Error");
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/edit-image",
@@ -456,26 +468,27 @@ export function registerAiImageRoutes(app) {
         model: "gemini-3-pro-image-preview",
         latencyMs: timer(),
         status: "failed",
-        error: error.message,
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
-      const statusCode = isQuotaOrRateLimitError(error) ? 429 : 500;
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
+      const statusCode = isQuotaOrRateLimitError(err) ? 429 : 500;
       return res
         .status(statusCode)
-        .json({ error: sanitizeErrorForClient(error) });
+        .json({ error: sanitizeErrorForClient(err) });
     }
   });
 
   // -------------------------------------------------------------------------
   // POST /api/ai/extract-colors
   // -------------------------------------------------------------------------
-  app.post("/api/ai/extract-colors", async (req, res) => {
+  app.post("/api/ai/extract-colors", async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
-      const { logo } = req.body;
+      const body = req.body as AiExtractColorsBody;
+      const { logo } = body;
 
       if (!logo) {
         return res.status(400).json({ error: "logo is required" });
@@ -541,7 +554,8 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
 
       res.json(colors);
     } catch (error) {
-      logger.error({ err: error }, "[Extract Colors API] Error");
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err }, "[Extract Colors API] Error");
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/extract-colors",
@@ -549,11 +563,11 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         model: DEFAULT_TEXT_MODEL,
         latencyMs: timer(),
         status: "failed",
-        error: error.message,
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       return res
         .status(500)
-        .json({ error: sanitizeErrorForClient(error) });
+        .json({ error: sanitizeErrorForClient(err) });
     }
   });
 
@@ -564,7 +578,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
   // -------------------------------------------------------------------------
   // POST /api/ai/image/async - Queue a single image generation
   // -------------------------------------------------------------------------
-  app.post("/api/ai/image/async", async (req, res) => {
+  app.post("/api/ai/image/async", async (req: Request, res: Response) => {
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
     const organizationId = authCtx?.orgId || null;
@@ -574,6 +588,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     }
 
     try {
+      const body = req.body as AiImageAsyncBody;
       const {
         prompt,
         brandProfile,
@@ -584,7 +599,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         styleReferenceImage,
         personReferenceImage,
         priority,
-      } = req.body;
+      } = body;
 
       const model = normalizeRequestedImageModel(requestedModel);
 
@@ -616,23 +631,24 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         ...result,
       });
     } catch (error) {
-      logger.error({ err: error, userId }, "[Image Async] Failed to queue job");
-      
-      if (error.message.includes("Redis not available")) {
-        return res.status(503).json({ 
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, userId }, "[Image Async] Failed to queue job");
+
+      if (err.message.includes("Redis not available")) {
+        return res.status(503).json({
           error: "Image queue temporarily unavailable. Use /api/ai/image for synchronous generation.",
-          useSyncEndpoint: true 
+          useSyncEndpoint: true
         });
       }
-      
-      return res.status(500).json({ error: sanitizeErrorForClient(error) });
+
+      return res.status(500).json({ error: sanitizeErrorForClient(err) });
     }
   });
 
   // -------------------------------------------------------------------------
   // POST /api/ai/image/async/batch - Queue multiple images
   // -------------------------------------------------------------------------
-  app.post("/api/ai/image/async/batch", async (req, res) => {
+  app.post("/api/ai/image/async/batch", async (req: Request, res: Response) => {
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
     const organizationId = authCtx?.orgId || null;
@@ -642,7 +658,8 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     }
 
     try {
-      const { jobs, priority } = req.body;
+      const body = req.body as AiImageAsyncBatchBody;
+      const { jobs, priority } = body;
 
       if (!Array.isArray(jobs) || jobs.length === 0) {
         return res.status(400).json({ error: "jobs array is required" });
@@ -675,23 +692,24 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         jobs: results,
       });
     } catch (error) {
-      logger.error({ err: error, userId }, "[Image Async] Failed to queue batch");
-      
-      if (error.message.includes("Redis not available")) {
-        return res.status(503).json({ 
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, userId }, "[Image Async] Failed to queue batch");
+
+      if (err.message.includes("Redis not available")) {
+        return res.status(503).json({
           error: "Image queue temporarily unavailable. Use /api/ai/image for synchronous generation.",
-          useSyncEndpoint: true 
+          useSyncEndpoint: true
         });
       }
-      
-      return res.status(500).json({ error: sanitizeErrorForClient(error) });
+
+      return res.status(500).json({ error: sanitizeErrorForClient(err) });
     }
   });
 
   // -------------------------------------------------------------------------
   // GET /api/ai/image/async/status/:jobId - Check job status
   // -------------------------------------------------------------------------
-  app.get("/api/ai/image/async/status/:jobId", async (req, res) => {
+  app.get("/api/ai/image/async/status/:jobId", async (req: Request, res: Response) => {
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
 
@@ -714,15 +732,16 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
 
       res.json(status);
     } catch (error) {
-      logger.error({ err: error, userId }, "[Image Async] Failed to get status");
-      return res.status(500).json({ error: sanitizeErrorForClient(error) });
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, userId }, "[Image Async] Failed to get status");
+      return res.status(500).json({ error: sanitizeErrorForClient(err) });
     }
   });
 
   // -------------------------------------------------------------------------
   // GET /api/ai/image/async/jobs - List user's jobs
   // -------------------------------------------------------------------------
-  app.get("/api/ai/image/async/jobs", async (req, res) => {
+  app.get("/api/ai/image/async/jobs", async (req: Request, res: Response) => {
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
     const organizationId = authCtx?.orgId || null;
@@ -732,20 +751,23 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     }
 
     try {
-      const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
+      const limitParam = req.query.limit;
+      const limitValue = typeof limitParam === "string" ? parseInt(limitParam, 10) : 20;
+      const limit = Math.min(isNaN(limitValue) ? 20 : limitValue, 100);
       const jobs = await getUserImageGenerationJobs(userId, organizationId, limit);
 
       res.json({ jobs });
     } catch (error) {
-      logger.error({ err: error, userId }, "[Image Async] Failed to list jobs");
-      return res.status(500).json({ error: sanitizeErrorForClient(error) });
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, userId }, "[Image Async] Failed to list jobs");
+      return res.status(500).json({ error: sanitizeErrorForClient(err) });
     }
   });
 
   // -------------------------------------------------------------------------
   // DELETE /api/ai/image/async/cancel/:jobId - Cancel a job
   // -------------------------------------------------------------------------
-  app.delete("/api/ai/image/async/cancel/:jobId", async (req, res) => {
+  app.delete("/api/ai/image/async/cancel/:jobId", async (req: Request, res: Response) => {
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
 
@@ -755,7 +777,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
 
     try {
       const { jobId } = req.params;
-      
+
       // Verify ownership first
       const status = await getImageGenerationJobStatus(jobId);
       if (!status) {
@@ -773,8 +795,9 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         res.status(400).json({ success: false, message: "Job already completed or failed" });
       }
     } catch (error) {
-      logger.error({ err: error, userId }, "[Image Async] Failed to cancel job");
-      return res.status(500).json({ error: sanitizeErrorForClient(error) });
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, userId }, "[Image Async] Failed to cancel job");
+      return res.status(500).json({ error: sanitizeErrorForClient(err) });
     }
   });
 }

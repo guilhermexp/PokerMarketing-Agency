@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express } from "express";
 /**
  * AI Speech Generation (TTS) Route
  * Extracted from server/index.mjs
@@ -16,20 +15,18 @@ import {
   createTimer,
 } from "../helpers/usage-tracking.js";
 import logger from "../lib/logger.js";
+import { validateRequest } from "../middleware/validate.js";
+import { type AiSpeechBody, aiSpeechBodySchema } from "../schemas/ai-schemas.js";
 
-export function registerAiSpeechRoutes(app) {
-  app.post("/api/ai/speech", async (req, res) => {
+export function registerAiSpeechRoutes(app: Express): void {
+  app.post("/api/ai/speech", validateRequest({ body: aiSpeechBodySchema }), async (req, res) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
     const sql = getSql();
 
     try {
-      const { script, voiceName = "Orus" } = req.body;
-
-      if (!script) {
-        return res.status(400).json({ error: "script is required" });
-      }
+      const { script, voiceName = "Orus" } = req.body as AiSpeechBody;
 
       logger.info({}, "[Speech API] Generating speech");
 
@@ -81,8 +78,8 @@ export function registerAiSpeechRoutes(app) {
         operation: "speech",
         model: "gemini-2.5-flash-preview-tts",
         latencyMs: timer(),
-        status: "failed",
-        error: error.message,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
       }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
       return res
         .status(500)

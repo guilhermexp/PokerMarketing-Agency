@@ -1,5 +1,3 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * Server entrypoint (dev + production).
  *
@@ -13,15 +11,43 @@ import "dotenv/config";
 import { validateEnv } from "./lib/env.js";
 import path from "path";
 import { fileURLToPath } from "url";
-import express from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import app, { finalizeApp } from "./app.js";
 import logger from "./lib/logger.js";
 import { DATABASE_URL, getSql, warmupDatabase, ensureGallerySourceType } from "./lib/db.js";
 import { initializeScheduledPostsChecker, waitForRedis, initializeImageGenerationWorker, registerImageGenerationProcessor } from "./helpers/job-queue.js";
 import { checkAndPublishScheduledPosts, publishScheduledPostById } from "./helpers/scheduled-publisher.js";
-import { generateImageWithFallback } from "./lib/ai/image-generation.js";
+import { generateImageWithFallback, type ImageReference } from "./lib/ai/image-generation.js";
+import type { FallbackResult } from "./lib/ai/image-providers.js";
+import type { BrandProfile } from "./lib/ai/prompt-builders.js";
 import { put } from "@vercel/blob";
 import { validateContentType } from "./lib/validation/contentType.js";
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface ImageGenerationJobData {
+  userId: string;
+  organizationId: string;
+  prompt: string;
+  brandProfile: BrandProfile | null;
+  aspectRatio: string;
+  imageSize: string;
+  model: string;
+  productImages?: ImageReference[];
+  styleReferenceImage?: ImageReference;
+  personReferenceImage?: ImageReference;
+}
+
+interface ImageGenerationResult {
+  imageUrl: string | undefined;
+  usedProvider: string;
+  usedModel: string;
+  usedFallback: boolean;
+}
+
+type ProgressCallback = (progress: number) => void;
 
 validateEnv();
 
@@ -31,18 +57,18 @@ validateEnv();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-function isTransientRedisError(error) {
-  const msg = error?.message || "";
+function isTransientRedisError(error: unknown): boolean {
+  const msg = (error instanceof Error ? error.message : "") || "";
   return msg.includes("ECONNRESET") || msg.includes("ECONNREFUSED") || msg.includes("Connection is closed");
 }
 
-process.on("uncaughtException", (error) => {
+process.on("uncaughtException", (error: Error) => {
   if (isTransientRedisError(error)) return; // Redis is optional — ignore
   logger.fatal({ err: error }, "Uncaught exception in Production API");
   process.exit(1);
 });
 
-process.on("unhandledRejection", (error) => {
+process.on("unhandledRejection", (error: unknown) => {
   if (isTransientRedisError(error)) return; // Redis is optional — ignore
   logger.fatal({ err: error }, "Unhandled rejection in Production API");
   process.exit(1);
@@ -56,7 +82,7 @@ logger.info({ distPath }, "[Static] Serving static files");
 app.use(express.static(distPath));
 
 // SPA catch-all (must come after static files but before error handlers)
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   if (req.path.startsWith("/api/") || req.path.includes(".")) {
     return next();
   }
@@ -104,7 +130,7 @@ const startup = async () => {
     // Initialize image generation worker
     try {
       // Register the processor function
-      registerImageGenerationProcessor(async (jobData, progressCallback) => {
+      registerImageGenerationProcessor(async (jobData: ImageGenerationJobData, progressCallback: ProgressCallback): Promise<ImageGenerationResult> => {
         const {
           prompt,
           brandProfile,

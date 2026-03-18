@@ -1,9 +1,46 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
-import { getSql } from '../../db.js';
+import { getSql, type SqlClient } from '../../db.js';
 
-function normalizeOrgId(orgId) {
+type NullableOrgId = string | null | undefined;
+
+type ThreadIdentityInput = {
+  organizationId?: NullableOrgId;
+  threadId?: string;
+  topicId?: string;
+  userId: string;
+};
+
+type ThreadKeyInput = {
+  organizationId?: NullableOrgId;
+  studioType: string;
+  topicId: string;
+  userId: string;
+};
+
+type SessionUpdateInput = {
+  sessionId: string | null;
+  threadId: string;
+};
+
+type ThreadMessageInput = {
+  payload: unknown;
+  role: string;
+  threadId: string;
+};
+
+type ListMessagesInput = {
+  limit?: number;
+  threadId: string;
+};
+
+type StudioAgentThreadRow = Record<string, unknown>;
+type StudioAgentMessageRow = Record<string, unknown>;
+
+function normalizeOrgId(orgId: NullableOrgId): string | null {
   return orgId || null;
+}
+
+function getThreadStoreSql(): SqlClient {
+  return getSql();
 }
 
 export async function getThreadByTopic({
@@ -11,8 +48,8 @@ export async function getThreadByTopic({
   organizationId,
   studioType,
   topicId,
-}) {
-  const sql = getSql();
+}: ThreadKeyInput): Promise<StudioAgentThreadRow | null> {
+  const sql = getThreadStoreSql();
   const orgId = normalizeOrgId(organizationId);
 
   const rows = await sql`
@@ -25,7 +62,7 @@ export async function getThreadByTopic({
     LIMIT 1
   `;
 
-  return rows[0] || null;
+  return (rows[0] as StudioAgentThreadRow | undefined) || null;
 }
 
 export async function ensureThread({
@@ -33,8 +70,8 @@ export async function ensureThread({
   organizationId,
   studioType,
   topicId,
-}) {
-  const sql = getSql();
+}: ThreadKeyInput): Promise<StudioAgentThreadRow | null> {
+  const sql = getThreadStoreSql();
   const orgId = normalizeOrgId(organizationId);
 
   const [row] = await sql`
@@ -59,11 +96,15 @@ export async function ensureThread({
     RETURNING *
   `;
 
-  return row;
+  return (row as StudioAgentThreadRow | undefined) || null;
 }
 
-export async function getThreadById({ threadId, userId, organizationId }) {
-  const sql = getSql();
+export async function getThreadById({
+  threadId,
+  userId,
+  organizationId,
+}: Required<Pick<ThreadIdentityInput, "threadId" | "userId">> & Pick<ThreadIdentityInput, "organizationId">): Promise<StudioAgentThreadRow | null> {
+  const sql = getThreadStoreSql();
   const orgId = normalizeOrgId(organizationId);
 
   const rows = await sql`
@@ -75,11 +116,11 @@ export async function getThreadById({ threadId, userId, organizationId }) {
     LIMIT 1
   `;
 
-  return rows[0] || null;
+  return (rows[0] as StudioAgentThreadRow | undefined) || null;
 }
 
-export async function updateThreadSessionId({ threadId, sessionId }) {
-  const sql = getSql();
+export async function updateThreadSessionId({ threadId, sessionId }: SessionUpdateInput): Promise<void> {
+  const sql = getThreadStoreSql();
 
   await sql`
     UPDATE studio_agent_threads
@@ -90,8 +131,8 @@ export async function updateThreadSessionId({ threadId, sessionId }) {
   `;
 }
 
-export async function appendThreadMessage({ threadId, role, payload }) {
-  const sql = getSql();
+export async function appendThreadMessage({ threadId, role, payload }: ThreadMessageInput): Promise<void> {
+  const sql = getThreadStoreSql();
 
   await sql`
     INSERT INTO studio_agent_messages (thread_id, role, payload_json)
@@ -105,8 +146,8 @@ export async function appendThreadMessage({ threadId, role, payload }) {
   `;
 }
 
-export async function listThreadMessages({ threadId, limit = 200 }) {
-  const sql = getSql();
+export async function listThreadMessages({ threadId, limit = 200 }: ListMessagesInput): Promise<StudioAgentMessageRow[]> {
+  const sql = getThreadStoreSql();
   const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(limit, 500)) : 200;
 
   const rows = await sql`
@@ -117,11 +158,15 @@ export async function listThreadMessages({ threadId, limit = 200 }) {
     LIMIT ${safeLimit}
   `;
 
-  return rows;
+  return rows as StudioAgentMessageRow[];
 }
 
-export async function resetThread({ threadId, userId, organizationId }) {
-  const sql = getSql();
+export async function resetThread({
+  threadId,
+  userId,
+  organizationId,
+}: Required<Pick<ThreadIdentityInput, "threadId" | "userId">> & Pick<ThreadIdentityInput, "organizationId">): Promise<void> {
+  const sql = getThreadStoreSql();
   const orgId = normalizeOrgId(organizationId);
 
   await sql`

@@ -1,10 +1,8 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * Dev API bootstrap.
  *
- * Keeps the existing `bun run dev:api` and `bun run dev:api:debug` commands
- * while delegating to the unified server implementation in `index.mjs`.
+ * Keeps the existing `npm run dev:api` and `npm run dev:api:debug` commands
+ * while delegating to the unified server implementation in `index.ts`.
  */
 
 import "./index.js";

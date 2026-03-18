@@ -9,7 +9,9 @@
 import { createUIMessageStream, streamText, smoothStream, convertToModelMessages } from 'ai';
 import { google } from '@ai-sdk/google';
 import { systemPrompt } from '../../lib/ai/prompts.js';
-import { createImageTool, editImageTool, createLogoTool } from '../../lib/ai/tools/index.js';
+import { createImageTool } from '../../lib/ai/tools/create-image.js';
+import { editImageTool } from '../../lib/ai/tools/edit-image.js';
+import { createLogoTool } from '../../lib/ai/tools/create-logo.js';
 import { validateChatRequest } from './schema.js';
 import { getRequestAuthContext } from '../../lib/auth.js';
 

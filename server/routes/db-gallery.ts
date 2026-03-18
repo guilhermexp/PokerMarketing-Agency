@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express } from "express";
 import {
   ValidationError,
   NotFoundError,
@@ -20,6 +19,12 @@ import {
   deleteGalleryImageRecord,
 } from "../services/gallery-service.js";
 import {
+  type GalleryCreateBody,
+  type GalleryDeleteQuery,
+  type GalleryDailyFlyersQuery,
+  type GalleryListQuery,
+  type GalleryPatchBody,
+  type GalleryPatchQuery,
   galleryListQuerySchema,
   galleryDailyFlyersQuerySchema,
   galleryCreateBodySchema,
@@ -28,10 +33,21 @@ import {
   galleryDeleteQuerySchema,
 } from "../schemas/gallery-schemas.js";
 
-export function registerGalleryRoutes(app) {
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function toDatabaseError(message: string, error: unknown): DatabaseError {
+  if (error instanceof Error) {
+    return new DatabaseError(message, error);
+  }
+  return new DatabaseError(message);
+}
+
+export function registerGalleryRoutes(app: Express): void {
   app.get("/api/db/gallery", validateRequest({ query: galleryListQuerySchema }), async (req, res) => {
     try {
-      const result = await listGallery(req.query);
+      const result = await listGallery(req.query as GalleryListQuery);
       res.json(result);
     } catch (error) {
       if (
@@ -40,7 +56,7 @@ export function registerGalleryRoutes(app) {
       ) {
         throw error;
       }
-      throw new DatabaseError("Failed to fetch gallery images", error);
+      throw toDatabaseError("Failed to fetch gallery images", error);
     }
   });
 
@@ -49,7 +65,7 @@ export function registerGalleryRoutes(app) {
     validateRequest({ query: galleryDailyFlyersQuerySchema }),
     async (req, res) => {
     try {
-      const result = await listDailyFlyers(req.query);
+      const result = await listDailyFlyers(req.query as GalleryDailyFlyersQuery);
       res.json(result);
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -58,7 +74,7 @@ export function registerGalleryRoutes(app) {
       if (error instanceof OrganizationAccessError) {
         return res.status(403).json({ error: error.message });
       }
-      logError("Gallery Daily Flyers API GET", error);
+      logError("Gallery Daily Flyers API GET", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
     },
@@ -66,7 +82,7 @@ export function registerGalleryRoutes(app) {
 
   app.post("/api/db/gallery", validateRequest({ body: galleryCreateBodySchema }), async (req, res) => {
     try {
-      const result = await createGalleryImage(req.body);
+      const result = await createGalleryImage(req.body as GalleryCreateBody);
       res.status(201).json(result);
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -78,7 +94,7 @@ export function registerGalleryRoutes(app) {
       ) {
         return res.status(403).json({ error: error.message });
       }
-      logError("Gallery API POST", error);
+      logError("Gallery API POST", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
@@ -91,7 +107,13 @@ export function registerGalleryRoutes(app) {
     }),
     async (req, res) => {
     try {
-      const result = await updateGalleryImageRecord(req.query.id, req.body);
+      const { id } = req.query as GalleryPatchQuery;
+      const body = req.body as GalleryPatchBody;
+      const result = await updateGalleryImageRecord(id, {
+        ...body,
+        src_url: body.src_url ?? undefined,
+        style_reference_name: body.style_reference_name ?? undefined,
+      });
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -100,7 +122,7 @@ export function registerGalleryRoutes(app) {
       if (error instanceof NotFoundError) {
         return res.status(404).json({ error: "Gallery image not found" });
       }
-      logError("Gallery API PATCH", error);
+      logError("Gallery API PATCH", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
     },
@@ -111,7 +133,8 @@ export function registerGalleryRoutes(app) {
     validateRequest({ query: galleryDeleteQuerySchema }),
     async (req, res) => {
     try {
-      await deleteGalleryImageRecord(req.query.id, req.query.user_id);
+      const { id, user_id } = req.query as GalleryDeleteQuery;
+      await deleteGalleryImageRecord(id, user_id);
       res.status(204).end();
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -126,7 +149,7 @@ export function registerGalleryRoutes(app) {
       ) {
         return res.status(403).json({ error: error.message });
       }
-      logError("Gallery API", error);
+      logError("Gallery API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
     },

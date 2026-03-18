@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express } from "express";
 import {
   ValidationError,
   NotFoundError,
@@ -23,6 +22,18 @@ import {
 } from "../services/campaigns-service.js";
 import { validateRequest } from "../middleware/validate.js";
 import {
+  type CampaignCreateBody,
+  type CampaignScenePatchBody,
+  type CampaignScenePatchQuery,
+  type CampaignsClipPatchBody,
+  type CampaignsClipPatchQuery,
+  type CampaignsDeleteQuery,
+  type CampaignsQuery,
+  type CarouselPatchBody,
+  type CarouselPatchQuery,
+  type CarouselSlidePatchBody,
+  type CarouselSlidePatchQuery,
+  type CarouselsQuery,
   campaignsQuerySchema,
   campaignCreateBodySchema,
   campaignsDeleteQuerySchema,
@@ -37,10 +48,21 @@ import {
   carouselSlidePatchBodySchema,
 } from "../schemas/campaigns-schemas.js";
 
-export function registerCampaignRoutes(app) {
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function toDatabaseError(message: string, error: unknown): DatabaseError {
+  if (error instanceof Error) {
+    return new DatabaseError(message, error);
+  }
+  return new DatabaseError(message);
+}
+
+export function registerCampaignRoutes(app: Express): void {
   app.get("/api/db/campaigns", validateRequest({ query: campaignsQuerySchema }), async (req, res) => {
     try {
-      const result = await getCampaigns(req.query);
+      const result = await getCampaigns(req.query as CampaignsQuery);
       return res.status(200).json(result);
     } catch (error) {
       if (
@@ -49,13 +71,27 @@ export function registerCampaignRoutes(app) {
       ) {
         throw error;
       }
-      throw new DatabaseError("Failed to fetch campaigns", error);
+      throw toDatabaseError("Failed to fetch campaigns", error);
     }
   });
 
   app.post("/api/db/campaigns", validateRequest({ body: campaignCreateBodySchema }), async (req, res) => {
     try {
-      const result = await createCampaign(req.body);
+      const body = req.body as CampaignCreateBody;
+      const result = await createCampaign({
+        ...body,
+        posts: body.posts?.map((post) => ({
+          ...post,
+          hashtags: Array.isArray(post.hashtags)
+            ? post.hashtags
+            : typeof post.hashtags === "string"
+              ? post.hashtags
+                  .split(/[,\s]+/)
+                  .map((tag) => tag.trim())
+                  .filter(Boolean)
+              : undefined,
+        })),
+      });
       res.status(201).json(result);
     } catch (error) {
       if (
@@ -66,13 +102,14 @@ export function registerCampaignRoutes(app) {
       ) {
         throw error;
       }
-      throw new DatabaseError("Failed to create campaign", error);
+      throw toDatabaseError("Failed to create campaign", error);
     }
   });
 
   app.delete("/api/db/campaigns", validateRequest({ query: campaignsDeleteQuerySchema }), async (req, res) => {
     try {
-      const result = await deleteCampaign(req.query.id, req.query.user_id);
+      const { id, user_id } = req.query as CampaignsDeleteQuery;
+      const result = await deleteCampaign(id, user_id);
       res.status(200).json(result);
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -87,7 +124,7 @@ export function registerCampaignRoutes(app) {
       ) {
         return res.status(403).json({ error: error.message });
       }
-      logError("Campaigns API", error);
+      logError("Campaigns API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
@@ -100,9 +137,11 @@ export function registerCampaignRoutes(app) {
     }),
     async (req, res) => {
     try {
+      const { clip_id } = req.query as CampaignsClipPatchQuery;
+      const { thumbnail_url } = req.body as CampaignsClipPatchBody;
       const result = await updateCampaignClipThumbnail(
-        req.query.clip_id,
-        req.body.thumbnail_url,
+        clip_id,
+        thumbnail_url ?? null,
       );
       res.json(result);
     } catch (error) {
@@ -112,7 +151,7 @@ export function registerCampaignRoutes(app) {
       if (error instanceof NotFoundError) {
         return res.status(404).json({ error: "Clip not found" });
       }
-      logError("Campaigns API (PATCH clip)", error);
+      logError("Campaigns API (PATCH clip)", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
     },
@@ -126,10 +165,12 @@ export function registerCampaignRoutes(app) {
     }),
     async (req, res) => {
     try {
+      const { clip_id, scene_number } = req.query as CampaignScenePatchQuery;
+      const { image_url } = req.body as CampaignScenePatchBody;
       const result = await updateCampaignSceneImage(
-        req.query.clip_id,
-        req.query.scene_number,
-        req.body.image_url,
+        clip_id,
+        scene_number,
+        image_url ?? null,
       );
       res.json(result);
     } catch (error) {
@@ -139,7 +180,7 @@ export function registerCampaignRoutes(app) {
       if (error instanceof NotFoundError) {
         return res.status(404).json({ error: "Clip not found" });
       }
-      logError("Campaigns API (PATCH scene)", error);
+      logError("Campaigns API (PATCH scene)", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
     },
@@ -147,7 +188,7 @@ export function registerCampaignRoutes(app) {
 
   app.get("/api/db/carousels", validateRequest({ query: carouselsQuerySchema }), async (req, res) => {
     try {
-      const result = await getCarousels(req.query);
+      const result = await getCarousels(req.query as CarouselsQuery);
       res.json(result);
     } catch (error) {
       if (
@@ -158,7 +199,7 @@ export function registerCampaignRoutes(app) {
           error instanceof ValidationError ? 400 : 403,
         ).json({ error: error.message });
       }
-      logError("Carousels API (GET)", error);
+      logError("Carousels API (GET)", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
@@ -171,7 +212,9 @@ export function registerCampaignRoutes(app) {
     }),
     async (req, res) => {
     try {
-      const result = await updateCarousel(req.query.id, req.body);
+      const { id } = req.query as CarouselPatchQuery;
+      const body = req.body as CarouselPatchBody;
+      const result = await updateCarousel(id, body);
       res.json(result);
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -180,7 +223,7 @@ export function registerCampaignRoutes(app) {
       if (error instanceof NotFoundError) {
         return res.status(404).json({ error: "Carousel not found" });
       }
-      logError("Carousels API (PATCH)", error);
+      logError("Carousels API (PATCH)", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
     },
@@ -194,10 +237,12 @@ export function registerCampaignRoutes(app) {
     }),
     async (req, res) => {
     try {
+      const { carousel_id, slide_number } = req.query as CarouselSlidePatchQuery;
+      const { image_url } = req.body as CarouselSlidePatchBody;
       const result = await updateCarouselSlideImage(
-        req.query.carousel_id,
-        req.query.slide_number,
-        req.body.image_url,
+        carousel_id,
+        slide_number,
+        image_url ?? null,
       );
       res.json(result);
     } catch (error) {
@@ -207,7 +252,7 @@ export function registerCampaignRoutes(app) {
       if (error instanceof NotFoundError) {
         return res.status(404).json({ error: "Carousel not found" });
       }
-      logError("Carousels API (PATCH slide)", error);
+      logError("Carousels API (PATCH slide)", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
     },

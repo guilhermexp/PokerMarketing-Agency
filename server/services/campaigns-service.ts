@@ -138,8 +138,8 @@ export interface GetCampaignsParams {
   organization_id?: string | null;
   id?: string;
   include_content?: string;
-  limit?: string;
-  offset?: string;
+  limit?: string | number;
+  offset?: string | number;
 }
 
 export async function getCampaigns({
@@ -216,8 +216,8 @@ export async function getCampaigns({
     return [];
   }
 
-  const parsedLimit = Number.parseInt(limit ?? "", 10);
-  const parsedOffset = Number.parseInt(offset ?? "", 10);
+  const parsedLimit = Number.parseInt(String(limit ?? ""), 10);
+  const parsedOffset = Number.parseInt(String(offset ?? ""), 10);
   const hasLimit = Number.isFinite(parsedLimit) && parsedLimit > 0;
   const safeOffset =
     Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;

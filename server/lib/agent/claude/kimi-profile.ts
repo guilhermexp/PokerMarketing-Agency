@@ -1,5 +1,3 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { homedir } from 'node:os';
@@ -20,25 +18,41 @@ const ALLOWED_PROFILE_ENV_KEYS = new Set([
   'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC',
 ]);
 
-export function getKimiProfilePath() {
+type ClaudeRuntimeEnvInput = {
+  profilePath?: string;
+  sessionDir: string;
+};
+
+type ProfileJson = {
+  env?: Record<string, unknown>;
+};
+
+type StringEnvMap = Record<string, string>;
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error;
+}
+
+export function getKimiProfilePath(): string {
   return DEFAULT_KIMI_PROFILE_PATH;
 }
 
-export async function loadKimiProfileEnv(profilePath = DEFAULT_KIMI_PROFILE_PATH) {
-  let profileEnv = {};
+export async function loadKimiProfileEnv(profilePath = DEFAULT_KIMI_PROFILE_PATH): Promise<StringEnvMap> {
+  let profileEnv: Record<string, unknown> = {};
   try {
     const raw = await fs.readFile(profilePath, 'utf8');
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as ProfileJson;
     profileEnv = parsed?.env && typeof parsed.env === 'object' ? parsed.env : {};
   } catch (error) {
-    if (error?.code !== 'ENOENT') {
-      throw new Error(`Falha ao carregar profile Kimi (${profilePath}): ${error.message}`);
+    if (!isNodeError(error) || error.code !== 'ENOENT') {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Falha ao carregar profile Kimi (${profilePath}): ${message}`);
     }
     // Fallback explícito para env do processo quando profile não existir.
     profileEnv = {};
   }
 
-  const filteredEnv = {};
+  const filteredEnv: StringEnvMap = {};
   for (const [key, value] of Object.entries(profileEnv)) {
     if (!ALLOWED_PROFILE_ENV_KEYS.has(key)) continue;
     if (typeof value !== 'string' || !value.trim()) continue;
@@ -59,7 +73,7 @@ export async function loadKimiProfileEnv(profilePath = DEFAULT_KIMI_PROFILE_PATH
 export async function buildClaudeRuntimeEnv({
   profilePath = DEFAULT_KIMI_PROFILE_PATH,
   sessionDir,
-}) {
+}: ClaudeRuntimeEnvInput): Promise<NodeJS.ProcessEnv> {
   const profileEnv = await loadKimiProfileEnv(profilePath);
 
   return {

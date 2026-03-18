@@ -1,13 +1,26 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express } from "express";
 import { getSql } from "../lib/db.js";
 import { ValidationError, DatabaseError } from "../lib/errors/index.js";
+import { validateRequest } from "../middleware/validate.js";
+import {
+  type UsersQuery,
+  type UsersUpsertBody,
+  usersQuerySchema,
+  usersUpsertBodySchema,
+} from "../schemas/users-schemas.js";
 
-export function registerUserRoutes(app) {
-  app.get("/api/db/users", async (req, res) => {
+function toDatabaseError(error: unknown, message: string): DatabaseError {
+  if (error instanceof Error) {
+    return new DatabaseError(message, error);
+  }
+  return new DatabaseError(message);
+}
+
+export function registerUserRoutes(app: Express): void {
+  app.get("/api/db/users", validateRequest({ query: usersQuerySchema }), async (req, res) => {
     try {
       const sql = getSql();
-      const { email, id } = req.query;
+      const { email, id } = req.query as UsersQuery;
 
       if (id) {
         const result =
@@ -26,24 +39,21 @@ export function registerUserRoutes(app) {
       if (error instanceof ValidationError) {
         throw error;
       }
-      throw new DatabaseError("Failed to fetch user", error);
+      throw toDatabaseError(error, "Failed to fetch user");
     }
   });
 
-  app.post("/api/db/users", async (req, res) => {
+  app.post("/api/db/users", validateRequest({ body: usersUpsertBodySchema }), async (req, res) => {
     try {
       const sql = getSql();
       const { email, name, avatar_url, auth_provider, auth_provider_id } =
-        req.body;
-
-      if (!email || !name) {
-        throw new ValidationError("email and name are required");
-      }
+        req.body as UsersUpsertBody;
 
       const existing =
         await sql`SELECT * FROM users WHERE email = ${email} AND deleted_at IS NULL LIMIT 1`;
 
       if (existing.length > 0) {
+        const existingUser = existing[0]!;
         const updated = await sql`
           UPDATE users SET
             last_login_at = NOW(),
@@ -51,7 +61,7 @@ export function registerUserRoutes(app) {
             auth_provider = COALESCE(${auth_provider}, auth_provider),
             name = COALESCE(${name}, name),
             avatar_url = COALESCE(${avatar_url}, avatar_url)
-          WHERE id = ${existing[0].id} RETURNING *`;
+          WHERE id = ${existingUser.id} RETURNING *`;
         return res.json(updated[0]);
       }
 
@@ -66,7 +76,7 @@ export function registerUserRoutes(app) {
       if (error instanceof ValidationError) {
         throw error;
       }
-      throw new DatabaseError("Failed to create or update user", error);
+      throw toDatabaseError(error, "Failed to create or update user");
     }
   });
 }

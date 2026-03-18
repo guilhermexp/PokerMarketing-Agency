@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express } from "express";
 import {
   ValidationError,
   PermissionDeniedError,
@@ -13,14 +12,21 @@ import {
 } from "../services/upload-service.js";
 import { validateRequest } from "../middleware/validate.js";
 import {
+  type ProxyVideoQuery,
+  type UploadBody,
   proxyVideoQuerySchema,
   uploadBodySchema,
 } from "../schemas/upload-schemas.js";
 
-export function registerUploadRoutes(app) {
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+export function registerUploadRoutes(app: Express): void {
   app.get("/api/proxy-video", validateRequest({ query: proxyVideoQuerySchema }), async (req, res) => {
     try {
-      const result = await proxyBlobVideo(req.query.url, req.headers.range);
+      const { url } = req.query as ProxyVideoQuery;
+      const result = await proxyBlobVideo(url, req.headers.range);
       res.status(result.status);
       Object.entries(result.headers).forEach(([key, value]) => {
         res.setHeader(key, value);
@@ -36,20 +42,20 @@ export function registerUploadRoutes(app) {
       if (error instanceof ExternalServiceError) {
         return res.status(error.statusCode || 502).json({ error: error.message });
       }
-      logError("Video Proxy", error);
+      logError("Video Proxy", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
   app.post("/api/upload", validateRequest({ body: uploadBodySchema }), async (req, res) => {
     try {
-      const result = await uploadBase64Asset(req.body);
+      const result = await uploadBase64Asset(req.body as UploadBody);
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof ValidationError) {
         return res.status(400).json({ error: error.message });
       }
-      logError("Upload API", error);
+      logError("Upload API", toError(error));
       return res.status(500).json({
         error: sanitizeErrorForClient(error),
       });

@@ -42,7 +42,7 @@ export const galleryCreateBodySchema = z.object({
   video_script_id: optionalNullableString,
   is_style_reference: z.boolean().optional(),
   style_reference_name: optionalNullableString,
-  media_type: optionalNullableString,
+  media_type: optionalString,
   duration: z.coerce.number().nonnegative().nullable().optional(),
   week_schedule_id: optionalNullableString,
   daily_flyer_day: optionalNullableString,
@@ -58,11 +58,11 @@ export const galleryPatchQuerySchema = z.object({
 export type GalleryPatchQuery = z.infer<typeof galleryPatchQuerySchema>;
 
 export const galleryPatchBodySchema = z.object({
-  published_at: optionalNullableString,
+  published_at: z.union([z.coerce.date(), z.null()]).optional(),
   is_style_reference: z.boolean().optional(),
   style_reference_name: optionalNullableString,
   src_url: optionalNullableString,
-}).passthrough();
+});
 
 export type GalleryPatchBody = z.infer<typeof galleryPatchBodySchema>;
 

@@ -1,17 +1,31 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express } from "express";
 import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
 import { RUBE_MCP_URL, RUBE_TIMEOUT_MS } from "../lib/constants.js";
 import logger from "../lib/logger.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
+import { validateRequest } from "../middleware/validate.js";
+import {
+  type InstagramAccountsQuery,
+  type InstagramConnectBody,
+  type InstagramUpdateBody,
+  type InstagramUpdateQuery,
+  instagramAccountsQuerySchema,
+  instagramConnectBodySchema,
+  instagramUpdateBodySchema,
+  instagramUpdateQuerySchema,
+} from "../schemas/instagram-schemas.js";
 
 // ============================================================================
 // INSTAGRAM ACCOUNTS API (Multi-tenant Rube MCP)
 // ============================================================================
 
 // Validate Rube token by calling Instagram API
-export async function validateRubeToken(rubeToken) {
+type InstagramValidationResult =
+  | { success: true; instagramUserId: string; instagramUsername: string }
+  | { success: false; error: string };
+
+export async function validateRubeToken(rubeToken: string): Promise<InstagramValidationResult> {
   try {
     const request = {
       jsonrpc: "2.0",
@@ -114,16 +128,19 @@ export async function validateRubeToken(rubeToken) {
     return { success: false, error: "Instagram não conectado no Rube." };
   } catch (error) {
     logger.error({ err: error }, "[Instagram] Validation error");
-    return { success: false, error: error.message || "Erro ao validar token" };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erro ao validar token",
+    };
   }
 }
 
-export function registerInstagramRoutes(app) {
+export function registerInstagramRoutes(app: Express): void {
   // GET - List Instagram accounts
-  app.get("/api/db/instagram-accounts", async (req, res) => {
+  app.get("/api/db/instagram-accounts", validateRequest({ query: instagramAccountsQuerySchema }), async (req, res) => {
     try {
       const sql = getSql();
-      const { user_id, organization_id, id } = req.query;
+      const { user_id, organization_id, id } = req.query as InstagramAccountsQuery;
 
       if (id) {
         const result = await sql`
@@ -169,10 +186,10 @@ export function registerInstagramRoutes(app) {
   });
 
   // POST - Connect new Instagram account
-  app.post("/api/db/instagram-accounts", async (req, res) => {
+  app.post("/api/db/instagram-accounts", validateRequest({ body: instagramConnectBodySchema }), async (req, res) => {
     try {
       const sql = getSql();
-      const { user_id, organization_id, rube_token } = req.body;
+      const { user_id, organization_id, rube_token } = req.body as InstagramConnectBody;
 
       logger.info(
         { user_id, organization_id, hasToken: !!rube_token },
@@ -210,12 +227,13 @@ export function registerInstagramRoutes(app) {
       `;
 
       if (existing.length > 0) {
+        const existingAccount = existing[0]!;
         // Update existing
         const result = await sql`
           UPDATE instagram_accounts
           SET rube_token = ${rube_token}, instagram_username = ${instagramUsername},
               is_active = TRUE, connected_at = NOW(), updated_at = NOW()
-          WHERE id = ${existing[0].id}
+          WHERE id = ${existingAccount.id}
           RETURNING id, user_id, organization_id, instagram_user_id, instagram_username,
                     is_active, connected_at, last_used_at, created_at, updated_at
         `;
@@ -246,15 +264,14 @@ export function registerInstagramRoutes(app) {
   });
 
   // PUT - Update Instagram account token
-  app.put("/api/db/instagram-accounts", async (req, res) => {
+  app.put(
+    "/api/db/instagram-accounts",
+    validateRequest({ query: instagramUpdateQuerySchema, body: instagramUpdateBodySchema }),
+    async (req, res) => {
     try {
       const sql = getSql();
-      const { id } = req.query;
-      const { rube_token } = req.body;
-
-      if (!id || !rube_token) {
-        return res.status(400).json({ error: "id and rube_token are required" });
-      }
+      const { id } = req.query as InstagramUpdateQuery;
+      const { rube_token } = req.body as InstagramUpdateBody;
 
       const validation = await validateRubeToken(rube_token);
       if (!validation.success) {
@@ -279,17 +296,14 @@ export function registerInstagramRoutes(app) {
       logger.error({ err: error }, "[Instagram Accounts API] Error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
-  });
+    },
+  );
 
   // DELETE - Disconnect Instagram account (soft delete)
-  app.delete("/api/db/instagram-accounts", async (req, res) => {
+  app.delete("/api/db/instagram-accounts", validateRequest({ query: instagramUpdateQuerySchema }), async (req, res) => {
     try {
       const sql = getSql();
-      const { id } = req.query;
-
-      if (!id) {
-        return res.status(400).json({ error: "id is required" });
-      }
+      const { id } = req.query as InstagramUpdateQuery;
 
       await sql`UPDATE instagram_accounts SET is_active = FALSE, updated_at = NOW() WHERE id = ${id}`;
       res.json({ success: true, message: "Conta desconectada." });

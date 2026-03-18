@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express } from "express";
 import {
   ValidationError,
   NotFoundError,
@@ -11,6 +10,21 @@ import {
 } from "../helpers/organization-context.js";
 import { logError } from "../lib/logging-helpers.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
+import { validateRequest } from "../middleware/validate.js";
+import {
+  type ScheduledPostCreateBody,
+  type ScheduledPostDeleteQuery,
+  type ScheduledPostRetryBody,
+  type ScheduledPostUpdateBody,
+  type ScheduledPostUpdateQuery,
+  type ScheduledPostsListQuery,
+  scheduledPostCreateBodySchema,
+  scheduledPostDeleteQuerySchema,
+  scheduledPostRetryBodySchema,
+  scheduledPostUpdateBodySchema,
+  scheduledPostUpdateQuerySchema,
+  scheduledPostsListQuerySchema,
+} from "../schemas/scheduled-posts-schemas.js";
 import {
   listScheduledPosts,
   createScheduledPost,
@@ -19,10 +33,21 @@ import {
   retryScheduledPost,
 } from "../services/scheduled-posts-service.js";
 
-export function registerScheduledPostRoutes(app) {
-  app.get("/api/db/scheduled-posts", async (req, res) => {
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function toDatabaseError(message: string, error: unknown): DatabaseError {
+  if (error instanceof Error) {
+    return new DatabaseError(message, error);
+  }
+  return new DatabaseError(message);
+}
+
+export function registerScheduledPostRoutes(app: Express): void {
+  app.get("/api/db/scheduled-posts", validateRequest({ query: scheduledPostsListQuerySchema }), async (req, res) => {
     try {
-      const result = await listScheduledPosts(req.query);
+      const result = await listScheduledPosts(req.query as ScheduledPostsListQuery);
       res.json(result);
     } catch (error) {
       if (
@@ -31,13 +56,13 @@ export function registerScheduledPostRoutes(app) {
       ) {
         throw error;
       }
-      throw new DatabaseError("Failed to fetch scheduled posts", error);
+      throw toDatabaseError("Failed to fetch scheduled posts", error);
     }
   });
 
-  app.post("/api/db/scheduled-posts", async (req, res) => {
+  app.post("/api/db/scheduled-posts", validateRequest({ body: scheduledPostCreateBodySchema }), async (req, res) => {
     try {
-      const result = await createScheduledPost(req.body);
+      const result = await createScheduledPost(req.body as ScheduledPostCreateBody);
       res.status(201).json(result);
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -49,14 +74,22 @@ export function registerScheduledPostRoutes(app) {
       ) {
         return res.status(403).json({ error: error.message });
       }
-      logError("Scheduled Posts API", error);
+      logError("Scheduled Posts API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
-  app.put("/api/db/scheduled-posts", async (req, res) => {
+  app.put(
+    "/api/db/scheduled-posts",
+    validateRequest({
+      query: scheduledPostUpdateQuerySchema,
+      body: scheduledPostUpdateBodySchema,
+    }),
+    async (req, res) => {
     try {
-      const result = await updateScheduledPost(req.query.id, req.body);
+      const { id } = req.query as ScheduledPostUpdateQuery;
+      const body = req.body as ScheduledPostUpdateBody;
+      const result = await updateScheduledPost(id, body);
       res.json(result);
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -75,14 +108,16 @@ export function registerScheduledPostRoutes(app) {
       ) {
         return res.status(403).json({ error: error.message });
       }
-      logError("Scheduled Posts API", error);
+      logError("Scheduled Posts API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
-  });
+    },
+  );
 
-  app.delete("/api/db/scheduled-posts", async (req, res) => {
+  app.delete("/api/db/scheduled-posts", validateRequest({ query: scheduledPostDeleteQuerySchema }), async (req, res) => {
     try {
-      await deleteScheduledPost(req.query.id, req.query.user_id);
+      const { id, user_id } = req.query as ScheduledPostDeleteQuery;
+      await deleteScheduledPost(id, user_id);
       res.status(204).end();
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -97,14 +132,15 @@ export function registerScheduledPostRoutes(app) {
       ) {
         return res.status(403).json({ error: error.message });
       }
-      logError("Scheduled Posts API", error);
+      logError("Scheduled Posts API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
 
-  app.post("/api/db/scheduled-posts/retry", async (req, res) => {
+  app.post("/api/db/scheduled-posts/retry", validateRequest({ body: scheduledPostRetryBodySchema }), async (req, res) => {
     try {
-      const result = await retryScheduledPost(req.body.id, req.body.user_id);
+      const { id, user_id } = req.body as ScheduledPostRetryBody;
+      const result = await retryScheduledPost(id, user_id);
       res.json(result);
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -123,7 +159,7 @@ export function registerScheduledPostRoutes(app) {
       ) {
         return res.status(403).json({ error: error.message });
       }
-      logError("Scheduled Posts API", error);
+      logError("Scheduled Posts API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });

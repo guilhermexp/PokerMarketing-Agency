@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express } from "express";
 import { getSql } from "../lib/db.js";
 import { userIdCache } from "../lib/user-resolver.js";
 import { generateCsrfToken } from "../lib/csrf.js";
@@ -7,18 +6,28 @@ import { requireSuperAdmin } from "../lib/auth.js";
 import { DatabaseError } from "../lib/errors/index.js";
 import logger from "../lib/logger.js";
 
-export function registerHealthRoutes(app) {
-  app.get("/health", (req, res) => {
+function toOriginalError(error: unknown): { code?: string; message: string } | null {
+  if (error instanceof Error) {
+    const maybeCode = "code" in error && typeof error.code === "string"
+      ? { code: error.code, message: error.message }
+      : { message: error.message };
+    return maybeCode;
+  }
+  return null;
+}
+
+export function registerHealthRoutes(app: Express): void {
+  app.get("/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  app.get("/api/db/health", async (req, res) => {
+  app.get("/api/db/health", async (_req, res) => {
     try {
       const sql = getSql();
       await sql`SELECT 1`;
       res.json({ status: "healthy", timestamp: new Date().toISOString() });
     } catch (error) {
-      throw new DatabaseError("Database health check failed", error);
+      throw new DatabaseError("Database health check failed", toOriginalError(error));
     }
   });
 
@@ -52,7 +61,7 @@ export function registerHealthRoutes(app) {
   // ============================================================================
   // DEBUG: Stats endpoint to monitor database usage (super admin only)
   // ============================================================================
-  app.get("/api/db/stats", requireSuperAdmin, (req, res) => {
+  app.get("/api/db/stats", requireSuperAdmin, (_req, res) => {
     res.json({
       cachedUserIds: userIdCache.size,
       timestamp: new Date().toISOString(),
@@ -60,7 +69,7 @@ export function registerHealthRoutes(app) {
   });
 
   // Reset stats (super admin only)
-  app.post("/api/db/stats/reset", requireSuperAdmin, (req, res) => {
+  app.post("/api/db/stats/reset", requireSuperAdmin, (_req, res) => {
     userIdCache.clear();
     logger.info({}, "[STATS] Cache reset");
     res.json({ success: true, message: "Stats reset" });

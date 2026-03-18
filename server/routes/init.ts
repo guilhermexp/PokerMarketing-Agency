@@ -1,25 +1,22 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express } from "express";
 import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
 import { logError } from "../lib/logging-helpers.js";
 import logger from "../lib/logger.js";
 import { validateRequest } from "../middleware/validate.js";
-import { initQuerySchema } from "../schemas/init-schemas.js";
+import { type InitQuery, initQuerySchema } from "../schemas/init-schemas.js";
 
-export function registerInitRoutes(app) {
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+export function registerInitRoutes(app: Express): void {
   app.get("/api/db/init", validateRequest({ query: initQuerySchema }), async (req, res) => {
     const start = Date.now();
 
     try {
       const sql = getSql();
-      const { user_id, organization_id, clerk_user_id } = req.query;
-
-      if (!user_id && !clerk_user_id) {
-        return res
-          .status(400)
-          .json({ error: "user_id or clerk_user_id is required" });
-      }
+      const { user_id, organization_id, clerk_user_id } = req.query as InitQuery;
 
       // If clerk_user_id is provided explicitly, try to find/create user
       let resolvedUserId = null;
@@ -225,8 +222,8 @@ export function registerInitRoutes(app) {
         },
       });
     } catch (error) {
-      logError("Init API", error);
-      res.status(500).json({ error: error.message });
+      logError("Init API", toError(error));
+      res.status(500).json({ error: error instanceof Error ? error.message : "Init request failed" });
     }
   });
 }

@@ -1,5 +1,3 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * Express app factory.
  *
@@ -9,6 +7,7 @@
 
 import "dotenv/config";
 
+import type { Request, Response, NextFunction } from "express";
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -147,7 +146,7 @@ app.use(cookieParser());
 app.all("/api/auth/*splat", toNodeHandler(auth));
 
 // Session extraction middleware (replaces clerkMiddleware)
-app.use(async (req, _res, next) => {
+app.use(async (req: Request, _res: Response, next: NextFunction) => {
   try {
     const session = await auth.api.getSession({ headers: req.headers });
     req.authSession = session; // { session, user } or null
@@ -159,21 +158,24 @@ app.use(async (req, _res, next) => {
 
 // Internal auth bridge for server-to-server tool calls
 const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
-const getHeaderValue = (value) => (Array.isArray(value) ? value[0] : value);
+const getHeaderValue = (value: string | string[] | undefined): string | undefined =>
+  Array.isArray(value) ? value[0] : value;
 
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   const token = getHeaderValue(req.headers["x-internal-token"]);
   if (INTERNAL_API_TOKEN && token === INTERNAL_API_TOKEN) {
     const userId =
-      getHeaderValue(req.headers["x-internal-user-id"]) || req.body?.user_id;
+      getHeaderValue(req.headers["x-internal-user-id"]) ||
+      (req.body as Record<string, unknown> | undefined)?.user_id;
     const orgId =
       getHeaderValue(req.headers["x-internal-org-id"]) ||
-      req.body?.organization_id ||
+      (req.body as Record<string, unknown> | undefined)?.organization_id ||
       null;
-    if (!userId) {
-      return res.status(400).json({ error: "internal user id is required" });
+    if (!userId || typeof userId !== "string") {
+      res.status(400).json({ error: "internal user id is required" });
+      return;
     }
-    req.internalAuth = { userId, orgId };
+    req.internalAuth = { userId, orgId: typeof orgId === "string" ? orgId : null };
   }
   next();
 });

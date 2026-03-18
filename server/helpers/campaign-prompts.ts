@@ -1,12 +1,17 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+type CampaignBrandProfile = {
+  name?: string | null;
+  description?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+};
+
 export function buildCampaignPrompt(
-  brandProfile,
-  transcript,
-  quantityInstructions,
-  toneText,
+  brandProfile: CampaignBrandProfile,
+  transcript: string,
+  quantityInstructions: string,
+  toneText?: string | null,
   carouselSlidesPerCarousel = 5,
-) {
+): string {
   const narrativeStructure =
     carouselSlidesPerCarousel <= 1
       ? `5. Estrutura narrativa obrigatória:
@@ -63,7 +68,31 @@ ${narrativeStructure}
 **MISSÃO:** Gere uma campanha completa em JSON com as QUANTIDADES EXATAS especificadas. Cada image_prompt DEVE ser em PORTUGUÊS e alinhado com seu content.`;
 }
 
-export function buildQuantityInstructions(options, mode = "prod") {
+type QuantityOption = {
+  count: number;
+  generate: boolean;
+  slidesPerCarousel?: number;
+};
+
+type CampaignQuantityOptions = {
+  videoClipScripts: QuantityOption;
+  posts: {
+    instagram?: QuantityOption;
+    facebook?: QuantityOption;
+    twitter?: QuantityOption;
+    linkedin?: QuantityOption;
+  };
+  adCreatives: {
+    facebook?: QuantityOption;
+    google?: QuantityOption;
+  };
+  carousels?: QuantityOption;
+};
+
+export function buildQuantityInstructions(
+  options: CampaignQuantityOptions,
+  mode: "prod" | "dev" = "prod",
+): string {
   const quantities = [];
   const isProd = mode === "prod";
   const slidesPerCarousel = Math.max(

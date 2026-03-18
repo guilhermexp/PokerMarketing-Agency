@@ -1,5 +1,3 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * Feedback API route
  *
@@ -7,26 +5,24 @@
  * to the Notes Capture API for persistent storage.
  */
 
-import { Router } from 'express';
+import { Router, type Express } from 'express';
 import logger from '../lib/logger.js';
+import { validateRequest } from "../middleware/validate.js";
+import { type FeedbackBody, feedbackBodySchema } from "../schemas/feedback-schemas.js";
 
 const NOTES_API_URL = process.env.NOTES_API_URL || 'https://suna-api.claudedokploy.com';
 const NOTES_API_KEY = process.env.NOTES_API_KEY;
 
 const router = Router();
 
-router.post('/api/feedback', async (req, res) => {
+router.post('/api/feedback', validateRequest({ body: feedbackBodySchema }), async (req, res) => {
   try {
     if (!NOTES_API_KEY) {
       logger.error('[Feedback] Missing NOTES_API_KEY environment variable');
       return res.status(500).json({ error: 'Feedback service misconfigured' });
     }
 
-    const { markdown, pageUrl, annotations } = req.body;
-
-    if (!markdown) {
-      return res.status(400).json({ error: 'Markdown content is required' });
-    }
+    const { markdown, pageUrl, annotations } = req.body as FeedbackBody;
 
     const userId = req.internalAuth?.userId || req.authUserId || 'anonymous';
     const orgId = req.internalAuth?.orgId || req.authOrgId || null;
@@ -81,6 +77,6 @@ router.post('/api/feedback', async (req, res) => {
   }
 });
 
-export function registerFeedbackRoutes(app) {
+export function registerFeedbackRoutes(app: Express): void {
   app.use(router);
 }

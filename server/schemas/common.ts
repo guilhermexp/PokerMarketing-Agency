@@ -16,15 +16,20 @@ export const clipScriptSchema = z.object({
   hook: z.string().trim().min(1),
   image_prompt: optionalNullableString,
   audio_script: optionalNullableString,
-  scenes: z.array(z.record(z.string(), z.unknown())).optional(),
-}).passthrough();
+  scenes: z.array(z.object({
+    scene: z.number().int().nonnegative(),
+    visual: z.string().trim().min(1),
+    narration: z.string().trim().min(1),
+    image_url: optionalNullableString,
+  })).optional(),
+});
 
 export const postSchema = z.object({
   platform: z.string().trim().min(1),
   content: z.string().trim().min(1),
   hashtags: z.union([z.array(z.string()), z.string()]).optional(),
   image_prompt: optionalNullableString,
-}).passthrough();
+});
 
 export const adCreativeSchema = z.object({
   platform: z.string().trim().min(1),
@@ -32,9 +37,15 @@ export const adCreativeSchema = z.object({
   body: z.string().trim().min(1),
   cta: z.string().trim().min(1),
   image_prompt: optionalNullableString,
-}).passthrough();
+});
 
-export const carouselSlideSchema = z.record(z.string(), z.unknown());
+export const carouselSlideSchema = z.object({
+  slide: z.number().int().nonnegative(),
+  title: z.string().trim().min(1),
+  content: z.string().trim().min(1),
+  image_prompt: optionalNullableString,
+  image_url: optionalNullableString,
+});
 
 export const carouselScriptSchema = z.object({
   title: z.string().trim().min(1),
@@ -43,7 +54,7 @@ export const carouselScriptSchema = z.object({
   cover_url: optionalNullableString,
   caption: optionalNullableString,
   slides: z.array(carouselSlideSchema).optional(),
-}).passthrough();
+});
 
 // Inferred types
 export type OptionalString = z.infer<typeof optionalString>;
