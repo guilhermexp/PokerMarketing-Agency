@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Overview Page - Visão geral do painel admin
  * Design minimalista com tema dark
@@ -63,7 +64,7 @@ export function OverviewPage() {
           setTimeline(usageData.timeline || []);
         }
       } catch (err) {
-        console.error('Error fetching overview data:', err);
+        clientLogger.error('Error fetching overview data:', err);
         setError(err instanceof Error ? err.message : 'Falha ao carregar dados');
       } finally {
         setIsLoading(false);

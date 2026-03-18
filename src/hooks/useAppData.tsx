@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Centralized data fetching hook with SWR caching
  *
@@ -110,18 +111,18 @@ export function useInitialData(
 ) {
   // DEBUG: Log SWR key to identify double-fetch cause
   const swrKey = userId ? KEYS.initialData(userId, organizationId) : null;
-  console.debug("[SWR] useInitialData called with key:", swrKey);
+  clientLogger.debug("[SWR] useInitialData called with key:", swrKey);
 
   const { data, error, isLoading, mutate } = useSWR(
     swrKey,
     async () => {
-      console.debug("[SWR] Fetching all initial data via /api/db/init...");
+      clientLogger.debug("[SWR] Fetching all initial data via /api/db/init...");
       const result = await getInitialData(userId!, organizationId, clerkUserId || undefined);
 
       // Populate individual caches for optimistic updates
       // This allows individual hooks to work without re-fetching
       if (result) {
-        console.debug("[SWR] Populating individual caches from init data...");
+        clientLogger.debug("[SWR] Populating individual caches from init data...");
         globalMutate(
           KEYS.brandProfile(userId!, organizationId),
           result.brandProfile,
@@ -238,7 +239,7 @@ export function useGalleryImages(
         mutate((current) => [...(current || []), ...newImages], false);
       }
     } catch (err) {
-      console.error('[useGalleryImages] Failed to load more:', err);
+      clientLogger.error('[useGalleryImages] Failed to load more:', err);
     } finally {
       setIsLoadingMore(false);
     }
@@ -364,7 +365,7 @@ export function useCampaigns(
         mutate((current) => [...(current || []), ...moreCampaigns], false);
       }
     } catch (err) {
-      console.error("[useCampaigns] Failed to load more campaigns:", err);
+      clientLogger.error("[useCampaigns] Failed to load more campaigns:", err);
     } finally {
       setIsLoadingMore(false);
     }

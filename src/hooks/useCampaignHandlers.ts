@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Campaign Handlers Hook
  *
@@ -66,12 +67,12 @@ export function saveProductImagesToStorage(
         `productImages_${campaignId}`,
         JSON.stringify(images)
       );
-      console.debug(
+      clientLogger.debug(
         "[Campaign] Saved productImages to localStorage for campaign:",
         campaignId
       );
     } catch (e) {
-      console.warn("[Campaign] Failed to save productImages to localStorage:", e);
+      clientLogger.warn("[Campaign] Failed to save productImages to localStorage:", e);
     }
   }
 }
@@ -86,14 +87,14 @@ export function loadProductImagesFromStorage(
     const stored = localStorage.getItem(`productImages_${campaignId}`);
     if (stored) {
       const images = JSON.parse(stored);
-      console.debug(
+      clientLogger.debug(
         "[Campaign] Loaded productImages from localStorage for campaign:",
         campaignId
       );
       return images;
     }
   } catch (e) {
-    console.warn("[Campaign] Failed to load productImages from localStorage:", e);
+    clientLogger.warn("[Campaign] Failed to load productImages from localStorage:", e);
   }
   return null;
 }
@@ -160,13 +161,13 @@ export function useCampaignHandlers({
       setError(null);
       onViewChange("campaign");
       // Store product images for use in PostsTab and AdCreativesTab
-      console.debug(
+      clientLogger.debug(
         "[Campaign] Storing productImages:",
         input.productImages ? `${input.productImages.length} image(s)` : "null"
       );
       setCampaignProductImages(input.productImages);
       // Store composition assets for use in image generation
-      console.debug(
+      clientLogger.debug(
         "[Campaign] Storing compositionAssets:",
         input.compositionAssets
           ? `${input.compositionAssets.length} asset(s)`
@@ -280,7 +281,7 @@ export function useCampaignHandlers({
             // Update SWR cache for campaigns list
             swrAddCampaign(savedCampaign);
 
-            console.debug(
+            clientLogger.debug(
               "[Campaign] Saved to database with IDs:",
               savedCampaign.id,
               "clips:",
@@ -296,7 +297,7 @@ export function useCampaignHandlers({
               saveProductImagesToStorage(savedCampaign.id, input.productImages);
             }
           } catch (saveError) {
-            console.error("[Campaign] Failed to save to database:", saveError);
+            clientLogger.error("[Campaign] Failed to save to database:", saveError);
             // Continue even if save fails - campaign is still in memory
           }
         }
@@ -421,17 +422,17 @@ export function useCampaignHandlers({
   const handleLoadCampaign = useCallback(
     async (campaignId: string) => {
       if (!userId) {
-        console.error("Cannot load campaign: user not authenticated");
+        clientLogger.error("Cannot load campaign: user not authenticated");
         return;
       }
       try {
-        console.debug("[Campaign] Loading campaign:", campaignId);
+        clientLogger.debug("[Campaign] Loading campaign:", campaignId);
         const fullCampaign = await getCampaignById(
           campaignId,
           userId,
           organizationId
         );
-        console.debug("[Campaign] API response:", fullCampaign);
+        clientLogger.debug("[Campaign] API response:", fullCampaign);
 
         if (fullCampaign) {
           const toneOverride = (
@@ -494,7 +495,7 @@ export function useCampaignHandlers({
             toneOfVoiceUsed:
               toneOfVoiceUsed as MarketingCampaign["toneOfVoiceUsed"],
           };
-          console.debug(
+          clientLogger.debug(
             "[Campaign] Loaded:",
             loadedCampaign.videoClipScripts.length,
             "clips,",
@@ -512,14 +513,14 @@ export function useCampaignHandlers({
           const storedProductImages = loadProductImagesFromStorage(campaignId);
           setCampaignProductImages(storedProductImages);
         } else {
-          console.error(
+          clientLogger.error(
             "[Campaign] API returned null for campaign:",
             campaignId
           );
           setError("Campanha não encontrada");
         }
       } catch (error: unknown) {
-        console.error("Failed to load campaign:", error);
+        clientLogger.error("Failed to load campaign:", error);
         setError("Falha ao carregar campanha");
       }
     },

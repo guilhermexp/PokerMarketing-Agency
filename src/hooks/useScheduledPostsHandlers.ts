@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Scheduled Posts Handlers Hook
  *
@@ -115,7 +116,7 @@ export function useScheduledPostsHandlers({
         // Update SWR cache
         swrUpdateScheduledPost(postId, dbUpdates as Partial<DbScheduledPost>);
       } catch (e) {
-        console.error("Failed to update scheduled post:", e);
+        clientLogger.error("Failed to update scheduled post:", e);
       }
     },
     [swrScheduledPosts, swrUpdateScheduledPost]
@@ -229,7 +230,7 @@ export function useScheduledPostsHandlers({
   const handleSchedulePost = useCallback(
     async (post: Omit<ScheduledPost, "id" | "createdAt" | "updatedAt">) => {
       if (!userId) {
-        console.error("Cannot schedule post without userId");
+        clientLogger.error("Cannot schedule post without userId");
         return;
       }
 
@@ -240,7 +241,7 @@ export function useScheduledPostsHandlers({
         !post.scheduledTime ||
         !post.platforms
       ) {
-        console.error("Cannot schedule post: missing required fields", {
+        clientLogger.error("Cannot schedule post: missing required fields", {
           hasImageUrl: !!post.imageUrl,
           hasScheduledDate: !!post.scheduledDate,
           hasScheduledTime: !!post.scheduledTime,
@@ -274,7 +275,7 @@ export function useScheduledPostsHandlers({
           created_from: post.createdFrom,
           organization_id: organizationId,
         };
-        console.debug(
+        clientLogger.debug(
           "[Schedule] Sending payload:",
           payload,
           isPublishNow ? "(PUBLISH NOW)" : ""
@@ -312,19 +313,19 @@ export function useScheduledPostsHandlers({
           isPublishNow &&
           (post.platforms === "instagram" || post.platforms === "both")
         ) {
-          console.debug("[Schedule] Publishing immediately...");
+          clientLogger.debug("[Schedule] Publishing immediately...");
           // Use setTimeout to ensure state is updated before publishing
           setTimeout(() => {
             handlePublishToInstagram(newPost);
           }, 100);
         } else {
           // Post is saved and scheduled - will need manual publish when time comes
-          console.debug(
+          clientLogger.debug(
             `[Schedule] Post ${dbPost.id} scheduled for ${new Date(post.scheduledTimestamp).toISOString()}`
           );
         }
       } catch (e) {
-        console.error("Failed to schedule post:", e);
+        clientLogger.error("Failed to schedule post:", e);
       }
     },
     [
@@ -343,7 +344,7 @@ export function useScheduledPostsHandlers({
         swrRemoveScheduledPost(postId);
         await deleteScheduledPostApi(postId);
       } catch (e) {
-        console.error("Failed to delete scheduled post:", e);
+        clientLogger.error("Failed to delete scheduled post:", e);
       }
     },
     [swrRemoveScheduledPost]
@@ -365,7 +366,7 @@ export function useScheduledPostsHandlers({
       } catch (e: unknown) {
         const errorMsg =
           e instanceof Error ? e.message : "Failed to retry scheduled post";
-        console.error("Failed to retry scheduled post:", errorMsg);
+        clientLogger.error("Failed to retry scheduled post:", errorMsg);
         alert(errorMsg);
       }
     },

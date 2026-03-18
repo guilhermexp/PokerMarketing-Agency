@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * GenerationItem
  * Displays a single generation with loading/success/error states
@@ -66,7 +67,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
               await api.updateTopic(topicId, { coverUrl: gen.asset.url });
               updateTopicStore(topicId, { coverUrl: gen.asset.url });
             } catch (err) {
-              console.error('[GenerationItem] Failed to update topic cover:', err);
+              clientLogger.error('[GenerationItem] Failed to update topic cover:', err);
             }
           }
         }
@@ -101,7 +102,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Failed to download image:', error);
+      clientLogger.error('Failed to download image:', error);
       window.open(generation.asset.url, '_blank');
     }
   }, [generation]);
@@ -141,7 +142,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       };
       reader.readAsDataURL(blob);
     } catch (error) {
-      console.error('Failed to add reference image:', error);
+      clientLogger.error('Failed to add reference image:', error);
     }
   }, [generation.asset?.url]);
 

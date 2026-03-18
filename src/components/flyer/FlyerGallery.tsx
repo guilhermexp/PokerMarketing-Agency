@@ -4,6 +4,7 @@ import { Icon } from "../common/Icon";
 import { ImagePreviewModal } from "../image-preview/ImagePreviewModal";
 import { downloadImage } from "../../utils/imageHelpers";
 import { DAY_TRANSLATIONS } from "./utils";
+import { clientLogger } from "@/lib/client-logger";
 
 interface FlyerGalleryProps {
   flyerState: Record<string, (GalleryImage | "loading")[]>;
@@ -146,7 +147,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
           await new Promise(resolve => setTimeout(resolve, 300));
         }
       } catch (err) {
-        console.error(`Failed to download flyer ${i}:`, err);
+        clientLogger.error(`Failed to download flyer ${i}:`, err);
       }
     }
   };
@@ -185,7 +186,7 @@ export const FlyerGallery: React.FC<FlyerGalleryProps> = ({
       const message = `Flyers de ${dayLabel}:\n${links}`;
       window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
     } catch (err) {
-      console.error("Failed to share flyers on WhatsApp:", err);
+      clientLogger.error("Failed to share flyers on WhatsApp:", err);
     } finally {
       setIsSharing(false);
     }

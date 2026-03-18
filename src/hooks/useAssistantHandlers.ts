@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Assistant Handlers Hook
  *
@@ -393,7 +394,7 @@ export function useAssistantHandlers({
         }
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        console.error("[Chat] Error sending message:", err);
+        clientLogger.error("[Chat] Error sending message:", err);
         setChatHistory((prev) => {
           const next = [...prev];
           if (next.length > 0)

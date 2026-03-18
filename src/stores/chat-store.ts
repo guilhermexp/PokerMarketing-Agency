@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Chat Store - Assistant/Chat state management
  *
@@ -181,12 +182,12 @@ export const useChatStore = create<ChatState>()(
       },
 
       handleRequestImageEdit: (request, galleryImages) => {
-        console.debug("[ChatStore] Tool edit requested:", request);
+        clientLogger.debug("[ChatStore] Tool edit requested:", request);
 
         const image = galleryImages.find((img) => img.id === request.imageId);
 
         if (!image) {
-          console.error("[ChatStore] Image not found:", request.imageId);
+          clientLogger.error("[ChatStore] Image not found:", request.imageId);
           set({
             pendingToolEdit: {
               ...request,
@@ -204,7 +205,7 @@ export const useChatStore = create<ChatState>()(
       },
 
       handleToolEditApproved: (toolCallId, imageUrl) => {
-        console.debug("[ChatStore] Tool edit approved:", {
+        clientLogger.debug("[ChatStore] Tool edit approved:", {
           toolCallId,
           imageUrl,
           imageUrlType: typeof imageUrl,
@@ -234,7 +235,7 @@ export const useChatStore = create<ChatState>()(
       },
 
       handleToolEditRejected: (toolCallId, reason) => {
-        console.debug("[ChatStore] Tool edit rejected:", { toolCallId, reason });
+        clientLogger.debug("[ChatStore] Tool edit rejected:", { toolCallId, reason });
 
         set((state) => ({
           pendingToolEdit: state.pendingToolEdit
@@ -275,7 +276,7 @@ export const useChatStore = create<ChatState>()(
             : null);
 
         if (!previewImage) {
-          console.warn(
+          clientLogger.warn(
             "[ChatStore] Tool edit preview skipped: reference image not found"
           );
           return;

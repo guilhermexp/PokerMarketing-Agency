@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Clip carousel generation helpers (4:5)
  */
@@ -51,7 +52,7 @@ export const generateCarouselSlide4x5 = async ({
   try {
     const imageData = await urlToBase64(originalImage.src);
     if (!imageData) {
-      console.error('[CarrosselTab] Failed to convert image to base64');
+      clientLogger.error('[CarrosselTab] Failed to convert image to base64');
       return;
     }
 
@@ -93,7 +94,7 @@ export const generateCarouselSlide4x5 = async ({
           const base64Data = base64.split(',')[1];
           productImageRefs.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
         } catch (err) {
-          console.error('[CarrosselTab] Failed to fetch chat reference image:', err);
+          clientLogger.error('[CarrosselTab] Failed to fetch chat reference image:', err);
         }
       }
     }
@@ -125,7 +126,7 @@ export const generateCarouselSlide4x5 = async ({
           const base64Data = base64.split(',')[1];
           productImageRefs.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
         } catch (err) {
-          console.error('[CarrosselTab] Failed to fetch style reference image:', err);
+          clientLogger.error('[CarrosselTab] Failed to fetch style reference image:', err);
         }
       }
     }
@@ -157,7 +158,7 @@ export const generateCarouselSlide4x5 = async ({
       });
     }
   } catch (err) {
-    console.error(`Error generating 4:5 image for scene ${sceneNumber}:`, err);
+    clientLogger.error(`Error generating 4:5 image for scene ${sceneNumber}:`, err);
   } finally {
     setGenerating((prev) => ({ ...prev, [key]: false }));
   }
@@ -194,7 +195,7 @@ export const generateAllCarouselSlides4x5 = async ({
 
   for (const scene of clip.scenes) {
     if (shouldPause?.()) {
-      console.debug('[CarrosselTab] Generation paused for clip carousel');
+      clientLogger.debug('[CarrosselTab] Generation paused for clip carousel');
       break;
     }
     const sceneNumber = scene.scene;

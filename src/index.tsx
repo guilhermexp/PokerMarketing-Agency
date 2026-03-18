@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import { Router } from "./Router";
 import "./styles/main.css";
+import { clientLogger } from "@/lib/client-logger";
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
@@ -26,7 +27,7 @@ async function clearOldCaches() {
     );
     await Promise.all(oldCaches.map(name => caches.delete(name)));
     if (oldCaches.length > 0) {
-      console.debug('[PWA] Caches antigos removidos:', oldCaches);
+      clientLogger.debug('[PWA] Caches antigos removidos:', oldCaches);
     }
   }
 }
@@ -35,7 +36,7 @@ async function clearOldCaches() {
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    console.debug('[PWA] Nova versão disponível, recarregando...');
+    clientLogger.debug('[PWA] Nova versão disponível, recarregando...');
     // Clear caches before updating
     clearOldCaches().then(() => {
       updateSW(true);
@@ -46,10 +47,10 @@ const updateSW = registerSW({
     });
   },
   onOfflineReady() {
-    console.debug('[PWA] App pronto para uso offline');
+    clientLogger.debug('[PWA] App pronto para uso offline');
   },
   onRegistered(registration) {
-    console.debug('[PWA] Service Worker registrado');
+    clientLogger.debug('[PWA] Service Worker registrado');
     // Check for updates every 1 minute for faster detection
     if (registration) {
       setInterval(() => {
@@ -58,7 +59,7 @@ const updateSW = registerSW({
     }
   },
   onRegisterError(error) {
-    console.error('[PWA] Erro ao registrar Service Worker:', error);
+    clientLogger.error('[PWA] Erro ao registrar Service Worker:', error);
     // Clear caches on error to prevent stuck state
     clearOldCaches();
   },

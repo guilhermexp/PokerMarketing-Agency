@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * TournamentEventCard Component
  *
@@ -113,7 +114,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
       if (job.context === jobContext) {
         setGeneratedFlyers((prev) => prev.filter((f) => f !== 'loading'));
         setIsGenerating(false);
-        console.error('[TournamentEventCard] Job failed:', job.error_message);
+        clientLogger.error('[TournamentEventCard] Job failed:', job.error_message);
       }
     });
 
@@ -195,7 +196,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
         prev.map((f) => (f === 'loading' ? newImage : f))
       );
     } catch (err) {
-      console.error('[TournamentEventCard] Generation failed:', err);
+      clientLogger.error('[TournamentEventCard] Generation failed:', err);
       setGeneratedFlyers((prev) => prev.filter((f) => f !== 'loading'));
     } finally {
       setIsGenerating(false);

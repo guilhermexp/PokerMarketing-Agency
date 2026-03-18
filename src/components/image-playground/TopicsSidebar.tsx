@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * TopicsSidebar
  * Right sidebar with list of topics (projects)
@@ -29,7 +30,7 @@ export const TopicsSidebar: React.FC = () => {
     try {
       await createTopic();
     } catch (err) {
-      console.error('Failed to create topic:', err);
+      clientLogger.error('Failed to create topic:', err);
     } finally {
       setIsCreating(false);
     }

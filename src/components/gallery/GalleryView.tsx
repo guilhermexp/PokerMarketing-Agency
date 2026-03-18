@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import type { GalleryImage, StyleReference } from "../../types";
 import { Icon } from "../common/Icon";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
+import { clientLogger } from "@/lib/client-logger";
 
 interface GalleryViewProps {
   images: GalleryImage[];
@@ -464,13 +465,13 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
   };
 
   const handleToggleFavorite = (image: GalleryImage) => {
-    console.debug("[GalleryView] handleToggleFavorite called", { image, styleReferences });
+    clientLogger.debug("[GalleryView] handleToggleFavorite called", { image, styleReferences });
     const existingRef = getFavoriteRef(image);
-    console.debug("[GalleryView] existingRef:", existingRef);
+    clientLogger.debug("[GalleryView] existingRef:", existingRef);
 
     if (existingRef) {
       // Remove from favorites
-      console.debug("[GalleryView] Removing from favorites:", existingRef.id);
+      clientLogger.debug("[GalleryView] Removing from favorites:", existingRef.id);
       onRemoveStyleReference(existingRef.id);
     } else {
       // Add to favorites
@@ -480,7 +481,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
           image.prompt?.substring(0, 50) ||
           `Favorito ${new Date().toLocaleDateString("pt-BR")}`,
       };
-      console.debug("[GalleryView] Adding to favorites:", newRef);
+      clientLogger.debug("[GalleryView] Adding to favorites:", newRef);
       onAddStyleReference(newRef);
     }
   };

@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * MinimalImageUploader
  *
@@ -20,7 +21,7 @@ export const MinimalImageUploader: React.FC<MinimalImageUploaderProps> = ({
           const imageData = await fileToImageFile(acceptedFiles[0]);
           onImageChange(imageData);
         } catch (e) {
-          console.error('Error processing file:', e);
+          clientLogger.error('Error processing file:', e);
         }
       }
     },

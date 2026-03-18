@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * LogDetailModal - Modal para visualização detalhada de logs com sugestões de IA
  * Design minimalista com tema dark
@@ -66,7 +67,7 @@ export function LogDetailModal({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      clientLogger.error('Failed to copy:', err);
     }
   };
 

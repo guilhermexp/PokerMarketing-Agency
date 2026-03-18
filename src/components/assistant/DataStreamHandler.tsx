@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Data Stream Handler - Vercel AI SDK
  *
@@ -28,11 +29,11 @@ export function DataStreamHandler() {
         // IMAGE GENERATION EVENTS
         // =====================================================================
         case 'data-imageGenerating':
-          console.debug('[DataStream] Gerando imagem:', delta.data.description);
+          clientLogger.debug('[DataStream] Gerando imagem:', delta.data.description);
           break;
 
         case 'data-imageCreated':
-          console.debug('[DataStream] Imagem criada:', delta.data.url);
+          clientLogger.debug('[DataStream] Imagem criada:', delta.data.url);
           // TODO: Adicionar notificação quando sistema de notificação existir
           // TODO: Recarregar galeria
           break;
@@ -41,11 +42,11 @@ export function DataStreamHandler() {
         // IMAGE EDITING EVENTS
         // =====================================================================
         case 'data-imageEditing':
-          console.debug('[DataStream] Editando imagem:', delta.data.prompt);
+          clientLogger.debug('[DataStream] Editando imagem:', delta.data.prompt);
           break;
 
         case 'data-imageEdited':
-          console.debug('[DataStream] Imagem editada:', delta.data.url);
+          clientLogger.debug('[DataStream] Imagem editada:', delta.data.url);
           // TODO: Adicionar notificação e recarregar galeria
           break;
 
@@ -53,11 +54,11 @@ export function DataStreamHandler() {
         // LOGO GENERATION EVENTS
         // =====================================================================
         case 'data-logoGenerating':
-          console.debug('[DataStream] Gerando logo:', delta.data.prompt);
+          clientLogger.debug('[DataStream] Gerando logo:', delta.data.prompt);
           break;
 
         case 'data-logoCreated':
-          console.debug('[DataStream] Logo criado:', delta.data.url);
+          clientLogger.debug('[DataStream] Logo criado:', delta.data.url);
           // TODO: Adicionar notificação e recarregar galeria
           break;
 
@@ -66,7 +67,7 @@ export function DataStreamHandler() {
         // =====================================================================
         case 'data-imageError':
         case 'data-logoError':
-          console.error('[DataStream] Erro:', delta.data.error);
+          clientLogger.error('[DataStream] Erro:', delta.data.error);
           // TODO: Adicionar notificação de erro
           break;
 
@@ -74,7 +75,7 @@ export function DataStreamHandler() {
         // UNKNOWN EVENT
         // =====================================================================
         default:
-          console.warn('[DataStream] Evento desconhecido:', delta);
+          clientLogger.warn('[DataStream] Evento desconhecido:', delta);
       }
     }
   }, [dataStream]);

@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Video encoding/concatenation
  */
@@ -261,7 +262,7 @@ export const concatenateVideos = async (
           await ffmpeg.exec(['-i', inputFilenames[0], '-c', 'copy', '-y', outputFilename]);
         }
       } catch (fadeError) {
-        console.warn('Filter complex failed, falling back to normalized concat:', fadeError);
+        clientLogger.warn('Filter complex failed, falling back to normalized concat:', fadeError);
 
         try {
           const normalizedFilenames: string[] = [];
@@ -316,7 +317,7 @@ export const concatenateVideos = async (
             }
           }
         } catch (fallbackError) {
-          console.error('Normalized fallback also failed:', fallbackError);
+          clientLogger.error('Normalized fallback also failed:', fallbackError);
           throw fadeError;
         }
       }
@@ -403,7 +404,7 @@ export const concatenateVideos = async (
           }
         }
       } catch (audioError) {
-        console.warn('[FFmpeg] Audio mixing failed, using video without mixed audio:', audioError);
+        clientLogger.warn('[FFmpeg] Audio mixing failed, using video without mixed audio:', audioError);
         try {
           await ffmpeg.deleteFile(audioFilename);
         } catch {

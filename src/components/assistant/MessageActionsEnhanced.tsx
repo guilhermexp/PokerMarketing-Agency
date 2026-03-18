@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * MessageActionsEnhanced - Extensão de MessageActions com ações customizadas
  *
@@ -51,7 +52,7 @@ export function MessageActionsEnhanced({
       await navigator.clipboard.writeText(content);
       showToast('Copiado!');
     } catch (err) {
-      console.error('Erro ao copiar:', err);
+      clientLogger.error('Erro ao copiar:', err);
     }
   };
 
@@ -61,7 +62,7 @@ export function MessageActionsEnhanced({
       await navigator.clipboard.writeText('```\n' + content + '\n```');
       showToast('Código copiado!');
     } catch (err) {
-      console.error('Erro ao copiar código:', err);
+      clientLogger.error('Erro ao copiar código:', err);
     }
   };
 
@@ -74,7 +75,7 @@ export function MessageActionsEnhanced({
       await navigator.clipboard.writeText(url);
       showToast('Link copiado!');
     } catch (err) {
-      console.error('Erro ao compartilhar:', err);
+      clientLogger.error('Erro ao compartilhar:', err);
     }
   };
 

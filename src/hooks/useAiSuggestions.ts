@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Hook para gerenciar sugestoes de IA para logs de erro
  * Fornece estado e funcoes para buscar sugestoes de correcao
@@ -73,7 +74,7 @@ export function useAiSuggestions(logId: string | null) {
         isCached: data.cached || false,
       });
     } catch (err) {
-      console.error('Error fetching AI suggestions:', err);
+      clientLogger.error('Error fetching AI suggestions:', err);
       setState({
         suggestions: null,
         isLoading: false,

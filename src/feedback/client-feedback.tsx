@@ -5,6 +5,7 @@ import { FeedbackPanel } from './feedback-panel';
 import { useFeedbackStore } from '../stores/feedbackStore';
 import { getCsrfToken } from '../services/apiClient';
 import { getApiErrorMessage } from '../services/api/response';
+import { clientLogger } from "@/lib/client-logger";
 
 interface Annotation {
   id: string;
@@ -136,7 +137,7 @@ export function ClientFeedback({
         sendTimeoutRef.current = setTimeout(() => setSendStatus('idle'), 3000);
       } else {
         const payload = await response.json().catch(() => ({ error: 'Falha ao enviar feedback' }));
-        console.error('[ClientFeedback]', getApiErrorMessage(payload, 'Falha ao enviar feedback'));
+        clientLogger.error('[ClientFeedback]', getApiErrorMessage(payload, 'Falha ao enviar feedback'));
         setSendStatus('error');
       }
     } catch {

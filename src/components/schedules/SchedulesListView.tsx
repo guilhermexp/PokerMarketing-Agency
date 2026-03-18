@@ -3,6 +3,7 @@ import { Icon } from "../common/Icon";
 import { ManualEventModal } from "../common/ManualEventModal";
 import type { WeekScheduleWithCount } from "../../services/apiClient";
 import type { TournamentEvent } from "../../types";
+import { clientLogger } from "@/lib/client-logger";
 
 interface SchedulesListViewProps {
   schedules: WeekScheduleWithCount[];
@@ -28,17 +29,17 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    console.debug("[SchedulesListView] File selected:", file?.name);
+    clientLogger.debug("[SchedulesListView] File selected:", file?.name);
     if (!file) return;
 
     setIsUploading(true);
     try {
-      console.debug("[SchedulesListView] Calling onFileUpload...");
+      clientLogger.debug("[SchedulesListView] Calling onFileUpload...");
       await onFileUpload(file);
-      console.debug("[SchedulesListView] Upload complete, entering schedule...");
+      clientLogger.debug("[SchedulesListView] Upload complete, entering schedule...");
       onEnterAfterUpload?.();
     } catch (err) {
-      console.error("[SchedulesListView] Failed to upload file:", err);
+      clientLogger.error("[SchedulesListView] Failed to upload file:", err);
     } finally {
       setIsUploading(false);
     }

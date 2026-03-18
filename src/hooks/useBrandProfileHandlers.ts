@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Brand Profile Handlers Hook
  *
@@ -52,10 +53,10 @@ export function useBrandProfileHandlers({
                 creativeModel: model,
               },
             });
-            console.debug("[BrandProfile] Creative model updated to:", model);
+            clientLogger.debug("[BrandProfile] Creative model updated to:", model);
           }
         } catch (e) {
-          console.error("Failed to update creative model:", e);
+          clientLogger.error("Failed to update creative model:", e);
         }
       }
     },
@@ -100,10 +101,10 @@ export function useCreativeModelHandler({
                 creativeModel: model,
               },
             });
-            console.debug("[BrandProfile] Creative model updated to:", model);
+            clientLogger.debug("[BrandProfile] Creative model updated to:", model);
           }
         } catch (e) {
-          console.error("Failed to update creative model:", e);
+          clientLogger.error("Failed to update creative model:", e);
         }
       }
     },

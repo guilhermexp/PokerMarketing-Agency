@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * ToolApproval - Componente focado em aprovação/negação de tools
  *
@@ -40,7 +41,7 @@ export interface ToolApprovalProps {
  *   toolName="createImage"
  *   onApprove={handleApprove}
  *   onDeny={handleDeny}
- *   onAlwaysAllow={(toolName) => console.log('Always allow:', toolName)}
+ *   onAlwaysAllow={(toolName) => clientLogger.info('Always allow:', toolName)}
  * />
  * ```
  */

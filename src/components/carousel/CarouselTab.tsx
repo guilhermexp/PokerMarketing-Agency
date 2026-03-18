@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * CarouselTab
  */
@@ -205,7 +206,7 @@ export const CarouselTab = React.memo<CarrosselTabProps>(function CarouselTab({
               const filename = `slide-${idx + 1}.${extension}`;
               folder.file(filename, blob);
             } catch (err) {
-              console.error(`Failed to fetch image ${idx}:`, err);
+              clientLogger.error(`Failed to fetch image ${idx}:`, err);
             }
           })
         );
@@ -244,13 +245,13 @@ export const CarouselTab = React.memo<CarrosselTabProps>(function CarouselTab({
               await new Promise(resolve => setTimeout(resolve, 300));
             }
           } catch (err) {
-            console.error(`Failed to download image ${i}:`, err);
+            clientLogger.error(`Failed to download image ${i}:`, err);
           }
         }
         setToast({ message: `Download de ${images.length} imagens iniciado`, type: 'success' });
       }
     } catch (error) {
-      console.error('Download failed:', error);
+      clientLogger.error('Download failed:', error);
       setToast({ message: 'Falha no download', type: 'error' });
     }
   };

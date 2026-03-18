@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Usage Page - Página de uso de IA
  * Design minimalista com tema dark
@@ -97,7 +98,7 @@ export function UsagePage() {
       setTopOrganizations(data.topOrganizations || []);
       setError(null);
     } catch (err) {
-      console.error('Error fetching usage:', err);
+      clientLogger.error('Error fetching usage:', err);
       setError(err instanceof Error ? err.message : 'Falha ao carregar dados');
     } finally {
       setIsLoading(false);

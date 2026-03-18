@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Logs Page - Página de logs de atividade
  * Design minimalista com tema dark
@@ -140,7 +141,7 @@ export function LogsPage() {
       setRecentErrorCount(data.filters?.recentErrorCount || 0);
       setError(null);
     } catch (err) {
-      console.error('Error fetching logs:', err);
+      clientLogger.error('Error fetching logs:', err);
       setError(err instanceof Error ? err.message : 'Falha ao carregar logs');
     } finally {
       setIsLoading(false);
@@ -166,7 +167,7 @@ export function LogsPage() {
       setSelectedLog(data);
       setIsModalOpen(true);
     } catch (err) {
-      console.error('Error fetching log details:', err);
+      clientLogger.error('Error fetching log details:', err);
       setError(err instanceof Error ? err.message : 'Falha ao carregar detalhes do log');
     } finally {
       setIsLoadingDetails(false);

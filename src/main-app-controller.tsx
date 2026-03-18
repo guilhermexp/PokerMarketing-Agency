@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Main App Controller
  *
@@ -111,8 +112,6 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
   const setCampaignProductImages = useCampaignsStore((s) => s.setCampaignProductImages);
   const campaignCompositionAssets = useCampaignsStore((s) => s.campaignCompositionAssets);
   const setCampaignCompositionAssets = useCampaignsStore((s) => s.setCampaignCompositionAssets);
-  const campaignsList = useCampaignsStore((s) => s.campaignsList);
-  const setCampaignsList = useCampaignsStore((s) => s.setCampaignsList);
   const isGenerating = useCampaignsStore((s) => s.isGenerating);
   const setIsGenerating = useCampaignsStore((s) => s.setIsGenerating);
 
@@ -148,8 +147,6 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
   const storeHandleShowToolEditPreview = useChatStore((s) => s.handleShowToolEditPreview);
 
   // Stores - Gallery & Posts
-  const galleryImages = useGalleryStore((s) => s.galleryImages);
-  const setGalleryImages = useGalleryStore((s) => s.setGalleryImages);
   const selectedStyleReference = useGalleryStore((s) => s.selectedStyleReference);
   const setSelectedStyleReference = useGalleryStore((s) => s.setSelectedStyleReference);
   const scheduledPosts = useScheduledPostsStore((s) => s.scheduledPosts);
@@ -198,6 +195,8 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
   const transformedScheduledPosts = useTransformedScheduledPosts(swrScheduledPosts);
   const transformedCampaignsList = useTransformedCampaignsList(swrCampaigns);
   const styleReferences = useStyleReferences(swrGalleryImages);
+  const galleryImages = transformedGalleryImages;
+  const campaignsList = transformedCampaignsList;
 
   // Computed
   const instagramContext = useMemo(() => {
@@ -225,9 +224,7 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
   const handleEditProfile = useCallback(() => setIsEditingProfile(true), [setIsEditingProfile]);
 
   // Effects - State Sync
-  useEffect(() => { setGalleryImages(transformedGalleryImages); }, [setGalleryImages, transformedGalleryImages]);
   useEffect(() => { setScheduledPosts(transformedScheduledPosts); }, [setScheduledPosts, transformedScheduledPosts]);
-  useEffect(() => { setCampaignsList(transformedCampaignsList); }, [setCampaignsList, transformedCampaignsList]);
   useEffect(() => { if (swrTournamentEvents?.length) setTournamentEvents(swrTournamentEvents.map(mapDbEventToTournamentEvent)); else if (tournamentEvents.length) setTournamentEvents([]); }, [swrTournamentEvents, setTournamentEvents, tournamentEvents.length]);
   useEffect(() => { if (swrAllSchedules?.length) setAllSchedules(swrAllSchedules); else if (allSchedules.length) setAllSchedules([]); }, [swrAllSchedules, setAllSchedules, allSchedules.length]);
 
@@ -289,7 +286,7 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
               if (!newOrgId) { const slug = p.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); const res = await getOrganizationApi().create({ name: p.name.trim(), slug }); if (res.data?.id) newOrgId = res.data.id; }
               if (newOrgId && newOrgId !== organizationId) { skipBrandClearOnOrgSwitch.current = true; await getOrganizationApi().setActive({ organizationId: newOrgId }); }
               await createBrandProfile(userId, { name: p.name, description: p.description, logo_url: p.logo || undefined, primary_color: p.primaryColor, secondary_color: p.secondaryColor, tertiary_color: p.tertiaryColor, tone_of_voice: p.toneOfVoice });
-            } catch (e) { console.error("Failed to save brand profile:", e); }
+            } catch (e) { clientLogger.error("Failed to save brand profile:", e); }
           }} existingProfile={null} />
         )
       ) : (
@@ -297,7 +294,7 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
           <SettingsModal isOpen={isEditingProfile} onClose={() => setIsEditingProfile(false)} brandProfile={brandProfile} onSaveProfile={async (p) => {
             setBrandProfile(p);
             if (!userId) return;
-            try { const ex = await getBrandProfile(userId, organizationId); if (ex) await updateBrandProfile(ex.id, { name: p.name, description: p.description, logo_url: p.logo || undefined, primary_color: p.primaryColor, secondary_color: p.secondaryColor, tertiary_color: p.tertiaryColor, tone_of_voice: p.toneOfVoice, settings: { ...ex.settings, toneTargets: p.toneTargets, creativeModel: p.creativeModel } }); } catch (e) { console.error("Failed to update brand profile:", e); }
+            try { const ex = await getBrandProfile(userId, organizationId); if (ex) await updateBrandProfile(ex.id, { name: p.name, description: p.description, logo_url: p.logo || undefined, primary_color: p.primaryColor, secondary_color: p.secondaryColor, tertiary_color: p.tertiaryColor, tone_of_voice: p.toneOfVoice, settings: { ...ex.settings, toneTargets: p.toneTargets, creativeModel: p.creativeModel } }); } catch (e) { clientLogger.error("Failed to update brand profile:", e); }
           }} />
           <ChatProvider value={chatContextValue}>
             <Suspense fallback={<LazyFallback />}>

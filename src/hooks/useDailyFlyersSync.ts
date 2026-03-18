@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Daily Flyers Sync Hook
  *
@@ -51,7 +52,7 @@ export function useDailyFlyersSync({
 }: UseDailyFlyersSyncParams): void {
   // Load daily flyers from database
   useEffect(() => {
-    console.debug("[DailyFlyers] useEffect triggered:", {
+    clientLogger.debug("[DailyFlyers] useEffect triggered:", {
       userId: !!userId,
       currentScheduleId,
       organizationId,
@@ -60,7 +61,7 @@ export function useDailyFlyersSync({
     });
 
     if (!userId || !currentScheduleId) {
-      console.debug("[DailyFlyers] Skipping: missing userId or currentScheduleId");
+      clientLogger.debug("[DailyFlyers] Skipping: missing userId or currentScheduleId");
       return;
     }
 
@@ -71,30 +72,30 @@ export function useDailyFlyersSync({
       hasRestoredDailyFlyers &&
       !orgChanged
     ) {
-      console.debug("[DailyFlyers] Skipping: already loaded for this schedule+org");
+      clientLogger.debug("[DailyFlyers] Skipping: already loaded for this schedule+org");
       return;
     }
 
     if (orgChanged) {
-      console.debug("[DailyFlyers] Organization changed, forcing reload");
+      clientLogger.debug("[DailyFlyers] Organization changed, forcing reload");
       setHasRestoredDailyFlyers(false);
     }
 
     const loadDailyFlyers = async () => {
       try {
-        console.debug("[DailyFlyers] Loading from database:", {
+        clientLogger.debug("[DailyFlyers] Loading from database:", {
           currentScheduleId,
           userId,
           organizationId,
         });
         const result = await getDailyFlyers(userId, currentScheduleId, organizationId);
-        console.debug("[DailyFlyers] Result:", {
+        clientLogger.debug("[DailyFlyers] Result:", {
           imagesCount: result.images?.length || 0,
           structuredKeys: Object.keys(result.structured || {}),
         });
 
         if (!result.structured || Object.keys(result.structured).length === 0) {
-          console.debug("[DailyFlyers] No flyers found in database");
+          clientLogger.debug("[DailyFlyers] No flyers found in database");
           setHasRestoredDailyFlyers(true);
           setLastLoadedScheduleId(currentScheduleId);
           setLastLoadedOrgId(organizationId);
@@ -157,14 +158,14 @@ export function useDailyFlyersSync({
             });
             return merged;
           });
-          console.debug("[DailyFlyers] Merged state from database:", Object.keys(restoredState));
+          clientLogger.debug("[DailyFlyers] Merged state from database:", Object.keys(restoredState));
         }
 
         setHasRestoredDailyFlyers(true);
         setLastLoadedScheduleId(currentScheduleId);
         setLastLoadedOrgId(organizationId);
       } catch (err) {
-        console.error("[App] Failed to load daily flyers from database:", err);
+        clientLogger.error("[App] Failed to load daily flyers from database:", err);
       }
     };
 
@@ -179,7 +180,7 @@ export function useDailyFlyersSync({
       lastLoadedScheduleId &&
       currentScheduleId !== lastLoadedScheduleId
     ) {
-      console.debug("[App] Schedule changed, clearing daily flyer state");
+      clientLogger.debug("[App] Schedule changed, clearing daily flyer state");
       setHasRestoredDailyFlyers(false);
       setDailyFlyerState({});
     }

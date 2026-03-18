@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * VideoCard Component
  * Displays a video in the playground feed with TikTok-style card layout
@@ -84,7 +85,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
         window.URL.revokeObjectURL(url);
       }
     } catch (error) {
-      console.error("Download failed:", error);
+      clientLogger.error("Download failed:", error);
     }
   };
 

@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Users Page - Página de usuários
  * Design minimalista com tema dark
@@ -70,7 +71,7 @@ export function UsersPage() {
       setPagination(data.pagination);
       setError(null);
     } catch (err) {
-      console.error('Error fetching users:', err);
+      clientLogger.error('Error fetching users:', err);
       setError(err instanceof Error ? err.message : 'Falha ao carregar usuários');
     } finally {
       setIsLoading(false);

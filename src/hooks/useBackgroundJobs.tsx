@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Background Jobs Hook & Provider
  * Manages background generation jobs (images, videos, flyers) across the entire app
@@ -108,7 +109,7 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
         if (Array.isArray(failed)) notifiedFailed.current = new Set(failed);
       }
     } catch (e) {
-      console.warn("[BackgroundJobs] Failed to load notified state:", e);
+      clientLogger.warn("[BackgroundJobs] Failed to load notified state:", e);
     }
   }
 
@@ -128,7 +129,7 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
 
   // Debug: log when jobs change
   useEffect(() => {
-    console.debug("[BackgroundJobs] Jobs state updated:", {
+    clientLogger.debug("[BackgroundJobs] Jobs state updated:", {
       total: jobs.length,
       pending: pendingJobs.length,
       completed: completedJobs.length,
@@ -185,11 +186,11 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
             }),
           );
         } catch (e) {
-          console.warn("[BackgroundJobs] Failed to persist notified state:", e);
+          clientLogger.warn("[BackgroundJobs] Failed to persist notified state:", e);
         }
       }
     } catch (error) {
-      console.error("[BackgroundJobs] Failed to refresh jobs:", error);
+      clientLogger.error("[BackgroundJobs] Failed to refresh jobs:", error);
     }
   }, [userId, organizationId]);
 
@@ -215,7 +216,7 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
     // Only poll if there are pending jobs
     if (pendingJobs.length === 0) return;
 
-    console.debug(
+    clientLogger.debug(
       `[BackgroundJobs] Starting auto-poll (${pendingJobs.length} pending jobs)`,
     );
 
@@ -224,7 +225,7 @@ export const BackgroundJobsProvider: React.FC<BackgroundJobsProviderProps> = ({
     }, 3000); // Poll every 3 seconds
 
     return () => {
-      console.debug("[BackgroundJobs] Stopping auto-poll");
+      clientLogger.debug("[BackgroundJobs] Stopping auto-poll");
       clearInterval(pollInterval);
     };
   }, [pendingJobs.length]); // Only re-run when pending state changes

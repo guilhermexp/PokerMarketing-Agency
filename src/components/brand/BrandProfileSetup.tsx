@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
@@ -131,17 +132,17 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       const file = acceptedFiles[0];
-      console.debug('[BrandProfile] Logo dropped:', { name: file.name, type: file.type, size: file.size });
+      clientLogger.debug('[BrandProfile] Logo dropped:', { name: file.name, type: file.type, size: file.size });
       setProfile(prev => ({ ...prev, logo: file }));
       setIsAnalyzingLogo(true);
       try {
         const { base64, mimeType, dataUrl } = await fileToBase64(file);
-        console.debug('[BrandProfile] Logo converted to base64:', { mimeType, base64Length: base64.length });
+        clientLogger.debug('[BrandProfile] Logo converted to base64:', { mimeType, base64Length: base64.length });
         setLogoPreview(dataUrl);
 
-        console.debug('[BrandProfile] Calling extractColorsFromLogo...');
+        clientLogger.debug('[BrandProfile] Calling extractColorsFromLogo...');
         const colors = await extractColorsFromLogo({ base64, mimeType });
-        console.debug('[BrandProfile] Colors extracted:', colors);
+        clientLogger.debug('[BrandProfile] Colors extracted:', colors);
 
         setProfile(prev => ({
           ...prev,
@@ -150,9 +151,9 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
           secondaryColor: colors.secondaryColor ?? prev.secondaryColor,
           tertiaryColor: colors.tertiaryColor ?? '',
         }));
-        console.debug('[BrandProfile] Profile updated with colors');
+        clientLogger.debug('[BrandProfile] Profile updated with colors');
       } catch (error) {
-        console.error("[BrandProfile] Failed to extract colors:", error);
+        clientLogger.error("[BrandProfile] Failed to extract colors:", error);
         alert(`Erro ao extrair cores: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
         setIsAnalyzingLogo(false);
@@ -182,12 +183,12 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
     // Upload logo to Vercel Blob to get a permanent URL
     if (profile.logo instanceof File) {
       const { base64, mimeType } = await fileToBase64(profile.logo);
-      console.debug('[BrandProfile] Uploading logo to Vercel Blob...');
+      clientLogger.debug('[BrandProfile] Uploading logo to Vercel Blob...');
       try {
         logoUrl = await uploadImageToBlob(base64, mimeType);
-        console.debug('[BrandProfile] Logo uploaded successfully:', logoUrl);
+        clientLogger.debug('[BrandProfile] Logo uploaded successfully:', logoUrl);
       } catch (err) {
-        console.error('[BrandProfile] Failed to upload logo to Blob:', err);
+        clientLogger.error('[BrandProfile] Failed to upload logo to Blob:', err);
         // Fallback to data URL if upload fails (will be cleared on next load)
         logoUrl = `data:${mimeType};base64,${base64}`;
       }
@@ -195,14 +196,14 @@ export const BrandProfileSetup: React.FC<BrandProfileSetupProps> = ({ onProfileS
       // If it's already a URL (http/https), use it directly
       // If it's a data URL, try to upload it to Blob
       if (profile.logo.startsWith('data:')) {
-        console.debug('[BrandProfile] Converting existing data URL to Blob...');
+        clientLogger.debug('[BrandProfile] Converting existing data URL to Blob...');
         try {
           const [header, base64Data] = profile.logo.split(',');
           const mimeType = header.match(/data:([^;]+)/)?.[1] || 'image/png';
           logoUrl = await uploadImageToBlob(base64Data, mimeType);
-          console.debug('[BrandProfile] Data URL converted to Blob:', logoUrl);
+          clientLogger.debug('[BrandProfile] Data URL converted to Blob:', logoUrl);
         } catch (err) {
-          console.error('[BrandProfile] Failed to convert data URL to Blob:', err);
+          clientLogger.error('[BrandProfile] Failed to convert data URL to Blob:', err);
           logoUrl = profile.logo; // Keep data URL as fallback
         }
       } else {

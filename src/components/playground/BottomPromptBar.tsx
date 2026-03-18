@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * BottomPromptBar Component
  * Floating input bar for video generation with cameo selection
@@ -173,7 +174,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
     if (file) {
       try {
         if (!file.type.startsWith('image/')) {
-          console.error("Apenas arquivos de imagem sao suportados.");
+          clientLogger.error("Apenas arquivos de imagem sao suportados.");
           return;
         }
 
@@ -194,7 +195,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
 
         if (!isExpanded) setIsExpanded(true);
       } catch (error) {
-        console.error("Erro ao carregar arquivo", error);
+        clientLogger.error("Erro ao carregar arquivo", error);
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -249,7 +250,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
           preview,
         }]);
       } catch (error) {
-        console.error("Erro ao carregar imagem de produto", error);
+        clientLogger.error("Erro ao carregar imagem de produto", error);
       }
     }
 
@@ -271,7 +272,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
         preview,
       });
     } catch (error) {
-      console.error("Erro ao carregar referencia de estilo", error);
+      clientLogger.error("Erro ao carregar referencia de estilo", error);
     }
 
     if (styleReferenceInputRef.current) styleReferenceInputRef.current.value = '';
@@ -325,7 +326,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
           inputRef.current.focus();
         }
       } catch (error) {
-        console.error('Image edit failed:', error);
+        clientLogger.error('Image edit failed:', error);
         setErrorToast?.('Falha ao editar imagem');
       }
       return;
@@ -348,7 +349,7 @@ export const BottomPromptBar: React.FC<BottomPromptBarProps> = ({
           const imgFile = await getProfileImage(cameo);
           referenceImages = [imgFile];
         } catch (e) {
-          console.error("Falha ao carregar imagem do rosto", e);
+          clientLogger.error("Falha ao carregar imagem do rosto", e);
           return;
         }
       }

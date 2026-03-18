@@ -1,5 +1,6 @@
 "use client";
 
+import { clientLogger } from "@/lib/client-logger";
 import type { RefObject } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MicIcon } from "lucide-react";
@@ -128,7 +129,7 @@ export const PromptInputSpeechButton = ({
     };
 
     speechRecognition.onerror = (event) => {
-      console.error("Speech recognition error:", event.error);
+      clientLogger.error("Speech recognition error:", event.error);
       setIsListening(false);
     };
 

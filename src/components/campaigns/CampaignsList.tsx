@@ -4,6 +4,7 @@ import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
 import { deleteCampaign, type DbCampaign } from "../../services/apiClient";
 import { useCampaigns } from "../../hooks/useAppData";
+import { clientLogger } from "@/lib/client-logger";
 
 interface CampaignWithCounts {
   id: string;
@@ -417,7 +418,7 @@ export function CampaignsList({
       removeCampaign(campaignId);
       await deleteCampaign(campaignId);
     } catch (error) {
-      console.error("Failed to delete campaign:", error);
+      clientLogger.error("Failed to delete campaign:", error);
     } finally {
       setDeletingId(null);
     }

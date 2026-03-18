@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Gallery Handlers Hook
  *
@@ -135,7 +136,7 @@ export function useGalleryHandlers({
             // Refresh gallery to ensure UI reflects the new image
             refreshGallery();
           } catch (e) {
-            console.error("Failed to save image to database:", e);
+            clientLogger.error("Failed to save image to database:", e);
           }
         })();
       }
@@ -155,18 +156,18 @@ export function useGalleryHandlers({
 
   const handleUpdateGalleryImage = useCallback(
     (imageId: string, newImageSrc: string) => {
-      console.debug("[Gallery] handleUpdateGalleryImage called:", {
+      clientLogger.debug("[Gallery] handleUpdateGalleryImage called:", {
         imageId,
         newSrc: newImageSrc.substring(0, 50),
       });
 
       // Update SWR cache immediately (optimistic update)
       swrUpdateGalleryImage(imageId, { src_url: newImageSrc });
-      console.debug("[Gallery] SWR cache updated");
+      clientLogger.debug("[Gallery] SWR cache updated");
 
       if (toolImageReference?.id === imageId) {
         setToolImageReference({ id: imageId, src: newImageSrc });
-        console.debug("[Gallery] toolImageReference updated");
+        clientLogger.debug("[Gallery] toolImageReference updated");
       }
 
       // Skip temp images, synthetic IDs (like thumbnail-xxx), and other non-database IDs
@@ -175,7 +176,7 @@ export function useGalleryHandlers({
         imageId.startsWith("thumbnail-") ||
         imageId.includes("-cover")
       ) {
-        console.debug("[Gallery] Skipping synthetic/temp image ID:", imageId);
+        clientLogger.debug("[Gallery] Skipping synthetic/temp image ID:", imageId);
         return;
       }
 
@@ -186,26 +187,26 @@ export function useGalleryHandlers({
             ? await uploadDataUrlToBlob(newImageSrc)
             : newImageSrc;
 
-          console.debug("[Gallery] Updating database with:", {
+          clientLogger.debug("[Gallery] Updating database with:", {
             imageId,
             srcUrl: srcUrl.substring(0, 50),
           });
 
           await updateGalleryImage(imageId, { src_url: srcUrl });
-          console.debug("[Gallery] Database updated successfully");
+          clientLogger.debug("[Gallery] Database updated successfully");
 
           // Update cache with final Blob URL
           if (srcUrl !== newImageSrc) {
             swrUpdateGalleryImage(imageId, { src_url: srcUrl });
             if (toolImageReference?.id === imageId)
               setToolImageReference({ id: imageId, src: srcUrl });
-            console.debug("[Gallery] Cache updated with blob URL");
+            clientLogger.debug("[Gallery] Cache updated with blob URL");
           }
 
           // Refresh gallery to ensure UI reflects the edit
           refreshGallery();
         } catch (e) {
-          console.error("[Gallery] Failed to update image in database:", e);
+          clientLogger.error("[Gallery] Failed to update image in database:", e);
         }
       })();
     },
@@ -228,7 +229,7 @@ export function useGalleryHandlers({
       try {
         await deleteGalleryImage(imageId);
       } catch (e) {
-        console.error("Failed to delete image from database:", e);
+        clientLogger.error("Failed to delete image from database:", e);
       }
     },
     [swrRemoveGalleryImage]
@@ -246,7 +247,7 @@ export function useGalleryHandlers({
 
   const handleAddStyleReference = useCallback(
     async (ref: Omit<StyleReference, "id" | "createdAt">) => {
-      console.info("[Gallery] handleAddStyleReference called", ref);
+      clientLogger.info("[Gallery] handleAddStyleReference called", ref);
 
       // Find the gallery image by src
       const galleryImage = swrGalleryImages?.find(
@@ -254,7 +255,7 @@ export function useGalleryHandlers({
       );
 
       if (!galleryImage) {
-        console.error("[Gallery] Could not find gallery image with src:", ref.src);
+        clientLogger.error("[Gallery] Could not find gallery image with src:", ref.src);
         return;
       }
 
@@ -271,9 +272,9 @@ export function useGalleryHandlers({
           style_reference_name: ref.name,
         } as Partial<DbGalleryImage>);
 
-        console.info("[Gallery] Successfully added to favorites:", galleryImage.id);
+        clientLogger.info("[Gallery] Successfully added to favorites:", galleryImage.id);
       } catch (error) {
-        console.error("[Gallery] Failed to add style reference:", error);
+        clientLogger.error("[Gallery] Failed to add style reference:", error);
       }
     },
     [swrGalleryImages, swrUpdateGalleryImage]
@@ -281,7 +282,7 @@ export function useGalleryHandlers({
 
   const handleRemoveStyleReference = useCallback(
     async (id: string) => {
-      console.info("[Gallery] handleRemoveStyleReference called", id);
+      clientLogger.info("[Gallery] handleRemoveStyleReference called", id);
 
       try {
         // Update image to unmark as style reference
@@ -296,11 +297,11 @@ export function useGalleryHandlers({
           style_reference_name: null,
         } as Partial<DbGalleryImage>);
 
-        console.info("[Gallery] Successfully removed from favorites:", id);
+        clientLogger.info("[Gallery] Successfully removed from favorites:", id);
 
         if (selectedStyleReference?.id === id) setSelectedStyleReference(null);
       } catch (error) {
-        console.error("[Gallery] Failed to remove style reference:", error);
+        clientLogger.error("[Gallery] Failed to remove style reference:", error);
       }
     },
     [selectedStyleReference?.id, setSelectedStyleReference, swrUpdateGalleryImage]

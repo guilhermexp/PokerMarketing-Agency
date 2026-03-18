@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * FreeCropOverlay
  * Componente de crop livre com seleção interativa
@@ -59,7 +60,7 @@ export const FreeCropOverlay: React.FC<FreeCropOverlayProps> = ({
       const croppedDataUrl = canvas.toDataURL('image/png');
       onCropComplete(croppedDataUrl);
     } catch (error) {
-      console.error('Crop error:', error);
+      clientLogger.error('Crop error:', error);
     } finally {
       setIsProcessing(false);
     }

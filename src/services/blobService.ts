@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Blob Service - Upload images via server API
  * Uses /api/upload endpoint to keep tokens secure on server
@@ -23,7 +24,7 @@ export const uploadImageToBlob = async (
   base64Data: string,
   mimeType: string = 'image/png'
 ): Promise<string> => {
-  console.debug('[Blob Service] Uploading image via API...');
+  clientLogger.debug('[Blob Service] Uploading image via API...');
 
   const extension = mimeType.split('/')[1] || 'png';
   const filename = `upload-${Date.now()}.${extension}`;
@@ -53,7 +54,7 @@ export const uploadImageToBlob = async (
   }
 
   const result = unwrapApiData<{ url: string }>(await response.json());
-  console.debug(`[Blob Service] Image uploaded: ${result.url}`);
+  clientLogger.debug(`[Blob Service] Image uploaded: ${result.url}`);
   return result.url;
 };
 

@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Team Management Component
  * Shows invite + member management for the active organization (= the brand).
@@ -132,7 +133,7 @@ export function TeamManagement() {
         setMembers(membersData as unknown as Member[]);
       }
     } catch (err) {
-      console.error("Failed to load members:", err);
+      clientLogger.error("Failed to load members:", err);
     } finally {
       setIsLoadingMembers(false);
     }

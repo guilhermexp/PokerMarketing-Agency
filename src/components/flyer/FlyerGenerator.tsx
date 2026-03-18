@@ -16,6 +16,7 @@ import { EmptyState } from "../common/EmptyState";
 import type {
   WeekScheduleWithCount,
 } from "../../services/apiClient";
+import { clientLogger } from "@/lib/client-logger";
 
 import type { TimePeriod, Currency } from "@/types/flyer.types";
 export type { TimePeriod, Currency };
@@ -197,7 +198,7 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
               const blob = await response.blob();
               const extension = blob.type.includes('png') ? 'png' : 'jpg';
               folder.file(`flyer-${idx + 1}.${extension}`, blob);
-            } catch (err) { console.error(`Failed to fetch image ${idx}:`, err); }
+            } catch (err) { clientLogger.error(`Failed to fetch image ${idx}:`, err); }
           })
         );
         const content = await zip.generateAsync({ type: 'blob' });
@@ -224,10 +225,10 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
             if (i < images.length - 1) await new Promise(resolve => setTimeout(resolve, 300));
-          } catch (err) { console.error(`Failed to download image ${i}:`, err); }
+          } catch (err) { clientLogger.error(`Failed to download image ${i}:`, err); }
         }
       }
-    } catch (error) { console.error('Download failed:', error); }
+    } catch (error) { clientLogger.error('Download failed:', error); }
   };
 
   const hasNoData = events.length === 0 && !weekScheduleInfo;

@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * FFmpeg core - initialization and helpers
  */
@@ -51,7 +52,7 @@ export const initFFmpeg = async (
     ffmpegInstance = new FFmpeg();
 
     ffmpegInstance.on('log', ({ message }) => {
-      console.debug('[FFmpeg]', message);
+      clientLogger.debug('[FFmpeg]', message);
     });
 
     await ffmpegInstance.load({

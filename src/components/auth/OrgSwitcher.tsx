@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { authClient, getOrganizationApi } from "../../lib/auth-client";
+import { clientLogger } from "@/lib/client-logger";
 
 const orgApi = getOrganizationApi();
 
@@ -29,7 +30,7 @@ export function OrgSwitcher() {
       setIsCreating(false);
       setIsOpen(false);
     } catch (err) {
-      console.error("Failed to create organization:", err);
+      clientLogger.error("Failed to create organization:", err);
     }
   };
 

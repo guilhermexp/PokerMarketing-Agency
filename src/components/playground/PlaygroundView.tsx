@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * PlaygroundView Component
  * Video Studio workspace with 3-panel layout inspired by Image Studio
@@ -491,7 +492,7 @@ const TopicsSidebar: React.FC = () => {
     try {
       await createTopic();
     } catch (err) {
-      console.error('Failed to create topic:', err);
+      clientLogger.error('Failed to create topic:', err);
     } finally {
       setIsCreating(false);
     }

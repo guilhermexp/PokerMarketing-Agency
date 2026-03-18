@@ -13,6 +13,7 @@ import { urlToBase64 } from "../../../utils/imageHelpers";
 import { getErrorMessage } from "../../../utils/errorMessages";
 import { buildThumbnailPrompt } from "@/ai-prompts/clipsPrompts";
 import { DEFAULT_CAMPAIGN_IMAGE_MODEL } from "../../../config/imageGenerationModelOptions";
+import { clientLogger } from "@/lib/client-logger";
 
 const CLIP_ASPECT_RATIO = "9:16" as const;
 import {
@@ -69,7 +70,7 @@ export const useClipsTab = ({
                         (img) => img.source === "Clipe" && img.video_script_id === clip.id
                     );
                     if (exactMatch) {
-                        console.debug('🔄 [useClipsTab] Found exact match in gallery for clip:', {
+                        clientLogger.debug('🔄 [useClipsTab] Found exact match in gallery for clip:', {
                             clipId: clip.id,
                             imageSrc: exactMatch.src.substring(0, 50),
                         });
@@ -81,7 +82,7 @@ export const useClipsTab = ({
                 const existingThumbnail = prevThumbnails[index];
                 if (existingThumbnail && existingThumbnail.src) {
                     if (existingThumbnail.video_script_id === clip.id) {
-                        console.debug('🔄 [useClipsTab] Using existing thumbnail for clip:', {
+                        clientLogger.debug('🔄 [useClipsTab] Using existing thumbnail for clip:', {
                             clipId: clip.id,
                             thumbnailSrc: existingThumbnail.src.substring(0, 50),
                         });
@@ -90,7 +91,7 @@ export const useClipsTab = ({
                 }
 
                 if (clip.thumbnail_url) {
-                    console.debug('🔄 [useClipsTab] Creating thumbnail from clip.thumbnail_url:', {
+                    clientLogger.debug('🔄 [useClipsTab] Creating thumbnail from clip.thumbnail_url:', {
                         clipId: clip.id,
                         thumbnailUrl: clip.thumbnail_url.substring(0, 50),
                     });
@@ -112,7 +113,7 @@ export const useClipsTab = ({
                             img.prompt === clip.image_prompt
                     );
                     if (legacyMatch) {
-                        console.debug('🔄 [useClipsTab] Found legacy match for clip:', {
+                        clientLogger.debug('🔄 [useClipsTab] Found legacy match for clip:', {
                             clipId: clip.id,
                             imageSrc: legacyMatch.src.substring(0, 50),
                         });
@@ -120,7 +121,7 @@ export const useClipsTab = ({
                     }
                 }
 
-                console.debug('🔄 [useClipsTab] No thumbnail found for clip:', clip.id);
+                clientLogger.debug('🔄 [useClipsTab] No thumbnail found for clip:', clip.id);
                 return null;
             });
         });
@@ -168,7 +169,7 @@ export const useClipsTab = ({
                             onUpdateGalleryImage(thumbnail.id, normalizedUrl);
                         }
                     } catch (error) {
-                        console.error(
+                        clientLogger.error(
                             "[useClipsTab] Failed to upload thumbnail to blob:",
                             error
                         );
@@ -180,7 +181,7 @@ export const useClipsTab = ({
                     try {
                         await updateClipThumbnail(clip.id, normalizedUrl);
                     } catch (error) {
-                        console.error(
+                        clientLogger.error(
                             "[useClipsTab] Failed to update clip thumbnail in database:",
                             error
                         );
@@ -225,7 +226,7 @@ export const useClipsTab = ({
                         try {
                             await updateClipThumbnail(clip.id, job.result_url);
                         } catch (err) {
-                            console.error(
+                            clientLogger.error(
                                 "[useClipsTab] Failed to update clip thumbnail in database:",
                                 err
                             );
@@ -324,7 +325,7 @@ export const useClipsTab = ({
                     try {
                         httpUrl = await uploadImageToBlob(base64Data, mimeType);
                     } catch (uploadErr) {
-                        console.error(
+                        clientLogger.error(
                             "[useClipsTab] Failed to upload thumbnail to blob:",
                             uploadErr
                         );
@@ -347,7 +348,7 @@ export const useClipsTab = ({
                     try {
                         await updateClipThumbnail(clip.id, httpUrl);
                     } catch (err) {
-                        console.error(
+                        clientLogger.error(
                             "[useClipsTab] Failed to update clip thumbnail in database:",
                             err
                         );

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import type { ScheduledPost, InstagramPublishState } from '../../types';
 import { ScheduledPostCard } from './ScheduledPostCard';
+import { clientLogger } from "@/lib/client-logger";
 
 interface MonthlyCalendarProps {
   currentDate: Date;
@@ -101,12 +102,12 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
         const dayDate = new Date(day.date);
         return dayDate >= todayDate;
       });
-      console.debug(`Semana ${idx}:`, week.map(d => d.dayNumber).join(', '), '-> visível:', hasCurrentOrFuture);
+      clientLogger.debug(`Semana ${idx}:`, week.map(d => d.dayNumber).join(', '), '-> visível:', hasCurrentOrFuture);
       return hasCurrentOrFuture;
     });
 
-    console.debug('Hoje:', todayStr);
-    console.debug('Semanas visíveis:', visibleWeekIndices);
+    clientLogger.debug('Hoje:', todayStr);
+    clientLogger.debug('Semanas visíveis:', visibleWeekIndices);
 
     return {
       calendarDays: days,

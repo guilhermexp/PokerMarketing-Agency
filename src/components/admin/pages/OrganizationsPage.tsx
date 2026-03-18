@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Organizations Page - Página de organizações
  * Design minimalista com tema dark
@@ -62,7 +63,7 @@ export function OrganizationsPage() {
       setPagination(data.pagination);
       setError(null);
     } catch (err) {
-      console.error('Error fetching organizations:', err);
+      clientLogger.error('Error fetching organizations:', err);
       setError(err instanceof Error ? err.message : 'Falha ao carregar organizações');
     } finally {
       setIsLoading(false);

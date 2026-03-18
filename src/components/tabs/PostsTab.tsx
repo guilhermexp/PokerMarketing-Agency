@@ -29,6 +29,7 @@ import { useGenerationState } from "../../hooks/useGenerationState";
 import { useImageRecoveryEffect } from "../../hooks/useImageRecovery";
 import { updatePostImage } from "../../services/apiClient";
 import { IMAGE_GENERATION_MODEL_OPTIONS } from "../../config/imageGenerationModelOptions";
+import { clientLogger } from "@/lib/client-logger";
 
 interface PostsTabProps {
   posts: Post[];
@@ -100,7 +101,7 @@ const PostCard: React.FC<{
           setTimeout(() => setIsCopied(false), 2500);
         },
         (err) => {
-          console.error("Failed to copy text: ", err);
+          clientLogger.error("Failed to copy text: ", err);
           alert("Falha ao copiar o texto.");
         },
       );
@@ -335,7 +336,7 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
             try {
               await updatePostImage(post.id, job.result_url);
             } catch (err) {
-              console.error(
+              clientLogger.error(
                 "[PostsTab] Failed to update post image in database:",
                 err,
               );
@@ -437,15 +438,15 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
         const mimeType = header.match(/:(.*?);/)?.[1] || "image/png";
         try {
           httpUrl = await uploadImageToBlob(base64Data, mimeType);
-          console.debug("[PostsTab] Uploaded to blob:", httpUrl);
+          clientLogger.debug("[PostsTab] Uploaded to blob:", httpUrl);
         } catch (uploadErr) {
-          console.error("[PostsTab] Failed to upload to blob:", uploadErr);
+          clientLogger.error("[PostsTab] Failed to upload to blob:", uploadErr);
           // Fall back to data URL (won't persist but will show)
         }
       }
 
       const source = getPostSource(index, post.platform);
-      console.debug("[PostsTab] Saving image to gallery with source:", source);
+      clientLogger.debug("[PostsTab] Saving image to gallery with source:", source);
       const galleryImage = onAddImageToGallery({
         src: httpUrl,
         prompt: post.image_prompt,
@@ -466,15 +467,15 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
       if (currentPostId) {
         try {
           await updatePostImage(currentPostId, httpUrl);
-          console.debug("[PostsTab] Saved image to database for post:", currentPostId);
+          clientLogger.debug("[PostsTab] Saved image to database for post:", currentPostId);
         } catch (err) {
-          console.error(
+          clientLogger.error(
             "[PostsTab] Failed to update post image in database:",
             err,
           );
         }
       } else {
-        console.warn("[PostsTab] Post has no ID, cannot save image to database. Image saved to gallery only.");
+        clientLogger.warn("[PostsTab] Post has no ID, cannot save image to database. Image saved to gallery only.");
       }
     } catch (err: unknown) {
       failGenerating(index, getErrorMessage(err));
@@ -511,9 +512,9 @@ export const PostsTab = React.memo<PostsTabProps>(function PostsTab({
       if (post?.id) {
         try {
           await updatePostImage(post.id, newSrc);
-          console.debug("[PostsTab] Updated post image in database:", post.id);
+          clientLogger.debug("[PostsTab] Updated post image in database:", post.id);
         } catch (err) {
-          console.error("[PostsTab] Failed to update post image in database:", err);
+          clientLogger.error("[PostsTab] Failed to update post image in database:", err);
         }
       }
     }

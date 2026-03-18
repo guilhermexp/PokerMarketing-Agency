@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Tournament Handlers Hook
  *
@@ -160,7 +161,7 @@ export function useTournamentHandlers({
 
         // Only clear daily flyer state when SWITCHING schedules (not on initial load or reload)
         if (isSwitchingSchedule) {
-          console.debug(
+          clientLogger.debug(
             "[Tournament] Switching schedules, clearing flyer state"
           );
           setDailyFlyerState({});
@@ -191,11 +192,11 @@ export function useTournamentHandlers({
           daily_flyer_urls: schedule.daily_flyer_urls,
         });
 
-        console.debug(
+        clientLogger.debug(
           `[Tournament] Selected schedule ${schedule.id} with ${mappedEvents.length} events`
         );
       } catch (error: unknown) {
-        console.error("[Tournament] Failed to load schedule events:", error);
+        clientLogger.error("[Tournament] Failed to load schedule events:", error);
       }
     },
     [
@@ -213,12 +214,12 @@ export function useTournamentHandlers({
 
   const handleTournamentFileUpload = useCallback(
     (file: File): Promise<void> => {
-      console.debug("[Upload] Starting file upload:", file.name);
+      clientLogger.debug("[Upload] Starting file upload:", file.name);
       return new Promise<void>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = async (e) => {
           try {
-            console.debug("[Upload] File read complete, parsing...");
+            clientLogger.debug("[Upload] File read complete, parsing...");
             const data = new Uint8Array(e.target!.result as ArrayBuffer);
             const XLSX = await import("xlsx");
             const wb = XLSX.read(data, { type: "array" });
@@ -269,7 +270,7 @@ export function useTournamentHandlers({
                 });
               }
             });
-            console.debug("[Upload] Parsed", events.length, "events from file");
+            clientLogger.debug("[Upload] Parsed", events.length, "events from file");
             setTournamentEvents(events);
 
             // Extract week info from filename or sheet name
@@ -295,11 +296,11 @@ export function useTournamentHandlers({
               };
             }
 
-            console.debug("[Upload] WeekInfo:", weekInfo);
+            clientLogger.debug("[Upload] WeekInfo:", weekInfo);
             setWeekScheduleInfo(weekInfo);
 
             // Save to database if authenticated
-            console.debug("[Upload] userId:", userId);
+            clientLogger.debug("[Upload] userId:", userId);
             if (userId) {
               try {
                 // Parse dates for database (convert DD/MM to YYYY-MM-DD)
@@ -340,7 +341,7 @@ export function useTournamentHandlers({
 
                 setCurrentScheduleId(result.schedule.id);
                 setIsWeekExpired(false);
-                console.debug(
+                clientLogger.debug(
                   `[Tournament] Saved ${result.eventsCount} events to database`
                 );
 
@@ -351,7 +352,7 @@ export function useTournamentHandlers({
                 );
                 setAllSchedules(schedulesData.schedules);
               } catch (dbErr) {
-                console.error(
+                clientLogger.error(
                   "[Tournament] Failed to save to database:",
                   dbErr
                 );
@@ -359,7 +360,7 @@ export function useTournamentHandlers({
               }
             }
 
-            console.debug(
+            clientLogger.debug(
               "[Upload] Complete! Events:",
               events.length,
               "WeekInfo:",
@@ -369,7 +370,7 @@ export function useTournamentHandlers({
             );
             resolve();
           } catch (err) {
-            console.error("[Upload] Error:", err);
+            clientLogger.error("[Upload] Error:", err);
             reject(err);
           }
         };
@@ -399,9 +400,9 @@ export function useTournamentHandlers({
           setWeekScheduleInfo(null);
           setIsWeekExpired(false);
         }
-        console.debug("[Tournament] Deleted schedule:", scheduleId);
+        clientLogger.debug("[Tournament] Deleted schedule:", scheduleId);
       } catch (e) {
-        console.error("[Tournament] Failed to delete schedule:", e);
+        clientLogger.error("[Tournament] Failed to delete schedule:", e);
       }
     },
     [
@@ -425,7 +426,7 @@ export function useTournamentHandlers({
         setWeekScheduleInfo(null);
         setIsWeekExpired(false);
       } catch (e) {
-        console.error("[Tournament] Failed to clear expired schedule:", e);
+        clientLogger.error("[Tournament] Failed to clear expired schedule:", e);
       }
     }
   }, [

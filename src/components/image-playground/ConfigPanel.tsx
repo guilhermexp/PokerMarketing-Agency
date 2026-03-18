@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * ConfigPanel
  * Left sidebar with model selection, reference images (up to 14), resolution, proportions, and quantity
@@ -208,7 +209,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
             );
           })
           .catch((err) => {
-            console.error('[ConfigPanel] Blob upload failed, will use base64 fallback:', err);
+            clientLogger.error('[ConfigPanel] Blob upload failed, will use base64 fallback:', err);
             setUploadingImageIds(
               useImagePlaygroundStore.getState().uploadingImageIds.filter((id) => id !== imageId)
             );

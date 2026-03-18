@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Image Playground Store
  * Zustand store for managing image generation playground state
@@ -295,7 +296,7 @@ const safePersistStorage = createJSONStorage((): StateStorage => {
       } catch (error) {
         if (isQuotaExceededError(error)) {
           persistenceDisabledForSession = true;
-          console.warn('[ImagePlaygroundStore] localStorage quota exceeded; skipping persistence for now');
+          clientLogger.warn('[ImagePlaygroundStore] localStorage quota exceeded; skipping persistence for now');
           try {
             window.localStorage.removeItem(name);
           } catch {

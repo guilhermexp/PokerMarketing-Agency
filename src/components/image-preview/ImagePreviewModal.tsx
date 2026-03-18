@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * ImagePreviewModal
  *
@@ -51,7 +52,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 
   // Log when image.src changes
   useEffect(() => {
-    console.debug('📸 [ImagePreviewModal] image.src changed:', {
+    clientLogger.debug('📸 [ImagePreviewModal] image.src changed:', {
       imageId: image.id,
       src: image.src.substring(0, 50),
     });
@@ -124,7 +125,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     // Tool approval mode
     pendingToolEdit,
     onToolEditComplete: (imageUrl: string) => {
-      console.debug('🔗 [ImagePreviewModal] onToolEditComplete called:', {
+      clientLogger.debug('🔗 [ImagePreviewModal] onToolEditComplete called:', {
         imageUrl,
         isToolApprovalMode,
         hasOnToolEditApproved: !!onToolEditApproved,
@@ -133,10 +134,10 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       });
 
       if (isToolApprovalMode && onToolEditApproved && pendingToolEdit) {
-        console.debug('🔗 [ImagePreviewModal] Calling onToolEditApproved');
+        clientLogger.debug('🔗 [ImagePreviewModal] Calling onToolEditApproved');
         onToolEditApproved(pendingToolEdit.toolCallId, imageUrl);
       } else {
-        console.warn('🔗 [ImagePreviewModal] NOT calling onToolEditApproved:', {
+        clientLogger.warn('🔗 [ImagePreviewModal] NOT calling onToolEditApproved:', {
           isToolApprovalMode,
           hasOnToolEditApproved: !!onToolEditApproved,
           hasPendingToolEdit: !!pendingToolEdit,

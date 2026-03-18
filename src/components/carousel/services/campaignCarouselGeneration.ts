@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Campaign carousel generation helpers
  */
@@ -70,7 +71,7 @@ export const generateCampaignCover = async (
           const base64Data = base64.split(',')[1];
           productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
         } catch (err) {
-          console.error('[CarrosselTab] Failed to fetch chat reference image:', err);
+          clientLogger.error('[CarrosselTab] Failed to fetch chat reference image:', err);
         }
       }
     }
@@ -96,7 +97,7 @@ export const generateCampaignCover = async (
           const base64Data = base64.split(',')[1];
           productImages.push({ base64: base64Data, mimeType: blob.type || 'image/png' });
         } catch (err) {
-          console.error('[CarrosselTab] Failed to fetch brand logo:', err);
+          clientLogger.error('[CarrosselTab] Failed to fetch brand logo:', err);
         }
       }
     }
@@ -121,7 +122,7 @@ export const generateCampaignCover = async (
           const base64Data = base64.split(',')[1];
           productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
         } catch (err) {
-          console.error('[CarrosselTab] Failed to fetch style reference image:', err);
+          clientLogger.error('[CarrosselTab] Failed to fetch style reference image:', err);
         }
       }
     }
@@ -158,7 +159,7 @@ export const generateCampaignCover = async (
       context.onCarouselUpdate?.(converted);
     }
   } catch (err) {
-    console.error('[CarrosselTab] Failed to generate carousel cover:', err);
+    clientLogger.error('[CarrosselTab] Failed to generate carousel cover:', err);
   } finally {
     context.setGeneratingCarousel((prev) => ({ ...prev, [key]: false }));
   }
@@ -171,7 +172,7 @@ export const generateCampaignSlide = async (
   context: GenerationContext,
 ) => {
   if (!carousel.cover_url) {
-    console.error('[CarrosselTab] Cannot generate slide without cover image');
+    clientLogger.error('[CarrosselTab] Cannot generate slide without cover image');
     return;
   }
 
@@ -181,7 +182,7 @@ export const generateCampaignSlide = async (
   try {
     const coverData = await urlToBase64(carousel.cover_url);
     if (!coverData) {
-      console.error('[CarrosselTab] Failed to convert cover to base64');
+      clientLogger.error('[CarrosselTab] Failed to convert cover to base64');
       return;
     }
 
@@ -222,7 +223,7 @@ export const generateCampaignSlide = async (
           const base64Data = base64.split(',')[1];
           productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
         } catch (err) {
-          console.error('[CarrosselTab] Failed to fetch chat reference image:', err);
+          clientLogger.error('[CarrosselTab] Failed to fetch chat reference image:', err);
         }
       }
     }
@@ -248,7 +249,7 @@ export const generateCampaignSlide = async (
           const base64Data = base64.split(',')[1];
           productImages.push({ base64: base64Data, mimeType: blob.type || 'image/png' });
         } catch (err) {
-          console.error('[CarrosselTab] Failed to fetch brand logo:', err);
+          clientLogger.error('[CarrosselTab] Failed to fetch brand logo:', err);
         }
       }
     }
@@ -273,7 +274,7 @@ export const generateCampaignSlide = async (
           const base64Data = base64.split(',')[1];
           productImages.push({ base64: base64Data, mimeType: blob.type || 'image/jpeg' });
         } catch (err) {
-          console.error('[CarrosselTab] Failed to fetch style reference image:', err);
+          clientLogger.error('[CarrosselTab] Failed to fetch style reference image:', err);
         }
       }
     }
@@ -312,7 +313,7 @@ export const generateCampaignSlide = async (
       context.onCarouselUpdate?.(converted);
     }
   } catch (err) {
-    console.error(
+    clientLogger.error(
       `[CarrosselTab] Failed to generate slide ${slideNumber}:`,
       err,
     );
@@ -334,16 +335,16 @@ export const generateAllCampaignCarouselImages = async (
 
     if (!currentCarousel.cover_url) {
       if (context.shouldPause?.()) {
-        console.debug('[CarrosselTab] Generation paused before cover');
+        clientLogger.debug('[CarrosselTab] Generation paused before cover');
         return;
       }
-      console.debug('[CarrosselTab] Generating cover...');
+      clientLogger.debug('[CarrosselTab] Generating cover...');
       await generateCampaignCover(currentCarousel, context);
 
       await new Promise((resolve) => setTimeout(resolve, 800));
 
       if (context.shouldPause?.()) {
-        console.debug('[CarrosselTab] Generation paused after cover');
+        clientLogger.debug('[CarrosselTab] Generation paused after cover');
         return;
       }
 
@@ -351,15 +352,15 @@ export const generateAllCampaignCarouselImages = async (
         context.localCarouselsRef.current.find((c) => c.id === carouselId) ||
         currentCarousel;
       if (!currentCarousel?.cover_url) {
-        console.error('[CarrosselTab] Cover generation failed, stopping');
+        clientLogger.error('[CarrosselTab] Cover generation failed, stopping');
         return;
       }
     }
 
-    console.debug('[CarrosselTab] Generating slides...');
+    clientLogger.debug('[CarrosselTab] Generating slides...');
     for (let i = 0; i < currentCarousel.slides.length; i++) {
       if (context.shouldPause?.()) {
-        console.debug('[CarrosselTab] Generation paused during slides');
+        clientLogger.debug('[CarrosselTab] Generation paused during slides');
         break;
       }
       currentCarousel =
@@ -378,8 +379,8 @@ export const generateAllCampaignCarouselImages = async (
       }
     }
 
-    console.debug('[CarrosselTab] All carousel images generated!');
+    clientLogger.debug('[CarrosselTab] All carousel images generated!');
   } catch (err) {
-    console.error('[CarrosselTab] Failed to generate all carousel images:', err);
+    clientLogger.error('[CarrosselTab] Failed to generate all carousel images:', err);
   }
 };

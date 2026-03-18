@@ -9,6 +9,7 @@ import { ChatPanelSlideIn } from '../chat-panel/ChatPanelSlideIn';
 import { FreeCropOverlay } from '../FreeCropOverlay';
 import type { GalleryImage, PendingToolEdit, EditPreview, ImageFile, Dimensions, ResizedPreview } from '../types';
 import '../preview-overlay.css';
+import { clientLogger } from "@/lib/client-logger";
 
 interface ImagePreviewOverlayProps {
   visible: boolean;
@@ -129,7 +130,7 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
 
   // Log when image.src changes
   useEffect(() => {
-    console.debug('🎨 [ImagePreviewOverlay] image.src changed:', {
+    clientLogger.debug('🎨 [ImagePreviewOverlay] image.src changed:', {
       imageId: image.id,
       src: image.src.substring(0, 50),
     });
@@ -210,7 +211,7 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
       // Clean up the blob URL
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Failed to download image:', error);
+      clientLogger.error('Failed to download image:', error);
       // Fallback: open in new tab
       window.open(image.src, '_blank');
     }
