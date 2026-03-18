@@ -348,8 +348,42 @@ const sessionsOutputSchema = z.object({
   sessions: z.array(genericRecordSchema),
 });
 
+const generationAssetSchema = z.object({
+  url: z.string(),
+  width: z.number(),
+  height: z.number(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+});
+
+const generationJsonSchema = z.object({
+  id: z.string(),
+  batchId: z.string(),
+  userId: z.string(),
+  asyncTaskId: z.string().nullable(),
+  seed: z.number().nullable(),
+  asset: generationAssetSchema.nullable(),
+  createdAt: z.string(),
+});
+
+const batchSchema = z.object({
+  id: z.string(),
+  topicId: z.string(),
+  userId: z.string(),
+  organizationId: z.string().nullable(),
+  provider: z.string(),
+  model: z.string(),
+  prompt: z.string(),
+  config: z.record(z.string(), jsonLikeSchema),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+  createdAt: z.string(),
+  userEmail: z.string().nullable(),
+  generations: z.array(generationJsonSchema),
+});
+
 const batchesOutputSchema = z.object({
-  batches: z.array(genericRecordSchema),
+  batches: z.array(batchSchema),
 });
 
 const filesOutputSchema = z.object({
@@ -1472,7 +1506,12 @@ export const routeContracts: ApiRouteContract[] = [
     response: {
       kind: "json",
       status: 200,
-      schema: genericSuccessSchema.extend({ data: genericRecordSchema.optional() }),
+      schema: genericSuccessSchema.extend({
+        data: z.object({
+          batch: batchSchema,
+          generations: z.array(generationJsonSchema),
+        }).optional(),
+      }),
       description: "Image generation result",
     },
     summary: "Generate image",
