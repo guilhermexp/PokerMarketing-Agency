@@ -18,7 +18,7 @@ export const envSchema = z.object({
   // Required
   DATABASE_URL: requiredEnv,
   BETTER_AUTH_SECRET: requiredEnv,
-  CSRF_SECRET: requiredEnv,
+  CSRF_SECRET: process.env.NODE_ENV === "production" ? requiredEnv : optionalEnv,
   GEMINI_API_KEY: requiredEnv,
 
   // Optional storage/AI providers

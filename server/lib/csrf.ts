@@ -20,8 +20,12 @@ function resolveCsrfSecret(): string {
     return envSecret;
   }
 
+  if (process.env.NODE_ENV !== 'production') {
+    return 'dev-csrf-secret-not-for-production';
+  }
+
   throw new Error(
-    'CSRF_SECRET environment variable must be set. ' +
+    'CSRF_SECRET environment variable must be set in production. ' +
     'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"'
   );
 }
