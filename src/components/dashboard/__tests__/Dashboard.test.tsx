@@ -124,6 +124,6 @@ describe("Dashboard", () => {
     }) as Parameters<typeof Dashboard>[0];
     render(<Dashboard {...props} />);
 
-    expect(screen.queryByPlaceholderText("Descreva sua ideia...")).toBeNull();
+    expect(screen.queryByText("upload-form")).toBeNull();
   });
 });
