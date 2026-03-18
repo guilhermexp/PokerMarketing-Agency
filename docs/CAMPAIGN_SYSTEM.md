@@ -1,5 +1,17 @@
 # 📘 Sistema de Campanhas - Documentação Completa
 
+## Status atual da implementação
+
+Este documento cobre o domínio de campanhas, mas parte da instrumentação histórica cita Next.js, Clerk, Bun ou arquivos `.mjs`.
+
+Para o runtime atual deste projeto, considere como fonte de verdade:
+
+- Frontend: Vite + React + React Router
+- Backend: Express 5 em TypeScript
+- Auth: Better Auth
+- Estado: SWR para server state, Zustand para estado client-only
+- Cliente HTTP: `src/services/apiClient.ts` com módulos em `src/services/api-client/`
+
 > **Guia Técnico Completo para Desenvolvedores**
 >
 > Documentação abrangente do sistema de campanhas de marketing com IA, incluindo arquitetura, APIs, schemas de dados e guia completo de clonagem para novos projetos.

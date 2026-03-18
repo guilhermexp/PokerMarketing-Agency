@@ -1,13 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { useCampaignsStore } from "../campaigns-store";
-import type { CampaignSummary, CarouselScript, MarketingCampaign } from "@/types";
-
-const summary: CampaignSummary = {
-  id: "campaign-1",
-  name: "Launch",
-  status: "draft",
-  createdAt: "2026-03-18T00:00:00.000Z",
-};
+import type { CarouselScript, MarketingCampaign } from "@/types";
 
 const campaign: MarketingCampaign = {
   id: "campaign-1",
@@ -31,18 +24,11 @@ describe("useCampaignsStore", () => {
     useCampaignsStore.getState().resetCampaignState();
   });
 
-  it("adiciona e atualiza um resumo de campanha sem duplicar ids", () => {
-    useCampaignsStore.getState().addCampaignSummary(summary);
-    useCampaignsStore.getState().addCampaignSummary({ ...summary, name: "Updated" });
-    useCampaignsStore.getState().updateCampaignSummary("campaign-1", { status: "ready" });
-
-    expect(useCampaignsStore.getState().campaignsList).toEqual([
-      { ...summary, name: "Updated", status: "ready" },
-    ]);
-  });
-
-  it("remove a campanha ativa e atualiza o carousel correto", () => {
+  it("atualiza o carousel correto e reseta o estado client-only", () => {
     useCampaignsStore.getState().setCampaign(campaign);
+    useCampaignsStore.getState().setCampaignProductImages([
+      { base64: "abc", mimeType: "image/png" },
+    ]);
 
     const updatedCarousel: CarouselScript = {
       ...campaign.carousels[0],
@@ -54,7 +40,8 @@ describe("useCampaignsStore", () => {
       "Carousel atualizado",
     );
 
-    useCampaignsStore.getState().removeCampaignSummary("campaign-1");
+    useCampaignsStore.getState().resetCampaignState();
     expect(useCampaignsStore.getState().campaign).toBeNull();
+    expect(useCampaignsStore.getState().campaignProductImages).toBeNull();
   });
 });

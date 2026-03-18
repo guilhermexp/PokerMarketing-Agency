@@ -5,7 +5,7 @@ import { clientLogger } from "@/lib/client-logger";
  * Thin orchestration component that connects stores, hooks, and renders UI.
  */
 
-import React, { Suspense, lazy, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { Suspense, lazy, useEffect, useRef, useMemo, useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Components
@@ -52,7 +52,8 @@ import { useTransformedGalleryImages, useTransformedScheduledPosts, useTransform
 import { useDailyFlyersSync } from "./hooks/useDailyFlyersSync";
 
 // Types
-import type { BrandProfile } from "./types";
+import type { BrandProfile, TournamentEvent, WeekScheduleInfo } from "./types";
+import type { WeekScheduleWithCount } from "./services/apiClient";
 
 // =============================================================================
 // Constants
@@ -105,6 +106,11 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
   const showOnboarding = useBrandProfileStore((s) => s.showOnboarding);
   const setShowOnboarding = useBrandProfileStore((s) => s.setShowOnboarding);
 
+  const [tournamentEvents, setTournamentEvents] = useState<TournamentEvent[]>([]);
+  const [allSchedules, setAllSchedules] = useState<WeekScheduleWithCount[]>([]);
+  const [weekScheduleInfo, setWeekScheduleInfo] = useState<WeekScheduleInfo | null>(null);
+  const [isWeekExpired, setIsWeekExpired] = useState(false);
+
   // Stores - Campaigns
   const campaign = useCampaignsStore((s) => s.campaign);
   const setCampaign = useCampaignsStore((s) => s.setCampaign);
@@ -149,22 +155,12 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
   // Stores - Gallery & Posts
   const selectedStyleReference = useGalleryStore((s) => s.selectedStyleReference);
   const setSelectedStyleReference = useGalleryStore((s) => s.setSelectedStyleReference);
-  const scheduledPosts = useScheduledPostsStore((s) => s.scheduledPosts);
-  const setScheduledPosts = useScheduledPostsStore((s) => s.setScheduledPosts);
   const publishingStates = useScheduledPostsStore((s) => s.publishingStates);
   const setPublishingStates = useScheduledPostsStore((s) => s.setPublishingStates);
 
   // Stores - Tournament
-  const tournamentEvents = useTournamentStore((s) => s.tournamentEvents);
-  const setTournamentEvents = useTournamentStore((s) => s.setTournamentEvents);
-  const allSchedules = useTournamentStore((s) => s.allSchedules);
-  const setAllSchedules = useTournamentStore((s) => s.setAllSchedules);
-  const weekScheduleInfo = useTournamentStore((s) => s.weekScheduleInfo);
-  const setWeekScheduleInfo = useTournamentStore((s) => s.setWeekScheduleInfo);
   const currentScheduleId = useTournamentStore((s) => s.currentScheduleId);
   const setCurrentScheduleId = useTournamentStore((s) => s.setCurrentScheduleId);
-  const isWeekExpired = useTournamentStore((s) => s.isWeekExpired);
-  const setIsWeekExpired = useTournamentStore((s) => s.setIsWeekExpired);
   const flyerState = useTournamentStore((s) => s.flyerState);
   const setFlyerState = useTournamentStore((s) => s.setFlyerState);
   const dailyFlyerState = useTournamentStore((s) => s.dailyFlyerState);
@@ -179,7 +175,11 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
   const setLastLoadedOrgId = useTournamentStore((s) => s.setLastLoadedOrgId);
   const hasAutoLoadedSchedule = useTournamentStore((s) => s.hasAutoLoadedSchedule);
   const setHasAutoLoadedSchedule = useTournamentStore((s) => s.setHasAutoLoadedSchedule);
-  const handleAddTournamentEvent = useTournamentStore((s) => s.addTournamentEvent);
+  const handleAddTournamentEvent = useCallback(
+    (event: TournamentEvent) =>
+      setTournamentEvents((current) => [event, ...current]),
+    [],
+  );
 
   // SWR Data
   const { data: initialData, isLoading: isInitialLoading } = useInitialData(isOrgReady ? clerkUserId : null, organizationId, clerkUserId);
@@ -197,6 +197,7 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
   const styleReferences = useStyleReferences(swrGalleryImages);
   const galleryImages = transformedGalleryImages;
   const campaignsList = transformedCampaignsList;
+  const scheduledPosts = transformedScheduledPosts;
 
   // Computed
   const instagramContext = useMemo(() => {
@@ -224,7 +225,6 @@ export function MainAppController({ routeView }: MainAppControllerProps) {
   const handleEditProfile = useCallback(() => setIsEditingProfile(true), [setIsEditingProfile]);
 
   // Effects - State Sync
-  useEffect(() => { setScheduledPosts(transformedScheduledPosts); }, [setScheduledPosts, transformedScheduledPosts]);
   useEffect(() => { if (swrTournamentEvents?.length) setTournamentEvents(swrTournamentEvents.map(mapDbEventToTournamentEvent)); else if (tournamentEvents.length) setTournamentEvents([]); }, [swrTournamentEvents, setTournamentEvents, tournamentEvents.length]);
   useEffect(() => { if (swrAllSchedules?.length) setAllSchedules(swrAllSchedules); else if (allSchedules.length) setAllSchedules([]); }, [swrAllSchedules, setAllSchedules, allSchedules.length]);
 
