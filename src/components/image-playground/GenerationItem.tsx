@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * GenerationItem
  * Displays a single generation with loading/success/error states
@@ -66,7 +67,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
               await api.updateTopic(topicId, { coverUrl: gen.asset.url });
               updateTopicStore(topicId, { coverUrl: gen.asset.url });
             } catch (err) {
-              console.error('[GenerationItem] Failed to update topic cover:', err);
+              clientLogger.error('[GenerationItem] Failed to update topic cover:', err);
             }
           }
         }
@@ -101,7 +102,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Failed to download image:', error);
+      clientLogger.error('Failed to download image:', error);
       window.open(generation.asset.url, '_blank');
     }
   }, [generation]);
@@ -141,7 +142,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       };
       reader.readAsDataURL(blob);
     } catch (error) {
-      console.error('Failed to add reference image:', error);
+      clientLogger.error('Failed to add reference image:', error);
     }
   }, [generation.asset?.url]);
 
@@ -153,7 +154,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       src: generation.asset.url,
       prompt: '',
       source: 'playground',
-      model: 'gemini-3-pro-image-preview' as any,
+      model: 'gemini-3-pro-image-preview' as const,
       aspectRatio: undefined,
       imageSize: undefined,
       mediaType: 'image',
@@ -168,29 +169,26 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
     }
   }, [generation.id, deleteGeneration]);
 
+  const [isRetrying, setIsRetrying] = useState(false);
+
   const handleRetry = useCallback(async () => {
-    const { batchesMap, addBatch } = useImagePlaygroundStore.getState();
-    const batches = batchesMap[topicId] || [];
-    const batch = batches.find(b => b.generations.some(g => g.id === generation.id));
-    if (!batch) return;
+    if (isRetrying) return; // debounce
+    setIsRetrying(true);
 
-    // Delete the failed generation first
-    await deleteGeneration(generation.id);
+    try {
+      const result = await api.retryGeneration(generation.id);
 
-    // Re-create with the same config, imageNum=1
-    const result = await api.createImage({
-      topicId,
-      provider: batch.provider,
-      model: batch.model,
-      imageNum: 1,
-      params: {
-        prompt: batch.prompt,
-        ...(batch.config as Record<string, unknown>),
-      },
-    });
-
-    addBatch(topicId, result.data.batch);
-  }, [generation.id, topicId, deleteGeneration]);
+      if (result.success && result.generation) {
+        // Update the generation in-place with the new asyncTaskId
+        // This changes the SWR key so polling auto-restarts
+        updateGeneration(topicId, generation.id, result.generation);
+      }
+    } catch (err) {
+      clientLogger.error('[GenerationItem] Retry failed:', err);
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [generation.id, topicId, isRetrying, updateGeneration]);
 
   // Loading State
   if (!generation.asset) {
@@ -206,7 +204,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
         )}
         {status === 'error' ? (
           <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-            <GenerationError error={pollingError} onDelete={handleDelete} onRetry={handleRetry} />
+            <GenerationError error={pollingError} onDelete={handleDelete} onRetry={handleRetry} isRetrying={isRetrying} />
           </div>
         ) : (
           <>
@@ -349,9 +347,10 @@ interface GenerationErrorProps {
   error: unknown;
   onDelete: () => void;
   onRetry?: () => void;
+  isRetrying?: boolean;
 }
 
-function GenerationError({ error, onDelete, onRetry }: GenerationErrorProps) {
+function GenerationError({ error, onDelete, onRetry, isRetrying }: GenerationErrorProps) {
   const errorObj = error && typeof error === 'object' ? (error as Record<string, unknown>) : null;
   const code = errorObj?.code as string | undefined;
   const message = errorObj?.message as string | undefined;
@@ -415,10 +414,11 @@ function GenerationError({ error, onDelete, onRetry }: GenerationErrorProps) {
         {onRetry && (
           <button
             onClick={onRetry}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] text-white/50 text-xs hover:bg-white/[0.12] transition-colors"
+            disabled={isRetrying}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] text-white/50 text-xs hover:bg-white/[0.12] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <RotateCw className="w-3 h-3" />
-            Tentar novamente
+            <RotateCw className={`w-3 h-3 ${isRetrying ? 'animate-spin' : ''}`} />
+            {isRetrying ? 'Tentando...' : 'Tentar novamente'}
           </button>
         )}
         <button
@@ -441,4 +441,3 @@ function formatTime(seconds: number): string {
   return `${mins}m ${secs}s`;
 }
 
-export default GenerationItem;

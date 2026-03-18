@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Database API - Core data operations
  *
@@ -45,12 +46,12 @@ export async function getInitialData(
   if (organizationId) params.append('organization_id', organizationId);
   if (clerkUserId) params.append('clerk_user_id', clerkUserId);
 
-  console.debug('[API] Loading all initial data in single request...');
+  clientLogger.debug('[API] Loading all initial data in single request...');
   const start = Date.now();
 
   const result = await fetchApi<InitialData>(`/init?${params}`);
 
-  console.debug(
+  clientLogger.debug(
     `[API] ✅ Initial data loaded in ${Date.now() - start}ms (server: ${result._meta?.loadTime}ms)`,
   );
 
@@ -221,7 +222,7 @@ export async function updateGalleryImage(
 ): Promise<DbGalleryImage | null> {
   // Skip if it's a temporary ID (not yet saved to database)
   if (id.startsWith('temp-')) {
-    console.debug('[API] Skipping updateGalleryImage for temp ID:', id);
+    clientLogger.debug('[API] Skipping updateGalleryImage for temp ID:', id);
     return null;
   }
 

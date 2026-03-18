@@ -27,6 +27,7 @@ import { useFavoriteToggle } from "../../hooks/useFavoriteToggle";
 import { useGenerationState } from "../../hooks/useGenerationState";
 import { useImageRecoveryEffect } from "../../hooks/useImageRecovery";
 import { IMAGE_GENERATION_MODEL_OPTIONS } from "../../config/imageGenerationModelOptions";
+import { clientLogger } from "@/lib/client-logger";
 
 interface AdCreativesTabProps {
   adCreatives: AdCreative[];
@@ -96,7 +97,7 @@ const AdCard: React.FC<{
           setTimeout(() => setIsCopied(false), 2500);
         },
         (err) => {
-          console.error("Failed to copy text: ", err);
+          clientLogger.error("Failed to copy text: ", err);
           alert("Falha ao copiar o texto.");
         },
       );
@@ -205,7 +206,7 @@ const AdCard: React.FC<{
               </Button>
             )}
           </div>
-          {error && <p className="text-red-400 text-[9px] px-4 pb-3">{error}</p>}
+          {error ? <p className="text-red-400 text-[9px] px-4 pb-3">{error}</p> : null}
         </div>
         {editingImage && (
           <ImagePreviewModal
@@ -233,7 +234,7 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
   onRemoveStyleReference,
   selectedStyleReference,
   compositionAssets,
-  userId,
+  userId: _userId,
   galleryImages,
   campaignId,
   onQuickPost,
@@ -311,7 +312,7 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
             try {
               await updateAdCreativeImage(ad.id, job.result_url);
             } catch (err) {
-              console.error(
+              clientLogger.error(
                 "[AdCreativesTab] Failed to update ad image in database:",
                 err,
               );
@@ -346,7 +347,7 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
   ]);
 
   const handleGenerate = async (index: number) => {
-    console.debug("[AdCreativesTab] handleGenerate called, referenceImage:", referenceImage ? "present" : "null");
+    clientLogger.debug("[AdCreativesTab] handleGenerate called, referenceImage:", referenceImage ? "present" : "null");
     if (selectedImageModel === "gemini-3-pro-image-preview") {
       if (
         window.aistudio &&
@@ -394,7 +395,7 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
           aspectRatio: "1.91:1",
           model: selectedImageModel,
           productImages: productImages.length > 0 ? productImages : undefined,
-          compositionAssets: compositionAssets?.length > 0 ? compositionAssets : undefined,
+          compositionAssets: (compositionAssets?.length ?? 0) > 0 ? compositionAssets : undefined,
         },
       );
 
@@ -405,9 +406,9 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
         const mimeType = header.match(/:(.*?);/)?.[1] || "image/png";
         try {
           httpUrl = await uploadImageToBlob(base64Data, mimeType);
-          console.debug("[AdCreativesTab] Uploaded to blob:", httpUrl);
+          clientLogger.debug("[AdCreativesTab] Uploaded to blob:", httpUrl);
         } catch (uploadErr) {
-          console.error("[AdCreativesTab] Failed to upload to blob:", uploadErr);
+          clientLogger.error("[AdCreativesTab] Failed to upload to blob:", uploadErr);
           // Fall back to data URL (won't persist but will show)
         }
       }
@@ -432,15 +433,15 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
       if (currentAdId) {
         try {
           await updateAdCreativeImage(currentAdId, httpUrl);
-          console.debug("[AdCreativesTab] Saved image to database for ad:", currentAdId);
+          clientLogger.debug("[AdCreativesTab] Saved image to database for ad:", currentAdId);
         } catch (err) {
-          console.error(
+          clientLogger.error(
             "[AdCreativesTab] Failed to update ad image in database:",
             err,
           );
         }
       } else {
-        console.warn("[AdCreativesTab] Ad has no ID, cannot save image to database. Image saved to gallery only.");
+        clientLogger.warn("[AdCreativesTab] Ad has no ID, cannot save image to database. Image saved to gallery only.");
       }
     } catch (err: unknown) {
       failGenerating(index, getErrorMessage(err));
@@ -477,9 +478,9 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
       if (ad?.id) {
         try {
           await updateAdCreativeImage(ad.id, newSrc);
-          console.debug("[AdCreativesTab] Updated ad image in database:", ad.id);
+          clientLogger.debug("[AdCreativesTab] Updated ad image in database:", ad.id);
         } catch (err) {
-          console.error("[AdCreativesTab] Failed to update ad image in database:", err);
+          clientLogger.error("[AdCreativesTab] Failed to update ad image in database:", err);
         }
       }
     }
@@ -538,7 +539,7 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
                 onImageClick={image ? () => setEditingAdImage({ image, index, platform: ad.platform }) : undefined}
                 imagePrompt={ad.image_prompt}
                 error={errors[index]}
-                galleryImage={image}
+                galleryImage={image ?? undefined}
               />
             );
           }
@@ -558,7 +559,7 @@ export const AdCreativesTab = React.memo<AdCreativesTabProps>(function AdCreativ
                 onImageClick={image ? () => setEditingAdImage({ image, index, platform: ad.platform }) : undefined}
                 imagePrompt={ad.image_prompt}
                 error={errors[index]}
-                galleryImage={image}
+                galleryImage={image ?? undefined}
               />
             );
           }

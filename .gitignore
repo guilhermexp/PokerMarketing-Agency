@@ -54,3 +54,10 @@ docs/security/XSS_PROTECTION_VERIFICATION.md
 .env*.local
 .playwright-cli/
 page-state.yaml
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+e2e/.auth/user.json

@@ -118,4 +118,3 @@ export const Workspace: React.FC = () => {
   );
 };
 
-export default Workspace;

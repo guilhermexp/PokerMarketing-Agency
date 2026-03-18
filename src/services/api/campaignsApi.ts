@@ -68,6 +68,8 @@ export interface DbCarouselScript {
     image_url?: string;
   }>;
   sort_order: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface DbCampaign {

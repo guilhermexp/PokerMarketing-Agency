@@ -1,8 +1,9 @@
 import React, { useEffect, useState, createContext, useContext, useRef } from "react";
-import { authClient } from "../../lib/auth-client";
+import { authClient, getOrganizationApi, type Session } from "../../lib/auth-client";
 import { getOrCreateUser, type DbUser } from "../../services/apiClient";
 import { SignInForm } from "./SignInForm";
 import { SignUpForm } from "./SignUpForm";
+import { clientLogger } from "@/lib/client-logger";
 
 interface AuthContextType {
   dbUser: DbUser | null;
@@ -115,12 +116,12 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
 
       try {
         if (!userEmail) {
-          console.error("User has no email address");
+          clientLogger.error("User has no email address");
           setIsDbSyncing(false);
           return;
         }
 
-        console.debug("[Auth] Syncing user to database (background)...");
+        clientLogger.debug("[Auth] Syncing user to database (background)...");
         setIsDbSyncing(true);
 
         const syncedUser = await getOrCreateUser({
@@ -133,25 +134,25 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
 
         setDbUser(syncedUser);
         syncedUserIdRef.current = betterAuthUserId;
-        console.debug("[Auth] User synced successfully:", syncedUser.id);
+        clientLogger.debug("[Auth] User synced successfully:", syncedUser.id);
 
         // Auto-activate organization if user has one but session doesn't
         try {
-          const orgApi = authClient.organization as any;
-          const session = sessionData?.session as any;
+          const orgApi = getOrganizationApi();
+          const session = sessionData?.session as Session["session"] | undefined;
           if (!session?.activeOrganizationId) {
             const orgsResult = await orgApi.list({});
             const orgs = orgsResult?.data;
             if (orgs && orgs.length > 0) {
-              console.debug("[Auth] No active org but user has", orgs.length, "org(s). Auto-activating:", orgs[0].name);
+              clientLogger.debug("[Auth] No active org but user has", orgs.length, "org(s). Auto-activating:", orgs[0].name);
               await orgApi.setActive({ organizationId: orgs[0].id });
             }
           }
         } catch (orgErr) {
-          console.warn("[Auth] Failed to auto-activate org:", orgErr);
+          clientLogger.warn("[Auth] Failed to auto-activate org:", orgErr);
         }
       } catch (error) {
-        console.error("Failed to sync user with database:", error);
+        clientLogger.error("Failed to sync user with database:", error);
         setDbUser({
           id: betterAuthUserId,
           email: userEmail || "",
@@ -167,7 +168,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
     }
 
     syncUser();
-  }, [isPending, isSignedIn, betterAuthUserId, userEmail, userName, userImage]);
+  }, [isPending, isSignedIn, betterAuthUserId, userEmail, userName, userImage, sessionData?.session]);
 
   const contextValue: AuthContextType = {
     dbUser,

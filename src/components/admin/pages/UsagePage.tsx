@@ -1,9 +1,11 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Usage Page - Página de uso de IA
  * Design minimalista com tema dark
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { unwrapApiData } from '../../../services/api/response';
 import { StatsCard } from '../common/StatsCard';
 import {
   AreaChart,
@@ -84,14 +86,19 @@ export function UsagePage() {
 
       if (!res.ok) throw new Error('Falha ao carregar dados de uso');
 
-      const data = await res.json();
+      const data = unwrapApiData<{
+        totals: UsageTotals;
+        timeline?: TimelineItem[];
+        topUsers?: TopUser[];
+        topOrganizations?: TopOrganization[];
+      }>(await res.json());
       setTotals(data.totals);
       setTimeline(data.timeline || []);
       setTopUsers(data.topUsers || []);
       setTopOrganizations(data.topOrganizations || []);
       setError(null);
     } catch (err) {
-      console.error('Error fetching usage:', err);
+      clientLogger.error('Error fetching usage:', err);
       setError(err instanceof Error ? err.message : 'Falha ao carregar dados');
     } finally {
       setIsLoading(false);
@@ -255,7 +262,7 @@ export function UsagePage() {
                 <XAxis type="number" stroke="rgba(255,255,255,0.3)" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v.toFixed(0)}`} />
                 <YAxis type="category" dataKey="name" stroke="rgba(255,255,255,0.3)" fontSize={9} width={80} tickLine={false} axisLine={false} />
                 <Tooltip
-                  formatter={(value: number) => [`$${value.toFixed(2)}`, 'Custo']}
+                  formatter={(value?: number) => [`$${(value ?? 0).toFixed(2)}`, 'Custo']}
                   contentStyle={{
                     backgroundColor: '#1a1a1a',
                     border: '1px solid rgba(255,255,255,0.1)',
@@ -380,5 +387,3 @@ export function UsagePage() {
     </div>
   );
 }
-
-export default UsagePage;

@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Carousel publish helper
  */
@@ -30,7 +31,7 @@ export const publishCarousel = async ({
     const caption = captions[clipKey] || title;
     await onPublishCarousel(imageUrls, caption);
   } catch (err) {
-    console.error('[CarrosselTab] Failed to publish carousel:', err);
+    clientLogger.error('[CarrosselTab] Failed to publish carousel:', err);
   } finally {
     setPublishing((prev) => ({ ...prev, [clipKey]: false }));
   }

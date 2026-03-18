@@ -1,0 +1,477 @@
+/**
+ * AI Usage Tracking Helper
+ * Logs all AI API calls to api_usage_logs table for admin dashboard
+ */
+
+import { randomUUID } from 'crypto';
+import type { SqlClient } from '../lib/db.js';
+import logger from "../lib/logger.js";
+
+// Model pricing configuration (in USD cents per million tokens/per item)
+// Updated with actual pricing from providers
+
+interface TextModelPricing {
+  provider: string;
+  inputPerMillion: number;
+  outputPerMillion: number;
+}
+
+interface ImageModelPricing {
+  provider: string;
+  costPerImage: {
+    '1K': number;
+    '2K': number;
+    '4K': number;
+  };
+}
+
+interface VideoModelPricing {
+  provider: string;
+  costPerSecond: number;
+}
+
+type ModelPricing = TextModelPricing | ImageModelPricing | VideoModelPricing;
+
+const MODEL_PRICING: Record<string, ModelPricing> = {
+  // Google Gemini Text Models (native API)
+  'google/gemini-3-flash-preview': {
+    provider: 'google',
+    inputPerMillion: 50,  // $0.50/1M = 50 cents (legacy ID, kept for historical logs)
+    outputPerMillion: 300  // $3/1M = 300 cents
+  },
+  'gemini-3-pro-preview': {
+    provider: 'google',
+    inputPerMillion: 200,
+    outputPerMillion: 1200
+  },
+  'gemini-3-flash-preview': {
+    provider: 'google',
+    inputPerMillion: 50,
+    outputPerMillion: 300
+  },
+  // Google Gemini Image Models — Pro
+  'gemini-3-pro-image-preview': {
+    provider: 'google',
+    costPerImage: {
+      '1K': 13.4,   // $0.134/image = 13.4 cents
+      '2K': 13.4,
+      '4K': 24      // $0.24/image = 24 cents
+    }
+  },
+  // Google Gemini Image Models — Standard (flat rate; model outputs 1024px only)
+  'gemini-3.1-flash-image-preview': {
+    provider: 'google',
+    costPerImage: {
+      '1K': 4,
+      '2K': 4,
+      '4K': 4
+    }
+  },
+  'gemini-2.5-flash-image': {
+    provider: 'google',
+    costPerImage: {
+      '1K': 4,     // ~$0.039/image = 4 cents
+      '2K': 4,
+      '4K': 4
+    }
+  },
+  // FAL.ai Image Models — Pro (Gemini 3 Pro Image via FAL)
+  'fal-ai/gemini-3-pro-image-preview': {
+    provider: 'fal',
+    costPerImage: {
+      '1K': 15,   // $0.15/image = 15 cents
+      '2K': 15,
+      '4K': 30    // $0.30/image = 30 cents
+    }
+  },
+  'fal-ai/gemini-3-pro-image-preview/edit': {
+    provider: 'fal',
+    costPerImage: {
+      '1K': 15,
+      '2K': 15,
+      '4K': 30
+    }
+  },
+  // FAL.ai Image Models — Standard (Gemini 2.5 Flash Image via FAL; flat rate, 1024px only)
+  'fal-ai/gemini-25-flash-image': {
+    provider: 'fal',
+    costPerImage: {
+      '1K': 5,    // ~$0.05/image = 5 cents
+      '2K': 5,
+      '4K': 5
+    }
+  },
+  'fal-ai/gemini-25-flash-image/edit': {
+    provider: 'fal',
+    costPerImage: {
+      '1K': 5,
+      '2K': 5,
+      '4K': 5
+    }
+  },
+  // Google TTS Models
+  'gemini-2.5-flash-preview-tts': {
+    provider: 'google',
+    inputPerMillion: 50,    // $0.50/1M input
+    outputPerMillion: 1000  // $10/1M output (audio)
+  },
+  'gemini-2.5-pro-preview-tts': {
+    provider: 'google',
+    inputPerMillion: 100,   // $1/1M input
+    outputPerMillion: 2000  // $20/1M output (audio)
+  },
+  // OpenRouter Models
+  'openai/gpt-5.2': {
+    provider: 'openrouter',
+    inputPerMillion: 175,   // $1.75/1M = 175 cents
+    outputPerMillion: 1400  // $14/1M = 1400 cents
+  },
+  'x-ai/grok-4.1-fast': {
+    provider: 'openrouter',
+    inputPerMillion: 20,    // $0.20/1M = 20 cents
+    outputPerMillion: 50    // $0.50/1M = 50 cents
+  },
+  // FAL Video Models
+  'veo-3.1': {
+    provider: 'fal',
+    costPerSecond: 40       // $0.40/s = 40 cents
+  },
+  'veo-3.1-fast': {
+    provider: 'fal',
+    costPerSecond: 15       // $0.15/s = 15 cents
+  },
+  'fal-ai/veo3.1/fast': {
+    provider: 'fal',
+    costPerSecond: 15
+  },
+  'fal-ai/veo3.1/fast/image-to-video': {
+    provider: 'fal',
+    costPerSecond: 15
+  },
+  'sora-2': {
+    provider: 'fal',
+    costPerSecond: 10       // Estimated
+  },
+  'fal-ai/sora-2/text-to-video': {
+    provider: 'fal',
+    costPerSecond: 10
+  },
+  'fal-ai/sora-2/image-to-video': {
+    provider: 'fal',
+    costPerSecond: 10
+  },
+  // Replicate Image Models (Replicate charges ~2x Google direct pricing)
+  'google/nano-banana-pro': {
+    provider: 'replicate',
+    costPerImage: {
+      '1K': 31,   // ~$0.31/image via Replicate (Google direct: $0.155)
+      '2K': 31,
+      '4K': 48    // ~$0.48/image (Google direct: $0.24)
+    }
+  },
+  'google/nano-banana': {
+    provider: 'replicate',
+    costPerImage: {
+      '1K': 8,    // ~$0.08/image via Replicate (Google direct: $0.039)
+      '2K': 8,
+      '4K': 8
+    }
+  },
+  'nano-banana-2': {
+    provider: 'google',
+    costPerImage: {
+      '1K': 4,
+      '2K': 4,
+      '4K': 4
+    }
+  }
+};
+
+// Map operation types to database enum values
+const OPERATION_TYPES: Record<string, string> = {
+  'campaign': 'campaign',
+  'text': 'text',
+  'image': 'image',
+  'video': 'video',
+  'speech': 'speech',
+  'flyer': 'flyer',
+  'edit_image': 'edit_image'
+};
+
+type ImageSize = '1K' | '2K' | '4K';
+
+interface CostCalculationParams {
+  model: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  imageCount?: number;
+  imageSize?: ImageSize;
+  videoDurationSeconds?: number;
+  characterCount?: number;
+}
+
+function isTextModelPricing(pricing: ModelPricing): pricing is TextModelPricing {
+  return 'inputPerMillion' in pricing;
+}
+
+function isImageModelPricing(pricing: ModelPricing): pricing is ImageModelPricing {
+  return 'costPerImage' in pricing;
+}
+
+function isVideoModelPricing(pricing: ModelPricing): pricing is VideoModelPricing {
+  return 'costPerSecond' in pricing;
+}
+
+/**
+ * Calculate cost in cents based on model and usage
+ */
+function calculateCost({
+  model,
+  inputTokens = 0,
+  outputTokens = 0,
+  imageCount = 0,
+  imageSize = '1K',
+}: CostCalculationParams): number {
+  const pricing = MODEL_PRICING[model];
+  if (!pricing) {
+    logger.warn(`[UsageTracking] Unknown model for pricing: ${model}`);
+    return 0;
+  }
+
+  let costCents = 0;
+
+  // Text model pricing (per million tokens)
+  if (isTextModelPricing(pricing)) {
+    if (inputTokens > 0) {
+      costCents += (inputTokens / 1_000_000) * pricing.inputPerMillion;
+    }
+    if (outputTokens > 0) {
+      costCents += (outputTokens / 1_000_000) * pricing.outputPerMillion;
+    }
+  }
+
+  // Image model pricing
+  if (isImageModelPricing(pricing) && imageCount > 0) {
+    const imageCost = pricing.costPerImage[imageSize] || pricing.costPerImage['1K'] || 13.4;
+    costCents += imageCount * imageCost;
+  }
+
+  // Video model pricing (per second)
+  // Note: videoDurationSeconds is passed but not used in current calculation
+  // Keep the interface for future use
+
+  return Math.round(costCents * 100) / 100; // Round to 2 decimal places
+}
+
+/**
+ * Get provider enum value from model ID
+ */
+function getProvider(model: string): string {
+  const pricing = MODEL_PRICING[model];
+  if (pricing) return pricing.provider;
+
+  // Fallback detection
+  if (model.includes('gemini') || model.includes('imagen')) return 'google';
+  if (model.includes('fal-ai/')) return 'fal';
+  if (model.includes('replicate') || model.includes('nano-banana')) return 'replicate';
+  if (model.includes('gpt') || model.includes('grok') || model.includes('claude')) return 'openrouter';
+  if (model.includes('veo') || model.includes('sora') || model.includes('fal')) return 'fal';
+
+  return 'google'; // Default
+}
+
+export interface LogAiUsageParams {
+  userId?: string | null;
+  organizationId?: string | null;
+  endpoint: string;
+  operation: string;
+  provider?: string | null;
+  model: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  imageCount?: number;
+  imageSize?: ImageSize | null;
+  videoDurationSeconds?: number;
+  audioDurationSeconds?: number;
+  characterCount?: number;
+  status?: 'success' | 'error';
+  error?: string | null;
+  latencyMs?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface LogAiUsageResult {
+  requestId: string;
+  estimatedCostCents: number;
+  error?: string;
+}
+
+/**
+ * Log AI usage to database
+ */
+export async function logAiUsage(
+  sql: SqlClient,
+  params: LogAiUsageParams
+): Promise<LogAiUsageResult> {
+  const {
+    userId = null,
+    organizationId = null,
+    endpoint,
+    operation,
+    provider = null,
+    model,
+    inputTokens = 0,
+    outputTokens = 0,
+    imageCount = 0,
+    imageSize = null,
+    videoDurationSeconds = 0,
+    audioDurationSeconds = 0,
+    characterCount = 0,
+    status = 'success',
+    error = null,
+    latencyMs = 0,
+    metadata = {}
+  } = params;
+
+  const requestId = randomUUID();
+  const rawProvider = provider || getProvider(model);
+  // Normalize internal provider names to DB enum values
+  // The provider chain uses "gemini" internally, but the DB enum uses "google"
+  const PROVIDER_TO_ENUM: Record<string, string> = { gemini: 'google' };
+  const detectedProvider = PROVIDER_TO_ENUM[rawProvider] || rawProvider;
+
+  // Calculate cost
+  const estimatedCostCents = calculateCost({
+    model,
+    inputTokens,
+    outputTokens,
+    imageCount,
+    imageSize: imageSize || '1K',
+    videoDurationSeconds,
+    characterCount
+  });
+
+  // Map operation to enum
+  const operationEnum = OPERATION_TYPES[operation] || 'text';
+
+  try {
+    await sql`
+      INSERT INTO api_usage_logs (
+        request_id,
+        user_id,
+        organization_id,
+        endpoint,
+        operation,
+        provider,
+        model_id,
+        input_tokens,
+        output_tokens,
+        total_tokens,
+        image_count,
+        image_size,
+        video_duration_seconds,
+        audio_duration_seconds,
+        character_count,
+        estimated_cost_cents,
+        latency_ms,
+        status,
+        error_message,
+        metadata
+      ) VALUES (
+        ${requestId},
+        ${userId},
+        ${organizationId},
+        ${endpoint},
+        ${operationEnum}::ai_operation,
+        ${detectedProvider}::ai_provider,
+        ${model},
+        ${inputTokens || null},
+        ${outputTokens || null},
+        ${inputTokens + outputTokens || null},
+        ${imageCount || null},
+        ${imageSize},
+        ${videoDurationSeconds || null},
+        ${audioDurationSeconds || null},
+        ${characterCount || null},
+        ${Math.round(estimatedCostCents)},
+        ${latencyMs || null},
+        ${status}::usage_status,
+        ${error},
+        ${JSON.stringify(metadata)}
+      )
+    `;
+
+    logger.info(`[UsageTracking] Logged ${operation} call to ${model} - Cost: $${(estimatedCostCents / 100).toFixed(4)}`);
+
+    return { requestId, estimatedCostCents };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    logger.error('[UsageTracking] Failed to log usage:', errorMessage);
+    // Don't throw - we don't want tracking failures to break the API
+    return { requestId, estimatedCostCents, error: errorMessage };
+  }
+}
+
+interface GeminiUsageMetadata {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+}
+
+interface GeminiResponse {
+  usageMetadata?: GeminiUsageMetadata;
+}
+
+/**
+ * Helper to extract token counts from Gemini response
+ */
+export function extractGeminiTokens(response: GeminiResponse | null | undefined): { inputTokens: number; outputTokens: number } {
+  try {
+    const usage = response?.usageMetadata;
+    if (usage) {
+      return {
+        inputTokens: usage.promptTokenCount || 0,
+        outputTokens: usage.candidatesTokenCount || 0
+      };
+    }
+  } catch {
+    // Ignore extraction errors
+  }
+  return { inputTokens: 0, outputTokens: 0 };
+}
+
+interface OpenRouterUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+}
+
+interface OpenRouterResponse {
+  usage?: OpenRouterUsage;
+}
+
+/**
+ * Helper to extract token counts from OpenRouter response
+ */
+export function extractOpenRouterTokens(response: OpenRouterResponse | null | undefined): { inputTokens: number; outputTokens: number } {
+  try {
+    const usage = response?.usage;
+    if (usage) {
+      return {
+        inputTokens: usage.prompt_tokens || 0,
+        outputTokens: usage.completion_tokens || 0
+      };
+    }
+  } catch {
+    // Ignore extraction errors
+  }
+  return { inputTokens: 0, outputTokens: 0 };
+}
+
+/**
+ * Create a timer for measuring latency
+ */
+export function createTimer(): () => number {
+  const start = Date.now();
+  return () => Date.now() - start;
+}
+
+export { MODEL_PRICING, calculateCost, getProvider };

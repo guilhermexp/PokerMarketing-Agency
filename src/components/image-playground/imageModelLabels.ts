@@ -1,9 +1,9 @@
 const IMAGE_MODEL_LABELS: Record<string, string> = {
-  'gemini-3-pro-image-preview': 'Nano Banana 2 Flash',
-  'gemini-3.1-flash-image-preview': 'Nano Banana 2 Flash',
-  'nano-banana-2': 'Nano Banana 2 Flash',
+  'gemini-3-pro-image-preview': 'Gemini Pro',
+  'gemini-3.1-flash-image-preview': 'Nano Banana 2',
+  'nano-banana-2': 'Nano Banana 2',
   'nano-banana-pro': 'Nano Banana Pro',
-  'nano-banana': 'Nano Banana',
+  'nano-banana': 'Nano Banana 2',
 };
 
 export function getImageModelDisplayLabel(model: string | null | undefined): string | null {

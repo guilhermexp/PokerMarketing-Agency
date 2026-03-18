@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Hook para gerenciar sugestoes de IA para logs de erro
  * Fornece estado e funcoes para buscar sugestoes de correcao
@@ -5,6 +6,7 @@
 
 import { useState, useCallback } from 'react';
 import { getCsrfToken, getCurrentCsrfToken } from '../services/apiClient';
+import { getApiErrorMessage, unwrapApiData } from '../services/api/response';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -58,10 +60,12 @@ export function useAiSuggestions(logId: string | null) {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
-        throw new Error(errorData.error || `Erro ${response.status}`);
+        throw new Error(getApiErrorMessage(errorData, `Erro ${response.status}`));
       }
 
-      const data = await response.json();
+      const data = unwrapApiData<{ suggestions: string; cached?: boolean }>(
+        await response.json(),
+      );
 
       setState({
         suggestions: data.suggestions,
@@ -70,7 +74,7 @@ export function useAiSuggestions(logId: string | null) {
         isCached: data.cached || false,
       });
     } catch (err) {
-      console.error('Error fetching AI suggestions:', err);
+      clientLogger.error('Error fetching AI suggestions:', err);
       setState({
         suggestions: null,
         isLoading: false,
@@ -95,5 +99,3 @@ export function useAiSuggestions(logId: string | null) {
     reset,
   };
 }
-
-export default useAiSuggestions;

@@ -35,7 +35,7 @@ export const ImageGenerationLoader = ({
   React.useEffect(() => {
     if (imageSrc !== currentImageSrc) {
       setIsImageLoaded(false);
-      setCurrentImageSrc(imageSrc);
+      setCurrentImageSrc(imageSrc ?? null);
     }
   }, [imageSrc, currentImageSrc]);
 

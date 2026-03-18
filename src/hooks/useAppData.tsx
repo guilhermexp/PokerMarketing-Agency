@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Centralized data fetching hook with SWR caching
  *
@@ -29,13 +30,14 @@ import {
   type TournamentData,
   type WeekScheduleWithCount,
 } from "../services/apiClient";
+import { getApiErrorMessage, unwrapApiData } from "../services/api/response";
 
 // Global SWR config to minimize refetches
 const defaultConfig: SWRConfiguration = {
   revalidateOnFocus: false, // Don't refetch when tab gets focus
   revalidateOnReconnect: false, // Don't refetch on reconnect
   revalidateIfStale: false, // Don't auto-refetch stale data
-  dedupingInterval: 300000, // Dedupe requests within 5 minutes (increased!)
+  dedupingInterval: 60000, // Dedupe requests within 60 seconds
   errorRetryCount: 2, // Only retry twice on error
 };
 
@@ -109,18 +111,18 @@ export function useInitialData(
 ) {
   // DEBUG: Log SWR key to identify double-fetch cause
   const swrKey = userId ? KEYS.initialData(userId, organizationId) : null;
-  console.debug("[SWR] useInitialData called with key:", swrKey);
+  clientLogger.debug("[SWR] useInitialData called with key:", swrKey);
 
   const { data, error, isLoading, mutate } = useSWR(
     swrKey,
     async () => {
-      console.debug("[SWR] Fetching all initial data via /api/db/init...");
+      clientLogger.debug("[SWR] Fetching all initial data via /api/db/init...");
       const result = await getInitialData(userId!, organizationId, clerkUserId || undefined);
 
       // Populate individual caches for optimistic updates
       // This allows individual hooks to work without re-fetching
       if (result) {
-        console.debug("[SWR] Populating individual caches from init data...");
+        clientLogger.debug("[SWR] Populating individual caches from init data...");
         globalMutate(
           KEYS.brandProfile(userId!, organizationId),
           result.brandProfile,
@@ -162,7 +164,7 @@ export function useInitialData(
     },
     {
       ...defaultConfig,
-      dedupingInterval: 600000, // 10 minutes for initial data
+      dedupingInterval: 60000,
     },
   );
 
@@ -220,9 +222,12 @@ export function useGalleryImages(
       }
 
       const response = await fetch(`/api/db/gallery?${params}`);
-      if (!response.ok) throw new Error('Failed to load more images');
+      const payload = await response.json().catch(() => ({ error: 'Failed to load more images' }));
+      if (!response.ok) {
+        throw new Error(getApiErrorMessage(payload, 'Failed to load more images'));
+      }
 
-      const newImages: DbGalleryImage[] = await response.json();
+      const newImages = unwrapApiData<DbGalleryImage[]>(payload);
 
       // If we got fewer than 50, there are no more images
       if (newImages.length < 50) {
@@ -234,7 +239,7 @@ export function useGalleryImages(
         mutate((current) => [...(current || []), ...newImages], false);
       }
     } catch (err) {
-      console.error('[useGalleryImages] Failed to load more:', err);
+      clientLogger.error('[useGalleryImages] Failed to load more:', err);
     } finally {
       setIsLoadingMore(false);
     }
@@ -360,7 +365,7 @@ export function useCampaigns(
         mutate((current) => [...(current || []), ...moreCampaigns], false);
       }
     } catch (err) {
-      console.error("[useCampaigns] Failed to load more campaigns:", err);
+      clientLogger.error("[useCampaigns] Failed to load more campaigns:", err);
     } finally {
       setIsLoadingMore(false);
     }

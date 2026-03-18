@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * useFlyerGeneration Hook
  *
@@ -11,7 +12,7 @@ import { urlToBase64 } from '@/utils/imageHelpers';
 import {
   buildBackgroundFlyerPrompt,
   buildSingleEventFlyerPrompt,
-} from '@/ai-prompts';
+} from '@/ai-prompts/flyerPrompts';
 import type { BrandProfile, GalleryImage, ImageSize, TournamentEvent } from '@/types';
 import type { GenerationJobConfig } from '@/services/apiClient';
 
@@ -98,7 +99,7 @@ export const useFlyerGeneration = ({
 
         return newImage;
       } catch (error) {
-        console.error('Generation failed:', error);
+        clientLogger.error('Generation failed:', error);
         setGenerationError(error instanceof Error ? error.message : 'Generation failed');
         return null;
       } finally {
@@ -185,7 +186,7 @@ export const useFlyerGeneration = ({
         onQueued?.();
         return true;
       } catch (error) {
-        console.error('Failed to queue job:', error);
+        clientLogger.error('Failed to queue job:', error);
         return false;
       }
     },

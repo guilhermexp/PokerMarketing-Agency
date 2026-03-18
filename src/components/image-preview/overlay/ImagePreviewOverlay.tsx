@@ -9,6 +9,7 @@ import { ChatPanelSlideIn } from '../chat-panel/ChatPanelSlideIn';
 import { FreeCropOverlay } from '../FreeCropOverlay';
 import type { GalleryImage, PendingToolEdit, EditPreview, ImageFile, Dimensions, ResizedPreview } from '../types';
 import '../preview-overlay.css';
+import { clientLogger } from "@/lib/client-logger";
 
 interface ImagePreviewOverlayProps {
   visible: boolean;
@@ -29,9 +30,9 @@ interface ImagePreviewOverlayProps {
   chatReferenceImageId?: string | null;
 
   // Canvas refs and handlers (needed by ImagePreviewCanvas)
-  imageCanvasRef?: React.RefObject<HTMLCanvasElement>;
-  maskCanvasRef?: React.RefObject<HTMLCanvasElement>;
-  protectionCanvasRef?: React.RefObject<HTMLCanvasElement>;
+  imageCanvasRef?: React.RefObject<HTMLCanvasElement | null>;
+  maskCanvasRef?: React.RefObject<HTMLCanvasElement | null>;
+  protectionCanvasRef?: React.RefObject<HTMLCanvasElement | null>;
   startDrawing?: (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => void;
   draw?: (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => void;
   stopDrawing?: () => void;
@@ -42,7 +43,7 @@ interface ImagePreviewOverlayProps {
   imageLoadError?: string | null;
 
   // Video props
-  videoRef?: React.RefObject<HTMLVideoElement>;
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
   handleLoadedMetadata?: (event: React.SyntheticEvent<HTMLVideoElement>) => void;
 
   // Editor state props
@@ -129,7 +130,7 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
 
   // Log when image.src changes
   useEffect(() => {
-    console.log('🎨 [ImagePreviewOverlay] image.src changed:', {
+    clientLogger.debug('🎨 [ImagePreviewOverlay] image.src changed:', {
       imageId: image.id,
       src: image.src.substring(0, 50),
     });
@@ -210,7 +211,7 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
       // Clean up the blob URL
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Failed to download image:', error);
+      clientLogger.error('Failed to download image:', error);
       // Fallback: open in new tab
       window.open(image.src, '_blank');
     }
@@ -341,7 +342,7 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
             <ImagePreviewCanvas
               image={props.image}
               isVideo={props.image.src?.endsWith('.mp4') || props.image.src?.includes('video') || props.image.source?.startsWith('Video-') || false}
-              videoRef={props.videoRef || { current: null } as React.RefObject<HTMLVideoElement>}
+              videoRef={props.videoRef || { current: null }}
               isVerticalVideo={props.isVerticalVideo || false}
               handleLoadedMetadata={props.handleLoadedMetadata || (() => {})}
               resizedPreview={props.resizedPreview || null}
@@ -349,9 +350,9 @@ export const ImagePreviewOverlay = (props: ImagePreviewOverlayProps) => {
               originalDimensions={props.originalDimensions || { width: 0, height: 0 }}
               isLoadingImage={props.isLoadingImage || false}
               imageLoadError={props.imageLoadError || null}
-              imageCanvasRef={props.imageCanvasRef || { current: null } as React.RefObject<HTMLCanvasElement>}
-              maskCanvasRef={props.maskCanvasRef || { current: null } as React.RefObject<HTMLCanvasElement>}
-              protectionCanvasRef={props.protectionCanvasRef || { current: null } as React.RefObject<HTMLCanvasElement>}
+              imageCanvasRef={props.imageCanvasRef || { current: null }}
+              maskCanvasRef={props.maskCanvasRef || { current: null }}
+              protectionCanvasRef={props.protectionCanvasRef || { current: null }}
               useProtectionMask={props.useProtectionMask || false}
               drawMode={props.drawMode || 'brush'}
               startDrawing={props.startDrawing || (() => {})}

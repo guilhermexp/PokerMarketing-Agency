@@ -15,7 +15,7 @@ import type { UseTextDetectionReturn } from '../types';
 
 interface UseTextDetectionProps {
   imageSrc: string;
-  protectionCanvasRef: RefObject<HTMLCanvasElement>;
+  protectionCanvasRef: RefObject<HTMLCanvasElement | null>;
   setUseProtectionMask: (enabled: boolean) => void;
   setError: (message: string | null) => void;
 }

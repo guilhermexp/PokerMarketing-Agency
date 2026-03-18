@@ -1,8 +1,10 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * LogDetailModal - Modal para visualização detalhada de logs com sugestões de IA
  * Design minimalista com tema dark
  */
 
+import DOMPurify from 'dompurify';
 import React, { useState } from 'react';
 import {
   Dialog,
@@ -66,7 +68,7 @@ export function LogDetailModal({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      clientLogger.error('Failed to copy:', err);
     }
   };
 
@@ -86,6 +88,10 @@ export function LogDetailModal({
     if (cents === null || cents === undefined) return 'N/A';
     return `R$ ${(cents / 100).toFixed(4)}`;
   };
+
+  const sanitizedSuggestionsHtml = suggestions
+    ? DOMPurify.sanitize(formatMarkdown(suggestions))
+    : null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -220,7 +226,7 @@ export function LogDetailModal({
                   <div
                     className="prose prose-invert prose-sm max-w-none text-[12px] text-white/70"
                     dangerouslySetInnerHTML={{
-                      __html: formatMarkdown(suggestions),
+                      __html: sanitizedSuggestionsHtml || '',
                     }}
                   />
                 </div>
@@ -282,5 +288,3 @@ function formatMarkdown(text: string): string {
 
   return formatted;
 }
-
-export default LogDetailModal;

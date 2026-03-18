@@ -20,8 +20,8 @@ export const ImagePreviewFooter: React.FC<ImagePreviewFooterProps> = ({
   handleDiscardEdit,
   handleSaveEdit,
   isToolApprovalMode,
-  onApprove,
-  onReject,
+  onApprove: _onApprove,
+  onReject: _onReject,
 }) => {
   if (isVideo) return null;
 

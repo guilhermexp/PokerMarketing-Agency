@@ -131,4 +131,3 @@ export const FloatingSidebar: React.FC<FloatingSidebarProps> = ({
   );
 };
 
-export default FloatingSidebar;

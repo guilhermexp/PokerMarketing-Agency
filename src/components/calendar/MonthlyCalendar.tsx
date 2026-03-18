@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import type { ScheduledPost, InstagramPublishState } from '../../types';
 import { ScheduledPostCard } from './ScheduledPostCard';
+import { clientLogger } from "@/lib/client-logger";
 
 interface MonthlyCalendarProps {
   currentDate: Date;
@@ -101,12 +102,12 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
         const dayDate = new Date(day.date);
         return dayDate >= todayDate;
       });
-      console.debug(`Semana ${idx}:`, week.map(d => d.dayNumber).join(', '), '-> visível:', hasCurrentOrFuture);
+      clientLogger.debug(`Semana ${idx}:`, week.map(d => d.dayNumber).join(', '), '-> visível:', hasCurrentOrFuture);
       return hasCurrentOrFuture;
     });
 
-    console.debug('Hoje:', todayStr);
-    console.debug('Semanas visíveis:', visibleWeekIndices);
+    clientLogger.debug('Hoje:', todayStr);
+    clientLogger.debug('Semanas visíveis:', visibleWeekIndices);
 
     return {
       calendarDays: days,
@@ -188,9 +189,9 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
                 {/* Status Indicators */}
                 {posts.length > 0 && (
                   <div className="flex items-center gap-1">
-                    {hasScheduled && <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
-                    {hasPublished && <div className="w-1.5 h-1.5 rounded-full bg-green-500" />}
-                    {hasFailed && <div className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+                    {hasScheduled ? <div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> : null}
+                    {hasPublished ? <div className="w-1.5 h-1.5 rounded-full bg-green-500" /> : null}
+                    {hasFailed ? <div className="w-1.5 h-1.5 rounded-full bg-red-500" /> : null}
                   </div>
                 )}
               </div>

@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 export const parseDataUrl = (
   dataUrl: string,
 ): { base64: string; mimeType: string } | null => {
@@ -24,7 +25,7 @@ export const urlToDataUrl = async (src: string): Promise<string | null> => {
     const blob = await response.blob();
     return await readBlobAsDataUrl(blob);
   } catch (error) {
-    console.error("[urlToDataUrl] Failed to convert URL:", src, error);
+    clientLogger.error("[urlToDataUrl] Failed to convert URL:", src, error);
     return null;
   }
 };
@@ -46,7 +47,7 @@ export const urlToBase64 = async (
     if (parsed) return parsed;
     return { base64: dataUrl.split(",")[1] || "", mimeType: blob.type || "" };
   } catch (error) {
-    console.error("[urlToBase64] Failed to convert URL:", src, error);
+    clientLogger.error("[urlToBase64] Failed to convert URL:", src, error);
     return null;
   }
 };
@@ -128,7 +129,7 @@ export const downloadImage = async (
     // Clean up the blob URL
     URL.revokeObjectURL(blobUrl);
   } catch (error) {
-    console.error("[downloadImage] Failed to download:", src, error);
+    clientLogger.error("[downloadImage] Failed to download:", src, error);
     // Fallback: open in new tab if fetch fails
     window.open(src, "_blank");
   }

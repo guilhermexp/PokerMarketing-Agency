@@ -80,4 +80,3 @@ export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
   return <AdminAccessCheck>{children}</AdminAccessCheck>;
 }
 
-export default AdminProtectedRoute;

@@ -99,9 +99,9 @@ export interface MaskRegion {
 // =============================================================================
 
 export interface UseImageCanvasReturn {
-  imageCanvasRef: RefObject<HTMLCanvasElement>;
-  maskCanvasRef: RefObject<HTMLCanvasElement>;
-  containerRef: RefObject<HTMLDivElement>;
+  imageCanvasRef: RefObject<HTMLCanvasElement | null>;
+  maskCanvasRef: RefObject<HTMLCanvasElement | null>;
+  containerRef: RefObject<HTMLDivElement | null>;
   originalDimensions: Dimensions;
   displayDimensions: Dimensions;
   isLoadingImage: boolean;
@@ -119,7 +119,7 @@ export interface UseImageCanvasReturn {
 }
 
 export interface UseProtectionCanvasReturn {
-  protectionCanvasRef: RefObject<HTMLCanvasElement>;
+  protectionCanvasRef: RefObject<HTMLCanvasElement | null>;
   isDrawingProtection: boolean;
   useProtectionMask: boolean;
   setUseProtectionMask: (enabled: boolean) => void;
@@ -181,7 +181,7 @@ export interface UseImageFiltersReturn {
 }
 
 export interface UseVideoPlayerReturn {
-  videoRef: RefObject<HTMLVideoElement>;
+  videoRef: RefObject<HTMLVideoElement | null>;
   videoDimensions: Dimensions | null;
   isVerticalVideo: boolean;
   handleLoadedMetadata: (event: SyntheticEvent<HTMLVideoElement>) => void;

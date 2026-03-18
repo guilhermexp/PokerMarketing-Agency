@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Rube MCP Service
  * Handles communication with Rube MCP for Instagram publishing
@@ -49,6 +50,43 @@ interface RubeMCPRequest {
     name: string;
     arguments: Record<string, unknown>;
   };
+}
+
+type RubeRecord = Record<string, unknown>;
+
+interface RubeResult extends RubeRecord {
+  id?: string;
+  creation_id?: string;
+  container_id?: string;
+  media_container_id?: string;
+  status_code?: string;
+  status?: string;
+  username?: string;
+  quota_usage?: number;
+  config?: RubeRecord & { quota_total?: number };
+  data?: RubeRecord | RubeRecord[] | unknown;
+  value?: string;
+}
+
+interface RubeExecutionResult extends RubeRecord {
+  data?: {
+    data?: {
+      results?: Array<{
+        response?: {
+          error?: string;
+          data?: unknown;
+        };
+      }>;
+    };
+    results?: Array<{
+      error?: string;
+      response?: {
+        data?: unknown;
+      };
+      data?: unknown;
+    }>;
+  };
+  error?: string;
 }
 
 // Instagram content types
@@ -107,7 +145,7 @@ const parseSSEResponse = (text: string): Record<string, unknown> | { error?: str
         }
         return json;
       } catch (e) {
-        console.error('[Rube MCP] Failed to parse SSE response:', e);
+        clientLogger.error('[Rube MCP] Failed to parse SSE response:', e);
       }
     }
   }
@@ -123,9 +161,8 @@ const parseSSEResponse = (text: string): Record<string, unknown> | { error?: str
 export const callRubeMCP = async (
   toolName: string,
   args: Record<string, unknown>,
-  context: InstagramContext
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> => {
+  context?: InstagramContext
+): Promise<RubeExecutionResult> => {
   if (!context?.instagramAccountId || !context?.userId) {
     throw new Error('Conecte sua conta Instagram em Configurações → Integrações para publicar.');
   }
@@ -137,7 +174,7 @@ export const callRubeMCP = async (
     params: { name: toolName, arguments: args }
   };
 
-  console.debug(`[Rube MCP] Calling ${toolName}...`, args);
+  clientLogger.debug(`[Rube MCP] Calling ${toolName}...`, args);
 
   // Build request body with multi-tenant context
   const requestBody = {
@@ -171,7 +208,9 @@ export const callRubeMCP = async (
     });
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('Serviço Rube não respondeu (timeout). Tente novamente mais tarde.');
+      throw new Error('Serviço Rube não respondeu (timeout). Tente novamente mais tarde.', {
+        cause: err,
+      });
     }
     throw err;
   } finally {
@@ -200,13 +239,13 @@ export const callRubeMCP = async (
   const text = await response.text();
   const data = parseSSEResponse(text);
 
-  console.debug(`[Rube MCP] Response:`, data);
+  clientLogger.debug(`[Rube MCP] Response:`, data);
 
   if (data.error) {
     throw new Error(`Erro Rube MCP: ${data.error}`);
   }
 
-  return data;
+  return data as RubeExecutionResult;
 };
 
 /**
@@ -221,8 +260,7 @@ export const executeInstagramTool = async (
   args: Record<string, unknown>,
   sessionId: string = 'zulu',
   context?: InstagramContext
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> => {
+): Promise<RubeResult> => {
   const result = await callRubeMCP('RUBE_MULTI_EXECUTE_TOOL', {
     tools: [{
       tool_slug: toolSlug,
@@ -236,7 +274,7 @@ export const executeInstagramTool = async (
 
   // Parse the deeply nested Rube MCP response
   // Structure: result.data.data.results[0].response.data
-  console.debug(`[Rube MCP] Full response for ${toolSlug}:`, JSON.stringify(result, null, 2));
+  clientLogger.debug(`[Rube MCP] Full response for ${toolSlug}:`, JSON.stringify(result, null, 2));
 
   // Navigate through the nested structure
   const nestedData = result?.data?.data;
@@ -250,8 +288,14 @@ export const executeInstagramTool = async (
 
     // Get the actual data from response.data
     const actualData = toolResult?.response?.data;
-    console.debug(`[Rube MCP] Extracted data for ${toolSlug}:`, JSON.stringify(actualData, null, 2));
-    return actualData;
+    clientLogger.debug(`[Rube MCP] Extracted data for ${toolSlug}:`, JSON.stringify(actualData, null, 2));
+    if (Array.isArray(actualData)) {
+      return { data: actualData };
+    }
+    if (actualData && typeof actualData === 'object') {
+      return actualData as RubeResult;
+    }
+    return { value: typeof actualData === 'string' ? actualData : JSON.stringify(actualData) };
   }
 
   // Fallback to old structure if new one doesn't match
@@ -260,7 +304,14 @@ export const executeInstagramTool = async (
     if (toolResult?.error) {
       throw new Error(toolResult.error);
     }
-    return toolResult?.response?.data || toolResult?.data || toolResult;
+    const actualData = toolResult?.response?.data || toolResult?.data || toolResult;
+    if (Array.isArray(actualData)) {
+      return { data: actualData };
+    }
+    if (actualData && typeof actualData === 'object') {
+      return actualData as RubeResult;
+    }
+    return { value: typeof actualData === 'string' ? actualData : JSON.stringify(actualData) };
   }
 
   return result;
@@ -290,7 +341,9 @@ export const checkPublishingQuota = async (context?: InstagramContext): Promise<
     );
 
     // Result can be an array or object
-    const quotaData = Array.isArray(result?.data) ? result.data[0] : (Array.isArray(result) ? result[0] : result);
+    const quotaData = Array.isArray(result.data)
+      ? (result.data[0] as RubeResult | undefined)
+      : result;
     const quotaUsage = quotaData?.quota_usage || result?.quota_usage || 0;
     const config = quotaData?.config || result?.config || { quota_total: 25 };
 
@@ -300,7 +353,7 @@ export const checkPublishingQuota = async (context?: InstagramContext): Promise<
       remaining: (config.quota_total || 25) - quotaUsage
     };
   } catch (e) {
-    console.error('[Rube MCP] Failed to check quota:', e);
+    clientLogger.error('[Rube MCP] Failed to check quota:', e);
     return { used: 0, limit: 25, remaining: 25 };
   }
 };
@@ -341,23 +394,27 @@ export const createMediaContainer = async (
   }
 
   const result = await executeInstagramTool('INSTAGRAM_CREATE_MEDIA_CONTAINER', args, 'zulu', context);
+  const resultData = !Array.isArray(result.data) && result.data && typeof result.data === 'object'
+    ? (result.data as { id?: string })
+    : undefined;
 
-  console.debug('[Rube MCP] createMediaContainer result:', JSON.stringify(result, null, 2));
+  clientLogger.debug('[Rube MCP] createMediaContainer result:', JSON.stringify(result, null, 2));
 
   // Try multiple paths to find container ID
   const containerId = result?.id
-    || result?.data?.id
+    || (typeof resultData?.id === 'string' ? resultData.id : null)
     || result?.creation_id
     || result?.container_id
     || result?.media_container_id
-    || (typeof result === 'string' ? result : null);
+    || result?.value
+    || null;
 
   if (!containerId) {
-    console.error('[Rube MCP] Could not find container ID in result:', result);
+    clientLogger.error('[Rube MCP] Could not find container ID in result:', result);
     throw new Error(`Falha ao criar container: ${JSON.stringify(result)}`);
   }
 
-  console.debug(`[Rube MCP] Container ID found: ${containerId}`);
+  clientLogger.debug(`[Rube MCP] Container ID found: ${containerId}`);
   return containerId;
 };
 
@@ -405,17 +462,24 @@ export const createCarouselContainer = async (
     carouselArgs.child_video_urls = videoUrls;
   }
 
-  console.debug('[Rube MCP] Creating carousel with', imageUrls.length, 'images and', videoUrls.length, 'videos');
+  clientLogger.debug('[Rube MCP] Creating carousel with', imageUrls.length, 'images and', videoUrls.length, 'videos');
   const result = await executeInstagramTool('INSTAGRAM_CREATE_CAROUSEL_CONTAINER', carouselArgs, 'zulu', context);
+  const resultData = !Array.isArray(result.data) && result.data && typeof result.data === 'object'
+    ? (result.data as { id?: string })
+    : undefined;
 
-  const containerId = result?.id || result?.data?.id || result?.creation_id || result?.container_id;
+  const containerId =
+    result?.id ||
+    (typeof resultData?.id === 'string' ? resultData.id : null) ||
+    result?.creation_id ||
+    result?.container_id;
 
   if (!containerId) {
-    console.error('[Rube MCP] Could not find carousel container ID in result:', result);
+    clientLogger.error('[Rube MCP] Could not find carousel container ID in result:', result);
     throw new Error(`Falha ao criar carousel container: ${JSON.stringify(result)}`);
   }
 
-  console.debug('[Rube MCP] Carousel container created:', containerId);
+  clientLogger.debug('[Rube MCP] Carousel container created:', containerId);
   return containerId;
 };
 
@@ -427,8 +491,11 @@ export const getContainerStatus = async (containerId: string, context?: Instagra
   const result = await executeInstagramTool('INSTAGRAM_GET_POST_STATUS', {
     creation_id: containerId
   }, 'zulu', context);
+  const resultData = !Array.isArray(result.data) && result.data && typeof result.data === 'object'
+    ? (result.data as { status_code?: string })
+    : undefined;
 
-  return result.status_code || result.data?.status_code || result.status || 'IN_PROGRESS';
+  return result.status_code || (typeof resultData?.status_code === 'string' ? resultData.status_code : undefined) || result.status || 'IN_PROGRESS';
 };
 
 /**
@@ -445,8 +512,11 @@ export const publishContainer = async (containerId: string, context?: InstagramC
   }
 
   const result = await executeInstagramTool('INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH', args, 'zulu', context);
+  const resultData = !Array.isArray(result.data) && result.data && typeof result.data === 'object'
+    ? (result.data as { id?: string })
+    : undefined;
 
-  return result.id || result.data?.id;
+  return result.id || (typeof resultData?.id === 'string' ? resultData.id : '');
 };
 
 /**
@@ -463,8 +533,11 @@ export const publishCarousel = async (containerId: string, context?: InstagramCo
   }
 
   const result = await executeInstagramTool('INSTAGRAM_CREATE_POST', args, 'zulu', context);
+  const resultData = !Array.isArray(result.data) && result.data && typeof result.data === 'object'
+    ? (result.data as { id?: string })
+    : undefined;
 
-  return result.id || result.data?.id;
+  return result.id || (typeof resultData?.id === 'string' ? resultData.id : '');
 };
 
 /**
@@ -524,14 +597,14 @@ export const publishToInstagram = async (
         onProgress?.({ step: 'uploading_image', message: `Fazendo upload ${i + 1}/${carouselImageUrls.length}...`, progress: 15 + (i * 10 / carouselImageUrls.length) });
         const httpUrl = await uploadImageForInstagram(carouselImageUrls[i]);
         httpUrls.push(httpUrl);
-        console.debug(`[Rube MCP] Carousel image ${i + 1} uploaded: ${httpUrl}`);
+        clientLogger.debug(`[Rube MCP] Carousel image ${i + 1} uploaded: ${httpUrl}`);
       }
       containerId = await createCarouselContainer(httpUrls, caption, context);
       publishFn = publishCarousel;
     } else {
       // Single image - upload first
       const httpImageUrl = await uploadImageForInstagram(imageUrl);
-      console.debug(`[Rube MCP] Image uploaded: ${httpImageUrl}`);
+      clientLogger.debug(`[Rube MCP] Image uploaded: ${httpImageUrl}`);
 
       if (contentType === 'story') {
         // Stories use media_type: 'STORIES'
@@ -548,7 +621,7 @@ export const publishToInstagram = async (
       }
     }
 
-    console.debug(`[Rube MCP] Container created: ${containerId}`);
+    clientLogger.debug(`[Rube MCP] Container created: ${containerId}`);
 
     // Step 4: Poll for status until FINISHED
     onProgress?.({ step: 'checking_status', message: 'Processando midia...', progress: 45 });
@@ -562,7 +635,7 @@ export const publishToInstagram = async (
         status = await getContainerStatus(containerId, context);
       } catch (e) {
         // Status check might fail, continue polling
-        console.warn('[Rube MCP] Status check failed, retrying...', e);
+        clientLogger.warn('[Rube MCP] Status check failed, retrying...', e);
       }
       attempts++;
       onProgress?.({
@@ -579,14 +652,14 @@ export const publishToInstagram = async (
     // Step 5: Publish
     onProgress?.({ step: 'publishing', message: 'Publicando no Instagram...', progress: 80 });
     const mediaId = await publishFn(containerId, context);
-    console.debug(`[Rube MCP] Published! Media ID: ${mediaId}`);
+    clientLogger.debug(`[Rube MCP] Published! Media ID: ${mediaId}`);
 
     onProgress?.({ step: 'completed', message: 'Publicado com sucesso!', progress: 100 });
     return { success: true, mediaId };
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-    console.error(`[Rube MCP] Error:`, error);
+    clientLogger.error(`[Rube MCP] Error:`, error);
     onProgress?.({
       step: 'failed',
       message: errorMessage,

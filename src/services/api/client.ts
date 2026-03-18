@@ -5,7 +5,8 @@
  * and typed responses. Used by all domain-specific API modules.
  */
 
-import { getCsrfToken, getCurrentCsrfToken } from '../apiClient';
+import { getCsrfToken, getCurrentCsrfToken } from '../api-client/base';
+import { getApiErrorMessage, parseApiResponse } from './response';
 
 export const API_BASE = '/api/db';
 export const AI_API_BASE = '/api/ai';
@@ -58,13 +59,11 @@ export async function fetchApi<T>(
       });
 
       if (!response.ok) {
-        const error = await response
-          .json()
-          .catch(() => ({ error: 'Unknown error' }));
-        throw new Error(error.error || `HTTP ${response.status}`);
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
       }
 
-      return response.json();
+      return parseApiResponse<T>(response);
     } catch (error) {
       lastError = error;
       if (!canRetry || attempt === maxAttempts) {
@@ -113,13 +112,11 @@ export async function fetchAiApi<T>(
   });
 
   if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
   }
 
-  return response.json();
+  return parseApiResponse<T>(response);
 }
 
 // =============================================================================

@@ -1,9 +1,11 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Organizations Page - Página de organizações
  * Design minimalista com tema dark
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { unwrapApiData } from '../../../services/api/response';
 import { DataTable, Column } from '../common/DataTable';
 import { Pagination } from '../common/Pagination';
 
@@ -53,12 +55,15 @@ export function OrganizationsPage() {
 
       if (!res.ok) throw new Error('Falha ao carregar organizações');
 
-      const data = await res.json();
+      const data = unwrapApiData<{
+        organizations: Organization[];
+        pagination: PaginationInfo;
+      }>(await res.json());
       setOrganizations(data.organizations);
       setPagination(data.pagination);
       setError(null);
     } catch (err) {
-      console.error('Error fetching organizations:', err);
+      clientLogger.error('Error fetching organizations:', err);
       setError(err instanceof Error ? err.message : 'Falha ao carregar organizações');
     } finally {
       setIsLoading(false);
@@ -197,5 +202,3 @@ export function OrganizationsPage() {
     </div>
   );
 }
-
-export default OrganizationsPage;

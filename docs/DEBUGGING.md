@@ -47,18 +47,9 @@ console.log('Response data:', data);
 
 ## 3. Depurando o Backend
 
-### Logs do Railway
+### Logs do Servidor
 
-```bash
-# Ver ultimos 50 logs
-railway logs --tail 50
-
-# Logs em tempo real
-railway logs -f
-
-# Logs de um servico especifico
-railway logs --service redis
-```
+Verifique os logs do servidor de produção via Dokploy ou diretamente no container.
 
 ### Testando Endpoints Localmente
 
@@ -101,7 +92,7 @@ app.post('/api/ai/generate-image', async (req, res) => {
 
 1. Verifique o indicador "Jobs em Background" no frontend
 2. Use o botao "Cancelar" ou "Cancelar Todos"
-3. Verifique logs do Railway
+3. Verifique logs do servidor
 
 ### Verificando Jobs no Banco
 
@@ -182,7 +173,7 @@ curl -X POST http://localhost:8080/api/generate/queue \
    - Rebuild necessario apos mudanca
 
 2. **No backend**: "Invalid API key"
-   - Verifique `GEMINI_API_KEY` nas variaveis do Railway
+   - Verifique `GEMINI_API_KEY` nas variaveis de ambiente
    - Nao use prefixo VITE_ no server
 
 ### Erros de Banco de Dados
@@ -209,12 +200,6 @@ Ou deixe a auto-migracao do server rodar no startup.
 
 ## 6. Variaveis de Ambiente
 
-### Verificando no Railway
-
-```bash
-railway variables list
-```
-
 ### Variaveis Obrigatorias
 
 | Variavel | Frontend | Backend |
@@ -224,7 +209,7 @@ railway variables list
 | `BLOB_READ_WRITE_TOKEN` | - | X |
 | `VITE_CLERK_PUBLISHABLE_KEY` | X | - |
 | `CLERK_SECRET_KEY` | - | X |
-| `REDIS_URL` ou `REDIS_PRIVATE_URL` | - | X |
+| `REDIS_URL` | - | X (opcional) |
 
 ## 7. Ferramentas Uteis
 
@@ -237,11 +222,6 @@ railway variables list
 ### CLI
 
 ```bash
-# Railway CLI
-railway logs -f          # Logs em tempo real
-railway shell            # Shell no container
-railway variables list   # Listar variaveis
-
 # PostgreSQL
 psql $DATABASE_URL       # Conectar ao banco
 

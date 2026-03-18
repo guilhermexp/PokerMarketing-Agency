@@ -43,4 +43,3 @@ export const ImagePlaygroundPage: React.FC<ImagePlaygroundPageProps> = ({
   );
 };
 
-export default ImagePlaygroundPage;

@@ -17,7 +17,7 @@ import type { UseImageResizeReturn } from '../types';
 interface UseImageResizeProps {
   imageSrc: string;
   useProtectionMask: boolean;
-  protectionCanvasRef: RefObject<HTMLCanvasElement>;
+  protectionCanvasRef: RefObject<HTMLCanvasElement | null>;
   onImageUpdate: (newImageUrl: string) => void;
   redrawCanvas: () => void;
   setError: (message: string | null) => void;

@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * useAiEdit Hook
  *
@@ -156,14 +157,14 @@ export function useAiEdit({
         }
       }
 
-      console.log('💾 [useAiEdit] handleSaveEdit - finalImageUrl:', {
+      clientLogger.debug('💾 [useAiEdit] handleSaveEdit - finalImageUrl:', {
         finalImageUrl,
         urlType: typeof finalImageUrl,
         urlLength: finalImageUrl?.length,
         isHttps: finalImageUrl?.startsWith('https://'),
       });
 
-      console.log('💾 [useAiEdit] Updating image with finalImageUrl:', finalImageUrl);
+      clientLogger.debug('💾 [useAiEdit] Updating image with finalImageUrl:', finalImageUrl);
 
       // Update the image - this will trigger imageSrc to change
       onImageUpdate(finalImageUrl);
@@ -173,21 +174,21 @@ export function useAiEdit({
 
       // Notify tool edit completion
       if (onToolEditComplete) {
-        console.log('💾 [useAiEdit] Calling onToolEditComplete with:', finalImageUrl);
+        clientLogger.debug('💾 [useAiEdit] Calling onToolEditComplete with:', finalImageUrl);
         onToolEditComplete(finalImageUrl);
       } else {
-        console.warn('💾 [useAiEdit] onToolEditComplete is not defined!');
+        clientLogger.warn('💾 [useAiEdit] onToolEditComplete is not defined!');
       }
 
       // NOTE: editPreview will be cleared automatically by the useEffect below
       // when imageSrc prop changes (which happens when image.src updates in parent)
-      console.log('💾 [useAiEdit] Waiting for imageSrc to update and trigger editPreview clear...');
+      clientLogger.debug('💾 [useAiEdit] Waiting for imageSrc to update and trigger editPreview clear...');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar a edição.');
     } finally {
       setIsEditing(false);
     }
-  }, [editPreview, onImageUpdate, redrawCanvas, resetEditorState, setError, onToolEditComplete]);
+  }, [editPreview, onImageUpdate, resetEditorState, setError, onToolEditComplete]);
 
   const handleDiscardEdit = useCallback(() => {
     setEditPreview(null);
@@ -198,7 +199,7 @@ export function useAiEdit({
   const prevImageSrcRef = useRef(imageSrc);
   useEffect(() => {
     if (prevImageSrcRef.current !== imageSrc) {
-      console.log('💾 [useAiEdit] imageSrc changed, clearing editPreview', {
+      clientLogger.debug('💾 [useAiEdit] imageSrc changed, clearing editPreview', {
         old: prevImageSrcRef.current?.substring(0, 50),
         new: imageSrc?.substring(0, 50),
       });
@@ -226,7 +227,7 @@ export function useAiEdit({
   useEffect(() => {
     if (initialEditPreview) return;
     if (pendingToolEdit && !editPreview && !isEditing && pendingToolEdit.prompt) {
-      console.debug('[useAiEdit] Auto-executing edit for tool approval:', pendingToolEdit);
+      clientLogger.debug('[useAiEdit] Auto-executing edit for tool approval:', pendingToolEdit);
 
       // Set prompt from tool call
       setEditPrompt(pendingToolEdit.prompt);

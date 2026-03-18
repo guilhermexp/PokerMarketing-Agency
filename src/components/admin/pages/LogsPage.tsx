@@ -1,9 +1,11 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Logs Page - Página de logs de atividade
  * Design minimalista com tema dark
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { unwrapApiData } from '../../../services/api/response';
 import { DataTable, Column } from '../common/DataTable';
 import { Pagination } from '../common/Pagination';
 import { SearchInput } from '../common/SearchInput';
@@ -128,14 +130,18 @@ export function LogsPage() {
 
       if (!res.ok) throw new Error('Falha ao carregar logs');
 
-      const data = await res.json();
+      const data = unwrapApiData<{
+        logs: ActivityLog[];
+        pagination: PaginationInfo;
+        filters?: { categories?: string[]; recentErrorCount?: number };
+      }>(await res.json());
       setLogs(data.logs);
       setPagination(data.pagination);
       setCategories(data.filters?.categories || []);
       setRecentErrorCount(data.filters?.recentErrorCount || 0);
       setError(null);
     } catch (err) {
-      console.error('Error fetching logs:', err);
+      clientLogger.error('Error fetching logs:', err);
       setError(err instanceof Error ? err.message : 'Falha ao carregar logs');
     } finally {
       setIsLoading(false);
@@ -157,11 +163,11 @@ export function LogsPage() {
 
       if (!res.ok) throw new Error('Falha ao carregar detalhes do log');
 
-      const data = await res.json();
+      const data = unwrapApiData<LogDetail>(await res.json());
       setSelectedLog(data);
       setIsModalOpen(true);
     } catch (err) {
-      console.error('Error fetching log details:', err);
+      clientLogger.error('Error fetching log details:', err);
       setError(err instanceof Error ? err.message : 'Falha ao carregar detalhes do log');
     } finally {
       setIsLoadingDetails(false);
@@ -437,5 +443,3 @@ export function LogsPage() {
     </div>
   );
 }
-
-export default LogsPage;

@@ -28,7 +28,7 @@ export interface ImageExportProps {
 export interface ImagePreviewCanvasProps {
   image: GalleryImage;
   isVideo: boolean;
-  videoRef: RefObject<HTMLVideoElement>;
+  videoRef: RefObject<HTMLVideoElement | null>;
   isVerticalVideo: boolean;
   handleLoadedMetadata: (event: SyntheticEvent<HTMLVideoElement>) => void;
   resizedPreview: ResizedPreview | null;
@@ -36,9 +36,9 @@ export interface ImagePreviewCanvasProps {
   originalDimensions: Dimensions;
   isLoadingImage: boolean;
   imageLoadError: string | null;
-  imageCanvasRef: RefObject<HTMLCanvasElement>;
-  maskCanvasRef: RefObject<HTMLCanvasElement>;
-  protectionCanvasRef: RefObject<HTMLCanvasElement>;
+  imageCanvasRef: RefObject<HTMLCanvasElement | null>;
+  maskCanvasRef: RefObject<HTMLCanvasElement | null>;
+  protectionCanvasRef: RefObject<HTMLCanvasElement | null>;
   useProtectionMask: boolean;
   drawMode: 'brush' | 'rectangle';
   startDrawing: (e: MouseEvent<HTMLCanvasElement> | TouchEvent<HTMLCanvasElement>) => void;
@@ -211,7 +211,7 @@ export interface PreviewReadyNoteProps {
 
 export interface ImagePreviewVideoPlayerProps {
   src: string;
-  videoRef: RefObject<HTMLVideoElement>;
+  videoRef: RefObject<HTMLVideoElement | null>;
   isVerticalVideo: boolean;
   handleLoadedMetadata: (event: SyntheticEvent<HTMLVideoElement>) => void;
 }
@@ -225,9 +225,9 @@ export interface ImagePreviewCompareProps {
 
 export interface ImagePreviewMaskCanvasProps {
   imageSrc: string;
-  imageCanvasRef: RefObject<HTMLCanvasElement>;
-  maskCanvasRef: RefObject<HTMLCanvasElement>;
-  protectionCanvasRef: RefObject<HTMLCanvasElement>;
+  imageCanvasRef: RefObject<HTMLCanvasElement | null>;
+  maskCanvasRef: RefObject<HTMLCanvasElement | null>;
+  protectionCanvasRef: RefObject<HTMLCanvasElement | null>;
   useProtectionMask: boolean;
   startDrawing: (e: MouseEvent<HTMLCanvasElement> | TouchEvent<HTMLCanvasElement>) => void;
   draw: (e: MouseEvent<HTMLCanvasElement> | TouchEvent<HTMLCanvasElement>) => void;

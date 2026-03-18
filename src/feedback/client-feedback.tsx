@@ -4,6 +4,8 @@ import { generateMarkdown, downloadMarkdown, copyMarkdownToClipboard } from './g
 import { FeedbackPanel } from './feedback-panel';
 import { useFeedbackStore } from '../stores/feedbackStore';
 import { getCsrfToken } from '../services/apiClient';
+import { getApiErrorMessage } from '../services/api/response';
+import { clientLogger } from "@/lib/client-logger";
 
 interface Annotation {
   id: string;
@@ -134,6 +136,8 @@ export function ClientFeedback({
         if (sendTimeoutRef.current) clearTimeout(sendTimeoutRef.current);
         sendTimeoutRef.current = setTimeout(() => setSendStatus('idle'), 3000);
       } else {
+        const payload = await response.json().catch(() => ({ error: 'Falha ao enviar feedback' }));
+        clientLogger.error('[ClientFeedback]', getApiErrorMessage(payload, 'Falha ao enviar feedback'));
         setSendStatus('error');
       }
     } catch {
@@ -158,7 +162,7 @@ export function ClientFeedback({
       >
         <span style={styles.toggleIcon}>{isActive ? '\u25CF' : '\u25CB'}</span>
         <span>Feedback</span>
-        {annotations.length > 0 && <span style={styles.badge}>{annotations.length}</span>}
+        {annotations.length > 0 ? <span style={styles.badge}>{annotations.length}</span> : null}
       </button>
 
       {annotations.length > 0 && (
@@ -185,7 +189,7 @@ export function ClientFeedback({
         />
       )}
 
-      {copyFeedback && <div style={styles.toast}>Copiado para a area de transferencia!</div>}
+      {copyFeedback ? <div style={styles.toast}>Copiado para a area de transferencia!</div> : null}
 
       {isActive && (
         <Agentation

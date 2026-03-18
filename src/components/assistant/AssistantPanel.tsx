@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import type { ChatMessage, ChatReferenceImage } from "../../types";
 import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
+import { ErrorBoundary } from "../common/ErrorBoundary";
 
 interface AssistantPanelProps {
   isOpen: boolean;
@@ -72,6 +73,7 @@ const ChatBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
   const isModel = message.role === "model";
   const textPart = message.parts.find((p) => p.text)?.text;
   const imagePart = message.parts.find((p) => p.inlineData);
+  const inlineData = imagePart?.inlineData;
 
   if (!textPart && !message.parts[0].functionCall && !imagePart) return null;
   const htmlContent = textPart ? parseMarkdown(textPart) : "";
@@ -83,10 +85,10 @@ const ChatBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
       <div
         className={`max-w-[90%] rounded-3xl px-5 py-4 shadow-xl ${isModel ? "bg-card border border-border rounded-bl-none text-white/90" : "bg-primary text-black font-bold rounded-br-none"}`}
       >
-        {imagePart && (
+        {inlineData && (
           <div className="mb-3 rounded-2xl overflow-hidden border border-border group relative">
             <img
-              src={`data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`}
+              src={`data:${inlineData.mimeType};base64,${inlineData.data}`}
               alt="Anexo"
               className="w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
@@ -108,7 +110,7 @@ const ChatBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
   );
 };
 
-export const AssistantPanel: React.FC<AssistantPanelProps> = ({
+function AssistantPanelContent({
   isOpen,
   onClose,
   history,
@@ -116,7 +118,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   onSendMessage,
   referenceImage,
   onClearReference,
-}) => {
+}: AssistantPanelProps) {
   const [input, setInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -259,4 +261,19 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
       </div>
     </aside>
   );
-};
+}
+
+export const AssistantPanel: React.FC<AssistantPanelProps> = (props) => (
+  <ErrorBoundary
+    resetKeys={[props.isOpen, props.referenceImage?.id, props.history.length]}
+    fallback={
+      <div className="flex h-full min-h-[220px] items-center justify-center border-l border-border bg-background">
+        <p className="text-sm text-muted-foreground">
+          Falha ao carregar o assistente.
+        </p>
+      </div>
+    }
+  >
+    <AssistantPanelContent {...props} />
+  </ErrorBoundary>
+);

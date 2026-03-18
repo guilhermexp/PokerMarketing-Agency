@@ -53,6 +53,9 @@ export function useApiErrorHandler() {
 
   // Track active retry operations to prevent duplicates
   const activeRetries = useRef(new Set<string>());
+  const handleApiErrorRef = useRef<(error: unknown, retryFn?: () => void | Promise<void>) => void>(
+    () => undefined,
+  );
 
   /**
    * Handles rate limit errors with exponential backoff
@@ -83,7 +86,7 @@ export function useApiErrorHandler() {
               onClick: () => {
                 const result = retryFn();
                 if (result instanceof Promise) {
-                  result.catch((error) => handleApiError(error));
+                  result.catch((error) => handleApiErrorRef.current(error));
                 }
               },
             },
@@ -129,7 +132,7 @@ export function useApiErrorHandler() {
               await handleRateLimitError(retryFn, attempt + 1);
             } else {
               // Different error, handle normally
-              handleApiError(retryError);
+              handleApiErrorRef.current(retryError);
             }
           });
         }
@@ -192,6 +195,8 @@ export function useApiErrorHandler() {
     },
     [addToast, handleRateLimitError]
   );
+
+  handleApiErrorRef.current = handleApiError;
 
   return {
     handleApiError,

@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * AssistantPanelNew - Versão com Vercel AI SDK
  *
@@ -6,6 +7,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import { useChat } from '@ai-sdk/react';
 import {
   isFileUIPart,
@@ -27,6 +29,7 @@ import type { DataUIPart } from './DataStreamProvider';
 import { MessageResponse } from './MessageResponse';
 import { MessageActionsEnhanced } from './MessageActionsEnhanced';
 import { ToolWithApproval } from './ToolWithApproval';
+import type { ToolDisplayMetadata } from './ToolWithApproval';
 import { LoadingIndicatorEnhanced } from './LoadingIndicatorEnhanced';
 import { uploadDataUrlToBlob } from '../../services/blobService';
 
@@ -82,6 +85,23 @@ const getImageMediaType = (url: string): 'image/jpeg' | 'image/png' | 'image/web
   if (lowerUrl.includes('.heif')) return 'image/heif';
   return 'image/png'; // default
 };
+
+function isToolDisplayMetadata(value: unknown): value is ToolDisplayMetadata {
+  if (!value || typeof value !== 'object') return false;
+  const metadata = value as Record<string, unknown>;
+
+  return (
+    (metadata.title === undefined || typeof metadata.title === 'string') &&
+    (metadata.description === undefined || typeof metadata.description === 'string') &&
+    (metadata.estimatedTime === undefined || typeof metadata.estimatedTime === 'string') &&
+    (metadata.cost === undefined || typeof metadata.cost === 'string') &&
+    (metadata.icon === undefined || typeof metadata.icon === 'string') &&
+    (
+      metadata.willDo === undefined ||
+      (Array.isArray(metadata.willDo) && metadata.willDo.every((item) => typeof item === 'string'))
+    )
+  );
+}
 
 // ChatBubble component - Apenas renderiza mensagens (approvals são mostrados acima do input)
 const ChatBubble: React.FC<{ message: UIMessage }> = ({ message }) => {
@@ -184,23 +204,24 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
   // useChat hook do Vercel AI SDK
   const chatOptions = {
     id: chatId,
-    ...({ body: {
+    body: {
       brandProfile: effectiveBrandProfile,
       chatReferenceImage: referenceImage,
-      selectedChatModel: brandProfile?.creativeModel || 'gemini-3-flash-preview'
+      selectedChatModel: brandProfile?.creativeModel || 'gemini-3-flash-preview',
     },
     sendAutomaticallyWhen: ({ messages }: { messages: UIMessage[] }) =>
       lastAssistantMessageIsCompleteWithToolCalls({ messages }) ||
       lastAssistantMessageIsCompleteWithApprovalResponses({ messages }),
     onResponse: (response: Response) => {
-      console.info('[AssistantPanel] Response received', response.status);
+      clientLogger.info('[AssistantPanel] Response received', response.status);
     },
     onError: (error: Error) => {
-      console.error('[AssistantPanel] Error:', error);
+      clientLogger.error('[AssistantPanel] Error:', error);
 
       // Detectar erro de limite de tokens
-      const isTokenLimitError = error.message?.includes('tokens limit exceeded') ||
-                                 error.message?.includes('context_length_exceeded');
+      const isTokenLimitError =
+        error.message?.includes('tokens limit exceeded') ||
+        error.message?.includes('context_length_exceeded');
 
       if (isTokenLimitError) {
         setErrorMessage('Conversa muito longa. Por favor, inicie uma nova conversa clicando em "Limpar chat".');
@@ -211,14 +232,13 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       // Auto-limpar erro após 8 segundos (mais tempo para erros de token)
       setTimeout(() => setErrorMessage(null), isTokenLimitError ? 10000 : 5000);
     },
-    onFinish: (message: UIMessage) => {
-      console.info('[AssistantPanel] Message finished:', {
+    onFinish: ({ message }: { message: UIMessage }) => {
+      clientLogger.info('[AssistantPanel] Message finished:', {
         role: message.role,
-        partsCount: message.parts?.length || 0
+        partsCount: message.parts?.length || 0,
       });
-    }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any) as Parameters<typeof useChat>[0]};
+    },
+  } as unknown as Parameters<typeof useChat>[0];
 
   const { messages, sendMessage, status, addToolApprovalResponse, setMessages } = useChat<UIMessage>(chatOptions);
 
@@ -277,7 +297,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       return;
     }
 
-    console.log(`[AssistantPanel] Trimming messages: ${messages.length} -> ${MAX_MESSAGES}`);
+    clientLogger.debug(`[AssistantPanel] Trimming messages: ${messages.length} -> ${MAX_MESSAGES}`);
 
     // Manter apenas as últimas MAX_MESSAGES mensagens
     const trimmedMessages = messages.slice(-MAX_MESSAGES).map((msg, index, arr) => {
@@ -300,7 +320,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
 
     lastTrimmedLengthRef.current = trimmedMessages.length;
     setMessages(trimmedMessages);
-  }, [messages.length, setMessages]);
+  }, [messages, setMessages]);
 
   // ========================================================================
   // SINCRONIZAÇÃO AUTOMÁTICA DE IMAGENS
@@ -347,13 +367,13 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       }))
     );
 
-    console.log('🔍 [AssistantPanel] All tool calls in messages:', allToolCalls);
-    console.log('🔍 [AssistantPanel] Looking for toolCallId:', toolCallId);
+    clientLogger.debug('🔍 [AssistantPanel] All tool calls in messages:', allToolCalls);
+    clientLogger.debug('🔍 [AssistantPanel] Looking for toolCallId:', toolCallId);
 
     const toolCallExists = allToolCalls.some(tc => tc.id === toolCallId);
 
     if (!toolCallExists) {
-      console.warn('❌ [AssistantPanel] Tool call not found in messages:', {
+      clientLogger.warn('❌ [AssistantPanel] Tool call not found in messages:', {
         toolCallId,
         availableToolCalls: allToolCalls.map(tc => tc.id),
         totalMessages: messages.length,
@@ -365,7 +385,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       // Neste caso, marcar como handled para não ficar em loop.
       // A imagem já foi salva com sucesso, apenas não conseguimos notificar o AI.
       if (messages.length === 0 && result === 'approved' && imageUrl) {
-        console.warn('⚠️ [AssistantPanel] Messages empty after error but edit was saved. Marking as handled.');
+        clientLogger.warn('⚠️ [AssistantPanel] Messages empty after error but edit was saved. Marking as handled.');
         handledEditResultsRef.current.add(toolCallId);
         // A imagem já foi salva - apenas não conseguimos notificar o AI devido ao erro
         // O usuário já vê a imagem atualizada
@@ -373,10 +393,10 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       return;
     }
 
-    console.log('✅ [AssistantPanel] Tool call found! Proceeding with approval/rejection');
+    clientLogger.debug('✅ [AssistantPanel] Tool call found! Proceeding with approval/rejection');
 
     if (result === 'approved' && imageUrl) {
-      console.log('✅ [AssistantPanel] Auto-approving tool edit:', {
+      clientLogger.debug('✅ [AssistantPanel] Auto-approving tool edit:', {
         toolCallId,
         imageUrl,
         imageUrlType: typeof imageUrl,
@@ -387,7 +407,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
       handledEditResultsRef.current.add(toolCallId);
 
       // Notificar o agente que a edição foi aprovada
-      console.log('✅ [AssistantPanel] Calling addToolApprovalResponse with:', {
+      clientLogger.debug('✅ [AssistantPanel] Calling addToolApprovalResponse with:', {
         id: toolCallId,
         approved: true,
         reason: imageUrl
@@ -399,9 +419,9 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
         reason: imageUrl
       });
 
-      console.log('✅ [AssistantPanel] addToolApprovalResponse completed');
+      clientLogger.debug('✅ [AssistantPanel] addToolApprovalResponse completed');
     } else if (result === 'rejected') {
-      console.debug('[AssistantPanel] Auto-denying tool edit:', { toolCallId, error });
+      clientLogger.debug('[AssistantPanel] Auto-denying tool edit:', { toolCallId, error });
 
       // Marcar como processado antes de chamar addToolApprovalResponse
       handledEditResultsRef.current.add(toolCallId);
@@ -421,7 +441,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     messages.forEach((msg, idx) => {
       const toolParts = msg.parts.filter(isToolUIPart);
       if (toolParts.length > 0) {
-        console.debug(`[Chat] Message ${idx} has tool parts:`, toolParts.map((part) => ({
+        clientLogger.debug(`[Chat] Message ${idx} has tool parts:`, toolParts.map((part) => ({
           toolName: part.type.replace('tool-', ''),
           state: part.state,
           toolCallId: part.toolCallId
@@ -641,6 +661,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
   if (!isOpen) return null;
 
   return (
+    <ErrorBoundary>
     <DataStreamProvider dataStream={dataStream} setDataStream={setDataStream}>
       <DataStreamHandler />
 
@@ -715,15 +736,18 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
                     toolName={toolPart.type.replace('tool-', '')}
                     args={toolArgs}
                     metadata={
-                      'metadata' in toolPart
-                        ? (toolPart as { metadata?: { preview?: unknown } }).metadata?.preview
+                      'metadata' in toolPart &&
+                      isToolDisplayMetadata(
+                        (toolPart as { metadata?: { preview?: unknown } }).metadata?.preview,
+                      )
+                        ? (toolPart as { metadata?: { preview?: ToolDisplayMetadata } }).metadata?.preview
                         : undefined
                     }
                     state={mapToolState(toolPart.state)}
                     approvalId={toolPart.approval?.id}
                     onApprove={handleApprove}
                     onDeny={handleDeny}
-                    onAlwaysAllow={(toolName) => console.info('Always allow:', toolName)}
+                    onAlwaysAllow={(toolName) => clientLogger.info('Always allow:', toolName)}
                   />
                 );
               })}
@@ -844,5 +868,6 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
         </div>
       </aside>
     </DataStreamProvider>
+    </ErrorBoundary>
   );
 };

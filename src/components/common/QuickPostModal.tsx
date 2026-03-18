@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -27,7 +28,7 @@ const urlToDataUrl = async (src: string): Promise<string | null> => {
             reader.readAsDataURL(blob);
         });
     } catch (error) {
-        console.error("[urlToDataUrl] Failed to convert URL:", src, error);
+        clientLogger.error("[urlToDataUrl] Failed to convert URL:", src, error);
         return null;
     }
 };
@@ -95,7 +96,7 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
             const result = await generateQuickPostText(brandProfile, contextText, imageDataUrl || undefined);
             setPost(result);
         } catch (e) {
-            console.error(e);
+            clientLogger.error(e);
         } finally {
             setIsGenerating(false);
         }
@@ -171,7 +172,7 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                     await markGalleryImagePublished(image.id);
                     onImagePublished?.(image.id);
                 } catch (err) {
-                    console.error('[QuickPostModal] Failed to mark image as published:', err);
+                    clientLogger.error('[QuickPostModal] Failed to mark image as published:', err);
                 }
                 // Success - close modal after a delay
                 setTimeout(() => {

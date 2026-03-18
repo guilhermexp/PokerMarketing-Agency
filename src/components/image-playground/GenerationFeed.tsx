@@ -64,4 +64,3 @@ export const GenerationFeed: React.FC<GenerationFeedProps> = ({ topicId }) => {
   );
 };
 
-export default GenerationFeed;

@@ -28,7 +28,7 @@ export const GoogleAdPreview: React.FC<GoogleAdPreviewProps> = ({
   onImageClick,
   imagePrompt,
   error,
-  galleryImage,
+  galleryImage: _galleryImage,
 }) => {
   const [isImageLoading, setIsImageLoading] = React.useState(false);
   const [loadedImage, setLoadedImage] = React.useState<string | null>(null);

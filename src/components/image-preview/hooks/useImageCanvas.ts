@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * useImageCanvas Hook
  *
@@ -25,7 +26,7 @@ export function useImageCanvas({ imageSrc }: UseImageCanvasProps): UseImageCanva
 
   // Log when imageSrc changes
   useEffect(() => {
-    console.log('🖌️ [useImageCanvas] imageSrc changed:', imageSrc.substring(0, 50));
+    clientLogger.debug('🖌️ [useImageCanvas] imageSrc changed:', imageSrc.substring(0, 50));
   }, [imageSrc]);
 
   // Calculate display dimensions based on container size and natural image size
@@ -282,7 +283,8 @@ export function useImageCanvas({ imageSrc }: UseImageCanvasProps): UseImageCanva
     const ctx = maskCanvas.getContext('2d');
     const imageData = ctx?.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
     const data = imageData?.data;
-    const hasDrawing = data?.some((channel) => channel !== 0);
+    if (!data) return undefined;
+    const hasDrawing = data.some((channel) => channel !== 0);
 
     if (!hasDrawing) return undefined;
 

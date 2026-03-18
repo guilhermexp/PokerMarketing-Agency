@@ -15,6 +15,7 @@ import {
 } from "../../config/ai-models";
 import { urlToBase64 } from "../../utils/imageHelpers";
 import { enhancePrompt } from "../../services/geminiService";
+import { clientLogger } from "@/lib/client-logger";
 
 // Models from centralized config
 const creativeModelLabels = Object.fromEntries(
@@ -211,7 +212,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
         localStorage.removeItem("campaign_collabLogo");
       }
     } catch (e) {
-      console.warn(
+      clientLogger.warn(
         "[UploadForm] Failed to save collabLogo to localStorage:",
         e,
       );
@@ -300,7 +301,7 @@ export const UploadForm: React.FC<UploadFormProps> = ({
       const enhanced = await enhancePrompt(transcript, brandProfile);
       setTranscript(enhanced);
     } catch (err) {
-      console.error("[UploadForm] Failed to enhance prompt:", err);
+      clientLogger.error("[UploadForm] Failed to enhance prompt:", err);
     } finally {
       setIsEnhancing(false);
     }

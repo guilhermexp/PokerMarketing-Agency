@@ -64,7 +64,10 @@ export const StudioAgentQuestionCard: React.FC<StudioAgentQuestionCardProps> = m
   }, [currentQuestionIndex]);
 
   const currentQuestion = questions[currentQuestionIndex];
-  const currentOptions = currentQuestion?.options || [];
+  const currentOptions = useMemo(
+    () => currentQuestion?.options || [],
+    [currentQuestion],
+  );
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
 
   const isOptionSelected = useCallback((questionText: string, optionLabel: string) => {
@@ -323,5 +326,3 @@ export const StudioAgentQuestionCard: React.FC<StudioAgentQuestionCardProps> = m
 });
 
 StudioAgentQuestionCard.displayName = 'StudioAgentQuestionCard';
-
-export default StudioAgentQuestionCard;

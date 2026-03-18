@@ -57,9 +57,9 @@ RUN npm run build && \
     ls -la dist/
 
 # =============================================================================
-# Stage 3: Runtime — Bun for speed, npm-installed deps for compatibility
+# Stage 3: Runtime
 # =============================================================================
-FROM oven/bun:1-debian
+FROM node:20-slim
 
 WORKDIR /app
 
@@ -72,6 +72,8 @@ COPY --from=builder /app/dist ./dist
 # Server code
 COPY package.json ./
 COPY server ./server
+
+COPY scripts/ensure-sharp-libvips-link.mjs ./scripts/
 
 # Runtime env from 
 ARG GEMINI_API_KEY
@@ -95,4 +97,4 @@ ENV NODE_ENV=production
 
 EXPOSE 8080
 
-CMD ["bun", "run", "server/index.mjs"]
+CMD ["node", "--import", "tsx", "server/index.ts"]

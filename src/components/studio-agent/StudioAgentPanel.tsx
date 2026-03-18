@@ -58,6 +58,14 @@ function getAttachmentIcon(type: StudioAgentAttachment['type']) {
   return <FileText className="w-3.5 h-3.5" />;
 }
 
+const mentionRegex = /(?:^|\s)@([^\s@]*)$/;
+const contentMentionPrefixes: { prefix: string; type: ContentMentionType }[] = [
+  { prefix: 'gallery:', type: 'gallery' },
+  { prefix: 'campaign:', type: 'campaign' },
+  { prefix: 'clip:', type: 'clip' },
+  { prefix: 'carousel:', type: 'carousel' },
+];
+
 export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
   studioType,
   topicId,
@@ -91,13 +99,6 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
   const isBlockedByStreaming = isStreaming && !pendingInteraction;
   const isGenerating = isStreaming && !pendingInteraction;
   const disabled = !topicId || isUploadingAttachment || isBlockedByStreaming || isAnsweringInteraction;
-  const mentionRegex = /(?:^|\s)@([^\s@]*)$/;
-  const contentMentionPrefixes: { prefix: string; type: ContentMentionType }[] = [
-    { prefix: 'gallery:', type: 'gallery' },
-    { prefix: 'campaign:', type: 'campaign' },
-    { prefix: 'clip:', type: 'clip' },
-    { prefix: 'carousel:', type: 'carousel' },
-  ];
 
   const subtitle = useMemo(() => {
     if (!topicId) {
@@ -782,5 +783,3 @@ export const StudioAgentPanel: React.FC<StudioAgentPanelProps> = ({
     </div>
   );
 };
-
-export default StudioAgentPanel;

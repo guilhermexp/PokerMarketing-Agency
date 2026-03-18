@@ -1,0 +1,854 @@
+import { AppError } from "../lib/errors/index.js";
+/**
+ * AI Image Generation Routes
+ * Extracted from server/index.mjs
+ *
+ * Routes:
+ *   POST /api/ai/image
+ *   POST /api/ai/edit-image
+ *   POST /api/ai/extract-colors
+ */
+
+import type { Application, Request, Response } from "express";
+import { z } from "zod";
+import { getRequestAuthContext } from "../lib/auth.js";
+import { getSql } from "../lib/db.js";
+import {
+  withRetry,
+  sanitizeErrorForClient,
+  isQuotaOrRateLimitError,
+} from "../lib/ai/retry.js";
+import { generateTextFromMessages } from "../lib/ai/text-generation.js";
+import {
+  generateImageWithFallback,
+  DEFAULT_IMAGE_MODEL,
+  type ImageReference,
+} from "../lib/ai/image-generation.js";
+import { runWithProviderFallback } from "../lib/ai/image-providers.js";
+import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.js";
+import {
+  buildImagePrompt,
+  convertImagePromptToJson,
+} from "../lib/ai/prompt-builders.js";
+import {
+  logAiUsage,
+  createTimer,
+} from "../helpers/usage-tracking.js";
+import { urlToBase64 } from "../helpers/image-helpers.js";
+import { validateContentType } from "../lib/validation/contentType.js";
+import logger from "../lib/logger.js";
+import {
+  enqueueImageGeneration,
+  enqueueImageGenerationBatch,
+  getImageGenerationJobStatus,
+  getUserImageGenerationJobs,
+  cancelImageGenerationJob,
+} from "../helpers/job-queue.js";
+import {
+  aiEditImageBodySchema,
+  aiExtractColorsBodySchema,
+  aiImageAsyncBodySchema,
+  aiImageAsyncBatchBodySchema,
+  aiImageAsyncJobsQuerySchema,
+  aiImageBodySchema,
+  type AiEditImageBody,
+  type AiExtractColorsBody,
+  type AiImageAsyncBatchBody,
+  type AiImageAsyncBody,
+  type AiImageAsyncJobsQuery,
+  type AiImageBody,
+} from "../schemas/ai-schemas.js";
+import { validateRequest } from "../middleware/validate.js";
+import { uploadBufferToBlob } from "../services/upload-service.js";
+
+/** Image size values accepted by logAiUsage */
+type ImageSize = '1K' | '2K' | '4K';
+
+const VALID_IMAGE_SIZES = new Set<ImageSize>(['1K', '2K', '4K']);
+
+function normalizeImageSize(size: unknown): ImageSize {
+  if (typeof size === 'string' && VALID_IMAGE_SIZES.has(size as ImageSize)) {
+    return size as ImageSize;
+  }
+  return '1K';
+}
+
+const SUPPORTED_IMAGE_MODELS = new Set([
+  "gemini-3-pro-image-preview",
+  "gemini-3.1-flash-image-preview",
+  "gemini-2.5-flash-image",
+  "gemini-25-flash-image",
+  "nano-banana-2",
+  "nano-banana",
+  "nano-banana-pro",
+  "google/nano-banana-2",
+  "google/nano-banana",
+  "google/nano-banana-pro",
+]);
+
+function normalizeRequestedImageModel(model: unknown): string {
+  if (typeof model !== "string") return DEFAULT_IMAGE_MODEL;
+  const normalized = model.trim().toLowerCase();
+  if (!SUPPORTED_IMAGE_MODELS.has(normalized)) {
+    return DEFAULT_IMAGE_MODEL;
+  }
+
+  // Upgrade legacy standard IDs/aliases to Nano Banana 2 (Gemini 3.1 Flash Image preview)
+  if (
+    normalized === "gemini-25-flash-image" ||
+    normalized === "gemini-2.5-flash-image"
+  ) return "gemini-3.1-flash-image-preview";
+  if (
+    normalized === "nano-banana" ||
+    normalized === "google/nano-banana" ||
+    normalized === "google/nano-banana-2"
+  ) return "nano-banana-2";
+  if (normalized === "google/nano-banana-pro") return "nano-banana-pro";
+  return normalized;
+}
+
+export function registerAiImageRoutes(app: Application): void {
+  // -------------------------------------------------------------------------
+  // POST /api/ai/image
+  // -------------------------------------------------------------------------
+  app.post("/api/ai/image", validateRequest({ body: aiImageBodySchema }), async (req: Request, res: Response) => {
+    const timer = createTimer();
+    const authCtx = getRequestAuthContext(req);
+    const userId = authCtx?.userId;
+    const organizationId = authCtx?.orgId || null;
+    const sql = getSql();
+    let selectedModelForLogs = DEFAULT_IMAGE_MODEL;
+
+    logger.info(
+      { userId, organizationId: organizationId || "personal" },
+      "[Image API] Nova requisição de geração de imagem",
+    );
+
+    try {
+      const body = req.body as AiImageBody;
+      const {
+        prompt,
+        brandProfile,
+        aspectRatio = "1:1",
+        imageSize = "1K",
+        model: requestedModel,
+        productImages,
+        styleReferenceImage,
+        personReferenceImage,
+      } = body;
+      const model = normalizeRequestedImageModel(requestedModel);
+      selectedModelForLogs = model;
+
+      logger.debug(
+        {
+          promptLength: prompt?.length || 0,
+          aspectRatio,
+          imageSize,
+          model,
+          hasBrandProfile: !!brandProfile,
+          brandProfileName: brandProfile?.name,
+          hasBrandLogo: !!brandProfile?.logo,
+          hasColors: !!brandProfile?.colors,
+          productImagesCount: productImages?.length || 0,
+          hasStyleReference: !!styleReferenceImage,
+          hasPersonReference: !!personReferenceImage,
+        },
+        "[Image API] Parâmetros recebidos",
+      );
+
+      // Prepare product images array, including brand logo if available
+      const allProductImages: ImageReference[] = productImages ? [...productImages] : [];
+
+      // Auto-include brand logo as reference if it's an HTTP URL
+      // (Frontend handles data URLs, server handles HTTP URLs)
+      if (brandProfile.logo && brandProfile.logo.startsWith("http")) {
+        try {
+          const logoBase64 = await urlToBase64(brandProfile.logo);
+          if (logoBase64) {
+            logger.debug({}, "[Image API] Including brand logo from HTTP URL");
+            // Detect mime type from URL or default to png
+            const mimeType = brandProfile.logo.includes(".svg")
+              ? "image/svg+xml"
+              : brandProfile.logo.includes(".jpg") ||
+                  brandProfile.logo.includes(".jpeg")
+                ? "image/jpeg"
+                : "image/png";
+            allProductImages.unshift({ base64: logoBase64, mimeType });
+          }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          logger.warn(
+            { errorMessage },
+            "[Image API] Failed to include brand logo",
+          );
+        }
+      }
+
+      const hasLogo = !!brandProfile.logo && allProductImages.length > 0;
+      const hasPersonReference = !!personReferenceImage;
+      const jsonPrompt = await convertImagePromptToJson(
+        prompt,
+        aspectRatio,
+        organizationId,
+        sql,
+      );
+      const fullPrompt = buildImagePrompt(
+        prompt,
+        brandProfile,
+        !!styleReferenceImage,
+        hasLogo,
+        hasPersonReference,
+        !!productImages?.length,
+        jsonPrompt,
+      );
+
+      // Log prompt as structured summary (not raw dump)
+      const jsonMatch = fullPrompt.match(/```json\n([\s\S]*?)```/);
+      if (jsonMatch && jsonMatch[1]) {
+        try {
+          const parsed = JSON.parse(jsonMatch[1]) as {
+            subject?: unknown;
+            environment?: unknown;
+            style?: string;
+            text?: { content?: unknown };
+            output?: { aspect_ratio?: unknown };
+          };
+          logger.debug(
+            {
+              subject: parsed.subject,
+              environment: parsed.environment,
+              style: parsed.style?.slice(0, 80),
+              text: parsed.text?.content,
+              aspectRatio: parsed.output?.aspect_ratio,
+              promptChars: fullPrompt.length,
+              hasLogo,
+              hasStyleRef: !!styleReferenceImage,
+              hasPersonRef: hasPersonReference,
+            },
+            "[Image API] Prompt (JSON estruturado)",
+          );
+        } catch {
+          logger.debug(
+            { promptChars: fullPrompt.length, promptPreview: fullPrompt.slice(0, 200) },
+            "[Image API] Prompt (parse falhou)",
+          );
+        }
+      } else {
+        logger.debug(
+          { promptChars: fullPrompt.length, promptPreview: fullPrompt.slice(0, 200) },
+          "[Image API] Prompt (texto livre)",
+        );
+      }
+
+      logger.debug(
+        {
+          model,
+          aspectRatio,
+          imageSize,
+          productImagesCount: allProductImages.length,
+        },
+        "[Image API] Chamando generateImageWithFallback",
+      );
+
+      const result = await generateImageWithFallback(
+        fullPrompt,
+        aspectRatio,
+        model,
+        imageSize,
+        allProductImages.length > 0 ? allProductImages : undefined,
+        styleReferenceImage,
+        personReferenceImage,
+      );
+
+      logger.info(
+        {
+          provider: result.usedProvider,
+          imageUrlLength: result.imageUrl?.length || 0,
+        },
+        "[Image API] Imagem gerada com sucesso",
+      );
+
+      // Upload to Vercel Blob for all providers
+      let finalImageUrl = result.imageUrl;
+      if (result.imageUrl) {
+        logger.debug(
+          {},
+          `[Image API] Uploading ${result.usedProvider} image to Vercel Blob`,
+        );
+        try {
+          let imageBuffer;
+          let contentType;
+
+          if (result.imageUrl.startsWith("data:")) {
+            // Handle data URL (from Gemini)
+            const matches = result.imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (!matches || !matches[1] || !matches[2]) {
+              throw new Error("Invalid data URL format");
+            }
+            contentType = matches[1];
+            imageBuffer = Buffer.from(matches[2], "base64");
+          } else {
+            // Handle HTTP URL (from FAL.ai fallback)
+            const imageResponse = await fetch(result.imageUrl);
+            if (!imageResponse.ok) {
+              throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+            }
+            imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+            contentType =
+              imageResponse.headers.get("content-type") || "image/png";
+          }
+
+          // SECURITY: Validate content type before storing in Vercel Blob
+          // contentType is guaranteed to be defined here because we either got it from
+          // the data URL regex (which throws if no match) or from HTTP response headers
+          const validatedContentType = contentType;
+          validateContentType(validatedContentType);
+
+          const ext = validatedContentType.includes("png")
+            ? "png"
+            : validatedContentType.includes("webp")
+              ? "webp"
+              : "jpg";
+          const filename = `generated-${Date.now()}.${ext}`;
+
+          const blobUpload = await uploadBufferToBlob(
+            filename,
+            imageBuffer,
+            validatedContentType,
+          );
+
+          finalImageUrl = blobUpload.url;
+          logger.info(
+            { blobUrl: blobUpload.url, optimizedContentType: blobUpload.contentType },
+            "[Image API] Uploaded to Vercel Blob",
+          );
+        } catch (uploadError) {
+          logger.error(
+            { err: uploadError },
+            "[Image API] Failed to upload to Vercel Blob",
+          );
+          // Keep using the original URL/data URL as fallback
+        }
+      }
+
+      // Log AI usage
+      await logAiUsage(sql, {
+        organizationId,
+        endpoint: "/api/ai/image",
+        operation: "image",
+        model: result.usedModel,
+        provider: result.usedProvider,
+        imageCount: 1,
+        imageSize: normalizeImageSize(imageSize),
+        latencyMs: timer(),
+        status: "success",
+        metadata: {
+          aspectRatio,
+          hasProductImages: !!productImages?.length,
+          hasStyleRef: !!styleReferenceImage,
+          fallbackUsed: result.usedFallback,
+        },
+      });
+
+      const elapsedTime = timer();
+      logger.info(
+        { durationMs: elapsedTime },
+        "[Image API] SUCESSO - Geração completa",
+      );
+
+      res.json({
+        success: true,
+        imageUrl: finalImageUrl,
+        model,
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const elapsedTime = timer();
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error(
+        {
+          err,
+          elapsedTime,
+          errorType: err.constructor.name,
+          stack: err.stack,
+        },
+        `[Image API] ERRO apos ${elapsedTime}ms`,
+      );
+
+      await logAiUsage(sql, {
+        organizationId,
+        endpoint: "/api/ai/image",
+        operation: "image",
+        model: selectedModelForLogs,
+        latencyMs: elapsedTime,
+        status: "error",
+        error: err.message,
+      }).catch((logError) => {
+        logger.error({ err: logError }, "[Image API] Falha ao logar erro no DB");
+      });
+
+      const statusCode = isQuotaOrRateLimitError(err) ? 429 : 500;
+      return res
+        .status(statusCode)
+        .json({ error: sanitizeErrorForClient(err, "Falha ao gerar imagem. Tente novamente.") });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /api/ai/edit-image
+  // -------------------------------------------------------------------------
+  app.post("/api/ai/edit-image", validateRequest({ body: aiEditImageBodySchema }), async (req: Request, res: Response) => {
+    const timer = createTimer();
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
+    const sql = getSql();
+
+    try {
+      const body = req.body as AiEditImageBody;
+      const { image, prompt, mask, referenceImage } = body;
+
+      if (!image || !prompt) {
+        throw new AppError("image and prompt are required", 400);
+      }
+
+      logger.info(
+        {
+          imageSize: image.base64?.length,
+          mimeType: image.mimeType,
+          promptLength: prompt.length,
+          hasMask: !!mask,
+          hasReference: !!referenceImage,
+        },
+        "[Edit Image API] Editing image",
+      );
+
+      const instructionPrompt = prompt;
+
+      // Validate and clean base64 data
+      let cleanBase64 = image.base64;
+      if (cleanBase64.startsWith("data:")) {
+        cleanBase64 = cleanBase64.split(",")[1] ?? cleanBase64;
+      }
+      if (cleanBase64.length % 4 !== 0) {
+        cleanBase64 = cleanBase64.padEnd(
+          Math.ceil(cleanBase64.length / 4) * 4,
+          "=",
+        );
+      }
+
+      logger.info({}, "[Edit Image API] Using provider chain");
+
+      const result = await runWithProviderFallback("edit", {
+        prompt: instructionPrompt,
+        imageBase64: cleanBase64,
+        mimeType: image.mimeType,
+        referenceImage,
+      });
+
+      const { usedProvider, usedModel } = result;
+
+      // Convert to data URL for the response (endpoint contract is data URL)
+      let imageDataUrl;
+      if (result.imageUrl.startsWith("data:")) {
+        imageDataUrl = result.imageUrl;
+      } else {
+        // HTTP URL (from FAL.ai or Replicate) — fetch and convert to data URL
+        const imgResponse = await fetch(result.imageUrl);
+        if (!imgResponse.ok) {
+          throw new Error(`Failed to fetch edited image: ${imgResponse.status}`);
+        }
+        const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
+        const imgMimeType = imgResponse.headers.get("content-type") || "image/png";
+        imageDataUrl = `data:${imgMimeType};base64,${imgBuffer.toString("base64")}`;
+      }
+
+      logger.info({ provider: usedProvider }, "[Edit Image API] Image edited successfully");
+
+      // Log AI usage
+      await logAiUsage(sql, {
+        organizationId,
+        endpoint: "/api/ai/edit-image",
+        operation: "edit_image",
+        model: usedModel,
+        provider: usedProvider,
+        imageCount: 1,
+        imageSize: "1K",
+        latencyMs: timer(),
+        status: "success",
+        metadata: {
+          hasMask: !!mask,
+          hasReference: !!referenceImage,
+          fallbackUsed: usedProvider !== "google",
+        },
+      });
+
+      res.json({
+        success: true,
+        imageUrl: imageDataUrl,
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err }, "[Edit Image API] Error");
+      await logAiUsage(sql, {
+        organizationId,
+        endpoint: "/api/ai/edit-image",
+        operation: "edit_image",
+        model: "gemini-3-pro-image-preview",
+        latencyMs: timer(),
+        status: "error",
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
+      const statusCode = isQuotaOrRateLimitError(err) ? 429 : 500;
+      return res
+        .status(statusCode)
+        .json({ error: sanitizeErrorForClient(err) });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /api/ai/extract-colors
+  // -------------------------------------------------------------------------
+  app.post("/api/ai/extract-colors", validateRequest({ body: aiExtractColorsBodySchema }), async (req: Request, res: Response) => {
+    const timer = createTimer();
+    const authCtx = getRequestAuthContext(req);
+    const organizationId = authCtx?.orgId || null;
+    const sql = getSql();
+
+    try {
+      const body = req.body as AiExtractColorsBody;
+      const { logo } = body;
+
+      if (!logo) {
+        throw new AppError("logo is required", 400);
+      }
+
+      logger.info({}, "[Extract Colors API] Analyzing logo");
+
+      const colorPrompt = `Analise este logo e extraia APENAS as cores que REALMENTE existem na imagem visível.
+
+REGRAS IMPORTANTES:
+- Extraia somente cores que você pode ver nos pixels da imagem
+- NÃO invente cores que não existem
+- Ignore áreas transparentes (não conte transparência como cor)
+- Se o logo tiver apenas 1 cor visível, retorne null para secondaryColor e tertiaryColor
+- Se o logo tiver apenas 2 cores visíveis, retorne null para tertiaryColor
+
+PRIORIDADE DAS CORES:
+- primaryColor: A cor mais dominante/presente no logo (maior área)
+- secondaryColor: A segunda cor mais presente (se existir), ou null
+- tertiaryColor: Uma terceira cor de destaque/acento (se existir), ou null
+
+Retorne as cores em formato hexadecimal (#RRGGBB).
+Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou null, "tertiaryColor": "#..." ou null}`;
+
+      const { text, usage } = await withRetry(() =>
+        generateTextFromMessages({
+          model: DEFAULT_TEXT_MODEL,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: colorPrompt },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${logo.mimeType};base64,${logo.base64}`,
+                  },
+                },
+              ],
+            },
+          ],
+          jsonMode: true,
+        }),
+      );
+
+      const colors = JSON.parse(text.trim());
+
+      logger.info({ colors }, "[Extract Colors API] Colors extracted");
+
+      // Log AI usage
+      const inputTokens = usage.inputTokens || 0;
+      const outputTokens = usage.outputTokens || 0;
+      await logAiUsage(sql, {
+        organizationId,
+        endpoint: "/api/ai/extract-colors",
+        operation: "text",
+        model: DEFAULT_TEXT_MODEL,
+        inputTokens,
+        outputTokens,
+        latencyMs: timer(),
+        status: "success",
+      });
+
+      res.json(colors);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err }, "[Extract Colors API] Error");
+      await logAiUsage(sql, {
+        organizationId,
+        endpoint: "/api/ai/extract-colors",
+        operation: "text",
+        model: DEFAULT_TEXT_MODEL,
+        latencyMs: timer(),
+        status: "error",
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
+      return res
+        .status(500)
+        .json({ error: sanitizeErrorForClient(err) });
+    }
+  });
+
+  // ============================================================================
+  // ASYNC IMAGE GENERATION ROUTES (Queue-based)
+  // ============================================================================
+
+  // -------------------------------------------------------------------------
+  // POST /api/ai/image/async - Queue a single image generation
+  // -------------------------------------------------------------------------
+  app.post("/api/ai/image/async", validateRequest({ body: aiImageAsyncBodySchema }), async (req: Request, res: Response) => {
+    const authCtx = getRequestAuthContext(req);
+    const userId = authCtx?.userId;
+    const organizationId = authCtx?.orgId || null;
+
+    if (!userId) {
+      throw new AppError("Authentication required", 401);
+    }
+
+    try {
+      const body = req.body as AiImageAsyncBody;
+      const {
+        prompt,
+        brandProfile,
+        aspectRatio = "1:1",
+        imageSize = "1K",
+        model: requestedModel,
+        productImages,
+        styleReferenceImage,
+        personReferenceImage,
+        priority,
+      } = body;
+
+      const model = normalizeRequestedImageModel(requestedModel);
+
+      // Convert image references to data URLs for queue storage
+      const serializedProductImages = productImages?.map(
+        img => `data:${img.mimeType};base64,${img.base64}`
+      );
+      const serializedStyleRef = styleReferenceImage
+        ? `data:${styleReferenceImage.mimeType};base64,${styleReferenceImage.base64}`
+        : undefined;
+      const serializedPersonRef = personReferenceImage
+        ? `data:${personReferenceImage.mimeType};base64,${personReferenceImage.base64}`
+        : undefined;
+
+      // Queue the job
+      const result = await enqueueImageGeneration({
+        userId,
+        organizationId: organizationId ?? undefined,
+        prompt,
+        brandProfile,
+        aspectRatio,
+        imageSize,
+        model,
+        productImages: serializedProductImages,
+        styleReferenceImage: serializedStyleRef,
+        personReferenceImage: serializedPersonRef,
+      }, { priority });
+
+      logger.info(
+        { jobId: result.jobId, userId, queuePosition: result.queuePosition },
+        "[Image Async] Job queued"
+      );
+
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, userId }, "[Image Async] Failed to queue job");
+
+      if (err.message.includes("Redis not available")) {
+        return res.status(503).json({
+          error: "Image queue temporarily unavailable. Use /api/ai/image for synchronous generation.",
+          useSyncEndpoint: true
+        });
+      }
+
+      return res.status(500).json({ error: sanitizeErrorForClient(err) });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /api/ai/image/async/batch - Queue multiple images
+  // -------------------------------------------------------------------------
+  app.post("/api/ai/image/async/batch", validateRequest({ body: aiImageAsyncBatchBodySchema }), async (req: Request, res: Response) => {
+    const authCtx = getRequestAuthContext(req);
+    const userId = authCtx?.userId;
+    const organizationId = authCtx?.orgId || null;
+
+    if (!userId) {
+      throw new AppError("Authentication required", 401);
+    }
+
+    try {
+      const body = req.body as AiImageAsyncBatchBody;
+      const { jobs, priority } = body;
+
+      // Add user context and serialize image references for each job
+      const jobsWithContext = jobs.map(job => {
+        const serializedProductImages = job.productImages?.map(
+          img => `data:${img.mimeType};base64,${img.base64}`
+        );
+        const serializedStyleRef = job.styleReferenceImage
+          ? `data:${job.styleReferenceImage.mimeType};base64,${job.styleReferenceImage.base64}`
+          : undefined;
+        const serializedPersonRef = job.personReferenceImage
+          ? `data:${job.personReferenceImage.mimeType};base64,${job.personReferenceImage.base64}`
+          : undefined;
+
+        return {
+          userId,
+          organizationId: organizationId ?? undefined,
+          prompt: job.prompt,
+          brandProfile: job.brandProfile,
+          aspectRatio: job.aspectRatio,
+          imageSize: job.imageSize,
+          model: normalizeRequestedImageModel(job.model),
+          productImages: serializedProductImages,
+          styleReferenceImage: serializedStyleRef,
+          personReferenceImage: serializedPersonRef,
+        };
+      });
+
+      const results = await enqueueImageGenerationBatch(jobsWithContext, { priority });
+
+      const successCount = results.filter(r => !r.error).length;
+      logger.info(
+        { userId, batchSize: jobs.length, successCount },
+        "[Image Async] Batch queued"
+      );
+
+      res.json({
+        success: true,
+        batchSize: jobs.length,
+        queued: successCount,
+        jobs: results,
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, userId }, "[Image Async] Failed to queue batch");
+
+      if (err.message.includes("Redis not available")) {
+        return res.status(503).json({
+          error: "Image queue temporarily unavailable. Use /api/ai/image for synchronous generation.",
+          useSyncEndpoint: true
+        });
+      }
+
+      return res.status(500).json({ error: sanitizeErrorForClient(err) });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /api/ai/image/async/status/:jobId - Check job status
+  // -------------------------------------------------------------------------
+  app.get("/api/ai/image/async/status/:jobId", validateRequest({ params: z.object({ jobId: z.string().trim().min(1) }) }), async (req: Request, res: Response) => {
+    const authCtx = getRequestAuthContext(req);
+    const userId = authCtx?.userId;
+
+    if (!userId) {
+      throw new AppError("Authentication required", 401);
+    }
+
+    try {
+      const { jobId } = req.params as { jobId: string };
+
+      const status = await getImageGenerationJobStatus(jobId);
+
+      if (!status) {
+        throw new AppError("Job not found", 404);
+      }
+
+      // Verify ownership
+      if (status.data.userId !== userId) {
+        throw new AppError("Access denied", 403);
+      }
+
+      res.json(status);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, userId }, "[Image Async] Failed to get status");
+      return res.status(500).json({ error: sanitizeErrorForClient(err) });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /api/ai/image/async/jobs - List user's jobs
+  // -------------------------------------------------------------------------
+  app.get("/api/ai/image/async/jobs", validateRequest({ query: aiImageAsyncJobsQuerySchema }), async (req: Request, res: Response) => {
+    const authCtx = getRequestAuthContext(req);
+    const userId = authCtx?.userId;
+    const organizationId = authCtx?.orgId ?? undefined;
+
+    if (!userId) {
+      throw new AppError("Authentication required", 401);
+    }
+
+    try {
+      const { limit } = req.query as unknown as AiImageAsyncJobsQuery;
+      const jobs = await getUserImageGenerationJobs(userId, organizationId, limit);
+
+      res.json({ jobs });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, userId }, "[Image Async] Failed to list jobs");
+      return res.status(500).json({ error: sanitizeErrorForClient(err) });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // DELETE /api/ai/image/async/cancel/:jobId - Cancel a job
+  // -------------------------------------------------------------------------
+  app.delete("/api/ai/image/async/cancel/:jobId", validateRequest({ params: z.object({ jobId: z.string().trim().min(1) }) }), async (req: Request, res: Response) => {
+    const authCtx = getRequestAuthContext(req);
+    const userId = authCtx?.userId;
+
+    if (!userId) {
+      throw new AppError("Authentication required", 401);
+    }
+
+    try {
+      const { jobId } = req.params as { jobId: string };
+
+      // Verify ownership first
+      const status = await getImageGenerationJobStatus(jobId);
+      if (!status) {
+        throw new AppError("Job not found", 404);
+      }
+      if (status.data.userId !== userId) {
+        throw new AppError("Access denied", 403);
+      }
+
+      const cancelled = await cancelImageGenerationJob(jobId);
+
+      if (cancelled) {
+        res.json({ success: true, message: "Job cancelled" });
+      } else {
+        res.status(400).json({ success: false, message: "Job already completed or failed" });
+      }
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, userId }, "[Image Async] Failed to cancel job");
+      return res.status(500).json({ error: sanitizeErrorForClient(err) });
+    }
+  });
+}

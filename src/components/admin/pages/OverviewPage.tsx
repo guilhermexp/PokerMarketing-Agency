@@ -1,9 +1,11 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Overview Page - Visão geral do painel admin
  * Design minimalista com tema dark
  */
 
 import React, { useEffect, useState } from 'react';
+import { unwrapApiData } from '../../../services/api/response';
 import { StatsCard } from '../common/StatsCard';
 import {
   AreaChart,
@@ -50,7 +52,7 @@ export function OverviewPage() {
         });
 
         if (!statsRes.ok) throw new Error('Falha ao carregar estatísticas');
-        const statsData = await statsRes.json();
+        const statsData = unwrapApiData<OverviewStats>(await statsRes.json());
         setStats(statsData);
 
         const usageRes = await fetch(`${API_BASE}/api/admin/usage?groupBy=day`, {
@@ -58,11 +60,11 @@ export function OverviewPage() {
         });
 
         if (usageRes.ok) {
-          const usageData = await usageRes.json();
+          const usageData = unwrapApiData<{ timeline?: UsageTimeline[] }>(await usageRes.json());
           setTimeline(usageData.timeline || []);
         }
       } catch (err) {
-        console.error('Error fetching overview data:', err);
+        clientLogger.error('Error fetching overview data:', err);
         setError(err instanceof Error ? err.message : 'Falha ao carregar dados');
       } finally {
         setIsLoading(false);
@@ -316,5 +318,3 @@ export function OverviewPage() {
     </div>
   );
 }
-
-export default OverviewPage;

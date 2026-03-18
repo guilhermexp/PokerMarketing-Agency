@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { GalleryImage } from "../types";
+import { clientLogger } from "@/lib/client-logger";
 
 /**
  * Image Recovery Hook
@@ -94,7 +95,7 @@ export function useImageRecoveryEffect<T extends RecoveryItem>(
         );
         if (galleryImage) {
           syncToDatabaseRef.current(item.id, galleryImage.src).catch((err) => {
-            console.error('[useImageRecovery] Failed to sync image to database:', { itemId: item.id, error: err });
+            clientLogger.error('[useImageRecovery] Failed to sync image to database:', { itemId: item.id, error: err });
           });
           return galleryImage;
         }
@@ -118,7 +119,7 @@ export function useImageRecoveryEffect<T extends RecoveryItem>(
 
         if (galleryImage && item.id) {
           syncToDatabaseRef.current(item.id, galleryImage.src).catch((err) => {
-            console.error('[useImageRecovery] Failed to sync image to database:', { itemId: item.id, error: err });
+            clientLogger.error('[useImageRecovery] Failed to sync image to database:', { itemId: item.id, error: err });
           });
           return galleryImage;
         }

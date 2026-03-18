@@ -1,10 +1,11 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Carousel image update helper
  */
 
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { CarouselScript } from '../../../types';
-import { updateCarouselCover, updateCarouselSlideImage } from '../../../services/api';
+import { updateCarouselCover, updateCarouselSlideImage } from '../../../services/api/campaignsApi';
 import { toCarouselScript } from '../utils';
 
 interface UpdateParams {
@@ -44,9 +45,9 @@ export const updateCarouselImage = async ({
           return newState;
         });
         onCarouselUpdate?.(converted);
-        console.debug('[CarrosselTab] Updated carousel cover:', carouselId);
+        clientLogger.debug('[CarrosselTab] Updated carousel cover:', carouselId);
       } catch (err) {
-        console.error('[CarrosselTab] Failed to update carousel cover:', err);
+        clientLogger.error('[CarrosselTab] Failed to update carousel cover:', err);
       }
     }
     return;
@@ -72,13 +73,13 @@ export const updateCarouselImage = async ({
           return newState;
         });
         onCarouselUpdate?.(converted);
-        console.debug(
+        clientLogger.debug(
           '[CarrosselTab] Updated carousel slide:',
           carouselId,
           slideNumber,
         );
       } catch (err) {
-        console.error(
+        clientLogger.error(
           `[CarrosselTab] Failed to update carousel slide ${slideNumber}:`,
           err,
         );

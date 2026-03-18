@@ -8,6 +8,7 @@ import type {
 } from "@/types";
 import type { Currency, TimePeriod } from "@/types/flyer.types";
 import { parseGtd, DAY_TRANSLATIONS, getSortValue } from "./utils";
+import { clientLogger } from "@/lib/client-logger";
 
 const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
@@ -134,14 +135,14 @@ export const useFlyerGenerator = (
         try {
             if (collabLogos.length > 0) localStorage.setItem("flyer_collabLogos", JSON.stringify(collabLogos));
             else localStorage.removeItem("flyer_collabLogos");
-        } catch (e) { console.warn("Failed to save collabLogos:", e); }
+        } catch (e) { clientLogger.warn("Failed to save collabLogos:", e); }
     }, [collabLogos]);
 
     useEffect(() => {
         try {
             if (manualStyleRef) localStorage.setItem("flyer_manualStyleRef", manualStyleRef);
             else localStorage.removeItem("flyer_manualStyleRef");
-        } catch (e) { console.warn("Failed to save manualStyleRef:", e); }
+        } catch (e) { clientLogger.warn("Failed to save manualStyleRef:", e); }
     }, [manualStyleRef]);
 
     // Restore global style ref

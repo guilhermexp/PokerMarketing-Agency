@@ -6,10 +6,12 @@ describe("image provider chain", () => {
     const result = spawnSync(
       process.execPath,
       [
+        "--import",
+        "tsx",
         "--input-type=module",
         "-e",
         `
-          const mod = await import("./server/lib/ai/image-providers.mjs");
+          const mod = await import("./server/lib/ai/image-providers.js");
           console.log(JSON.stringify({
             chain: mod.PROVIDER_CHAIN,
             gemini: mod.isProviderEnabled("gemini"),

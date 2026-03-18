@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Carousel caption generation
  */
@@ -46,7 +47,7 @@ export const generateCarouselCaption = async ({
       .join(' ')}`;
     setCaptions((prev) => ({ ...prev, [clipKey]: fullCaption }));
   } catch (err) {
-    console.error('[CarrosselTab] Failed to generate caption:', err);
+    clientLogger.error('[CarrosselTab] Failed to generate caption:', err);
   } finally {
     setGeneratingCaption((prev) => ({ ...prev, [clipKey]: false }));
   }

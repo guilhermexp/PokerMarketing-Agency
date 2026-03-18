@@ -119,6 +119,7 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
                   <>
                     <img
                       src={flyer.src}
+                      alt={flyer.prompt || flyer.source}
                       className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
                       onClick={() => {
                         if (onSelectFlyer) {
@@ -138,8 +139,9 @@ export const FlyerThumbStrip: React.FC<FlyerThumbStripProps> = ({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onDelete(flyer);
+                          onDelete(flyer);
                           }}
+                          aria-label={`Excluir flyer ${flyer.prompt || flyer.source}`}
                           className="absolute top-2 left-2 w-6 h-6 rounded-md bg-white/10 hover:bg-red-500/90 border border-white/[0.1] hover:border-transparent flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
                           title="Excluir flyer"
                         >

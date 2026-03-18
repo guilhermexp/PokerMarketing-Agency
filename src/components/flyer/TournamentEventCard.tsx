@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * TournamentEventCard Component
  *
@@ -16,7 +17,7 @@ import { SchedulePostModal } from '@/components/calendar/SchedulePostModal';
 import { useBackgroundJobs, type ActiveJob } from '@/hooks/useBackgroundJobs';
 import { urlToBase64 } from '@/utils/imageHelpers';
 import { generateFlyer } from '@/services/geminiService';
-import { buildSingleEventFlyerPromptExtended } from '@/ai-prompts';
+import { buildSingleEventFlyerPromptExtended } from '@/ai-prompts/flyerPrompts';
 import type { BrandProfile, TournamentEvent, GalleryImage, ImageModel, ImageSize, ImageFile } from '@/types';
 import type { Currency } from '@/types/flyer.types';
 import type { InstagramContext } from '@/services/rubeService';
@@ -70,7 +71,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
   onUpdateGalleryImage,
   onSetChatReference,
   onPublishToCampaign,
-  userId,
+  userId: _userId,
   instagramContext,
   galleryImages = [],
   onSchedulePost,
@@ -113,7 +114,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
       if (job.context === jobContext) {
         setGeneratedFlyers((prev) => prev.filter((f) => f !== 'loading'));
         setIsGenerating(false);
-        console.error('[TournamentEventCard] Job failed:', job.error_message);
+        clientLogger.error('[TournamentEventCard] Job failed:', job.error_message);
       }
     });
 
@@ -195,12 +196,12 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
         prev.map((f) => (f === 'loading' ? newImage : f))
       );
     } catch (err) {
-      console.error('[TournamentEventCard] Generation failed:', err);
+      clientLogger.error('[TournamentEventCard] Generation failed:', err);
       setGeneratedFlyers((prev) => prev.filter((f) => f !== 'loading'));
     } finally {
       setIsGenerating(false);
     }
-  }, [event, brandProfile, currency, model, aspectRatio, imageSize, collabLogos, styleReference, compositionAssets, userId, jobContext, setGeneratedFlyers]);
+  }, [event, brandProfile, currency, model, aspectRatio, imageSize, collabLogos, styleReference, compositionAssets, setGeneratedFlyers]);
 
   const handleQuickPost = (flyer: GalleryImage) => {
     setQuickPostFlyer(flyer);

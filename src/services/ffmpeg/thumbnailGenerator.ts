@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Thumbnail generation
  */
@@ -121,7 +122,7 @@ export const extractLastFrameFromVideo = async (
   try {
     return await extractLastFrameViaCanvas(videoUrl, timeoutMs);
   } catch (canvasError) {
-    console.warn('[FFmpeg] Canvas frame extraction failed, falling back to FFmpeg:', canvasError);
+    clientLogger.warn('[FFmpeg] Canvas frame extraction failed, falling back to FFmpeg:', canvasError);
   }
 
   const ffmpeg = await withTimeout(initFFmpeg(), timeoutMs, 'Timeout initializing FFmpeg');

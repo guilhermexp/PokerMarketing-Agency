@@ -4,7 +4,8 @@
  * Handles uploads to Vercel Blob storage for images, videos, and audio.
  */
 
-import { getCsrfToken, getCurrentCsrfToken } from '../apiClient';
+import { getCsrfToken, getCurrentCsrfToken } from '../api-client/base';
+import { getApiErrorMessage, parseApiResponse } from './response';
 
 // =============================================================================
 // Types
@@ -37,18 +38,21 @@ export async function uploadToBlob(
     throw new Error('Cannot upload empty blob');
   }
 
-  // Convert blob to base64
-  const arrayBuffer = await blob.arrayBuffer();
-  if (arrayBuffer.byteLength === 0) {
+  if (blob.size === 0) {
     throw new Error('Blob contains no data');
   }
 
-  const base64 = btoa(
-    new Uint8Array(arrayBuffer).reduce(
-      (data, byte) => data + String.fromCharCode(byte),
-      '',
-    ),
+  const normalizedContentType = contentType || blob.type || 'application/octet-stream';
+  const formData = new FormData();
+  formData.append(
+    'file',
+    new File([blob], filename, {
+      type: normalizedContentType,
+    }),
   );
+  formData.append('filename', filename);
+  formData.append('contentType', normalizedContentType);
+
   if (!getCurrentCsrfToken()) {
     await getCsrfToken();
   }
@@ -57,25 +61,18 @@ export async function uploadToBlob(
   const response = await fetch('/api/upload', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
       ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
     credentials: 'include',
-    body: JSON.stringify({
-      filename,
-      contentType,
-      data: base64,
-    }),
+    body: formData,
   });
 
   if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(getApiErrorMessage(error, `HTTP ${response.status}`));
   }
 
-  return response.json();
+  return parseApiResponse<UploadResult>(response);
 }
 
 /**

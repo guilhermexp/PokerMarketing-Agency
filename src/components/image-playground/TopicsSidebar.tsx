@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * TopicsSidebar
  * Right sidebar with list of topics (projects)
@@ -13,7 +14,6 @@ import {
   Check,
   X,
   Loader2,
-  Film,
 } from 'lucide-react';
 import { useImagePlaygroundTopics } from '../../hooks/useImagePlayground';
 import { useImagePlaygroundStore } from '../../stores/imagePlaygroundStore';
@@ -30,7 +30,7 @@ export const TopicsSidebar: React.FC = () => {
     try {
       await createTopic();
     } catch (err) {
-      console.error('Failed to create topic:', err);
+      clientLogger.error('Failed to create topic:', err);
     } finally {
       setIsCreating(false);
     }
@@ -225,5 +225,3 @@ const TopicItem: React.FC<TopicItemProps> = ({
     </div>
   );
 };
-
-export default TopicsSidebar;

@@ -1,4 +1,5 @@
 import { getCsrfToken, getCurrentCsrfToken, clearCsrfToken } from '../apiClient';
+import { getApiErrorMessage, parseApiResponse } from './response';
 
 const API_BASE = '/api/agent/studio';
 
@@ -66,9 +67,9 @@ async function parseJsonResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     if (res.status === 403) clearCsrfToken();
     const data = await res.json().catch(() => ({}));
-    throw new Error((data as { error?: string }).error || `Request failed: ${res.status}`);
+    throw new Error(getApiErrorMessage(data, `Request failed: ${res.status}`));
   }
-  return res.json();
+  return parseApiResponse<T>(res);
 }
 
 function isCsrfMismatchStatus(response: Response): boolean {
@@ -134,7 +135,7 @@ export async function streamStudioAgent(
     mentions?: StudioAgentMention[];
   },
   onEvent: (event: StudioAgentEvent) => void,
-  signal?: AbortSignal,
+  signal?: globalThis.AbortSignal,
 ): Promise<void> {
   let headers = await buildHeaders('POST');
   let response = await fetch(`${API_BASE}/stream`, {
@@ -160,7 +161,7 @@ export async function streamStudioAgent(
   if (!response.ok) {
     if (isCsrfMismatchStatus(response)) clearCsrfToken();
     const data = await response.json().catch(() => ({}));
-    throw new Error((data as { error?: string }).error || `Stream failed: ${response.status}`);
+    throw new Error(getApiErrorMessage(data, `Stream failed: ${response.status}`));
   }
 
   await consumeSseResponse(response, onEvent);
@@ -172,7 +173,7 @@ export async function answerStudioAgent(
     interactionId: string;
     answer: string | { optionId?: string; text?: string; approved?: boolean; answers?: Record<string, string> };
   },
-  signal?: AbortSignal,
+  signal?: globalThis.AbortSignal,
 ): Promise<{ ok: boolean }> {
   let headers = await buildHeaders('POST');
   let response = await fetch(`${API_BASE}/answer`, {
@@ -198,7 +199,7 @@ export async function answerStudioAgent(
   if (!response.ok) {
     if (isCsrfMismatchStatus(response)) clearCsrfToken();
     const data = await response.json().catch(() => ({}));
-    throw new Error((data as { error?: string }).error || `Answer failed: ${response.status}`);
+    throw new Error(getApiErrorMessage(data, `Answer failed: ${response.status}`));
   }
 
   return parseJsonResponse(response);

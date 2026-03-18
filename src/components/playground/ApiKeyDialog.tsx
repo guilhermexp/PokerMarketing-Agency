@@ -59,4 +59,3 @@ export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({ onContinue }) => {
   );
 };
 
-export default ApiKeyDialog;

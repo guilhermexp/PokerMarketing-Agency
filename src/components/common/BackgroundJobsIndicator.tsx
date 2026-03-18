@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Background Jobs Indicator
  * Shows a floating indicator when there are background jobs running (images, videos, flyers via BullMQ)
@@ -58,7 +59,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
         dismissedCompletedRef.current = new Set(parsed);
       }
     } catch (error) {
-      console.warn("[BackgroundJobs] Failed to read dismissed jobs:", error);
+      clientLogger.warn("[BackgroundJobs] Failed to read dismissed jobs:", error);
     }
   }, []);
 
@@ -68,7 +69,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
       await cancelGenerationJob(jobId);
       await refreshJobs();
     } catch (error) {
-      console.error("Failed to cancel job:", error);
+      clientLogger.error("Failed to cancel job:", error);
     } finally {
       setCancellingJob(null);
     }
@@ -84,7 +85,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
       await cancelAllGenerationJobs(userId);
       await refreshJobs();
     } catch (error) {
-      console.error("Failed to cancel all jobs:", error);
+      clientLogger.error("Failed to cancel all jobs:", error);
     } finally {
       setCancellingAll(false);
     }
@@ -296,7 +297,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
                               }),
                             );
                           } catch (error) {
-                            console.warn(
+                            clientLogger.warn(
                               "[BackgroundJobs] Failed to persist dismissed jobs:",
                               error,
                             );
@@ -359,7 +360,7 @@ export const BackgroundJobsIndicator: React.FC<BackgroundJobsIndicatorProps> = (
                               }),
                             );
                           } catch (error) {
-                            console.warn(
+                            clientLogger.warn(
                               "[BackgroundJobs] Failed to persist dismissed jobs:",
                               error,
                             );

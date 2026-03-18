@@ -1,3 +1,4 @@
+import { clientLogger } from "@/lib/client-logger";
 /**
  * Settings Modal with Tabs
  * Modal for managing brand profile and team settings
@@ -175,7 +176,7 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
           tertiaryColor: colors.tertiaryColor || '', // Empty string if no tertiary color
         }));
       } catch (error) {
-        console.error('Failed to extract colors:', error);
+        clientLogger.error('Failed to extract colors:', error);
       } finally {
         setIsAnalyzingLogo(false);
       }
@@ -219,12 +220,12 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
       // Upload logo to Vercel Blob to get a permanent URL
       if (profile.logo instanceof File) {
         const { base64, mimeType } = await fileToBase64(profile.logo);
-        console.debug('[Settings] Uploading logo to Vercel Blob...');
+        clientLogger.debug('[Settings] Uploading logo to Vercel Blob...');
         try {
           logoUrl = await uploadImageToBlob(base64, mimeType);
-          console.debug('[Settings] Logo uploaded successfully:', logoUrl);
+          clientLogger.debug('[Settings] Logo uploaded successfully:', logoUrl);
         } catch (err) {
-          console.error('[Settings] Failed to upload logo to Blob:', err);
+          clientLogger.error('[Settings] Failed to upload logo to Blob:', err);
           // Fallback to data URL if upload fails
           logoUrl = `data:${mimeType};base64,${base64}`;
         }
@@ -232,14 +233,14 @@ export function SettingsModal({ isOpen, onClose, brandProfile, onSaveProfile }: 
         // If it's already a URL (http/https), use it directly
         // If it's a data URL, try to upload it to Blob
         if (profile.logo.startsWith('data:')) {
-          console.debug('[Settings] Converting existing data URL to Blob...');
+          clientLogger.debug('[Settings] Converting existing data URL to Blob...');
           try {
             const [header, base64Data] = profile.logo.split(',');
             const mimeType = header.match(/data:([^;]+)/)?.[1] || 'image/png';
             logoUrl = await uploadImageToBlob(base64Data, mimeType);
-            console.debug('[Settings] Data URL converted to Blob:', logoUrl);
+            clientLogger.debug('[Settings] Data URL converted to Blob:', logoUrl);
           } catch (err) {
-            console.error('[Settings] Failed to convert data URL to Blob:', err);
+            clientLogger.error('[Settings] Failed to convert data URL to Blob:', err);
             logoUrl = profile.logo; // Keep data URL as fallback
           }
         } else {

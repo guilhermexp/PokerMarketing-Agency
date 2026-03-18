@@ -9,11 +9,10 @@ import type {
 } from "@/types";
 import type { InstagramContext } from "@/services/rubeService";
 import type { Currency, TimePeriod } from "@/types/flyer.types";
-import { Button } from "../common/Button";
 import { Loader } from "../common/Loader";
 import { Icon } from "../common/Icon";
 import { generateFlyer } from "../../services/geminiService";
-import { buildDailyFlyerPromptCompact } from "@/ai-prompts";
+import { buildDailyFlyerPromptCompact } from "@/ai-prompts/flyerPrompts";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import { QuickPostModal } from "../common/QuickPostModal";
 import { SchedulePostModal } from "../calendar/SchedulePostModal";
@@ -27,6 +26,7 @@ import {
     getSortValue,
     parseGtd
 } from "./utils";
+import { clientLogger } from "@/lib/client-logger";
 
 const handleDownloadFlyer = (src: string, filename: string) => {
     downloadImage(src, filename);
@@ -101,7 +101,7 @@ export const PeriodCardRow: React.FC<{
     onCloneStyle,
     collabLogos,
     onPublishToCampaign,
-    userId,
+    userId: _userId,
     instagramContext,
     galleryImages = [],
     onSchedulePost,
@@ -131,7 +131,7 @@ export const PeriodCardRow: React.FC<{
         // Debug logging for job state issues
         useEffect(() => {
             if (pendingJob) {
-                console.debug(`[PeriodCardRow:${period}] Found job:`, {
+                clientLogger.debug(`[PeriodCardRow:${period}] Found job:`, {
                     id: pendingJob.id,
                     status: pendingJob.status,
                     context: pendingJob.context,
@@ -167,11 +167,11 @@ export const PeriodCardRow: React.FC<{
                     if (scheduleId && job.result_url && selectedDay) {
                         try {
                             await addDailyFlyer(scheduleId, period, job.result_url, selectedDay);
-                            console.debug(
+                            clientLogger.debug(
                                 `[PeriodCardRow] Saved background job flyer to database: day=${selectedDay}, period=${period}`,
                             );
                         } catch (err) {
-                            console.error(
+                            clientLogger.error(
                                 "[PeriodCardRow] Failed to save daily flyer URL to database:",
                                 err,
                             );
@@ -216,7 +216,7 @@ export const PeriodCardRow: React.FC<{
                 !isGenerating &&
                 !hasGeneratedContent // Only restore if we don't have any content yet
             ) {
-                console.debug(`[PeriodCardRow] Restoring loading state for ${period}:`, pendingJob.id);
+                clientLogger.debug(`[PeriodCardRow] Restoring loading state for ${period}:`, pendingJob.id);
                 setIsGenerating(true);
                 if (!generatedFlyers.includes("loading")) {
                     setGeneratedFlyers((prev) => ["loading", ...prev]);
@@ -246,13 +246,14 @@ export const PeriodCardRow: React.FC<{
             const firstFlyer = generatedFlyers.find((f) => f !== "loading") as GalleryImage | undefined;
             const currentSelectedExists = selectedFlyerId && generatedFlyers.some(f => f !== "loading" && f.id === selectedFlyerId);
 
-            let newSelectedId: string | null = null;
+            const newSelectedId =
+                firstFlyer && !currentSelectedExists
+                    ? firstFlyer.id
+                    : !firstFlyer
+                      ? null
+                      : undefined;
 
-            if (firstFlyer && !currentSelectedExists) {
-                newSelectedId = firstFlyer.id;
-            } else if (!firstFlyer) {
-                newSelectedId = null;
-            } else {
+            if (newSelectedId === undefined) {
                 // Keep current selection
                 return;
             }
@@ -267,7 +268,7 @@ export const PeriodCardRow: React.FC<{
                 lastNotifiedFlyerIdRef.current = newSelectedId;
                 onExternalSelectFlyer(newSelectedId);
             }
-        }, [generatedFlyers, selectedFlyerId]);
+        }, [generatedFlyers, onExternalSelectFlyer, selectedFlyerId]);
 
         const handleGenerate = useCallback(
             async (forced: boolean = false) => {
@@ -279,7 +280,7 @@ export const PeriodCardRow: React.FC<{
                     (f) => f !== "loading" && f.id === styleReference.id
                 );
                 if (isReferenceImage && !forced) {
-                    console.debug(`[PeriodCardRow] Skipping generation for ${period} - image is being used as reference`);
+                    clientLogger.debug(`[PeriodCardRow] Skipping generation for ${period} - image is being used as reference`);
                     return;
                 }
 
@@ -368,7 +369,7 @@ export const PeriodCardRow: React.FC<{
                         daily_flyer_period: period, // Track which period this flyer is for
                     });
 
-                    console.debug(
+                    clientLogger.debug(
                         `[FlyerGenerator] Added flyer to gallery with ID: ${galleryImage.id}`,
                     );
 
@@ -381,11 +382,11 @@ export const PeriodCardRow: React.FC<{
                     if (scheduleId && imageUrl) {
                         try {
                             await addDailyFlyer(scheduleId, period, imageUrl, selectedDay);
-                            console.debug(
+                            clientLogger.debug(
                                 `[FlyerGenerator] Saved daily flyer URL to database: day=${selectedDay}, period=${period}`,
                             );
                         } catch (err) {
-                            console.error(
+                            clientLogger.error(
                                 "[FlyerGenerator] Failed to save daily flyer URL to database:",
                                 err,
                             );
@@ -414,8 +415,6 @@ export const PeriodCardRow: React.FC<{
                 collabLogos,
                 imageSize,
                 compositionAssets,
-                userId,
-                jobContext,
                 dayInfo,
                 selectedDay,
                 onAddImageToGallery,

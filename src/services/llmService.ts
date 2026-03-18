@@ -5,6 +5,7 @@
 
 import type { BrandProfile } from '../types';
 import { getCsrfToken, getCurrentCsrfToken } from './apiClient';
+import { getApiErrorMessage, unwrapApiData } from './api/response';
 
 export interface LLMResponse {
   content: string;
@@ -33,11 +34,9 @@ export interface PromptPart {
 export const generateCreativeText = async (
   brandProfile: BrandProfile,
   parts: { text?: string; inlineData?: { mimeType: string; data: string } }[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema: any,
+  schema: unknown,
   temperature: number = 0.7
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> => {
+): Promise<string> => {
   // Extrai texto e imagens das partes
   const textParts = parts.filter(p => p.text).map(p => p.text!);
   const imageParts = parts
@@ -78,9 +77,9 @@ export const generateCreativeText = async (
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: response.statusText }));
-    throw new Error(error.error || `API call failed: ${response.status}`);
+    throw new Error(getApiErrorMessage(error, `API call failed: ${response.status}`));
   }
 
-  const result = await response.json();
+  const result = unwrapApiData<{ result: unknown }>(await response.json());
   return JSON.stringify(result.result);
 };

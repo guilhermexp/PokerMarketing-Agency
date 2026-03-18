@@ -4,6 +4,7 @@
  */
 
 import { getCsrfToken, getCurrentCsrfToken, clearCsrfToken } from '../apiClient';
+import { getApiErrorMessage, parseApiResponse, unwrapApiData } from './response';
 import type {
   VideoGenerationTopic,
   VideoSession,
@@ -78,7 +79,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Request failed: ${response.status}`);
+    throw new Error(getApiErrorMessage(errorData, `Request failed: ${response.status}`));
   }
 
   return response;
@@ -93,7 +94,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
  */
 export async function getTopics(): Promise<VideoGenerationTopic[]> {
   const response = await fetchWithAuth(`${API_BASE}/topics`);
-  const data = await response.json();
+  const data = unwrapApiData<{ topics?: VideoGenerationTopic[] }>(await response.json());
   return data.topics || [];
 }
 
@@ -105,7 +106,7 @@ export async function createTopic(title?: string): Promise<CreateTopicResponse> 
     method: 'POST',
     body: JSON.stringify({ title }),
   });
-  return response.json();
+  return parseApiResponse<CreateTopicResponse>(response);
 }
 
 /**
@@ -119,7 +120,7 @@ export async function updateTopic(
     method: 'PATCH',
     body: JSON.stringify(updates),
   });
-  const data = await response.json();
+  const data = unwrapApiData<{ topic: VideoGenerationTopic }>(await response.json());
   return data.topic;
 }
 
@@ -142,7 +143,7 @@ export async function deleteTopic(topicId: string): Promise<void> {
 export async function getSessions(topicId: string): Promise<VideoSession[]> {
   const safeTopicId = encodeURIComponent(topicId);
   const response = await fetchWithAuth(`${API_BASE}/sessions?topicId=${safeTopicId}&limit=100`);
-  const data = await response.json();
+  const data = unwrapApiData<{ sessions?: VideoSession[] }>(await response.json());
   return data.sessions || [];
 }
 
@@ -172,7 +173,7 @@ export async function createVideo(input: CreateVideoInput): Promise<CreateVideoR
       body: JSON.stringify(input),
       signal: controller.signal,
     });
-    return response.json();
+    return parseApiResponse<CreateVideoResponse>(response);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -205,7 +206,7 @@ export async function updateGeneration(
     method: 'PATCH',
     body: JSON.stringify(updates),
   });
-  const data = await response.json();
+  const data = unwrapApiData<{ generation: VideoGeneration }>(await response.json());
   return data.generation;
 }
 
@@ -221,6 +222,6 @@ export async function generateTopicTitle(prompts: string[]): Promise<string> {
     method: 'POST',
     body: JSON.stringify({ prompts }),
   });
-  const data = await response.json();
+  const data = unwrapApiData<{ title: string }>(await response.json());
   return data.title;
 }

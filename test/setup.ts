@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
+
+mkdirSync(resolve(process.cwd(), 'coverage/.tmp'), { recursive: true });
 
 // Cleanup após cada teste
 afterEach(() => {
@@ -15,6 +19,8 @@ vi.stubGlobal('import.meta.env', {
   PROD: false,
   MODE: 'test',
 });
+
+process.env.CSRF_SECRET ||= 'test-csrf-secret';
 
 // Mock do localStorage
 const localStorageMock = {

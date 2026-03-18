@@ -29,7 +29,7 @@ export function CarouselsList({
   organizationId,
   brandProfile,
   onCreateCarouselFromPrompt,
-  onSelectCampaign,
+  onSelectCampaign: _onSelectCampaign,
 }: CarouselsListProps) {
   const [items, setItems] = useState<DbCarouselListItem[]>([]);
   const [localCarousels, setLocalCarousels] = useState<CarouselScript[]>([]);
@@ -321,5 +321,3 @@ export function CarouselsList({
     </div>
   );
 }
-
-export default CarouselsList;

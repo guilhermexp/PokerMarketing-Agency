@@ -59,4 +59,3 @@ export function StatsCard({ title, value, icon, subtitle, change, color = 'defau
   );
 }
 
-export default StatsCard;
