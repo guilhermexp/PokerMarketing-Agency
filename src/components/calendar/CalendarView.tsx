@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import type {
   ScheduledPost,
   GalleryImage,
@@ -75,50 +75,62 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
 
-  const goToPreviousMonth = () => {
+  const goToPreviousMonth = useCallback(() => {
     setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
-  };
+  }, [currentMonth, currentYear]);
 
-  const goToNextMonth = () => {
+  const goToNextMonth = useCallback(() => {
     setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
-  };
+  }, [currentMonth, currentYear]);
 
-  const goToToday = () => {
+  const goToToday = useCallback(() => {
     setCurrentDate(new Date());
-  };
+  }, []);
 
-  const handleDayClick = (date: string) => {
+  const handleDayClick = useCallback((date: string) => {
     setSelectedDate(date);
     setSelectedTime(null);
     setIsScheduleModalOpen(true);
-  };
+  }, []);
 
-  const handleDayViewClick = (date: string) => {
+  const handleDayViewClick = useCallback((date: string) => {
     setSelectedDayDate(date);
     setDayViewDialogOpen(true);
-  };
+  }, []);
 
-  const handleSchedulePost = (
+  const handleSchedulePost = useCallback((
     post: Omit<ScheduledPost, "id" | "createdAt" | "updatedAt">,
   ) => {
     onSchedulePost(post);
     setIsScheduleModalOpen(false);
     setSelectedDate(null);
     setSelectedTime(null);
-  };
+  }, [onSchedulePost]);
 
-  const handlePostClick = (post: ScheduledPost) => {
+  const handlePostClick = useCallback((post: ScheduledPost) => {
     setSelectedPost(post);
     setPostDialogOpen(true);
-  };
+  }, []);
 
-  const handleEditPost = (post: ScheduledPost) => {
+  const handleEditPost = useCallback((post: ScheduledPost) => {
     setSelectedPostForEdit(post);
     setSelectedDate(post.scheduledDate);
     setSelectedTime(post.scheduledTime);
     setPostDialogOpen(false);
     setIsScheduleModalOpen(true);
-  };
+  }, []);
+
+  const scheduledPostsByDate = useMemo(() => {
+    const grouped = new Map<string, ScheduledPost[]>();
+
+    scheduledPosts.forEach((post) => {
+      const items = grouped.get(post.scheduledDate) ?? [];
+      items.push(post);
+      grouped.set(post.scheduledDate, items);
+    });
+
+    return grouped;
+  }, [scheduledPosts]);
 
   // Stats
   const stats = useMemo(() => {
@@ -153,7 +165,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
     // Days of month
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-      const dayPosts = scheduledPosts.filter((post) => post.scheduledDate === dateStr);
+      const dayPosts = scheduledPostsByDate.get(dateStr) ?? [];
       fullCalendar.push({ date: day, dateStr, posts: dayPosts });
     }
 
@@ -188,7 +200,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
     });
 
     return filteredWeeks.flat();
-  }, [currentMonth, currentYear, scheduledPosts]);
+  }, [currentMonth, currentYear, scheduledPostsByDate]);
 
   const isToday = (date: number | null) => {
     if (!date) return false;
@@ -242,7 +254,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
     }
   }, []);
 
-  const handlePublishAll = async () => {
+  const handlePublishAll = useCallback(async () => {
     const instagramPosts = pendingPosts.filter(
       (p) => p.platforms === "instagram" || p.platforms === "both",
     );
@@ -250,7 +262,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
       onPublishToInstagram(post);
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
-  };
+  }, [onPublishToInstagram, pendingPosts]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#060606]">

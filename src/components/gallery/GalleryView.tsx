@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import type { GalleryImage, StyleReference } from "../../types";
 import { Icon } from "../common/Icon";
 import { ImagePreviewModal } from "../common/ImagePreviewModal";
@@ -65,14 +65,14 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const handleImageUpdate = (newSrc: string) => {
+  const handleImageUpdate = useCallback((newSrc: string) => {
     if (selectedImage) {
       onUpdateImage(selectedImage.id, newSrc);
       setSelectedImage((prev) => (prev ? { ...prev, src: newSrc } : null));
     }
-  };
+  }, [onUpdateImage, selectedImage]);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
       for (const file of Array.from(files) as File[]) {
@@ -84,9 +84,9 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
-  };
+  }, [onAddStyleReference]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     if (!onRefresh || isRefreshing) return;
     setIsRefreshing(true);
     try {
@@ -94,14 +94,14 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [isRefreshing, onRefresh]);
 
-  const toggleSelectMode = () => {
+  const toggleSelectMode = useCallback(() => {
     setIsSelectMode((prev) => !prev);
     setSelectedIds(new Set());
-  };
+  }, []);
 
-  const toggleImageSelection = (imageId: string) => {
+  const toggleImageSelection = useCallback((imageId: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(imageId)) {
@@ -111,17 +111,13 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
       }
       return next;
     });
-  };
+  }, []);
 
-  const selectAllVisible = () => {
-    setSelectedIds(new Set(sortedImages.map((img) => img.id)));
-  };
-
-  const clearSelection = () => {
+  const clearSelection = useCallback(() => {
     setSelectedIds(new Set());
-  };
+  }, []);
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = useCallback(async () => {
     if (selectedIds.size === 0 || !onDeleteImage) return;
     const count = selectedIds.size;
     if (!confirm(`Tem certeza que deseja excluir ${count} ${count === 1 ? "item" : "itens"}?`)) return;
@@ -131,7 +127,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
     }
     setSelectedIds(new Set());
     setIsSelectMode(false);
-  };
+  }, [onDeleteImage, selectedIds]);
 
   // Check if image is already in favorites
   const isFavorite = (image: GalleryImage) => {
@@ -177,7 +173,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleToggleFavorite = (image: GalleryImage) => {
+  const handleToggleFavorite = useCallback((image: GalleryImage) => {
     clientLogger.debug("[GalleryView] handleToggleFavorite called", { image, styleReferences });
     const existingRef = getFavoriteRef(image);
     clientLogger.debug("[GalleryView] existingRef:", existingRef);
@@ -197,7 +193,7 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
       clientLogger.debug("[GalleryView] Adding to favorites:", newRef);
       onAddStyleReference(newRef);
     }
-  };
+  }, [onAddStyleReference, onRemoveStyleReference, styleReferences]);
 
   // Deduplicate images by src URL (keep the first/newest occurrence)
   const deduplicatedImages = React.useMemo(() => {
@@ -297,6 +293,10 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
     });
   }, [pagedImages]);
 
+  const selectAllVisible = useCallback(() => {
+    setSelectedIds(new Set(sortedImages.map((img) => img.id)));
+  }, [sortedImages]);
+
   // Build maps for video posters: clip thumbnails and scene images by video_script_id
   const { clipPosterByScriptId, scenePosterByScriptId } = React.useMemo(() => {
     const clipMap = new Map<string, string>();
@@ -353,6 +353,14 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
 
     return undefined;
   };
+
+  const handleSelectImage = useCallback((image: GalleryImage | null) => {
+    setSelectedImage(image);
+  }, []);
+
+  const handleDeleteImage = useCallback((imageId: string) => {
+    onDeleteImage?.(imageId);
+  }, [onDeleteImage]);
 
   return (
     <>
@@ -431,9 +439,9 @@ export const GalleryView = React.memo<GalleryViewProps>(function GalleryView({
                         isFavorite={isFavorite}
                         formatDuration={formatDuration}
                         onToggleFavorite={handleToggleFavorite}
-                        onSelect={setSelectedImage}
+                        onSelect={handleSelectImage}
                         getVideoPoster={getVideoPoster}
-                        onDelete={onDeleteImage}
+                        onDelete={handleDeleteImage}
                         className="break-inside-avoid mb-3"
                         isNew={newImageIds.has(image.id)}
                         isSelectMode={isSelectMode}

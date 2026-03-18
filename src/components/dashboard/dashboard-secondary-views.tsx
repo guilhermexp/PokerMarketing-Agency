@@ -1,194 +1,205 @@
 import React, { Suspense, lazy } from "react";
-import type { DbCampaign } from "../../services/apiClient";
-import type { DashboardProps, View } from "./dashboard-shared";
-import { ViewLoadingFallback } from "./dashboard-shared";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { useBrandProfileController } from "@/controllers/BrandProfileController";
+import { useCampaignController } from "@/controllers/CampaignController";
+import { useGalleryController } from "@/controllers/GalleryController";
+import { ViewLoadingFallback } from "@/components/dashboard/dashboard-shared";
 
 const GalleryView = lazy(() =>
-  import("../gallery/GalleryView").then((m) => ({ default: m.GalleryView })),
+  import("@/components/gallery/GalleryView").then((module) => ({
+    default: module.GalleryView,
+  }))
 );
 const CalendarView = lazy(() =>
-  import("../calendar/CalendarView").then((m) => ({ default: m.CalendarView })),
+  import("@/components/calendar/CalendarView").then((module) => ({
+    default: module.CalendarView,
+  }))
 );
 const CampaignsList = lazy(() =>
-  import("../campaigns/CampaignsList").then((m) => ({ default: m.CampaignsList })),
+  import("@/components/campaigns/CampaignsList").then((module) => ({
+    default: module.CampaignsList,
+  }))
 );
 const CarouselsList = lazy(() =>
-  import("../campaigns/CarouselsList").then((m) => ({ default: m.CarouselsList })),
+  import("@/components/campaigns/CarouselsList").then((module) => ({
+    default: module.CarouselsList,
+  }))
 );
 const PlaygroundView = lazy(() =>
-  import("../playground/PlaygroundView").then((m) => ({ default: m.PlaygroundView })),
+  import("@/components/playground/PlaygroundView").then((module) => ({
+    default: module.PlaygroundView,
+  }))
 );
 const ImagePlaygroundPage = lazy(() =>
-  import("../image-playground/ImagePlaygroundPage").then((m) => ({
-    default: m.ImagePlaygroundPage,
-  })),
+  import("@/components/image-playground/ImagePlaygroundPage").then((module) => ({
+    default: module.ImagePlaygroundPage,
+  }))
 );
 
-interface DashboardSecondaryViewsProps {
-  activeView: Exclude<View, "campaign" | "flyer">;
-  brandProfile: DashboardProps["brandProfile"];
-  campaign: DashboardProps["campaign"];
-  campaigns: DbCampaign[];
-  galleryImages: DashboardProps["galleryImages"];
-  galleryIsLoading?: DashboardProps["galleryIsLoading"];
-  onAddImageToGallery: DashboardProps["onAddImageToGallery"];
-  onCreateCarouselFromPrompt?: DashboardProps["onCreateCarouselFromPrompt"];
-  onDeleteGalleryImage?: DashboardProps["onDeleteGalleryImage"];
-  onDeleteScheduledPost: DashboardProps["onDeleteScheduledPost"];
-  onLoadCampaign: DashboardProps["onLoadCampaign"];
-  onMarkGalleryImagePublished?: DashboardProps["onMarkGalleryImagePublished"];
-  onPublishToInstagram: DashboardProps["onPublishToInstagram"];
-  onRefreshGallery?: DashboardProps["onRefreshGallery"];
-  onRetryScheduledPost?: DashboardProps["onRetryScheduledPost"];
-  onSchedulePost: DashboardProps["onSchedulePost"];
-  onSelectStyleReference: DashboardProps["onSelectStyleReference"];
-  onSetQuickPostImage: (image: DashboardProps["galleryImages"][number]) => void;
-  onSetScheduleModalImage: (image: DashboardProps["galleryImages"][number]) => void;
-  onSetScheduleModalOpen: (value: boolean) => void;
-  onSetChatReference: DashboardProps["onSetChatReference"];
-  onUpdateGalleryImage: DashboardProps["onUpdateGalleryImage"];
-  onUpdateScheduledPost: DashboardProps["onUpdateScheduledPost"];
-  organizationId?: DashboardProps["organizationId"];
-  publishingStates: DashboardProps["publishingStates"];
-  scheduledPosts: DashboardProps["scheduledPosts"];
-  styleReferences: DashboardProps["styleReferences"];
-  userId?: DashboardProps["userId"];
-  onViewChange: DashboardProps["onViewChange"];
+function FeatureSection({
+  children,
+  title,
+}: {
+  children: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <ErrorBoundary
+      fallback={
+        <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-border bg-black/30">
+          <p className="text-xs text-muted-foreground">
+            Falha ao carregar {title}.
+          </p>
+        </div>
+      }
+    >
+      <Suspense fallback={<ViewLoadingFallback />}>{children}</Suspense>
+    </ErrorBoundary>
+  );
 }
 
-export function DashboardSecondaryViews({
-  activeView,
-  brandProfile,
-  campaign,
-  campaigns,
-  galleryImages,
-  galleryIsLoading,
-  onAddImageToGallery,
-  onCreateCarouselFromPrompt,
-  onDeleteGalleryImage,
-  onDeleteScheduledPost,
-  onLoadCampaign,
-  onMarkGalleryImagePublished,
-  onPublishToInstagram,
-  onRefreshGallery,
-  onRetryScheduledPost,
-  onSchedulePost,
-  onSelectStyleReference,
-  onSetQuickPostImage,
-  onSetScheduleModalImage,
-  onSetScheduleModalOpen,
-  onSetChatReference,
-  onUpdateGalleryImage,
-  onUpdateScheduledPost,
-  organizationId,
-  publishingStates,
-  scheduledPosts,
-  styleReferences,
-  userId,
-  onViewChange,
-}: DashboardSecondaryViewsProps) {
-  if (activeView === "gallery") {
+export function DashboardSecondaryViews() {
+  const { brandProfile, onViewChange, organizationId, routeView, userId } =
+    useBrandProfileController();
+  const { campaign, handleCreateCarouselFromPrompt, handleLoadCampaign } =
+    useCampaignController();
+  const {
+    campaigns,
+    galleryImages,
+    galleryIsLoading,
+    handleAddImageToGallery,
+    handleDeleteGalleryImage,
+    handleDeleteScheduledPost,
+    handleMarkGalleryImagePublished,
+    handlePublishToInstagram,
+    handleSchedulePost,
+    handleSelectStyleReference,
+    handleSetChatReference,
+    handleUpdateGalleryImage,
+    handleUpdateScheduledPost,
+    handleRetryScheduledPost,
+    publishingStates,
+    refreshGallery,
+    scheduledPosts,
+    setQuickPostImage,
+    setScheduleModalImage,
+    setScheduleModalOpen,
+    styleReferences,
+  } = useGalleryController();
+
+  if (!brandProfile && (routeView === "carousels" || routeView === "playground")) {
+    return null;
+  }
+
+  if (routeView === "gallery") {
     return (
       <div className="px-4 py-4 sm:px-6 sm:py-5">
-        <Suspense fallback={<ViewLoadingFallback />}>
+        <FeatureSection title="galeria">
           <GalleryView
             images={galleryImages}
             isLoading={galleryIsLoading}
-            onUpdateImage={onUpdateGalleryImage}
-            onDeleteImage={onDeleteGalleryImage}
-            onSetChatReference={onSetChatReference}
-            onRefresh={onRefreshGallery}
+            onUpdateImage={handleUpdateGalleryImage}
+            onDeleteImage={handleDeleteGalleryImage}
+            onSetChatReference={handleSetChatReference}
+            onRefresh={refreshGallery}
             styleReferences={styleReferences}
             onAddStyleReference={() => undefined}
             onRemoveStyleReference={() => undefined}
-            onSelectStyleReference={onSelectStyleReference}
+            onSelectStyleReference={handleSelectStyleReference}
             onPublishToCampaign={() => undefined}
-            onQuickPost={onSetQuickPostImage}
+            onQuickPost={setQuickPostImage}
             onSchedulePost={(image) => {
-              onSetScheduleModalImage(image);
-              onSetScheduleModalOpen(true);
+              setScheduleModalImage(image);
+              setScheduleModalOpen(true);
             }}
           />
-        </Suspense>
+        </FeatureSection>
       </div>
     );
   }
 
-  if (activeView === "calendar") {
+  if (routeView === "calendar") {
     return (
-      <div className="px-4 py-4 sm:px-6 sm:py-5 h-full">
-        <Suspense fallback={<ViewLoadingFallback />}>
+      <div className="h-full px-4 py-4 sm:px-6 sm:py-5">
+        <FeatureSection title="calendário">
           <CalendarView
             scheduledPosts={scheduledPosts}
-            onSchedulePost={onSchedulePost}
-            onUpdateScheduledPost={onUpdateScheduledPost}
-            onDeleteScheduledPost={onDeleteScheduledPost}
+            onSchedulePost={handleSchedulePost}
+            onUpdateScheduledPost={handleUpdateScheduledPost}
+            onDeleteScheduledPost={handleDeleteScheduledPost}
             galleryImages={galleryImages}
             campaigns={campaigns}
-            onPublishToInstagram={onPublishToInstagram}
-            onRetryScheduledPost={onRetryScheduledPost}
+            onPublishToInstagram={handlePublishToInstagram}
+            onRetryScheduledPost={handleRetryScheduledPost}
             publishingStates={publishingStates}
           />
-        </Suspense>
+        </FeatureSection>
       </div>
     );
   }
 
-  if (activeView === "campaigns" && userId) {
+  if (routeView === "campaigns" && userId) {
     return (
       <div className="px-4 py-4 sm:px-6 sm:py-5">
-        <Suspense fallback={<ViewLoadingFallback />}>
+        <FeatureSection title="campanhas">
           <CampaignsList
             userId={userId}
             organizationId={organizationId}
-            onSelectCampaign={onLoadCampaign}
+            onSelectCampaign={handleLoadCampaign}
             onNewCampaign={() => onViewChange("campaign")}
             currentCampaignId={campaign?.id}
           />
-        </Suspense>
+        </FeatureSection>
       </div>
     );
   }
 
-  if (activeView === "carousels" && userId) {
+  if (routeView === "carousels" && userId) {
+    const resolvedBrandProfile = brandProfile;
+
     return (
       <div className="px-4 py-4 sm:px-6 sm:py-5">
-        <Suspense fallback={<ViewLoadingFallback />}>
+        <FeatureSection title="carrosséis">
           <CarouselsList
             userId={userId}
             organizationId={organizationId}
-            brandProfile={brandProfile}
+            brandProfile={resolvedBrandProfile!}
             galleryImages={galleryImages}
-            onCreateCarouselFromPrompt={onCreateCarouselFromPrompt}
+            onCreateCarouselFromPrompt={handleCreateCarouselFromPrompt}
             onSelectCampaign={(campaignId) => {
-              onLoadCampaign(campaignId);
+              void handleLoadCampaign(campaignId);
               onViewChange("campaign");
             }}
           />
-        </Suspense>
+        </FeatureSection>
       </div>
     );
   }
 
-  if (activeView === "playground") {
+  if (routeView === "playground") {
+    const resolvedBrandProfile = brandProfile;
+
     return (
       <div className="h-full">
-        <Suspense fallback={<ViewLoadingFallback />}>
+        <FeatureSection title="playground">
           <PlaygroundView
-            brandProfile={brandProfile}
-            userId={userId}
-            onAddImageToGallery={onAddImageToGallery}
+            brandProfile={resolvedBrandProfile!}
+            userId={userId ?? undefined}
+            onAddImageToGallery={handleAddImageToGallery}
           />
-        </Suspense>
+        </FeatureSection>
       </div>
     );
   }
 
   return (
     <div className="h-full">
-      <Suspense fallback={<ViewLoadingFallback />}>
-        <ImagePlaygroundPage userId={userId} organizationId={organizationId} />
-      </Suspense>
+      <FeatureSection title="image playground">
+        <ImagePlaygroundPage
+          userId={userId ?? undefined}
+          organizationId={organizationId}
+        />
+      </FeatureSection>
     </div>
   );
 }

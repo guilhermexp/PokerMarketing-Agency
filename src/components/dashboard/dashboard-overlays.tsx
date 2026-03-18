@@ -1,152 +1,131 @@
 import React, { Suspense, lazy } from "react";
-import type { DbCampaign } from "../../services/apiClient";
-import { QuickPostModal } from "../common/QuickPostModal";
-import { PublishedStoriesWidget } from "../ui/published-stories-widget";
-import type { DashboardProps } from "./dashboard-shared";
-import { ViewLoadingFallback } from "./dashboard-shared";
+import { QuickPostModal } from "@/components/common/QuickPostModal";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { PublishedStoriesWidget } from "@/components/ui/published-stories-widget";
+import { ViewLoadingFallback } from "@/components/dashboard/dashboard-shared";
+import { useBrandProfileController } from "@/controllers/BrandProfileController";
+import { useGalleryController } from "@/controllers/GalleryController";
+import { authClient } from "@/lib/auth-client";
 
 const SchedulePostModal = lazy(() =>
-  import("../calendar/SchedulePostModal").then((m) => ({
-    default: m.SchedulePostModal,
-  })),
+  import("@/components/calendar/SchedulePostModal").then((module) => ({
+    default: module.SchedulePostModal,
+  }))
 );
 const ImagePreviewModal = lazy(() =>
-  import("../image-preview/ImagePreviewModal").then((m) => ({
-    default: m.ImagePreviewModal,
-  })),
+  import("@/components/image-preview/ImagePreviewModal").then((module) => ({
+    default: module.ImagePreviewModal,
+  }))
 );
 const AssistantPanel = lazy(() =>
-  import("../assistant/AssistantPanel").then((m) => ({ default: m.AssistantPanel })),
+  import("@/components/assistant/AssistantPanel").then((module) => ({
+    default: module.AssistantPanel,
+  }))
 );
 const AssistantPanelNew = lazy(() =>
-  import("../assistant/AssistantPanelNew").then((m) => ({
-    default: m.AssistantPanelNew,
-  })),
+  import("@/components/assistant/AssistantPanelNew").then((module) => ({
+    default: module.AssistantPanelNew,
+  }))
 );
 
-interface DashboardOverlaysProps {
-  assistantHistory: DashboardProps["assistantHistory"];
-  brandProfile: DashboardProps["brandProfile"];
-  campaigns: DbCampaign[];
-  chatReferenceImage: DashboardProps["chatReferenceImage"];
-  editingImage?: DashboardProps["editingImage"];
-  galleryImages: DashboardProps["galleryImages"];
-  instagramContext?: DashboardProps["instagramContext"];
-  isAssistantLoading: DashboardProps["isAssistantLoading"];
-  onAssistantSendMessage: DashboardProps["onAssistantSendMessage"];
-  onCloseImageEditor?: DashboardProps["onCloseImageEditor"];
-  onEditProfile: DashboardProps["onEditProfile"];
-  onMarkGalleryImagePublished?: DashboardProps["onMarkGalleryImagePublished"];
-  onRequestImageEdit?: DashboardProps["onRequestImageEdit"];
-  onSchedulePost: DashboardProps["onSchedulePost"];
-  onSetChatReference: DashboardProps["onSetChatReference"];
-  onSetChatReferenceSilent?: DashboardProps["onSetChatReferenceSilent"];
-  onShowToolEditPreview?: DashboardProps["onShowToolEditPreview"];
-  onSignOut: () => void;
-  onToolEditApproved?: DashboardProps["onToolEditApproved"];
-  onToolEditRejected?: DashboardProps["onToolEditRejected"];
-  onUpdateGalleryImage: DashboardProps["onUpdateGalleryImage"];
-  pendingToolEdit?: DashboardProps["pendingToolEdit"];
-  quickPostImage: DashboardProps["galleryImages"][number] | null;
-  scheduleModalImage: DashboardProps["galleryImages"][number] | null;
-  scheduleModalOpen: boolean;
-  scheduledPosts: DashboardProps["scheduledPosts"];
-  setQuickPostImage: (image: DashboardProps["galleryImages"][number] | null) => void;
-  setScheduleModalImage: (image: DashboardProps["galleryImages"][number] | null) => void;
-  setScheduleModalOpen: (value: boolean) => void;
-  toolEditPreview?: DashboardProps["toolEditPreview"];
-}
+export function DashboardOverlays() {
+  const { brandProfile, handleEditProfile } = useBrandProfileController();
+  const {
+    campaigns,
+    chatHistory,
+    chatReferenceImage,
+    editingImage,
+    galleryImages,
+    handleAssistantSendMessage,
+    handleCloseImageEditor,
+    handleMarkGalleryImagePublished,
+    handleRequestImageEdit,
+    handleSchedulePost,
+    handleSetChatReference,
+    handleSetChatReferenceSilent,
+    handleShowToolEditPreview,
+    handleToolEditApproved,
+    handleToolEditRejected,
+    handleUpdateGalleryImage,
+    isAssistantLoading,
+    instagramContext,
+    pendingToolEdit,
+    quickPostImage,
+    scheduleModalImage,
+    scheduleModalOpen,
+    scheduledPosts,
+    setQuickPostImage,
+    setScheduleModalImage,
+    setScheduleModalOpen,
+    toolEditPreview,
+  } = useGalleryController();
 
-export function DashboardOverlays({
-  assistantHistory,
-  brandProfile,
-  campaigns,
-  chatReferenceImage,
-  editingImage,
-  galleryImages,
-  instagramContext,
-  isAssistantLoading,
-  onAssistantSendMessage,
-  onCloseImageEditor,
-  onEditProfile,
-  onMarkGalleryImagePublished,
-  onRequestImageEdit,
-  onSchedulePost,
-  onSetChatReference,
-  onSetChatReferenceSilent,
-  onShowToolEditPreview,
-  onSignOut,
-  onToolEditApproved,
-  onToolEditRejected,
-  onUpdateGalleryImage,
-  pendingToolEdit,
-  quickPostImage,
-  scheduleModalImage,
-  scheduleModalOpen,
-  scheduledPosts,
-  setQuickPostImage,
-  setScheduleModalImage,
-  setScheduleModalOpen,
-  toolEditPreview,
-}: DashboardOverlaysProps) {
+  if (!brandProfile) {
+    return null;
+  }
+
   return (
     <>
       {editingImage ? (
-        <Suspense fallback={<ViewLoadingFallback />}>
-          <ImagePreviewModal
-            image={editingImage}
-            onClose={onCloseImageEditor || (() => {})}
-            onImageUpdate={(newSrc) => onUpdateGalleryImage?.(editingImage.id, newSrc)}
-            onSetChatReference={onSetChatReference}
-            onSetChatReferenceSilent={
-              onSetChatReferenceSilent
-                ? (image) => onSetChatReferenceSilent(image)
-                : undefined
-            }
-            pendingToolEdit={pendingToolEdit}
-            onToolEditApproved={onToolEditApproved}
-            onToolEditRejected={onToolEditRejected}
-            initialEditPreview={toolEditPreview || null}
-            chatReferenceImageId={chatReferenceImage?.id || null}
-            chatComponent={
-              <Suspense fallback={<ViewLoadingFallback />}>
-                {import.meta.env.VITE_USE_VERCEL_AI_SDK === "true" ? (
-                  <AssistantPanelNew
-                    isOpen={true}
-                    onClose={() => {}}
-                    referenceImage={chatReferenceImage}
-                    onClearReference={() => onSetChatReference(null)}
-                    onUpdateReference={(ref) =>
-                      onSetChatReference({
-                        id: ref.id,
-                        model: "",
-                        source: "",
-                        src: ref.src,
-                      } as unknown as DashboardProps["galleryImages"][number])
-                    }
-                    galleryImages={galleryImages}
-                    brandProfile={brandProfile}
-                    pendingToolEdit={pendingToolEdit}
-                    onRequestImageEdit={onRequestImageEdit}
-                    onToolEditApproved={onToolEditApproved}
-                    onToolEditRejected={onToolEditRejected}
-                    onShowToolEditPreview={onShowToolEditPreview}
-                  />
-                ) : (
-                  <AssistantPanel
-                    isOpen={true}
-                    onClose={() => {}}
-                    history={assistantHistory}
-                    isLoading={isAssistantLoading}
-                    onSendMessage={onAssistantSendMessage}
-                    referenceImage={chatReferenceImage}
-                    onClearReference={() => onSetChatReference(null)}
-                  />
-                )}
-              </Suspense>
-            }
-          />
-        </Suspense>
+        <ErrorBoundary fallback={<ViewLoadingFallback />}>
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <ImagePreviewModal
+              image={editingImage}
+              onClose={handleCloseImageEditor}
+              onImageUpdate={(newSrc) =>
+                handleUpdateGalleryImage(editingImage.id, newSrc)
+              }
+              onSetChatReference={handleSetChatReference}
+              onSetChatReferenceSilent={
+                handleSetChatReferenceSilent
+                  ? (image) => handleSetChatReferenceSilent(image)
+                  : undefined
+              }
+              pendingToolEdit={pendingToolEdit}
+              onToolEditApproved={handleToolEditApproved}
+              onToolEditRejected={handleToolEditRejected}
+              initialEditPreview={toolEditPreview || null}
+              chatReferenceImageId={chatReferenceImage?.id || null}
+              chatComponent={
+                <Suspense fallback={<ViewLoadingFallback />}>
+                  {import.meta.env.VITE_USE_VERCEL_AI_SDK === "true" ? (
+                    <AssistantPanelNew
+                      isOpen
+                      onClose={() => undefined}
+                      referenceImage={chatReferenceImage}
+                      onClearReference={() => handleSetChatReference(null)}
+                      onUpdateReference={(reference) =>
+                        handleSetChatReference({
+                          id: reference.id,
+                          model: "gemini-3-pro-image-preview",
+                          source: "Edição",
+                          src: reference.src,
+                        })
+                      }
+                      galleryImages={galleryImages}
+                      brandProfile={brandProfile}
+                      pendingToolEdit={pendingToolEdit}
+                      onRequestImageEdit={handleRequestImageEdit}
+                      onToolEditApproved={handleToolEditApproved}
+                      onToolEditRejected={handleToolEditRejected}
+                      onShowToolEditPreview={handleShowToolEditPreview}
+                    />
+                  ) : (
+                    <AssistantPanel
+                      isOpen
+                      onClose={() => undefined}
+                      history={chatHistory}
+                      isLoading={isAssistantLoading}
+                      onSendMessage={handleAssistantSendMessage}
+                      referenceImage={chatReferenceImage}
+                      onClearReference={() => handleSetChatReference(null)}
+                    />
+                  )}
+                </Suspense>
+              }
+            />
+          </Suspense>
+        </ErrorBoundary>
       ) : null}
 
       {quickPostImage ? (
@@ -156,7 +135,7 @@ export function DashboardOverlays({
           image={quickPostImage}
           brandProfile={brandProfile}
           context={quickPostImage.prompt || "Imagem da galeria"}
-          onImagePublished={onMarkGalleryImagePublished}
+          onImagePublished={handleMarkGalleryImagePublished}
           instagramContext={instagramContext}
         />
       ) : null}
@@ -167,39 +146,41 @@ export function DashboardOverlays({
       />
 
       {scheduleModalOpen ? (
-        <Suspense fallback={<ViewLoadingFallback />}>
-          <SchedulePostModal
-            isOpen={scheduleModalOpen}
-            onClose={() => {
-              setScheduleModalOpen(false);
-              setScheduleModalImage(null);
-            }}
-            onSchedule={(post) => {
-              onSchedulePost(post);
-              setScheduleModalOpen(false);
-              setScheduleModalImage(null);
-            }}
-            galleryImages={galleryImages}
-            campaigns={campaigns}
-            initialImage={scheduleModalImage}
-          />
-        </Suspense>
+        <ErrorBoundary fallback={<ViewLoadingFallback />}>
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <SchedulePostModal
+              isOpen={scheduleModalOpen}
+              onClose={() => {
+                setScheduleModalOpen(false);
+                setScheduleModalImage(null);
+              }}
+              onSchedule={(post) => {
+                void handleSchedulePost(post);
+                setScheduleModalOpen(false);
+                setScheduleModalImage(null);
+              }}
+              galleryImages={galleryImages}
+              campaigns={campaigns}
+              initialImage={scheduleModalImage}
+            />
+          </Suspense>
+        </ErrorBoundary>
       ) : null}
 
-      <footer className="fixed bottom-4 left-4 z-[10000] pointer-events-auto hidden lg:flex flex-col items-center gap-2 rounded-2xl bg-black/40 backdrop-blur-2xl border border-border p-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)]">
+      <footer className="fixed bottom-4 left-4 z-[10000] hidden pointer-events-auto flex-col items-center gap-2 rounded-2xl border border-border bg-black/40 p-2 shadow-[0_25px_90px_rgba(0,0,0,0.7)] backdrop-blur-2xl lg:flex">
         <button
-          onClick={onEditProfile}
-          className="flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+          onClick={handleEditProfile}
+          className="flex cursor-pointer items-center justify-center transition-transform active:scale-95"
           title={brandProfile.name}
         >
           {brandProfile.logo ? (
             <img
               src={brandProfile.logo}
               alt="Logo"
-              className="w-10 h-10 rounded-xl object-cover"
+              className="h-10 w-10 rounded-xl object-cover"
             />
           ) : (
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white">
               <span className="text-sm font-semibold">
                 {brandProfile.name.substring(0, 1).toUpperCase()}
               </span>
@@ -208,11 +189,11 @@ export function DashboardOverlays({
         </button>
 
         <button
-          onClick={onSignOut}
-          className="flex items-center justify-center p-2.5 cursor-pointer text-white hover:text-red-400 active:scale-95 transition-all rounded-xl hover:bg-white/5"
+          onClick={() => authClient.signOut()}
+          className="flex cursor-pointer items-center justify-center rounded-xl p-2.5 text-white transition-all hover:bg-white/5 hover:text-red-400 active:scale-95"
           title="Sair"
         >
-          <span className="w-5 h-5" />
+          <span className="h-5 w-5" />
         </button>
       </footer>
     </>

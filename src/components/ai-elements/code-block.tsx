@@ -1,7 +1,9 @@
 "use client";
 
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import DOMPurify from "dompurify";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import {
   type ComponentProps,
@@ -83,17 +85,19 @@ export async function highlightCode(
   ]);
 }
 
-export const CodeBlock = ({
+function CodeBlockContent({
   code,
   language,
   showLineNumbers = false,
   className,
   children,
   ...props
-}: CodeBlockProps) => {
+}: CodeBlockProps) {
   const [html, setHtml] = useState<string>("");
   const [darkHtml, setDarkHtml] = useState<string>("");
   const mounted = useRef(false);
+  const sanitizedHtml = DOMPurify.sanitize(html);
+  const sanitizedDarkHtml = DOMPurify.sanitize(darkHtml);
 
   useEffect(() => {
     highlightCode(code, language, showLineNumbers).then(([light, dark]) => {
@@ -122,12 +126,12 @@ export const CodeBlock = ({
           <div
             className="overflow-auto dark:hidden [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-foreground! [&>pre]:text-sm [&_code]:font-mono [&_code]:text-sm"
             // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
-            dangerouslySetInnerHTML={{ __html: html }}
+            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
           />
           <div
             className="hidden overflow-auto dark:block [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-foreground! [&>pre]:text-sm [&_code]:font-mono [&_code]:text-sm"
             // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
-            dangerouslySetInnerHTML={{ __html: darkHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizedDarkHtml }}
           />
           {children && (
             <div className="absolute top-2 right-2 flex items-center gap-2">
@@ -138,7 +142,20 @@ export const CodeBlock = ({
       </div>
     </CodeBlockContext.Provider>
   );
-};
+}
+
+export const CodeBlock = (props: CodeBlockProps) => (
+  <ErrorBoundary
+    resetKeys={[props.code, props.language, props.showLineNumbers]}
+    fallback={
+      <div className="rounded-md border bg-background p-4 text-sm text-muted-foreground">
+        Falha ao renderizar o bloco de código.
+      </div>
+    }
+  >
+    <CodeBlockContent {...props} />
+  </ErrorBoundary>
+);
 
 export type CodeBlockCopyButtonProps = ComponentProps<typeof Button> & {
   onCopy?: () => void;

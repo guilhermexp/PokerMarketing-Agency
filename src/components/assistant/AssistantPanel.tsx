@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import type { ChatMessage, ChatReferenceImage } from "../../types";
 import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
+import { ErrorBoundary } from "../common/ErrorBoundary";
 
 interface AssistantPanelProps {
   isOpen: boolean;
@@ -109,7 +110,7 @@ const ChatBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
   );
 };
 
-export const AssistantPanel: React.FC<AssistantPanelProps> = ({
+function AssistantPanelContent({
   isOpen,
   onClose,
   history,
@@ -117,7 +118,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   onSendMessage,
   referenceImage,
   onClearReference,
-}) => {
+}: AssistantPanelProps) {
   const [input, setInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -260,4 +261,19 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
       </div>
     </aside>
   );
-};
+}
+
+export const AssistantPanel: React.FC<AssistantPanelProps> = (props) => (
+  <ErrorBoundary
+    resetKeys={[props.isOpen, props.referenceImage?.id, props.history.length]}
+    fallback={
+      <div className="flex h-full min-h-[220px] items-center justify-center border-l border-border bg-background">
+        <p className="text-sm text-muted-foreground">
+          Falha ao carregar o assistente.
+        </p>
+      </div>
+    }
+  >
+    <AssistantPanelContent {...props} />
+  </ErrorBoundary>
+);

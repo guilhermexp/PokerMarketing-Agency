@@ -4,6 +4,7 @@ import { clientLogger } from "@/lib/client-logger";
  * Design minimalista com tema dark
  */
 
+import DOMPurify from 'dompurify';
 import React, { useState } from 'react';
 import {
   Dialog,
@@ -87,6 +88,10 @@ export function LogDetailModal({
     if (cents === null || cents === undefined) return 'N/A';
     return `R$ ${(cents / 100).toFixed(4)}`;
   };
+
+  const sanitizedSuggestionsHtml = suggestions
+    ? DOMPurify.sanitize(formatMarkdown(suggestions))
+    : null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -221,7 +226,7 @@ export function LogDetailModal({
                   <div
                     className="prose prose-invert prose-sm max-w-none text-[12px] text-white/70"
                     dangerouslySetInnerHTML={{
-                      __html: formatMarkdown(suggestions),
+                      __html: sanitizedSuggestionsHtml || '',
                     }}
                   />
                 </div>
@@ -283,4 +288,3 @@ function formatMarkdown(text: string): string {
 
   return formatted;
 }
-

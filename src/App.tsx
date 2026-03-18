@@ -26,11 +26,8 @@ export function App({ routeView }: AppProps) {
         <div className="flex items-center justify-center min-h-screen bg-background">
           <div className="text-center space-y-4">
             <h1 className="text-xl font-semibold text-white">
-              Algo deu errado
+              Algo deu errado, recarregar
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Um erro inesperado ocorreu.
-            </p>
             <div className="flex gap-3 justify-center">
               <button
                 onClick={reset}

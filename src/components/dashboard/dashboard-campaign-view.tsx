@@ -1,11 +1,11 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense, lazy, useEffect, useState, useTransition } from "react";
 import { AnimatePresence } from "framer-motion";
 import { UploadForm } from "../campaigns/UploadForm";
 import { Icon } from "../common/Icon";
 import { GeneratingLoader } from "../ui/quantum-pulse-loade";
 import { IMAGE_GENERATION_MODEL_OPTIONS } from "../../config/imageGenerationModelOptions";
 import type { GalleryImage, ImageModel, MarketingCampaign } from "../../types";
-import type { DashboardProps, Tab } from "./dashboard-shared";
+import type { Tab } from "./dashboard-shared";
 import {
   DOT_GRID_STYLE_20,
   DOT_GRID_STYLE_30,
@@ -14,6 +14,10 @@ import {
   VIGNETTE_STYLE,
   ViewLoadingFallback,
 } from "./dashboard-shared";
+import { DEFAULT_CAMPAIGN_IMAGE_MODEL } from "../../config/imageGenerationModelOptions";
+import { useBrandProfileController } from "@/controllers/BrandProfileController";
+import { useCampaignController } from "@/controllers/CampaignController";
+import { useGalleryController } from "@/controllers/GalleryController";
 
 const ClipsTab = lazy(() =>
   import("../tabs/ClipsTab").then((m) => ({ default: m.ClipsTab })),
@@ -41,46 +45,9 @@ interface CampaignPreview {
   posts_count?: number | string | null;
 }
 
-interface DashboardCampaignViewProps {
-  activeTab: Tab;
-  brandProfile: DashboardProps["brandProfile"];
-  campaign: MarketingCampaign | null;
-  campaigns: CampaignPreview[];
-  chatReferenceImage: DashboardProps["chatReferenceImage"];
-  compositionAssets: DashboardProps["compositionAssets"];
-  galleryImages: DashboardProps["galleryImages"];
-  instagramContext: DashboardProps["instagramContext"];
-  isGenerating: boolean;
-  isTabPending: boolean;
-  onAddImageToGallery: DashboardProps["onAddImageToGallery"];
-  onAddStyleReference: DashboardProps["onAddStyleReference"];
-  onCarouselUpdate: DashboardProps["onCarouselUpdate"];
-  onClearSelectedStyleReference: DashboardProps["onClearSelectedStyleReference"];
-  onGenerate: DashboardProps["onGenerate"];
-  onLoadCampaign: DashboardProps["onLoadCampaign"];
-  onPublishToCampaign: DashboardProps["onPublishToCampaign"];
-  onResetCampaign: DashboardProps["onResetCampaign"];
-  onSchedulePost: DashboardProps["onSchedulePost"];
-  onSelectStyleReference: DashboardProps["onSelectStyleReference"];
-  onSetChatReference: DashboardProps["onSetChatReference"];
-  onUpdateCreativeModel?: DashboardProps["onUpdateCreativeModel"];
-  onUpdateGalleryImage: DashboardProps["onUpdateGalleryImage"];
-  onViewChange: DashboardProps["onViewChange"];
-  productImages: DashboardProps["productImages"];
-  selectedCampaignImageModel: ImageModel;
-  selectedStyleReference: DashboardProps["selectedStyleReference"];
-  setActiveTab: React.Dispatch<React.SetStateAction<Tab>>;
-  setQuickPostImage: React.Dispatch<React.SetStateAction<GalleryImage | null>>;
-  setSelectedCampaignImageModel: React.Dispatch<React.SetStateAction<ImageModel>>;
-  showUploadForm: boolean;
-  startTabTransition: React.TransitionStartFunction;
-  styleReferences: DashboardProps["styleReferences"];
-  userId: DashboardProps["userId"];
-}
-
 function renderCampaignPreviewCard(
   campaign: CampaignPreview,
-  onLoadCampaign: DashboardProps["onLoadCampaign"],
+  onLoadCampaign: (campaignId: string) => void,
 ) {
   const previewItems = [
     campaign.clip_preview_url ? { url: campaign.clip_preview_url, type: "clip" } : null,
@@ -142,42 +109,49 @@ function renderCampaignPreviewCard(
   );
 }
 
-export function DashboardCampaignView({
-  activeTab,
-  brandProfile,
-  campaign,
-  campaigns,
-  chatReferenceImage,
-  compositionAssets,
-  galleryImages,
-  instagramContext,
-  isGenerating,
-  isTabPending,
-  onAddImageToGallery,
-  onAddStyleReference,
-  onCarouselUpdate,
-  onClearSelectedStyleReference,
-  onGenerate,
-  onLoadCampaign,
-  onPublishToCampaign,
-  onResetCampaign,
-  onSchedulePost,
-  onSelectStyleReference,
-  onSetChatReference,
-  onUpdateCreativeModel,
-  onUpdateGalleryImage,
-  onViewChange,
-  productImages,
-  selectedCampaignImageModel,
-  selectedStyleReference,
-  setActiveTab,
-  setQuickPostImage,
-  setSelectedCampaignImageModel,
-  showUploadForm,
-  startTabTransition,
-  styleReferences,
-  userId,
-}: DashboardCampaignViewProps) {
+export function DashboardCampaignView() {
+  const {
+    brandProfile,
+    handleUpdateCreativeModel: onUpdateCreativeModel,
+    onViewChange,
+    userId,
+  } = useBrandProfileController();
+  const {
+    campaign,
+    campaignCompositionAssets: compositionAssets,
+    campaignProductImages: productImages,
+    campaigns,
+    handleCarouselUpdate: onCarouselUpdate,
+    handleGenerateCampaign: onGenerate,
+    handleLoadCampaign: onLoadCampaign,
+    handlePublishFlyerToCampaign: onPublishToCampaign,
+    handleResetCampaign: onResetCampaign,
+    isGenerating,
+  } = useCampaignController();
+  const {
+    chatReferenceImage,
+    galleryImages,
+    handleAddImageToGallery: onAddImageToGallery,
+    handleAddStyleReference: onAddStyleReference,
+    handleClearSelectedStyleReference: onClearSelectedStyleReference,
+    handleSchedulePost: onSchedulePost,
+    handleSelectStyleReference: onSelectStyleReference,
+    handleSetChatReference: onSetChatReference,
+    handleUpdateGalleryImage: onUpdateGalleryImage,
+    instagramContext,
+    selectedStyleReference,
+    setQuickPostImage,
+    styleReferences,
+  } = useGalleryController();
+  const [activeTab, setActiveTab] = useState<Tab>("clips");
+  const [isTabPending, startTabTransition] = useTransition();
+  const [selectedCampaignImageModel, setSelectedCampaignImageModel] =
+    useState<ImageModel>(DEFAULT_CAMPAIGN_IMAGE_MODEL);
+  const showUploadForm = !campaign && !isGenerating;
+
+  if (!brandProfile) {
+    return null;
+  }
   const hasClips = (campaign?.videoClipScripts?.length ?? 0) > 0;
   const hasPosts = (campaign?.posts?.length ?? 0) > 0;
   const hasAds = (campaign?.adCreatives?.length ?? 0) > 0;
@@ -191,6 +165,16 @@ export function DashboardCampaignView({
     { id: "posts", label: "Social", enabled: hasPosts },
     { id: "ads", label: "Ads", enabled: hasAds },
   ] as const).filter((tab) => tab.enabled);
+
+  useEffect(() => {
+    if (
+      campaign &&
+      availableTabs.length > 0 &&
+      !availableTabs.some((tab) => tab.id === activeTab)
+    ) {
+      setActiveTab(availableTabs[0].id);
+    }
+  }, [activeTab, availableTabs, campaign]);
 
   const handlePublishCarousel = async (imageUrls: string[], caption: string) => {
     if (!instagramContext?.instagramAccountId) {
