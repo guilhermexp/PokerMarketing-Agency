@@ -40,4 +40,19 @@ describe("health routes", () => {
     expect(response.body.data).toBeNull();
     expect(response.body.error.message).toBe("Database health check failed");
   });
+
+  it("rate limits csrf token requests after 50 requests per minute per IP", async () => {
+    const { registerHealthRoutes } = await import("../../server/routes/health.js");
+    const app = createRouteApp(registerHealthRoutes);
+
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      const response = await request(app).get("/api/csrf-token");
+      expect(response.status).toBe(200);
+    }
+
+    const limitedResponse = await request(app).get("/api/csrf-token");
+
+    expect(limitedResponse.status).toBe(429);
+    expect(limitedResponse.body.error.message).toContain("Rate limit exceeded");
+  });
 });

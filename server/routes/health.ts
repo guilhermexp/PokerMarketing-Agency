@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { getSql } from "../lib/db.js";
 import { userIdCache } from "../lib/user-resolver.js";
 import { generateCsrfToken } from "../lib/csrf.js";
-import { requireSuperAdmin } from "../lib/auth.js";
+import { createRateLimitMiddleware, requireSuperAdmin } from "../lib/auth.js";
 import { DatabaseError } from "../lib/errors/index.js";
 import logger from "../lib/logger.js";
 
@@ -17,6 +17,8 @@ function toOriginalError(error: unknown): { code?: string; message: string } | n
 }
 
 export function registerHealthRoutes(app: Express): void {
+  const csrfTokenRateLimit = createRateLimitMiddleware(50, 60_000, "public:csrf-token");
+
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
@@ -34,7 +36,7 @@ export function registerHealthRoutes(app: Express): void {
   // CSRF token endpoint — the ONLY place new tokens are generated.
   // Protected-prefix GET requests no longer generate tokens to prevent
   // race conditions when parallel requests arrive without a cookie.
-  app.get("/api/csrf-token", (req, res) => {
+  app.get("/api/csrf-token", csrfTokenRateLimit, (req, res) => {
     const isProduction = process.env.NODE_ENV === "production";
 
     // Reuse existing cookie token if available, otherwise generate new one

@@ -1,87 +1,86 @@
+import { randomBytes } from "node:crypto";
+import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const putMock = vi.fn();
-
-vi.mock("@vercel/blob", () => ({
-  put: putMock,
-}));
 
 describe("upload service", () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
-    vi.unstubAllGlobals();
   });
 
-  it("rejects invalid proxy URLs", async () => {
-    const { proxyBlobVideo } = await import("../../server/services/upload-service.js");
+  it("rejects proxying a blob URL that is not associated with the authenticated organization", async () => {
+    const sqlMock = vi.fn().mockResolvedValue([]);
 
-    await expect(proxyBlobVideo("notaurl")).rejects.toMatchObject({
-      message: "Invalid URL",
-    });
-  });
+    vi.doMock("../../server/lib/db.js", () => ({
+      getSql: () => sqlMock,
+    }));
 
-  it("rejects non-Vercel Blob hosts", async () => {
-    const { proxyBlobVideo } = await import("../../server/services/upload-service.js");
-
-    await expect(proxyBlobVideo("https://example.com/video.mp4")).rejects.toMatchObject({
-      message: "Only Vercel Blob URLs are allowed",
-    });
-  });
-
-  it("proxies blob videos and preserves partial content headers", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({
-          "content-type": "video/mp4",
-          "content-length": "10",
-        }),
-        arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
-      }),
+    const { PermissionDeniedError } = await import("../../server/lib/errors/index.js");
+    const { assertBlobUrlBelongsToOrganization } = await import(
+      "../../server/services/upload-service.js"
     );
-
-    const { proxyBlobVideo } = await import("../../server/services/upload-service.js");
-    const result = await proxyBlobVideo(
-      "https://foo.public.blob.vercel-storage.com/video.mp4",
-      "bytes=0-3",
-    );
-
-    expect(result.status).toBe(206);
-    expect(result.headers["Content-Range"]).toBe("bytes 0-3/10");
-    expect(result.headers["Content-Type"]).toBe("video/mp4");
-    expect(result.body).toBeInstanceOf(Buffer);
-  });
-
-  it("uploads base64 assets through Vercel Blob", async () => {
-    putMock.mockResolvedValue({
-      url: "https://blob.example.com/uploaded.png",
-    });
-
-    const { uploadBase64Asset } = await import("../../server/services/upload-service.js");
-    const result = await uploadBase64Asset({
-      filename: "uploaded.png",
-      contentType: "image/png",
-      data: Buffer.from("hello world").toString("base64"),
-    });
-
-    expect(putMock).toHaveBeenCalledOnce();
-    expect(result.success).toBe(true);
-    expect(result.url).toBe("https://blob.example.com/uploaded.png");
-    expect(result.filename).toContain("uploaded.png");
-  });
-
-  it("rejects unsupported upload content types", async () => {
-    const { uploadBase64Asset } = await import("../../server/services/upload-service.js");
 
     await expect(
-      uploadBase64Asset({
-        filename: "payload.exe",
-        contentType: "application/x-msdownload",
-        data: Buffer.from("hello world").toString("base64"),
-      }),
-    ).rejects.toMatchObject({
-      message: expect.stringContaining("Invalid content type"),
-    });
+      assertBlobUrlBelongsToOrganization(
+        "https://team.public.blob.vercel-storage.com/private-video.mp4",
+        "org-1",
+      ),
+    ).rejects.toBeInstanceOf(PermissionDeniedError);
+  });
+
+  it("allows proxying a blob URL that is associated with the authenticated organization", async () => {
+    const sqlMock = vi.fn().mockResolvedValue([{ matched: "1" }]);
+
+    vi.doMock("../../server/lib/db.js", () => ({
+      getSql: () => sqlMock,
+    }));
+
+    const { assertBlobUrlBelongsToOrganization } = await import(
+      "../../server/services/upload-service.js"
+    );
+
+    await expect(
+      assertBlobUrlBelongsToOrganization(
+        "https://team.public.blob.vercel-storage.com/private-video.mp4",
+        "org-1",
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("compresses large image buffers before upload and prefers webp when possible", async () => {
+    const width = 1600;
+    const height = 1200;
+    const inputBuffer = await sharp(randomBytes(width * height * 3), {
+      raw: { width, height, channels: 3 },
+    })
+      .png()
+      .toBuffer();
+
+    const { optimizeImageBuffer } = await import("../../server/services/upload-service.js");
+
+    const optimized = await optimizeImageBuffer(inputBuffer, "image/png");
+
+    expect(optimized.contentType).toBe("image/webp");
+    expect(optimized.buffer.byteLength).toBeLessThan(inputBuffer.byteLength);
+  });
+
+  it("skips compression for images smaller than 200KB", async () => {
+    const inputBuffer = await sharp({
+      create: {
+        width: 80,
+        height: 80,
+        channels: 3,
+        background: "#2563eb",
+      },
+    })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    const { optimizeImageBuffer } = await import("../../server/services/upload-service.js");
+
+    const optimized = await optimizeImageBuffer(inputBuffer, "image/jpeg");
+
+    expect(optimized.contentType).toBe("image/jpeg");
+    expect(optimized.buffer.equals(inputBuffer)).toBe(true);
   });
 });

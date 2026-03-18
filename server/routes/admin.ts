@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { getSql } from "../lib/db.js";
-import { requireSuperAdmin } from "../lib/auth.js";
+import { createRateLimitMiddleware, requireSuperAdmin } from "../lib/auth.js";
 import { generateTextFromMessages } from "../lib/ai/text-generation.js";
 import { withRetry } from "../lib/ai/retry.js";
 import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.js";
@@ -180,8 +180,36 @@ interface AiSuggestionsCacheEntry {
 // Cache for AI suggestions (1 hour TTL)
 const aiSuggestionsCache = new Map<string, AiSuggestionsCacheEntry>();
 const CACHE_DURATION_MS = 3600000; // 1 hour
+const adminRateLimit = createRateLimitMiddleware(30, 60_000, "admin");
+
+function logAdminAction(req: Request, adminAction: string): void {
+  const session = req.authSession;
+  const adminEmail =
+    session && typeof session === "object" && "user" in session
+      ? (session.user as { email?: string } | undefined)?.email ?? null
+      : null;
+  const adminUserId =
+    session && typeof session === "object" && "user" in session
+      ? (session.user as { id?: string } | undefined)?.id ?? null
+      : null;
+
+  logger.info(
+    {
+      adminAction,
+      adminEmail: adminEmail?.toLowerCase() ?? null,
+      adminUserId,
+      method: req.method,
+      path: req.path,
+      requestId: req.id,
+      happenedAt: new Date().toISOString(),
+    },
+    "[Admin] Action completed",
+  );
+}
 
 export function registerAdminRoutes(app: Express): void {
+  app.use("/api/admin", adminRateLimit);
+
   // Admin: Get overview stats
   app.get("/api/admin/stats", requireSuperAdmin, async (_req: Request, res: Response) => {
     try {
@@ -230,6 +258,7 @@ export function registerAdminRoutes(app: Express): void {
       const errorsResult = results[6] as CountRow[];
       const orgCountResult = results[7] as CountRow[];
 
+      logAdminAction(_req, "admin.stats.view");
       res.json({
         totalUsers: parseInt(usersResult[0]?.count || "0", 10),
         activeUsersToday: parseInt(activeUsersResult[0]?.count || "0", 10),
@@ -357,6 +386,7 @@ export function registerAdminRoutes(app: Express): void {
         total_video_seconds: "0",
       };
 
+      logAdminAction(req, "admin.usage.view");
       res.json({
         totals: {
           totalRequests: parseInt(totals.total_requests || "0", 10),
@@ -446,6 +476,7 @@ export function registerAdminRoutes(app: Express): void {
       const total = parseInt(countResult[0]?.total || "0", 10);
       const totalPages = Math.ceil(total / safeLimit);
 
+      logAdminAction(req, "admin.users.list");
       res.json({
         users,
         pagination: {
@@ -608,6 +639,7 @@ export function registerAdminRoutes(app: Express): void {
       const total = parseInt(countResult[0]?.total || "0", 10);
       const totalPages = Math.ceil(total / safeLimit);
 
+      logAdminAction(req, "admin.organizations.list");
       res.json({
         organizations,
         pagination: {
@@ -681,6 +713,7 @@ export function registerAdminRoutes(app: Express): void {
       const total = parseInt(totalResult[0]?.count || "0", 10);
       const totalPages = Math.ceil(total / safeLimit);
 
+      logAdminAction(req, "admin.logs.list");
       res.json({
         logs,
         pagination: {
@@ -722,6 +755,7 @@ export function registerAdminRoutes(app: Express): void {
         return;
       }
 
+      logAdminAction(req, "admin.logs.detail");
       res.json(logs[0]);
     } catch (error) {
       logger.error({ err: error }, "[Admin] Log detail error");
@@ -743,6 +777,7 @@ export function registerAdminRoutes(app: Express): void {
         const cacheKey = `suggestions_${id}`;
         const cached = aiSuggestionsCache.get(cacheKey);
         if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
+          logAdminAction(req, "admin.logs.ai-suggestions");
           res.json({ suggestions: cached.suggestions, cached: true });
           return;
         }
@@ -763,6 +798,7 @@ export function registerAdminRoutes(app: Express): void {
 
         // Only generate suggestions for failed logs
         if (log.status !== "failed") {
+          logAdminAction(req, "admin.logs.ai-suggestions");
           res.json({
             suggestions:
               'Este log não contém erros. Sugestões de IA estão disponíveis apenas para logs com status "failed".',
@@ -810,6 +846,7 @@ Formate em markdown claro com seções.`;
           timestamp: Date.now(),
         });
 
+        logAdminAction(req, "admin.logs.ai-suggestions");
         res.json({ suggestions, cached: false });
       } catch (error) {
         logger.error({ err: error }, "[Admin] AI suggestions error");

@@ -27,6 +27,7 @@ describe("init routes", () => {
     }));
     vi.doMock("../../server/lib/logger.js", () => ({
       default: { debug: vi.fn() },
+      rawLogger: { debug: vi.fn() },
     }));
 
     const { registerInitRoutes } = await import("../../server/routes/init.js");
@@ -58,6 +59,7 @@ describe("init routes", () => {
     }));
     vi.doMock("../../server/lib/logger.js", () => ({
       default: { debug: vi.fn() },
+      rawLogger: { debug: vi.fn() },
     }));
 
     const { registerInitRoutes } = await import("../../server/routes/init.js");
@@ -73,5 +75,45 @@ describe("init routes", () => {
     expect(response.body.data.gallery).toEqual([]);
     expect(response.body.data.scheduledPosts).toEqual([]);
     expect(response.body.data.campaigns).toEqual([]);
+  });
+
+  it("rate limits init requests after 10 requests per minute per IP", async () => {
+    const resolveUserIdMock = vi.fn().mockResolvedValue("db-user-1");
+    const queryResults = [
+      [{ id: "brand-1", name: "Brand" }],
+      [{ id: "gallery-1", src_url: "https://cdn.example.com/image.png" }],
+      [{ id: "post-1", scheduled_timestamp: Date.now() }],
+      [{ id: "campaign-1", name: "Campaign" }],
+      [{ id: "schedule-1", name: "Week 1" }],
+    ];
+    const sqlMock = vi.fn(async () => queryResults.shift() ?? []);
+
+    vi.doMock("../../server/lib/db.js", () => ({
+      getSql: () => sqlMock,
+    }));
+    vi.doMock("../../server/lib/user-resolver.js", () => ({
+      resolveUserId: resolveUserIdMock,
+    }));
+    vi.doMock("../../server/lib/logger.js", () => ({
+      default: { debug: vi.fn(), error: vi.fn() },
+      rawLogger: { debug: vi.fn(), error: vi.fn() },
+    }));
+
+    const { registerInitRoutes } = await import("../../server/routes/init.js");
+    const app = createRouteApp(registerInitRoutes);
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const response = await request(app).get("/api/db/init").query({
+        user_id: "auth-user-1",
+      });
+      expect(response.status).toBe(200);
+    }
+
+    const limitedResponse = await request(app).get("/api/db/init").query({
+      user_id: "auth-user-1",
+    });
+
+    expect(limitedResponse.status).toBe(429);
+    expect(limitedResponse.body.error.message).toContain("Rate limit exceeded");
   });
 });

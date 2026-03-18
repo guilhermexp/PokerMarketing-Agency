@@ -18,6 +18,7 @@ describe("pending validation routes", () => {
   it("rejects invalid admin users query params", async () => {
     vi.doMock("../../server/lib/auth.js", () => ({
       requireSuperAdmin: createNoopMiddleware(),
+      createRateLimitMiddleware: () => createNoopMiddleware(),
     }));
     vi.doMock("../../server/lib/db.js", () => ({
       getSql: vi.fn(() => {

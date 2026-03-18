@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { getSql } from "../lib/db.js";
+import { createRateLimitMiddleware } from "../lib/auth.js";
 import { resolveUserId } from "../lib/user-resolver.js";
 import { logError } from "../lib/logging-helpers.js";
 import logger from "../lib/logger.js";
@@ -11,7 +12,9 @@ function toError(error: unknown): Error {
 }
 
 export function registerInitRoutes(app: Express): void {
-  app.get("/api/db/init", validateRequest({ query: initQuerySchema }), async (req, res) => {
+  const initRateLimit = createRateLimitMiddleware(10, 60_000, "public:db-init");
+
+  app.get("/api/db/init", initRateLimit, validateRequest({ query: initQuerySchema }), async (req, res) => {
     const start = Date.now();
 
     try {

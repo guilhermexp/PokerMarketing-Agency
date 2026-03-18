@@ -12,13 +12,15 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
+import crypto from "node:crypto";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/better-auth.js";
 import { registerApiDocs } from "./lib/api-docs.js";
 import { requestLogger } from "./middleware/requestLogger.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { csrfProtection } from "./middleware/csrfProtection.js";
-import logger from "./lib/logger.js";
+import logger, { rawLogger } from "./lib/logger.js";
+import { buildConnectSrcOrigins, buildScriptSrcOrigins } from "./lib/csp.js";
 import { createResponseEnvelopeMiddleware } from "./lib/response-middleware.js";
 
 // Lib imports (used in middleware only)
@@ -65,6 +67,7 @@ import { registerFeedbackRoutes } from "./routes/feedback.js";
 // App creation
 // ---------------------------------------------------------------------------
 const app = express();
+const isProduction = process.env.NODE_ENV === "production";
 
 // ---------------------------------------------------------------------------
 // CORS
@@ -93,18 +96,20 @@ app.use(
 // ---------------------------------------------------------------------------
 // Middleware stack
 // ---------------------------------------------------------------------------
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.locals.cspNonce = crypto.randomBytes(16).toString("base64");
+  next();
+});
+
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          "'unsafe-eval'",
-          "https://*.sociallab.pro",
-          "https://cdn.jsdelivr.net",
-          "https://aistudiocdn.com",
+          ...buildScriptSrcOrigins(isProduction),
+          (_req, res) =>
+            `'nonce-${String((res as Response).locals.cspNonce)}'`,
         ],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         imgSrc: [
@@ -115,14 +120,7 @@ app.use(
           "https://*.public.blob.vercel-storage.com",
           "https://*.googleusercontent.com",
         ],
-        connectSrc: [
-          "'self'",
-          "https://*.sociallab.pro",
-          "https://*.blob.vercel-storage.com",
-          "https://cdn.jsdelivr.net",
-          "https://aistudiocdn.com",
-          "wss:",
-        ],
+        connectSrc: buildConnectSrcOrigins(),
         fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'", "blob:", "https://*.blob.vercel-storage.com"],
@@ -131,6 +129,12 @@ app.use(
       },
     },
     crossOriginEmbedderPolicy: false,
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    strictTransportSecurity: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+    },
+    xFrameOptions: { action: "deny" },
   }),
 );
 
@@ -204,8 +208,8 @@ for (const prefix of PROTECTED_API_PREFIXES) {
 }
 
 // Rate limiting for AI endpoints (applied after auth so identifier is available)
-const aiRateLimit = createRateLimitMiddleware(30, 60_000);     // 30 req/min
-const videoRateLimit = createRateLimitMiddleware(5, 60_000);   // 5 req/min (expensive)
+const aiRateLimit = createRateLimitMiddleware(30, 60_000, "ai");     // 30 req/min
+const videoRateLimit = createRateLimitMiddleware(5, 60_000, "ai:video");   // 5 req/min (expensive)
 
 app.use("/api/ai", aiRateLimit);
 app.use("/api/chat", aiRateLimit);
@@ -247,7 +251,7 @@ registerImagePlaygroundRoutes(app, {
   getRequestAuthContext,
   getSql,
   resolveUserId,
-  logger,
+  logger: rawLogger,
   buildImagePrompt,
 });
 
@@ -255,7 +259,7 @@ registerVideoPlaygroundRoutes(app, {
   getRequestAuthContext,
   getSql,
   resolveUserId,
-  logger,
+  logger: rawLogger,
 });
 registerAgentStudioRoutes(app);
 registerFeedbackRoutes(app);

@@ -1298,7 +1298,7 @@ export async function retryGeneration(
   }
 
   // 2. Reconstruct params from batch config
-  const params = row.config as GenerationParams;
+  const params = row.config as unknown as GenerationParams;
   const generationParams: GenerationParams = {
     ...params,
     model: row.model,

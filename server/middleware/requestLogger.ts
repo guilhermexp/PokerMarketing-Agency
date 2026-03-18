@@ -13,7 +13,7 @@ import type { Logger } from "pino";
 import type { IncomingMessage, ServerResponse } from "http";
 import { pinoHttp } from "pino-http";
 import { randomUUID } from "crypto";
-import logger from "../lib/logger.js";
+import { createChildLogger, rawLogger, type AppLogger } from "../lib/logger.js";
 
 interface SerializedRequest {
   id?: string | number | object;
@@ -101,7 +101,7 @@ function customResponseSerializer(res: Response): SerializedResponse {
  */
 export const requestLogger: Handler = pinoHttp({
   // Use our base logger instance
-  logger,
+  logger: rawLogger,
 
   // Generate unique request ID for each request
   genReqId: (req: IncomingMessage) => generateRequestId(req as Request),
@@ -174,6 +174,6 @@ export function attachRequestId(req: Request, res: Response, next: NextFunction)
  * Create child logger for a specific request
  * Useful for adding request context to logs throughout the request lifecycle
  */
-export function getRequestLogger(req: Request): Logger {
-  return req.log || logger.child({ requestId: req.id });
+export function getRequestLogger(req: Request): Logger | AppLogger {
+  return req.log || createChildLogger({ requestId: req.id });
 }

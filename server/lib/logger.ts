@@ -6,7 +6,7 @@
  * - Production: JSON logs for log aggregation tools
  */
 
-import pino, { type Logger } from 'pino';
+import pino, { type Logger } from "pino";
 
 // Determine environment
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -18,10 +18,22 @@ function getLogLevel(): string {
   return process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info');
 }
 
+type FlexibleLogMethod = (...args: unknown[]) => void;
+
+export interface AppLogger {
+  trace: FlexibleLogMethod;
+  debug: FlexibleLogMethod;
+  info: FlexibleLogMethod;
+  warn: FlexibleLogMethod;
+  error: FlexibleLogMethod;
+  fatal: FlexibleLogMethod;
+  child(bindings: Record<string, unknown>): AppLogger;
+}
+
 /**
  * Create logger instance with environment-specific configuration
  */
-const logger: Logger = pino({
+export const rawLogger: Logger = pino({
   // Log level configuration
   level: getLogLevel(),
 
@@ -74,10 +86,33 @@ const logger: Logger = pino({
     : {}),
 });
 
+function createLoggerWrapper(instance: Logger): AppLogger {
+  const wrapMethod = (
+    method: (...args: unknown[]) => Logger,
+  ): FlexibleLogMethod => {
+    return (...args: unknown[]) => {
+      method(...args);
+    };
+  };
+
+  return {
+    trace: wrapMethod(instance.trace.bind(instance) as (...args: unknown[]) => Logger),
+    debug: wrapMethod(instance.debug.bind(instance) as (...args: unknown[]) => Logger),
+    info: wrapMethod(instance.info.bind(instance) as (...args: unknown[]) => Logger),
+    warn: wrapMethod(instance.warn.bind(instance) as (...args: unknown[]) => Logger),
+    error: wrapMethod(instance.error.bind(instance) as (...args: unknown[]) => Logger),
+    fatal: wrapMethod(instance.fatal.bind(instance) as (...args: unknown[]) => Logger),
+    child: (bindings: Record<string, unknown>) =>
+      createLoggerWrapper(instance.child(bindings)),
+  };
+}
+
+const logger = createLoggerWrapper(rawLogger);
+
 /**
  * Create child logger with additional context
  */
-export function createChildLogger(context: Record<string, unknown>): Logger {
+export function createChildLogger(context: Record<string, unknown>): AppLogger {
   return logger.child(context);
 }
 

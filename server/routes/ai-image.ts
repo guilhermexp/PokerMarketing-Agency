@@ -11,7 +11,6 @@
 import type { Application, Request, Response } from "express";
 import { z } from "zod";
 import { getRequestAuthContext } from "../lib/auth.js";
-import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.js";
 import {
   withRetry,
@@ -59,6 +58,7 @@ import {
   type AiImageBody,
 } from "../schemas/ai-schemas.js";
 import { validateRequest } from "../middleware/validate.js";
+import { uploadBufferToBlob } from "../services/upload-service.js";
 
 /** Image size values accepted by logAiUsage */
 type ImageSize = '1K' | '2K' | '4K';
@@ -303,17 +303,22 @@ export function registerAiImageRoutes(app: Application): void {
           const validatedContentType = contentType;
           validateContentType(validatedContentType);
 
-          const ext = validatedContentType.includes("png") ? "png" : "jpg";
+          const ext = validatedContentType.includes("png")
+            ? "png"
+            : validatedContentType.includes("webp")
+              ? "webp"
+              : "jpg";
           const filename = `generated-${Date.now()}.${ext}`;
 
-          const blob = await put(filename, imageBuffer, {
-            access: "public",
-            contentType: validatedContentType,
-          });
+          const blobUpload = await uploadBufferToBlob(
+            filename,
+            imageBuffer,
+            validatedContentType,
+          );
 
-          finalImageUrl = blob.url;
+          finalImageUrl = blobUpload.url;
           logger.info(
-            { blobUrl: blob.url },
+            { blobUrl: blobUpload.url, optimizedContentType: blobUpload.contentType },
             "[Image API] Uploaded to Vercel Blob",
           );
         } catch (uploadError) {

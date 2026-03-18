@@ -70,18 +70,19 @@ export async function listGallery({
 
   const limitNum = Number.parseInt(String(limit ?? "50"), 10) || 50;
   const offsetNum = Number.parseInt(String(offset ?? "0"), 10) || 0;
+  const includeSrc = include_src === true || include_src === "true";
 
   if (organization_id) {
     await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
     if (source) {
-      return include_src === true || include_src === "true"
+      return includeSrc
         ? (await sql`
             SELECT *
             FROM gallery_images
-            WHERE organization_id = ${organization_id}
+            WHERE deleted_at IS NULL
+              AND organization_id = ${organization_id}
               AND source = ${source}
-              AND deleted_at IS NULL
             ORDER BY created_at DESC
             LIMIT ${limitNum}
             OFFSET ${offsetNum}
@@ -89,21 +90,21 @@ export async function listGallery({
         : (await sql`
             SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period
             FROM gallery_images
-            WHERE organization_id = ${organization_id}
+            WHERE deleted_at IS NULL
+              AND organization_id = ${organization_id}
               AND source = ${source}
-              AND deleted_at IS NULL
             ORDER BY created_at DESC
             LIMIT ${limitNum}
             OFFSET ${offsetNum}
           `) as GalleryImage[];
     }
 
-    return include_src === true || include_src === "true"
+    return includeSrc
       ? (await sql`
           SELECT *
           FROM gallery_images
-          WHERE organization_id = ${organization_id}
-            AND deleted_at IS NULL
+          WHERE deleted_at IS NULL
+            AND organization_id = ${organization_id}
           ORDER BY created_at DESC
           LIMIT ${limitNum}
           OFFSET ${offsetNum}
@@ -111,8 +112,8 @@ export async function listGallery({
       : (await sql`
           SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period
           FROM gallery_images
-          WHERE organization_id = ${organization_id}
-            AND deleted_at IS NULL
+          WHERE deleted_at IS NULL
+            AND organization_id = ${organization_id}
           ORDER BY created_at DESC
           LIMIT ${limitNum}
           OFFSET ${offsetNum}
@@ -120,14 +121,14 @@ export async function listGallery({
   }
 
   if (source) {
-    return include_src === true || include_src === "true"
+    return includeSrc
       ? (await sql`
           SELECT *
           FROM gallery_images
-          WHERE user_id = ${resolvedUserId}
+          WHERE deleted_at IS NULL
+            AND user_id = ${resolvedUserId}
             AND organization_id IS NULL
             AND source = ${source}
-            AND deleted_at IS NULL
           ORDER BY created_at DESC
           LIMIT ${limitNum}
           OFFSET ${offsetNum}
@@ -135,23 +136,23 @@ export async function listGallery({
       : (await sql`
           SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period
           FROM gallery_images
-          WHERE user_id = ${resolvedUserId}
+          WHERE deleted_at IS NULL
+            AND user_id = ${resolvedUserId}
             AND organization_id IS NULL
             AND source = ${source}
-            AND deleted_at IS NULL
           ORDER BY created_at DESC
           LIMIT ${limitNum}
           OFFSET ${offsetNum}
         `) as GalleryImage[];
   }
 
-  return include_src === true || include_src === "true"
+  return includeSrc
     ? (await sql`
         SELECT *
         FROM gallery_images
-        WHERE user_id = ${resolvedUserId}
+        WHERE deleted_at IS NULL
+          AND user_id = ${resolvedUserId}
           AND organization_id IS NULL
-          AND deleted_at IS NULL
         ORDER BY created_at DESC
         LIMIT ${limitNum}
         OFFSET ${offsetNum}
@@ -159,9 +160,9 @@ export async function listGallery({
     : (await sql`
         SELECT id, user_id, organization_id, source, src_url, thumbnail_url, created_at, updated_at, deleted_at, is_style_reference, style_reference_name, week_schedule_id, daily_flyer_period
         FROM gallery_images
-        WHERE user_id = ${resolvedUserId}
+        WHERE deleted_at IS NULL
+          AND user_id = ${resolvedUserId}
           AND organization_id IS NULL
-          AND deleted_at IS NULL
         ORDER BY created_at DESC
         LIMIT ${limitNum}
         OFFSET ${offsetNum}

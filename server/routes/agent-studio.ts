@@ -3,7 +3,7 @@ import type { SqlClient } from '../lib/db.js';
 import { getSql } from '../lib/db.js';
 import { getRequestAuthContext } from '../lib/auth.js';
 import { resolveUserId } from '../lib/user-resolver.js';
-import logger from '../lib/logger.js';
+import logger, { rawLogger } from '../lib/logger.js';
 import { runStudioAgentStream, getPendingInteraction, resolvePendingInteraction } from '../lib/agent/claude/runner.js';
 import { promisify } from 'node:util';
 import { execFile as execFileCb } from 'node:child_process';
@@ -306,7 +306,7 @@ export function registerAgentStudioRoutes(app: Application): void {
     await runStudioAgentStream({
       res,
       sql,
-      logger,
+      logger: rawLogger,
       userId,
       organizationId,
       thread,

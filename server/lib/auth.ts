@@ -79,8 +79,13 @@ interface RateLimitResult {
   remaining: number;
 }
 
-function checkAiRateLimitInMemory(identifier: string, maxRequests = 30, windowMs = 60_000): RateLimitResult {
-  const key = `ai:${identifier}`;
+function checkRateLimitInMemory(
+  prefix: string,
+  identifier: string,
+  maxRequests = 30,
+  windowMs = 60_000,
+): RateLimitResult {
+  const key = `${prefix}:${identifier}`;
   const now = Date.now();
   const record = rateLimitStore.get(key);
 
@@ -102,7 +107,7 @@ function checkAiRateLimitInMemory(identifier: string, maxRequests = 30, windowMs
 
 export async function checkAiRateLimit(identifier: string, maxRequests = 30, windowMs = 60_000): Promise<RateLimitResult> {
   if (!upstashRedis || !RatelimitClass) {
-    return checkAiRateLimitInMemory(identifier, maxRequests, windowMs);
+    return checkRateLimitInMemory("ai", identifier, maxRequests, windowMs);
   }
 
   // Upstash path — create a limiter scoped to (maxRequests, windowMs)
@@ -120,7 +125,11 @@ export async function checkAiRateLimit(identifier: string, maxRequests = 30, win
  * Factory for rate-limit middleware. Returns Express middleware that limits
  * requests per identifier (orgId > userId > IP) within a sliding window.
  */
-export function createRateLimitMiddleware(maxRequests = 30, windowMs = 60_000) {
+export function createRateLimitMiddleware(
+  maxRequests = 30,
+  windowMs = 60_000,
+  prefix = "route",
+) {
   maxWindowMs = Math.max(maxWindowMs, windowMs);
 
   // Pre-build an Upstash limiter if available (avoids creating one per request)
@@ -129,7 +138,7 @@ export function createRateLimitMiddleware(maxRequests = 30, windowMs = 60_000) {
     upstashLimiter = new RatelimitClass({
       redis: upstashRedis,
       limiter: RatelimitClass.slidingWindow(maxRequests, `${Math.ceil(windowMs / 1000)} s`),
-      prefix: "rl",
+      prefix: `rl:${prefix}`,
     });
   }
 
@@ -145,10 +154,10 @@ export function createRateLimitMiddleware(maxRequests = 30, windowMs = 60_000) {
     try {
       let result: RateLimitResult;
       if (upstashLimiter) {
-        const { success, remaining } = await upstashLimiter.limit(`ai:${identifier}`);
+        const { success, remaining } = await upstashLimiter.limit(`${prefix}:${identifier}`);
         result = { allowed: success, remaining };
       } else {
-        result = checkAiRateLimitInMemory(identifier, maxRequests, windowMs);
+        result = checkRateLimitInMemory(prefix, identifier, maxRequests, windowMs);
       }
 
       res.setHeader("X-RateLimit-Limit", maxRequests);

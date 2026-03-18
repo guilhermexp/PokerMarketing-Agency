@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { createRateLimitMiddleware, getRequestAuthContext } from "../lib/auth.js";
 import {
   ValidationError,
   PermissionDeniedError,
@@ -23,10 +24,22 @@ function toError(error: unknown): Error {
 }
 
 export function registerUploadRoutes(app: Express): void {
-  app.get("/api/proxy-video", validateRequest({ query: proxyVideoQuerySchema }), async (req, res) => {
+  const proxyVideoRateLimit = createRateLimitMiddleware(20, 60_000, "media:proxy-video");
+
+  app.get("/api/proxy-video", proxyVideoRateLimit, validateRequest({ query: proxyVideoQuerySchema }), async (req, res) => {
     try {
       const { url } = req.query as ProxyVideoQuery;
-      const result = await proxyBlobVideo(url, req.headers.range);
+      const authContext = getRequestAuthContext(req);
+      const result = await proxyBlobVideo(
+        url,
+        req.headers.range,
+        authContext
+          ? {
+              userId: authContext.userId,
+              organizationId: authContext.orgId,
+            }
+          : null,
+      );
       res.status(result.status);
       Object.entries(result.headers).forEach(([key, value]) => {
         res.setHeader(key, value);

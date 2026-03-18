@@ -226,6 +226,31 @@ const dailyFlyersOutputSchema = z.object({
   ),
 });
 
+const adminUserOutputSchema = z
+  .object({
+    id: idSchema,
+    clerk_user_id: z.string().trim().min(1),
+    email: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    avatar_url: z.string().nullable(),
+    last_login: optionalNullableIsoDateSchema,
+    created_at: isoDateSchema,
+    campaign_count: z.string().trim().min(1),
+    brand_count: z.string().trim().min(1),
+    scheduled_post_count: z.string().trim().min(1),
+  })
+  .catchall(jsonLikeSchema);
+
+const adminUsersOutputSchema = z.object({
+  users: z.array(adminUserOutputSchema),
+  pagination: z.object({
+    page: z.number().int().positive(),
+    limit: z.number().int().positive(),
+    total: z.number().int().nonnegative(),
+    totalPages: z.number().int().nonnegative(),
+  }),
+});
+
 const scheduledPostOutputSchema = z
   .object({
     id: idSchema.optional(),
@@ -1016,7 +1041,7 @@ export const routeContracts: ApiRouteContract[] = [
     response: {
       kind: "json",
       status: 200,
-      schema: genericRecordSchema,
+      schema: adminUsersOutputSchema,
       description: "Admin users list",
     },
     summary: "List admin users",

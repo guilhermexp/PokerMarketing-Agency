@@ -22,6 +22,7 @@ import type { FallbackResult } from "./lib/ai/image-providers.js";
 import type { BrandProfile } from "./lib/ai/prompt-builders.js";
 import { put } from "@vercel/blob";
 import { validateContentType } from "./lib/validation/contentType.js";
+import { injectNonceIntoHtml } from "./lib/spa-html.js";
 
 // ============================================================================
 // TYPES
@@ -65,11 +66,23 @@ logger.info({ distPath }, "[Static] Serving static files");
 app.use(express.static(distPath));
 
 // SPA catch-all (must come after static files but before error handlers)
-app.use((req: Request, res: Response, next: NextFunction) => {
+app.use(async (req: Request, res: Response, next: NextFunction) => {
   if (req.path.startsWith("/api/") || req.path.includes(".")) {
     return next();
   }
-  res.sendFile(path.join(distPath, "index.html"));
+
+  try {
+    const { readFile } = await import("node:fs/promises");
+    const html = await readFile(path.join(distPath, "index.html"), "utf8");
+    const cspNonce =
+      typeof res.locals.cspNonce === "string" ? res.locals.cspNonce : null;
+
+    res
+      .type("html")
+      .send(cspNonce ? injectNonceIntoHtml(html, cspNonce) : html);
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Finalize: register notFoundHandler + errorHandler (must be last)
