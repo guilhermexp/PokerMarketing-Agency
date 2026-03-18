@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { AppError } from "../lib/errors/index.js";
 /**
  * AI Speech Generation (TTS) Route
  * Extracted from server/index.mjs
@@ -71,6 +72,7 @@ export function registerAiSpeechRoutes(app: Express): void {
         audioBase64,
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[Speech API] Error");
       await logAiUsage(sql, {
         organizationId,

@@ -1,3 +1,4 @@
+import { AppError } from "../lib/errors/index.js";
 /**
  * AI Text Generation Routes
  * Extracted from server/index.mjs
@@ -419,6 +420,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         imageUrl: imageDataUrl,
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error as Error;
       logger.error({ err }, "[Flyer API] Error");
       await logAiUsage(sql, {
@@ -527,6 +529,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         model,
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error as Error;
       const body = req.body as AiTextBody | undefined;
       logger.error({ err }, "[Text API] Error");
@@ -657,6 +660,7 @@ REGRAS:
 
       res.json({ enhancedPrompt });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error as Error;
       logger.error({ err }, "[Enhance Prompt API] Error");
       await logAiUsage(sql, {
@@ -737,6 +741,7 @@ REGRAS:
         result,
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error as Error;
       logger.error({ err }, "[Convert Prompt API] Error");
       await logAiUsage(sql, {

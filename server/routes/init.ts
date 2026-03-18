@@ -6,6 +6,7 @@ import { logError } from "../lib/logging-helpers.js";
 import logger from "../lib/logger.js";
 import { validateRequest } from "../middleware/validate.js";
 import { type InitQuery, initQuerySchema } from "../schemas/init-schemas.js";
+import { AppError } from "../lib/errors/index.js";
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
@@ -225,6 +226,7 @@ export function registerInitRoutes(app: Express): void {
         },
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logError("Init API", toError(error));
       res.status(500).json({ error: error instanceof Error ? error.message : "Init request failed" });
     }

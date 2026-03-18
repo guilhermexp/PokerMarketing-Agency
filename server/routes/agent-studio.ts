@@ -7,6 +7,7 @@ import logger, { rawLogger } from '../lib/logger.js';
 import { runStudioAgentStream, getPendingInteraction, resolvePendingInteraction } from '../lib/agent/claude/runner.js';
 import { promisify } from 'node:util';
 import { execFile as execFileCb } from 'node:child_process';
+import { AppError } from "../lib/errors/index.js";
 import {
   ensureThread,
   getThreadById,
@@ -255,8 +256,7 @@ export function registerAgentStudioRoutes(app: Application): void {
     const organizationId = auth?.orgId || null;
 
     if (!clerkUserId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+      throw new AppError('Unauthorized', 401);
     }
 
     const body = req.body as StudioStreamBody;
@@ -269,8 +269,7 @@ export function registerAgentStudioRoutes(app: Application): void {
     const userId = await resolveUserId(sql, clerkUserId);
 
     if (!userId) {
-      res.status(404).json({ error: 'Usuário não encontrado no banco.' });
-      return;
+      throw new AppError('Usuário não encontrado no banco.', 404);
     }
 
     let thread: ThreadRow | null = null;
@@ -327,8 +326,7 @@ export function registerAgentStudioRoutes(app: Application): void {
     const organizationId = auth?.orgId || null;
 
     if (!clerkUserId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+      throw new AppError('Unauthorized', 401);
     }
 
     const body = req.body as StudioAnswerBody;
@@ -338,20 +336,17 @@ export function registerAgentStudioRoutes(app: Application): void {
     const userId = await resolveUserId(sql, clerkUserId);
 
     if (!userId) {
-      res.status(404).json({ error: 'Usuário não encontrado no banco.' });
-      return;
+      throw new AppError('Usuário não encontrado no banco.', 404);
     }
 
     const thread = await getThreadById({ threadId, userId, organizationId });
     if (!thread) {
-      res.status(404).json({ error: 'Thread não encontrada.' });
-      return;
+      throw new AppError('Thread não encontrada.', 404);
     }
 
     const pending = getPendingInteraction(threadId, interactionId);
     if (!pending) {
-      res.status(409).json({ error: 'Interação pendente não encontrada ou já respondida.' });
-      return;
+      throw new AppError('Interação pendente não encontrada ou já respondida.', 409);
     }
 
     const answerObj = typeof answer === 'object' && answer !== null ? answer : null;
@@ -416,8 +411,7 @@ export function registerAgentStudioRoutes(app: Application): void {
         });
 
     if (!resolved) {
-      res.status(409).json({ error: 'Interação já foi resolvida.' });
-      return;
+      throw new AppError('Interação já foi resolvida.', 409);
     }
 
     res.json({ ok: true });
@@ -430,8 +424,7 @@ export function registerAgentStudioRoutes(app: Application): void {
     const organizationId = auth?.orgId || null;
 
     if (!clerkUserId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+      throw new AppError('Unauthorized', 401);
     }
 
     const { studioType, topicId } = req.query as StudioHistoryQuery;
@@ -440,8 +433,7 @@ export function registerAgentStudioRoutes(app: Application): void {
     const userId = await resolveUserId(sql, clerkUserId);
 
     if (!userId) {
-      res.status(404).json({ error: 'Usuário não encontrado no banco.' });
-      return;
+      throw new AppError('Usuário não encontrado no banco.', 404);
     }
 
     const thread = await getThreadByTopic({
@@ -467,8 +459,7 @@ export function registerAgentStudioRoutes(app: Application): void {
     const organizationId = auth?.orgId || null;
 
     if (!clerkUserId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+      throw new AppError('Unauthorized', 401);
     }
 
     const { type, query: searchQuery = "", limit } = req.query as unknown as StudioContentSearchQuery;
@@ -476,8 +467,7 @@ export function registerAgentStudioRoutes(app: Application): void {
     const sql = getSql();
     const userId = await resolveUserId(sql, clerkUserId);
     if (!userId) {
-      res.status(404).json({ error: 'Usuário não encontrado no banco.' });
-      return;
+      throw new AppError('Usuário não encontrado no banco.', 404);
     }
 
     try {
@@ -538,6 +528,7 @@ export function registerAgentStudioRoutes(app: Application): void {
 
       res.json({ results });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.warn({ err: error }, '[StudioAgent] content-search failed');
       res.json({ results: [] });
     }
@@ -547,8 +538,7 @@ export function registerAgentStudioRoutes(app: Application): void {
   app.get('/api/agent/studio/files', validateRequest({ query: studioFilesQuerySchema }), async (req: Request, res: Response): Promise<void> => {
     const auth = getRequestAuthContext(req);
     if (!auth?.userId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+      throw new AppError('Unauthorized', 401);
     }
 
     const { query: rawQuery = "", limit } = req.query as unknown as StudioFilesQuery;
@@ -582,6 +572,7 @@ export function registerAgentStudioRoutes(app: Application): void {
 
       res.json({ files });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.warn({ err: error }, '[StudioAgent] Failed to list files for mentions');
       res.json({ files: [] });
     }
@@ -594,8 +585,7 @@ export function registerAgentStudioRoutes(app: Application): void {
     const organizationId = auth?.orgId || null;
 
     if (!clerkUserId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+      throw new AppError('Unauthorized', 401);
     }
 
     const body = req.body as StudioResetBody;
@@ -605,8 +595,7 @@ export function registerAgentStudioRoutes(app: Application): void {
     const userId = await resolveUserId(sql, clerkUserId);
 
     if (!userId) {
-      res.status(404).json({ error: 'Usuário não encontrado no banco.' });
-      return;
+      throw new AppError('Usuário não encontrado no banco.', 404);
     }
 
     let thread: ThreadRow | null = null;
@@ -623,8 +612,7 @@ export function registerAgentStudioRoutes(app: Application): void {
     }
 
     if (!thread) {
-      res.status(404).json({ error: 'Thread não encontrada.' });
-      return;
+      throw new AppError('Thread não encontrada.', 404);
     }
 
     await resetThread({

@@ -79,6 +79,10 @@ interface RateLimitResult {
   remaining: number;
 }
 
+interface ConnectionWithRemoteAddress {
+  remoteAddress?: string;
+}
+
 function checkRateLimitInMemory(
   prefix: string,
   identifier: string,
@@ -144,7 +148,19 @@ export function createRateLimitMiddleware(
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const authContext = getRequestAuthContext(req);
-    const identifier = authContext?.orgId || authContext?.userId || req.ip;
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const connection = req.connection as ConnectionWithRemoteAddress | undefined;
+    const forwardedIp = typeof xForwardedFor === "string"
+      ? xForwardedFor.split(",")[0]?.trim()
+      : Array.isArray(xForwardedFor)
+        ? xForwardedFor[0]
+        : undefined;
+    const identifier =
+      authContext?.orgId ||
+      authContext?.userId ||
+      req.ip ||
+      forwardedIp ||
+      connection?.remoteAddress;
     if (!identifier) {
       logger.warn({ requestId: req.id }, "Rate limit identifier unavailable");
       res.status(400).json({ error: "Unable to identify request for rate limiting" });
@@ -444,6 +460,7 @@ function getAdminAuditContext(
   req: Request,
   adminAction: string,
   session: AuthSession | null | undefined,
+  details: Record<string, unknown> = {},
 ) {
   return {
     adminAction,
@@ -453,6 +470,7 @@ function getAdminAuditContext(
     path: req.path,
     requestId: req.id,
     happenedAt: new Date().toISOString(),
+    ...details,
   };
 }
 
@@ -461,6 +479,14 @@ export async function requireSuperAdmin(req: Request, res: Response, next: NextF
     const session = req.authSession as AuthSession | null | undefined;
 
     if (!session?.user?.id) {
+      logger.warn(
+        getAdminAuditContext(req, "admin.access.denied", session, {
+          result: "denied",
+          statusCode: 401,
+          reason: "missing-session-user",
+        }),
+        "[Admin] Unauthorized access attempt for super admin endpoint",
+      );
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
@@ -469,10 +495,12 @@ export async function requireSuperAdmin(req: Request, res: Response, next: NextF
 
     if (!userEmail || !SUPER_ADMIN_EMAILS.includes(userEmail)) {
       logger.warn(
-        {
-          ...getAdminAuditContext(req, "admin.access.denied", session),
+        getAdminAuditContext(req, "admin.access.denied", session, {
+          result: "denied",
+          statusCode: 403,
+          reason: "not-super-admin",
           superAdminCount: SUPER_ADMIN_EMAILS.length,
-        },
+        }),
         "[Admin] Access denied for super admin endpoint",
       );
       res
@@ -484,7 +512,22 @@ export async function requireSuperAdmin(req: Request, res: Response, next: NextF
     req.adminEmail = userEmail;
     next();
   } catch (error) {
-    logger.error({ err: error }, "[Admin] Auth error");
+    logger.error(
+      {
+        err: error,
+        ...getAdminAuditContext(
+          req,
+          "admin.access.fail",
+          req.authSession as AuthSession | null | undefined,
+          {
+            result: "fail",
+            statusCode: 500,
+            errorMessage: error instanceof Error ? error.message : String(error),
+          },
+        ),
+      },
+      "[Admin] Auth error",
+    );
     res.status(500).json({ error: "Authentication error" });
   }
 }

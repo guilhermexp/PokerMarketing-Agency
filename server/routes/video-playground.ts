@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import type { Logger } from "pino";
 import type { SqlClient } from "../lib/db.js";
 import type { AuthContext } from "../lib/auth.js";
+import { AppError } from "../lib/errors/index.js";
 import {
   getTopics,
   createTopic,
@@ -112,20 +113,19 @@ export function registerVideoPlaygroundRoutes(
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        throw new AppError("Unauthorized", 401);
       }
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
-        res.status(401).json({ error: "User not found" });
-        return;
+        throw new AppError("User not found", 401);
       }
       const topics = await getTopics(sql, resolvedUserId, orgId);
 
       res.json({ topics });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       // Handle missing table gracefully
       if (isDatabaseError(error) && (error.code === "42P01" || error.code === "42703")) {
         logger.warn(
@@ -147,21 +147,20 @@ export function registerVideoPlaygroundRoutes(
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        throw new AppError("Unauthorized", 401);
       }
 
       const { title } = req.body as PlaygroundTopicBody;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
-        res.status(401).json({ error: "User not found" });
-        return;
+        throw new AppError("User not found", 401);
       }
       const topic = await createTopic(sql, resolvedUserId, orgId, title);
 
       res.json({ success: true, topic });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[VideoPlayground] Create topic error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -174,8 +173,7 @@ export function registerVideoPlaygroundRoutes(
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        throw new AppError("Unauthorized", 401);
       }
 
       const { id } = req.params as PlaygroundIdParams;
@@ -183,8 +181,7 @@ export function registerVideoPlaygroundRoutes(
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
-        res.status(401).json({ error: "User not found" });
-        return;
+        throw new AppError("User not found", 401);
       }
       const topic = await updateTopic(
         sql,
@@ -196,6 +193,7 @@ export function registerVideoPlaygroundRoutes(
 
       res.json({ success: true, topic });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[VideoPlayground] Update topic error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -208,21 +206,20 @@ export function registerVideoPlaygroundRoutes(
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        throw new AppError("Unauthorized", 401);
       }
 
       const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
-        res.status(401).json({ error: "User not found" });
-        return;
+        throw new AppError("User not found", 401);
       }
       await deleteTopic(sql, id, resolvedUserId, orgId);
 
       res.json({ success: true });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[VideoPlayground] Delete topic error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -235,8 +232,7 @@ export function registerVideoPlaygroundRoutes(
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        throw new AppError("Unauthorized", 401);
       }
 
       const { topicId, limit } = req.query as unknown as VideoPlaygroundSessionsQuery;
@@ -244,8 +240,7 @@ export function registerVideoPlaygroundRoutes(
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
-        res.status(401).json({ error: "User not found" });
-        return;
+        throw new AppError("User not found", 401);
       }
       const sessions = await getSessions(
         sql,
@@ -257,6 +252,7 @@ export function registerVideoPlaygroundRoutes(
 
       res.json({ sessions });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       // Handle missing table gracefully
       if (isDatabaseError(error) && (error.code === "42P01" || error.code === "42703")) {
         logger.warn(
@@ -278,16 +274,14 @@ export function registerVideoPlaygroundRoutes(
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        throw new AppError("Unauthorized", 401);
       }
 
       const { topicId, model, prompt, aspectRatio, resolution, referenceImageUrl } = req.body as VideoPlaygroundGenerateBody;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
-        res.status(401).json({ error: "User not found" });
-        return;
+        throw new AppError("User not found", 401);
       }
 
       const result = await createSession(
@@ -299,6 +293,7 @@ export function registerVideoPlaygroundRoutes(
 
       res.json({ success: true, data: result });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[VideoPlayground] Create session error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -311,21 +306,20 @@ export function registerVideoPlaygroundRoutes(
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        throw new AppError("Unauthorized", 401);
       }
 
       const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
-        res.status(401).json({ error: "User not found" });
-        return;
+        throw new AppError("User not found", 401);
       }
       await deleteSession(sql, id, resolvedUserId, orgId);
 
       res.json({ success: true });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[VideoPlayground] Delete session error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -338,21 +332,20 @@ export function registerVideoPlaygroundRoutes(
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        throw new AppError("Unauthorized", 401);
       }
 
       const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
-        res.status(401).json({ error: "User not found" });
-        return;
+        throw new AppError("User not found", 401);
       }
       await deleteGeneration(sql, id, resolvedUserId, orgId);
 
       res.json({ success: true });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[VideoPlayground] Delete generation error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -365,8 +358,7 @@ export function registerVideoPlaygroundRoutes(
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        throw new AppError("Unauthorized", 401);
       }
 
       const { id } = req.params as PlaygroundIdParams;
@@ -375,13 +367,13 @@ export function registerVideoPlaygroundRoutes(
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
-        res.status(401).json({ error: "User not found" });
-        return;
+        throw new AppError("User not found", 401);
       }
       const generation = await updateGeneration(sql, id, { status, videoUrl, duration, errorMessage }, resolvedUserId, orgId);
 
       res.json({ success: true, generation });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[VideoPlayground] Update generation error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -393,8 +385,7 @@ export function registerVideoPlaygroundRoutes(
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        throw new AppError("Unauthorized", 401);
       }
 
       const { prompts } = req.body as PlaygroundGenerateTitleBody;
@@ -404,6 +395,7 @@ export function registerVideoPlaygroundRoutes(
 
       res.json({ title });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[VideoPlayground] Generate title error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }

@@ -3,6 +3,7 @@ import { getSql } from "../lib/db.js";
 import { logError } from "../lib/logging-helpers.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import { validateRequest } from "../middleware/validate.js";
+import { AppError } from "../lib/errors/index.js";
 import {
   type PostsPatchBody,
   type PostsPatchQuery,
@@ -31,11 +32,12 @@ export function registerPostRoutes(app: Express): void {
       `;
 
       if (result.length === 0) {
-        return res.status(404).json({ error: "Post not found" });
+        throw new AppError("Post not found", 404);
       }
 
       res.json(result[0]);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logError("Posts API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -59,11 +61,12 @@ export function registerPostRoutes(app: Express): void {
       `;
 
       if (result.length === 0) {
-        return res.status(404).json({ error: "Ad creative not found" });
+        throw new AppError("Ad creative not found", 404);
       }
 
       res.json(result[0]);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logError("Ad Creatives API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }

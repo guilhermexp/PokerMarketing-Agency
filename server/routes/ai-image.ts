@@ -1,3 +1,4 @@
+import { AppError } from "../lib/errors/index.js";
 /**
  * AI Image Generation Routes
  * Extracted from server/index.mjs
@@ -361,6 +362,7 @@ export function registerAiImageRoutes(app: Application): void {
         model,
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const elapsedTime = timer();
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error(
@@ -406,7 +408,7 @@ export function registerAiImageRoutes(app: Application): void {
       const { image, prompt, mask, referenceImage } = body;
 
       if (!image || !prompt) {
-        return res.status(400).json({ error: "image and prompt are required" });
+        throw new AppError("image and prompt are required", 400);
       }
 
       logger.info(
@@ -485,6 +487,7 @@ export function registerAiImageRoutes(app: Application): void {
         imageUrl: imageDataUrl,
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error({ err }, "[Edit Image API] Error");
       await logAiUsage(sql, {
@@ -517,7 +520,7 @@ export function registerAiImageRoutes(app: Application): void {
       const { logo } = body;
 
       if (!logo) {
-        return res.status(400).json({ error: "logo is required" });
+        throw new AppError("logo is required", 400);
       }
 
       logger.info({}, "[Extract Colors API] Analyzing logo");
@@ -580,6 +583,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
 
       res.json(colors);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error({ err }, "[Extract Colors API] Error");
       await logAiUsage(sql, {
@@ -610,7 +614,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     const organizationId = authCtx?.orgId || null;
 
     if (!userId) {
-      return res.status(401).json({ error: "Authentication required" });
+      throw new AppError("Authentication required", 401);
     }
 
     try {
@@ -664,6 +668,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         ...result,
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error({ err, userId }, "[Image Async] Failed to queue job");
 
@@ -687,7 +692,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     const organizationId = authCtx?.orgId || null;
 
     if (!userId) {
-      return res.status(401).json({ error: "Authentication required" });
+      throw new AppError("Authentication required", 401);
     }
 
     try {
@@ -735,6 +740,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         jobs: results,
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error({ err, userId }, "[Image Async] Failed to queue batch");
 
@@ -757,7 +763,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     const userId = authCtx?.userId;
 
     if (!userId) {
-      return res.status(401).json({ error: "Authentication required" });
+      throw new AppError("Authentication required", 401);
     }
 
     try {
@@ -766,16 +772,17 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
       const status = await getImageGenerationJobStatus(jobId);
 
       if (!status) {
-        return res.status(404).json({ error: "Job not found" });
+        throw new AppError("Job not found", 404);
       }
 
       // Verify ownership
       if (status.data.userId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
+        throw new AppError("Access denied", 403);
       }
 
       res.json(status);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error({ err, userId }, "[Image Async] Failed to get status");
       return res.status(500).json({ error: sanitizeErrorForClient(err) });
@@ -791,7 +798,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     const organizationId = authCtx?.orgId ?? undefined;
 
     if (!userId) {
-      return res.status(401).json({ error: "Authentication required" });
+      throw new AppError("Authentication required", 401);
     }
 
     try {
@@ -800,6 +807,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
 
       res.json({ jobs });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error({ err, userId }, "[Image Async] Failed to list jobs");
       return res.status(500).json({ error: sanitizeErrorForClient(err) });
@@ -814,7 +822,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     const userId = authCtx?.userId;
 
     if (!userId) {
-      return res.status(401).json({ error: "Authentication required" });
+      throw new AppError("Authentication required", 401);
     }
 
     try {
@@ -823,10 +831,10 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
       // Verify ownership first
       const status = await getImageGenerationJobStatus(jobId);
       if (!status) {
-        return res.status(404).json({ error: "Job not found" });
+        throw new AppError("Job not found", 404);
       }
       if (status.data.userId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
+        throw new AppError("Access denied", 403);
       }
 
       const cancelled = await cancelImageGenerationJob(jobId);
@@ -837,6 +845,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         res.status(400).json({ success: false, message: "Job already completed or failed" });
       }
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error({ err, userId }, "[Image Async] Failed to cancel job");
       return res.status(500).json({ error: sanitizeErrorForClient(err) });

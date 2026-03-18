@@ -7,6 +7,7 @@ import { urlToBase64 } from "../helpers/image-helpers.js";
 import { getGeminiAi } from "../lib/ai/clients.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import { expandAiInfluencerPrompt, expandProductHeroPrompt, expandExplodedProductPrompt, expandBrandIdentityPrompt } from "../lib/ai/prompt-builders.js";
+import { AppError } from "../lib/errors/index.js";
 import {
   getTopics,
   createTopic,
@@ -317,7 +318,7 @@ ${userPrompt}`;
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) throw new AppError("Unauthorized", 401);
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
@@ -325,6 +326,7 @@ ${userPrompt}`;
 
       res.json({ topics });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[ImagePlayground] Get topics error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -336,7 +338,7 @@ ${userPrompt}`;
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) throw new AppError("Unauthorized", 401);
 
       const { title } = req.body as PlaygroundTopicBody;
       const sql = getSql();
@@ -345,6 +347,7 @@ ${userPrompt}`;
 
       res.json({ success: true, topic });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[ImagePlayground] Create topic error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -356,7 +359,7 @@ ${userPrompt}`;
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) throw new AppError("Unauthorized", 401);
 
       const { id } = req.params as PlaygroundIdParams;
       const { title, coverUrl } = req.body as PlaygroundTopicUpdateBody;
@@ -372,6 +375,7 @@ ${userPrompt}`;
 
       res.json({ success: true, topic });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[ImagePlayground] Update topic error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -383,7 +387,7 @@ ${userPrompt}`;
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) throw new AppError("Unauthorized", 401);
 
       const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
@@ -392,6 +396,7 @@ ${userPrompt}`;
 
       res.json({ success: true });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[ImagePlayground] Delete topic error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -403,7 +408,7 @@ ${userPrompt}`;
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) throw new AppError("Unauthorized", 401);
 
       const { topicId, limit } = req.query as unknown as ImagePlaygroundBatchesQuery;
 
@@ -419,6 +424,7 @@ ${userPrompt}`;
 
       res.json({ batches });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const dbError = error as DatabaseError;
       if (
         typeof dbError?.message === "string" &&
@@ -448,7 +454,7 @@ ${userPrompt}`;
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) throw new AppError("Unauthorized", 401);
 
       const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
@@ -457,6 +463,7 @@ ${userPrompt}`;
 
       res.json({ success: true });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[ImagePlayground] Delete batch error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -468,7 +475,7 @@ ${userPrompt}`;
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) throw new AppError("Unauthorized", 401);
 
       const { topicId, provider, model, imageNum, params } = req.body as ImagePlaygroundGenerateBody;
 
@@ -754,6 +761,7 @@ ${userPrompt}`;
 
       res.json({ success: true, data: result });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (req.destroyed || res.headersSent) {
         logger.warn(
           { err: error },
@@ -771,7 +779,7 @@ ${userPrompt}`;
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) throw new AppError("Unauthorized", 401);
 
       const { generationId } = req.params as ImagePlaygroundStatusParams;
       const { asyncTaskId } = req.query as ImagePlaygroundStatusQuery;
@@ -793,6 +801,7 @@ ${userPrompt}`;
         meta: null,
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[ImagePlayground] Get status error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -804,19 +813,19 @@ ${userPrompt}`;
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) throw new AppError("Unauthorized", 401);
 
       const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
-        res.status(401).json({ error: "User not found" });
-        return;
+        throw new AppError("User not found", 401);
       }
       await deleteGeneration(sql, id, resolvedUserId, orgId);
 
       res.json({ success: true });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[ImagePlayground] Delete generation error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -828,14 +837,13 @@ ${userPrompt}`;
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) throw new AppError("Unauthorized", 401);
 
       const { id } = req.params as PlaygroundIdParams;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       if (!resolvedUserId) {
-        res.status(401).json({ error: "User not found" });
-        return;
+        throw new AppError("User not found", 401);
       }
 
       const genai = getGeminiAi();
@@ -843,6 +851,7 @@ ${userPrompt}`;
 
       res.json({ success: true, generation });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[ImagePlayground] Retry generation error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -853,7 +862,7 @@ ${userPrompt}`;
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) throw new AppError("Unauthorized", 401);
 
       const { prompts } = req.body as PlaygroundGenerateTitleBody;
 
@@ -862,6 +871,7 @@ ${userPrompt}`;
 
       res.json({ title });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[ImagePlayground] Generate title error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }

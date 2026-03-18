@@ -4,6 +4,7 @@ import { resolveUserId } from "../lib/user-resolver.js";
 import { logError } from "../lib/logging-helpers.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import { validateRequest } from "../middleware/validate.js";
+import { AppError } from "../lib/errors/index.js";
 import {
   type GenerationCancelAllBody,
   type GenerationStatusQuery,
@@ -39,7 +40,7 @@ app.get("/api/generate/status", validateRequest({ query: generationStatusQuerySc
     if (jobId) {
       const resolvedUserId = await resolveUserId(sql, req.authUserId);
       if (!resolvedUserId) {
-        return res.status(401).json({ error: "User not found" });
+        throw new AppError("User not found", 401);
       }
 
       const effectiveOrgId = req.authOrgId || null;
@@ -59,7 +60,7 @@ app.get("/api/generate/status", validateRequest({ query: generationStatusQuerySc
       `;
 
       if (jobs.length === 0) {
-        return res.status(404).json({ error: "Job not found" });
+        throw new AppError("Job not found", 404);
       }
 
       return res.json(jobs[0]);
@@ -154,6 +155,7 @@ app.get("/api/generate/status", validateRequest({ query: generationStatusQuerySc
       return res.json({ jobs, total: jobs.length });
     }
   } catch (error) {
+      if (error instanceof AppError) throw error;
     logError("Generate Status", toError(error));
     res.status(500).json({ error: sanitizeErrorForClient(error) });
   }
@@ -168,7 +170,7 @@ app.post("/api/generate/cancel-all", validateRequest({ body: generationCancelAll
     // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, userId);
     if (!resolvedUserId) {
-      return res.status(400).json({ error: "User not found" });
+      throw new AppError("User not found", 400);
     }
 
     // Delete all queued jobs (not started yet)
@@ -187,6 +189,7 @@ app.post("/api/generate/cancel-all", validateRequest({ body: generationCancelAll
       message: `${cancelledCount} job(s) cancelled`,
     });
   } catch (error) {
+      if (error instanceof AppError) throw error;
     logError("Cancel All Jobs API", toError(error));
     res.status(500).json({ error: sanitizeErrorForClient(error) });
   }

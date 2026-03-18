@@ -1,3 +1,4 @@
+import { AppError } from "../lib/errors/index.js";
 /**
  * AI Video Generation Route
  * Extracted from server/index.mjs
@@ -277,6 +278,7 @@ export function registerAiVideoRoutes(app: Express): void {
         provider: usedProvider,
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       logError("Video API", error instanceof Error ? error : new Error(errorMessage));
       await logAiUsage(sql, {

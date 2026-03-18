@@ -5,6 +5,7 @@ import { RUBE_MCP_URL, RUBE_TIMEOUT_MS } from "../lib/constants.js";
 import logger from "../lib/logger.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import { validateRequest } from "../middleware/validate.js";
+import { AppError } from "../lib/errors/index.js";
 import {
   type InstagramAccountsQuery,
   type InstagramConnectBody,
@@ -127,6 +128,7 @@ export async function validateRubeToken(rubeToken: string): Promise<InstagramVal
     }
     return { success: false, error: "Instagram não conectado no Rube." };
   } catch (error) {
+      if (error instanceof AppError) throw error;
     logger.error({ err: error }, "[Instagram] Validation error");
     return {
       success: false,
@@ -152,7 +154,7 @@ export function registerInstagramRoutes(app: Express): void {
       }
 
       if (!user_id) {
-        return res.status(400).json({ error: "user_id is required" });
+        throw new AppError("user_id is required", 400);
       }
 
       const resolvedUserId = await resolveUserId(sql, String(user_id));
@@ -180,6 +182,7 @@ export function registerInstagramRoutes(app: Express): void {
 
       res.json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[Instagram Accounts API] Error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -197,15 +200,13 @@ export function registerInstagramRoutes(app: Express): void {
       );
 
       if (!user_id || !rube_token) {
-        return res
-          .status(400)
-          .json({ error: "user_id and rube_token are required" });
+        throw new AppError("user_id and rube_token are required", 400);
       }
 
       const resolvedUserId = await resolveUserId(sql, String(user_id));
       if (!resolvedUserId) {
         logger.debug({ user_id }, "[Instagram] User not found");
-        return res.status(400).json({ error: "User not found" });
+        throw new AppError("User not found", 400);
       }
       logger.trace({ resolvedUserId }, "[Instagram] Resolved user ID");
 
@@ -213,9 +214,7 @@ export function registerInstagramRoutes(app: Express): void {
       const validation = await validateRubeToken(rube_token);
       logger.debug({ validation }, "[Instagram] Validation result");
       if (!validation.success) {
-        return res
-          .status(400)
-          .json({ error: validation.error || "Token inválido" });
+        throw new AppError(validation.error || "Token inválido", 400);
       }
 
       const { instagramUserId, instagramUsername } = validation;
@@ -258,6 +257,7 @@ export function registerInstagramRoutes(app: Express): void {
         message: `Conta @${instagramUsername} conectada!`,
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[Instagram Accounts API] Error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -275,7 +275,7 @@ export function registerInstagramRoutes(app: Express): void {
 
       const validation = await validateRubeToken(rube_token);
       if (!validation.success) {
-        return res.status(400).json({ error: validation.error });
+        throw new AppError(validation.error, 400);
       }
 
       const result = await sql`
@@ -293,6 +293,7 @@ export function registerInstagramRoutes(app: Express): void {
         message: "Token atualizado!",
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[Instagram Accounts API] Error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
@@ -308,6 +309,7 @@ export function registerInstagramRoutes(app: Express): void {
       await sql`UPDATE instagram_accounts SET is_active = FALSE, updated_at = NOW() WHERE id = ${id}`;
       res.json({ success: true, message: "Conta desconectada." });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[Instagram Accounts API] Error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }

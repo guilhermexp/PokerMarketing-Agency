@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { getSql } from "../lib/db.js";
+import { AppError, getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
 import { resolveOrganizationContext } from "../lib/auth.js";
 import { logError } from "../lib/logging-helpers.js";
@@ -93,8 +93,9 @@ app.get("/api/db/tournaments/list", validateRequest({ query: tournamentsListQuer
 
     res.json({ schedules });
   } catch (error) {
+      if (error instanceof AppError) throw error;
     if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
+      throw new AppError(error.message, 403);
     }
     logError("Tournaments API List", toError(error));
     res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -159,6 +160,7 @@ app.get("/api/db/tournaments", validateRequest({ query: tournamentsQuerySchema }
 
     res.json({ schedule, events });
   } catch (error) {
+      if (error instanceof AppError) throw error;
     if (
       error instanceof OrganizationAccessError ||
       error instanceof ValidationError
@@ -178,7 +180,7 @@ app.post("/api/db/tournaments", validateRequest({ body: tournamentsCreateBodySch
     // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
-      return res.status(400).json({ error: "User not found" });
+      throw new AppError("User not found", 400);
     }
 
     // Verify organization membership if organization_id provided
@@ -245,8 +247,9 @@ app.post("/api/db/tournaments", validateRequest({ body: tournamentsCreateBodySch
       eventsCount: events?.length || 0,
     });
   } catch (error) {
+      if (error instanceof AppError) throw error;
     if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
+      throw new AppError(error.message, 403);
     }
     logError("Tournaments API", toError(error));
     res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -261,7 +264,7 @@ app.delete("/api/db/tournaments", validateRequest({ query: tournamentsDeleteQuer
     // Resolve user_id (handles both Clerk IDs and UUIDs)
     const resolvedUserId = await resolveUserId(sql, user_id);
     if (!resolvedUserId) {
-      return res.status(400).json({ error: "User not found" });
+      throw new AppError("User not found", 400);
     }
 
     // Check if schedule belongs to an organization and verify membership
@@ -290,8 +293,9 @@ app.delete("/api/db/tournaments", validateRequest({ query: tournamentsDeleteQuer
 
     res.json({ success: true });
   } catch (error) {
+      if (error instanceof AppError) throw error;
     if (error instanceof OrganizationAccessError) {
-      return res.status(403).json({ error: error.message });
+      throw new AppError(error.message, 403);
     }
     logError("Tournaments API", toError(error));
     res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -314,7 +318,7 @@ app.patch(
     ` as TournamentEventFlyerRow[];
 
     if (!event) {
-      return res.status(404).json({ error: "Event not found" });
+      throw new AppError("Event not found", 404);
     }
 
     let flyer_urls = event.flyer_urls || [];
@@ -343,6 +347,7 @@ app.patch(
 
     res.json(result[0]);
   } catch (error) {
+      if (error instanceof AppError) throw error;
     logError("Tournaments API (PATCH event-flyer)", toError(error));
     res.status(500).json({ error: sanitizeErrorForClient(error) });
   }
@@ -364,7 +369,7 @@ app.patch(
     ` as WeekScheduleFlyerRow[];
 
     if (!schedule) {
-      return res.status(404).json({ error: "Schedule not found" });
+      throw new AppError("Schedule not found", 404);
     }
 
     const dailyFlyerUrls: Record<string, string[] | Record<string, string[]>> = schedule.daily_flyer_urls || {};
@@ -432,6 +437,7 @@ app.patch(
 
     res.json(result[0]);
   } catch (error) {
+      if (error instanceof AppError) throw error;
     logError("Tournaments API (PATCH daily-flyer)", toError(error));
     res.status(500).json({ error: sanitizeErrorForClient(error) });
   }

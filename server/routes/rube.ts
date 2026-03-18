@@ -4,6 +4,7 @@ import { resolveUserId } from "../lib/user-resolver.js";
 import logger from "../lib/logger.js";
 import { RUBE_MCP_URL, RUBE_TIMEOUT_MS } from "../lib/constants.js";
 import { validateRequest } from "../middleware/validate.js";
+import { AppError } from "../lib/errors/index.js";
 import {
   rubeProxyBodySchema,
   type RubeProxyBody,
@@ -43,8 +44,7 @@ export function registerRubeRoutes(app: Express): void {
               { user_id },
               "[Rube Proxy] User not found",
             );
-            res.status(400).json({ error: "User not found" });
-            return;
+            throw new AppError("User not found", 400);
           }
           logger.debug(
             { resolvedUserId },
@@ -72,10 +72,7 @@ export function registerRubeRoutes(app: Express): void {
               {},
               "[Rube Proxy] Instagram account not found or not active for user/org",
             );
-            res
-              .status(403)
-              .json({ error: "Instagram account not found or inactive" });
-            return;
+            throw new AppError("Instagram account not found or inactive", 403);
           }
 
           const account = accountResult[0] as InstagramAccountRow;

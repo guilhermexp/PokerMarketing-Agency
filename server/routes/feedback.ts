@@ -1,3 +1,4 @@
+import { AppError } from "../lib/errors/index.js";
 /**
  * Feedback API route
  *
@@ -72,6 +73,7 @@ router.post('/api/feedback', validateRequest({ body: feedbackBodySchema }), asyn
       annotationsCount: annotations?.length || 0,
     });
   } catch (error) {
+      if (error instanceof AppError) throw error;
     logger.error({ err: error }, '[Feedback] Failed to process feedback');
     return res.status(500).json({ error: 'Internal server error' });
   }

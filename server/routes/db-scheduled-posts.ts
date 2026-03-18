@@ -1,9 +1,5 @@
 import type { Express } from "express";
-import {
-  ValidationError,
-  NotFoundError,
-  DatabaseError,
-} from "../lib/errors/index.js";
+import { AppError, ValidationError, NotFoundError, DatabaseError } from "../lib/errors/index.js";
 import {
   OrganizationAccessError,
   PermissionDeniedError,
@@ -50,6 +46,7 @@ export function registerScheduledPostRoutes(app: Express): void {
       const result = await listScheduledPosts(req.query as ScheduledPostsListQuery);
       res.json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (
         error instanceof OrganizationAccessError ||
         error instanceof ValidationError
@@ -65,14 +62,15 @@ export function registerScheduledPostRoutes(app: Express): void {
       const result = await createScheduledPost(req.body as ScheduledPostCreateBody);
       res.status(201).json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        throw new AppError(error.message, 400);
       }
       if (
         error instanceof OrganizationAccessError ||
         error instanceof PermissionDeniedError
       ) {
-        return res.status(403).json({ error: error.message });
+        throw new AppError(error.message, 403);
       }
       logError("Scheduled Posts API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -92,21 +90,20 @@ export function registerScheduledPostRoutes(app: Express): void {
       const result = await updateScheduledPost(id, body);
       res.json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        throw new AppError(error.message, 400);
       }
       if (error instanceof NotFoundError) {
-        return res.status(404).json({
-          error: error.message.includes("Scheduled post")
+        throw new AppError(error.message.includes("Scheduled post")
             ? "Scheduled post not found"
-            : error.message,
-        });
+            : error.message, 404);
       }
       if (
         error instanceof OrganizationAccessError ||
         error instanceof PermissionDeniedError
       ) {
-        return res.status(403).json({ error: error.message });
+        throw new AppError(error.message, 403);
       }
       logError("Scheduled Posts API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -120,17 +117,18 @@ export function registerScheduledPostRoutes(app: Express): void {
       await deleteScheduledPost(id, user_id);
       res.status(204).end();
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        throw new AppError(error.message, 400);
       }
       if (error instanceof NotFoundError) {
-        return res.status(404).json({ error: "Scheduled post not found" });
+        throw new AppError("Scheduled post not found", 404);
       }
       if (
         error instanceof OrganizationAccessError ||
         error instanceof PermissionDeniedError
       ) {
-        return res.status(403).json({ error: error.message });
+        throw new AppError(error.message, 403);
       }
       logError("Scheduled Posts API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -143,21 +141,20 @@ export function registerScheduledPostRoutes(app: Express): void {
       const result = await retryScheduledPost(id, user_id);
       res.json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        throw new AppError(error.message, 400);
       }
       if (error instanceof NotFoundError) {
-        return res.status(404).json({
-          error: error.message.includes("Scheduled post")
+        throw new AppError(error.message.includes("Scheduled post")
             ? "Scheduled post not found"
-            : "User not found",
-        });
+            : "User not found", 404);
       }
       if (
         error instanceof OrganizationAccessError ||
         error instanceof PermissionDeniedError
       ) {
-        return res.status(403).json({ error: error.message });
+        throw new AppError(error.message, 403);
       }
       logError("Scheduled Posts API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });

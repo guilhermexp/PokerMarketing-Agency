@@ -1,14 +1,11 @@
-import type { Express } from "express";
-import {
-  ValidationError,
-  NotFoundError,
-  DatabaseError,
-} from "../lib/errors/index.js";
+import type { Express, NextFunction } from "express";
+import { AppError, ValidationError, NotFoundError, DatabaseError } from "../lib/errors/index.js";
 import {
   OrganizationAccessError,
   PermissionDeniedError,
 } from "../helpers/organization-context.js";
 import { logError } from "../lib/logging-helpers.js";
+import { sendError } from "../lib/response.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {
   getBrandProfile,
@@ -47,6 +44,7 @@ export function registerBrandProfileRoutes(app: Express): void {
       const result = await getBrandProfile(req.query as BrandProfileQuery);
       return res.json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (
         error instanceof OrganizationAccessError ||
         error instanceof ValidationError ||
@@ -67,6 +65,7 @@ export function registerBrandProfileRoutes(app: Express): void {
       const result = await createBrandProfile(req.body as BrandProfileCreateBody);
       res.status(201).json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (
         error instanceof OrganizationAccessError ||
         error instanceof PermissionDeniedError ||
@@ -86,24 +85,35 @@ export function registerBrandProfileRoutes(app: Express): void {
       query: brandProfileUpdateQuerySchema,
       body: brandProfileUpdateBodySchema,
     }),
-    async (req, res) => {
+    async (req, res, next: NextFunction) => {
     try {
       const { id } = req.query as BrandProfileUpdateQuery;
       const body = req.body as BrandProfileUpdateBody;
       const result = await updateBrandProfile(id, body);
       res.json(result);
     } catch (error) {
+      if (error instanceof AppError) {
+        res.status(error.statusCode);
+        sendError(res, error);
+        return;
+      }
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        res.status(400);
+        sendError(res, new AppError(error.message, 400));
+        return;
       }
       if (error instanceof NotFoundError) {
-        return res.status(404).json({ error: "Brand profile not found" });
+        res.status(404);
+        sendError(res, new AppError("Brand profile not found", 404));
+        return;
       }
       if (
         error instanceof OrganizationAccessError ||
         error instanceof PermissionDeniedError
       ) {
-        return res.status(403).json({ error: error.message });
+        res.status(403);
+        sendError(res, new AppError(error.message, 403));
+        return;
       }
       logError("Brand Profiles API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });

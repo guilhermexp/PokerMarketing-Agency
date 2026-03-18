@@ -3,7 +3,7 @@ import { getSql } from "../lib/db.js";
 import { userIdCache } from "../lib/user-resolver.js";
 import { generateCsrfToken } from "../lib/csrf.js";
 import { createRateLimitMiddleware, requireSuperAdmin } from "../lib/auth.js";
-import { DatabaseError } from "../lib/errors/index.js";
+import { AppError, DatabaseError } from "../lib/errors/index.js";
 import logger from "../lib/logger.js";
 
 function toOriginalError(error: unknown): { code?: string; message: string } | null {
@@ -29,6 +29,7 @@ export function registerHealthRoutes(app: Express): void {
       await sql`SELECT 1`;
       res.json({ status: "healthy", timestamp: new Date().toISOString() });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       throw new DatabaseError("Database health check failed", toOriginalError(error));
     }
   });

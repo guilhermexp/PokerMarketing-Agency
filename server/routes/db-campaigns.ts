@@ -1,9 +1,5 @@
 import type { Express } from "express";
-import {
-  ValidationError,
-  NotFoundError,
-  DatabaseError,
-} from "../lib/errors/index.js";
+import { AppError, ValidationError, NotFoundError, DatabaseError } from "../lib/errors/index.js";
 import {
   OrganizationAccessError,
   PermissionDeniedError,
@@ -65,6 +61,7 @@ export function registerCampaignRoutes(app: Express): void {
       const result = await getCampaigns(req.query as CampaignsQuery);
       return res.status(200).json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (
         error instanceof OrganizationAccessError ||
         error instanceof ValidationError
@@ -94,6 +91,7 @@ export function registerCampaignRoutes(app: Express): void {
       });
       res.status(201).json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (
         error instanceof OrganizationAccessError ||
         error instanceof PermissionDeniedError ||
@@ -112,17 +110,18 @@ export function registerCampaignRoutes(app: Express): void {
       const result = await deleteCampaign(id, user_id);
       res.status(200).json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        throw new AppError(error.message, 400);
       }
       if (error instanceof NotFoundError) {
-        return res.status(404).json({ error: "Campaign not found" });
+        throw new AppError("Campaign not found", 404);
       }
       if (
         error instanceof OrganizationAccessError ||
         error instanceof PermissionDeniedError
       ) {
-        return res.status(403).json({ error: error.message });
+        throw new AppError(error.message, 403);
       }
       logError("Campaigns API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -145,11 +144,12 @@ export function registerCampaignRoutes(app: Express): void {
       );
       res.json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        throw new AppError(error.message, 400);
       }
       if (error instanceof NotFoundError) {
-        return res.status(404).json({ error: "Clip not found" });
+        throw new AppError("Clip not found", 404);
       }
       logError("Campaigns API (PATCH clip)", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -174,11 +174,12 @@ export function registerCampaignRoutes(app: Express): void {
       );
       res.json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        throw new AppError(error.message, 400);
       }
       if (error instanceof NotFoundError) {
-        return res.status(404).json({ error: "Clip not found" });
+        throw new AppError("Clip not found", 404);
       }
       logError("Campaigns API (PATCH scene)", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -191,6 +192,7 @@ export function registerCampaignRoutes(app: Express): void {
       const result = await getCarousels(req.query as CarouselsQuery);
       res.json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (
         error instanceof OrganizationAccessError ||
         error instanceof ValidationError
@@ -217,11 +219,12 @@ export function registerCampaignRoutes(app: Express): void {
       const result = await updateCarousel(id, body);
       res.json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        throw new AppError(error.message, 400);
       }
       if (error instanceof NotFoundError) {
-        return res.status(404).json({ error: "Carousel not found" });
+        throw new AppError("Carousel not found", 404);
       }
       logError("Carousels API (PATCH)", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -246,11 +249,12 @@ export function registerCampaignRoutes(app: Express): void {
       );
       res.json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        throw new AppError(error.message, 400);
       }
       if (error instanceof NotFoundError) {
-        return res.status(404).json({ error: "Carousel not found" });
+        throw new AppError("Carousel not found", 404);
       }
       logError("Carousels API (PATCH slide)", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });

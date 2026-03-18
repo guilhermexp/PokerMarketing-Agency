@@ -1,3 +1,4 @@
+import { AppError } from "../lib/errors/index.js";
 /**
  * AI Assistant & Chat Routes
  * Extracted from server/index.mjs
@@ -88,8 +89,7 @@ export function registerAiAssistantRoutes(app: Application): void {
     async (req: Request, res: Response): Promise<void> => {
     // Feature flag: only enable if VITE_USE_VERCEL_AI_SDK=true
     if (process.env.VITE_USE_VERCEL_AI_SDK !== "true") {
-      res.status(404).json({ error: "Endpoint not available" });
-      return;
+      throw new AppError("Endpoint not available", 404);
     }
 
     await chatHandler(req, res);
@@ -248,6 +248,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
         metadata: { historyLength: history.length },
       }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error as Error;
       logger.error({ err }, "[Assistant API] Error");
       await logAiUsage(sql, {

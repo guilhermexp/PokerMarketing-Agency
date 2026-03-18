@@ -83,6 +83,27 @@ export interface AppErrorJSON {
   };
 }
 
+function getDefaultErrorCode(statusCode: number): string {
+  switch (statusCode) {
+    case HTTP_STATUS.BAD_REQUEST:
+      return ERROR_CODES.VALIDATION_ERROR;
+    case HTTP_STATUS.UNAUTHORIZED:
+      return ERROR_CODES.UNAUTHORIZED;
+    case HTTP_STATUS.FORBIDDEN:
+      return ERROR_CODES.FORBIDDEN;
+    case HTTP_STATUS.NOT_FOUND:
+      return ERROR_CODES.NOT_FOUND;
+    case HTTP_STATUS.CONFLICT:
+      return ERROR_CODES.CONFLICT;
+    case HTTP_STATUS.TOO_MANY_REQUESTS:
+      return ERROR_CODES.RATE_LIMIT_EXCEEDED;
+    case HTTP_STATUS.SERVICE_UNAVAILABLE:
+      return ERROR_CODES.SERVICE_UNAVAILABLE;
+    default:
+      return ERROR_CODES.INTERNAL_SERVER_ERROR;
+  }
+}
+
 /**
  * Base Application Error
  * All custom errors should extend this class
@@ -94,20 +115,47 @@ export class AppError extends Error {
   readonly details: ErrorDetails | null;
   readonly timestamp: string;
 
+  constructor(message: string, statusCode: number, details?: ErrorDetails | null);
   constructor(
     message: string,
     code: string = ERROR_CODES.INTERNAL_SERVER_ERROR,
     statusCode: number = HTTP_STATUS.INTERNAL_SERVER_ERROR,
     isOperational: boolean = true,
     details: ErrorDetails | null = null
+  );
+  constructor(
+    message: string,
+    codeOrStatus: string | number = ERROR_CODES.INTERNAL_SERVER_ERROR,
+    statusCodeOrDetails: number | ErrorDetails | null = HTTP_STATUS.INTERNAL_SERVER_ERROR,
+    isOperational: boolean = true,
+    details: ErrorDetails | null = null
   ) {
     super(message);
 
+    const normalized =
+      typeof codeOrStatus === "number"
+        ? {
+            code: getDefaultErrorCode(codeOrStatus),
+            statusCode: codeOrStatus,
+            details:
+              typeof statusCodeOrDetails === "number"
+                ? details
+                : statusCodeOrDetails,
+          }
+        : {
+            code: codeOrStatus,
+            statusCode:
+              typeof statusCodeOrDetails === "number"
+                ? statusCodeOrDetails
+                : HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            details,
+          };
+
     this.name = this.constructor.name;
-    this.code = code;
-    this.statusCode = statusCode;
+    this.code = normalized.code;
+    this.statusCode = normalized.statusCode;
     this.isOperational = isOperational;
-    this.details = details;
+    this.details = normalized.details ?? null;
     this.timestamp = new Date().toISOString();
 
     // Capture stack trace

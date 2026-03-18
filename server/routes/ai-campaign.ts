@@ -1,3 +1,4 @@
+import { AppError } from "../lib/errors/index.js";
 /**
  * AI Campaign Generation Route
  * Extracted from server/index.mjs
@@ -380,6 +381,7 @@ export function registerAiCampaignRoutes(app: Application): void {
         model,
       });
     } catch (error) {
+      if (error instanceof AppError) throw error;
       const err = error as Error;
       logger.error({ err }, "[Campaign API] Error");
       // Log failed usage

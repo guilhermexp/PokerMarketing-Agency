@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { getSql } from "../lib/db.js";
+import { AppError, getSql } from "../lib/db.js";
 import { ValidationError, DatabaseError } from "../lib/errors/index.js";
 import { validateRequest } from "../middleware/validate.js";
 import {
@@ -36,6 +36,7 @@ export function registerUserRoutes(app: Express): void {
 
       throw new ValidationError("email or id is required");
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
         throw error;
       }
@@ -73,6 +74,7 @@ export function registerUserRoutes(app: Express): void {
 
       res.status(201).json(result[0]);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
         throw error;
       }

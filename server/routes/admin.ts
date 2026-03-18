@@ -4,6 +4,7 @@ import { createRateLimitMiddleware, requireSuperAdmin } from "../lib/auth.js";
 import { generateTextFromMessages } from "../lib/ai/text-generation.js";
 import { withRetry } from "../lib/ai/retry.js";
 import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.js";
+import { AppError } from "../lib/errors/index.js";
 import logger from "../lib/logger.js";
 import { validateRequest } from "../middleware/validate.js";
 import {
@@ -182,29 +183,63 @@ const aiSuggestionsCache = new Map<string, AiSuggestionsCacheEntry>();
 const CACHE_DURATION_MS = 3600000; // 1 hour
 const adminRateLimit = createRateLimitMiddleware(30, 60_000, "admin");
 
-function logAdminAction(req: Request, adminAction: string): void {
-  const session = req.authSession;
-  const adminEmail =
-    session && typeof session === "object" && "user" in session
-      ? (session.user as { email?: string } | undefined)?.email ?? null
-      : null;
-  const adminUserId =
-    session && typeof session === "object" && "user" in session
-      ? (session.user as { id?: string } | undefined)?.id ?? null
-      : null;
+type AdminActionResult = "success" | "fail";
 
+interface AdminActionDetails {
+  adminEmail?: string | null;
+  result: AdminActionResult;
+  requestId?: string;
+  method?: string;
+  path?: string;
+  happenedAt?: string;
+  [key: string]: unknown;
+}
+
+function getAdminActor(req: Request) {
+  const session = req.authSession;
+  return {
+    adminEmail:
+      session && typeof session === "object" && "user" in session
+        ? (session.user as { email?: string } | undefined)?.email?.toLowerCase() ?? null
+        : null,
+    adminUserId:
+      session && typeof session === "object" && "user" in session
+        ? (session.user as { id?: string } | undefined)?.id ?? null
+        : null,
+  };
+}
+
+function logAdminAction(
+  userId: string | null,
+  adminAction: string,
+  details: AdminActionDetails,
+): void {
   logger.info(
     {
       adminAction,
-      adminEmail: adminEmail?.toLowerCase() ?? null,
-      adminUserId,
-      method: req.method,
-      path: req.path,
-      requestId: req.id,
-      happenedAt: new Date().toISOString(),
+      adminUserId: userId,
+      ...details,
+      happenedAt: details.happenedAt ?? new Date().toISOString(),
     },
-    "[Admin] Action completed",
+    details.result === "success" ? "[Admin] Action completed" : "[Admin] Action failed",
   );
+}
+
+function logAdminRequest(
+  req: Request,
+  adminAction: string,
+  result: AdminActionResult,
+  details: Record<string, unknown> = {},
+): void {
+  const actor = getAdminActor(req);
+  logAdminAction(actor.adminUserId, adminAction, {
+    adminEmail: actor.adminEmail,
+    result,
+    requestId: req.id,
+    method: req.method,
+    path: req.path,
+    ...details,
+  });
 }
 
 export function registerAdminRoutes(app: Express): void {
@@ -258,7 +293,7 @@ export function registerAdminRoutes(app: Express): void {
       const errorsResult = results[6] as CountRow[];
       const orgCountResult = results[7] as CountRow[];
 
-      logAdminAction(_req, "admin.stats.view");
+      logAdminRequest(_req, "admin.stats.view", "success");
       res.json({
         totalUsers: parseInt(usersResult[0]?.count || "0", 10),
         activeUsersToday: parseInt(activeUsersResult[0]?.count || "0", 10),
@@ -272,6 +307,16 @@ export function registerAdminRoutes(app: Express): void {
         recentErrors: parseInt(errorsResult[0]?.count || "0", 10),
       });
     } catch (error) {
+      if (error instanceof AppError) {
+        logAdminRequest(_req, "admin.stats.view", "fail", {
+          statusCode: error.statusCode,
+          errorMessage: error.message,
+        });
+        throw error;
+      }
+      logAdminRequest(_req, "admin.stats.view", "fail", {
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       logger.error({ err: error }, "[Admin] Stats error");
       res.status(500).json({ error: "Failed to fetch stats" });
     }
@@ -386,7 +431,7 @@ export function registerAdminRoutes(app: Express): void {
         total_video_seconds: "0",
       };
 
-      logAdminAction(req, "admin.usage.view");
+      logAdminRequest(req, "admin.usage.view", "success", { groupBy, days });
       res.json({
         totals: {
           totalRequests: parseInt(totals.total_requests || "0", 10),
@@ -433,6 +478,16 @@ export function registerAdminRoutes(app: Express): void {
         })),
       });
     } catch (error) {
+      if (error instanceof AppError) {
+        logAdminRequest(req, "admin.usage.view", "fail", {
+          statusCode: error.statusCode,
+          errorMessage: error.message,
+        });
+        throw error;
+      }
+      logAdminRequest(req, "admin.usage.view", "fail", {
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       logger.error({ err: error }, "[Admin] Usage error");
       res.status(500).json({ error: "Failed to fetch usage data" });
     }
@@ -476,7 +531,11 @@ export function registerAdminRoutes(app: Express): void {
       const total = parseInt(countResult[0]?.total || "0", 10);
       const totalPages = Math.ceil(total / safeLimit);
 
-      logAdminAction(req, "admin.users.list");
+      logAdminRequest(req, "admin.users.list", "success", {
+        page: safePage,
+        limit: safeLimit,
+        search: searchParam || null,
+      });
       res.json({
         users,
         pagination: {
@@ -487,6 +546,16 @@ export function registerAdminRoutes(app: Express): void {
         },
       });
     } catch (error) {
+      if (error instanceof AppError) {
+        logAdminRequest(req, "admin.users.list", "fail", {
+          statusCode: error.statusCode,
+          errorMessage: error.message,
+        });
+        throw error;
+      }
+      logAdminRequest(req, "admin.users.list", "fail", {
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       logger.error({ err: error }, "[Admin] Users error");
       res.status(500).json({ error: "Failed to fetch users" });
     }
@@ -639,7 +708,10 @@ export function registerAdminRoutes(app: Express): void {
       const total = parseInt(countResult[0]?.total || "0", 10);
       const totalPages = Math.ceil(total / safeLimit);
 
-      logAdminAction(req, "admin.organizations.list");
+      logAdminRequest(req, "admin.organizations.list", "success", {
+        page: safePage,
+        limit: safeLimit,
+      });
       res.json({
         organizations,
         pagination: {
@@ -650,6 +722,16 @@ export function registerAdminRoutes(app: Express): void {
         },
       });
     } catch (error) {
+      if (error instanceof AppError) {
+        logAdminRequest(req, "admin.organizations.list", "fail", {
+          statusCode: error.statusCode,
+          errorMessage: error.message,
+        });
+        throw error;
+      }
+      logAdminRequest(req, "admin.organizations.list", "fail", {
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       logger.error({ err: error }, "[Admin] Organizations error");
       res.status(500).json({ error: "Failed to fetch organizations" });
     }
@@ -713,7 +795,12 @@ export function registerAdminRoutes(app: Express): void {
       const total = parseInt(totalResult[0]?.count || "0", 10);
       const totalPages = Math.ceil(total / safeLimit);
 
-      logAdminAction(req, "admin.logs.list");
+      logAdminRequest(req, "admin.logs.list", "success", {
+        page: safePage,
+        limit: safeLimit,
+        category: category || null,
+        status: status || null,
+      });
       res.json({
         logs,
         pagination: {
@@ -728,6 +815,16 @@ export function registerAdminRoutes(app: Express): void {
         },
       });
     } catch (error) {
+      if (error instanceof AppError) {
+        logAdminRequest(req, "admin.logs.list", "fail", {
+          statusCode: error.statusCode,
+          errorMessage: error.message,
+        });
+        throw error;
+      }
+      logAdminRequest(req, "admin.logs.list", "fail", {
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       logger.error({ err: error }, "[Admin] Logs error");
       res.status(500).json({ error: "Failed to fetch logs" });
     }
@@ -751,13 +848,24 @@ export function registerAdminRoutes(app: Express): void {
       ` as LogDetailRow[];
 
       if (!logs || logs.length === 0) {
-        res.status(404).json({ error: "Log not found" });
-        return;
+        throw new AppError("Log not found", 404);
       }
 
-      logAdminAction(req, "admin.logs.detail");
+      logAdminRequest(req, "admin.logs.detail", "success", { logId: id });
       res.json(logs[0]);
     } catch (error) {
+      if (error instanceof AppError) {
+        logAdminRequest(req, "admin.logs.detail", "fail", {
+          logId: req.params.id,
+          statusCode: error.statusCode,
+          errorMessage: error.message,
+        });
+        throw error;
+      }
+      logAdminRequest(req, "admin.logs.detail", "fail", {
+        logId: req.params.id,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       logger.error({ err: error }, "[Admin] Log detail error");
       res.status(500).json({ error: "Failed to fetch log details" });
     }
@@ -777,7 +885,10 @@ export function registerAdminRoutes(app: Express): void {
         const cacheKey = `suggestions_${id}`;
         const cached = aiSuggestionsCache.get(cacheKey);
         if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
-          logAdminAction(req, "admin.logs.ai-suggestions");
+          logAdminRequest(req, "admin.logs.ai-suggestions", "success", {
+            logId: id,
+            cached: true,
+          });
           res.json({ suggestions: cached.suggestions, cached: true });
           return;
         }
@@ -792,13 +903,16 @@ export function registerAdminRoutes(app: Express): void {
 
         const log = logs[0];
         if (!log) {
-          res.status(404).json({ error: "Log not found" });
-          return;
+          throw new AppError("Log not found", 404);
         }
 
         // Only generate suggestions for failed logs
         if (log.status !== "failed") {
-          logAdminAction(req, "admin.logs.ai-suggestions");
+          logAdminRequest(req, "admin.logs.ai-suggestions", "success", {
+            logId: id,
+            cached: false,
+            skipped: true,
+          });
           res.json({
             suggestions:
               'Este log não contém erros. Sugestões de IA estão disponíveis apenas para logs com status "failed".',
@@ -846,9 +960,24 @@ Formate em markdown claro com seções.`;
           timestamp: Date.now(),
         });
 
-        logAdminAction(req, "admin.logs.ai-suggestions");
+        logAdminRequest(req, "admin.logs.ai-suggestions", "success", {
+          logId: id,
+          cached: false,
+        });
         res.json({ suggestions, cached: false });
       } catch (error) {
+        if (error instanceof AppError) {
+          logAdminRequest(req, "admin.logs.ai-suggestions", "fail", {
+            logId: req.params.id,
+            statusCode: error.statusCode,
+            errorMessage: error.message,
+          });
+          throw error;
+        }
+        logAdminRequest(req, "admin.logs.ai-suggestions", "fail", {
+          logId: req.params.id,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
         logger.error({ err: error }, "[Admin] AI suggestions error");
         res.status(500).json({ error: "Failed to generate AI suggestions" });
       }

@@ -1,10 +1,7 @@
-import type { Express } from "express";
-import {
-  ValidationError,
-  NotFoundError,
-  DatabaseError,
-} from "../lib/errors/index.js";
+import type { Express, NextFunction } from "express";
+import { AppError, ValidationError, NotFoundError, DatabaseError } from "../lib/errors/index.js";
 import { logError } from "../lib/logging-helpers.js";
+import { sendError } from "../lib/response.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 import {
   OrganizationAccessError,
@@ -50,6 +47,7 @@ export function registerGalleryRoutes(app: Express): void {
       const result = await listGallery(req.query as GalleryListQuery);
       res.json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (
         error instanceof OrganizationAccessError ||
         error instanceof ValidationError
@@ -68,11 +66,12 @@ export function registerGalleryRoutes(app: Express): void {
       const result = await listDailyFlyers(req.query as GalleryDailyFlyersQuery);
       res.json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        throw new AppError(error.message, 400);
       }
       if (error instanceof OrganizationAccessError) {
-        return res.status(403).json({ error: error.message });
+        throw new AppError(error.message, 403);
       }
       logError("Gallery Daily Flyers API GET", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -80,19 +79,28 @@ export function registerGalleryRoutes(app: Express): void {
     },
   );
 
-  app.post("/api/db/gallery", validateRequest({ body: galleryCreateBodySchema }), async (req, res) => {
+  app.post("/api/db/gallery", validateRequest({ body: galleryCreateBodySchema }), async (req, res, next: NextFunction) => {
     try {
       const result = await createGalleryImage(req.body as GalleryCreateBody);
       res.status(201).json(result);
     } catch (error) {
+      if (error instanceof AppError) {
+        res.status(error.statusCode);
+        sendError(res, error);
+        return;
+      }
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        res.status(400);
+        sendError(res, new AppError(error.message, 400));
+        return;
       }
       if (
         error instanceof OrganizationAccessError ||
         error instanceof PermissionDeniedError
       ) {
-        return res.status(403).json({ error: error.message });
+        res.status(403);
+        sendError(res, new AppError(error.message, 403));
+        return;
       }
       logError("Gallery API POST", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -116,11 +124,12 @@ export function registerGalleryRoutes(app: Express): void {
       });
       return res.status(200).json(result);
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        throw new AppError(error.message, 400);
       }
       if (error instanceof NotFoundError) {
-        return res.status(404).json({ error: "Gallery image not found" });
+        throw new AppError("Gallery image not found", 404);
       }
       logError("Gallery API PATCH", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -137,17 +146,18 @@ export function registerGalleryRoutes(app: Express): void {
       await deleteGalleryImageRecord(id, user_id);
       res.status(204).end();
     } catch (error) {
+      if (error instanceof AppError) throw error;
       if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
+        throw new AppError(error.message, 400);
       }
       if (error instanceof NotFoundError) {
-        return res.status(404).json({ error: "Image not found" });
+        throw new AppError("Image not found", 404);
       }
       if (
         error instanceof OrganizationAccessError ||
         error instanceof PermissionDeniedError
       ) {
-        return res.status(403).json({ error: error.message });
+        throw new AppError(error.message, 403);
       }
       logError("Gallery API", toError(error));
       res.status(500).json({ error: sanitizeErrorForClient(error) });
