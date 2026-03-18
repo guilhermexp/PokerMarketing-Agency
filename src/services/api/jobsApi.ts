@@ -5,7 +5,11 @@
  * processed by BullMQ.
  */
 
-import { getCsrfToken, getCurrentCsrfToken, clearCsrfToken } from '../apiClient';
+import {
+  clearCsrfToken,
+  getCsrfToken,
+  getCurrentCsrfToken,
+} from '../api-client/base';
 import { getApiErrorMessage, parseApiResponse } from './response';
 
 // =============================================================================

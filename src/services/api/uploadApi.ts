@@ -4,7 +4,7 @@
  * Handles uploads to Vercel Blob storage for images, videos, and audio.
  */
 
-import { getCsrfToken, getCurrentCsrfToken } from '../apiClient';
+import { getCsrfToken, getCurrentCsrfToken } from '../api-client/base';
 import { getApiErrorMessage, parseApiResponse } from './response';
 
 // =============================================================================

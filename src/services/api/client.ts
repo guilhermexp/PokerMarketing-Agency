@@ -5,7 +5,7 @@
  * and typed responses. Used by all domain-specific API modules.
  */
 
-import { getCsrfToken, getCurrentCsrfToken } from '../apiClient';
+import { getCsrfToken, getCurrentCsrfToken } from '../api-client/base';
 import { getApiErrorMessage, parseApiResponse } from './response';
 
 export const API_BASE = '/api/db';

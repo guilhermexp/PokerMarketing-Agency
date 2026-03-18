@@ -20,6 +20,8 @@ vi.stubGlobal('import.meta.env', {
   MODE: 'test',
 });
 
+process.env.CSRF_SECRET ||= 'test-csrf-secret';
+
 // Mock do localStorage
 const localStorageMock = {
   getItem: vi.fn(),
