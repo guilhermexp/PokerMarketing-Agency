@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { del } from "@vercel/blob";
 import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
@@ -19,6 +20,124 @@ function isBlobUrl(url: string | null | undefined): url is string {
       (url.includes(".public.blob.vercel-storage.com/") ||
         url.includes(".blob.vercel-storage.com/")),
   );
+}
+
+function buildCampaignListQuery(options: {
+  ownerId: string;
+  organizationId: string | null;
+  hasLimit: boolean;
+  limit: number;
+  offset: number;
+}): { query: string; params: unknown[] } {
+  const { ownerId, organizationId, hasLimit, limit, offset } = options;
+  const params: unknown[] = [ownerId];
+  const ownershipFilter = organizationId
+    ? "c.organization_id = $1"
+    : "c.user_id = $1 AND c.organization_id IS NULL";
+  let paginationClause = "";
+
+  if (hasLimit) {
+    params.push(limit);
+    paginationClause += ` LIMIT $${params.length}`;
+    params.push(offset);
+    paginationClause += ` OFFSET $${params.length}`;
+  }
+
+  return {
+    query: `
+      WITH video_stats AS (
+        SELECT
+          campaign_id,
+          COUNT(*)::int AS clips_count,
+          (ARRAY_AGG(thumbnail_url ORDER BY sort_order ASC, id ASC)
+            FILTER (WHERE thumbnail_url IS NOT NULL))[1] AS clip_preview_url
+        FROM video_clip_scripts
+        GROUP BY campaign_id
+      ),
+      post_stats AS (
+        SELECT
+          campaign_id,
+          COUNT(*)::int AS posts_count,
+          (ARRAY_AGG(image_url ORDER BY sort_order ASC, id ASC)
+            FILTER (WHERE image_url IS NOT NULL AND image_url NOT LIKE 'data:%'))[1] AS post_preview_url
+        FROM posts
+        GROUP BY campaign_id
+      ),
+      ad_stats AS (
+        SELECT
+          campaign_id,
+          COUNT(*)::int AS ads_count,
+          (ARRAY_AGG(image_url ORDER BY sort_order ASC, id ASC)
+            FILTER (WHERE image_url IS NOT NULL AND image_url NOT LIKE 'data:%'))[1] AS ad_preview_url
+        FROM ad_creatives
+        GROUP BY campaign_id
+      ),
+      carousel_stats AS (
+        SELECT
+          campaign_id,
+          COUNT(*)::int AS carousels_count,
+          (ARRAY_AGG(cover_url ORDER BY sort_order ASC, id ASC)
+            FILTER (WHERE cover_url IS NOT NULL))[1] AS carousel_preview_url
+        FROM carousel_scripts
+        GROUP BY campaign_id
+      )
+      SELECT
+        c.id,
+        c.user_id,
+        c.organization_id,
+        c.name,
+        c.description,
+        c.input_transcript,
+        c.status,
+        c.created_at,
+        c.updated_at,
+        COALESCE(video_stats.clips_count, 0)::int AS clips_count,
+        COALESCE(post_stats.posts_count, 0)::int AS posts_count,
+        COALESCE(ad_stats.ads_count, 0)::int AS ads_count,
+        COALESCE(carousel_stats.carousels_count, 0)::int AS carousels_count,
+        video_stats.clip_preview_url,
+        post_stats.post_preview_url,
+        ad_stats.ad_preview_url,
+        carousel_stats.carousel_preview_url
+      FROM campaigns c
+      LEFT JOIN video_stats ON video_stats.campaign_id = c.id
+      LEFT JOIN post_stats ON post_stats.campaign_id = c.id
+      LEFT JOIN ad_stats ON ad_stats.campaign_id = c.id
+      LEFT JOIN carousel_stats ON carousel_stats.campaign_id = c.id
+      WHERE ${ownershipFilter}
+        AND c.deleted_at IS NULL
+      ORDER BY c.created_at DESC
+      ${paginationClause}
+    `,
+    params,
+  };
+}
+
+function buildMultiRowInsertQuery(
+  table: string,
+  columns: string[],
+  rows: unknown[][],
+): { query: string; params: unknown[] } {
+  const params: unknown[] = [];
+  let parameterIndex = 1;
+
+  const valuesClause = rows
+    .map((row) => {
+      const placeholders = row.map((value) => {
+        params.push(value);
+        const placeholder = `$${parameterIndex}`;
+        parameterIndex += 1;
+        return placeholder;
+      });
+
+      return `(${placeholders.join(", ")})`;
+    })
+    .join(", ");
+
+  return {
+    query: `INSERT INTO ${table} (${columns.join(", ")}) VALUES ${valuesClause} RETURNING *`,
+    params,
+  };
 }
 
 export interface Campaign {
@@ -225,112 +344,26 @@ export async function getCampaigns({
   if (organization_id) {
     await resolveOrganizationContext(sql, resolvedUserId, organization_id);
 
-    return hasLimit
-      ? (await sql`
-          SELECT
-            c.id,
-            c.user_id,
-            c.organization_id,
-            c.name,
-            c.description,
-            c.input_transcript,
-            c.status,
-            c.created_at,
-            c.updated_at,
-            COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
-            COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
-            COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-            COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count,
-            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
-            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
-            (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url,
-            (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url
-          FROM campaigns c
-          WHERE c.organization_id = ${organization_id}
-            AND c.deleted_at IS NULL
-          ORDER BY c.created_at DESC
-          LIMIT ${parsedLimit}
-          OFFSET ${safeOffset}
-        `) as CampaignWithCounts[]
-      : (await sql`
-          SELECT
-            c.id,
-            c.user_id,
-            c.organization_id,
-            c.name,
-            c.description,
-            c.input_transcript,
-            c.status,
-            c.created_at,
-            c.updated_at,
-            COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
-            COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
-            COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-            COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count,
-            (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
-            (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
-            (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url,
-            (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url
-          FROM campaigns c
-          WHERE c.organization_id = ${organization_id}
-            AND c.deleted_at IS NULL
-          ORDER BY c.created_at DESC
-        `) as CampaignWithCounts[];
+    const { query, params } = buildCampaignListQuery({
+      ownerId: organization_id,
+      organizationId: organization_id,
+      hasLimit,
+      limit: parsedLimit,
+      offset: safeOffset,
+    });
+
+    return (await sql.query(query, params)) as CampaignWithCounts[];
   }
 
-  return hasLimit
-    ? (await sql`
-        SELECT
-          c.id,
-          c.user_id,
-          c.organization_id,
-          c.name,
-          c.description,
-          c.input_transcript,
-          c.status,
-          c.created_at,
-          c.updated_at,
-          COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
-          COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
-          COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-          COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count,
-          (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
-          (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
-          (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url,
-          (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url
-        FROM campaigns c
-        WHERE c.user_id = ${resolvedUserId}
-          AND c.organization_id IS NULL
-          AND c.deleted_at IS NULL
-        ORDER BY c.created_at DESC
-        LIMIT ${parsedLimit}
-        OFFSET ${safeOffset}
-      `) as CampaignWithCounts[]
-    : (await sql`
-        SELECT
-          c.id,
-          c.user_id,
-          c.organization_id,
-          c.name,
-          c.description,
-          c.input_transcript,
-          c.status,
-          c.created_at,
-          c.updated_at,
-          COALESCE((SELECT COUNT(*) FROM video_clip_scripts WHERE campaign_id = c.id), 0)::int as clips_count,
-          COALESCE((SELECT COUNT(*) FROM posts WHERE campaign_id = c.id), 0)::int as posts_count,
-          COALESCE((SELECT COUNT(*) FROM ad_creatives WHERE campaign_id = c.id), 0)::int as ads_count,
-          COALESCE((SELECT COUNT(*) FROM carousel_scripts WHERE campaign_id = c.id), 0)::int as carousels_count,
-          (SELECT thumbnail_url FROM video_clip_scripts WHERE campaign_id = c.id AND thumbnail_url IS NOT NULL LIMIT 1) as clip_preview_url,
-          (SELECT image_url FROM posts WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as post_preview_url,
-          (SELECT image_url FROM ad_creatives WHERE campaign_id = c.id AND image_url IS NOT NULL AND image_url NOT LIKE 'data:%' LIMIT 1) as ad_preview_url,
-          (SELECT cover_url FROM carousel_scripts WHERE campaign_id = c.id AND cover_url IS NOT NULL LIMIT 1) as carousel_preview_url
-        FROM campaigns c
-        WHERE c.user_id = ${resolvedUserId}
-          AND c.organization_id IS NULL
-          AND c.deleted_at IS NULL
-        ORDER BY c.created_at DESC
-      `) as CampaignWithCounts[];
+  const { query, params } = buildCampaignListQuery({
+    ownerId: resolvedUserId,
+    organizationId: null,
+    hasLimit,
+    limit: parsedLimit,
+    offset: safeOffset,
+  });
+
+  return (await sql.query(query, params)) as CampaignWithCounts[];
 }
 
 export interface CreateCampaignParams {
@@ -406,61 +439,164 @@ export async function createCampaign(payload: CreateCampaignParams): Promise<Cam
       throw new PermissionDeniedError("create_campaign");
     }
   }
-
-  const result = (await sql`
-    INSERT INTO campaigns (user_id, organization_id, name, brand_profile_id, input_transcript, generation_options, status)
-    VALUES (${resolvedUserId}, ${organization_id || null}, ${name || null}, ${brand_profile_id || null}, ${input_transcript || null}, ${JSON.stringify(generation_options) || null}, ${status || "draft"})
-    RETURNING *
-  `) as Campaign[];
-
-  const campaign = result[0]!;
-  const createdVideoClipScripts: VideoClipScript[] = [];
-  if (Array.isArray(video_clip_scripts)) {
-    for (const [index, script] of video_clip_scripts.entries()) {
-      const row = (await sql`
-        INSERT INTO video_clip_scripts (campaign_id, user_id, organization_id, title, hook, image_prompt, audio_script, scenes, sort_order)
-        VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${script.title}, ${script.hook}, ${script.image_prompt || null}, ${script.audio_script || null}, ${JSON.stringify(script.scenes || [])}, ${index})
+  const campaignId = randomUUID();
+  const transactionQueries = [
+    sql.query(
+      `
+        INSERT INTO campaigns (id, user_id, organization_id, name, brand_profile_id, input_transcript, generation_options, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
-      `) as VideoClipScript[];
-      createdVideoClipScripts.push(row[0]!);
-    }
+      `,
+      [
+        campaignId,
+        resolvedUserId,
+        organization_id || null,
+        name || null,
+        brand_profile_id || null,
+        input_transcript || null,
+        generation_options == null ? null : JSON.stringify(generation_options),
+        status || "draft",
+      ],
+    ),
+  ];
+
+  const hasVideoScripts = Array.isArray(video_clip_scripts) && video_clip_scripts.length > 0;
+  if (hasVideoScripts) {
+    const { query, params } = buildMultiRowInsertQuery(
+      "video_clip_scripts",
+      [
+        "campaign_id",
+        "user_id",
+        "organization_id",
+        "title",
+        "hook",
+        "image_prompt",
+        "audio_script",
+        "scenes",
+        "sort_order",
+      ],
+      video_clip_scripts.map((script, index) => [
+        campaignId,
+        resolvedUserId,
+        organization_id || null,
+        script.title,
+        script.hook,
+        script.image_prompt || null,
+        script.audio_script || null,
+        JSON.stringify(script.scenes || []),
+        index,
+      ]),
+    );
+    transactionQueries.push(sql.query(query, params));
   }
 
-  const createdPosts: Post[] = [];
-  if (Array.isArray(posts)) {
-    for (const [index, post] of posts.entries()) {
-      const row = (await sql`
-        INSERT INTO posts (campaign_id, user_id, organization_id, platform, content, hashtags, image_prompt, sort_order)
-        VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${post.platform}, ${post.content}, ${post.hashtags || []}, ${post.image_prompt || null}, ${index})
-        RETURNING *
-      `) as Post[];
-      createdPosts.push(row[0]!);
-    }
+  const hasPosts = Array.isArray(posts) && posts.length > 0;
+  if (hasPosts) {
+    const { query, params } = buildMultiRowInsertQuery(
+      "posts",
+      [
+        "campaign_id",
+        "user_id",
+        "organization_id",
+        "platform",
+        "content",
+        "hashtags",
+        "image_prompt",
+        "sort_order",
+      ],
+      posts.map((post, index) => [
+        campaignId,
+        resolvedUserId,
+        organization_id || null,
+        post.platform,
+        post.content,
+        post.hashtags || [],
+        post.image_prompt || null,
+        index,
+      ]),
+    );
+    transactionQueries.push(sql.query(query, params));
   }
 
-  const createdAdCreatives: AdCreative[] = [];
-  if (Array.isArray(ad_creatives)) {
-    for (const [index, ad] of ad_creatives.entries()) {
-      const row = (await sql`
-        INSERT INTO ad_creatives (campaign_id, user_id, organization_id, platform, headline, body, cta, image_prompt, sort_order)
-        VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${ad.platform}, ${ad.headline}, ${ad.body}, ${ad.cta}, ${ad.image_prompt || null}, ${index})
-        RETURNING *
-      `) as AdCreative[];
-      createdAdCreatives.push(row[0]!);
-    }
+  const hasAdCreatives = Array.isArray(ad_creatives) && ad_creatives.length > 0;
+  if (hasAdCreatives) {
+    const { query, params } = buildMultiRowInsertQuery(
+      "ad_creatives",
+      [
+        "campaign_id",
+        "user_id",
+        "organization_id",
+        "platform",
+        "headline",
+        "body",
+        "cta",
+        "image_prompt",
+        "sort_order",
+      ],
+      ad_creatives.map((ad, index) => [
+        campaignId,
+        resolvedUserId,
+        organization_id || null,
+        ad.platform,
+        ad.headline,
+        ad.body,
+        ad.cta,
+        ad.image_prompt || null,
+        index,
+      ]),
+    );
+    transactionQueries.push(sql.query(query, params));
   }
 
-  const createdCarouselScripts: CarouselScript[] = [];
-  if (Array.isArray(carousel_scripts)) {
-    for (const [index, carousel] of carousel_scripts.entries()) {
-      const row = (await sql`
-        INSERT INTO carousel_scripts (campaign_id, user_id, organization_id, title, hook, cover_prompt, cover_url, caption, slides, sort_order)
-        VALUES (${campaign.id}, ${resolvedUserId}, ${organization_id || null}, ${carousel.title}, ${carousel.hook}, ${carousel.cover_prompt || null}, ${carousel.cover_url || null}, ${carousel.caption || null}, ${JSON.stringify(carousel.slides || [])}, ${index})
-        RETURNING *
-      `) as CarouselScript[];
-      createdCarouselScripts.push(row[0]!);
-    }
+  const hasCarouselScripts =
+    Array.isArray(carousel_scripts) && carousel_scripts.length > 0;
+  if (hasCarouselScripts) {
+    const { query, params } = buildMultiRowInsertQuery(
+      "carousel_scripts",
+      [
+        "campaign_id",
+        "user_id",
+        "organization_id",
+        "title",
+        "hook",
+        "cover_prompt",
+        "cover_url",
+        "caption",
+        "slides",
+        "sort_order",
+      ],
+      carousel_scripts.map((carousel, index) => [
+        campaignId,
+        resolvedUserId,
+        organization_id || null,
+        carousel.title,
+        carousel.hook,
+        carousel.cover_prompt || null,
+        carousel.cover_url || null,
+        carousel.caption || null,
+        JSON.stringify(carousel.slides || []),
+        index,
+      ]),
+    );
+    transactionQueries.push(sql.query(query, params));
   }
+
+  const transactionResults = await sql.transaction(transactionQueries);
+  let resultIndex = 0;
+
+  const campaign = (transactionResults[resultIndex++] as Campaign[])[0]!;
+  const createdVideoClipScripts = hasVideoScripts
+    ? (transactionResults[resultIndex++] as VideoClipScript[])
+    : [];
+  const createdPosts = hasPosts
+    ? (transactionResults[resultIndex++] as Post[])
+    : [];
+  const createdAdCreatives = hasAdCreatives
+    ? (transactionResults[resultIndex++] as AdCreative[])
+    : [];
+  const createdCarouselScripts = hasCarouselScripts
+    ? (transactionResults[resultIndex++] as CarouselScript[])
+    : [];
 
   return {
     ...campaign,
@@ -554,27 +690,31 @@ export async function deleteCampaign(id: string, userId?: string): Promise<Delet
     ...clips.flatMap((clip) => [clip.thumbnail_url, clip.video_url]).filter(isBlobUrl),
   ];
 
-  for (const url of urlsToDelete) {
-    try {
-      await del(url);
-      logger.debug({ url }, "[Campaign Delete] Deleted file");
-    } catch (error) {
-      logger.error(
-        { err: error, url },
-        `[Campaign Delete] Failed to delete file: ${url}`,
-      );
-    }
-  }
+  await Promise.allSettled(
+    urlsToDelete.map(async (url) => {
+      try {
+        await del(url);
+        logger.debug({ url }, "[Campaign Delete] Deleted file");
+      } catch (error) {
+        logger.error(
+          { err: error, url },
+          `[Campaign Delete] Failed to delete file: ${url}`,
+        );
+      }
+    }),
+  );
 
+  const deleteQueries = [];
   if (campaignImages.length > 0) {
     const imageIds = campaignImages.map((image) => image.id);
-    await sql`DELETE FROM gallery_images WHERE id = ANY(${imageIds})`;
+    deleteQueries.push(sql`DELETE FROM gallery_images WHERE id = ANY(${imageIds})`);
   }
+  deleteQueries.push(sql`DELETE FROM posts WHERE campaign_id = ${id}`);
+  deleteQueries.push(sql`DELETE FROM ad_creatives WHERE campaign_id = ${id}`);
+  deleteQueries.push(sql`DELETE FROM video_clip_scripts WHERE campaign_id = ${id}`);
+  deleteQueries.push(sql`DELETE FROM campaigns WHERE id = ${id}`);
 
-  await sql`DELETE FROM posts WHERE campaign_id = ${id}`;
-  await sql`DELETE FROM ad_creatives WHERE campaign_id = ${id}`;
-  await sql`DELETE FROM video_clip_scripts WHERE campaign_id = ${id}`;
-  await sql`DELETE FROM campaigns WHERE id = ${id}`;
+  await sql.transaction(deleteQueries);
 
   return {
     success: true,
