@@ -13,6 +13,7 @@
 
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { LanguageModel } from "ai";
+import logger from "../logger.js";
 import {
   normalizeModelId,
   TEXT_MODEL,
@@ -57,7 +58,7 @@ export function getLanguageModel(modelId: string): LanguageModel {
     throw new Error("GEMINI_API_KEY não configurada");
   }
 
-  console.log(`[Providers] Usando Gemini Native: ${normalizedId}`);
+  logger.info(`[Providers] Usando Gemini Native: ${normalizedId}`);
   return googleProvider(normalizedId);
 }
 

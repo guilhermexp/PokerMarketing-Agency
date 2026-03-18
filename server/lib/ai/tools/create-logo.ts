@@ -6,6 +6,7 @@
 
 import { tool } from "ai";
 import { z } from "zod";
+import logger from "../../logger.js";
 
 // ============================================================================
 // TYPES
@@ -106,7 +107,7 @@ export function createLogoTool({ userId, orgId, dataStream, brandProfile }: Tool
           });
         }
 
-        console.log(`[Tool:createLogo] Gerando logo | orgId: ${orgId}`);
+        logger.info(`[Tool:createLogo] Gerando logo | orgId: ${orgId}`);
 
         // 2. Construir prompt específico para logo
         const brandName = brandProfile?.name || "a marca";
@@ -179,7 +180,7 @@ Requisitos:
           });
         }
 
-        console.log(`[Tool:createLogo] Logo criado | id: ${savedImage?.id}`);
+        logger.info(`[Tool:createLogo] Logo criado | id: ${savedImage?.id}`);
 
         return {
           success: true,
@@ -189,7 +190,7 @@ Requisitos:
         };
       } catch (error) {
         const err = error as Error;
-        console.error("[Tool:createLogo] Erro:", err);
+        logger.error("[Tool:createLogo] Erro:", err);
 
         // Enviar evento de erro (se dataStream disponível)
         if (dataStream) {

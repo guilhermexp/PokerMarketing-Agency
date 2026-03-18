@@ -1,3 +1,4 @@
+import logger from "../lib/logger.js";
 /**
  * Helper: Convert URL or data URL to base64 string
  * - If already base64 or data URL, extracts the base64 part
@@ -21,7 +22,7 @@ export async function urlToBase64(input: string | null | undefined): Promise<str
     try {
       const response = await fetch(input);
       if (!response.ok) {
-        console.error(
+        logger.error(
           `[urlToBase64] Failed to fetch ${input}: ${response.status}`,
         );
         return null;
@@ -30,7 +31,7 @@ export async function urlToBase64(input: string | null | undefined): Promise<str
       const base64 = Buffer.from(arrayBuffer).toString("base64");
       return base64;
     } catch (error) {
-      console.error(
+      logger.error(
         `[urlToBase64] Error fetching ${input}:`,
         error instanceof Error ? error.message : String(error),
       );

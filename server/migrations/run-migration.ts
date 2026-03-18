@@ -4,6 +4,7 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { env } from "../lib/env.js";
+import logger from "../lib/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -17,7 +18,7 @@ type MigrationTableRow = {
 async function runMigration(): Promise<void> {
   const sql = neon(env.DATABASE_URL);
 
-  console.log("📦 Executando migration 002_chat_tables_simple.sql...");
+  logger.info("📦 Executando migration 002_chat_tables_simple.sql...");
 
   try {
     const migrationSQL = readFileSync(join(__dirname, "002_chat_tables_simple.sql"), "utf8");
@@ -35,19 +36,19 @@ async function runMigration(): Promise<void> {
 
     const statements = [...createTables, ...createIndexes, ...comments];
 
-    console.log(`Executando ${statements.length} statements...`);
+    logger.info(`Executando ${statements.length} statements...`);
 
     // Executar cada statement
     for (let i = 0; i < statements.length; i++) {
       const stmt = statements[i];
       if (stmt) {
         const preview = stmt.substring(0, 50).replace(/\n/g, " ");
-        console.log(`  ${i + 1}/${statements.length}: ${preview}...`);
+        logger.info(`  ${i + 1}/${statements.length}: ${preview}...`);
         await sql.query(stmt);
       }
     }
 
-    console.log("✅ Migration executada com sucesso!");
+    logger.info("✅ Migration executada com sucesso!");
 
     // Verificar tabelas criadas
     const tables = await sql`
@@ -58,11 +59,11 @@ async function runMigration(): Promise<void> {
       ORDER BY table_name
     ` as MigrationTableRow[];
 
-    console.log("✅ Tabelas criadas:");
-    tables.forEach((table) => console.log(`   - ${table.table_name}`));
+    logger.info("✅ Tabelas criadas:");
+    tables.forEach((table) => logger.info(`   - ${table.table_name}`));
 
   } catch (error) {
-    console.error("❌ Erro na migration:", error);
+    logger.error("❌ Erro na migration:", error);
     process.exit(1);
   }
 }

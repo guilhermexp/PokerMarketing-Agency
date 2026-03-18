@@ -5,6 +5,7 @@
 
 import { randomUUID } from 'crypto';
 import type { SqlClient } from '../lib/db.js';
+import logger from "../lib/logger.js";
 
 // Model pricing configuration (in USD cents per million tokens/per item)
 // Updated with actual pricing from providers
@@ -233,7 +234,7 @@ function calculateCost({
 }: CostCalculationParams): number {
   const pricing = MODEL_PRICING[model];
   if (!pricing) {
-    console.warn(`[UsageTracking] Unknown model for pricing: ${model}`);
+    logger.warn(`[UsageTracking] Unknown model for pricing: ${model}`);
     return 0;
   }
 
@@ -400,12 +401,12 @@ export async function logAiUsage(
       )
     `;
 
-    console.log(`[UsageTracking] Logged ${operation} call to ${model} - Cost: $${(estimatedCostCents / 100).toFixed(4)}`);
+    logger.info(`[UsageTracking] Logged ${operation} call to ${model} - Cost: $${(estimatedCostCents / 100).toFixed(4)}`);
 
     return { requestId, estimatedCostCents };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error('[UsageTracking] Failed to log usage:', errorMessage);
+    logger.error('[UsageTracking] Failed to log usage:', errorMessage);
     // Don't throw - we don't want tracking failures to break the API
     return { requestId, estimatedCostCents, error: errorMessage };
   }

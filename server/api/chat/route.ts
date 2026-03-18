@@ -14,6 +14,7 @@ import { editImageTool } from '../../lib/ai/tools/edit-image.js';
 import { createLogoTool } from '../../lib/ai/tools/create-logo.js';
 import { validateChatRequest, type ChatRequestBody } from './schema.js';
 import { getRequestAuthContext } from '../../lib/auth.js';
+import logger from "../../lib/logger.js";
 
 // ============================================================================
 // TYPES
@@ -171,7 +172,7 @@ function truncateMessages(messages: ChatMessage[]): ChatMessage[] {
     return messages;
   }
 
-  console.log(`[Chat API] Truncating messages: ${messages.length} -> ${MAX_MESSAGES}`);
+  logger.info(`[Chat API] Truncating messages: ${messages.length} -> ${MAX_MESSAGES}`);
 
   // Manter as ultimas MAX_MESSAGES mensagens
   const truncated = messages.slice(-MAX_MESSAGES);
@@ -220,7 +221,7 @@ function normalizeModelId(modelId: string): ValidModel {
     return normalized as ValidModel;
   }
 
-  console.log(`[Chat API] Modelo invalido "${normalized}", forcando gemini-3-flash-preview`);
+  logger.info(`[Chat API] Modelo invalido "${normalized}", forcando gemini-3-flash-preview`);
   return 'gemini-3-flash-preview';
 }
 
@@ -255,7 +256,7 @@ function extractReferenceImage(
           id: filePart.filename || filePart.name,
           src: filePart.url
         };
-        console.log('[Chat API] Found reference image in message history:', referenceImage.id);
+        logger.info('[Chat API] Found reference image in message history:', referenceImage.id);
         return referenceImage;
       }
     }
@@ -281,12 +282,12 @@ export async function chatHandler(req: Request, res: Response): Promise<void> {
 
     // DEBUG: Log do body recebido
     if (isDev) {
-      console.log('[Chat API] Request keys:', Object.keys(req.body || {}));
+      logger.info('[Chat API] Request keys:', Object.keys(req.body || {}));
     }
 
     const validation = validateChatRequest(req.body);
     if (!validation.success) {
-      console.error('[Chat API] Validation error:', validation.error.issues);
+      logger.error('[Chat API] Validation error:', validation.error.issues);
       res.status(400).json({
         error: 'Invalid request',
         details: validation.error.issues
@@ -305,12 +306,12 @@ export async function chatHandler(req: Request, res: Response): Promise<void> {
     const orgId = authCtx?.orgId;
 
     if (!userId) {
-      console.error('[Chat API] Unauthorized: no userId');
+      logger.error('[Chat API] Unauthorized: no userId');
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log(`[Chat API] Request | chatId: ${id} | userId: ${userId} | model: ${selectedChatModel}`);
+    logger.info(`[Chat API] Request | chatId: ${id} | userId: ${userId} | model: ${selectedChatModel}`);
 
     // =========================================================================
     // 3. RATE LIMITING
@@ -328,11 +329,11 @@ export async function chatHandler(req: Request, res: Response): Promise<void> {
     if (isToolApprovalFlow && messages) {
       // Tool approval: truncar mensagens para evitar exceder limite de tokens
       messagesToProcess = truncateMessages(messages as ChatMessage[]);
-      console.log(`[Chat API] Tool approval flow | messages: ${messages.length} (truncated: ${messagesToProcess.length})`);
+      logger.info(`[Chat API] Tool approval flow | messages: ${messages.length} (truncated: ${messagesToProcess.length})`);
     } else if (message) {
       // Nova mensagem: apenas a ultima
       messagesToProcess = [message as ChatMessage];
-      console.log('[Chat API] New message flow');
+      logger.info('[Chat API] New message flow');
     } else {
       // Should not happen due to validation, but handle gracefully
       res.status(400).json({ error: 'No message or messages provided' });
@@ -353,8 +354,8 @@ export async function chatHandler(req: Request, res: Response): Promise<void> {
     // =========================================================================
     // 6. VALIDAR BRANDPROFILE ANTES DE CONFIGURAR TOOLS
     // =========================================================================
-    console.log(`[Chat API] Validando brandProfile...`);
-    console.log(`[Chat API] brandProfile recebido:`, brandProfile ? {
+    logger.info(`[Chat API] Validando brandProfile...`);
+    logger.info(`[Chat API] brandProfile recebido:`, brandProfile ? {
       hasName: !!brandProfile.name,
       hasColors: !!brandProfile.colors,
       hasDescription: !!brandProfile.description,
@@ -364,8 +365,8 @@ export async function chatHandler(req: Request, res: Response): Promise<void> {
 
     // Validar que brandProfile tem os campos minimos necessarios
     if (!brandProfile || !brandProfile.name) {
-      console.warn(`[Chat API] brandProfile invalido ou incompleto!`);
-      console.warn(`[Chat API] brandProfile:`, JSON.stringify(brandProfile, null, 2));
+      logger.warn(`[Chat API] brandProfile invalido ou incompleto!`);
+      logger.warn(`[Chat API] brandProfile:`, JSON.stringify(brandProfile, null, 2));
     }
 
     // =========================================================================
@@ -411,9 +412,9 @@ export async function chatHandler(req: Request, res: Response): Promise<void> {
     type ToolName = 'createImage' | 'editImage' | 'createLogo';
     const activeTools: ToolName[] = isReasoningModel ? [] : ['createImage', 'editImage', 'createLogo'];
 
-    console.log(`[Chat API] Starting streamText | activeTools: ${activeTools.length}`);
-    console.log(`[Chat API] Usando Gemini nativo para modelo: ${selectedChatModel}`);
-    console.log(`[Chat API] Reference image:`, chatReferenceImage ? `id=${chatReferenceImage.id}` : 'none');
+    logger.info(`[Chat API] Starting streamText | activeTools: ${activeTools.length}`);
+    logger.info(`[Chat API] Usando Gemini nativo para modelo: ${selectedChatModel}`);
+    logger.info(`[Chat API] Reference image:`, chatReferenceImage ? `id=${chatReferenceImage.id}` : 'none');
 
     // Create system prompt options
     const systemPromptBrandProfile = brandProfile ? {
@@ -427,7 +428,7 @@ export async function chatHandler(req: Request, res: Response): Promise<void> {
     } : undefined;
 
     const systemMessage = systemPrompt({ brandProfile: systemPromptBrandProfile, selectedChatModel });
-    console.log(`[Chat API] System prompt length: ${systemMessage.length} chars`);
+    logger.info(`[Chat API] System prompt length: ${systemMessage.length} chars`);
 
     // =========================================================================
     // 8. STREAM DE TEXTO COM VERCEL AI SDK
@@ -449,30 +450,30 @@ export async function chatHandler(req: Request, res: Response): Promise<void> {
       temperature: 0.7,
       stopWhen: stepCountIs(5), // Permitir ate 5 steps de tool calling
       onStepFinish: ({ text, toolCalls, toolResults, finishReason, usage }) => {
-        console.log('[Chat API] ================================================');
-        console.log('[Chat API] STEP FINISHED');
-        console.log('[Chat API] finishReason:', finishReason);
-        console.log('[Chat API] usage:', usage);
+        logger.info('[Chat API] ================================================');
+        logger.info('[Chat API] STEP FINISHED');
+        logger.info('[Chat API] finishReason:', finishReason);
+        logger.info('[Chat API] usage:', usage);
 
         if (text) {
-          console.log('[Chat API] text preview:', text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+          logger.info('[Chat API] text preview:', text.substring(0, 100) + (text.length > 100 ? '...' : ''));
         }
 
         // Log detalhado de tool calls
         if (toolCalls && toolCalls.length > 0) {
-          console.log(`[Chat API] Tool Calls (${toolCalls.length}):`);
+          logger.info(`[Chat API] Tool Calls (${toolCalls.length}):`);
           toolCalls.forEach((tc, idx) => {
-            console.log(`[Chat API]   ${idx + 1}. ${tc.toolName} (${tc.type})`);
-            console.log(`[Chat API]      toolCallId: ${tc.toolCallId}`);
+            logger.info(`[Chat API]   ${idx + 1}. ${tc.toolName} (${tc.type})`);
+            logger.info(`[Chat API]      toolCallId: ${tc.toolCallId}`);
 
             // Log dos argumentos da tool - access via type narrowing
             if ('args' in tc && tc.args) {
               try {
                 const argsStr = JSON.stringify(tc.args, null, 2).split('\n').map(l => `[Chat API]         ${l}`).join('\n');
-                console.log(`[Chat API]      args:`);
-                console.log(argsStr);
+                logger.info(`[Chat API]      args:`);
+                logger.info(argsStr);
               } catch {
-                console.log(`[Chat API]      args: <error serializing>`);
+                logger.info(`[Chat API]      args: <error serializing>`);
               }
             }
           });
@@ -480,10 +481,10 @@ export async function chatHandler(req: Request, res: Response): Promise<void> {
 
         // Log detalhado de tool results
         if (toolResults && toolResults.length > 0) {
-          console.log(`[Chat API] Tool Results (${toolResults.length}):`);
+          logger.info(`[Chat API] Tool Results (${toolResults.length}):`);
           toolResults.forEach((tr, idx) => {
-            console.log(`[Chat API]   ${idx + 1}. ${tr.toolName}`);
-            console.log(`[Chat API]      toolCallId: ${tr.toolCallId}`);
+            logger.info(`[Chat API]   ${idx + 1}. ${tr.toolName}`);
+            logger.info(`[Chat API]      toolCallId: ${tr.toolCallId}`);
 
             // Log do resultado da tool - access via type narrowing
             try {
@@ -498,34 +499,34 @@ export async function chatHandler(req: Request, res: Response): Promise<void> {
               } else {
                 resultLog = 'undefined';
               }
-              console.log(`[Chat API]      result: ${resultLog}`);
+              logger.info(`[Chat API]      result: ${resultLog}`);
             } catch (e) {
               const error = e as Error;
-              console.log(`[Chat API]      result: <error serializing: ${error.message}>`);
+              logger.info(`[Chat API]      result: <error serializing: ${error.message}>`);
             }
 
             // Log de erros se houver
             if ('error' in tr && tr.error) {
-              console.error(`[Chat API]      ERROR: ${tr.error}`);
+              logger.error(`[Chat API]      ERROR: ${tr.error}`);
             }
           });
         }
 
-        console.log('[Chat API] ================================================');
+        logger.info('[Chat API] ================================================');
       }
     });
 
-    console.log('[Chat API] Streaming started');
+    logger.info('[Chat API] Streaming started');
 
     // Para Express + useChat, usar pipeUIMessageStreamToResponse
     result.pipeUIMessageStreamToResponse(res);
   } catch (error) {
     const err = error as Error;
-    console.error('[Chat API] Error:', err);
+    logger.error('[Chat API] Error:', err);
 
     // Se headers ja foram enviados, nao podemos enviar erro
     if (res.headersSent) {
-      console.error('[Chat API] Headers already sent, closing connection');
+      logger.error('[Chat API] Headers already sent, closing connection');
       res.end();
       return;
     }

@@ -6,6 +6,7 @@
 import { Queue, Worker, Job, type JobProgress } from 'bullmq';
 import { Redis } from 'ioredis';
 import net from 'net';
+import logger from "../lib/logger.js";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -228,7 +229,7 @@ export async function waitForRedis(timeoutMs = 5000): Promise<boolean> {
         resolve(true);
       } else if (Date.now() - startTime > timeoutMs) {
         clearInterval(checkInterval);
-        console.log('[JobQueue] Redis connection timeout after', timeoutMs, 'ms');
+        logger.info('[JobQueue] Redis connection timeout after', timeoutMs, 'ms');
         resolve(false);
       }
     }, 100);
@@ -251,12 +252,12 @@ export async function getRedisConnection(): Promise<Redis | null> {
 
   if (!connection) {
     const maskedUrl = REDIS_URL.replace(/\/\/.*@/, '//***@');
-    console.log('[JobQueue] Probing Redis:', maskedUrl);
+    logger.info('[JobQueue] Probing Redis:', maskedUrl);
 
     // Quick TCP probe — avoids all the ioredis/BullMQ error noise if host is dead
     const reachable = await probeRedis(REDIS_URL);
     if (!reachable) {
-      console.log('[JobQueue] Redis not reachable, skipping (development mode OK, will use fallback)');
+      logger.info('[JobQueue] Redis not reachable, skipping (development mode OK, will use fallback)');
       redisGaveUp = true;
       return null;
     }
@@ -268,7 +269,7 @@ export async function getRedisConnection(): Promise<Redis | null> {
       connectTimeout: 5000,
       retryStrategy: (times: number): number | null => {
         if (times > 3) {
-          console.log('[JobQueue] Redis connection failed after 3 attempts, giving up');
+          logger.info('[JobQueue] Redis connection failed after 3 attempts, giving up');
           redisAvailable = false;
           redisGaveUp = true;
           return null;
@@ -285,11 +286,11 @@ export async function getRedisConnection(): Promise<Redis | null> {
     });
 
     newConnection.on('connect', () => {
-      console.log('[JobQueue] Redis socket connected');
+      logger.info('[JobQueue] Redis socket connected');
     });
 
     newConnection.on('ready', () => {
-      console.log('[JobQueue] Redis ready');
+      logger.info('[JobQueue] Redis ready');
       redisAvailable = true;
     });
 
@@ -309,7 +310,7 @@ export async function getRedisConnection(): Promise<Redis | null> {
         return newConnection;
       })
       .catch(() => {
-        console.log('[JobQueue] Redis not available, using fallback');
+        logger.info('[JobQueue] Redis not available, using fallback');
         redisAvailable = false;
         connection = null;
         connectionPromise = null;
@@ -352,7 +353,7 @@ export function getScheduledPostsQueue(): Queue<ScheduledPostJobData, ScheduledP
         },
       },
     });
-    console.log('[JobQueue] Scheduled posts queue created');
+    logger.info('[JobQueue] Scheduled posts queue created');
   }
   return scheduledPostsQueue;
 }
@@ -368,7 +369,7 @@ export async function schedulePostForPublishing(
   const queue = getScheduledPostsQueue();
 
   if (!queue) {
-    console.log(`[JobQueue] Redis not available, post ${postId} will be handled by fallback checker`);
+    logger.info(`[JobQueue] Redis not available, post ${postId} will be handled by fallback checker`);
     return { jobId: null, fallback: true };
   }
 
@@ -385,7 +386,7 @@ export async function schedulePostForPublishing(
     const existingJob = await queue.getJob(jobId);
     if (existingJob) {
       await existingJob.remove();
-      console.log(`[JobQueue] Removed existing job for post ${postId}`);
+      logger.info(`[JobQueue] Removed existing job for post ${postId}`);
     }
   } catch {
     // Job doesn't exist, that's fine
@@ -404,7 +405,7 @@ export async function schedulePostForPublishing(
   });
 
   const delayMinutes = Math.round(delay / 60000);
-  console.log(`[JobQueue] Post ${postId} scheduled for ${new Date(targetTime).toISOString()} (in ${delayMinutes} min)`);
+  logger.info(`[JobQueue] Post ${postId} scheduled for ${new Date(targetTime).toISOString()} (in ${delayMinutes} min)`);
 
   return { jobId: job.id ?? null, delay, scheduledFor: new Date(targetTime).toISOString() };
 }
@@ -416,7 +417,7 @@ export async function cancelScheduledPost(postId: string): Promise<boolean> {
   const queue = getScheduledPostsQueue();
 
   if (!queue) {
-    console.log(`[JobQueue] Redis not available, skipping job cancellation for post ${postId}`);
+    logger.info(`[JobQueue] Redis not available, skipping job cancellation for post ${postId}`);
     return false;
   }
 
@@ -426,12 +427,12 @@ export async function cancelScheduledPost(postId: string): Promise<boolean> {
     const job = await queue.getJob(jobId);
     if (job) {
       await job.remove();
-      console.log(`[JobQueue] Cancelled scheduled job for post ${postId}`);
+      logger.info(`[JobQueue] Cancelled scheduled job for post ${postId}`);
       return true;
     }
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
-    console.error(`[JobQueue] Error cancelling job for post ${postId}:`, error.message);
+    logger.error(`[JobQueue] Error cancelling job for post ${postId}:`, error.message);
   }
   return false;
 }
@@ -449,7 +450,7 @@ export async function initializeScheduledPostsChecker(
   const queue = getScheduledPostsQueue();
 
   if (!queue || !connection || !redisAvailable) {
-    console.log('[ScheduledPosts] Redis not available, using fallback-only mode (checks every 5min via database polling)');
+    logger.info('[ScheduledPosts] Redis not available, using fallback-only mode (checks every 5min via database polling)');
     return null;
   }
 
@@ -461,7 +462,7 @@ export async function initializeScheduledPostsChecker(
       if (job.name === 'publish-post') {
         const data = job.data as PublishPostJobData;
         const { postId, userId } = data;
-        console.log(`[ScheduledPosts] Publishing post ${postId} (exact time)`);
+        logger.info(`[ScheduledPosts] Publishing post ${postId} (exact time)`);
 
         if (publishSingleFn) {
           const result = await publishSingleFn(postId, userId);
@@ -474,7 +475,7 @@ export async function initializeScheduledPostsChecker(
       if (job.name === 'check-scheduled') {
         const result = await publishFn();
         if (result?.published && result.published > 0) {
-          console.log(`[ScheduledPosts] Fallback caught ${result.published} missed posts`);
+          logger.info(`[ScheduledPosts] Fallback caught ${result.published} missed posts`);
         }
         return result;
       }
@@ -490,12 +491,12 @@ export async function initializeScheduledPostsChecker(
   scheduledPostsWorker.on('completed', (job: Job<ScheduledPostJobData, ScheduledPostResult>, result: ScheduledPostResult) => {
     const publishResult = result as PublishPostResult;
     if (job.name === 'publish-post' && publishResult?.success) {
-      console.log(`[ScheduledPosts] Post published successfully`);
+      logger.info(`[ScheduledPosts] Post published successfully`);
     }
   });
 
   scheduledPostsWorker.on('failed', (job: Job<ScheduledPostJobData, ScheduledPostResult> | undefined, err: Error) => {
-    console.error(`[ScheduledPosts] Job ${job?.name} failed:`, err.message);
+    logger.error(`[ScheduledPosts] Job ${job?.name} failed:`, err.message);
   });
 
   // Setup fallback checker (every 5 minutes) - catches missed posts after server restart
@@ -509,10 +510,10 @@ export async function initializeScheduledPostsChecker(
       },
       jobId: 'scheduled-posts-fallback',
     });
-    console.log('[ScheduledPosts] Fallback checker added (every 5 min)');
+    logger.info('[ScheduledPosts] Fallback checker added (every 5 min)');
   }
 
-  console.log('[ScheduledPosts] Worker initialized (exact time + 5min fallback)');
+  logger.info('[ScheduledPosts] Worker initialized (exact time + 5min fallback)');
   return scheduledPostsWorker;
 }
 
@@ -528,7 +529,7 @@ let imageGenerationProcessor: ImageGenerationProcessor | null = null;
  */
 export function registerImageGenerationProcessor(processorFn: ImageGenerationProcessor): void {
   imageGenerationProcessor = processorFn;
-  console.log('[ImageGenQueue] Processor registered');
+  logger.info('[ImageGenQueue] Processor registered');
 }
 
 /**
@@ -557,7 +558,7 @@ export function getImageGenerationQueue(): Queue<ImageGenerationJobData, ImageGe
         },
       },
     });
-    console.log(`[ImageGenQueue] Created with concurrency=${IMAGE_GEN_CONCURRENCY}, delay=${IMAGE_GEN_DELAY_MS}ms`);
+    logger.info(`[ImageGenQueue] Created with concurrency=${IMAGE_GEN_CONCURRENCY}, delay=${IMAGE_GEN_DELAY_MS}ms`);
   }
   return imageGenerationQueue;
 }
@@ -618,7 +619,7 @@ export async function enqueueImageGeneration(
   });
 
   const estimatedStart = Date.now() + delay;
-  console.log(`[ImageGenQueue] Job ${jobId} queued (delay=${delay}ms, position=${waitingCount + 1})`);
+  logger.info(`[ImageGenQueue] Job ${jobId} queued (delay=${delay}ms, position=${waitingCount + 1})`);
 
   return {
     jobId: job.id,
@@ -660,12 +661,12 @@ export async function enqueueImageGenerationBatch(
       results.push(result);
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
-      console.error(`[ImageGenQueue] Failed to queue batch job ${i}:`, error.message);
+      logger.error(`[ImageGenQueue] Failed to queue batch job ${i}:`, error.message);
       results.push({ error: error.message, jobId: undefined, status: 'failed', delay: 0, estimatedStart: '', queuePosition: 0 });
     }
   }
 
-  console.log(`[ImageGenQueue] Batch queued: ${results.filter(r => !r.error).length}/${jobsData.length} jobs`);
+  logger.info(`[ImageGenQueue] Batch queued: ${results.filter(r => !r.error).length}/${jobsData.length} jobs`);
   return results;
 }
 
@@ -696,7 +697,7 @@ export async function getImageGenerationJobStatus(jobId: string): Promise<ImageG
     };
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
-    console.error(`[ImageGenQueue] Error getting job status:`, error.message);
+    logger.error(`[ImageGenQueue] Error getting job status:`, error.message);
     return null;
   }
 }
@@ -744,7 +745,7 @@ export async function getUserImageGenerationJobs(
       .slice(0, limit);
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
-    console.error(`[ImageGenQueue] Error getting user jobs:`, error.message);
+    logger.error(`[ImageGenQueue] Error getting user jobs:`, error.message);
     return [];
   }
 }
@@ -757,12 +758,12 @@ export async function initializeImageGenerationWorker(): Promise<Worker<ImageGen
   const queue = getImageGenerationQueue();
 
   if (!queue || !connection || !redisAvailable) {
-    console.log('[ImageGenQueue] Redis not available, worker not started');
+    logger.info('[ImageGenQueue] Redis not available, worker not started');
     return null;
   }
 
   if (!imageGenerationProcessor) {
-    console.warn('[ImageGenQueue] No processor registered - worker will not process jobs');
+    logger.warn('[ImageGenQueue] No processor registered - worker will not process jobs');
     return null;
   }
 
@@ -773,7 +774,7 @@ export async function initializeImageGenerationWorker(): Promise<Worker<ImageGen
       const startTime = Date.now();
       const { queuedAt } = job.data;
 
-      console.log(`[ImageGenWorker] Processing job ${job.id} (waited ${Date.now() - (queuedAt ?? startTime)}ms)`);
+      logger.info(`[ImageGenWorker] Processing job ${job.id} (waited ${Date.now() - (queuedAt ?? startTime)}ms)`);
 
       // Update progress
       await job.updateProgress(10);
@@ -788,7 +789,7 @@ export async function initializeImageGenerationWorker(): Promise<Worker<ImageGen
         await job.updateProgress(100);
 
         const duration = Date.now() - startTime;
-        console.log(`[ImageGenWorker] Job ${job.id} completed in ${duration}ms`);
+        logger.info(`[ImageGenWorker] Job ${job.id} completed in ${duration}ms`);
 
         return {
           success: true,
@@ -800,7 +801,7 @@ export async function initializeImageGenerationWorker(): Promise<Worker<ImageGen
         };
       } catch (e) {
         const error = e instanceof Error ? e : new Error(String(e));
-        console.error(`[ImageGenWorker] Job ${job.id} failed:`, error.message);
+        logger.error(`[ImageGenWorker] Job ${job.id} failed:`, error.message);
         throw error; // Let BullMQ handle retry
       }
     },
@@ -816,21 +817,21 @@ export async function initializeImageGenerationWorker(): Promise<Worker<ImageGen
   );
 
   imageGenerationWorker.on('completed', (job: Job<ImageGenerationJobData, ImageGenerationResult>, result: ImageGenerationResult) => {
-    console.log(`[ImageGenWorker] ✓ ${job.id} completed (${result.usedProvider})`);
+    logger.info(`[ImageGenWorker] ✓ ${job.id} completed (${result.usedProvider})`);
   });
 
   imageGenerationWorker.on('failed', (job: Job<ImageGenerationJobData, ImageGenerationResult> | undefined, err: Error) => {
-    console.error(`[ImageGenWorker] ✗ ${job?.id} failed:`, err.message);
+    logger.error(`[ImageGenWorker] ✗ ${job?.id} failed:`, err.message);
   });
 
   imageGenerationWorker.on('progress', (job: Job<ImageGenerationJobData, ImageGenerationResult>, progress: JobProgress) => {
     const progressStr = typeof progress === 'number' || typeof progress === 'string' || typeof progress === 'boolean'
       ? String(progress)
       : JSON.stringify(progress);
-    console.log(`[ImageGenWorker] ${job.id} progress: ${progressStr}%`);
+    logger.info(`[ImageGenWorker] ${job.id} progress: ${progressStr}%`);
   });
 
-  console.log(`[ImageGenWorker] Initialized (concurrency=${IMAGE_GEN_CONCURRENCY})`);
+  logger.info(`[ImageGenWorker] Initialized (concurrency=${IMAGE_GEN_CONCURRENCY})`);
   return imageGenerationWorker;
 }
 
@@ -851,11 +852,11 @@ export async function cancelImageGenerationJob(jobId: string): Promise<boolean> 
     }
 
     await job.remove();
-    console.log(`[ImageGenQueue] Job ${jobId} cancelled`);
+    logger.info(`[ImageGenQueue] Job ${jobId} cancelled`);
     return true;
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
-    console.error(`[ImageGenQueue] Error cancelling job:`, error.message);
+    logger.error(`[ImageGenQueue] Error cancelling job:`, error.message);
     return false;
   }
 }
@@ -870,10 +871,10 @@ export async function cleanupImageGenerationJobs(keepCompleted = 100, keepFailed
   try {
     await queue.clean(24 * 60 * 60 * 1000, keepCompleted, 'completed');
     await queue.clean(7 * 24 * 60 * 60 * 1000, keepFailed, 'failed');
-    console.log('[ImageGenQueue] Cleaned up old jobs');
+    logger.info('[ImageGenQueue] Cleaned up old jobs');
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
-    console.error('[ImageGenQueue] Cleanup error:', error.message);
+    logger.error('[ImageGenQueue] Cleanup error:', error.message);
   }
 }
 
@@ -901,5 +902,5 @@ export async function closeQueue(): Promise<void> {
     await connection.quit();
     connection = null;
   }
-  console.log('[JobQueue] All queues closed');
+  logger.info('[JobQueue] All queues closed');
 }

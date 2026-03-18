@@ -807,7 +807,7 @@ export async function createImageBatch(
       generationParams,
       genai,
     ).catch((err) => {
-      console.error("[ImagePlayground] Background generation failed:", err);
+      logger.error("[ImagePlayground] Background generation failed:", err);
     });
   }
 
@@ -874,13 +874,13 @@ async function buildContentParts(params: GenerationParams): Promise<ContentPart[
         parts.push({ inlineData: { data: base64Data, mimeType } });
       } catch (imgError) {
         const error = imgError as Error;
-        console.warn(
+        logger.warn(
           `[ImagePlayground] Failed to process reference image ${refImage.id}:`,
           error.message,
         );
       }
     }
-    console.log(
+    logger.info(
       `[ImagePlayground] Added ${params.referenceImages.length} reference images`,
     );
   }
@@ -904,12 +904,12 @@ async function buildContentParts(params: GenerationParams): Promise<ContentPart[
       }
 
       parts.push({ inlineData: { data: base64Data, mimeType } });
-      console.log(
+      logger.info(
         `[ImagePlayground] Added legacy reference image (${mimeType})`,
       );
     } catch (imgError) {
       const error = imgError as Error;
-      console.warn(
+      logger.warn(
         `[ImagePlayground] Failed to process reference image:`,
         error.message,
       );
@@ -921,7 +921,7 @@ async function buildContentParts(params: GenerationParams): Promise<ContentPart[
     for (const img of params.productImages) {
       if (img.base64 && img.mimeType) {
         parts.push({ inlineData: { data: img.base64, mimeType: img.mimeType } });
-        console.log(`[ImagePlayground] Added product image (${img.mimeType})`);
+        logger.info(`[ImagePlayground] Added product image (${img.mimeType})`);
       }
     }
   }
@@ -951,7 +951,7 @@ async function processImageGeneration(
       WHERE id = ${taskId}
     `;
 
-    console.log(`[ImagePlayground] Starting generation ${generationId}`, {
+    logger.info(`[ImagePlayground] Starting generation ${generationId}`, {
       prompt: params.prompt?.substring(0, 50) + "...",
       aspectRatio: params.aspectRatio,
       imageSize: params.imageSize,
@@ -982,7 +982,7 @@ async function processImageGeneration(
     const modelTier: "standard" | "pro" = standardModels.has(normalizedRequestedModel) ? "standard" : "pro";
 
     // Run through provider chain with automatic fallback
-    console.log("[ImagePlayground] Using provider chain", { modelTier });
+    logger.info("[ImagePlayground] Using provider chain", { modelTier });
     const result = await runWithProviderFallback("generate", {
       prompt: params.prompt,
       aspectRatio: params.aspectRatio || "1:1",
@@ -1041,10 +1041,10 @@ async function processImageGeneration(
         contentType: "image/jpeg",
       });
       thumbnailUrl = thumbnailBlob.url;
-      console.log(`[ImagePlayground] Thumbnail generated: ${thumbnailUrl}`);
+      logger.info(`[ImagePlayground] Thumbnail generated: ${thumbnailUrl}`);
     } catch (thumbError) {
       const error = thumbError as Error;
-      console.warn(
+      logger.warn(
         `[ImagePlayground] Failed to generate thumbnail:`,
         error.message,
       );
@@ -1156,16 +1156,16 @@ async function processImageGeneration(
           generationId,
         },
       }).catch((err) => {
-        console.warn("[ImagePlayground] Failed to log usage:", (err as Error).message);
+        logger.warn("[ImagePlayground] Failed to log usage:", (err as Error).message);
       });
     }
 
-    console.log(
+    logger.info(
       `[ImagePlayground] Generation ${generationId} completed successfully (provider: ${usedProvider})`,
     );
   } catch (error) {
     const err = error as Error;
-    console.error(
+    logger.error(
       `[ImagePlayground] Generation ${generationId} failed:`,
       error,
     );
@@ -1296,7 +1296,7 @@ export async function generateTopicTitle(
 
     return title;
   } catch (error) {
-    console.error("[ImagePlayground] Title generation failed:", error);
+    logger.error("[ImagePlayground] Title generation failed:", error);
     // Fallback to first few words of first prompt
     const firstPrompt = prompts[0] ?? "";
     return firstPrompt.split(" ").slice(0, 4).join(" ");

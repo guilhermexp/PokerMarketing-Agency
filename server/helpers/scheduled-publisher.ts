@@ -7,6 +7,7 @@
 import { put } from "@vercel/blob";
 import { validateContentType } from "../lib/validation/contentType.js";
 import { getSql, DATABASE_URL } from "../lib/db.js";
+import logger from "../lib/logger.js";
 
 // =============================================================================
 // Types
@@ -168,7 +169,7 @@ const parseSSEResponse = (text: string): RubeMcpData => {
         }
         return json as unknown as RubeMcpData;
       } catch (e) {
-        console.error('[Publisher] Failed to parse SSE:', e);
+        logger.error('[Publisher] Failed to parse SSE:', e);
       }
     }
   }
@@ -189,12 +190,12 @@ async function getInstagramCredentials(instagramAccountId: string): Promise<Inst
       LIMIT 1
     ` as InstagramCredentials[];
     if (!result[0]) {
-      console.error(`[Publisher] Instagram account ${instagramAccountId} not found or inactive`);
+      logger.error(`[Publisher] Instagram account ${instagramAccountId} not found or inactive`);
     }
     return result[0] || null;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[Publisher] DB error fetching Instagram credentials for ${instagramAccountId}:`, errorMessage);
+    logger.error(`[Publisher] DB error fetching Instagram credentials for ${instagramAccountId}:`, errorMessage);
     return null;
   }
 }
@@ -221,7 +222,7 @@ async function callRubeMCP(
     params: { name: toolName, arguments: args }
   };
 
-  console.log(`[Publisher] Calling ${toolName}...`);
+  logger.info(`[Publisher] Calling ${toolName}...`);
 
   const response = await fetch(MCP_URL, {
     method: 'POST',
@@ -437,7 +438,7 @@ async function createCarouselContainer(
 ): Promise<string> {
   const { token, instagramUserId } = credentials;
 
-  console.log(`[Publisher] Creating carousel with ${mediaUrls.length} items...`);
+  logger.info(`[Publisher] Creating carousel with ${mediaUrls.length} items...`);
 
   // Ensure all URLs are HTTP (upload data URLs to blob)
   const httpUrls: string[] = [];
@@ -456,7 +457,7 @@ async function createCarouselContainer(
     } else {
       httpUrls.push(httpUrl);
     }
-    console.log(`[Publisher] Prepared item ${i + 1}/${mediaUrls.length}: ${httpUrl.substring(0, 50)}...`);
+    logger.info(`[Publisher] Prepared item ${i + 1}/${mediaUrls.length}: ${httpUrl.substring(0, 50)}...`);
   }
 
   if (httpUrls.length + videoUrls.length < 2) {
@@ -476,7 +477,7 @@ async function createCarouselContainer(
     carouselArgs.child_video_urls = videoUrls;
   }
 
-  console.log(`[Publisher] Creating carousel container with ${httpUrls.length} images and ${videoUrls.length} videos...`);
+  logger.info(`[Publisher] Creating carousel container with ${httpUrls.length} images and ${videoUrls.length} videos...`);
   const result = await executeInstagramTool('INSTAGRAM_CREATE_CAROUSEL_CONTAINER', carouselArgs as Record<string, unknown>, token);
   const carouselId = result?.id || result?.creation_id || result?.container_id || result?.data?.id;
 
@@ -484,7 +485,7 @@ async function createCarouselContainer(
     throw new Error(`Failed to create carousel container: ${JSON.stringify(result)}`);
   }
 
-  console.log(`[Publisher] Carousel container created: ${carouselId}`);
+  logger.info(`[Publisher] Carousel container created: ${carouselId}`);
   return carouselId;
 }
 
@@ -511,7 +512,7 @@ async function publishCarousel(
  */
 async function publishPost(post: ScheduledPostRow): Promise<PublishResult> {
   try {
-    console.log(`[Publisher] Publishing post ${post.id}...`);
+    logger.info(`[Publisher] Publishing post ${post.id}...`);
 
     // Get credentials - from database if instagram_account_id, else try to auto-resolve
     let credentials: ResolvedCredentials;
@@ -519,7 +520,7 @@ async function publishPost(post: ScheduledPostRow): Promise<PublishResult> {
 
     // Auto-resolve: if no instagram_account_id, find active account for this user/org
     if (!instagramAccountId) {
-      console.log('[Publisher] No instagram_account_id on post, auto-resolving...');
+      logger.info('[Publisher] No instagram_account_id on post, auto-resolving...');
       try {
         const sql = getSql();
         const accounts = post.organization_id
@@ -539,11 +540,11 @@ async function publishPost(post: ScheduledPostRow): Promise<PublishResult> {
         const firstAccount = accounts[0];
         if (firstAccount) {
           instagramAccountId = firstAccount.id;
-          console.log(`[Publisher] Auto-resolved instagram account: ${instagramAccountId}`);
+          logger.info(`[Publisher] Auto-resolved instagram account: ${instagramAccountId}`);
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        console.error('[Publisher] Failed to auto-resolve instagram account:', errorMessage);
+        logger.error('[Publisher] Failed to auto-resolve instagram account:', errorMessage);
       }
     }
 
@@ -556,7 +557,7 @@ async function publishPost(post: ScheduledPostRow): Promise<PublishResult> {
         token: dbCredentials.rube_token,
         instagramUserId: dbCredentials.instagram_user_id
       };
-      console.log(`[Publisher] Using user token for Instagram: ${credentials.instagramUserId}`);
+      logger.info(`[Publisher] Using user token for Instagram: ${credentials.instagramUserId}`);
     } else {
       // Legacy: no instagram_account_id and no active accounts - use global token
       if (!RUBE_TOKEN || !process.env.INSTAGRAM_USER_ID) {
@@ -566,7 +567,7 @@ async function publishPost(post: ScheduledPostRow): Promise<PublishResult> {
         token: RUBE_TOKEN,
         instagramUserId: process.env.INSTAGRAM_USER_ID
       };
-      console.log('[Publisher] Warning: Using legacy global token');
+      logger.info('[Publisher] Warning: Using legacy global token');
     }
 
     // Build caption with hashtags
@@ -585,7 +586,7 @@ async function publishPost(post: ScheduledPostRow): Promise<PublishResult> {
 
     if (isCarousel && post.carousel_image_urls) {
       // Create carousel container with all images
-      console.log(`[Publisher] Creating carousel with ${post.carousel_image_urls.length} images...`);
+      logger.info(`[Publisher] Creating carousel with ${post.carousel_image_urls.length} images...`);
       isCarouselPost = true;
       containerId = await createCarouselContainer(
         post.carousel_image_urls,
@@ -595,7 +596,7 @@ async function publishPost(post: ScheduledPostRow): Promise<PublishResult> {
     } else {
       // Single image post - ensure HTTP URL
       const httpUrl = await ensureHttpUrl(post.image_url);
-      console.log(`[Publisher] Image URL ready: ${httpUrl.substring(0, 50)}...`);
+      logger.info(`[Publisher] Image URL ready: ${httpUrl.substring(0, 50)}...`);
 
       // Create single media container
       containerId = await createMediaContainer(
@@ -605,7 +606,7 @@ async function publishPost(post: ScheduledPostRow): Promise<PublishResult> {
         credentials
       );
     }
-    console.log(`[Publisher] Container created: ${containerId}`);
+    logger.info(`[Publisher] Container created: ${containerId}`);
 
     // Wait for processing (max 60 seconds for single, 120 for carousel)
     const maxAttempts = isCarouselPost ? 120 : 60;
@@ -616,7 +617,7 @@ async function publishPost(post: ScheduledPostRow): Promise<PublishResult> {
       try {
         status = await getContainerStatus(containerId, credentials);
       } catch {
-        console.warn('[Publisher] Status check failed, retrying...');
+        logger.warn('[Publisher] Status check failed, retrying...');
       }
       attempts++;
     }
@@ -632,13 +633,13 @@ async function publishPost(post: ScheduledPostRow): Promise<PublishResult> {
     } else {
       mediaId = await publishContainer(containerId, credentials);
     }
-    console.log(`[Publisher] Published! Media ID: ${mediaId}`);
+    logger.info(`[Publisher] Published! Media ID: ${mediaId}`);
 
     return { success: true, mediaId };
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`[Publisher] Failed to publish post ${post.id}:`, errorMessage);
+    logger.error(`[Publisher] Failed to publish post ${post.id}:`, errorMessage);
     return { success: false, error: errorMessage };
   }
 }
@@ -657,7 +658,7 @@ export async function publishScheduledPostById(
 
   // Check publishing hours
   if (!isWithinPublishingHours()) {
-    console.log(`[Publisher] Post ${postId} outside publishing hours, will retry via fallback`);
+    logger.info(`[Publisher] Post ${postId} outside publishing hours, will retry via fallback`);
     return { success: false, error: 'Outside publishing hours', retryLater: true };
   }
 
@@ -704,7 +705,7 @@ export async function publishScheduledPostById(
             instagram_media_id = ${result.mediaId || null}
         WHERE id = ${postId}
       `;
-      console.log(`[Publisher] Post ${postId} published successfully`);
+      logger.info(`[Publisher] Post ${postId} published successfully`);
       return { success: true, mediaId: result.mediaId };
     } else {
       const attempts = (post.publish_attempts || 0) + 1;
@@ -721,7 +722,7 @@ export async function publishScheduledPostById(
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[Publisher] Error publishing post ${postId}:`, error);
+    logger.error(`[Publisher] Error publishing post ${postId}:`, error);
     return { success: false, error: errorMessage };
   }
 }
@@ -769,7 +770,7 @@ export async function checkAndPublishScheduledPosts(): Promise<CheckAndPublishRe
   }
 
   if (!DATABASE_URL) {
-    console.log('[Publisher] DATABASE_URL not configured, skipping');
+    logger.info('[Publisher] DATABASE_URL not configured, skipping');
     return { published: 0, failed: 0, skipped: true };
   }
 
@@ -788,7 +789,7 @@ export async function checkAndPublishScheduledPosts(): Promise<CheckAndPublishRe
       RETURNING id
     ` as ExpiredPostRow[];
     if (expired.length > 0) {
-      console.log(`[Publisher] Expired ${expired.length} stale post(s)`);
+      logger.info(`[Publisher] Expired ${expired.length} stale post(s)`);
     }
 
     // Atomic claim: only grab posts still in 'scheduled' status
@@ -813,7 +814,7 @@ export async function checkAndPublishScheduledPosts(): Promise<CheckAndPublishRe
       return { published: 0, failed: 0, expired: expired.length };
     }
 
-    console.log(`[Publisher] Found ${duePosts.length} posts to publish`);
+    logger.info(`[Publisher] Found ${duePosts.length} posts to publish`);
 
     let published = 0;
     let failed = 0;
@@ -849,12 +850,12 @@ export async function checkAndPublishScheduledPosts(): Promise<CheckAndPublishRe
       }
     }
 
-    console.log(`[Publisher] Done: ${published} published, ${failed} failed`);
+    logger.info(`[Publisher] Done: ${published} published, ${failed} failed`);
     return { published, failed, expired: expired.length };
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('[Publisher] Error:', error);
+    logger.error('[Publisher] Error:', error);
     return { published: 0, failed: 0, error: errorMessage };
   }
 }

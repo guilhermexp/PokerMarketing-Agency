@@ -6,6 +6,7 @@
 
 import { tool } from "ai";
 import { z } from "zod";
+import logger from "../../logger.js";
 
 // ============================================================================
 // TYPES
@@ -100,18 +101,18 @@ export function createImageTool({ userId, orgId, dataStream, brandProfile }: Too
     execute: async (params: CreateImageParams): Promise<CreateImageResult> => {
       const { description, aspectRatio } = params;
       const startTime = Date.now();
-      console.log(`[Tool:createImage] ========================================`);
-      console.log(`[Tool:createImage] INÍCIO DA EXECUÇÃO`);
-      console.log(`[Tool:createImage] userId: ${userId}`);
-      console.log(`[Tool:createImage] orgId: ${orgId || "null (personal)"}`);
-      console.log(`[Tool:createImage] description: "${description}"`);
-      console.log(`[Tool:createImage] aspectRatio: ${aspectRatio}`);
-      console.log(`[Tool:createImage] brandProfile presente: ${!!brandProfile}`);
+      logger.info(`[Tool:createImage] ========================================`);
+      logger.info(`[Tool:createImage] INÍCIO DA EXECUÇÃO`);
+      logger.info(`[Tool:createImage] userId: ${userId}`);
+      logger.info(`[Tool:createImage] orgId: ${orgId || "null (personal)"}`);
+      logger.info(`[Tool:createImage] description: "${description}"`);
+      logger.info(`[Tool:createImage] aspectRatio: ${aspectRatio}`);
+      logger.info(`[Tool:createImage] brandProfile presente: ${!!brandProfile}`);
 
       if (brandProfile) {
-        console.log(`[Tool:createImage] brandProfile.name: ${brandProfile.name || "undefined"}`);
-        console.log(`[Tool:createImage] brandProfile.logo: ${brandProfile.logo ? "presente" : "ausente"}`);
-        console.log(`[Tool:createImage] brandProfile.colors: ${brandProfile.colors ? JSON.stringify(brandProfile.colors) : "ausente"}`);
+        logger.info(`[Tool:createImage] brandProfile.name: ${brandProfile.name || "undefined"}`);
+        logger.info(`[Tool:createImage] brandProfile.logo: ${brandProfile.logo ? "presente" : "ausente"}`);
+        logger.info(`[Tool:createImage] brandProfile.colors: ${brandProfile.colors ? JSON.stringify(brandProfile.colors) : "ausente"}`);
       }
 
       try {
@@ -137,8 +138,8 @@ export function createImageTool({ userId, orgId, dataStream, brandProfile }: Too
           imageSize: "1K",
         };
 
-        console.log(`[Tool:createImage] Fazendo requisição para: ${requestUrl}`);
-        console.log(`[Tool:createImage] Request body:`, JSON.stringify(requestBody, null, 2));
+        logger.info(`[Tool:createImage] Fazendo requisição para: ${requestUrl}`);
+        logger.info(`[Tool:createImage] Request body:`, JSON.stringify(requestBody, null, 2));
 
         const response = await fetch(requestUrl, {
           method: "POST",
@@ -146,30 +147,30 @@ export function createImageTool({ userId, orgId, dataStream, brandProfile }: Too
           body: JSON.stringify(requestBody),
         });
 
-        console.log(`[Tool:createImage] Response status: ${response.status} ${response.statusText}`);
+        logger.info(`[Tool:createImage] Response status: ${response.status} ${response.statusText}`);
 
         if (!response.ok) {
           let errorData: GenerateImageResponse;
           try {
             errorData = await response.json() as GenerateImageResponse;
-            console.error(`[Tool:createImage] Erro da API (JSON):`, errorData);
+            logger.error(`[Tool:createImage] Erro da API (JSON):`, errorData);
           } catch {
             const errorText = await response.text();
-            console.error(`[Tool:createImage] Erro da API (text):`, errorText);
+            logger.error(`[Tool:createImage] Erro da API (text):`, errorText);
             throw new Error(`Falha ao gerar imagem (${response.status}): ${errorText}`);
           }
           throw new Error(errorData.error || `Falha ao gerar imagem (${response.status})`);
         }
 
         const data = await response.json() as GenerateImageResponse;
-        console.log(`[Tool:createImage] Resposta da API recebida:`, {
+        logger.info(`[Tool:createImage] Resposta da API recebida:`, {
           success: data.success,
           hasImageUrl: !!data.imageUrl,
           model: data.model,
         });
 
         // 3. Salvar na gallery (via API interna)
-        console.log(`[Tool:createImage] Salvando imagem na galeria...`);
+        logger.info(`[Tool:createImage] Salvando imagem na galeria...`);
         const galleryResponse = await fetch(`${baseUrl}/api/db/gallery`, {
           method: "POST",
           headers: getInternalHeaders(userId, orgId),
@@ -185,15 +186,15 @@ export function createImageTool({ userId, orgId, dataStream, brandProfile }: Too
           }),
         });
 
-        console.log(`[Tool:createImage] Gallery response status: ${galleryResponse.status}`);
+        logger.info(`[Tool:createImage] Gallery response status: ${galleryResponse.status}`);
 
         let savedImage: GalleryResponse | null = null;
         if (galleryResponse.ok) {
           savedImage = await galleryResponse.json() as GalleryResponse;
-          console.log(`[Tool:createImage] Imagem salva na galeria com id: ${savedImage?.id}`);
+          logger.info(`[Tool:createImage] Imagem salva na galeria com id: ${savedImage?.id}`);
         } else {
           const galleryError = await galleryResponse.text();
-          console.warn(`[Tool:createImage] Falha ao salvar na galeria: ${galleryError}`);
+          logger.warn(`[Tool:createImage] Falha ao salvar na galeria: ${galleryError}`);
         }
 
         // 4. Enviar evento de conclusão (se dataStream disponível)
@@ -210,8 +211,8 @@ export function createImageTool({ userId, orgId, dataStream, brandProfile }: Too
         }
 
         const elapsedTime = Date.now() - startTime;
-        console.log(`[Tool:createImage] SUCESSO | Tempo total: ${elapsedTime}ms | id: ${savedImage?.id}`);
-        console.log(`[Tool:createImage] ========================================`);
+        logger.info(`[Tool:createImage] SUCESSO | Tempo total: ${elapsedTime}ms | id: ${savedImage?.id}`);
+        logger.info(`[Tool:createImage] ========================================`);
 
         return {
           success: true,
@@ -222,12 +223,12 @@ export function createImageTool({ userId, orgId, dataStream, brandProfile }: Too
       } catch (error) {
         const elapsedTime = Date.now() - startTime;
         const err = error as Error;
-        console.error(`[Tool:createImage] ========================================`);
-        console.error(`[Tool:createImage] ERRO após ${elapsedTime}ms`);
-        console.error(`[Tool:createImage] Tipo de erro: ${err.constructor.name}`);
-        console.error(`[Tool:createImage] Mensagem: ${err.message}`);
-        console.error(`[Tool:createImage] Stack:`, err.stack);
-        console.error(`[Tool:createImage] ========================================`);
+        logger.error(`[Tool:createImage] ========================================`);
+        logger.error(`[Tool:createImage] ERRO após ${elapsedTime}ms`);
+        logger.error(`[Tool:createImage] Tipo de erro: ${err.constructor.name}`);
+        logger.error(`[Tool:createImage] Mensagem: ${err.message}`);
+        logger.error(`[Tool:createImage] Stack:`, err.stack);
+        logger.error(`[Tool:createImage] ========================================`);
 
         // Enviar evento de erro (se dataStream disponível)
         if (dataStream) {

@@ -6,6 +6,7 @@
 
 import { tool } from "ai";
 import { z } from "zod";
+import logger from "../../logger.js";
 
 // ============================================================================
 // TYPES
@@ -118,10 +119,10 @@ export function editImageTool({ userId, orgId, dataStream, referenceImage }: Too
           });
         }
 
-        console.log(`[Tool:editImage] Editando imagem | orgId: ${orgId} | refId: ${referenceImage.id}`);
+        logger.info(`[Tool:editImage] Editando imagem | orgId: ${orgId} | refId: ${referenceImage.id}`);
 
         // 3. Baixar e converter imagem para base64
-        console.log(`[Tool:editImage] Baixando imagem: ${referenceImage.src}`);
+        logger.info(`[Tool:editImage] Baixando imagem: ${referenceImage.src}`);
         let base64Data = "";
         let mimeType = "image/jpeg";
         if (referenceImage.src.startsWith("data:")) {
@@ -136,8 +137,8 @@ export function editImageTool({ userId, orgId, dataStream, referenceImage }: Too
           mimeType = imageResponse.headers.get("content-type") || "image/jpeg";
         }
 
-        console.log(`[Tool:editImage] Imagem convertida para base64: ${base64Data.length} bytes, ${mimeType}`);
-        console.log(`[Tool:editImage] Prompt da edição: "${prompt}"`);
+        logger.info(`[Tool:editImage] Imagem convertida para base64: ${base64Data.length} bytes, ${mimeType}`);
+        logger.info(`[Tool:editImage] Prompt da edição: "${prompt}"`);
 
         // 4. Chamar API de edição de imagem
         const baseUrl = getInternalBaseUrl();
@@ -162,7 +163,7 @@ export function editImageTool({ userId, orgId, dataStream, referenceImage }: Too
 
         const data = await response.json() as EditImageResponse;
 
-        console.log(`[Tool:editImage] Resposta da API:`, {
+        logger.info(`[Tool:editImage] Resposta da API:`, {
           success: data.success,
           imageUrlLength: data.imageUrl?.length,
         });
@@ -186,10 +187,10 @@ export function editImageTool({ userId, orgId, dataStream, referenceImage }: Too
         let savedImage: GalleryResponse | null = null;
         if (galleryResponse.ok) {
           savedImage = await galleryResponse.json() as GalleryResponse;
-          console.log(`[Tool:editImage] Imagem salva na galeria:`, savedImage?.id);
+          logger.info(`[Tool:editImage] Imagem salva na galeria:`, savedImage?.id);
         } else {
           const errorData = await galleryResponse.json().catch(() => ({ error: "unknown" })) as { error: string };
-          console.error(`[Tool:editImage] Erro ao salvar na galeria:`, galleryResponse.status, errorData);
+          logger.error(`[Tool:editImage] Erro ao salvar na galeria:`, galleryResponse.status, errorData);
         }
 
         // 6. Enviar evento de conclusão (se dataStream disponível)
@@ -204,7 +205,7 @@ export function editImageTool({ userId, orgId, dataStream, referenceImage }: Too
           });
         }
 
-        console.log(`[Tool:editImage] Imagem editada | newId: ${savedImage?.id}`);
+        logger.info(`[Tool:editImage] Imagem editada | newId: ${savedImage?.id}`);
 
         return {
           success: true,
@@ -217,7 +218,7 @@ export function editImageTool({ userId, orgId, dataStream, referenceImage }: Too
         };
       } catch (error) {
         const err = error as Error;
-        console.error("[Tool:editImage] Erro:", err);
+        logger.error("[Tool:editImage] Erro:", err);
 
         // Enviar evento de erro (se dataStream disponível)
         if (dataStream) {
