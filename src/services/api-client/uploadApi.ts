@@ -17,21 +17,20 @@ export async function uploadToBlob(
   filename: string,
   contentType: string,
 ): Promise<UploadResult> {
-  if (!blob || blob.size === 0) {
+  if (!(blob instanceof Blob) || blob.size === 0) {
     throw new Error("Cannot upload empty blob");
   }
 
-  const arrayBuffer = await blob.arrayBuffer();
-  if (arrayBuffer.byteLength === 0) {
-    throw new Error("Blob contains no data");
-  }
-
-  const base64 = btoa(
-    new Uint8Array(arrayBuffer).reduce(
-      (data, byte) => data + String.fromCharCode(byte),
-      "",
-    ),
+  const normalizedContentType = contentType || blob.type || "application/octet-stream";
+  const formData = new FormData();
+  formData.append(
+    "file",
+    new File([blob], filename, {
+      type: normalizedContentType,
+    }),
   );
+  formData.append("filename", filename);
+  formData.append("contentType", normalizedContentType);
 
   if (!getCurrentCsrfToken()) {
     await getCsrfToken();
@@ -41,10 +40,9 @@ export async function uploadToBlob(
     method: "POST",
     credentials: "include",
     headers: {
-      "Content-Type": "application/json",
       ...(getCurrentCsrfToken() ? { "X-CSRF-Token": getCurrentCsrfToken()! } : {}),
     },
-    body: JSON.stringify({ filename, contentType, data: base64 }),
+    body: formData,
   });
 
   if (!response.ok) {
