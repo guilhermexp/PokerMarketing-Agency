@@ -1,5 +1,10 @@
 import { App } from "@/App";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export function CalendarView() {
-  return <App routeView="calendar" />;
+  return (
+    <ErrorBoundary>
+      <App routeView="calendar" />
+    </ErrorBoundary>
+  );
 }

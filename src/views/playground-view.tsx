@@ -1,5 +1,10 @@
 import { App } from "@/App";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export function PlaygroundView() {
-  return <App routeView="playground" />;
+  return (
+    <ErrorBoundary>
+      <App routeView="playground" />
+    </ErrorBoundary>
+  );
 }

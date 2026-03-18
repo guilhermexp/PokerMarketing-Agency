@@ -1,5 +1,10 @@
 import { App } from "@/App";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export function CarouselsView() {
-  return <App routeView="carousels" />;
+  return (
+    <ErrorBoundary>
+      <App routeView="carousels" />
+    </ErrorBoundary>
+  );
 }

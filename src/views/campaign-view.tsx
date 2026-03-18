@@ -1,5 +1,10 @@
 import { App } from "@/App";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export function CampaignView() {
-  return <App routeView="campaign" />;
+  return (
+    <ErrorBoundary>
+      <App routeView="campaign" />
+    </ErrorBoundary>
+  );
 }

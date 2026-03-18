@@ -7,6 +7,7 @@ import { clientLogger } from "@/lib/client-logger";
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import { useChat } from '@ai-sdk/react';
 import {
   isFileUIPart,
@@ -660,6 +661,7 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
   if (!isOpen) return null;
 
   return (
+    <ErrorBoundary>
     <DataStreamProvider dataStream={dataStream} setDataStream={setDataStream}>
       <DataStreamHandler />
 
@@ -866,5 +868,6 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
         </div>
       </aside>
     </DataStreamProvider>
+    </ErrorBoundary>
   );
 };

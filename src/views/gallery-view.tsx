@@ -1,5 +1,10 @@
 import { App } from "@/App";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export function GalleryView() {
-  return <App routeView="gallery" />;
+  return (
+    <ErrorBoundary>
+      <App routeView="gallery" />
+    </ErrorBoundary>
+  );
 }
