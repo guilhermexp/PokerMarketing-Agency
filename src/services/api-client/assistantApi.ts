@@ -1,0 +1,186 @@
+import { fetchAiApi } from "./base";
+
+export interface AiBrandProfile {
+  name: string;
+  description: string;
+  logoUrl?: string | null;
+  primaryColor: string;
+  secondaryColor: string;
+  toneOfVoice: string;
+  toneTargets?: Array<"campaigns" | "posts" | "images" | "flyers">;
+  creativeModel?: string;
+}
+
+export interface AiImageFile {
+  base64: string;
+  mimeType: string;
+}
+
+export interface AiGenerationResult<T> {
+  success: boolean;
+  result?: T;
+  imageUrl?: string;
+  audioBase64?: string;
+  campaign?: AiCampaign;
+  model?: string;
+}
+
+export interface AiCampaign {
+  videoClipScripts: Array<{
+    title: string;
+    hook: string;
+    scenes: Array<{ scene: number; visual: string; narration: string; duration_seconds: number }>;
+    image_prompt: string;
+    audio_script: string;
+  }>;
+  posts: Array<{ platform: string; content: string; hashtags: string[]; image_prompt: string }>;
+  adCreatives: Array<{
+    platform: string;
+    headline: string;
+    body: string;
+    cta: string;
+    image_prompt: string;
+  }>;
+}
+
+export interface AiGenerationOptions {
+  videoClipScripts: { generate: boolean; count: number };
+  carousels: { generate: boolean; count: number };
+  posts: {
+    instagram: { generate: boolean; count: number };
+    facebook: { generate: boolean; count: number };
+    twitter: { generate: boolean; count: number };
+    linkedin: { generate: boolean; count: number };
+  };
+  adCreatives: {
+    facebook: { generate: boolean; count: number };
+    google: { generate: boolean; count: number };
+  };
+}
+
+export type ApiVideoModel = "sora-2" | "veo-3.1";
+
+export interface VideoGenerationResult {
+  success: boolean;
+  url: string;
+  model: ApiVideoModel;
+}
+
+export async function generateAiImage(params: {
+  prompt: string;
+  brandProfile: AiBrandProfile;
+  aspectRatio?: string;
+  model?: string;
+  imageSize?: "1K" | "2K" | "4K";
+  productImages?: AiImageFile[];
+  styleReferenceImage?: AiImageFile;
+}): Promise<string> {
+  const result = await fetchAiApi<AiGenerationResult<never>>("/image", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+  return result.imageUrl!;
+}
+
+export async function generateAiFlyer(params: {
+  prompt: string;
+  brandProfile: AiBrandProfile;
+  logo?: AiImageFile | null;
+  referenceImage?: AiImageFile | null;
+  aspectRatio?: string;
+  collabLogo?: AiImageFile | null;
+  imageSize?: "1K" | "2K" | "4K";
+  compositionAssets?: AiImageFile[];
+}): Promise<string> {
+  const result = await fetchAiApi<AiGenerationResult<never>>("/flyer", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+  return result.imageUrl!;
+}
+
+export async function editAiImage(params: {
+  image: AiImageFile;
+  prompt: string;
+  mask?: AiImageFile;
+  referenceImage?: AiImageFile;
+}): Promise<string> {
+  const result = await fetchAiApi<AiGenerationResult<never>>("/edit-image", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+  return result.imageUrl!;
+}
+
+export async function generateAiSpeech(params: {
+  script: string;
+  voiceName?: string;
+}): Promise<string> {
+  const result = await fetchAiApi<AiGenerationResult<never>>("/speech", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+  return result.audioBase64!;
+}
+
+export async function generateAiText<T = Record<string, unknown>>(params: {
+  type: "quickPost" | "custom";
+  brandProfile: AiBrandProfile;
+  context?: string;
+  systemPrompt?: string;
+  userPrompt?: string;
+  image?: AiImageFile;
+  temperature?: number;
+  responseSchema?: Record<string, unknown>;
+}): Promise<T> {
+  const result = await fetchAiApi<AiGenerationResult<T>>("/text", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+  return result.result!;
+}
+
+export async function generateAiCampaign(params: {
+  brandProfile: AiBrandProfile;
+  transcript: string;
+  options: AiGenerationOptions;
+  productImages?: AiImageFile[];
+}): Promise<AiCampaign> {
+  const result = await fetchAiApi<AiGenerationResult<never>>("/campaign", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+  return result.campaign!;
+}
+
+export async function generateVideo(params: {
+  prompt: string;
+  aspectRatio: "16:9" | "9:16";
+  resolution?: "720p" | "1080p";
+  model: ApiVideoModel;
+  imageUrl?: string;
+  lastFrameUrl?: string;
+  sceneDuration?: number;
+  generateAudio?: boolean;
+  useInterpolation?: boolean;
+  useBrandProfile?: boolean;
+}): Promise<string> {
+  try {
+    const result = await fetchAiApi<VideoGenerationResult>("/video", {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+    return result.url;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("Nao foi possivel conectar ao servidor de IA")
+    ) {
+      throw new Error(
+        "Servidor de video indisponivel no momento. Verifique se a API local esta rodando na porta 3002.",
+        { cause: error },
+      );
+    }
+    throw error;
+  }
+}
