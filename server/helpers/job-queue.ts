@@ -1,25 +1,152 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * BullMQ Job Queue for Scheduled Post Publishing & Image Generation
  * Uses Redis for job queue management
  */
 
-import { Queue, Worker } from 'bullmq';
-import IORedis from 'ioredis';
+import { Queue, Worker, Job, type JobProgress } from 'bullmq';
+import { Redis } from 'ioredis';
 import net from 'net';
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+/** Job data for publishing a scheduled post */
+export interface PublishPostJobData {
+  postId: string;
+  userId: string;
+  scheduledTime: string;
+}
+
+/** Job data for checking scheduled posts (fallback) */
+export interface CheckScheduledJobData {
+  /** Empty object - no data needed */
+}
+
+/** Union type for all scheduled post job data types */
+export type ScheduledPostJobData = PublishPostJobData | CheckScheduledJobData;
+
+/** Result from publishing a single post */
+export interface PublishPostResult {
+  success?: boolean;
+  skipped?: boolean;
+  reason?: string;
+}
+
+/** Result from checking scheduled posts (batch) */
+export interface CheckScheduledResult {
+  published?: number;
+  skipped?: boolean;
+}
+
+/** Union type for scheduled post job results */
+export type ScheduledPostResult = PublishPostResult | CheckScheduledResult;
+
+/** Job data for image generation */
+export interface ImageGenerationJobData {
+  userId: string;
+  organizationId?: string;
+  prompt: string;
+  brandProfile?: unknown;
+  aspectRatio?: string;
+  imageSize?: string;
+  model?: string;
+  productImages?: string[];
+  styleReferenceImage?: string;
+  personReferenceImage?: string;
+  queuedAt?: number;
+}
+
+/** Options for enqueueing image generation jobs */
+export interface EnqueueImageOptions {
+  delay?: number;
+  priority?: number;
+}
+
+/** Result from image generation */
+export interface ImageGenerationResult {
+  success: boolean;
+  imageUrl?: string;
+  usedProvider?: string;
+  usedModel?: string;
+  usedFallback?: boolean;
+  duration?: number;
+  error?: string;
+}
+
+/** Status of an image generation job */
+export interface ImageGenerationJobStatus {
+  jobId: string | undefined;
+  state: string;
+  progress: JobProgress;
+  data: ImageGenerationJobData;
+  result: ImageGenerationResult | null;
+  failedReason: string | undefined;
+  attemptsMade: number;
+  processedOn: number | undefined;
+  finishedOn: number | undefined;
+}
+
+/** Summary of a user's image generation job */
+export interface UserImageJobSummary {
+  jobId: string | undefined;
+  state: Promise<string>;
+  progress: JobProgress;
+  prompt: string;
+  model?: string;
+  createdAt: number;
+  finishedOn?: number;
+  attemptsMade: number;
+}
+
+/** Function to publish scheduled posts (batch) */
+export type PublishScheduledFn = () => Promise<CheckScheduledResult>;
+
+/** Function to publish a single post */
+export type PublishSingleFn = (postId: string, userId: string) => Promise<PublishPostResult>;
+
+/** Progress callback for image generation */
+export type ImageProgressCallback = (progress: number) => void;
+
+/** Image generation processor function */
+export type ImageGenerationProcessor = (
+  data: ImageGenerationJobData,
+  onProgress: ImageProgressCallback
+) => Promise<ImageGenerationResult>;
+
+/** Result from scheduling a post */
+export interface SchedulePostResult {
+  jobId: string | null;
+  fallback?: boolean;
+  delay?: number;
+  scheduledFor?: string;
+}
+
+/** Result from enqueueing an image generation job */
+export interface EnqueueImageResult {
+  jobId: string | undefined;
+  status: string;
+  delay: number;
+  estimatedStart: string;
+  queuePosition: number;
+  error?: string;
+}
+
+// ============================================================================
+// MODULE STATE
+// ============================================================================
 
 // Redis connection - Use REDIS_URL environment variable
 // In development without Redis, scheduled posts will use fallback polling
 const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || null;
 const JOB_QUEUE_ENABLED = process.env.NODE_ENV === 'production';
 
-let connection = null;
-let connectionPromise = null;
-let scheduledPostsQueue = null;
-let scheduledPostsWorker = null;
-let imageGenerationQueue = null;
-let imageGenerationWorker = null;
+let connection: Redis | null = null;
+let connectionPromise: Promise<Redis | null> | null = null;
+let scheduledPostsQueue: Queue<ScheduledPostJobData, ScheduledPostResult> | null = null;
+let scheduledPostsWorker: Worker<ScheduledPostJobData, ScheduledPostResult> | null = null;
+let imageGenerationQueue: Queue<ImageGenerationJobData, ImageGenerationResult> | null = null;
+let imageGenerationWorker: Worker<ImageGenerationJobData, ImageGenerationResult> | null = null;
 let redisAvailable = false;
 let redisGaveUp = false;
 
@@ -28,14 +155,18 @@ const IMAGE_GEN_CONCURRENCY = parseInt(process.env.IMAGE_GEN_CONCURRENCY || '2',
 const IMAGE_GEN_DELAY_MS = parseInt(process.env.IMAGE_GEN_DELAY_MS || '1500', 10);
 const IMAGE_GEN_MAX_RETRIES = parseInt(process.env.IMAGE_GEN_MAX_RETRIES || '3', 10);
 
+// ============================================================================
+// REDIS CONNECTION
+// ============================================================================
+
 /**
  * Check if Redis is available
  */
-export function isRedisAvailable() {
+export function isRedisAvailable(): boolean {
   return redisAvailable;
 }
 
-export function isJobQueueEnabled() {
+export function isJobQueueEnabled(): boolean {
   return JOB_QUEUE_ENABLED && !!REDIS_URL;
 }
 
@@ -43,7 +174,7 @@ export function isJobQueueEnabled() {
  * Quick TCP probe to check if host:port is reachable and stable.
  * Returns true only if we can connect AND the connection stays open for 1s.
  */
-function probeRedis(url, timeoutMs = 3000) {
+function probeRedis(url: string, timeoutMs = 3000): Promise<boolean> {
   return new Promise((resolve) => {
     try {
       const parsed = new URL(url);
@@ -52,7 +183,13 @@ function probeRedis(url, timeoutMs = 3000) {
 
       const socket = net.connect({ host, port, timeout: timeoutMs });
       let settled = false;
-      const settle = (val) => { if (!settled) { settled = true; socket.destroy(); resolve(val); } };
+      const settle = (val: boolean): void => {
+        if (!settled) {
+          settled = true;
+          socket.destroy();
+          resolve(val);
+        }
+      };
 
       socket.on('connect', () => {
         // Wait briefly to detect immediate ECONNRESET (unstable proxy)
@@ -60,7 +197,9 @@ function probeRedis(url, timeoutMs = 3000) {
       });
       socket.on('error', () => settle(false));
       socket.on('timeout', () => settle(false));
-      socket.on('close', () => { if (!settled) settle(false); });
+      socket.on('close', () => {
+        if (!settled) settle(false);
+      });
     } catch {
       resolve(false);
     }
@@ -71,7 +210,7 @@ function probeRedis(url, timeoutMs = 3000) {
  * Wait for Redis to connect (with timeout)
  * Returns true if connected, false if timeout/failed
  */
-export async function waitForRedis(timeoutMs = 5000) {
+export async function waitForRedis(timeoutMs = 5000): Promise<boolean> {
   if (redisAvailable) return true;
   if (!isJobQueueEnabled() || redisGaveUp) return false;
 
@@ -101,7 +240,7 @@ export async function waitForRedis(timeoutMs = 5000) {
  * Returns null if Redis is not configured or unavailable.
  * Now async — probes host reachability before creating ioredis.
  */
-export async function getRedisConnection() {
+export async function getRedisConnection(): Promise<Redis | null> {
   if (!JOB_QUEUE_ENABLED) {
     return null;
   }
@@ -122,12 +261,12 @@ export async function getRedisConnection() {
       return null;
     }
 
-    connection = new IORedis(REDIS_URL, {
+    const newConnection = new Redis(REDIS_URL, {
       maxRetriesPerRequest: null,
       enableReadyCheck: true,
       lazyConnect: true,
       connectTimeout: 5000,
-      retryStrategy: (times) => {
+      retryStrategy: (times: number): number | null => {
         if (times > 3) {
           console.log('[JobQueue] Redis connection failed after 3 attempts, giving up');
           redisAvailable = false;
@@ -138,34 +277,36 @@ export async function getRedisConnection() {
       },
     });
 
+    connection = newConnection;
+
     // Suppress ALL error events — Redis is optional, errors are non-fatal
-    connection.on('error', () => {
+    newConnection.on('error', () => {
       redisAvailable = false;
     });
 
-    connection.on('connect', () => {
+    newConnection.on('connect', () => {
       console.log('[JobQueue] Redis socket connected');
     });
 
-    connection.on('ready', () => {
+    newConnection.on('ready', () => {
       console.log('[JobQueue] Redis ready');
       redisAvailable = true;
     });
 
-    connection.on('close', () => {
+    newConnection.on('close', () => {
       redisAvailable = false;
     });
 
-    connection.on('end', () => {
+    newConnection.on('end', () => {
       redisAvailable = false;
     });
 
     // Try to connect
-    connectionPromise = connection.connect()
+    connectionPromise = newConnection.connect()
       .then(async () => {
-        await connection.ping();
+        await newConnection.ping();
         redisAvailable = true;
-        return connection;
+        return newConnection;
       })
       .catch(() => {
         console.log('[JobQueue] Redis not available, using fallback');
@@ -183,15 +324,19 @@ export async function getRedisConnection() {
   return connection;
 }
 
+// ============================================================================
+// SCHEDULED POSTS QUEUE
+// ============================================================================
+
 /**
  * Get or create the scheduled posts queue
  */
-export function getScheduledPostsQueue() {
+export function getScheduledPostsQueue(): Queue<ScheduledPostJobData, ScheduledPostResult> | null {
   if (!scheduledPostsQueue) {
     if (!connection || !redisAvailable) {
       return null;
     }
-    scheduledPostsQueue = new Queue('scheduled-posts', {
+    scheduledPostsQueue = new Queue<ScheduledPostJobData, ScheduledPostResult>('scheduled-posts', {
       connection,
       defaultJobOptions: {
         attempts: 3,
@@ -214,11 +359,12 @@ export function getScheduledPostsQueue() {
 
 /**
  * Schedule a post for publication at exact time
- * @param {string} postId - The post ID
- * @param {string} userId - The user ID
- * @param {Date|string|number} scheduledTime - When to publish
  */
-export async function schedulePostForPublishing(postId, userId, scheduledTime) {
+export async function schedulePostForPublishing(
+  postId: string,
+  userId: string,
+  scheduledTime: Date | string | number
+): Promise<SchedulePostResult> {
   const queue = getScheduledPostsQueue();
 
   if (!queue) {
@@ -241,7 +387,7 @@ export async function schedulePostForPublishing(postId, userId, scheduledTime) {
       await existingJob.remove();
       console.log(`[JobQueue] Removed existing job for post ${postId}`);
     }
-  } catch (e) {
+  } catch {
     // Job doesn't exist, that's fine
   }
 
@@ -250,7 +396,7 @@ export async function schedulePostForPublishing(postId, userId, scheduledTime) {
     postId,
     userId,
     scheduledTime: new Date(scheduledTime).toISOString(),
-  }, {
+  } as PublishPostJobData, {
     jobId,
     delay,
     removeOnComplete: true,
@@ -260,14 +406,13 @@ export async function schedulePostForPublishing(postId, userId, scheduledTime) {
   const delayMinutes = Math.round(delay / 60000);
   console.log(`[JobQueue] Post ${postId} scheduled for ${new Date(targetTime).toISOString()} (in ${delayMinutes} min)`);
 
-  return { jobId: job.id, delay, scheduledFor: new Date(targetTime).toISOString() };
+  return { jobId: job.id ?? null, delay, scheduledFor: new Date(targetTime).toISOString() };
 }
 
 /**
  * Cancel a scheduled post job
- * @param {string} postId - The post ID to cancel
  */
-export async function cancelScheduledPost(postId) {
+export async function cancelScheduledPost(postId: string): Promise<boolean> {
   const queue = getScheduledPostsQueue();
 
   if (!queue) {
@@ -285,7 +430,8 @@ export async function cancelScheduledPost(postId) {
       return true;
     }
   } catch (e) {
-    console.error(`[JobQueue] Error cancelling job for post ${postId}:`, e.message);
+    const error = e instanceof Error ? e : new Error(String(e));
+    console.error(`[JobQueue] Error cancelling job for post ${postId}:`, error.message);
   }
   return false;
 }
@@ -296,7 +442,10 @@ export async function cancelScheduledPost(postId) {
  * - publish-post: Jobs with exact delay (primary method)
  * - check-scheduled: Fallback check every 5 min for missed posts
  */
-export async function initializeScheduledPostsChecker(publishFn, publishSingleFn) {
+export async function initializeScheduledPostsChecker(
+  publishFn: PublishScheduledFn,
+  publishSingleFn?: PublishSingleFn
+): Promise<Worker<ScheduledPostJobData, ScheduledPostResult> | null> {
   const queue = getScheduledPostsQueue();
 
   if (!queue || !connection || !redisAvailable) {
@@ -305,41 +454,47 @@ export async function initializeScheduledPostsChecker(publishFn, publishSingleFn
   }
 
   // Create worker for scheduled posts
-  scheduledPostsWorker = new Worker('scheduled-posts', async (job) => {
-    // Exact time job - publish single post
-    if (job.name === 'publish-post') {
-      const { postId, userId } = job.data;
-      console.log(`[ScheduledPosts] Publishing post ${postId} (exact time)`);
+  scheduledPostsWorker = new Worker<ScheduledPostJobData, ScheduledPostResult>(
+    'scheduled-posts',
+    async (job: Job<ScheduledPostJobData, ScheduledPostResult>): Promise<ScheduledPostResult> => {
+      // Exact time job - publish single post
+      if (job.name === 'publish-post') {
+        const data = job.data as PublishPostJobData;
+        const { postId, userId } = data;
+        console.log(`[ScheduledPosts] Publishing post ${postId} (exact time)`);
 
-      if (publishSingleFn) {
-        const result = await publishSingleFn(postId, userId);
+        if (publishSingleFn) {
+          const result = await publishSingleFn(postId, userId);
+          return result;
+        }
+        return { skipped: true, reason: 'no publishSingleFn' };
+      }
+
+      // Fallback checker - catch any missed posts
+      if (job.name === 'check-scheduled') {
+        const result = await publishFn();
+        if (result?.published && result.published > 0) {
+          console.log(`[ScheduledPosts] Fallback caught ${result.published} missed posts`);
+        }
         return result;
       }
-      return { skipped: true, reason: 'no publishSingleFn' };
+
+      return { skipped: true };
+    },
+    {
+      connection,
+      concurrency: 1, // One at a time to avoid race conditions
     }
+  );
 
-    // Fallback checker - catch any missed posts
-    if (job.name === 'check-scheduled') {
-      const result = await publishFn();
-      if (result?.published > 0) {
-        console.log(`[ScheduledPosts] Fallback caught ${result.published} missed posts`);
-      }
-      return result;
-    }
-
-    return { skipped: true };
-  }, {
-    connection,
-    concurrency: 1, // One at a time to avoid race conditions
-  });
-
-  scheduledPostsWorker.on('completed', (job, result) => {
-    if (job.name === 'publish-post' && result?.success) {
+  scheduledPostsWorker.on('completed', (job: Job<ScheduledPostJobData, ScheduledPostResult>, result: ScheduledPostResult) => {
+    const publishResult = result as PublishPostResult;
+    if (job.name === 'publish-post' && publishResult?.success) {
       console.log(`[ScheduledPosts] Post published successfully`);
     }
   });
 
-  scheduledPostsWorker.on('failed', (job, err) => {
+  scheduledPostsWorker.on('failed', (job: Job<ScheduledPostJobData, ScheduledPostResult> | undefined, err: Error) => {
     console.error(`[ScheduledPosts] Job ${job?.name} failed:`, err.message);
   });
 
@@ -348,7 +503,7 @@ export async function initializeScheduledPostsChecker(publishFn, publishSingleFn
   const hasChecker = existingJobs.some(j => j.name === 'check-scheduled');
 
   if (!hasChecker) {
-    await queue.add('check-scheduled', {}, {
+    await queue.add('check-scheduled', {} as CheckScheduledJobData, {
       repeat: {
         every: 300000, // Every 5 minutes (fallback only)
       },
@@ -365,13 +520,13 @@ export async function initializeScheduledPostsChecker(publishFn, publishSingleFn
 // IMAGE GENERATION QUEUE
 // ============================================================================
 
-let imageGenerationProcessor = null;
+let imageGenerationProcessor: ImageGenerationProcessor | null = null;
 
 /**
  * Register the image generation processor function
  * This is called from the server initialization with the actual generate function
  */
-export function registerImageGenerationProcessor(processorFn) {
+export function registerImageGenerationProcessor(processorFn: ImageGenerationProcessor): void {
   imageGenerationProcessor = processorFn;
   console.log('[ImageGenQueue] Processor registered');
 }
@@ -379,12 +534,12 @@ export function registerImageGenerationProcessor(processorFn) {
 /**
  * Get or create the image generation queue
  */
-export function getImageGenerationQueue() {
+export function getImageGenerationQueue(): Queue<ImageGenerationJobData, ImageGenerationResult> | null {
   if (!imageGenerationQueue) {
     if (!connection || !redisAvailable) {
       return null;
     }
-    imageGenerationQueue = new Queue('image-generation', {
+    imageGenerationQueue = new Queue<ImageGenerationJobData, ImageGenerationResult>('image-generation', {
       connection,
       defaultJobOptions: {
         attempts: IMAGE_GEN_MAX_RETRIES,
@@ -411,7 +566,10 @@ export function getImageGenerationQueue() {
  * Add an image generation job to the queue
  * Uses rate limiting via job delays to avoid provider rate limits
  */
-export async function enqueueImageGeneration(jobData, options = {}) {
+export async function enqueueImageGeneration(
+  jobData: ImageGenerationJobData & { jobId?: string },
+  options: EnqueueImageOptions = {}
+): Promise<EnqueueImageResult> {
   const queue = getImageGenerationQueue();
 
   if (!queue) {
@@ -435,7 +593,7 @@ export async function enqueueImageGeneration(jobData, options = {}) {
   // Get current queue size to calculate delay
   const waitingCount = await queue.getWaitingCount();
   const activeCount = await queue.getActiveCount();
-  
+
   // Add delay based on position in queue to avoid burst
   // Each job waits for the previous one + IMAGE_GEN_DELAY_MS
   const calculatedDelay = (waitingCount + activeCount) * IMAGE_GEN_DELAY_MS;
@@ -456,8 +614,7 @@ export async function enqueueImageGeneration(jobData, options = {}) {
   }, {
     jobId,
     delay: Math.max(0, delay),
-    priority: options.priority || 5, // 1-10, lower = higher priority
-    ...options,
+    priority: options.priority ?? 5, // 1-10, lower = higher priority
   });
 
   const estimatedStart = Date.now() + delay;
@@ -476,29 +633,35 @@ export async function enqueueImageGeneration(jobData, options = {}) {
  * Add multiple image generation jobs as a batch
  * Each job gets staggered delays automatically
  */
-export async function enqueueImageGenerationBatch(jobsData, options = {}) {
+export async function enqueueImageGenerationBatch(
+  jobsData: Array<ImageGenerationJobData & { jobId?: string }>,
+  options: EnqueueImageOptions = {}
+): Promise<EnqueueImageResult[]> {
   const queue = getImageGenerationQueue();
 
   if (!queue) {
     throw new Error('Redis not available - cannot queue image generation');
   }
 
-  const results = [];
-  
+  const results: EnqueueImageResult[] = [];
+
   for (let i = 0; i < jobsData.length; i++) {
     const jobData = jobsData[i];
-    const jobOptions = {
+    if (!jobData) continue;
+
+    const jobOptions: EnqueueImageOptions = {
       ...options,
       // Stagger delays: first job immediate, others spaced by IMAGE_GEN_DELAY_MS
       delay: i * IMAGE_GEN_DELAY_MS,
     };
-    
+
     try {
       const result = await enqueueImageGeneration(jobData, jobOptions);
       results.push(result);
-    } catch (error) {
+    } catch (e) {
+      const error = e instanceof Error ? e : new Error(String(e));
       console.error(`[ImageGenQueue] Failed to queue batch job ${i}:`, error.message);
-      results.push({ error: error.message, jobId: null });
+      results.push({ error: error.message, jobId: undefined, status: 'failed', delay: 0, estimatedStart: '', queuePosition: 0 });
     }
   }
 
@@ -509,7 +672,7 @@ export async function enqueueImageGenerationBatch(jobsData, options = {}) {
 /**
  * Get job status and progress
  */
-export async function getImageGenerationJobStatus(jobId) {
+export async function getImageGenerationJobStatus(jobId: string): Promise<ImageGenerationJobStatus | null> {
   const queue = getImageGenerationQueue();
   if (!queue) return null;
 
@@ -518,7 +681,7 @@ export async function getImageGenerationJobStatus(jobId) {
     if (!job) return null;
 
     const state = await job.getState();
-    const progress = job.progress || 0;
+    const progress = job.progress ?? 0;
 
     return {
       jobId: job.id,
@@ -531,7 +694,8 @@ export async function getImageGenerationJobStatus(jobId) {
       processedOn: job.processedOn,
       finishedOn: job.finishedOn,
     };
-  } catch (error) {
+  } catch (e) {
+    const error = e instanceof Error ? e : new Error(String(e));
     console.error(`[ImageGenQueue] Error getting job status:`, error.message);
     return null;
   }
@@ -540,7 +704,11 @@ export async function getImageGenerationJobStatus(jobId) {
 /**
  * Get all jobs for a user
  */
-export async function getUserImageGenerationJobs(userId, organizationId = null, limit = 50) {
+export async function getUserImageGenerationJobs(
+  userId: string,
+  organizationId: string | null = null,
+  limit = 50
+): Promise<UserImageJobSummary[]> {
   const queue = getImageGenerationQueue();
   if (!queue) return [];
 
@@ -554,7 +722,7 @@ export async function getUserImageGenerationJobs(userId, organizationId = null, 
     ]);
 
     const allJobs = [...waiting, ...active, ...completed, ...failed];
-    
+
     // Filter by user/organization
     return allJobs
       .filter(job => {
@@ -566,15 +734,16 @@ export async function getUserImageGenerationJobs(userId, organizationId = null, 
       .map(job => ({
         jobId: job.id,
         state: job.getState(),
-        progress: job.progress || 0,
-        prompt: job.data.prompt?.slice(0, 100) + '...',
+        progress: job.progress ?? 0,
+        prompt: (job.data.prompt?.slice(0, 100) ?? '') + '...',
         model: job.data.model,
         createdAt: job.timestamp,
         finishedOn: job.finishedOn,
         attemptsMade: job.attemptsMade,
       }))
       .slice(0, limit);
-  } catch (error) {
+  } catch (e) {
+    const error = e instanceof Error ? e : new Error(String(e));
     console.error(`[ImageGenQueue] Error getting user jobs:`, error.message);
     return [];
   }
@@ -584,7 +753,7 @@ export async function getUserImageGenerationJobs(userId, organizationId = null, 
  * Initialize the image generation worker
  * Processes jobs with controlled concurrency and rate limiting
  */
-export async function initializeImageGenerationWorker() {
+export async function initializeImageGenerationWorker(): Promise<Worker<ImageGenerationJobData, ImageGenerationResult> | null> {
   const queue = getImageGenerationQueue();
 
   if (!queue || !connection || !redisAvailable) {
@@ -598,58 +767,67 @@ export async function initializeImageGenerationWorker() {
   }
 
   // Create worker with limited concurrency to avoid rate limits
-  imageGenerationWorker = new Worker('image-generation', async (job) => {
-    const startTime = Date.now();
-    const { userId, organizationId, prompt, model, queuedAt } = job.data;
-    
-    console.log(`[ImageGenWorker] Processing job ${job.id} (waited ${Date.now() - queuedAt}ms)`);
-    
-    // Update progress
-    await job.updateProgress(10);
+  imageGenerationWorker = new Worker<ImageGenerationJobData, ImageGenerationResult>(
+    'image-generation',
+    async (job: Job<ImageGenerationJobData, ImageGenerationResult>): Promise<ImageGenerationResult> => {
+      const startTime = Date.now();
+      const { queuedAt } = job.data;
 
-    try {
-      // Call the registered processor (the actual generate function)
-      const result = await imageGenerationProcessor(job.data, (progress) => {
-        job.updateProgress(10 + progress * 0.8); // 10-90% during generation
-      });
+      console.log(`[ImageGenWorker] Processing job ${job.id} (waited ${Date.now() - (queuedAt ?? startTime)}ms)`);
 
-      await job.updateProgress(100);
-      
-      const duration = Date.now() - startTime;
-      console.log(`[ImageGenWorker] Job ${job.id} completed in ${duration}ms`);
+      // Update progress
+      await job.updateProgress(10);
 
-      return {
-        success: true,
-        imageUrl: result.imageUrl,
-        usedProvider: result.usedProvider,
-        usedModel: result.usedModel,
-        usedFallback: result.usedFallback,
-        duration,
-      };
-    } catch (error) {
-      console.error(`[ImageGenWorker] Job ${job.id} failed:`, error.message);
-      throw error; // Let BullMQ handle retry
-    }
-  }, {
-    connection,
-    concurrency: IMAGE_GEN_CONCURRENCY, // Process N jobs simultaneously max
-    limiter: {
-      // Additional rate limiting: max 1 job per IMAGE_GEN_DELAY_MS per worker
-      max: 1,
-      duration: IMAGE_GEN_DELAY_MS,
+      try {
+        // Call the registered processor (the actual generate function)
+        // We know imageGenerationProcessor is not null because we checked above
+        const result = await imageGenerationProcessor!(job.data, (progress: number) => {
+          void job.updateProgress(10 + progress * 0.8); // 10-90% during generation
+        });
+
+        await job.updateProgress(100);
+
+        const duration = Date.now() - startTime;
+        console.log(`[ImageGenWorker] Job ${job.id} completed in ${duration}ms`);
+
+        return {
+          success: true,
+          imageUrl: result.imageUrl,
+          usedProvider: result.usedProvider,
+          usedModel: result.usedModel,
+          usedFallback: result.usedFallback,
+          duration,
+        };
+      } catch (e) {
+        const error = e instanceof Error ? e : new Error(String(e));
+        console.error(`[ImageGenWorker] Job ${job.id} failed:`, error.message);
+        throw error; // Let BullMQ handle retry
+      }
     },
-  });
+    {
+      connection,
+      concurrency: IMAGE_GEN_CONCURRENCY, // Process N jobs simultaneously max
+      limiter: {
+        // Additional rate limiting: max 1 job per IMAGE_GEN_DELAY_MS per worker
+        max: 1,
+        duration: IMAGE_GEN_DELAY_MS,
+      },
+    }
+  );
 
-  imageGenerationWorker.on('completed', (job, result) => {
+  imageGenerationWorker.on('completed', (job: Job<ImageGenerationJobData, ImageGenerationResult>, result: ImageGenerationResult) => {
     console.log(`[ImageGenWorker] ✓ ${job.id} completed (${result.usedProvider})`);
   });
 
-  imageGenerationWorker.on('failed', (job, err) => {
+  imageGenerationWorker.on('failed', (job: Job<ImageGenerationJobData, ImageGenerationResult> | undefined, err: Error) => {
     console.error(`[ImageGenWorker] ✗ ${job?.id} failed:`, err.message);
   });
 
-  imageGenerationWorker.on('progress', (job, progress) => {
-    console.log(`[ImageGenWorker] ${job.id} progress: ${progress}%`);
+  imageGenerationWorker.on('progress', (job: Job<ImageGenerationJobData, ImageGenerationResult>, progress: JobProgress) => {
+    const progressStr = typeof progress === 'number' || typeof progress === 'string' || typeof progress === 'boolean'
+      ? String(progress)
+      : JSON.stringify(progress);
+    console.log(`[ImageGenWorker] ${job.id} progress: ${progressStr}%`);
   });
 
   console.log(`[ImageGenWorker] Initialized (concurrency=${IMAGE_GEN_CONCURRENCY})`);
@@ -659,7 +837,7 @@ export async function initializeImageGenerationWorker() {
 /**
  * Cancel an image generation job
  */
-export async function cancelImageGenerationJob(jobId) {
+export async function cancelImageGenerationJob(jobId: string): Promise<boolean> {
   const queue = getImageGenerationQueue();
   if (!queue) return false;
 
@@ -675,7 +853,8 @@ export async function cancelImageGenerationJob(jobId) {
     await job.remove();
     console.log(`[ImageGenQueue] Job ${jobId} cancelled`);
     return true;
-  } catch (error) {
+  } catch (e) {
+    const error = e instanceof Error ? e : new Error(String(e));
     console.error(`[ImageGenQueue] Error cancelling job:`, error.message);
     return false;
   }
@@ -684,15 +863,16 @@ export async function cancelImageGenerationJob(jobId) {
 /**
  * Clean up old completed jobs
  */
-export async function cleanupImageGenerationJobs(keepCompleted = 100, keepFailed = 50) {
+export async function cleanupImageGenerationJobs(keepCompleted = 100, keepFailed = 50): Promise<void> {
   const queue = getImageGenerationQueue();
   if (!queue) return;
 
   try {
-    await queue.clean(24 * 60 * 60 * 1000, 'completed', keepCompleted);
-    await queue.clean(7 * 24 * 60 * 60 * 1000, 'failed', keepFailed);
+    await queue.clean(24 * 60 * 60 * 1000, keepCompleted, 'completed');
+    await queue.clean(7 * 24 * 60 * 60 * 1000, keepFailed, 'failed');
     console.log('[ImageGenQueue] Cleaned up old jobs');
-  } catch (error) {
+  } catch (e) {
+    const error = e instanceof Error ? e : new Error(String(e));
     console.error('[ImageGenQueue] Cleanup error:', error.message);
   }
 }
@@ -700,7 +880,7 @@ export async function cleanupImageGenerationJobs(keepCompleted = 100, keepFailed
 /**
  * Graceful shutdown
  */
-export async function closeQueue() {
+export async function closeQueue(): Promise<void> {
   if (imageGenerationWorker) {
     await imageGenerationWorker.close();
     imageGenerationWorker = null;

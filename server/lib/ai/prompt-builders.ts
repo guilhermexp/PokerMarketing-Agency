@@ -1,5 +1,3 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file in a future refactoring
 /**
  * AI prompt builders and schemas.
  *
@@ -12,7 +10,7 @@
  *          DEFAULT_TEXT_MODEL, DEFAULT_FAST_TEXT_MODEL, DEFAULT_ASSISTANT_MODEL, AI_INFLUENCER_FLASH_MODEL
  */
 
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { SqlClient } from "../db.js";
 import { generateTextFromMessages } from "./text-generation.js";
 import { withRetry } from "./retry.js";
 import {
@@ -37,6 +35,7 @@ export interface BrandProfile {
   description?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  tertiaryColor?: string;
   toneOfVoice?: string;
   toneTargets?: string[];
   logo?: string;
@@ -50,7 +49,48 @@ export interface PromptResult {
   error?: string;
 }
 
-type ToneTarget = "campaigns" | "posts" | "images" | "flyers";
+type ToneTarget = "campaigns" | "posts" | "images" | "flyers" | "videos";
+
+// Options for buildImagePrompt when called with an object
+export interface BuildImagePromptOptions {
+  prompt: string;
+  brandProfile?: BrandProfile | null;
+  hasStyleReference?: boolean;
+  hasLogo?: boolean;
+  hasPersonReference?: boolean;
+  hasProductImages?: boolean;
+  fontStyle?: string | null;
+}
+
+// Options for buildVideoPrompt
+export interface BuildVideoPromptOptions {
+  resolution?: string;
+  aspectRatio?: string;
+  hasReferenceImage?: boolean;
+  isInterpolationMode?: boolean;
+  useCampaignGradePrompt?: boolean;
+  hasBrandLogoReference?: boolean;
+}
+
+// Options for prompt expansion functions
+export interface PromptExpansionOptions {
+  hasReferenceImages?: boolean;
+  referenceImageCount?: number;
+  aspectRatio?: string;
+  organizationId?: string | null;
+  sql?: SqlClient | null;
+}
+
+export interface BrandIdentityPromptOptions extends PromptExpansionOptions {
+  brandProfile?: BrandProfile | null;
+}
+
+// Result from prompt expansion functions
+export interface PromptExpansionResult {
+  generationPrompt: string;
+  imageAnalysis: Record<string, unknown> | null;
+  rawResponse: Record<string, unknown>;
+}
 
 // Re-export model constants and Type for backward compatibility
 export { DEFAULT_TEXT_MODEL, DEFAULT_FAST_TEXT_MODEL, DEFAULT_ASSISTANT_MODEL, AI_INFLUENCER_FLASH_MODEL, Type };
@@ -83,21 +123,34 @@ export const getToneText = (brandProfile: BrandProfile | null | undefined, targe
  * The options signature adds `fontStyle` (not available via positional args).
  * The `jsonPrompt` positional arg is accepted but ignored (JSON spec removed).
  */
-export const buildImagePrompt = (
-  promptOrOpts,
-  brandProfileArg,
-  hasStyleReferenceArg = false,
-  hasLogoArg = false,
-  hasPersonReferenceArg = false,
-  hasProductImagesArg = false,
-  _jsonPrompt = null,
-) => {
-  let prompt, brandProfile, hasStyleReference, hasLogo, hasPersonReference, hasProductImages, fontStyle;
+export function buildImagePrompt(
+  promptOrOpts: string | BuildImagePromptOptions,
+  brandProfileArg?: BrandProfile | null,
+  hasStyleReferenceArg: boolean = false,
+  hasLogoArg: boolean = false,
+  hasPersonReferenceArg: boolean = false,
+  hasProductImagesArg: boolean = false,
+  _jsonPrompt: unknown = null,
+): string {
+  let prompt: string;
+  let brandProfile: BrandProfile | null | undefined;
+  let hasStyleReference: boolean;
+  let hasLogo: boolean;
+  let hasPersonReference: boolean;
+  let hasProductImages: boolean;
+  let fontStyle: string | null | undefined;
 
   if (typeof promptOrOpts === "object" && promptOrOpts !== null && "prompt" in promptOrOpts) {
-    ({ prompt, brandProfile = null, hasStyleReference = false, hasLogo = false, hasPersonReference = false, hasProductImages = false, fontStyle = null } = promptOrOpts);
+    const opts = promptOrOpts as BuildImagePromptOptions;
+    prompt = opts.prompt;
+    brandProfile = opts.brandProfile ?? null;
+    hasStyleReference = opts.hasStyleReference ?? false;
+    hasLogo = opts.hasLogo ?? false;
+    hasPersonReference = opts.hasPersonReference ?? false;
+    hasProductImages = opts.hasProductImages ?? false;
+    fontStyle = opts.fontStyle ?? null;
   } else {
-    prompt = promptOrOpts;
+    prompt = promptOrOpts as string;
     brandProfile = brandProfileArg;
     hasStyleReference = hasStyleReferenceArg;
     hasLogo = hasLogoArg;
@@ -158,9 +211,9 @@ export const buildImagePrompt = (
   return parts.join("\n\n");
 };
 
-export const buildVideoPrompt = (
-  prompt,
-  brandProfile,
+export function buildVideoPrompt(
+  prompt: string,
+  brandProfile: BrandProfile | null | undefined,
   {
     resolution = "720p",
     aspectRatio = "16:9",
@@ -168,8 +221,8 @@ export const buildVideoPrompt = (
     isInterpolationMode = false,
     useCampaignGradePrompt = true,
     hasBrandLogoReference = false,
-  } = {},
-) => {
+  }: BuildVideoPromptOptions = {},
+): string {
   const toneText =
     getToneText(brandProfile, "videos") || brandProfile?.toneOfVoice || "";
   const primaryColor = brandProfile?.primaryColor || "#000000";
@@ -224,18 +277,18 @@ REGRAS DE IDENTIDADE:
 - Não invente logos novos; use apenas elementos oficiais da marca`;
 };
 
-export const convertImagePromptToJson = async (
-  prompt,
-  aspectRatio,
-  organizationId,
-  sql,
-) => {
+export async function convertImagePromptToJson(
+  prompt: string,
+  aspectRatio: string,
+  organizationId: string | null,
+  sql: SqlClient,
+): Promise<string | null> {
   const timer = createTimer();
 
   try {
     const systemPrompt = getImagePromptSystemPrompt(aspectRatio);
 
-    const { text: rawText } = await withRetry(() =>
+    const { text: rawText, usage } = await withRetry(() =>
       generateTextFromMessages({
         model: DEFAULT_FAST_TEXT_MODEL,
         messages: [
@@ -248,10 +301,10 @@ export const convertImagePromptToJson = async (
     );
 
     const text = rawText?.trim() || "";
-    let parsed = null;
+    let parsed: Record<string, unknown> | null = null;
 
     try {
-      parsed = JSON.parse(text);
+      parsed = JSON.parse(text) as Record<string, unknown>;
     } catch {
       parsed = null;
     }
@@ -278,8 +331,8 @@ export const convertImagePromptToJson = async (
       2,
     );
 
-    const inputTokens = data.usage?.prompt_tokens || 0;
-    const outputTokens = data.usage?.completion_tokens || 0;
+    const inputTokens = usage.inputTokens || 0;
+    const outputTokens = usage.outputTokens || 0;
     await logAiUsage(sql, {
       organizationId,
       endpoint: "/api/ai/convert-image-prompt",
@@ -293,19 +346,20 @@ export const convertImagePromptToJson = async (
 
     return result;
   } catch (error) {
-    logger.error({ err: error }, "[Image Prompt JSON] Error");
+    const err = error as Error;
+    logger.error({ err }, "[Image Prompt JSON] Error");
     await logAiUsage(sql, {
       organizationId,
       endpoint: "/api/ai/convert-image-prompt",
       operation: "text",
       model: DEFAULT_FAST_TEXT_MODEL,
       latencyMs: timer(),
-      status: "failed",
-      error: error.message,
-    }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+      status: "error",
+      error: err.message,
+    }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
     return null;
   }
-};
+}
 
 // --- AI Influencer Prompt Expansion ---
 
@@ -399,10 +453,10 @@ Now transform the user's query following these exact patterns. Always output val
  *
  * Follows the same pattern as convertImagePromptToJson.
  */
-export const expandAiInfluencerPrompt = async (
-  userPrompt,
-  { hasReferenceImages = false, referenceImageCount = 0, aspectRatio = "4:5", organizationId = null, sql = null } = {}
-) => {
+export async function expandAiInfluencerPrompt(
+  userPrompt: string,
+  { hasReferenceImages = false, referenceImageCount = 0, aspectRatio = "4:5", organizationId = null, sql = null }: PromptExpansionOptions = {}
+): Promise<PromptExpansionResult | null> {
   const timer = createTimer();
   try {
     const systemPrompt = AI_INFLUENCER_SYSTEM_PROMPT.replace("{{ASPECT_RATIO}}", aspectRatio);
@@ -428,17 +482,17 @@ export const expandAiInfluencerPrompt = async (
     );
 
     const text = rawText?.trim() || "";
-    let parsed = null;
+    let parsed: Record<string, unknown> | null = null;
     try {
-      parsed = JSON.parse(text);
+      parsed = JSON.parse(text) as Record<string, unknown>;
     } catch {
       parsed = null;
     }
 
-    const generationPrompt = parsed?.generation_prompt || null;
-    const imageAnalysis = parsed?.image_analysis || null;
+    const generationPrompt = (parsed?.generation_prompt as string) || null;
+    const imageAnalysis = (parsed?.image_analysis as Record<string, unknown>) || null;
 
-    if (!generationPrompt) {
+    if (!generationPrompt || !parsed) {
       logger.warn({ rawLength: text.length }, "[AI Influencer] Flash returned no generation_prompt");
       return null;
     }
@@ -464,9 +518,10 @@ export const expandAiInfluencerPrompt = async (
       "[AI Influencer] Prompt expanded via Flash"
     );
 
-    return { generationPrompt, imageAnalysis, rawResponse: parsed };
+    return { generationPrompt, imageAnalysis, rawResponse: parsed ?? {} };
   } catch (error) {
-    logger.error({ err: error }, "[AI Influencer] Flash expansion failed");
+    const err = error as Error;
+    logger.error({ err }, "[AI Influencer] Flash expansion failed");
 
     if (sql) {
       await logAiUsage(sql, {
@@ -475,14 +530,14 @@ export const expandAiInfluencerPrompt = async (
         operation: "text",
         model: AI_INFLUENCER_FLASH_MODEL,
         latencyMs: timer(),
-        status: "failed",
-        error: error.message,
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+        status: "error",
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
     }
 
     return null;
   }
-};
+}
 
 // --- Product Hero Shot Prompt Expansion ---
 
@@ -584,10 +639,10 @@ Now transform the user's query following these exact patterns. Always output val
  * Expand a simple Product Hero Shot prompt into a rich advertising prompt
  * using Gemini Flash as an agent. Returns null on failure (caller should fallback).
  */
-export const expandProductHeroPrompt = async (
-  userPrompt,
-  { hasReferenceImages = false, referenceImageCount = 0, aspectRatio = "1:1", organizationId = null, sql = null } = {}
-) => {
+export async function expandProductHeroPrompt(
+  userPrompt: string,
+  { hasReferenceImages = false, referenceImageCount = 0, aspectRatio = "1:1", organizationId = null, sql = null }: PromptExpansionOptions = {}
+): Promise<PromptExpansionResult | null> {
   const timer = createTimer();
   try {
     const userMessage = JSON.stringify({
@@ -611,13 +666,13 @@ export const expandProductHeroPrompt = async (
     );
 
     const text = rawText?.trim() || "";
-    let parsed = null;
-    try { parsed = JSON.parse(text); } catch { parsed = null; }
+    let parsed: Record<string, unknown> | null = null;
+    try { parsed = JSON.parse(text) as Record<string, unknown>; } catch { parsed = null; }
 
-    const generationPrompt = parsed?.generation_prompt || null;
-    const imageAnalysis = parsed?.image_analysis || null;
+    const generationPrompt = (parsed?.generation_prompt as string) || null;
+    const imageAnalysis = (parsed?.image_analysis as Record<string, unknown>) || null;
 
-    if (!generationPrompt) {
+    if (!generationPrompt || !parsed) {
       logger.warn({ rawLength: text.length }, "[Product Hero] Flash returned no generation_prompt");
       return null;
     }
@@ -643,9 +698,10 @@ export const expandProductHeroPrompt = async (
       "[Product Hero] Prompt expanded via Flash"
     );
 
-    return { generationPrompt, imageAnalysis, rawResponse: parsed };
+    return { generationPrompt, imageAnalysis, rawResponse: parsed ?? {} };
   } catch (error) {
-    logger.error({ err: error }, "[Product Hero] Flash expansion failed");
+    const err = error as Error;
+    logger.error({ err }, "[Product Hero] Flash expansion failed");
 
     if (sql) {
       await logAiUsage(sql, {
@@ -654,14 +710,14 @@ export const expandProductHeroPrompt = async (
         operation: "text",
         model: AI_INFLUENCER_FLASH_MODEL,
         latencyMs: timer(),
-        status: "failed",
-        error: error.message,
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+        status: "error",
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
     }
 
     return null;
   }
-};
+}
 
 // --- Exploded Product Prompt Expansion ---
 
@@ -759,10 +815,10 @@ Now transform the user's query following these exact patterns. Always output val
  * Expand a simple Exploded Product prompt into a rich deconstruction infographic prompt
  * using Gemini Flash as an agent. Returns null on failure (caller should fallback).
  */
-export const expandExplodedProductPrompt = async (
-  userPrompt,
-  { hasReferenceImages = false, referenceImageCount = 0, aspectRatio = "9:16", organizationId = null, sql = null } = {}
-) => {
+export async function expandExplodedProductPrompt(
+  userPrompt: string,
+  { hasReferenceImages = false, referenceImageCount = 0, aspectRatio = "9:16", organizationId = null, sql = null }: PromptExpansionOptions = {}
+): Promise<PromptExpansionResult | null> {
   const timer = createTimer();
   try {
     const userMessage = JSON.stringify({
@@ -786,13 +842,13 @@ export const expandExplodedProductPrompt = async (
     );
 
     const text = rawText?.trim() || "";
-    let parsed = null;
-    try { parsed = JSON.parse(text); } catch { parsed = null; }
+    let parsed: Record<string, unknown> | null = null;
+    try { parsed = JSON.parse(text) as Record<string, unknown>; } catch { parsed = null; }
 
-    const generationPrompt = parsed?.generation_prompt || null;
-    const imageAnalysis = parsed?.image_analysis || null;
+    const generationPrompt = (parsed?.generation_prompt as string) || null;
+    const imageAnalysis = (parsed?.image_analysis as Record<string, unknown>) || null;
 
-    if (!generationPrompt) {
+    if (!generationPrompt || !parsed) {
       logger.warn({ rawLength: text.length }, "[Exploded Product] Flash returned no generation_prompt");
       return null;
     }
@@ -818,9 +874,10 @@ export const expandExplodedProductPrompt = async (
       "[Exploded Product] Prompt expanded via Flash"
     );
 
-    return { generationPrompt, imageAnalysis, rawResponse: parsed };
+    return { generationPrompt, imageAnalysis, rawResponse: parsed ?? {} };
   } catch (error) {
-    logger.error({ err: error }, "[Exploded Product] Flash expansion failed");
+    const err = error as Error;
+    logger.error({ err }, "[Exploded Product] Flash expansion failed");
 
     if (sql) {
       await logAiUsage(sql, {
@@ -829,14 +886,14 @@ export const expandExplodedProductPrompt = async (
         operation: "text",
         model: AI_INFLUENCER_FLASH_MODEL,
         latencyMs: timer(),
-        status: "failed",
-        error: error.message,
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+        status: "error",
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
     }
 
     return null;
   }
-};
+}
 
 // --- Brand Identity Prompt Expansion ---
 
@@ -904,10 +961,10 @@ Now transform the user's query following these exact patterns. Always output val
  *
  * This function receives the brand profile to inject into the user message.
  */
-export const expandBrandIdentityPrompt = async (
-  userPrompt,
-  { brandProfile = null, hasReferenceImages = false, referenceImageCount = 0, aspectRatio = "4:5", organizationId = null, sql = null } = {}
-) => {
+export async function expandBrandIdentityPrompt(
+  userPrompt: string,
+  { brandProfile = null, hasReferenceImages = false, referenceImageCount = 0, aspectRatio = "4:5", organizationId = null, sql = null }: BrandIdentityPromptOptions = {}
+): Promise<PromptExpansionResult | null> {
   const timer = createTimer();
   try {
     const brandData = brandProfile ? {
@@ -940,13 +997,13 @@ export const expandBrandIdentityPrompt = async (
     );
 
     const text = rawText?.trim() || "";
-    let parsed = null;
-    try { parsed = JSON.parse(text); } catch { parsed = null; }
+    let parsed: Record<string, unknown> | null = null;
+    try { parsed = JSON.parse(text) as Record<string, unknown>; } catch { parsed = null; }
 
-    const generationPrompt = parsed?.generation_prompt || null;
-    const imageAnalysis = parsed?.image_analysis || null;
+    const generationPrompt = (parsed?.generation_prompt as string) || null;
+    const imageAnalysis = (parsed?.image_analysis as Record<string, unknown>) || null;
 
-    if (!generationPrompt) {
+    if (!generationPrompt || !parsed) {
       logger.warn({ rawLength: text.length }, "[Brand Identity] Flash returned no generation_prompt");
       return null;
     }
@@ -972,9 +1029,10 @@ export const expandBrandIdentityPrompt = async (
       "[Brand Identity] Prompt expanded via Flash"
     );
 
-    return { generationPrompt, imageAnalysis, rawResponse: parsed };
+    return { generationPrompt, imageAnalysis, rawResponse: parsed ?? {} };
   } catch (error) {
-    logger.error({ err: error }, "[Brand Identity] Flash expansion failed");
+    const err = error as Error;
+    logger.error({ err }, "[Brand Identity] Flash expansion failed");
 
     if (sql) {
       await logAiUsage(sql, {
@@ -983,16 +1041,16 @@ export const expandBrandIdentityPrompt = async (
         operation: "text",
         model: AI_INFLUENCER_FLASH_MODEL,
         latencyMs: timer(),
-        status: "failed",
-        error: error.message,
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+        status: "error",
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
     }
 
     return null;
   }
-};
+}
 
-export const buildFlyerPrompt = (brandProfile) => {
+export function buildFlyerPrompt(brandProfile: BrandProfile | null | undefined): string {
   const toneText = getToneText(brandProfile, "flyers");
   const brandName = brandProfile?.name || "a marca";
   const brandDescription = brandProfile?.description || "";
@@ -1042,9 +1100,9 @@ ${toneText ? `- Tom de Comunicação: ${toneText}` : ""}
 - Cinematográfico mas não exagerado
 - Profissional mas criativo
 - Impactante mas elegante`;
-};
+}
 
-export const buildQuickPostPrompt = (brandProfile, context) => {
+export function buildQuickPostPrompt(brandProfile: BrandProfile | null | undefined, context: string): string {
   const toneText = getToneText(brandProfile, "posts");
   const brandName = brandProfile?.name || "a marca";
   const brandDescription = brandProfile?.description || "";
@@ -1065,9 +1123,9 @@ ${context}
 
 Responda apenas JSON:
 { "platform": "Instagram", "content": "Texto Legenda", "hashtags": ["tag1", "tag2"], "image_prompt": "descrição visual" }`;
-};
+}
 
-export const getVideoPromptSystemPrompt = (duration, aspectRatio) => {
+export function getVideoPromptSystemPrompt(duration: number | string, aspectRatio: string): string {
   return `Você é um especialista em prompt engineering para vídeo de IA.
 Converta o prompt genérico fornecido em um JSON estruturado e aninhado otimizado para modelos de geração de vídeo (Veo 3, Sora 2).
 
@@ -1104,9 +1162,9 @@ Exemplo de audio_context:
 }
 
 Mantenha a essência do prompt original mas expanda com detalhes visuais cinematográficos.`;
-};
+}
 
-export const getImagePromptSystemPrompt = (aspectRatio) => {
+export function getImagePromptSystemPrompt(aspectRatio: string): string {
   return `Você é especialista em prompt engineering para imagens de IA.
 Converta o prompt fornecido em um JSON estruturado para geração de imagens.
 
@@ -1136,10 +1194,28 @@ O JSON deve seguir esta estrutura:
 }
 
 Se houver texto na imagem, marque text.enabled como true e preencha content/placement/font conforme o prompt.`;
-};
+}
+
+// ============================================================================
+// SCHEMA TYPES
+// ============================================================================
+
+interface SchemaProperty {
+  type: string;
+  description?: string;
+  items?: SchemaProperty;
+  properties?: Record<string, SchemaProperty>;
+  required?: string[];
+}
+
+export interface Schema {
+  type: string;
+  properties: Record<string, SchemaProperty>;
+  required: string[];
+}
 
 // Campaign schema for structured generation
-export const campaignSchema = {
+export const campaignSchema: Schema = {
   type: Type.OBJECT,
   properties: {
     videoClipScripts: {
@@ -1226,7 +1302,7 @@ export const campaignSchema = {
 };
 
 // Quick post schema
-export const quickPostSchema = {
+export const quickPostSchema: Schema = {
   type: Type.OBJECT,
   properties: {
     platform: { type: Type.STRING },

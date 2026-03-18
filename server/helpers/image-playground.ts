@@ -1,5 +1,3 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * Image Playground API Helpers
  * Handles CRUD operations for topics, batches, and generations
@@ -10,16 +8,228 @@
 
 import { put } from "@vercel/blob";
 import sharp from "sharp";
+import type { GoogleGenAI } from "@google/genai";
+import type { SqlClient } from "../lib/db.js";
 import { validateContentType } from "../lib/validation/contentType.js";
 import { isQuotaOrRateLimitError } from "../lib/ai/retry.js";
 import { runWithProviderFallback } from "../lib/ai/image-providers.js";
 import { logAiUsage } from "./usage-tracking.js";
 import logger from "../lib/logger.js";
 
+// =============================================================================
+// Types
+// =============================================================================
+
+// Database row types (raw from SQL)
+interface TopicRow {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  title: string | null;
+  cover_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface BatchRow {
+  id: string;
+  topic_id: string;
+  user_id: string;
+  organization_id: string | null;
+  provider: string;
+  model: string;
+  prompt: string;
+  config: Record<string, unknown>;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+  user_email: string | null;
+  generations: GenerationJson[];
+}
+
+interface GenerationRow {
+  id: string;
+  batch_id: string;
+  user_id: string;
+  async_task_id: string | null;
+  seed: number | null;
+  asset: GenerationAsset | null;
+  created_at: string;
+}
+
+interface GenerationWithTaskRow extends GenerationRow {
+  task_status: string | null;
+  task_error: GenerationError | null;
+  task_updated_at: string | null;
+}
+
+interface AsyncTaskRow {
+  id: string;
+  user_id: string;
+  type: string;
+  status: string;
+  metadata: Record<string, unknown>;
+  error: GenerationError | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface GenerationInfoRow {
+  batch_id: string;
+  topic_id: string;
+  user_id: string;
+  organization_id: string | null;
+  prompt: string;
+  model: string;
+  provider: string;
+}
+
+interface TopicCoverRow {
+  cover_url: string | null;
+}
+
+interface CountRow {
+  count: string;
+}
+
+// Mapped/API types
+interface Topic {
+  id: string;
+  userId: string;
+  organizationId: string | null;
+  title: string | null;
+  coverUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface GenerationJson {
+  id: string;
+  batchId: string;
+  userId: string;
+  asyncTaskId: string | null;
+  seed: number | null;
+  asset: GenerationAsset | null;
+  createdAt: string;
+}
+
+interface Batch {
+  id: string;
+  topicId: string;
+  userId: string;
+  organizationId: string | null;
+  provider: string;
+  model: string;
+  prompt: string;
+  config: Record<string, unknown>;
+  width: number | null;
+  height: number | null;
+  createdAt: string;
+  userEmail: string | null;
+  generations: GenerationJson[];
+}
+
+interface GenerationAsset {
+  url: string;
+  width: number;
+  height: number;
+  provider?: string;
+  model?: string;
+}
+
+interface GenerationError {
+  code: string;
+  message: string;
+}
+
+interface GenerationStatus {
+  status: string;
+  generation: GenerationJson | null;
+  error: GenerationError | null;
+}
+
+// Input types
+interface TopicUpdates {
+  title?: string;
+  coverUrl?: string;
+}
+
+interface ReferenceImage {
+  id?: string;
+  dataUrl: string;
+  mimeType?: string;
+}
+
+interface ProductImage {
+  base64: string;
+  mimeType: string;
+}
+
+interface GenerationParams {
+  prompt: string;
+  userPrompt?: string;
+  width?: number;
+  height?: number;
+  aspectRatio?: string;
+  imageSize?: string;
+  seed?: number;
+  model?: string;
+  referenceImages?: ReferenceImage[];
+  productImages?: ProductImage[];
+  imageUrl?: string;
+  brandProfile?: Record<string, unknown>;
+}
+
+interface CreateImageBatchInput {
+  topicId: string;
+  provider: string;
+  model: string;
+  imageNum: number;
+  params: GenerationParams;
+}
+
+interface CreateImageBatchResult {
+  batch: Batch & { generations: GenerationJson[] };
+  generations: GenerationJson[];
+}
+
+// Content parts for Gemini API
+interface TextPart {
+  text: string;
+}
+
+interface InlineDataPart {
+  inlineData: {
+    data: string;
+    mimeType: string;
+  };
+}
+
+type ContentPart = TextPart | InlineDataPart;
+
+// Image input for provider chain
+interface ImageInput {
+  base64: string;
+  mimeType: string;
+}
+
+// Dimension lookup
+interface Dimensions {
+  width: number;
+  height: number;
+}
+
+// Aspect ratio map type
+type AspectRatioMap = Record<string, Record<string, [number, number]>>;
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
 // Normalize model names to match the image_model enum in the database.
 // The DB enum currently only has 'gemini-3-pro-image-preview', so we map
 // all provider models to that value until the enum is extended.
-function normalizeModelForDb(model) {
+function normalizeModelForDb(model: string): string {
   // FAL: "fal-ai/gemini-3-pro-image-preview/edit" → "gemini-3-pro-image-preview"
   const normalized = model.replace(/^fal-ai\//, "").replace(/\/edit$/, "");
   // Map all model variants to valid DB enum values
@@ -33,7 +243,7 @@ function normalizeModelForDb(model) {
 // Timeout for fetching remote reference images (30 seconds)
 const FETCH_TIMEOUT_MS = 30_000;
 
-function fetchWithTimeout(url, options = {}) {
+function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   return fetch(url, { ...options, signal: controller.signal }).finally(() =>
@@ -46,11 +256,7 @@ const THUMBNAIL_WIDTH = 400;
 const THUMBNAIL_QUALITY = 80;
 const MAX_STORED_STRING_LENGTH = 4096;
 
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function mapTopic(r) {
+function mapTopic(r: TopicRow | null | undefined): Topic | null {
   if (!r) return null;
   return {
     id: r.id,
@@ -63,7 +269,9 @@ function mapTopic(r) {
   };
 }
 
-function compactForStorage(value) {
+type CompactValue = string | number | boolean | null | undefined | CompactValue[] | { [key: string]: CompactValue };
+
+function compactForStorage(value: CompactValue): CompactValue {
   if (typeof value === "string") {
     if (value.startsWith("data:")) {
       return "[inline-data-omitted]";
@@ -80,7 +288,7 @@ function compactForStorage(value) {
 
   if (value && typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, compactForStorage(entry)]),
+      Object.entries(value).map(([key, entry]) => [key, compactForStorage(entry as CompactValue)]),
     );
   }
 
@@ -91,11 +299,15 @@ function compactForStorage(value) {
 // Topics
 // =============================================================================
 
-export async function getTopics(sql, userId, organizationId) {
+export async function getTopics(
+  sql: SqlClient,
+  userId: string | null,
+  organizationId: string | null,
+): Promise<Topic[]> {
   // Handle null/undefined organizationId properly
   const orgId = organizationId || null;
 
-  const rows = orgId
+  const rows = (orgId
     ? await sql`
         SELECT * FROM image_generation_topics
         WHERE organization_id = ${orgId}
@@ -106,32 +318,37 @@ export async function getTopics(sql, userId, organizationId) {
         WHERE user_id = ${userId}
         AND organization_id IS NULL
         ORDER BY updated_at DESC
-      `;
-  return rows.map(mapTopic);
+      `) as TopicRow[];
+  return rows.map(mapTopic).filter((t): t is Topic => t !== null);
 }
 
-export async function createTopic(sql, userId, organizationId, title = null) {
-  const [r] = await sql`
+export async function createTopic(
+  sql: SqlClient,
+  userId: string | null,
+  organizationId: string | null,
+  title: string | null = null,
+): Promise<Topic | null> {
+  const [r] = (await sql`
     INSERT INTO image_generation_topics (user_id, organization_id, title)
     VALUES (${userId}, ${organizationId}, ${title})
     RETURNING *
-  `;
+  `) as TopicRow[];
   return mapTopic(r);
 }
 
 export async function updateTopic(
-  sql,
-  topicId,
-  userId,
-  updates,
-  organizationId,
-) {
+  sql: SqlClient,
+  topicId: string,
+  userId: string | null,
+  updates: TopicUpdates,
+  organizationId: string | null,
+): Promise<Topic | null> {
   const { title, coverUrl } = updates;
   const orgId = organizationId || null;
 
   // Build SET clause dynamically
-  let setClause = [];
-  let values = { topicId, userId };
+  const setClause: string[] = [];
+  const values: { topicId: string; userId: string | null; title?: string; coverUrl?: string } = { topicId, userId };
 
   if (title !== undefined) {
     setClause.push("title");
@@ -144,14 +361,14 @@ export async function updateTopic(
 
   if (setClause.length === 0) {
     // No updates, just return existing
-    const [existing] = orgId
+    const [existing] = (orgId
       ? await sql`SELECT * FROM image_generation_topics WHERE id = ${topicId} AND organization_id = ${orgId}`
-      : await sql`SELECT * FROM image_generation_topics WHERE id = ${topicId} AND user_id = ${userId}`;
+      : await sql`SELECT * FROM image_generation_topics WHERE id = ${topicId} AND user_id = ${userId}`) as TopicRow[];
     return mapTopic(existing);
   }
 
   // Always update updated_at
-  const [topic] = orgId
+  const [topic] = (orgId
     ? await sql`
         UPDATE image_generation_topics
         SET title = COALESCE(${values.title}, title), cover_url = COALESCE(${values.coverUrl}, cover_url), updated_at = NOW()
@@ -163,11 +380,16 @@ export async function updateTopic(
         SET title = COALESCE(${values.title}, title), cover_url = COALESCE(${values.coverUrl}, cover_url), updated_at = NOW()
         WHERE id = ${topicId} AND user_id = ${userId}
         RETURNING *
-      `;
+      `) as TopicRow[];
   return mapTopic(topic);
 }
 
-export async function deleteTopic(sql, topicId, userId, organizationId) {
+export async function deleteTopic(
+  sql: SqlClient,
+  topicId: string,
+  userId: string | null,
+  organizationId: string | null,
+): Promise<void> {
   const orgId = organizationId || null;
   // Cascade deletes will handle batches, generations, and tasks
   if (orgId) {
@@ -181,13 +403,19 @@ export async function deleteTopic(sql, topicId, userId, organizationId) {
 // Batches
 // =============================================================================
 
-export async function getBatches(sql, topicId, userId, organizationId, limit = 100) {
+export async function getBatches(
+  sql: SqlClient,
+  topicId: string,
+  userId: string | null,
+  organizationId: string | null,
+  limit = 100,
+): Promise<Batch[]> {
   const orgId = organizationId || null;
   const safeLimit = Number.isFinite(limit)
     ? Math.max(1, Math.min(200, Number(limit)))
     : 100;
   // Get batches with their generations (includes user email via JOIN)
-  const batches = orgId
+  const batches = (orgId
     ? await sql`
         WITH selected_batches AS (
           SELECT
@@ -281,7 +509,7 @@ export async function getBatches(sql, topicId, userId, organizationId, limit = 1
         LEFT JOIN users u ON u.id = sb.user_id
         GROUP BY sb.id, sb.topic_id, sb.user_id, sb.organization_id, sb.provider, sb.model, sb.prompt, sb.config, sb.width, sb.height, sb.created_at, u.email
         ORDER BY sb.created_at DESC
-      `;
+      `) as BatchRow[];
 
   return batches.map((b) => ({
     id: b.id,
@@ -300,7 +528,12 @@ export async function getBatches(sql, topicId, userId, organizationId, limit = 1
   }));
 }
 
-export async function deleteBatch(sql, batchId, userId, organizationId) {
+export async function deleteBatch(
+  sql: SqlClient,
+  batchId: string,
+  userId: string | null,
+  organizationId: string | null,
+): Promise<void> {
   const orgId = organizationId || null;
   // Cascade deletes will handle generations
   if (orgId) {
@@ -315,20 +548,20 @@ export async function deleteBatch(sql, batchId, userId, organizationId) {
 // =============================================================================
 
 export async function deleteGeneration(
-  sql,
-  generationId,
-  userId,
-  organizationId,
-) {
+  sql: SqlClient,
+  generationId: string,
+  userId: string | null,
+  organizationId: string | null,
+): Promise<void> {
   const orgId = organizationId || null;
   // Check if this is the last generation in the batch
-  const [generation] = orgId
+  const [generation] = (orgId
     ? await sql`
         SELECT g.batch_id FROM image_generations g
         JOIN image_generation_batches b ON b.id = g.batch_id
         WHERE g.id = ${generationId} AND b.organization_id = ${orgId}
       `
-    : await sql`SELECT batch_id FROM image_generations WHERE id = ${generationId} AND user_id = ${userId}`;
+    : await sql`SELECT batch_id FROM image_generations WHERE id = ${generationId} AND user_id = ${userId}`) as { batch_id: string }[];
 
   if (!generation) return;
 
@@ -336,13 +569,13 @@ export async function deleteGeneration(
   await sql`DELETE FROM image_generations WHERE id = ${generationId}`;
 
   // Check if batch is now empty
-  const [countResult] = await sql`
+  const [countResult] = (await sql`
     SELECT COUNT(*) as count FROM image_generations
     WHERE batch_id = ${generation.batch_id}
-  `;
+  `) as CountRow[];
 
   // If batch is empty, delete it too
-  if (parseInt(countResult.count) === 0) {
+  if (countResult && parseInt(countResult.count) === 0) {
     await sql`
       DELETE FROM image_generation_batches
       WHERE id = ${generation.batch_id}
@@ -350,9 +583,13 @@ export async function deleteGeneration(
   }
 }
 
-export async function getGenerationStatus(sql, generationId, asyncTaskId) {
+export async function getGenerationStatus(
+  sql: SqlClient,
+  generationId: string,
+  _asyncTaskId: string | undefined,
+): Promise<GenerationStatus> {
   // Get both generation and async task status
-  const [result] = await sql`
+  const [result] = (await sql`
     SELECT
       g.*,
       t.status as task_status,
@@ -361,11 +598,12 @@ export async function getGenerationStatus(sql, generationId, asyncTaskId) {
     FROM image_generations g
     LEFT JOIN image_async_tasks t ON t.id = g.async_task_id
     WHERE g.id = ${generationId}
-  `;
+  `) as GenerationWithTaskRow[];
 
   if (!result) {
     return {
       status: "error",
+      generation: null,
       error: { code: "NOT_FOUND", message: "Generation not found" },
     };
   }
@@ -383,7 +621,7 @@ export async function getGenerationStatus(sql, generationId, asyncTaskId) {
     elapsedMs > STALE_TASK_TIMEOUT_MS;
 
   if (isStalePendingTask && result.async_task_id) {
-    const timeoutError = {
+    const timeoutError: GenerationError = {
       code: "GENERATION_TIMEOUT",
       message:
         "A geração expirou por tempo limite. Remova e tente novamente.",
@@ -431,11 +669,11 @@ export async function getGenerationStatus(sql, generationId, asyncTaskId) {
 /**
  * Convert width/height to aspect ratio string
  */
-function getAspectRatioFromDimensions(width, height) {
+function getAspectRatioFromDimensions(width: number, height: number): string {
   const ratio = width / height;
 
   // Map to supported aspect ratios
-  const aspectRatios = {
+  const aspectRatios: Record<string, number> = {
     "1:1": 1,
     "2:3": 2 / 3,
     "3:2": 3 / 2,
@@ -466,19 +704,19 @@ function getAspectRatioFromDimensions(width, height) {
 /**
  * Convert width to image size (1K, 2K, 4K)
  */
-function getImageSizeFromWidth(width) {
+function getImageSizeFromWidth(width: number): string {
   if (width >= 4096) return "4K";
   if (width >= 2048) return "2K";
   return "1K";
 }
 
 export async function createImageBatch(
-  sql,
-  input,
-  userId,
-  organizationId,
-  genai,
-) {
+  sql: SqlClient,
+  input: CreateImageBatchInput,
+  userId: string | null,
+  organizationId: string | null,
+  genai: GoogleGenAI,
+): Promise<CreateImageBatchResult> {
   const { topicId, provider, model, imageNum, params } = input;
 
   // Use provided values first, fallback to calculated values
@@ -488,14 +726,14 @@ export async function createImageBatch(
     params.aspectRatio || getAspectRatioFromDimensions(width, height);
   const imageSize = params.imageSize || getImageSizeFromWidth(width);
   const generationParams = { ...params, aspectRatio, imageSize, model };
-  const storedParams = compactForStorage(generationParams);
+  const storedParams = compactForStorage(generationParams as unknown as CompactValue);
   const displayPrompt =
     typeof params.userPrompt === "string" && params.userPrompt.trim()
       ? params.userPrompt
       : params.prompt;
 
   // Create batch
-  const [batch] = await sql`
+  const batchRows = (await sql`
     INSERT INTO image_generation_batches (
       topic_id, user_id, organization_id, provider, model, prompt, config, width, height
     )
@@ -504,13 +742,17 @@ export async function createImageBatch(
       ${displayPrompt}, ${JSON.stringify(storedParams)}, ${width}, ${height}
     )
     RETURNING *
-  `;
+  `) as BatchRow[];
+  const batch = batchRows[0];
+  if (!batch) {
+    throw new Error("Failed to create batch");
+  }
 
   // Create generations and async tasks
-  const generations = [];
+  const generations: GenerationJson[] = [];
   for (let i = 0; i < imageNum; i++) {
     // Create async task
-    const [task] = await sql`
+    const taskRows = (await sql`
       INSERT INTO image_async_tasks (
         user_id, type, status, metadata
       )
@@ -525,11 +767,15 @@ export async function createImageBatch(
         })}
       )
       RETURNING *
-    `;
+    `) as AsyncTaskRow[];
+    const task = taskRows[0];
+    if (!task) {
+      throw new Error("Failed to create async task");
+    }
 
     // Create generation with seed (for tracking/reproducibility reference)
     const seed = params.seed || Math.floor(Math.random() * 1000000);
-    const [generation] = await sql`
+    const generationRows = (await sql`
       INSERT INTO image_generations (
         batch_id, user_id, async_task_id, seed
       )
@@ -537,7 +783,11 @@ export async function createImageBatch(
         ${batch.id}, ${userId}, ${task.id}, ${seed}
       )
       RETURNING *
-    `;
+    `) as GenerationRow[];
+    const generation = generationRows[0];
+    if (!generation) {
+      throw new Error("Failed to create generation");
+    }
 
     generations.push({
       id: generation.id,
@@ -581,6 +831,7 @@ export async function createImageBatch(
       width: batch.width,
       height: batch.height,
       createdAt: batch.created_at,
+      userEmail: null,
       generations,
     },
     generations,
@@ -588,31 +839,11 @@ export async function createImageBatch(
 }
 
 /**
- * Map aspect ratios (same as dev-api.mjs)
- */
-function mapAspectRatio(ratio) {
-  const map = {
-    "1:1": "1:1",
-    "9:16": "9:16",
-    "16:9": "16:9",
-    "1.91:1": "16:9",
-    "4:5": "4:5",
-    "3:4": "3:4",
-    "4:3": "4:3",
-    "2:3": "2:3",
-    "3:2": "3:2",
-    "5:4": "5:4",
-    "21:9": "16:9", // Map ultrawide to closest supported
-  };
-  return map[ratio] || "1:1";
-}
-
-/**
  * Build content parts array from params (reference images, product images, etc.)
  * Shared between Gemini and FAL.ai fallback.
  */
-async function buildContentParts(params) {
-  const parts = [{ text: params.prompt }];
+async function buildContentParts(params: GenerationParams): Promise<ContentPart[]> {
+  const parts: ContentPart[] = [{ text: params.prompt }];
 
   // Add multiple reference images if provided (array of up to 14 images)
   if (
@@ -629,7 +860,7 @@ async function buildContentParts(params) {
           const matches = refImage.dataUrl.match(
             /^data:([^;]+);base64,(.+)$/,
           );
-          if (matches) {
+          if (matches && matches[1] && matches[2]) {
             mimeType = matches[1];
             base64Data = matches[2];
           }
@@ -642,9 +873,10 @@ async function buildContentParts(params) {
 
         parts.push({ inlineData: { data: base64Data, mimeType } });
       } catch (imgError) {
+        const error = imgError as Error;
         console.warn(
           `[ImagePlayground] Failed to process reference image ${refImage.id}:`,
-          imgError.message,
+          error.message,
         );
       }
     }
@@ -660,7 +892,7 @@ async function buildContentParts(params) {
 
       if (params.imageUrl.startsWith("data:")) {
         const matches = params.imageUrl.match(/^data:([^;]+);base64,(.+)$/);
-        if (matches) {
+        if (matches && matches[1] && matches[2]) {
           mimeType = matches[1];
           base64Data = matches[2];
         }
@@ -676,9 +908,10 @@ async function buildContentParts(params) {
         `[ImagePlayground] Added legacy reference image (${mimeType})`,
       );
     } catch (imgError) {
+      const error = imgError as Error;
       console.warn(
         `[ImagePlayground] Failed to process reference image:`,
-        imgError.message,
+        error.message,
       );
     }
   }
@@ -701,12 +934,12 @@ async function buildContentParts(params) {
  * Tries Gemini first, falls back to FAL.ai on quota/rate-limit errors.
  */
 async function processImageGeneration(
-  sql,
-  taskId,
-  generationId,
-  params,
-  genai,
-) {
+  sql: SqlClient,
+  taskId: string,
+  generationId: string,
+  params: GenerationParams,
+  _genai: GoogleGenAI,
+): Promise<void> {
   let usedProvider = "google";
   let usedModel = "gemini-3-pro-image-preview";
 
@@ -733,8 +966,8 @@ async function processImageGeneration(
     const parts = await buildContentParts(params);
 
     // Extract image inputs from parts for the provider chain
-    const imageInputs = parts
-      .filter((p) => p.inlineData)
+    const imageInputs: ImageInput[] = parts
+      .filter((p): p is InlineDataPart => "inlineData" in p)
       .map((p) => ({ base64: p.inlineData.data, mimeType: p.inlineData.mimeType }));
 
     // Map user model choice to generic tier for all providers
@@ -746,7 +979,7 @@ async function processImageGeneration(
       "gemini-25-flash-image",
       "gemini-3.1-flash-image-preview",
     ]);
-    const modelTier = standardModels.has(normalizedRequestedModel) ? "standard" : "pro";
+    const modelTier: "standard" | "pro" = standardModels.has(normalizedRequestedModel) ? "standard" : "pro";
 
     // Run through provider chain with automatic fallback
     console.log("[ImagePlayground] Using provider chain", { modelTier });
@@ -762,12 +995,12 @@ async function processImageGeneration(
     usedModel = result.usedModel;
 
     // Convert result to base64 for upload
-    let imageBase64;
-    let mimeType;
+    let imageBase64: string;
+    let mimeType: string;
 
     if (result.imageUrl.startsWith("data:")) {
       const matches = result.imageUrl.match(/^data:([^;]+);base64,(.+)$/);
-      if (!matches) throw new Error("Invalid data URL from provider");
+      if (!matches || !matches[1] || !matches[2]) throw new Error("Invalid data URL from provider");
       mimeType = matches[1];
       imageBase64 = matches[2];
     } else {
@@ -795,7 +1028,7 @@ async function processImageGeneration(
     });
 
     // Generate and upload thumbnail for faster gallery loading
-    let thumbnailUrl = null;
+    let thumbnailUrl: string | null = null;
     try {
       const thumbnailBuffer = await sharp(buffer)
         .resize(THUMBNAIL_WIDTH, null, { withoutEnlargement: true })
@@ -810,9 +1043,10 @@ async function processImageGeneration(
       thumbnailUrl = thumbnailBlob.url;
       console.log(`[ImagePlayground] Thumbnail generated: ${thumbnailUrl}`);
     } catch (thumbError) {
+      const error = thumbError as Error;
       console.warn(
         `[ImagePlayground] Failed to generate thumbnail:`,
-        thumbError.message,
+        error.message,
       );
     }
 
@@ -823,7 +1057,7 @@ async function processImageGeneration(
     );
 
     // Update generation with asset (include provider info)
-    const asset = {
+    const asset: GenerationAsset = {
       url: blob.url,
       width: dimensions.width,
       height: dimensions.height,
@@ -845,7 +1079,7 @@ async function processImageGeneration(
     `;
 
     // Get batch info for gallery and topic cover
-    const [generationInfo] = await sql`
+    const [generationInfo] = (await sql`
       SELECT
         g.batch_id,
         b.topic_id,
@@ -857,16 +1091,16 @@ async function processImageGeneration(
       FROM image_generations g
       JOIN image_generation_batches b ON b.id = g.batch_id
       WHERE g.id = ${generationId}
-    `;
+    `) as GenerationInfoRow[];
 
     if (generationInfo) {
       // Update topic cover if this is first successful generation
-      const [topic] = await sql`
+      const [topic] = (await sql`
         SELECT cover_url FROM image_generation_topics
         WHERE id = ${generationInfo.topic_id}
-      `;
+      `) as TopicCoverRow[];
 
-      if (!topic.cover_url) {
+      if (topic && !topic.cover_url) {
         await sql`
           UPDATE image_generation_topics
           SET cover_url = ${blob.url}
@@ -913,7 +1147,7 @@ async function processImageGeneration(
         model: usedModel,
         provider: usedProvider,
         imageCount: 1,
-        imageSize: params.imageSize || "1K",
+        imageSize: (params.imageSize || "1K") as "1K" | "2K" | "4K",
         status: "success",
         metadata: {
           source: "playground",
@@ -922,7 +1156,7 @@ async function processImageGeneration(
           generationId,
         },
       }).catch((err) => {
-        console.warn("[ImagePlayground] Failed to log usage:", err.message);
+        console.warn("[ImagePlayground] Failed to log usage:", (err as Error).message);
       });
     }
 
@@ -930,38 +1164,39 @@ async function processImageGeneration(
       `[ImagePlayground] Generation ${generationId} completed successfully (provider: ${usedProvider})`,
     );
   } catch (error) {
+    const err = error as Error;
     console.error(
       `[ImagePlayground] Generation ${generationId} failed:`,
       error,
     );
 
     // Look up user context for the failed generation
-    const [genInfo] = await sql`
+    const [genInfo] = (await sql`
       SELECT b.user_id, b.organization_id
       FROM image_generations g
       JOIN image_generation_batches b ON b.id = g.batch_id
       WHERE g.id = ${generationId}
-    `.catch(() => [{}]);
+    `.catch(() => [{ user_id: undefined, organization_id: undefined }])) as { user_id: string | undefined; organization_id: string | null | undefined }[];
 
     // Log failed usage to admin dashboard
     await logAiUsage(sql, {
       userId: genInfo?.user_id,
-      organizationId: genInfo?.organization_id,
+      organizationId: genInfo?.organization_id ?? null,
       endpoint: "/api/image-playground/generate",
       operation: "image",
       model: usedModel,
-      status: "failed",
-      error: error.message,
+      status: "error",
+      error: err.message,
       metadata: { source: "playground", generationId, provider: usedProvider },
-    }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+    }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
 
     // Build user-friendly error for the frontend
     const isQuota = isQuotaOrRateLimitError(error);
-    const errorPayload = {
-      code: isQuota ? "QUOTA_EXCEEDED" : (error.code || "GENERATION_FAILED"),
+    const errorPayload: GenerationError = {
+      code: isQuota ? "QUOTA_EXCEEDED" : ((err as Error & { code?: string }).code || "GENERATION_FAILED"),
       message: isQuota
         ? "Limite de uso da IA atingido. Tente novamente mais tarde ou entre em contato com o suporte."
-        : error.message,
+        : err.message,
     };
 
     // Update task to error
@@ -980,8 +1215,8 @@ async function processImageGeneration(
  * Get actual pixel dimensions from aspect ratio and image size
  * Based on Gemini documentation
  */
-function getActualDimensions(aspectRatio, imageSize) {
-  const dimensionMap = {
+function getActualDimensions(aspectRatio: string, imageSize: string): Dimensions {
+  const dimensionMap: AspectRatioMap = {
     "1:1": { "1K": [1024, 1024], "2K": [2048, 2048], "4K": [4096, 4096] },
     "2:3": { "1K": [848, 1264], "2K": [1696, 2528], "4K": [3392, 5056] },
     "3:2": { "1K": [1264, 848], "2K": [2528, 1696], "4K": [5056, 3392] },
@@ -994,8 +1229,9 @@ function getActualDimensions(aspectRatio, imageSize) {
     "21:9": { "1K": [1584, 672], "2K": [3168, 1344], "4K": [6336, 2688] },
   };
 
+  const defaultDims: [number, number] = [1024, 1024];
   const dims =
-    dimensionMap[aspectRatio]?.[imageSize] || dimensionMap["1:1"]["1K"];
+    dimensionMap[aspectRatio]?.[imageSize] ?? dimensionMap["1:1"]?.["1K"] ?? defaultDims;
   return { width: dims[0], height: dims[1] };
 }
 
@@ -1003,7 +1239,20 @@ function getActualDimensions(aspectRatio, imageSize) {
 // Title Generation
 // =============================================================================
 
-export async function generateTopicTitle(prompts, genai) {
+interface GeminiTitleResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+}
+
+export async function generateTopicTitle(
+  prompts: string[],
+  _genai: GoogleGenAI,
+): Promise<string> {
   try {
     const promptText = prompts.slice(0, 3).join("\n");
 
@@ -1039,15 +1288,17 @@ export async function generateTopicTitle(prompts, genai) {
       throw new Error(`API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as GeminiTitleResponse;
+    const firstPrompt = prompts[0] ?? "";
     const title =
       data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-      prompts[0].split(" ").slice(0, 4).join(" ");
+      firstPrompt.split(" ").slice(0, 4).join(" ");
 
     return title;
   } catch (error) {
     console.error("[ImagePlayground] Title generation failed:", error);
     // Fallback to first few words of first prompt
-    return prompts[0].split(" ").slice(0, 4).join(" ");
+    const firstPrompt = prompts[0] ?? "";
+    return firstPrompt.split(" ").slice(0, 4).join(" ");
   }
 }

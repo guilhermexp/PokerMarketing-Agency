@@ -1,5 +1,3 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * Validation Schema - Vercel AI SDK Chat API
  *
@@ -20,7 +18,7 @@ const textPartSchema = z.object({
   text: z.string().min(1).max(5000)
 });
 
-const isValidUrl = (value) => {
+const isValidUrl = (value: string): boolean => {
   try {
     new URL(value);
     return true;
@@ -48,22 +46,24 @@ const filePartSchema = z.object({
 
 /**
  * Part de tool call (usado internamente pelo SDK)
+ * Tool arguments can be any JSON-serializable value
  */
 const toolCallPartSchema = z.object({
   type: z.literal('tool-call'),
   toolCallId: z.string(),
   toolName: z.string(),
-  args: z.record(z.any())
+  args: z.record(z.string(), z.unknown())
 });
 
 /**
  * Part de tool result (usado internamente pelo SDK)
+ * Tool results can be any JSON-serializable value
  */
 const toolResultPartSchema = z.object({
   type: z.literal('tool-result'),
   toolCallId: z.string(),
   toolName: z.string(),
-  result: z.any()
+  result: z.unknown()
 });
 
 /**
@@ -105,13 +105,21 @@ const messagePartSchema = z.union([
 // ============================================================================
 
 /**
+ * Content can be a string or an array of parts (SDK flexibility)
+ */
+const messageContentSchema = z.union([
+  z.string(),
+  z.array(messagePartSchema)
+]);
+
+/**
  * Mensagem individual
  */
 const messageSchema = z.object({
   id: z.string().optional(), // Opcional: nem sempre é UUID no formato do SDK
   role: z.enum(['user', 'assistant']),
   parts: z.array(messagePartSchema).optional(),
-  content: z.union([z.string(), z.any()]).optional(), // String simples ou qualquer outro formato
+  content: messageContentSchema.optional(), // String simples ou array de parts
 }).passthrough(); // Permite campos extras do SDK
 
 // ============================================================================
@@ -178,43 +186,32 @@ export const chatBodySchema = z.object({
 
 /**
  * Valida se o request body é válido
- *
- * @param {any} body - Corpo da requisição
- * @returns {{ success: boolean, data?: object, error?: object }}
  */
-export function validateChatRequest(body) {
+export function validateChatRequest(body: unknown) {
   return chatBodySchema.safeParse(body);
 }
 
 /**
  * Valida se uma mensagem individual é válida
- *
- * @param {any} message
- * @returns {{ success: boolean, data?: object, error?: object }}
  */
-export function validateMessage(message) {
+export function validateMessage(message: unknown) {
   return messageSchema.safeParse(message);
 }
 
 /**
  * Valida se o modelo ID é válido (formato básico)
- *
- * @param {string} modelId
- * @returns {boolean}
  */
-export function isValidModelId(modelId) {
+export function isValidModelId(modelId: string): boolean {
   // Formato: "gemini-xxx" or legacy "google/gemini-xxx"
-  const pattern = /^(google\/)?gemini-[a-z0-9\-\.]+$/i;
+  const pattern = /^(google\/)?gemini-[a-z0-9\-.]+$/i;
   return pattern.test(modelId);
 }
 
 // ============================================================================
-// EXPORT TYPES (para TypeScript/JSDoc)
+// EXPORT TYPES
 // ============================================================================
 
-/**
- * @typedef {z.infer<typeof chatBodySchema>} ChatRequestBody
- * @typedef {z.infer<typeof messageSchema>} Message
- * @typedef {z.infer<typeof messagePartSchema>} MessagePart
- * @typedef {z.infer<typeof brandProfileSchema>} BrandProfile
- */
+export type ChatRequestBody = z.infer<typeof chatBodySchema>;
+export type Message = z.infer<typeof messageSchema>;
+export type MessagePart = z.infer<typeof messagePartSchema>;
+export type BrandProfile = z.infer<typeof brandProfileSchema>;

@@ -96,3 +96,23 @@ export const aiImageAsyncJobsQuerySchema = z.object({
 });
 
 export type AiImageAsyncJobsQuery = z.infer<typeof aiImageAsyncJobsQuerySchema>;
+
+// ============================================================================
+// AI VIDEO GENERATION
+// ============================================================================
+
+export const aiVideoBodySchema = z.object({
+  prompt: z.string().trim().min(1),
+  aspectRatio: z.string().trim().min(1),
+  model: z.string().trim().min(1),
+  resolution: z.string().optional().default("720p"),
+  imageUrl: z.string().optional(),
+  lastFrameUrl: z.string().optional(),
+  sceneDuration: z.number().optional(),
+  generateAudio: z.boolean().optional().default(true),
+  useInterpolation: z.boolean().optional().default(false),
+  useBrandProfile: z.boolean().optional().default(false),
+  useCampaignGradePrompt: z.boolean().optional().default(true),
+});
+
+export type AiVideoBody = z.infer<typeof aiVideoBodySchema>;

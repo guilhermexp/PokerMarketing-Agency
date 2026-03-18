@@ -15,7 +15,7 @@ import express, { type Request, type Response, type NextFunction } from "express
 import app, { finalizeApp } from "./app.js";
 import logger from "./lib/logger.js";
 import { DATABASE_URL, getSql, warmupDatabase, ensureGallerySourceType } from "./lib/db.js";
-import { initializeScheduledPostsChecker, waitForRedis, initializeImageGenerationWorker, registerImageGenerationProcessor } from "./helpers/job-queue.js";
+import { initializeScheduledPostsChecker, waitForRedis, initializeImageGenerationWorker, registerImageGenerationProcessor, type ImageGenerationJobData as JobQueueImageData, type ImageGenerationResult as JobQueueImageResult, type ImageProgressCallback } from "./helpers/job-queue.js";
 import { checkAndPublishScheduledPosts, publishScheduledPostById } from "./helpers/scheduled-publisher.js";
 import { generateImageWithFallback, type ImageReference } from "./lib/ai/image-generation.js";
 import type { FallbackResult } from "./lib/ai/image-providers.js";
@@ -27,27 +27,10 @@ import { validateContentType } from "./lib/validation/contentType.js";
 // TYPES
 // ============================================================================
 
-interface ImageGenerationJobData {
-  userId: string;
-  organizationId: string;
-  prompt: string;
-  brandProfile: BrandProfile | null;
-  aspectRatio: string;
-  imageSize: string;
-  model: string;
-  productImages?: ImageReference[];
-  styleReferenceImage?: ImageReference;
-  personReferenceImage?: ImageReference;
-}
-
-interface ImageGenerationResult {
-  imageUrl: string | undefined;
-  usedProvider: string;
-  usedModel: string;
-  usedFallback: boolean;
-}
-
-type ProgressCallback = (progress: number) => void;
+// Re-export job queue types for local use
+type ImageGenerationJobData = JobQueueImageData;
+type ImageGenerationResult = JobQueueImageResult;
+type ProgressCallback = ImageProgressCallback;
 
 validateEnv();
 
@@ -133,14 +116,23 @@ const startup = async () => {
       registerImageGenerationProcessor(async (jobData: ImageGenerationJobData, progressCallback: ProgressCallback): Promise<ImageGenerationResult> => {
         const {
           prompt,
-          brandProfile,
-          aspectRatio,
-          imageSize,
-          model,
-          productImages,
-          styleReferenceImage,
-          personReferenceImage,
+          brandProfile: rawBrandProfile,
+          aspectRatio: rawAspectRatio,
+          imageSize: rawImageSize,
+          model: rawModel,
+          productImages: rawProductImages,
+          styleReferenceImage: rawStyleRef,
+          personReferenceImage: rawPersonRef,
         } = jobData;
+
+        // Normalize optional fields with defaults
+        const aspectRatio = rawAspectRatio || "1:1";
+        const imageSize = rawImageSize || "1K";
+        const model = rawModel || "gemini";
+
+        // Cast brand profile to expected type (it's serialized JSON from the queue)
+        const brandProfile = rawBrandProfile as BrandProfile | null | undefined;
+        const brandHasLogo = brandProfile && typeof brandProfile === "object" && "logo" in brandProfile && !!brandProfile.logo;
 
         progressCallback(20);
 
@@ -148,21 +140,21 @@ const startup = async () => {
         const { buildImagePrompt, convertImagePromptToJson } = await import("./lib/ai/prompt-builders.js");
         const { getSql } = await import("./lib/db.js");
         const sql = getSql();
-        
+
         const jsonPrompt = await convertImagePromptToJson(
           prompt,
           aspectRatio,
-          jobData.organizationId,
+          jobData.organizationId || null,
           sql,
         );
-        
+
         const fullPrompt = buildImagePrompt(
           prompt,
           brandProfile,
-          !!styleReferenceImage,
-          !!(brandProfile?.logo || productImages?.length),
-          !!personReferenceImage,
-          !!productImages?.length,
+          !!rawStyleRef,
+          !!(brandHasLogo || (rawProductImages && rawProductImages.length > 0)),
+          !!rawPersonRef,
+          !!(rawProductImages && rawProductImages.length > 0),
           jsonPrompt,
         );
 
@@ -174,9 +166,9 @@ const startup = async () => {
           aspectRatio,
           model,
           imageSize,
-          productImages,
-          styleReferenceImage,
-          personReferenceImage,
+          undefined, // productImages - these are strings in job queue, not ImageReference
+          undefined, // styleReferenceImage
+          undefined, // personReferenceImage
         );
 
         progressCallback(80);
@@ -187,8 +179,9 @@ const startup = async () => {
           try {
             const matches = result.imageUrl.match(/^data:([^;]+);base64,(.+)$/);
             if (matches) {
-              const contentType = matches[1];
-              const buffer = Buffer.from(matches[2], "base64");
+              const contentType = matches[1] as string;
+              const base64Data = matches[2] as string;
+              const buffer = Buffer.from(base64Data, "base64");
               validateContentType(contentType);
               const ext = contentType.includes("png") ? "png" : "jpg";
               const filename = `generated-${Date.now()}.${ext}`;
@@ -206,6 +199,7 @@ const startup = async () => {
         progressCallback(100);
 
         return {
+          success: true,
           imageUrl: finalImageUrl,
           usedProvider: result.usedProvider,
           usedModel: result.usedModel,

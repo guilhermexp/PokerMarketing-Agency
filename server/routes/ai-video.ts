@@ -1,5 +1,3 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * AI Video Generation Route
  * Extracted from server/index.mjs
@@ -7,6 +5,7 @@
  * Route: POST /api/ai/video
  */
 
+import type { Express } from "express";
 import { put } from "@vercel/blob";
 import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
@@ -27,9 +26,37 @@ import {
 } from "../lib/ai/video-generation.js";
 import { buildVideoPrompt } from "../lib/ai/prompt-builders.js";
 import logger from "../lib/logger.js";
+import { validateRequest } from "../middleware/validate.js";
+import { type AiVideoBody, aiVideoBodySchema } from "../schemas/ai-schemas.js";
 
-export function registerAiVideoRoutes(app) {
-  app.post("/api/ai/video", async (req, res) => {
+/** Brand profile mapped from database record for video prompt building */
+interface MappedBrandProfile {
+  name: string | null;
+  description: string | null;
+  logo: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  tertiaryColor: string | null;
+  toneOfVoice: string | null;
+  toneTargets: string[];
+}
+
+/** Database brand profile record */
+interface BrandProfileRecord {
+  name: string | null;
+  description: string | null;
+  logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  tertiary_color: string | null;
+  tone_of_voice: string | null;
+  settings?: {
+    toneTargets?: string[];
+  } | null;
+}
+
+export function registerAiVideoRoutes(app: Express): void {
+  app.post("/api/ai/video", validateRequest({ body: aiVideoBodySchema }), async (req, res) => {
     const timer = createTimer();
     const authContext = getRequestAuthContext(req);
     const organizationId = authContext?.orgId || null;
@@ -49,18 +76,12 @@ export function registerAiVideoRoutes(app) {
         useInterpolation = false,
         useBrandProfile = false,
         useCampaignGradePrompt = true,
-      } = req.body;
-
-      if (!prompt || !aspectRatio || !model) {
-        return res.status(400).json({
-          error: "Missing required fields: prompt, aspectRatio, model",
-        });
-      }
+      } = req.body as AiVideoBody;
 
       const isInterpolationMode = useInterpolation && lastFrameUrl;
       let finalPrompt = prompt;
-      let mappedBrandProfile = null;
-      let effectiveImageUrl = imageUrl;
+      let mappedBrandProfile: MappedBrandProfile | null = null;
+      let effectiveImageUrl: string | undefined = imageUrl;
       let usedBrandLogoAsReference = false;
 
       if (useBrandProfile && authUserId) {
@@ -72,8 +93,9 @@ export function registerAiVideoRoutes(app) {
             : resolvedUserId
               ? await sql`SELECT * FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`
               : [];
+        const brandProfileRows = brandProfileResult as BrandProfileRecord[];
 
-        const brandProfile = brandProfileResult[0];
+        const brandProfile = brandProfileRows[0];
         if (brandProfile) {
           mappedBrandProfile = {
             name: brandProfile.name,
@@ -97,11 +119,23 @@ export function registerAiVideoRoutes(app) {
             usedBrandLogoAsReference = true;
           }
 
-          finalPrompt = buildVideoPrompt(prompt, mappedBrandProfile, {
+          // Convert mapped brand profile to the format expected by buildVideoPrompt
+          const brandProfileForPrompt = {
+            name: mappedBrandProfile.name ?? undefined,
+            description: mappedBrandProfile.description ?? undefined,
+            logo: mappedBrandProfile.logo ?? undefined,
+            primaryColor: mappedBrandProfile.primaryColor ?? undefined,
+            secondaryColor: mappedBrandProfile.secondaryColor ?? undefined,
+            tertiaryColor: mappedBrandProfile.tertiaryColor ?? undefined,
+            toneOfVoice: mappedBrandProfile.toneOfVoice ?? undefined,
+            toneTargets: mappedBrandProfile.toneTargets,
+          };
+
+          finalPrompt = buildVideoPrompt(prompt, brandProfileForPrompt, {
             resolution,
             aspectRatio,
             hasReferenceImage: !!effectiveImageUrl,
-            isInterpolationMode,
+            isInterpolationMode: !!isInterpolationMode,
             useCampaignGradePrompt,
             hasBrandLogoReference: usedBrandLogoAsReference,
           });
@@ -150,8 +184,8 @@ export function registerAiVideoRoutes(app) {
         "[Video API] Generating video",
       );
 
-      let videoUrl;
-      let videoBuffer;
+      let videoUrl: string | null = null;
+      let videoBuffer: Buffer | null = null;
       let usedProvider = "google";
 
       // For Veo 3.1, use Google API only (no fallback).
@@ -190,13 +224,15 @@ export function registerAiVideoRoutes(app) {
       );
       const uploadStart = Date.now();
 
-      let videoData;
+      let videoData: Buffer;
       if (videoBuffer) {
         videoData = videoBuffer;
-      } else {
+      } else if (videoUrl) {
         // FAL.ai returns a URL - download it
         const videoResponse = await fetch(videoUrl);
         videoData = Buffer.from(await videoResponse.arrayBuffer());
+      } else {
+        throw new Error("No video data available");
       }
 
       const filename = `${model}-video-${Date.now()}.mp4`;
@@ -241,16 +277,17 @@ export function registerAiVideoRoutes(app) {
         provider: usedProvider,
       });
     } catch (error) {
-      logError("Video API", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logError("Video API", error instanceof Error ? error : new Error(errorMessage));
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/video",
         operation: "video",
-        model: req.body?.model || "veo-3.1-fast",
+        model: (req.body as AiVideoBody)?.model || "veo-3.1-fast",
         latencyMs: timer(),
-        status: "failed",
+        status: "error",
         error: error instanceof Error ? error.message : "Unknown error",
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+      }).catch((err: unknown) => logger.warn({ err }, "Non-critical usage logging failed"));
       return res.status(500).json({
         error:
           error instanceof Error ? error.message : "Failed to generate video",

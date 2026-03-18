@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express, Request, Response } from "express";
 import { getSql } from "../lib/db.js";
 import { requireSuperAdmin } from "../lib/auth.js";
 import { generateTextFromMessages } from "../lib/ai/text-generation.js";
@@ -7,28 +6,177 @@ import { withRetry } from "../lib/ai/retry.js";
 import { DEFAULT_TEXT_MODEL } from "../lib/ai/models.js";
 import logger from "../lib/logger.js";
 
+// ----------------------------------------------------------------------------
+// SQL Query Result Interfaces
+// ----------------------------------------------------------------------------
+
+interface CountRow {
+  count: string;
+}
+
+interface PostsCountRow {
+  count: string;
+  pending: string;
+}
+
+interface AiUsageTotalsRow {
+  total_cost: string;
+  total_requests: string;
+}
+
+interface UsageTotalsRow {
+  total_requests: string;
+  success_count: string;
+  failed_count: string;
+  total_cost_cents: string;
+  total_input_tokens: string;
+  total_output_tokens: string;
+  total_images: string;
+  total_video_seconds: string;
+}
+
+interface TimelineRowBase {
+  total_requests: string;
+  total_cost_cents: string;
+}
+
+interface TimelineRowByDate extends TimelineRowBase {
+  date: Date | string;
+}
+
+interface TimelineRowByProvider extends TimelineRowBase {
+  provider: string;
+}
+
+interface TimelineRowByModel extends TimelineRowBase {
+  model_id: string;
+}
+
+interface TimelineRowByOperation extends TimelineRowBase {
+  operation: string;
+}
+
+type TimelineRow =
+  | TimelineRowByDate
+  | TimelineRowByProvider
+  | TimelineRowByModel
+  | TimelineRowByOperation;
+
+interface TopUserRow {
+  user_id: string;
+  email: string;
+  name: string;
+  total_requests: string;
+  total_cost_cents: string;
+}
+
+interface TopOrganizationRow {
+  organization_id: string;
+  total_requests: string;
+  total_cost_cents: string;
+}
+
+interface UserRow {
+  id: string;
+  clerk_user_id: string;
+  email: string;
+  name: string;
+  avatar_url: string | null;
+  last_login: Date | null;
+  created_at: Date;
+  campaign_count: string;
+  brand_count: string;
+  scheduled_post_count: string;
+}
+
+interface TotalRow {
+  total: string;
+}
+
+interface OrganizationRow {
+  organization_id: string;
+  primary_brand_name: string;
+  brand_count: string;
+  campaign_count: string;
+  gallery_image_count: string;
+  scheduled_post_count: string;
+  first_brand_created: Date | null;
+  last_activity: Date | null;
+  ai_requests: string;
+  ai_cost_cents: string;
+}
+
+interface LogRow {
+  id: string;
+  user_id: string | null;
+  organization_id: string | null;
+  endpoint: string | null;
+  category: string | null;
+  model: string | null;
+  cost_cents: number | null;
+  error: string | null;
+  severity: string;
+  status: string;
+  duration_ms: number | null;
+  timestamp: Date;
+}
+
+interface CategoryRow {
+  category: string;
+}
+
+interface LogDetailRow {
+  id: string;
+  request_id: string | null;
+  user_id: string | null;
+  organization_id: string | null;
+  endpoint: string | null;
+  operation: string | null;
+  provider: string | null;
+  model_id: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  image_count: number | null;
+  image_size: string | null;
+  video_duration_seconds: number | null;
+  estimated_cost_cents: number | null;
+  latency_ms: number | null;
+  status: string;
+  error_message: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: Date;
+}
+
+interface AiSuggestionsLogRow {
+  id: string;
+  endpoint: string | null;
+  operation: string | null;
+  model_id: string | null;
+  error_message: string | null;
+  metadata: Record<string, unknown> | null;
+  latency_ms: number | null;
+  status: string;
+}
+
+interface AiSuggestionsCacheEntry {
+  suggestions: string;
+  timestamp: number;
+}
+
 // Cache for AI suggestions (1 hour TTL)
-const aiSuggestionsCache = new Map();
+const aiSuggestionsCache = new Map<string, AiSuggestionsCacheEntry>();
 const CACHE_DURATION_MS = 3600000; // 1 hour
 
-export function registerAdminRoutes(app) {
+export function registerAdminRoutes(app: Express): void {
   // Admin: Get overview stats
-  app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
+  app.get("/api/admin/stats", requireSuperAdmin, async (_req: Request, res: Response) => {
     try {
       const sql = getSql();
 
       // Get all stats in parallel
       // Note: organizations are managed by Clerk, not in our DB
-      const [
-        usersResult,
-        activeUsersResult,
-        campaignsResult,
-        postsResult,
-        galleryResult,
-        aiUsageResult,
-        errorsResult,
-        orgCountResult,
-      ] = await Promise.all([
+      const results = await Promise.all([
         sql`SELECT COUNT(*) as count FROM users`,
         sql`SELECT COUNT(*) as count FROM users WHERE last_login_at >= DATE_TRUNC('day', NOW())`,
         sql`SELECT COUNT(*) as count FROM campaigns`,
@@ -60,17 +208,26 @@ export function registerAdminRoutes(app) {
         `,
       ]);
 
+      const usersResult = results[0] as CountRow[];
+      const activeUsersResult = results[1] as CountRow[];
+      const campaignsResult = results[2] as CountRow[];
+      const postsResult = results[3] as PostsCountRow[];
+      const galleryResult = results[4] as CountRow[];
+      const aiUsageResult = results[5] as AiUsageTotalsRow[];
+      const errorsResult = results[6] as CountRow[];
+      const orgCountResult = results[7] as CountRow[];
+
       res.json({
-        totalUsers: parseInt(usersResult[0]?.count || 0),
-        activeUsersToday: parseInt(activeUsersResult[0]?.count || 0),
-        totalOrganizations: parseInt(orgCountResult[0]?.count || 0),
-        totalCampaigns: parseInt(campaignsResult[0]?.count || 0),
-        totalScheduledPosts: parseInt(postsResult[0]?.count || 0),
-        pendingPosts: parseInt(postsResult[0]?.pending || 0),
-        totalGalleryImages: parseInt(galleryResult[0]?.count || 0),
-        aiCostThisMonth: parseInt(aiUsageResult[0]?.total_cost || 0),
-        aiRequestsThisMonth: parseInt(aiUsageResult[0]?.total_requests || 0),
-        recentErrors: parseInt(errorsResult[0]?.count || 0),
+        totalUsers: parseInt(usersResult[0]?.count || "0", 10),
+        activeUsersToday: parseInt(activeUsersResult[0]?.count || "0", 10),
+        totalOrganizations: parseInt(orgCountResult[0]?.count || "0", 10),
+        totalCampaigns: parseInt(campaignsResult[0]?.count || "0", 10),
+        totalScheduledPosts: parseInt(postsResult[0]?.count || "0", 10),
+        pendingPosts: parseInt(postsResult[0]?.pending || "0", 10),
+        totalGalleryImages: parseInt(galleryResult[0]?.count || "0", 10),
+        aiCostThisMonth: parseInt(aiUsageResult[0]?.total_cost || "0", 10),
+        aiRequestsThisMonth: parseInt(aiUsageResult[0]?.total_requests || "0", 10),
+        recentErrors: parseInt(errorsResult[0]?.count || "0", 10),
       });
     } catch (error) {
       logger.error({ err: error }, "[Admin] Stats error");
@@ -79,7 +236,7 @@ export function registerAdminRoutes(app) {
   });
 
   // Admin: Get AI usage analytics
-  app.get("/api/admin/usage", requireSuperAdmin, async (req, res) => {
+  app.get("/api/admin/usage", requireSuperAdmin, async (req: Request, res: Response) => {
     try {
       const sql = getSql();
       const normalizedGroupBy = String(req.query?.groupBy || "day").toLowerCase();
@@ -103,9 +260,9 @@ export function registerAdminRoutes(app) {
           COALESCE(SUM(video_duration_seconds), 0) as total_video_seconds
         FROM api_usage_logs
         WHERE created_at >= NOW() - INTERVAL '1 day' * ${days}
-      `;
+      ` as UsageTotalsRow[];
 
-      let timeline = [];
+      let timeline: TimelineRow[] = [];
       if (groupBy === "provider") {
         timeline = await sql`
           SELECT
@@ -117,7 +274,7 @@ export function registerAdminRoutes(app) {
           GROUP BY provider
           ORDER BY total_requests DESC
           LIMIT 20
-        `;
+        ` as TimelineRowByProvider[];
       } else if (groupBy === "model") {
         timeline = await sql`
           SELECT
@@ -129,7 +286,7 @@ export function registerAdminRoutes(app) {
           GROUP BY model_id
           ORDER BY total_requests DESC
           LIMIT 20
-        `;
+        ` as TimelineRowByModel[];
       } else if (groupBy === "operation") {
         timeline = await sql`
           SELECT
@@ -140,7 +297,7 @@ export function registerAdminRoutes(app) {
           WHERE created_at >= NOW() - INTERVAL '1 day' * ${days}
           GROUP BY operation
           ORDER BY total_requests DESC
-        `;
+        ` as TimelineRowByOperation[];
       } else {
         timeline = await sql`
           SELECT
@@ -151,7 +308,7 @@ export function registerAdminRoutes(app) {
           WHERE created_at >= NOW() - INTERVAL '1 day' * ${days}
           GROUP BY DATE(created_at)
           ORDER BY date ASC
-        `;
+        ` as TimelineRowByDate[];
       }
 
       const topUsers = await sql`
@@ -168,7 +325,7 @@ export function registerAdminRoutes(app) {
         GROUP BY l.user_id, u.email, u.name
         ORDER BY total_cost_cents DESC
         LIMIT 10
-      `;
+      ` as TopUserRow[];
 
       const topOrganizations = await sql`
         SELECT
@@ -181,53 +338,62 @@ export function registerAdminRoutes(app) {
         GROUP BY organization_id
         ORDER BY total_cost_cents DESC
         LIMIT 10
-      `;
+      ` as TopOrganizationRow[];
 
-      const totals = totalsResult[0] || {};
+      const totals = totalsResult[0] || {
+        total_requests: "0",
+        success_count: "0",
+        failed_count: "0",
+        total_cost_cents: "0",
+        total_input_tokens: "0",
+        total_output_tokens: "0",
+        total_images: "0",
+        total_video_seconds: "0",
+      };
 
       res.json({
         totals: {
-          totalRequests: parseInt(totals.total_requests || 0),
-          successCount: parseInt(totals.success_count || 0),
-          failedCount: parseInt(totals.failed_count || 0),
-          totalCostCents: parseInt(totals.total_cost_cents || 0),
-          totalCostUsd: (parseInt(totals.total_cost_cents || 0) || 0) / 100,
-          totalInputTokens: parseInt(totals.total_input_tokens || 0),
-          totalOutputTokens: parseInt(totals.total_output_tokens || 0),
-          totalImages: parseInt(totals.total_images || 0),
-          totalVideoSeconds: parseInt(totals.total_video_seconds || 0),
+          totalRequests: parseInt(totals.total_requests || "0", 10),
+          successCount: parseInt(totals.success_count || "0", 10),
+          failedCount: parseInt(totals.failed_count || "0", 10),
+          totalCostCents: parseInt(totals.total_cost_cents || "0", 10),
+          totalCostUsd: (parseInt(totals.total_cost_cents || "0", 10) || 0) / 100,
+          totalInputTokens: parseInt(totals.total_input_tokens || "0", 10),
+          totalOutputTokens: parseInt(totals.total_output_tokens || "0", 10),
+          totalImages: parseInt(totals.total_images || "0", 10),
+          totalVideoSeconds: parseInt(totals.total_video_seconds || "0", 10),
         },
-        timeline: timeline.map((row) => {
+        timeline: timeline.map((row: TimelineRow) => {
           const mapped = {
-            total_requests: String(parseInt(row.total_requests || 0)),
-            total_cost_cents: String(parseInt(row.total_cost_cents || 0)),
+            total_requests: String(parseInt(row.total_requests || "0", 10)),
+            total_cost_cents: String(parseInt(row.total_cost_cents || "0", 10)),
           };
 
-          if (row.date) {
+          if ("date" in row && row.date) {
             const dateValue = row.date instanceof Date
               ? row.date.toISOString().split("T")[0]
               : String(row.date);
             return { ...mapped, date: dateValue };
           }
 
-          if (row.provider) return { ...mapped, provider: row.provider };
-          if (row.model_id) return { ...mapped, model_id: row.model_id };
-          if (row.operation) return { ...mapped, operation: row.operation };
+          if ("provider" in row && row.provider) return { ...mapped, provider: row.provider };
+          if ("model_id" in row && row.model_id) return { ...mapped, model_id: row.model_id };
+          if ("operation" in row && row.operation) return { ...mapped, operation: row.operation };
           return mapped;
         }),
-        topUsers: topUsers.map((row) => ({
+        topUsers: topUsers.map((row: TopUserRow) => ({
           user_id: row.user_id,
           email: row.email || "",
           name: row.name || "",
-          total_requests: String(parseInt(row.total_requests || 0)),
-          total_cost_cents: String(parseInt(row.total_cost_cents || 0)),
-          totalCostUsd: (parseInt(row.total_cost_cents || 0) || 0) / 100,
+          total_requests: String(parseInt(row.total_requests || "0", 10)),
+          total_cost_cents: String(parseInt(row.total_cost_cents || "0", 10)),
+          totalCostUsd: (parseInt(row.total_cost_cents || "0", 10) || 0) / 100,
         })),
-        topOrganizations: topOrganizations.map((row) => ({
+        topOrganizations: topOrganizations.map((row: TopOrganizationRow) => ({
           organization_id: row.organization_id,
-          total_requests: String(parseInt(row.total_requests || 0)),
-          total_cost_cents: String(parseInt(row.total_cost_cents || 0)),
-          totalCostUsd: (parseInt(row.total_cost_cents || 0) || 0) / 100,
+          total_requests: String(parseInt(row.total_requests || "0", 10)),
+          total_cost_cents: String(parseInt(row.total_cost_cents || "0", 10)),
+          totalCostUsd: (parseInt(row.total_cost_cents || "0", 10) || 0) / 100,
         })),
       });
     } catch (error) {
@@ -237,13 +403,17 @@ export function registerAdminRoutes(app) {
   });
 
   // Admin: Get users list
-  app.get("/api/admin/users", requireSuperAdmin, async (req, res) => {
+  app.get("/api/admin/users", requireSuperAdmin, async (req: Request, res: Response) => {
     try {
       const sql = getSql();
-      const { limit = 20, page = 1, search = "" } = req.query;
-      const offset = (parseInt(page) - 1) * parseInt(limit);
+      const limitParam = parseInt(String(req.query.limit || "20"), 10);
+      const pageParam = parseInt(String(req.query.page || "1"), 10);
+      const searchParam = String(req.query.search || "");
+      const safeLimit = Math.min(Math.max(limitParam, 1), 100);
+      const safePage = Math.max(pageParam, 1);
+      const offset = (safePage - 1) * safeLimit;
 
-      const searchFilter = search ? `%${search}%` : null;
+      const searchFilter = searchParam ? `%${searchParam}%` : null;
 
       const users = await sql`
         SELECT
@@ -264,21 +434,21 @@ export function registerAdminRoutes(app) {
         WHERE (${searchFilter}::text IS NULL OR u.email ILIKE ${searchFilter} OR u.name ILIKE ${searchFilter})
         GROUP BY u.id, u.auth_provider_id, u.email, u.name, u.avatar_url, u.last_login_at, u.created_at
         ORDER BY u.created_at DESC
-        LIMIT ${parseInt(limit)} OFFSET ${offset}
-      `;
+        LIMIT ${safeLimit} OFFSET ${offset}
+      ` as UserRow[];
 
       const countResult = await sql`
         SELECT COUNT(*) as total FROM users
         WHERE (${searchFilter}::text IS NULL OR email ILIKE ${searchFilter} OR name ILIKE ${searchFilter})
-      `;
-      const total = parseInt(countResult[0]?.total || 0);
-      const totalPages = Math.ceil(total / parseInt(limit));
+      ` as TotalRow[];
+      const total = parseInt(countResult[0]?.total || "0", 10);
+      const totalPages = Math.ceil(total / safeLimit);
 
       res.json({
         users,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page: safePage,
+          limit: safeLimit,
           total,
           totalPages,
         },
@@ -290,11 +460,14 @@ export function registerAdminRoutes(app) {
   });
 
   // Admin: Get organizations list (from Clerk org IDs in brand_profiles/campaigns/usage tables)
-  app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
+  app.get("/api/admin/organizations", requireSuperAdmin, async (req: Request, res: Response) => {
     try {
       const sql = getSql();
-      const { limit = 20, page = 1 } = req.query;
-      const offset = (parseInt(page) - 1) * parseInt(limit);
+      const limitParam = parseInt(String(req.query.limit || "20"), 10);
+      const pageParam = parseInt(String(req.query.page || "1"), 10);
+      const safeLimit = Math.min(Math.max(limitParam, 1), 100);
+      const safePage = Math.max(pageParam, 1);
+      const offset = (safePage - 1) * safeLimit;
 
       // Get organization base data with counts from various tables
       const orgs = await sql`
@@ -399,11 +572,11 @@ export function registerAdminRoutes(app) {
         LEFT JOIN activity_data a ON a.organization_id = o.organization_id
         LEFT JOIN usage_this_month u ON u.organization_id = o.organization_id
         ORDER BY a.last_activity DESC NULLS LAST
-        LIMIT ${parseInt(limit)} OFFSET ${offset}
-      `;
+        LIMIT ${safeLimit} OFFSET ${offset}
+      ` as OrganizationRow[];
 
       // Transform data to match frontend interface
-      const organizations = orgs.map((org) => ({
+      const organizations = orgs.map((org: OrganizationRow) => ({
         organization_id: org.organization_id,
         primary_brand_name: org.primary_brand_name,
         brand_count: String(org.brand_count),
@@ -413,9 +586,9 @@ export function registerAdminRoutes(app) {
         first_brand_created: org.first_brand_created,
         last_activity: org.last_activity,
         aiUsageThisMonth: {
-          requests: parseInt(org.ai_requests) || 0,
-          costCents: parseInt(org.ai_cost_cents) || 0,
-          costUsd: (parseInt(org.ai_cost_cents) || 0) / 100,
+          requests: parseInt(String(org.ai_requests), 10) || 0,
+          costCents: parseInt(String(org.ai_cost_cents), 10) || 0,
+          costUsd: (parseInt(String(org.ai_cost_cents), 10) || 0) / 100,
         },
       }));
 
@@ -432,15 +605,15 @@ export function registerAdminRoutes(app) {
           UNION
           SELECT organization_id FROM api_usage_logs WHERE organization_id IS NOT NULL
         ) orgs
-      `;
-      const total = parseInt(countResult[0]?.total || 0);
-      const totalPages = Math.ceil(total / parseInt(limit));
+      ` as TotalRow[];
+      const total = parseInt(countResult[0]?.total || "0", 10);
+      const totalPages = Math.ceil(total / safeLimit);
 
       res.json({
         organizations,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page: safePage,
+          limit: safeLimit,
           total,
           totalPages,
         },
@@ -452,17 +625,20 @@ export function registerAdminRoutes(app) {
   });
 
   // Admin: Get activity logs
-  app.get("/api/admin/logs", requireSuperAdmin, async (req, res) => {
+  app.get("/api/admin/logs", requireSuperAdmin, async (req: Request, res: Response) => {
     try {
       const sql = getSql();
-      const { limit = 100, page = 1, action = "", category = "", severity = "" } =
-        req.query;
-      const safeLimit = Math.min(Math.max(parseInt(limit) || 100, 1), 200);
-      const safePage = Math.max(parseInt(page) || 1, 1);
+      const limitParam = parseInt(String(req.query.limit || "100"), 10);
+      const pageParam = parseInt(String(req.query.page || "1"), 10);
+      const actionParam = String(req.query.action || "");
+      const categoryParam = String(req.query.category || "");
+      const severityParam = String(req.query.severity || "");
+      const safeLimit = Math.min(Math.max(limitParam || 100, 1), 200);
+      const safePage = Math.max(pageParam || 1, 1);
       const offset = (safePage - 1) * safeLimit;
-      const actionFilter = action ? `%${action}%` : null;
-      const categoryFilter = category ? String(category) : null;
-      const severityFilter = severity ? String(severity).toLowerCase() : null;
+      const actionFilter = actionParam ? `%${actionParam}%` : null;
+      const categoryFilter = categoryParam || null;
+      const severityFilter = severityParam ? severityParam.toLowerCase() : null;
 
       const logs = await sql`
         SELECT id, user_id, organization_id, endpoint, operation as category, model_id as model,
@@ -480,7 +656,7 @@ export function registerAdminRoutes(app) {
           )
         ORDER BY created_at DESC
         LIMIT ${safeLimit} OFFSET ${offset}
-      `;
+      ` as LogRow[];
 
       const totalResult = await sql`
         SELECT COUNT(*) as count
@@ -493,17 +669,17 @@ export function registerAdminRoutes(app) {
             OR (${severityFilter} = 'error' AND status = 'failed')
             OR (${severityFilter} IN ('info', 'warning', 'critical') AND status != 'failed')
           )
-      `;
+      ` as CountRow[];
 
       // Get unique categories
       const categoriesResult =
-        await sql`SELECT DISTINCT operation as category FROM api_usage_logs WHERE operation IS NOT NULL`;
+        await sql`SELECT DISTINCT operation as category FROM api_usage_logs WHERE operation IS NOT NULL` as CategoryRow[];
 
       // Get recent error count
       const errorCountResult =
-        await sql`SELECT COUNT(*) as count FROM api_usage_logs WHERE status = 'failed' AND created_at >= NOW() - INTERVAL '24 hours'`;
+        await sql`SELECT COUNT(*) as count FROM api_usage_logs WHERE status = 'failed' AND created_at >= NOW() - INTERVAL '24 hours'` as CountRow[];
 
-      const total = parseInt(totalResult[0]?.count || 0);
+      const total = parseInt(totalResult[0]?.count || "0", 10);
       const totalPages = Math.ceil(total / safeLimit);
 
       res.json({
@@ -515,8 +691,8 @@ export function registerAdminRoutes(app) {
           totalPages,
         },
         filters: {
-          categories: categoriesResult.map((r) => r.category),
-          recentErrorCount: parseInt(errorCountResult[0]?.count || 0),
+          categories: categoriesResult.map((r: CategoryRow) => r.category),
+          recentErrorCount: parseInt(errorCountResult[0]?.count || "0", 10),
         },
       });
     } catch (error) {
@@ -526,7 +702,7 @@ export function registerAdminRoutes(app) {
   });
 
   // Admin: Get single log details
-  app.get("/api/admin/logs/:id", requireSuperAdmin, async (req, res) => {
+  app.get("/api/admin/logs/:id", requireSuperAdmin, async (req: Request, res: Response) => {
     try {
       const sql = getSql();
       const { id } = req.params;
@@ -540,10 +716,11 @@ export function registerAdminRoutes(app) {
                error_message, metadata, created_at
         FROM api_usage_logs
         WHERE id = ${id}
-      `;
+      ` as LogDetailRow[];
 
       if (!logs || logs.length === 0) {
-        return res.status(404).json({ error: "Log not found" });
+        res.status(404).json({ error: "Log not found" });
+        return;
       }
 
       res.json(logs[0]);
@@ -557,7 +734,7 @@ export function registerAdminRoutes(app) {
   app.post(
     "/api/admin/logs/:id/ai-suggestions",
     requireSuperAdmin,
-    async (req, res) => {
+    async (req: Request, res: Response) => {
       try {
         const sql = getSql();
         const { id } = req.params;
@@ -566,7 +743,8 @@ export function registerAdminRoutes(app) {
         const cacheKey = `suggestions_${id}`;
         const cached = aiSuggestionsCache.get(cacheKey);
         if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
-          return res.json({ suggestions: cached.suggestions, cached: true });
+          res.json({ suggestions: cached.suggestions, cached: true });
+          return;
         }
 
         // Fetch log from database
@@ -575,21 +753,22 @@ export function registerAdminRoutes(app) {
                metadata, latency_ms, status
         FROM api_usage_logs
         WHERE id = ${id}
-      `;
-
-        if (!logs || logs.length === 0) {
-          return res.status(404).json({ error: "Log not found" });
-        }
+      ` as AiSuggestionsLogRow[];
 
         const log = logs[0];
+        if (!log) {
+          res.status(404).json({ error: "Log not found" });
+          return;
+        }
 
         // Only generate suggestions for failed logs
         if (log.status !== "failed") {
-          return res.json({
+          res.json({
             suggestions:
               'Este log não contém erros. Sugestões de IA estão disponíveis apenas para logs com status "failed".',
             cached: false,
           });
+          return;
         }
 
         // Construct prompt for AI
@@ -601,7 +780,7 @@ export function registerAdminRoutes(app) {
 - Modelo: ${log.model_id || "N/A"}
 - Mensagem: ${log.error_message || "N/A"}
 - Metadata: ${log.metadata ? JSON.stringify(log.metadata) : "N/A"}
-- Latência: ${log.latency_ms || "N/A"}ms
+- Latência: ${log.latency_ms ?? "N/A"}ms
 
 **Sua Tarefa:**
 1. Análise da causa raiz (2-3 frases)

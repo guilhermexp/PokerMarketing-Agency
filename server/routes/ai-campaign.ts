@@ -1,5 +1,3 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * AI Campaign Generation Route
  * Extracted from server/index.mjs
@@ -7,6 +5,7 @@
  * Route: POST /api/ai/campaign
  */
 
+import type { Application, Request, Response } from "express";
 import { getRequestAuthContext } from "../lib/auth.js";
 import { getSql } from "../lib/db.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
@@ -26,21 +25,155 @@ import {
 } from "../helpers/usage-tracking.js";
 import logger from "../lib/logger.js";
 
-function normalizeCarouselSlides(carousels, expectedSlides) {
+// ============================================================================
+// TYPES
+// ============================================================================
+
+/** Base64-encoded image data */
+interface ImageData {
+  base64: string;
+  mimeType: string;
+}
+
+/** Brand profile for AI campaign generation */
+interface BrandProfile {
+  name?: string;
+  description?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  toneOfVoice?: string;
+  creativeModel?: string;
+  [key: string]: unknown;
+}
+
+/** Quantity option for campaign elements */
+interface QuantityOption {
+  count: number;
+  generate: boolean;
+  slidesPerCarousel?: number;
+}
+
+/** Platform-specific quantity options */
+interface PlatformQuantityOptions {
+  instagram?: QuantityOption;
+  facebook?: QuantityOption;
+  twitter?: QuantityOption;
+  linkedin?: QuantityOption;
+  google?: QuantityOption;
+}
+
+/** Campaign generation options */
+interface CampaignOptions {
+  videoClipScripts: QuantityOption;
+  posts: PlatformQuantityOptions;
+  adCreatives: PlatformQuantityOptions;
+  carousels?: QuantityOption;
+}
+
+/** Request body for /api/ai/campaign */
+interface CampaignRequestBody {
+  brandProfile: BrandProfile;
+  transcript: string;
+  options: CampaignOptions;
+  productImages?: ImageData[];
+  inspirationImages?: ImageData[];
+  collabLogo?: ImageData;
+  compositionAssets?: ImageData[];
+  toneOfVoiceOverride?: string;
+}
+
+/** Carousel slide structure */
+interface CarouselSlide {
+  slide: number;
+  visual: string;
+  text: string;
+}
+
+/** Raw carousel slide from AI response */
+interface RawCarouselSlide {
+  visual?: string;
+  text?: string;
+  [key: string]: unknown;
+}
+
+/** Carousel structure */
+interface Carousel {
+  title?: string;
+  hook?: string;
+  slides: CarouselSlide[];
+  [key: string]: unknown;
+}
+
+/** Raw carousel from AI response */
+interface RawCarousel {
+  title?: string;
+  hook?: string;
+  slides?: RawCarouselSlide[];
+  [key: string]: unknown;
+}
+
+/** Video clip script structure */
+interface VideoClipScript {
+  title: string;
+  hook: string;
+  scenes: unknown[];
+  image_prompt: string;
+  audio_script: string;
+  [key: string]: unknown;
+}
+
+/** Raw video clip script from AI response */
+interface RawVideoClipScript {
+  title?: string;
+  hook?: string;
+  scenes?: unknown[];
+  image_prompt?: string;
+  audio_script?: string;
+  [key: string]: unknown;
+}
+
+/** Campaign structure from AI response */
+interface Campaign {
+  posts: unknown[];
+  adCreatives: unknown[];
+  ad_creatives?: unknown[];
+  videoClipScripts: VideoClipScript[];
+  video_clip_scripts?: RawVideoClipScript[];
+  carousels: Carousel[];
+  [key: string]: unknown;
+}
+
+/** Text part for Gemini API */
+interface TextPart {
+  text: string;
+}
+
+/** Inline data part for Gemini API */
+interface InlineDataPart {
+  inlineData: {
+    mimeType: string;
+    data: string;
+  };
+}
+
+/** Union type for Gemini content parts */
+type ContentPart = TextPart | InlineDataPart;
+
+function normalizeCarouselSlides(carousels: unknown, expectedSlides: number): Carousel[] {
   if (!Array.isArray(carousels)) return [];
 
   return carousels
-    .filter((carousel) => carousel && typeof carousel === "object")
+    .filter((carousel): carousel is RawCarousel => carousel !== null && typeof carousel === "object")
     .map((carousel) => {
       const rawSlides = Array.isArray(carousel.slides) ? carousel.slides : [];
       const sanitized = rawSlides
-        .filter((slide) => slide && typeof slide === "object")
+        .filter((slide): slide is RawCarouselSlide => slide !== null && typeof slide === "object")
         .map((slide) => ({
           visual: String(slide.visual || "").trim(),
           text: String(slide.text || "").trim(),
         }));
 
-      const normalized = sanitized.slice(0, expectedSlides).map((slide, index) => ({
+      const normalized: CarouselSlide[] = sanitized.slice(0, expectedSlides).map((slide, index) => ({
         slide: index + 1,
         visual:
           slide.visual ||
@@ -64,8 +197,8 @@ function normalizeCarouselSlides(carousels, expectedSlides) {
     });
 }
 
-export function registerAiCampaignRoutes(app) {
-  app.post("/api/ai/campaign", async (req, res) => {
+export function registerAiCampaignRoutes(app: Application): void {
+  app.post("/api/ai/campaign", async (req: Request, res: Response) => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
     const organizationId = authCtx?.orgId || null;
@@ -81,7 +214,7 @@ export function registerAiCampaignRoutes(app) {
         collabLogo,
         compositionAssets,
         toneOfVoiceOverride,
-      } = req.body;
+      } = req.body as CampaignRequestBody;
 
       if (!brandProfile || !transcript || !options) {
         return res.status(400).json({
@@ -101,7 +234,7 @@ export function registerAiCampaignRoutes(app) {
       );
 
       // Collect all images for vision models
-      const allImages = [];
+      const allImages: ImageData[] = [];
       if (productImages) allImages.push(...productImages);
       if (inspirationImages) allImages.push(...inspirationImages);
       if (collabLogo) allImages.push(collabLogo);
@@ -127,7 +260,7 @@ export function registerAiCampaignRoutes(app) {
         slidesPerCarousel,
       );
 
-      const parts = [{ text: prompt }];
+      const parts: ContentPart[] = [{ text: prompt }];
 
       if (allImages.length > 0) {
         allImages.forEach((img) => {
@@ -140,7 +273,7 @@ export function registerAiCampaignRoutes(app) {
       const result = await generateStructuredContent(
         model,
         parts,
-        campaignSchema,
+        campaignSchema as unknown as Record<string, unknown>,
         0.7,
       );
 
@@ -156,20 +289,34 @@ export function registerAiCampaignRoutes(app) {
       }
       cleanResult = cleanResult.trim();
 
-      const campaign = JSON.parse(cleanResult);
+      const parsedCampaign = JSON.parse(cleanResult) as Partial<Campaign>;
 
       // Normalize field names (ensure arrays exist)
-      campaign.posts = campaign.posts || [];
-      campaign.adCreatives = campaign.adCreatives || campaign.ad_creatives || [];
-      campaign.videoClipScripts =
-        campaign.videoClipScripts || campaign.video_clip_scripts || [];
+      const campaign: Campaign = {
+        ...parsedCampaign,
+        posts: parsedCampaign.posts || [],
+        adCreatives: parsedCampaign.adCreatives || parsedCampaign.ad_creatives || [],
+        videoClipScripts: [],
+        carousels: [],
+      };
+
+      // Get raw video clip scripts from either field name
+      const rawVideoScripts: RawVideoClipScript[] =
+        (parsedCampaign.videoClipScripts as RawVideoClipScript[] | undefined) ||
+        parsedCampaign.video_clip_scripts ||
+        [];
 
       // Validate videoClipScripts have required fields
-      campaign.videoClipScripts = campaign.videoClipScripts
+      campaign.videoClipScripts = rawVideoScripts
         .filter(
-          (script) => script && script.title && script.hook && script.scenes,
+          (script): script is RawVideoClipScript =>
+            script !== null &&
+            typeof script === "object" &&
+            Boolean(script.title) &&
+            Boolean(script.hook) &&
+            Boolean(script.scenes),
         )
-        .map((script) => ({
+        .map((script): VideoClipScript => ({
           ...script,
           title: script.title || "Sem título",
           hook: script.hook || "",
@@ -179,17 +326,17 @@ export function registerAiCampaignRoutes(app) {
         }));
 
       campaign.carousels = normalizeCarouselSlides(
-        campaign.carousels,
+        parsedCampaign.carousels,
         slidesPerCarousel,
       );
 
       // Debug: log carousel summary (not raw data which is huge)
       logger.debug(
         {
-          carouselsCount: campaign.carousels?.length || 0,
-          carousels: campaign.carousels?.map((c) => ({
+          carouselsCount: campaign.carousels.length,
+          carousels: campaign.carousels.map((c) => ({
             title: c.title,
-            slides: c.slides?.length || 0,
+            slides: c.slides.length,
             hook: c.hook?.slice(0, 60),
           })),
         },
@@ -197,21 +344,21 @@ export function registerAiCampaignRoutes(app) {
       );
       logger.debug(
         {
-          hasPosts: !!campaign.posts,
-          postsCount: campaign.posts?.length,
-          hasAdCreatives: !!campaign.adCreatives,
-          adCreativesCount: campaign.adCreatives?.length,
-          hasVideoScripts: !!campaign.videoClipScripts,
-          videoScriptsCount: campaign.videoClipScripts?.length,
-          hasCarousels: !!campaign.carousels,
-          carouselsCount: campaign.carousels?.length,
-          hasProductImages: !!productImages?.length,
-          productImagesCount: productImages?.length || 0,
-          hasInspirationImages: !!inspirationImages?.length,
-          inspirationImagesCount: inspirationImages?.length || 0,
+          hasPosts: campaign.posts.length > 0,
+          postsCount: campaign.posts.length,
+          hasAdCreatives: campaign.adCreatives.length > 0,
+          adCreativesCount: campaign.adCreatives.length,
+          hasVideoScripts: campaign.videoClipScripts.length > 0,
+          videoScriptsCount: campaign.videoClipScripts.length,
+          hasCarousels: campaign.carousels.length > 0,
+          carouselsCount: campaign.carousels.length,
+          hasProductImages: (productImages?.length ?? 0) > 0,
+          productImagesCount: productImages?.length ?? 0,
+          hasInspirationImages: (inspirationImages?.length ?? 0) > 0,
+          inspirationImagesCount: inspirationImages?.length ?? 0,
           hasCollabLogo: !!collabLogo,
-          compositionAssetsCount: compositionAssets?.length || 0,
-          toneOverride: toneOfVoiceOverride || null,
+          compositionAssetsCount: compositionAssets?.length ?? 0,
+          toneOverride: toneOfVoiceOverride ?? null,
         },
         "[Campaign API v2] Campaign structure",
       );
@@ -231,11 +378,11 @@ export function registerAiCampaignRoutes(app) {
         latencyMs: timer(),
         status: "success",
         metadata: {
-          productImagesCount: productImages?.length || 0,
-          inspirationImagesCount: inspirationImages?.length || 0,
+          productImagesCount: productImages?.length ?? 0,
+          inspirationImagesCount: inspirationImages?.length ?? 0,
           hasCollabLogo: !!collabLogo,
-          postsCount: campaign.posts?.length || 0,
-          videoScriptsCount: campaign.videoClipScripts?.length || 0,
+          postsCount: campaign.posts.length,
+          videoScriptsCount: campaign.videoClipScripts.length,
         },
       });
 
@@ -245,17 +392,19 @@ export function registerAiCampaignRoutes(app) {
         model,
       });
     } catch (error) {
-      logger.error({ err: error }, "[Campaign API] Error");
+      const err = error as Error;
+      logger.error({ err }, "[Campaign API] Error");
       // Log failed usage
+      const body = req.body as CampaignRequestBody | undefined;
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/campaign",
         operation: "campaign",
-        model: req.body?.brandProfile?.creativeModel || DEFAULT_TEXT_MODEL,
+        model: body?.brandProfile?.creativeModel || DEFAULT_TEXT_MODEL,
         latencyMs: timer(),
-        status: "failed",
-        error: error.message,
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+        status: "error",
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       return res
         .status(500)
         .json({ error: sanitizeErrorForClient(error) });

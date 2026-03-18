@@ -40,7 +40,11 @@ import {
 import {
   logAiUsage,
   createTimer,
+  type LogAiUsageParams,
 } from "../helpers/usage-tracking.js";
+
+// Type for valid image sizes (must match LogAiUsageParams.imageSize)
+type ImageSize = NonNullable<LogAiUsageParams['imageSize']>;
 import { validateContentType } from "../lib/validation/contentType.js";
 import logger from "../lib/logger.js";
 
@@ -95,6 +99,17 @@ function isTextPart(part: ContentPart): part is TextPart {
 /** Type guard for InlineDataPart */
 function isInlineDataPart(part: ContentPart): part is InlineDataPart {
   return "inlineData" in part;
+}
+
+/** Valid image sizes */
+const VALID_IMAGE_SIZES = new Set<ImageSize>(['1K', '2K', '4K']);
+
+/** Normalize imageSize to a valid ImageSize type */
+function normalizeImageSize(size: string | undefined): ImageSize {
+  if (size && VALID_IMAGE_SIZES.has(size as ImageSize)) {
+    return size as ImageSize;
+  }
+  return '1K';
 }
 
 // ============================================================================
@@ -382,7 +397,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         // Gemini returns data URLs — upload base64 to Blob
         try {
           const matches = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
-          if (matches) {
+          if (matches && matches[1] && matches[2]) {
             const contentType = matches[1];
             validateContentType(contentType);
             const imageBuffer = Buffer.from(matches[2], "base64");
@@ -421,7 +436,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         model: usedModel,
         provider: usedProvider,
         imageCount: 1,
-        imageSize: imageSize || "1K",
+        imageSize: normalizeImageSize(imageSize),
         latencyMs: timer(),
         status: "success",
         metadata: {
@@ -445,7 +460,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         operation: "flyer",
         model: DEFAULT_IMAGE_MODEL,
         latencyMs: timer(),
-        status: "failed",
+        status: "error",
         error: err.message,
       }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       return res
@@ -507,7 +522,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         result = await generateStructuredContent(
           model,
           parts,
-          quickPostSchema,
+          quickPostSchema as unknown as Record<string, unknown>,
           temperature,
         );
       } else {
@@ -533,7 +548,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         result = await generateStructuredContent(
           model,
           parts,
-          responseSchema || quickPostSchema,
+          (responseSchema ?? quickPostSchema) as Record<string, unknown>,
           temperature,
         );
       }
@@ -570,7 +585,7 @@ Os logos devem parecer assinaturas elegantes da marca, não elementos principais
         operation: "text",
         model: body?.brandProfile?.creativeModel || DEFAULT_TEXT_MODEL,
         latencyMs: timer(),
-        status: "failed",
+        status: "error",
         error: err.message,
       }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       return res
@@ -703,7 +718,7 @@ REGRAS:
         operation: "text",
         model: DEFAULT_FAST_TEXT_MODEL,
         latencyMs: timer(),
-        status: "failed",
+        status: "error",
         error: err.message,
       }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       return res
@@ -787,7 +802,7 @@ REGRAS:
         operation: "text",
         model: DEFAULT_FAST_TEXT_MODEL,
         latencyMs: timer(),
-        status: "failed",
+        status: "error",
         error: err.message,
       }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       return res

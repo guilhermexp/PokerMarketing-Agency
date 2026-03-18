@@ -1,5 +1,7 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express, Request, Response } from "express";
+import type { Logger } from "pino";
+import type { SqlClient } from "../lib/db.js";
+import type { AuthContext } from "../lib/auth.js";
 import {
   getTopics,
   createTopic,
@@ -15,36 +17,106 @@ import {
 import { getGeminiAi } from "../lib/ai/clients.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
 
+// =============================================================================
+// Dependencies Interface
+// =============================================================================
+
+interface VideoPlaygroundDependencies {
+  getRequestAuthContext: (req: Request) => AuthContext | null;
+  getSql: () => SqlClient;
+  resolveUserId: (sql: SqlClient, userId: string | null | undefined) => Promise<string | null>;
+  logger: Logger;
+}
+
+// =============================================================================
+// Request Body Interfaces
+// =============================================================================
+
+interface CreateTopicBody {
+  title?: string;
+}
+
+interface UpdateTopicBody {
+  title?: string;
+  coverUrl?: string;
+}
+
+interface GenerateSessionBody {
+  topicId: string;
+  model: string;
+  prompt: string;
+  aspectRatio?: string;
+  resolution?: string;
+  referenceImageUrl?: string;
+}
+
+type GenerationStatus = "pending" | "generating" | "success" | "error";
+
+interface UpdateGenerationBody {
+  status?: GenerationStatus;
+  videoUrl?: string;
+  duration?: number;
+  errorMessage?: string;
+}
+
+interface GenerateTitleBody {
+  prompts: string[];
+}
+
+// =============================================================================
+// Database Error Interface
+// =============================================================================
+
+interface DatabaseError extends Error {
+  code?: string;
+}
+
+function isDatabaseError(error: unknown): error is DatabaseError {
+  return error instanceof Error && "code" in error;
+}
+
+// =============================================================================
+// Route Registration
+// =============================================================================
+
 export function registerVideoPlaygroundRoutes(
-  app,
+  app: Express,
   {
     getRequestAuthContext,
     getSql,
     resolveUserId,
     logger,
-  },
-) {
+  }: VideoPlaygroundDependencies,
+): void {
   // Get all topics
-  app.get("/api/video-playground/topics", async (req, res) => {
+  app.get("/api/video-playground/topics", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
       const topics = await getTopics(sql, resolvedUserId, orgId);
 
       res.json({ topics });
     } catch (error) {
       // Handle missing table gracefully
-      if (error?.code === "42P01" || error?.code === "42703") {
+      if (isDatabaseError(error) && (error.code === "42P01" || error.code === "42703")) {
         logger.warn(
           { err: error },
           "[VideoPlayground] Topics schema not ready - returning empty list",
         );
-        return res.json({ topics: [] });
+        res.json({ topics: [] });
+        return;
       }
       logger.error({ err: error }, "[VideoPlayground] Get topics error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -52,16 +124,23 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Create topic
-  app.post("/api/video-playground/topics", async (req, res) => {
+  app.post("/api/video-playground/topics", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
 
-      const { title } = req.body;
+      const { title } = req.body as CreateTopicBody;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
       const topic = await createTopic(sql, resolvedUserId, orgId, title);
 
       res.json({ success: true, topic });
@@ -72,20 +151,28 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Update topic
-  app.patch("/api/video-playground/topics/:id", async (req, res) => {
+  app.patch("/api/video-playground/topics/:id", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
 
-      const { id } = req.params;
-      const { title, coverUrl } = req.body;
+      const id = String(req.params.id);
+      const { title, coverUrl } = req.body as UpdateTopicBody;
       if (coverUrl && coverUrl.startsWith('data:')) {
-        return res.status(400).json({ error: "Base64 data URLs not allowed; upload to blob storage first" });
+        res.status(400).json({ error: "Base64 data URLs not allowed; upload to blob storage first" });
+        return;
       }
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
       const topic = await updateTopic(
         sql,
         id,
@@ -102,16 +189,23 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Delete topic
-  app.delete("/api/video-playground/topics/:id", async (req, res) => {
+  app.delete("/api/video-playground/topics/:id", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
 
-      const { id } = req.params;
+      const id = String(req.params.id);
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
       await deleteTopic(sql, id, resolvedUserId, orgId);
 
       res.json({ success: true });
@@ -122,20 +216,30 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Get sessions for topic
-  app.get("/api/video-playground/sessions", async (req, res) => {
+  app.get("/api/video-playground/sessions", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
 
       const topicId = String(req.query.topicId || "");
-      if (!topicId) return res.status(400).json({ error: "topicId required" });
+      if (!topicId) {
+        res.status(400).json({ error: "topicId required" });
+        return;
+      }
       const requestedLimit = Number.parseInt(String(req.query.limit || ""), 10);
       const limit = Number.isFinite(requestedLimit) ? requestedLimit : 100;
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
       const sessions = await getSessions(
         sql,
         topicId,
@@ -147,12 +251,13 @@ export function registerVideoPlaygroundRoutes(
       res.json({ sessions });
     } catch (error) {
       // Handle missing table gracefully
-      if (error?.code === "42P01" || error?.code === "42703") {
+      if (isDatabaseError(error) && (error.code === "42P01" || error.code === "42703")) {
         logger.warn(
           { err: error },
           "[VideoPlayground] Sessions schema not ready - returning empty list",
         );
-        return res.json({ sessions: [] });
+        res.json({ sessions: [] });
+        return;
       }
       logger.error({ err: error }, "[VideoPlayground] Get sessions error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
@@ -160,23 +265,32 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Create video generation session (just the record, actual generation uses /api/ai/video)
-  app.post("/api/video-playground/generate", async (req, res) => {
+  app.post("/api/video-playground/generate", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
 
-      const { topicId, model, prompt, aspectRatio, resolution, referenceImageUrl } = req.body;
+      const { topicId, model, prompt, aspectRatio, resolution, referenceImageUrl } = req.body as GenerateSessionBody;
       if (!topicId || !model || !prompt) {
-        return res.status(400).json({ error: "Missing required fields" });
+        res.status(400).json({ error: "Missing required fields" });
+        return;
       }
       if (referenceImageUrl && referenceImageUrl.startsWith('data:')) {
-        return res.status(400).json({ error: "Base64 data URLs not allowed; upload to blob storage first" });
+        res.status(400).json({ error: "Base64 data URLs not allowed; upload to blob storage first" });
+        return;
       }
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
 
       const result = await createSession(
         sql,
@@ -193,16 +307,23 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Delete session
-  app.delete("/api/video-playground/sessions/:id", async (req, res) => {
+  app.delete("/api/video-playground/sessions/:id", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
 
-      const { id } = req.params;
+      const id = String(req.params.id);
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
       await deleteSession(sql, id, resolvedUserId, orgId);
 
       res.json({ success: true });
@@ -213,16 +334,23 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Delete generation
-  app.delete("/api/video-playground/generations/:id", async (req, res) => {
+  app.delete("/api/video-playground/generations/:id", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
 
-      const { id } = req.params;
+      const id = String(req.params.id);
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
       await deleteGeneration(sql, id, resolvedUserId, orgId);
 
       res.json({ success: true });
@@ -233,22 +361,30 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Update generation (set video URL and status after generation completes)
-  app.patch("/api/video-playground/generations/:id", async (req, res) => {
+  app.patch("/api/video-playground/generations/:id", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
 
-      const { id } = req.params;
-      const { status, videoUrl, duration, errorMessage } = req.body;
+      const id = String(req.params.id);
+      const { status, videoUrl, duration, errorMessage } = req.body as UpdateGenerationBody;
 
       if (videoUrl && videoUrl.startsWith('data:')) {
-        return res.status(400).json({ error: "Base64 data URLs not allowed; upload to blob storage first" });
+        res.status(400).json({ error: "Base64 data URLs not allowed; upload to blob storage first" });
+        return;
       }
 
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
       const generation = await updateGeneration(sql, id, { status, videoUrl, duration, errorMessage }, resolvedUserId, orgId);
 
       res.json({ success: true, generation });
@@ -259,15 +395,19 @@ export function registerVideoPlaygroundRoutes(
   });
 
   // Generate topic title
-  app.post("/api/video-playground/generate-title", async (req, res) => {
+  app.post("/api/video-playground/generate-title", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
 
-      const { prompts } = req.body;
+      const { prompts } = req.body as GenerateTitleBody;
       if (!prompts || !Array.isArray(prompts)) {
-        return res.status(400).json({ error: "prompts array required" });
+        res.status(400).json({ error: "prompts array required" });
+        return;
       }
 
       const genai = getGeminiAi();

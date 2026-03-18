@@ -1,5 +1,8 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+import type { Express, Request, Response } from "express";
+import type { Logger } from "pino";
+import type { SqlClient } from "../lib/db.js";
+import type { AuthContext } from "../lib/auth.js";
+import type { BrandProfile } from "../lib/ai/prompt-builders.js";
 import { urlToBase64 } from "../helpers/image-helpers.js";
 import { getGeminiAi } from "../lib/ai/clients.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
@@ -17,16 +20,132 @@ import {
   generateTopicTitle,
 } from "../helpers/image-playground.js";
 
+// =============================================================================
+// Types
+// =============================================================================
+
+interface ImagePlaygroundDependencies {
+  getRequestAuthContext: (req: Request) => AuthContext | null;
+  getSql: () => SqlClient;
+  resolveUserId: (sql: SqlClient, userId: string | null | undefined) => Promise<string | null>;
+  logger: Logger;
+  buildImagePrompt: (options: BuildImagePromptOptions) => string;
+}
+
+interface BuildImagePromptOptions {
+  prompt: string;
+  brandProfile?: MappedBrandProfile | null;
+  hasStyleReference?: boolean;
+  hasLogo?: boolean;
+  hasPersonReference?: boolean;
+  hasProductImages?: boolean;
+  fontStyle?: string | null;
+}
+
+interface MappedBrandProfile {
+  name?: string;
+  description?: string;
+  logo?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  toneOfVoice?: string;
+  toneTargets?: string[];
+  [key: string]: unknown;
+}
+
+interface InlineImage {
+  base64: string;
+  mimeType: string;
+}
+
+interface ReferenceImage {
+  id?: string;
+  dataUrl: string;
+  mimeType?: string;
+}
+
+interface GenerationParams {
+  prompt: string;
+  userPrompt?: string;
+  width?: number;
+  height?: number;
+  aspectRatio?: string;
+  imageSize?: string;
+  seed?: number;
+  useInstagramMode?: boolean;
+  useAiInfluencerMode?: boolean;
+  useProductHeroMode?: boolean;
+  useExplodedProductMode?: boolean;
+  useBrandIdentityMode?: boolean;
+  useBrandProfile?: boolean;
+  toneOfVoiceOverride?: string;
+  fontStyleOverride?: string;
+  referenceImages?: ReferenceImage[];
+  productImages?: InlineImage[];
+  personReferenceImage?: string;
+  imageUrl?: string;
+  brandProfile?: Record<string, unknown>;
+  model?: string;
+}
+
+// Request body interfaces
+interface CreateTopicBody {
+  title?: string;
+}
+
+interface UpdateTopicBody {
+  title?: string;
+  coverUrl?: string;
+}
+
+interface GenerateBody {
+  topicId: string;
+  provider: string;
+  model: string;
+  imageNum?: number;
+  params: GenerationParams;
+}
+
+interface GenerateTitleBody {
+  prompts: string[];
+}
+
+// Database row interfaces
+interface BrandProfileRow {
+  name?: string;
+  description?: string;
+  logo_url?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  tone_of_voice?: string;
+  settings?: {
+    toneTargets?: string[];
+  };
+}
+
+interface DatabaseError extends Error {
+  code?: string;
+}
+
+interface ParsedDataUrl {
+  mimeType: string;
+  base64: string;
+}
+
+// =============================================================================
+// Route Registration
+// =============================================================================
+
 export function registerImagePlaygroundRoutes(
-  app,
+  app: Express,
   {
     getRequestAuthContext,
     getSql,
     resolveUserId,
     logger,
     buildImagePrompt,
-  },
-) {
+  }: ImagePlaygroundDependencies,
+): void {
   const ALLOWED_TONES = new Set([
     "Profissional",
     "Espirituoso",
@@ -42,9 +161,11 @@ export function registerImagePlaygroundRoutes(
     "Montserrat ExtraBold",
     "Gilroy",
   ]);
-  const inferMimeTypeFromSource = (source) => {
+
+  const inferMimeTypeFromSource = (source: string | null | undefined): string => {
     if (!source || typeof source !== "string") return "image/png";
-    const cleanSource = source.split("?")[0].toLowerCase();
+    const [pathWithoutQuery] = source.split("?");
+    const cleanSource = (pathWithoutQuery ?? source).toLowerCase();
     if (cleanSource.endsWith(".svg")) return "image/svg+xml";
     if (cleanSource.endsWith(".jpg") || cleanSource.endsWith(".jpeg")) {
       return "image/jpeg";
@@ -53,14 +174,14 @@ export function registerImagePlaygroundRoutes(
     return "image/png";
   };
 
-  const parseDataUrl = (value) => {
+  const parseDataUrl = (value: string | null | undefined): ParsedDataUrl | null => {
     if (!value || typeof value !== "string") return null;
     const match = value.match(/^data:([^;]+);base64,(.+)$/);
-    if (!match) return null;
+    if (!match || !match[1] || !match[2]) return null;
     return { mimeType: match[1], base64: match[2] };
   };
 
-  const getLogoInlineImage = async (logoSource) => {
+  const getLogoInlineImage = async (logoSource: string | null | undefined): Promise<InlineImage | null> => {
     if (!logoSource || typeof logoSource !== "string") return null;
 
     // data URL
@@ -86,7 +207,7 @@ export function registerImagePlaygroundRoutes(
     return { base64: logoSource, mimeType: "image/png" };
   };
 
-  const buildAiInfluencerPrompt = (userPrompt) => {
+  const buildAiInfluencerPrompt = (userPrompt: string): string => {
     return `CONTEXTO DE GERAÇÃO — AI INFLUENCER (FOTORREALISMO):
 - A imagem deve parecer foto REAL tirada por um influenciador digital com smartphone
 - Estilo: selfie candid ou foto lifestyle autêntica para redes sociais
@@ -103,7 +224,7 @@ PROMPT DO USUÁRIO:
 ${userPrompt}`;
   };
 
-  const buildInstagramPostPrompt = (userPrompt) => {
+  const buildInstagramPostPrompt = (userPrompt: string): string => {
     return `CONTEXTO DE COMPOSIÇÃO — POST PARA INSTAGRAM (FEED):
 - Formato: quadrado (1:1), otimizado para feed do Instagram
 - A imagem deve funcionar como um POST PROFISSIONAL de Instagram para uma marca/agência
@@ -121,7 +242,7 @@ PROMPT DO USUÁRIO:
 ${userPrompt}`;
   };
 
-  const buildProductHeroPrompt = (userPrompt) => {
+  const buildProductHeroPrompt = (userPrompt: string): string => {
     return `CONTEXTO DE GERAÇÃO — PRODUCT HERO SHOT (FOTOGRAFIA PUBLICITÁRIA PREMIUM):
 - A imagem deve parecer fotografia publicitária premium de produto, nível campanha internacional
 - Hero shot: produto centralizado, composição simétrica, fundo limpo com bokeh suave
@@ -136,7 +257,7 @@ PROMPT DO USUÁRIO:
 ${userPrompt}`;
   };
 
-  const buildExplodedProductPrompt = (userPrompt) => {
+  const buildExplodedProductPrompt = (userPrompt: string): string => {
     return `CONTEXTO DE GERAÇÃO — EXPLODED PRODUCT (INFOGRÁFICO DESCONSTRUÍDO):
 - Layout vertical com cada componente/ingrediente flutuando independentemente
 - Ordem de cima para baixo: decoração/pó → ingredientes principais → camadas líquidas → recipiente vazio no fundo
@@ -151,7 +272,7 @@ PROMPT DO USUÁRIO:
 ${userPrompt}`;
   };
 
-  const buildBrandIdentityPrompt = (userPrompt, brandProfile) => {
+  const buildBrandIdentityPrompt = (userPrompt: string, brandProfile: BrandProfile | null): string => {
     const name = brandProfile?.name || "a marca";
     const primary = brandProfile?.primaryColor || "#000000";
     const secondary = brandProfile?.secondaryColor || "#FFFFFF";
@@ -171,7 +292,7 @@ ${userPrompt}`;
   };
 
   // Get all topics
-  app.get("/api/image-playground/topics", async (req, res) => {
+  app.get("/api/image-playground/topics", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
@@ -190,14 +311,14 @@ ${userPrompt}`;
   });
 
   // Create topic
-  app.post("/api/image-playground/topics", async (req, res) => {
+  app.post("/api/image-playground/topics", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { title } = req.body;
+      const { title } = req.body as CreateTopicBody;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       const topic = await createTopic(sql, resolvedUserId, orgId, title);
@@ -210,15 +331,15 @@ ${userPrompt}`;
   });
 
   // Update topic
-  app.patch("/api/image-playground/topics/:id", async (req, res) => {
+  app.patch("/api/image-playground/topics/:id", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { id } = req.params;
-      const { title, coverUrl } = req.body;
+      const id = String(req.params.id);
+      const { title, coverUrl } = req.body as UpdateTopicBody;
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       const topic = await updateTopic(
@@ -237,14 +358,14 @@ ${userPrompt}`;
   });
 
   // Delete topic
-  app.delete("/api/image-playground/topics/:id", async (req, res) => {
+  app.delete("/api/image-playground/topics/:id", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { id } = req.params;
+      const id = String(req.params.id);
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       await deleteTopic(sql, id, resolvedUserId, orgId);
@@ -257,7 +378,7 @@ ${userPrompt}`;
   });
 
   // Get batches for topic
-  app.get("/api/image-playground/batches", async (req, res) => {
+  app.get("/api/image-playground/batches", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
@@ -281,9 +402,10 @@ ${userPrompt}`;
 
       res.json({ batches });
     } catch (error) {
+      const dbError = error as DatabaseError;
       if (
-        typeof error?.message === "string" &&
-        error.message.toLowerCase().includes("response is too large")
+        typeof dbError?.message === "string" &&
+        dbError.message.toLowerCase().includes("response is too large")
       ) {
         logger.warn(
           { err: error },
@@ -291,7 +413,7 @@ ${userPrompt}`;
         );
         return res.json({ batches: [] });
       }
-      if (error?.code === "42P01" || error?.code === "42703") {
+      if (dbError?.code === "42P01" || dbError?.code === "42703") {
         logger.warn(
           { err: error },
           "[ImagePlayground] Batches schema not ready - returning empty list",
@@ -304,14 +426,14 @@ ${userPrompt}`;
   });
 
   // Delete batch
-  app.delete("/api/image-playground/batches/:id", async (req, res) => {
+  app.delete("/api/image-playground/batches/:id", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { id } = req.params;
+      const id = String(req.params.id);
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
       await deleteBatch(sql, id, resolvedUserId, orgId);
@@ -324,14 +446,14 @@ ${userPrompt}`;
   });
 
   // Create image generation
-  app.post("/api/image-playground/generate", async (req, res) => {
+  app.post("/api/image-playground/generate", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { topicId, provider, model, imageNum, params } = req.body;
+      const { topicId, provider, model, imageNum, params } = req.body as GenerateBody;
       if (!topicId || !provider || !model || !params?.prompt) {
         return res.status(400).json({ error: "Missing required fields" });
       }
@@ -340,7 +462,7 @@ ${userPrompt}`;
       const resolvedUserId = await resolveUserId(sql, userId);
 
       // Enhanced params to pass to helper
-      let enhancedParams = { ...params };
+      let enhancedParams: GenerationParams = { ...params };
 
       // Instagram Post Mode: apply composition context + force brand + 1:1
       if (params.useInstagramMode) {
@@ -448,11 +570,11 @@ ${userPrompt}`;
 
         // Fetch brand profile early so we can pass it to the expand function
         const isOrgContextBrand = !!orgId;
-        const brandProfileResultBrand = isOrgContextBrand
+        const brandProfileResultBrand: BrandProfileRow[] = isOrgContextBrand
           ? await sql`SELECT * FROM brand_profiles WHERE organization_id = ${orgId} AND deleted_at IS NULL LIMIT 1`
           : await sql`SELECT * FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`;
 
-        const brandProfileForExpand = brandProfileResultBrand[0] ? {
+        const brandProfileForExpand: BrandProfile | null = brandProfileResultBrand[0] ? {
           name: brandProfileResultBrand[0].name,
           description: brandProfileResultBrand[0].description,
           primaryColor: brandProfileResultBrand[0].primary_color,
@@ -489,14 +611,14 @@ ${userPrompt}`;
       // If useBrandProfile is enabled, use SAME logic as /api/ai/image
       if (enhancedParams.useBrandProfile) {
         const isOrgContext = !!orgId;
-        const brandProfileResult = isOrgContext
+        const brandProfileResult: BrandProfileRow[] = isOrgContext
           ? await sql`SELECT * FROM brand_profiles WHERE organization_id = ${orgId} AND deleted_at IS NULL LIMIT 1`
           : await sql`SELECT * FROM brand_profiles WHERE user_id = ${resolvedUserId} AND organization_id IS NULL AND deleted_at IS NULL LIMIT 1`;
 
         const brandProfile = brandProfileResult[0];
         if (brandProfile) {
           // Map DB columns to expected format (same as /api/ai/image)
-          const mappedBrandProfile = {
+          const mappedBrandProfile: MappedBrandProfile = {
             name: brandProfile.name,
             description: brandProfile.description,
             logo: brandProfile.logo_url,
@@ -527,9 +649,9 @@ ${userPrompt}`;
 
           // 1. Prepare productImages with logo + optional client images
           const clientProductImages = Array.isArray(enhancedParams.productImages)
-            ? enhancedParams.productImages.filter((img) => img?.base64 && img?.mimeType)
+            ? enhancedParams.productImages.filter((img: InlineImage): img is InlineImage => !!img?.base64 && !!img?.mimeType)
             : [];
-          const productImages = [...clientProductImages];
+          const productImages: InlineImage[] = [...clientProductImages];
           let hasLogo = false;
           try {
             const logoInlineImage = await getLogoInlineImage(mappedBrandProfile.logo);
@@ -539,8 +661,9 @@ ${userPrompt}`;
               logger.debug({}, "[ImagePlayground] Brand logo included in prompt");
             }
           } catch (err) {
+            const logoError = err as Error;
             logger.warn(
-              { errorMessage: err.message },
+              { errorMessage: logoError.message },
               "[ImagePlayground] Failed to include brand logo",
             );
           }
@@ -629,14 +752,14 @@ ${userPrompt}`;
   });
 
   // Get generation status (for polling)
-  app.get("/api/image-playground/status/:generationId", async (req, res) => {
+  app.get("/api/image-playground/status/:generationId", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { generationId } = req.params;
-      const { asyncTaskId } = req.query;
+      const generationId = String(req.params.generationId);
+      const asyncTaskId = req.query.asyncTaskId as string | undefined;
 
       const sql = getSql();
       const status = await getGenerationStatus(sql, generationId, asyncTaskId);
@@ -649,16 +772,20 @@ ${userPrompt}`;
   });
 
   // Delete generation
-  app.delete("/api/image-playground/generations/:id", async (req, res) => {
+  app.delete("/api/image-playground/generations/:id", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       const orgId = auth?.orgId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { id } = req.params;
+      const id = String(req.params.id);
       const sql = getSql();
       const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
       await deleteGeneration(sql, id, resolvedUserId, orgId);
 
       res.json({ success: true });
@@ -669,13 +796,13 @@ ${userPrompt}`;
   });
 
   // Generate topic title
-  app.post("/api/image-playground/generate-title", async (req, res) => {
+  app.post("/api/image-playground/generate-title", async (req: Request, res: Response) => {
     try {
       const auth = getRequestAuthContext(req);
       const userId = auth?.userId || null;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { prompts } = req.body;
+      const { prompts } = req.body as GenerateTitleBody;
       if (!prompts || !Array.isArray(prompts)) {
         return res.status(400).json({ error: "prompts array required" });
       }

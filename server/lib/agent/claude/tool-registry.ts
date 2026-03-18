@@ -1,8 +1,15 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
+/**
+ * Studio Agent Tool Registry
+ *
+ * Provides tool definitions for the Claude Agent SDK MCP server.
+ * Tools are prefixed with `studio_` and handle Image/Video Studio operations.
+ */
+
 import { z } from 'zod';
-import { tool } from '@anthropic-ai/claude-agent-sdk';
+import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { put } from '@vercel/blob';
+import type { GoogleGenAI } from '@google/genai';
+import type { Logger } from 'pino';
 import { getGeminiAi } from '../../ai/clients.js';
 import { generateStructuredContent } from '../../ai/text-generation.js';
 import {
@@ -13,6 +20,7 @@ import {
   campaignSchema,
   quickPostSchema,
   DEFAULT_TEXT_MODEL,
+  type BrandProfile,
 } from '../../ai/prompt-builders.js';
 import {
   generateImageWithFallback,
@@ -45,20 +53,158 @@ import {
   createSession as createVideoSession,
   updateGeneration as updateVideoGeneration,
   deleteGeneration as deleteVideoGeneration,
+  type CreateSessionResult,
 } from '../../../helpers/video-playground.js';
+import type { SqlClient } from '../../db.js';
 
-function ok(data) {
+// =============================================================================
+// Types
+// =============================================================================
+
+/** Tool result wrapper for success */
+interface ToolSuccessResult<T> {
+  success: true;
+  data: T;
+}
+
+/** Tool result wrapper for failure */
+interface ToolFailureResult {
+  success: false;
+  error: string;
+}
+
+type ToolResult<T> = ToolSuccessResult<T> | ToolFailureResult;
+
+/** Brand profile row from database */
+interface BrandProfileRow {
+  id: string;
+  name: string | null;
+  description: string | null;
+  logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  tertiary_color: string | null;
+  tone_of_voice: string | null;
+  settings: { toneTargets?: string[] } | null;
+}
+
+/** Mapped brand profile for prompts */
+interface MappedBrandProfile {
+  name: string | null;
+  description: string | null;
+  logo: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  tertiaryColor: string | null;
+  toneOfVoice: string | null;
+  toneTargets: string[];
+}
+
+/** Configuration for building studio tools */
+export interface StudioToolConfig {
+  sql: SqlClient;
+  userId: string;
+  organizationId: string | null;
+  logger: Logger;
+}
+
+/** Reference image structure for image generation */
+interface ReferenceImage {
+  id: string;
+  dataUrl: string;
+  mimeType: string;
+}
+
+/** Gemini content part with inline data */
+interface GeminiInlinePart {
+  inlineData: {
+    data: string;
+    mimeType: string;
+  };
+}
+
+/** Gemini content part with text */
+interface GeminiTextPart {
+  text: string;
+}
+
+type GeminiContentPart = GeminiInlinePart | GeminiTextPart;
+
+/** Gemini response candidate */
+interface GeminiCandidate {
+  content?: {
+    parts?: GeminiContentPart[];
+  };
+}
+
+/** Gemini API response */
+interface GeminiResponse {
+  candidates?: GeminiCandidate[];
+}
+
+/** MCP tool content item - matches CallToolResult from @modelcontextprotocol/sdk */
+interface TextContent {
+  type: 'text';
+  text: string;
+}
+
+interface ImageContent {
+  type: 'image';
+  data: string;
+  mimeType: string;
+}
+
+interface EmbeddedResource {
+  type: 'resource';
+  resource: {
+    uri: string;
+    mimeType?: string;
+    text?: string;
+    blob?: string;
+  };
+}
+
+/** MCP CallToolResult type - matches @modelcontextprotocol/sdk/types.js */
+interface CallToolResult {
+  content: (TextContent | ImageContent | EmbeddedResource)[];
+  isError?: boolean;
+}
+
+/**
+ * Type alias for studio tool definitions.
+ * Uses SdkMcpToolDefinition<any> to match createSdkMcpServer's expected type
+ * and avoid generic schema parameter compatibility issues between Zod versions.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type StudioTool = SdkMcpToolDefinition<any>;
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+function ok<T>(data: T): ToolSuccessResult<T> {
   return { success: true, data };
 }
 
-function fail(error) {
+function fail(error: unknown): ToolFailureResult {
   return {
     success: false,
     error: error instanceof Error ? error.message : String(error),
   };
 }
 
-async function getBrandProfile(sql, userId, organizationId) {
+function jsonResult<T>(result: ToolResult<T>): CallToolResult {
+  return {
+    content: [{ type: 'text', text: JSON.stringify(result) }],
+    isError: !result.success,
+  };
+}
+
+async function getBrandProfile(
+  sql: SqlClient,
+  userId: string,
+  organizationId: string | null
+): Promise<BrandProfileRow | null> {
   if (organizationId) {
     const rows = await sql`
       SELECT * FROM brand_profiles
@@ -66,7 +212,7 @@ async function getBrandProfile(sql, userId, organizationId) {
         AND deleted_at IS NULL
       LIMIT 1
     `;
-    return rows[0] || null;
+    return (rows[0] as BrandProfileRow | undefined) ?? null;
   }
 
   const rows = await sql`
@@ -76,10 +222,10 @@ async function getBrandProfile(sql, userId, organizationId) {
       AND deleted_at IS NULL
     LIMIT 1
   `;
-  return rows[0] || null;
+  return (rows[0] as BrandProfileRow | undefined) ?? null;
 }
 
-function mapBrandProfileForPrompt(raw) {
+function mapBrandProfileForPrompt(raw: BrandProfileRow | null): MappedBrandProfile | null {
   if (!raw) return null;
   return {
     name: raw.name,
@@ -89,96 +235,117 @@ function mapBrandProfileForPrompt(raw) {
     secondaryColor: raw.secondary_color,
     tertiaryColor: raw.tertiary_color,
     toneOfVoice: raw.tone_of_voice,
-    toneTargets: raw.settings?.toneTargets || ['campaigns', 'posts', 'images', 'flyers', 'videos'],
+    toneTargets: raw.settings?.toneTargets ?? ['campaigns', 'posts', 'images', 'flyers', 'videos'],
   };
 }
 
-export function buildStudioToolDefinitions({ sql, userId, organizationId, logger }) {
-  const genai = getGeminiAi();
+function isGeminiInlinePart(part: GeminiContentPart): part is GeminiInlinePart {
+  return 'inlineData' in part;
+}
 
-  return [
+// =============================================================================
+// Tool Builder
+// =============================================================================
+
+export function buildStudioToolDefinitions(config: StudioToolConfig): StudioTool[] {
+  const { sql, userId, organizationId, logger: log } = config;
+  const genai: GoogleGenAI = getGeminiAi();
+
+  // Note: Tools are explicitly typed in-place. The array uses 'as StudioTool[]'
+  // at the end to satisfy the return type while preserving each tool's specific schema.
+  const tools = [
+    // =========================================================================
+    // Image Studio Tools
+    // =========================================================================
+
     tool(
       'studio_image_list_topics',
-      'Lista tópicos do Image Studio.',
+      'Lista topicos do Image Studio.',
       {},
-      async () => {
+      async (): Promise<CallToolResult> => {
         try {
           const topics = await getImageTopics(sql, userId, organizationId);
-          return { content: [{ type: 'text', text: JSON.stringify(ok(topics)) }] };
+          return jsonResult(ok(topics));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_image_create_topic',
-      'Cria tópico no Image Studio.',
+      'Cria topico no Image Studio.',
       { title: z.string().optional() },
-      async ({ title }) => {
+      async ({ title }: { title?: string }): Promise<CallToolResult> => {
         try {
-          const topic = await createImageTopic(sql, userId, organizationId, title || null);
-          return { content: [{ type: 'text', text: JSON.stringify(ok(topic)) }] };
+          const topic = await createImageTopic(sql, userId, organizationId, title ?? null);
+          return jsonResult(ok(topic));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_image_update_topic',
-      'Renomeia ou atualiza capa de tópico no Image Studio.',
+      'Renomeia ou atualiza capa de topico no Image Studio.',
       {
         topicId: z.string(),
         title: z.string().optional(),
         coverUrl: z.string().optional(),
       },
-      async ({ topicId, title, coverUrl }) => {
+      async ({ topicId, title, coverUrl }: { topicId: string; title?: string; coverUrl?: string }): Promise<CallToolResult> => {
         try {
           const topic = await updateImageTopic(sql, topicId, userId, { title, coverUrl }, organizationId);
-          return { content: [{ type: 'text', text: JSON.stringify(ok(topic)) }] };
+          return jsonResult(ok(topic));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_image_delete_topic',
-      'Exclui tópico do Image Studio.',
+      'Exclui topico do Image Studio.',
       { topicId: z.string() },
-      async ({ topicId }) => {
+      async ({ topicId }: { topicId: string }): Promise<CallToolResult> => {
         try {
           await deleteImageTopic(sql, topicId, userId, organizationId);
-          return { content: [{ type: 'text', text: JSON.stringify(ok({ topicId })) }] };
+          return jsonResult(ok({ topicId }));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_image_list_batches',
-      'Lista batches de um tópico do Image Studio.',
+      'Lista batches de um topico do Image Studio.',
       { topicId: z.string(), limit: z.number().optional() },
-      async ({ topicId, limit }) => {
+      async ({ topicId, limit }: { topicId: string; limit?: number }): Promise<CallToolResult> => {
         try {
-          const batches = await getImageBatches(sql, topicId, userId, organizationId, limit || 100);
-          return { content: [{ type: 'text', text: JSON.stringify(ok(batches)) }] };
+          const batches = await getImageBatches(sql, topicId, userId, organizationId, limit ?? 100);
+          return jsonResult(ok(batches));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_image_delete_batch',
       'Exclui batch no Image Studio.',
       { batchId: z.string() },
-      async ({ batchId }) => {
+      async ({ batchId }: { batchId: string }): Promise<CallToolResult> => {
         try {
           await deleteImageBatch(sql, batchId, userId, organizationId);
-          return { content: [{ type: 'text', text: JSON.stringify(ok({ batchId })) }] };
+          return jsonResult(ok({ batchId }));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_image_generate',
       'Gera imagens no Image Studio usando pipeline existente.',
@@ -194,7 +361,21 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           mimeType: z.string(),
         })).optional(),
       },
-      async ({ topicId, prompt, imageNum, aspectRatio, imageSize, referenceImages }) => {
+      async ({
+        topicId,
+        prompt,
+        imageNum,
+        aspectRatio,
+        imageSize,
+        referenceImages,
+      }: {
+        topicId: string;
+        prompt: string;
+        imageNum?: number;
+        aspectRatio?: string;
+        imageSize?: '1K' | '2K' | '4K';
+        referenceImages?: ReferenceImage[];
+      }): Promise<CallToolResult> => {
         try {
           const result = await createImageBatch(
             sql,
@@ -202,7 +383,7 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
               topicId,
               provider: 'google',
               model: 'gemini-3-pro-image-preview',
-              imageNum: imageNum || 1,
+              imageNum: imageNum ?? 1,
               params: {
                 prompt,
                 userPrompt: prompt,
@@ -216,128 +397,140 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
             genai,
           );
 
-          return { content: [{ type: 'text', text: JSON.stringify(ok(result)) }] };
+          return jsonResult(ok(result));
         } catch (error) {
-          logger.error({ err: error }, '[AgentTools] studio_image_generate failed');
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
-        }
-      },
-    ),
-    tool(
-      'studio_image_get_generation_status',
-      'Consulta status de geração de imagem.',
-      {
-        generationId: z.string(),
-        asyncTaskId: z.string().optional(),
-      },
-      async ({ generationId, asyncTaskId }) => {
-        try {
-          const status = await getGenerationStatus(sql, generationId, asyncTaskId || '');
-          return { content: [{ type: 'text', text: JSON.stringify(ok(status)) }] };
-        } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
-        }
-      },
-    ),
-    tool(
-      'studio_image_delete_generation',
-      'Exclui uma geração de imagem.',
-      { generationId: z.string() },
-      async ({ generationId }) => {
-        try {
-          await deleteImageGeneration(sql, generationId, userId, organizationId);
-          return { content: [{ type: 'text', text: JSON.stringify(ok({ generationId })) }] };
-        } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          log.error({ err: error }, '[AgentTools] studio_image_generate failed');
+          return jsonResult(fail(error));
         }
       },
     ),
 
     tool(
+      'studio_image_get_generation_status',
+      'Consulta status de geracao de imagem.',
+      {
+        generationId: z.string(),
+        asyncTaskId: z.string().optional(),
+      },
+      async ({ generationId, asyncTaskId }: { generationId: string; asyncTaskId?: string }): Promise<CallToolResult> => {
+        try {
+          const status = await getGenerationStatus(sql, generationId, asyncTaskId ?? '');
+          return jsonResult(ok(status));
+        } catch (error) {
+          return jsonResult(fail(error));
+        }
+      },
+    ),
+
+    tool(
+      'studio_image_delete_generation',
+      'Exclui uma geracao de imagem.',
+      { generationId: z.string() },
+      async ({ generationId }: { generationId: string }): Promise<CallToolResult> => {
+        try {
+          await deleteImageGeneration(sql, generationId, userId, organizationId);
+          return jsonResult(ok({ generationId }));
+        } catch (error) {
+          return jsonResult(fail(error));
+        }
+      },
+    ),
+
+    // =========================================================================
+    // Video Studio Tools
+    // =========================================================================
+
+    tool(
       'studio_video_list_topics',
-      'Lista tópicos do Studio Video.',
+      'Lista topicos do Studio Video.',
       {},
-      async () => {
+      async (): Promise<CallToolResult> => {
         try {
           const topics = await getVideoTopics(sql, userId, organizationId);
-          return { content: [{ type: 'text', text: JSON.stringify(ok(topics)) }] };
+          return jsonResult(ok(topics));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_video_create_topic',
-      'Cria tópico no Studio Video.',
+      'Cria topico no Studio Video.',
       { title: z.string().optional() },
-      async ({ title }) => {
+      async ({ title }: { title?: string }): Promise<CallToolResult> => {
         try {
-          const topic = await createVideoTopic(sql, userId, organizationId, title || null);
-          return { content: [{ type: 'text', text: JSON.stringify(ok(topic)) }] };
+          const topic = await createVideoTopic(sql, userId, organizationId, title ?? null);
+          return jsonResult(ok(topic));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_video_update_topic',
-      'Atualiza tópico do Studio Video.',
+      'Atualiza topico do Studio Video.',
       {
         topicId: z.string(),
         title: z.string().optional(),
         coverUrl: z.string().optional(),
       },
-      async ({ topicId, title, coverUrl }) => {
+      async ({ topicId, title, coverUrl }: { topicId: string; title?: string; coverUrl?: string }): Promise<CallToolResult> => {
         try {
           const topic = await updateVideoTopic(sql, topicId, userId, { title, coverUrl }, organizationId);
-          return { content: [{ type: 'text', text: JSON.stringify(ok(topic)) }] };
+          return jsonResult(ok(topic));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_video_delete_topic',
-      'Exclui tópico do Studio Video.',
+      'Exclui topico do Studio Video.',
       { topicId: z.string() },
-      async ({ topicId }) => {
+      async ({ topicId }: { topicId: string }): Promise<CallToolResult> => {
         try {
           await deleteVideoTopic(sql, topicId, userId, organizationId);
-          return { content: [{ type: 'text', text: JSON.stringify(ok({ topicId })) }] };
+          return jsonResult(ok({ topicId }));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_video_list_sessions',
-      'Lista sessões de vídeo de um tópico.',
+      'Lista sessoes de video de um topico.',
       { topicId: z.string(), limit: z.number().optional() },
-      async ({ topicId, limit }) => {
+      async ({ topicId, limit }: { topicId: string; limit?: number }): Promise<CallToolResult> => {
         try {
-          const sessions = await getVideoSessions(sql, topicId, userId, organizationId, limit || 100);
-          return { content: [{ type: 'text', text: JSON.stringify(ok(sessions)) }] };
+          const sessions = await getVideoSessions(sql, topicId, userId, organizationId, limit ?? 100);
+          return jsonResult(ok(sessions));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_video_delete_session',
-      'Exclui sessão de vídeo.',
+      'Exclui sessao de video.',
       { sessionId: z.string() },
-      async ({ sessionId }) => {
+      async ({ sessionId }: { sessionId: string }): Promise<CallToolResult> => {
         try {
           await deleteVideoSession(sql, sessionId, userId, organizationId);
-          return { content: [{ type: 'text', text: JSON.stringify(ok({ sessionId })) }] };
+          return jsonResult(ok({ sessionId }));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_video_generate',
-      'Gera vídeo no Studio Video e atualiza sessão/geração.',
+      'Gera video no Studio Video e atualiza sessao/geracao.',
       {
         topicId: z.string(),
         prompt: z.string(),
@@ -357,17 +550,26 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
         referenceImageUrl,
         useBrandProfile,
         generateAudio,
-      }) => {
+      }: {
+        topicId: string;
+        prompt: string;
+        model?: 'veo-3.1' | 'sora-2';
+        aspectRatio?: '16:9' | '9:16';
+        resolution?: '720p' | '1080p';
+        referenceImageUrl?: string;
+        useBrandProfile?: boolean;
+        generateAudio?: boolean;
+      }): Promise<CallToolResult> => {
         try {
-          const sessionResult = await createVideoSession(
+          const sessionResult: CreateSessionResult = await createVideoSession(
             sql,
             {
               topicId,
-              model: model || 'veo-3.1',
+              model: model ?? 'veo-3.1',
               prompt,
-              aspectRatio: aspectRatio || '9:16',
-              resolution: resolution || '720p',
-              referenceImageUrl: referenceImageUrl || null,
+              aspectRatio: aspectRatio ?? '9:16',
+              resolution: resolution ?? '720p',
+              referenceImageUrl: referenceImageUrl ?? null,
             },
             userId,
             organizationId,
@@ -387,41 +589,41 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
             : null;
           const mappedBrandProfile = mapBrandProfileForPrompt(rawBrandProfile);
 
-          let effectiveImageUrl = referenceImageUrl || null;
+          let effectiveImageUrl: string | null = referenceImageUrl ?? null;
           if (!effectiveImageUrl && mappedBrandProfile?.logo) {
             effectiveImageUrl = mappedBrandProfile.logo;
           }
 
           const finalPrompt = mappedBrandProfile
-            ? buildVideoPrompt(prompt, mappedBrandProfile, {
-                resolution: resolution || '720p',
-                aspectRatio: aspectRatio || '9:16',
+            ? buildVideoPrompt(prompt, mappedBrandProfile as BrandProfile, {
+                resolution: resolution ?? '720p',
+                aspectRatio: aspectRatio ?? '9:16',
                 hasReferenceImage: !!effectiveImageUrl,
                 useCampaignGradePrompt: true,
                 hasBrandLogoReference: Boolean(
-                  effectiveImageUrl && mappedBrandProfile?.logo && effectiveImageUrl === mappedBrandProfile.logo,
+                  effectiveImageUrl && mappedBrandProfile.logo && effectiveImageUrl === mappedBrandProfile.logo,
                 ),
               })
             : prompt;
 
-          const selectedModel = model || 'veo-3.1';
-          const selectedAspectRatio = aspectRatio || '9:16';
-          const selectedResolution = resolution || '720p';
+          const selectedModel = model ?? 'veo-3.1';
+          const selectedAspectRatio = aspectRatio ?? '9:16';
+          const selectedResolution = resolution ?? '720p';
 
-          const isFalProviderModel =
-            selectedModel !== 'veo-3.1' && selectedModel !== 'veo-3.1-fast-generate-preview';
+          // Check if using Google Veo provider (veo-3.1) or FAL provider (sora-2, etc.)
+          const isGoogleVeoModel = selectedModel === 'veo-3.1';
 
-          if (effectiveImageUrl && effectiveImageUrl.startsWith('data:') && isFalProviderModel) {
+          if (effectiveImageUrl?.startsWith('data:') && !isGoogleVeoModel) {
             effectiveImageUrl = await uploadDataUrlImageToBlob(effectiveImageUrl, 'agent-video-reference');
           }
 
           let finalVideoUrl = '';
 
-          if (selectedModel === 'veo-3.1' || selectedModel === 'veo-3.1-fast-generate-preview') {
+          if (isGoogleVeoModel) {
             const result = await generateVideoWithGoogleVeo(
               finalPrompt,
               selectedAspectRatio,
-              effectiveImageUrl || undefined,
+              effectiveImageUrl ?? undefined,
             );
 
             const blob = await put(`agent-video-${Date.now()}.mp4`, result.videoBuffer, {
@@ -434,18 +636,18 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
               finalPrompt,
               selectedAspectRatio,
               selectedModel,
-              effectiveImageUrl || undefined,
+              effectiveImageUrl ?? undefined,
               5,
               generateAudio !== false,
             );
 
             if (!generatedUrl) {
-              throw new Error('Falha ao gerar vídeo no provider externo.');
+              throw new Error('Falha ao gerar video no provider externo.');
             }
 
             const response = await fetch(generatedUrl);
             if (!response.ok) {
-              throw new Error(`Falha ao baixar vídeo gerado (${response.status}).`);
+              throw new Error(`Falha ao baixar video gerado (${response.status}).`);
             }
 
             const videoBuffer = Buffer.from(await response.arrayBuffer());
@@ -467,34 +669,24 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
             organizationId,
           );
 
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify(
-                ok({
-                  session: sessionResult.session,
-                  generation,
-                  videoUrl: finalVideoUrl,
-                  model: selectedModel,
-                  aspectRatio: selectedAspectRatio,
-                  resolution: selectedResolution,
-                }),
-              ),
-            }],
-          };
+          return jsonResult(ok({
+            session: sessionResult.session,
+            generation,
+            videoUrl: finalVideoUrl,
+            model: selectedModel,
+            aspectRatio: selectedAspectRatio,
+            resolution: selectedResolution,
+          }));
         } catch (error) {
-          logger.error({ err: error }, '[AgentTools] studio_video_generate failed');
-
-          return {
-            content: [{ type: 'text', text: JSON.stringify(fail(error)) }],
-            isError: true,
-          };
+          log.error({ err: error }, '[AgentTools] studio_video_generate failed');
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_video_update_generation',
-      'Atualiza status de geração de vídeo.',
+      'Atualiza status de geracao de video.',
       {
         generationId: z.string(),
         status: z.enum(['pending', 'generating', 'success', 'error']).optional(),
@@ -502,7 +694,19 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
         duration: z.number().optional(),
         errorMessage: z.string().optional(),
       },
-      async ({ generationId, status, videoUrl, duration, errorMessage }) => {
+      async ({
+        generationId,
+        status,
+        videoUrl,
+        duration,
+        errorMessage,
+      }: {
+        generationId: string;
+        status?: 'pending' | 'generating' | 'success' | 'error';
+        videoUrl?: string;
+        duration?: number;
+        errorMessage?: string;
+      }): Promise<CallToolResult> => {
         try {
           const generation = await updateVideoGeneration(
             sql,
@@ -511,41 +715,42 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
             userId,
             organizationId,
           );
-          return { content: [{ type: 'text', text: JSON.stringify(ok(generation)) }] };
+          return jsonResult(ok(generation));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_video_delete_generation',
-      'Exclui uma geração de vídeo.',
+      'Exclui uma geracao de video.',
       { generationId: z.string() },
-      async ({ generationId }) => {
+      async ({ generationId }: { generationId: string }): Promise<CallToolResult> => {
         try {
           await deleteVideoGeneration(sql, generationId, userId, organizationId);
-          return { content: [{ type: 'text', text: JSON.stringify(ok({ generationId })) }] };
+          return jsonResult(ok({ generationId }));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
 
     // =========================================================================
-    // Reading tools — gallery, brand, campaigns, posts, clips, carousels, scheduled
+    // Reading tools - gallery, brand, campaigns, posts, clips, carousels, scheduled
     // =========================================================================
 
     tool(
       'studio_gallery_search',
-      'Busca imagens na galeria do usuário. Pode filtrar por texto (prompt/source) e source.',
+      'Busca imagens na galeria do usuario. Pode filtrar por texto (prompt/source) e source.',
       {
         query: z.string().optional(),
         source: z.string().optional(),
         limit: z.number().int().min(1).max(50).optional(),
       },
-      async ({ query, source, limit }) => {
+      async ({ query, source, limit }: { query?: string; source?: string; limit?: number }): Promise<CallToolResult> => {
         try {
-          const max = limit || 20;
+          const max = limit ?? 20;
           const conditions = [
             organizationId
               ? sql`organization_id = ${organizationId}`
@@ -566,17 +771,18 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
             ORDER BY created_at DESC
             LIMIT ${max}
           `;
-          return { content: [{ type: 'text', text: JSON.stringify(ok(rows)) }] };
+          return jsonResult(ok(rows));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_gallery_get',
-      'Obtém detalhes completos de uma imagem específica da galeria.',
+      'Obtem detalhes completos de uma imagem especifica da galeria.',
       { imageId: z.string() },
-      async ({ imageId }) => {
+      async ({ imageId }: { imageId: string }): Promise<CallToolResult> => {
         try {
           const userCondition = organizationId
             ? sql`organization_id = ${organizationId}`
@@ -587,46 +793,46 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
             FROM gallery_images
             WHERE id = ${imageId} AND ${userCondition} AND deleted_at IS NULL
           `;
-          if (rows.length === 0) return { content: [{ type: 'text', text: JSON.stringify(fail('Imagem não encontrada.')) }], isError: true };
-          return { content: [{ type: 'text', text: JSON.stringify(ok(rows[0])) }] };
+          if (rows.length === 0) return jsonResult(fail('Imagem nao encontrada.'));
+          return jsonResult(ok(rows[0]));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_brand_profile_get',
-      'Obtém o brand profile do usuário (nome, descrição, logo, cores, tom de voz).',
+      'Obtem o brand profile do usuario (nome, descricao, logo, cores, tom de voz).',
       {},
-      async () => {
+      async (): Promise<CallToolResult> => {
         try {
           const raw = await getBrandProfile(sql, userId, organizationId);
-          if (!raw) return { content: [{ type: 'text', text: JSON.stringify(ok(null)) }] };
-          return {
-            content: [{ type: 'text', text: JSON.stringify(ok({
-              id: raw.id,
-              name: raw.name,
-              description: raw.description,
-              logoUrl: raw.logo_url,
-              primaryColor: raw.primary_color,
-              secondaryColor: raw.secondary_color,
-              tertiaryColor: raw.tertiary_color,
-              toneOfVoice: raw.tone_of_voice,
-              settings: raw.settings,
-            })) }],
-          };
+          if (!raw) return jsonResult(ok(null));
+          return jsonResult(ok({
+            id: raw.id,
+            name: raw.name,
+            description: raw.description,
+            logoUrl: raw.logo_url,
+            primaryColor: raw.primary_color,
+            secondaryColor: raw.secondary_color,
+            tertiaryColor: raw.tertiary_color,
+            toneOfVoice: raw.tone_of_voice,
+            settings: raw.settings,
+          }));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_campaigns_list',
-      'Lista campanhas do usuário com contagem de clips, posts, ads e carrosséis.',
+      'Lista campanhas do usuario com contagem de clips, posts, ads e carrosseis.',
       { limit: z.number().int().min(1).max(50).optional() },
-      async ({ limit }) => {
+      async ({ limit }: { limit?: number }): Promise<CallToolResult> => {
         try {
-          const max = limit || 20;
+          const max = limit ?? 20;
           const userCondition = organizationId
             ? sql`c.organization_id = ${organizationId}`
             : sql`c.user_id = ${userId} AND c.organization_id IS NULL`;
@@ -646,17 +852,18 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
             ORDER BY c.created_at DESC
             LIMIT ${max}
           `;
-          return { content: [{ type: 'text', text: JSON.stringify(ok(rows)) }] };
+          return jsonResult(ok(rows));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_campaign_get',
-      'Obtém campanha completa com clips, posts, ads e carrosséis.',
+      'Obtem campanha completa com clips, posts, ads e carrosseis.',
       { campaignId: z.string() },
-      async ({ campaignId }) => {
+      async ({ campaignId }: { campaignId: string }): Promise<CallToolResult> => {
         try {
           const userCondition = organizationId
             ? sql`organization_id = ${organizationId}`
@@ -668,23 +875,19 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
             sql`SELECT id, platform, headline, body, cta, image_prompt, image_url, sort_order FROM ad_creatives WHERE campaign_id = ${campaignId} ORDER BY sort_order`,
             sql`SELECT id, title, hook, cover_prompt, caption, slides, cover_url, sort_order FROM carousel_scripts WHERE campaign_id = ${campaignId} ORDER BY sort_order`,
           ]);
-          if (campaigns.length === 0) return { content: [{ type: 'text', text: JSON.stringify(fail('Campanha não encontrada.')) }], isError: true };
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify(ok({ ...campaigns[0], clips, posts, ads, carousels })),
-            }],
-          };
+          if (campaigns.length === 0) return jsonResult(fail('Campanha nao encontrada.'));
+          return jsonResult(ok({ ...campaigns[0], clips, posts, ads, carousels }));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_posts_list',
       'Lista posts de uma campanha.',
       { campaignId: z.string() },
-      async ({ campaignId }) => {
+      async ({ campaignId }: { campaignId: string }): Promise<CallToolResult> => {
         try {
           const ownerCondition = organizationId
             ? sql`c.organization_id = ${organizationId}`
@@ -696,17 +899,18 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
             WHERE p.campaign_id = ${campaignId} AND ${ownerCondition} AND c.deleted_at IS NULL
             ORDER BY p.sort_order
           `;
-          return { content: [{ type: 'text', text: JSON.stringify(ok(rows)) }] };
+          return jsonResult(ok(rows));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_clips_list',
       'Lista video clips de uma campanha.',
       { campaignId: z.string() },
-      async ({ campaignId }) => {
+      async ({ campaignId }: { campaignId: string }): Promise<CallToolResult> => {
         try {
           const ownerCondition = organizationId
             ? sql`c.organization_id = ${organizationId}`
@@ -718,17 +922,18 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
             WHERE v.campaign_id = ${campaignId} AND ${ownerCondition} AND c.deleted_at IS NULL
             ORDER BY v.sort_order
           `;
-          return { content: [{ type: 'text', text: JSON.stringify(ok(rows)) }] };
+          return jsonResult(ok(rows));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_carousels_list',
-      'Lista carrosséis de uma campanha.',
+      'Lista carrosseis de uma campanha.',
       { campaignId: z.string() },
-      async ({ campaignId }) => {
+      async ({ campaignId }: { campaignId: string }): Promise<CallToolResult> => {
         try {
           const ownerCondition = organizationId
             ? sql`c.organization_id = ${organizationId}`
@@ -740,19 +945,20 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
             WHERE cs.campaign_id = ${campaignId} AND ${ownerCondition} AND c.deleted_at IS NULL
             ORDER BY cs.sort_order
           `;
-          return { content: [{ type: 'text', text: JSON.stringify(ok(rows)) }] };
+          return jsonResult(ok(rows));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_scheduled_posts_list',
-      'Lista posts agendados do usuário.',
+      'Lista posts agendados do usuario.',
       { limit: z.number().int().min(1).max(50).optional() },
-      async ({ limit }) => {
+      async ({ limit }: { limit?: number }): Promise<CallToolResult> => {
         try {
-          const max = limit || 20;
+          const max = limit ?? 20;
           const userCondition = organizationId
             ? sql`organization_id = ${organizationId}`
             : sql`user_id = ${userId} AND organization_id IS NULL`;
@@ -763,32 +969,32 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
             ORDER BY scheduled_timestamp DESC
             LIMIT ${max}
           `;
-          return { content: [{ type: 'text', text: JSON.stringify(ok(rows)) }] };
+          return jsonResult(ok(rows));
         } catch (error) {
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          return jsonResult(fail(error));
         }
       },
     ),
 
     // =========================================================================
-    // Mutation tools — edit, flyer, save, text, campaign generation
+    // Mutation tools - edit, flyer, save, text, campaign generation
     // =========================================================================
 
     tool(
       'studio_image_edit',
-      'Edita uma imagem existente com prompt de instrução (ex: alterar cores, adicionar texto, remover fundo). Recebe URL da imagem e prompt de edição.',
+      'Edita uma imagem existente com prompt de instrucao (ex: alterar cores, adicionar texto, remover fundo). Recebe URL da imagem e prompt de edicao.',
       {
         imageUrl: z.string().describe('URL da imagem a editar'),
-        prompt: z.string().describe('Instrução de edição'),
-        referenceImageUrl: z.string().optional().describe('URL de imagem de referência opcional'),
+        prompt: z.string().describe('Instrucao de edicao'),
+        referenceImageUrl: z.string().optional().describe('URL de imagem de referencia opcional'),
       },
-      async ({ imageUrl, prompt, referenceImageUrl }) => {
+      async ({ imageUrl, prompt: editPrompt, referenceImageUrl }: { imageUrl: string; prompt: string; referenceImageUrl?: string }): Promise<CallToolResult> => {
         try {
           const base64 = await urlToBase64(imageUrl);
           if (!base64) throw new Error('Falha ao converter imagem para base64.');
 
-          const parts = [
-            { text: prompt },
+          const parts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }> = [
+            { text: editPrompt },
             { inlineData: { data: base64, mimeType: 'image/png' } },
           ];
 
@@ -805,75 +1011,97 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
               contents: { parts },
               config: { imageConfig: { imageSize: '1K' } },
             }),
-          );
+          ) as GeminiResponse;
 
-          let imageDataUrl = null;
+          let imageDataUrl: string | null = null;
           const contentParts = response.candidates?.[0]?.content?.parts;
           if (Array.isArray(contentParts)) {
             for (const part of contentParts) {
-              if (part.inlineData) {
+              if (isGeminiInlinePart(part)) {
                 imageDataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
                 break;
               }
             }
           }
 
-          if (!imageDataUrl) throw new Error('Edição retornou resposta vazia.');
+          if (!imageDataUrl) throw new Error('Edicao retornou resposta vazia.');
 
           const blobUrl = await uploadDataUrlImageToBlob(imageDataUrl, 'agent-image-edit');
-          return { content: [{ type: 'text', text: JSON.stringify(ok({ imageUrl: blobUrl })) }] };
+          return jsonResult(ok({ imageUrl: blobUrl }));
         } catch (error) {
-          logger.error({ err: error }, '[AgentTools] studio_image_edit failed');
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          log.error({ err: error }, '[AgentTools] studio_image_edit failed');
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_flyer_generate',
-      'Gera um flyer/arte usando o brand profile e prompt do usuário. Ideal para materiais promocionais.',
+      'Gera um flyer/arte usando o brand profile e prompt do usuario. Ideal para materiais promocionais.',
       {
-        prompt: z.string().describe('Descrição do flyer a gerar'),
+        prompt: z.string().describe('Descricao do flyer a gerar'),
         aspectRatio: z.string().optional(),
         imageSize: z.enum(['1K', '2K', '4K']).optional(),
-        useBrandProfile: z.boolean().optional().describe('Usar brand profile do usuário? Default true.'),
+        useBrandProfile: z.boolean().optional().describe('Usar brand profile do usuario? Default true.'),
       },
-      async ({ prompt: userPrompt, aspectRatio, imageSize, useBrandProfile }) => {
+      async ({
+        prompt: userPrompt,
+        aspectRatio,
+        imageSize,
+        useBrandProfile,
+      }: {
+        prompt: string;
+        aspectRatio?: string;
+        imageSize?: '1K' | '2K' | '4K';
+        useBrandProfile?: boolean;
+      }): Promise<CallToolResult> => {
         try {
           const shouldUseBrand = useBrandProfile !== false;
           const rawBrand = shouldUseBrand ? await getBrandProfile(sql, userId, organizationId) : null;
           const mappedBrand = mapBrandProfileForPrompt(rawBrand);
 
-          const flyerSystemPrompt = mappedBrand ? buildFlyerPrompt(mappedBrand) : '';
+          const flyerSystemPrompt = mappedBrand ? buildFlyerPrompt(mappedBrand as BrandProfile) : '';
           const imagePrompt = mappedBrand
-            ? buildImagePrompt(`${flyerSystemPrompt}\n\nSOLICITAÇÃO DO USUÁRIO: ${userPrompt}`, mappedBrand)
+            ? buildImagePrompt(`${flyerSystemPrompt}\n\nSOLICITACAO DO USUARIO: ${userPrompt}`, mappedBrand as BrandProfile)
             : userPrompt;
 
           const result = await generateImageWithFallback(
             imagePrompt,
-            aspectRatio || '1:1',
+            aspectRatio ?? '1:1',
             undefined,
-            imageSize || '2K',
+            imageSize ?? '2K',
           );
-          return { content: [{ type: 'text', text: JSON.stringify(ok({ imageUrl: result.imageUrl, model: result.usedModel, provider: result.usedProvider })) }] };
+          return jsonResult(ok({ imageUrl: result.imageUrl, model: result.usedModel, provider: result.usedProvider }));
         } catch (error) {
-          logger.error({ err: error }, '[AgentTools] studio_flyer_generate failed');
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          log.error({ err: error }, '[AgentTools] studio_flyer_generate failed');
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_gallery_save',
-      'Salva uma imagem na galeria do usuário (para imagens geradas ou editadas).',
+      'Salva uma imagem na galeria do usuario (para imagens geradas ou editadas).',
       {
         imageUrl: z.string().describe('URL da imagem a salvar'),
         source: z.string().describe('Origem (ex: agent-flyer, agent-edit, agent-image)'),
         prompt: z.string().optional(),
         model: z.string().optional(),
       },
-      async ({ imageUrl, source, prompt: imgPrompt, model: imgModel }) => {
+      async ({
+        imageUrl,
+        source,
+        prompt: imgPrompt,
+        model: imgModel,
+      }: {
+        imageUrl: string;
+        source: string;
+        prompt?: string;
+        model?: string;
+      }): Promise<CallToolResult> => {
         try {
           if (!imageUrl.startsWith('https://')) {
-            return { content: [{ type: 'text', text: JSON.stringify(fail('imageUrl deve ser uma URL HTTPS válida (data URLs não são permitidas).')) }], isError: true };
+            return jsonResult(fail('imageUrl deve ser uma URL HTTPS valida (data URLs nao sao permitidas).'));
           }
           const rows = await sql`
             INSERT INTO gallery_images (user_id, organization_id, src_url, source, prompt, model)
@@ -882,41 +1110,50 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
               ${organizationId},
               ${imageUrl},
               ${source},
-              ${imgPrompt || null},
-              ${imgModel || 'gemini-3-pro-image-preview'}
+              ${imgPrompt ?? null},
+              ${imgModel ?? 'gemini-3-pro-image-preview'}
             )
             RETURNING id, src_url, source, prompt, created_at
           `;
-          return { content: [{ type: 'text', text: JSON.stringify(ok(rows[0])) }] };
+          return jsonResult(ok(rows[0]));
         } catch (error) {
-          logger.error({ err: error }, '[AgentTools] studio_gallery_save failed');
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          log.error({ err: error }, '[AgentTools] studio_gallery_save failed');
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_text_generate',
       'Gera texto de marketing (caption, post, ad copy) usando IA. Pode usar brand profile.',
       {
         type: z.enum(['quick_post', 'caption', 'ad_copy', 'custom']).describe('Tipo de texto'),
-        prompt: z.string().describe('Contexto ou instrução do texto'),
+        prompt: z.string().describe('Contexto ou instrucao do texto'),
         useBrandProfile: z.boolean().optional(),
       },
-      async ({ type, prompt: userPrompt, useBrandProfile }) => {
+      async ({
+        type,
+        prompt: userPrompt,
+        useBrandProfile,
+      }: {
+        type: 'quick_post' | 'caption' | 'ad_copy' | 'custom';
+        prompt: string;
+        useBrandProfile?: boolean;
+      }): Promise<CallToolResult> => {
         try {
           const shouldUseBrand = useBrandProfile !== false;
           const rawBrand = shouldUseBrand ? await getBrandProfile(sql, userId, organizationId) : null;
           const mappedBrand = mapBrandProfileForPrompt(rawBrand);
 
-          let systemPrompt;
-          let schema;
+          let systemPrompt: string;
+          let schema: typeof quickPostSchema;
 
           if (type === 'quick_post') {
-            systemPrompt = buildQuickPostPrompt(mappedBrand, userPrompt);
+            systemPrompt = buildQuickPostPrompt(mappedBrand as BrandProfile | null, userPrompt);
             schema = quickPostSchema;
           } else {
             systemPrompt = mappedBrand
-              ? `Marca: ${mappedBrand.name}. Tom: ${mappedBrand.toneOfVoice || 'Profissional'}. ${userPrompt}`
+              ? `Marca: ${mappedBrand.name}. Tom: ${mappedBrand.toneOfVoice ?? 'Profissional'}. ${userPrompt}`
               : userPrompt;
             schema = quickPostSchema;
           }
@@ -924,21 +1161,22 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           const result = await generateStructuredContent(
             DEFAULT_TEXT_MODEL,
             [{ text: systemPrompt }],
-            schema,
+            schema as unknown as Record<string, unknown>,
             0.8,
           );
-          return { content: [{ type: 'text', text: JSON.stringify(ok(JSON.parse(result))) }] };
+          return jsonResult(ok(JSON.parse(result) as unknown));
         } catch (error) {
-          logger.error({ err: error }, '[AgentTools] studio_text_generate failed');
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          log.error({ err: error }, '[AgentTools] studio_text_generate failed');
+          return jsonResult(fail(error));
         }
       },
     ),
+
     tool(
       'studio_campaign_generate',
-      'Gera uma campanha de marketing completa (clips, posts, ads, carrosséis) a partir de um transcript ou briefing.',
+      'Gera uma campanha de marketing completa (clips, posts, ads, carrosseis) a partir de um transcript ou briefing.',
       {
-        transcript: z.string().describe('Transcript, briefing ou descrição do conteúdo'),
+        transcript: z.string().describe('Transcript, briefing ou descricao do conteudo'),
         options: z.object({
           clips: z.number().int().min(0).max(10).optional(),
           posts: z.number().int().min(0).max(10).optional(),
@@ -947,7 +1185,15 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
         }).optional(),
         useBrandProfile: z.boolean().optional(),
       },
-      async ({ transcript, options, useBrandProfile }) => {
+      async ({
+        transcript,
+        options,
+        useBrandProfile,
+      }: {
+        transcript: string;
+        options?: { clips?: number; posts?: number; ads?: number; carousels?: number };
+        useBrandProfile?: boolean;
+      }): Promise<CallToolResult> => {
         try {
           const shouldUseBrand = useBrandProfile !== false;
           const rawBrand = shouldUseBrand ? await getBrandProfile(sql, userId, organizationId) : null;
@@ -959,32 +1205,34 @@ export function buildStudioToolDefinitions({ sql, userId, organizationId, logger
           const carouselCount = options?.carousels ?? 2;
 
           const brandSection = mappedBrand
-            ? `\n\nMARCA: ${mappedBrand.name}${mappedBrand.description ? ` - ${mappedBrand.description}` : ''}${mappedBrand.toneOfVoice ? `\nTOM: ${mappedBrand.toneOfVoice}` : ''}\nCORES: ${mappedBrand.primaryColor || '#000'}, ${mappedBrand.secondaryColor || '#FFF'}`
+            ? `\n\nMARCA: ${mappedBrand.name}${mappedBrand.description ? ` - ${mappedBrand.description}` : ''}${mappedBrand.toneOfVoice ? `\nTOM: ${mappedBrand.toneOfVoice}` : ''}\nCORES: ${mappedBrand.primaryColor ?? '#000'}, ${mappedBrand.secondaryColor ?? '#FFF'}`
             : '';
 
-          const systemPrompt = `Você é um estrategista de marketing digital de elite. Crie uma campanha completa de marketing baseada no conteúdo abaixo.${brandSection}
+          const systemPrompt = `Voce e um estrategista de marketing digital de elite. Crie uma campanha completa de marketing baseada no conteudo abaixo.${brandSection}
 
 GERE EXATAMENTE:
-- ${clipCount} roteiros de vídeo curto (Reels/Shorts/TikTok)
+- ${clipCount} roteiros de video curto (Reels/Shorts/TikTok)
 - ${postCount} posts de redes sociais
-- ${adCount} criativos de anúncio (Facebook/Google)
-- ${carouselCount} carrosséis para Instagram
+- ${adCount} criativos de anuncio (Facebook/Google)
+- ${carouselCount} carrosseis para Instagram
 
-CONTEÚDO BASE:
+CONTEUDO BASE:
 ${transcript}`;
 
           const result = await generateStructuredContent(
             DEFAULT_TEXT_MODEL,
             [{ text: systemPrompt }],
-            campaignSchema,
+            campaignSchema as unknown as Record<string, unknown>,
             0.8,
           );
-          return { content: [{ type: 'text', text: JSON.stringify(ok(JSON.parse(result))) }] };
+          return jsonResult(ok(JSON.parse(result) as unknown));
         } catch (error) {
-          logger.error({ err: error }, '[AgentTools] studio_campaign_generate failed');
-          return { content: [{ type: 'text', text: JSON.stringify(fail(error)) }], isError: true };
+          log.error({ err: error }, '[AgentTools] studio_campaign_generate failed');
+          return jsonResult(fail(error));
         }
       },
     ),
-  ];
+  ] as StudioTool[];
+
+  return tools;
 }

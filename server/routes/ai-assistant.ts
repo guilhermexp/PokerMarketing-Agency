@@ -1,5 +1,3 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * AI Assistant & Chat Routes
  * Extracted from server/index.mjs
@@ -9,10 +7,11 @@
  *   POST /api/ai/assistant
  */
 
+import type { Application, Request, Response } from "express";
 import { getRequestAuthContext } from "../lib/auth.js";
 import { getSql } from "../lib/db.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";
-import { streamTextFromMessages } from "../lib/ai/text-generation.js";
+import { streamTextFromMessages, type Message } from "../lib/ai/text-generation.js";
 import { ASSISTANT_MODEL } from "../lib/ai/models.js";
 import { requireAuthWithAiRateLimit } from "../lib/auth.js";
 import {
@@ -22,39 +21,96 @@ import {
 import { chatHandler } from "../api/chat/route.js";
 import logger from "../lib/logger.js";
 
-export function registerAiAssistantRoutes(app) {
+// ============================================================================
+// REQUEST BODY INTERFACES
+// ============================================================================
+
+interface GeminiTextPart {
+  text?: string;
+}
+
+interface GeminiInlineDataPart {
+  inlineData?: {
+    mimeType: string;
+    data: string;
+  };
+}
+
+type GeminiPart = GeminiTextPart | GeminiInlineDataPart;
+
+interface GeminiHistoryMessage {
+  role: "user" | "model";
+  parts?: GeminiPart[];
+}
+
+interface BrandProfile {
+  name?: string;
+  logo?: string;
+  colors?: {
+    primary?: string;
+    secondary?: string;
+  };
+  description?: string;
+}
+
+interface AssistantRequestBody {
+  history?: GeminiHistoryMessage[];
+  brandProfile?: BrandProfile;
+}
+
+interface TextContent {
+  type: "text";
+  text: string;
+}
+
+interface ImageUrlContent {
+  type: "image_url";
+  image_url: {
+    url: string;
+  };
+}
+
+type MessageContent = TextContent | ImageUrlContent;
+
+interface StreamChunk {
+  text?: string;
+}
+
+export function registerAiAssistantRoutes(app: Application): void {
   // -------------------------------------------------------------------------
   // POST /api/chat - Vercel AI SDK Chat Endpoint (Feature Flag)
   // -------------------------------------------------------------------------
-  app.post("/api/chat", requireAuthWithAiRateLimit, async (req, res) => {
+  app.post("/api/chat", requireAuthWithAiRateLimit, async (req: Request, res: Response): Promise<void> => {
     // Feature flag: only enable if VITE_USE_VERCEL_AI_SDK=true
     if (process.env.VITE_USE_VERCEL_AI_SDK !== "true") {
-      return res.status(404).json({ error: "Endpoint not available" });
+      res.status(404).json({ error: "Endpoint not available" });
+      return;
     }
 
-    return chatHandler(req, res);
+    await chatHandler(req, res);
   });
 
   // -------------------------------------------------------------------------
   // POST /api/ai/assistant - AI Assistant Streaming Endpoint (Legacy)
   // -------------------------------------------------------------------------
-  app.post("/api/ai/assistant", async (req, res) => {
+  app.post("/api/ai/assistant", async (req: Request, res: Response): Promise<void> => {
     const timer = createTimer();
     const authCtx = getRequestAuthContext(req);
-    const organizationId = authCtx?.orgId || null;
+    const organizationId = authCtx?.orgId ?? null;
     const sql = getSql();
 
     try {
-      const { history, brandProfile } = req.body;
+      const { history, brandProfile } = req.body as AssistantRequestBody;
 
       if (!history) {
-        return res.status(400).json({ error: "history is required" });
+        res.status(400).json({ error: "history is required" });
+        return;
       }
 
       logger.info({}, "[Assistant API] Starting streaming conversation");
 
       // Convert Gemini history format to OpenAI messages format
-      const messages = [];
+      const messages: Message[] = [];
       const systemInstruction = `Você é o Diretor de Criação Sênior da DirectorAi. Especialista em Branding e Design de alta performance.
 
 SUAS CAPACIDADES CORE:
@@ -67,35 +123,44 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
       messages.push({ role: "system", content: systemInstruction });
 
       for (const message of history) {
-        const parts = (message.parts || []).filter(
-          (part) => part.text || part.inlineData,
+        const parts = (message.parts ?? []).filter(
+          (part): part is GeminiPart => {
+            const textPart = part as GeminiTextPart;
+            const dataPart = part as GeminiInlineDataPart;
+            return Boolean(textPart.text) || Boolean(dataPart.inlineData);
+          },
         );
         if (!parts.length) continue;
 
-        const role = message.role === "model" ? "assistant" : "user";
-        const content = [];
+        const role: "user" | "assistant" = message.role === "model" ? "assistant" : "user";
+        const content: MessageContent[] = [];
         for (const part of parts) {
-          if (part.text) {
-            content.push({ type: "text", text: part.text });
-          } else if (part.inlineData) {
+          const textPart = part as GeminiTextPart;
+          const dataPart = part as GeminiInlineDataPart;
+          if (textPart.text) {
+            content.push({ type: "text", text: textPart.text });
+          } else if (dataPart.inlineData) {
             content.push({
               type: "image_url",
               image_url: {
-                url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
+                url: `data:${dataPart.inlineData.mimeType};base64,${dataPart.inlineData.data}`,
               },
             });
           }
         }
-        if (content.length === 1 && content[0].type === "text") {
-          messages.push({ role, content: content[0].text });
+        if (content.length === 1 && content[0]?.type === "text") {
+          const textContent = content[0] as TextContent;
+          messages.push({ role, content: textContent.text });
         } else {
           messages.push({ role, content });
         }
       }
 
-      const tools = [
+      // Note: tools array is defined but not used in this endpoint
+      // Kept for future reference or use with tool-enabled models
+      const _tools = [
         {
-          type: "function",
+          type: "function" as const,
           function: {
             name: "create_image",
             description: "Gera uma nova imagem de marketing do zero.",
@@ -117,7 +182,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
           },
         },
         {
-          type: "function",
+          type: "function" as const,
           function: {
             name: "edit_referenced_image",
             description: "Edita a imagem atualmente em foco.",
@@ -134,7 +199,7 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
           },
         },
         {
-          type: "function",
+          type: "function" as const,
           function: {
             name: "create_brand_logo",
             description: "Cria um novo logo para a marca.",
@@ -163,7 +228,8 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
 
       // Process Gemini stream chunks
       for await (const chunk of streamResponse) {
-        const text = chunk.text || "";
+        const streamChunk = chunk as StreamChunk;
+        const text = streamChunk.text ?? "";
         if (text) {
           res.write(`data: ${JSON.stringify({ text })}\n\n`);
         }
@@ -187,20 +253,20 @@ Sempre descreva o seu raciocínio criativo antes de executar uma ferramenta.`;
         metadata: { historyLength: history.length },
       }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
     } catch (error) {
-      logger.error({ err: error }, "[Assistant API] Error");
+      const err = error as Error;
+      logger.error({ err }, "[Assistant API] Error");
       await logAiUsage(sql, {
         organizationId,
         endpoint: "/api/ai/assistant",
         operation: "text",
         model: ASSISTANT_MODEL,
         latencyMs: timer(),
-        status: "failed",
-        error: error.message,
-      }).catch(err => logger.warn({ err }, "Non-critical usage logging failed"));
+        status: "error",
+        error: err.message,
+      }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       if (!res.headersSent) {
-        return res
-          .status(500)
-          .json({ error: sanitizeErrorForClient(error) });
+        res.status(500).json({ error: sanitizeErrorForClient(error) });
+        return;
       }
       res.end();
     }

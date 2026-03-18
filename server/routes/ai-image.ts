@@ -51,6 +51,18 @@ import type {
   AiImageAsyncBatchBody,
 } from "../schemas/ai-schemas.js";
 
+/** Image size values accepted by logAiUsage */
+type ImageSize = '1K' | '2K' | '4K';
+
+const VALID_IMAGE_SIZES = new Set<ImageSize>(['1K', '2K', '4K']);
+
+function normalizeImageSize(size: unknown): ImageSize {
+  if (typeof size === 'string' && VALID_IMAGE_SIZES.has(size as ImageSize)) {
+    return size as ImageSize;
+  }
+  return '1K';
+}
+
 const SUPPORTED_IMAGE_MODELS = new Set([
   "gemini-3-pro-image-preview",
   "gemini-3.1-flash-image-preview",
@@ -191,9 +203,15 @@ export function registerAiImageRoutes(app: Application): void {
 
       // Log prompt as structured summary (not raw dump)
       const jsonMatch = fullPrompt.match(/```json\n([\s\S]*?)```/);
-      if (jsonMatch) {
+      if (jsonMatch && jsonMatch[1]) {
         try {
-          const parsed = JSON.parse(jsonMatch[1]);
+          const parsed = JSON.parse(jsonMatch[1]) as {
+            subject?: unknown;
+            environment?: unknown;
+            style?: string;
+            text?: { content?: unknown };
+            output?: { aspect_ratio?: unknown };
+          };
           logger.debug(
             {
               subject: parsed.subject,
@@ -263,7 +281,7 @@ export function registerAiImageRoutes(app: Application): void {
           if (result.imageUrl.startsWith("data:")) {
             // Handle data URL (from Gemini)
             const matches = result.imageUrl.match(/^data:([^;]+);base64,(.+)$/);
-            if (!matches) {
+            if (!matches || !matches[1] || !matches[2]) {
               throw new Error("Invalid data URL format");
             }
             contentType = matches[1];
@@ -280,14 +298,17 @@ export function registerAiImageRoutes(app: Application): void {
           }
 
           // SECURITY: Validate content type before storing in Vercel Blob
-          validateContentType(contentType);
+          // contentType is guaranteed to be defined here because we either got it from
+          // the data URL regex (which throws if no match) or from HTTP response headers
+          const validatedContentType = contentType;
+          validateContentType(validatedContentType);
 
-          const ext = contentType.includes("png") ? "png" : "jpg";
+          const ext = validatedContentType.includes("png") ? "png" : "jpg";
           const filename = `generated-${Date.now()}.${ext}`;
 
           const blob = await put(filename, imageBuffer, {
             access: "public",
-            contentType,
+            contentType: validatedContentType,
           });
 
           finalImageUrl = blob.url;
@@ -312,7 +333,7 @@ export function registerAiImageRoutes(app: Application): void {
         model: result.usedModel,
         provider: result.usedProvider,
         imageCount: 1,
-        imageSize: imageSize || "1K",
+        imageSize: normalizeImageSize(imageSize),
         latencyMs: timer(),
         status: "success",
         metadata: {
@@ -353,7 +374,7 @@ export function registerAiImageRoutes(app: Application): void {
         operation: "image",
         model: selectedModelForLogs,
         latencyMs: elapsedTime,
-        status: "failed",
+        status: "error",
         error: err.message,
       }).catch((logError) => {
         logger.error({ err: logError }, "[Image API] Falha ao logar erro no DB");
@@ -467,7 +488,7 @@ export function registerAiImageRoutes(app: Application): void {
         operation: "edit_image",
         model: "gemini-3-pro-image-preview",
         latencyMs: timer(),
-        status: "failed",
+        status: "error",
         error: err.message,
       }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       const statusCode = isQuotaOrRateLimitError(err) ? 429 : 500;
@@ -562,7 +583,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         operation: "text",
         model: DEFAULT_TEXT_MODEL,
         latencyMs: timer(),
-        status: "failed",
+        status: "error",
         error: err.message,
       }).catch(logErr => logger.warn({ err: logErr }, "Non-critical usage logging failed"));
       return res
@@ -607,18 +628,29 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         return res.status(400).json({ error: "prompt and brandProfile are required" });
       }
 
+      // Convert image references to data URLs for queue storage
+      const serializedProductImages = productImages?.map(
+        img => `data:${img.mimeType};base64,${img.base64}`
+      );
+      const serializedStyleRef = styleReferenceImage
+        ? `data:${styleReferenceImage.mimeType};base64,${styleReferenceImage.base64}`
+        : undefined;
+      const serializedPersonRef = personReferenceImage
+        ? `data:${personReferenceImage.mimeType};base64,${personReferenceImage.base64}`
+        : undefined;
+
       // Queue the job
       const result = await enqueueImageGeneration({
         userId,
-        organizationId,
+        organizationId: organizationId ?? undefined,
         prompt,
         brandProfile,
         aspectRatio,
         imageSize,
         model,
-        productImages,
-        styleReferenceImage,
-        personReferenceImage,
+        productImages: serializedProductImages,
+        styleReferenceImage: serializedStyleRef,
+        personReferenceImage: serializedPersonRef,
       }, { priority });
 
       logger.info(
@@ -669,13 +701,31 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
         return res.status(400).json({ error: "Maximum 10 images per batch" });
       }
 
-      // Add user context to each job
-      const jobsWithContext = jobs.map(job => ({
-        ...job,
-        userId,
-        organizationId,
-        model: normalizeRequestedImageModel(job.model),
-      }));
+      // Add user context and serialize image references for each job
+      const jobsWithContext = jobs.map(job => {
+        const serializedProductImages = job.productImages?.map(
+          img => `data:${img.mimeType};base64,${img.base64}`
+        );
+        const serializedStyleRef = job.styleReferenceImage
+          ? `data:${job.styleReferenceImage.mimeType};base64,${job.styleReferenceImage.base64}`
+          : undefined;
+        const serializedPersonRef = job.personReferenceImage
+          ? `data:${job.personReferenceImage.mimeType};base64,${job.personReferenceImage.base64}`
+          : undefined;
+
+        return {
+          userId,
+          organizationId: organizationId ?? undefined,
+          prompt: job.prompt,
+          brandProfile: job.brandProfile,
+          aspectRatio: job.aspectRatio,
+          imageSize: job.imageSize,
+          model: normalizeRequestedImageModel(job.model),
+          productImages: serializedProductImages,
+          styleReferenceImage: serializedStyleRef,
+          personReferenceImage: serializedPersonRef,
+        };
+      });
 
       const results = await enqueueImageGenerationBatch(jobsWithContext, { priority });
 
@@ -718,7 +768,11 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     }
 
     try {
-      const { jobId } = req.params;
+      const jobId = req.params.jobId;
+      if (typeof jobId !== "string") {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
       const status = await getImageGenerationJobStatus(jobId);
 
       if (!status) {
@@ -744,7 +798,7 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
   app.get("/api/ai/image/async/jobs", async (req: Request, res: Response) => {
     const authCtx = getRequestAuthContext(req);
     const userId = authCtx?.userId;
-    const organizationId = authCtx?.orgId || null;
+    const organizationId = authCtx?.orgId ?? undefined;
 
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -776,7 +830,10 @@ Responda APENAS com JSON: {"primaryColor": "#...", "secondaryColor": "#..." ou n
     }
 
     try {
-      const { jobId } = req.params;
+      const jobId = req.params.jobId;
+      if (typeof jobId !== "string") {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
 
       // Verify ownership first
       const status = await getImageGenerationJobStatus(jobId);

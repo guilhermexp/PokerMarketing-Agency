@@ -1,8 +1,11 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { query } from '@anthropic-ai/claude-agent-sdk';
+import type { Response } from 'express';
+import type { Logger } from 'pino';
+import {
+  query,
+  type PermissionResult,
+} from '@anthropic-ai/claude-agent-sdk';
 import { createStudioMcpServer } from './mcp-bridge.js';
 import { buildClaudeRuntimeEnv, getKimiProfilePath } from './kimi-profile.js';
 import { translateSdkMessage } from './message-translator.js';
@@ -10,6 +13,132 @@ import {
   appendThreadMessage,
   updateThreadSessionId,
 } from './session-store.js';
+import type { SqlClient } from '../../db.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Type Definitions
+// ─────────────────────────────────────────────────────────────────────────────
+
+type SsePayload = Record<string, unknown>;
+
+type StudioAgentThreadRecord = {
+  id: string;
+  claude_session_id: string | null;
+  [key: string]: unknown;
+};
+
+type AttachmentItem = {
+  type?: string;
+  name?: string;
+  url?: string;
+};
+
+type MentionItem = {
+  path?: string;
+};
+
+type AskUserDecision = {
+  approved: boolean;
+  message?: string;
+  updatedInput?: AskUserUpdatedInput;
+};
+
+type AskUserOption = {
+  id?: string;
+  label?: string;
+  title?: string;
+  description?: string;
+};
+
+type AskUserQuestion = {
+  id?: string;
+  header?: string;
+  question?: string;
+  prompt?: string;
+  options?: AskUserOption[];
+  multiSelect?: boolean;
+};
+
+type AskUserRawInput = {
+  header?: string;
+  question?: string;
+  prompt?: string;
+  options?: AskUserOption[];
+  questions?: AskUserQuestion[];
+};
+
+type NormalizedOption = {
+  id: string;
+  label: string;
+  description: string;
+};
+
+type NormalizedQuestion = {
+  id: string;
+  header: string;
+  question: string;
+  options: NormalizedOption[];
+  multiSelect: boolean;
+};
+
+type AskUserUpdatedInput = {
+  answers?: unknown;
+  [key: string]: unknown;
+};
+
+type InteractionResolveResponse = {
+  approved?: boolean;
+  message?: string;
+  updatedInput?: AskUserUpdatedInput;
+};
+
+type PendingInteraction = {
+  interactionId: string;
+  header: string;
+  question: string;
+  options: NormalizedOption[];
+  questions: NormalizedQuestion[];
+  timeoutId?: ReturnType<typeof setTimeout>;
+  resolve?: (value: AskUserDecision) => void;
+};
+
+type CanUseToolOptions = {
+  toolUseID?: string;
+  signal?: AbortSignal;
+  suggestions?: unknown[];
+  blockedPath?: string;
+  decisionReason?: string;
+  agentID?: string;
+};
+
+type CanUseToolFn = (
+  toolName: string,
+  input: Record<string, unknown>,
+  options?: CanUseToolOptions
+) => Promise<PermissionResult>;
+
+type BuildCanUseToolInput = {
+  threadId: string;
+  emitEvent: (payload: SsePayload) => void;
+};
+
+type RunStudioAgentStreamInput = {
+  res: Response;
+  sql: SqlClient;
+  logger: Logger;
+  userId: string;
+  organizationId: string | null;
+  thread: StudioAgentThreadRecord;
+  message: string;
+  attachments?: AttachmentItem[];
+  mentions?: MentionItem[];
+  signal?: AbortSignal;
+  abortController?: AbortController;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
 
 const BLOCKED_NATIVE_TOOLS = [
   'Read',
@@ -32,17 +161,17 @@ const LOOP_GUARD_WINDOW_SECONDS = 45;
 const LOOP_GUARD_MAX_REPEATS = 8;
 const ASK_USER_TIMEOUT_MS = 60_000;
 
-const pendingInteractionsByThread = new Map();
+const pendingInteractionsByThread = new Map<string, Map<string, PendingInteraction>>();
 
-function toSse(res, payload) {
+function toSse(res: Response, payload: SsePayload): void {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
-function getSessionDir(threadId) {
+function getSessionDir(threadId: string): string {
   return path.join('/tmp', 'claude-sessions', 'studio-agent', String(threadId));
 }
 
-function renderRuntimeInstructions() {
+function renderRuntimeInstructions(): string {
   return [
     'Você é o assistente criativo do Studio (Image/Video).',
     'Use somente tools MCP prefixadas com mcp__studio__* para operações do Studio.',
@@ -67,24 +196,20 @@ function renderRuntimeInstructions() {
   ].join('\n');
 }
 
-function getOrCreateThreadInteractionMap(threadId) {
-  if (!pendingInteractionsByThread.has(threadId)) {
-    pendingInteractionsByThread.set(threadId, new Map());
+function getOrCreateThreadInteractionMap(threadId: string): Map<string, PendingInteraction> {
+  let map = pendingInteractionsByThread.get(threadId);
+  if (!map) {
+    map = new Map<string, PendingInteraction>();
+    pendingInteractionsByThread.set(threadId, map);
   }
-  return pendingInteractionsByThread.get(threadId);
+  return map;
 }
 
-export function getPendingInteraction(threadId, interactionId) {
-  return pendingInteractionsByThread.get(threadId)?.get(interactionId) || null;
+export function getPendingInteraction(threadId: string, interactionId: string): PendingInteraction | null {
+  return pendingInteractionsByThread.get(threadId)?.get(interactionId) ?? null;
 }
 
-function savePendingInteraction(threadId, event) {
-  if (!event?.interactionId) return;
-  const map = getOrCreateThreadInteractionMap(threadId);
-  map.set(event.interactionId, event);
-}
-
-function clearPendingInteraction(threadId, interactionId) {
+function clearPendingInteraction(threadId: string, interactionId: string | undefined): void {
   if (!interactionId) return;
   const map = pendingInteractionsByThread.get(threadId);
   const pending = map?.get(interactionId);
@@ -94,36 +219,40 @@ function clearPendingInteraction(threadId, interactionId) {
   map?.delete(interactionId);
 }
 
-export function resolvePendingInteraction(threadId, interactionId, response = {}) {
+export function resolvePendingInteraction(
+  threadId: string,
+  interactionId: string,
+  response: InteractionResolveResponse = {}
+): boolean {
   const map = pendingInteractionsByThread.get(threadId);
   const pending = map?.get(interactionId);
   if (!pending?.resolve) return false;
 
   clearPendingInteraction(threadId, interactionId);
   pending.resolve({
-    approved: Boolean(response?.approved),
-    message: typeof response?.message === 'string' ? response.message : undefined,
-    updatedInput: response?.updatedInput,
+    approved: Boolean(response.approved),
+    message: typeof response.message === 'string' ? response.message : undefined,
+    updatedInput: response.updatedInput,
   });
   return true;
 }
 
-function normalizeAskUserQuestions(input = {}) {
+function normalizeAskUserQuestions(input: AskUserRawInput = {}): NormalizedQuestion[] {
   if (Array.isArray(input.questions) && input.questions.length > 0) {
     return input.questions.map((question, idx) => {
       const fallbackLabel = `Opção ${idx + 1}`;
-      const options = Array.isArray(question?.options)
+      const options: NormalizedOption[] = Array.isArray(question?.options)
         ? question.options.map((option, optIdx) => ({
-            id: String(option?.id || `opt_${optIdx + 1}`),
-            label: String(option?.label || option?.title || `Opção ${optIdx + 1}`),
+            id: String(option?.id ?? `opt_${optIdx + 1}`),
+            label: String(option?.label ?? option?.title ?? `Opção ${optIdx + 1}`),
             description: option?.description ? String(option.description) : '',
           }))
         : [];
 
       return {
-        id: String(question?.id || `q_${idx + 1}`),
-        header: String(question?.header || 'Pergunta'),
-        question: String(question?.question || question?.prompt || 'Preciso da sua confirmação.'),
+        id: String(question?.id ?? `q_${idx + 1}`),
+        header: String(question?.header ?? 'Pergunta'),
+        question: String(question?.question ?? question?.prompt ?? 'Preciso da sua confirmação.'),
         options:
           options.length > 0
             ? options
@@ -133,42 +262,46 @@ function normalizeAskUserQuestions(input = {}) {
     });
   }
 
-  const options = Array.isArray(input.options)
-    ? input.options.map((option, idx) => ({
-        id: String(option?.id || `opt_${idx + 1}`),
-        label: String(option?.label || option?.title || `Opção ${idx + 1}`),
+  const options: NormalizedOption[] = Array.isArray(input.options)
+    ? input.options.map((option, optIdx) => ({
+        id: String(option?.id ?? `opt_${optIdx + 1}`),
+        label: String(option?.label ?? option?.title ?? `Opção ${optIdx + 1}`),
         description: option?.description ? String(option.description) : '',
       }))
     : [];
 
   return [{
     id: 'q_1',
-    header: String(input.header || 'Pergunta'),
-    question: String(input.question || input.prompt || 'Preciso da sua confirmação.'),
+    header: String(input.header ?? 'Pergunta'),
+    question: String(input.question ?? input.prompt ?? 'Preciso da sua confirmação.'),
     options: options.length > 0 ? options : [{ id: 'opt_1', label: 'Confirmar', description: '' }],
     multiSelect: false,
   }];
 }
 
-function buildCanUseTool({ threadId, emitEvent }) {
-  const recentSignatures = new Map();
+function buildCanUseTool({ threadId, emitEvent }: BuildCanUseToolInput): CanUseToolFn {
+  const recentSignatures = new Map<string, { count: number; lastTs: number }>();
 
-  return async (toolName, input, options = {}) => {
+  return async (
+    toolName: string,
+    input: Record<string, unknown>,
+    options: CanUseToolOptions = {}
+  ): Promise<PermissionResult> => {
     // NOTE: Native tools are already blocked via `disallowedTools` in query options.
     // canUseTool here handles: AskUserQuestion interception + loop guard.
 
     // Handle interactive tools before the loop guard — these must always
     // suspend execution and wait for user input regardless of call count.
     if (toolName === 'AskUserQuestion') {
-      const interactionId = typeof options?.toolUseID === 'string'
+      const interactionId = typeof options.toolUseID === 'string'
         ? options.toolUseID
         : `ask_user_${Date.now()}`;
-      const questions = normalizeAskUserQuestions(input || {});
-      const pendingPayload = {
+      const questions = normalizeAskUserQuestions(input as AskUserRawInput);
+      const pendingPayload: Omit<PendingInteraction, 'timeoutId' | 'resolve'> = {
         interactionId,
-        header: questions[0]?.header || 'Pergunta',
-        question: questions[0]?.question || 'Preciso da sua confirmação.',
-        options: questions[0]?.options || [],
+        header: questions[0]?.header ?? 'Pergunta',
+        question: questions[0]?.question ?? 'Preciso da sua confirmação.',
+        options: questions[0]?.options ?? [],
         questions,
       };
 
@@ -177,7 +310,7 @@ function buildCanUseTool({ threadId, emitEvent }) {
         ...pendingPayload,
       });
 
-      const decision = await new Promise((resolve) => {
+      const decision = await new Promise<AskUserDecision>((resolve) => {
         const timeoutId = setTimeout(() => {
           clearPendingInteraction(threadId, interactionId);
           emitEvent({
@@ -198,18 +331,18 @@ function buildCanUseTool({ threadId, emitEvent }) {
         });
       });
 
-      if (!decision?.approved) {
+      if (!decision.approved) {
         emitEvent({
           type: 'ask_user_result',
           interactionId,
           result: {
             approved: false,
-            message: decision?.message || 'User skipped questions - proceed with defaults',
+            message: decision.message ?? 'User skipped questions - proceed with defaults',
           },
         });
         return {
           behavior: 'deny',
-          message: decision?.message || 'User skipped questions - proceed with defaults',
+          message: decision.message ?? 'User skipped questions - proceed with defaults',
         };
       }
 
@@ -218,21 +351,22 @@ function buildCanUseTool({ threadId, emitEvent }) {
         interactionId,
         result: {
           approved: true,
-          answers: decision?.updatedInput?.answers || null,
+          answers: decision.updatedInput?.answers ?? null,
         },
       });
       return {
         behavior: 'allow',
-        updatedInput: decision?.updatedInput || input,
+        updatedInput: decision.updatedInput ?? input,
       };
     }
 
     // Loop guard for non-interactive tools
     let inputSignature = '';
     try {
-      inputSignature = JSON.stringify(input || {}, Object.keys(input || {}).sort());
+      const inputObj = input ?? {};
+      inputSignature = JSON.stringify(inputObj, Object.keys(inputObj).sort());
     } catch {
-      inputSignature = String(input || '');
+      inputSignature = String(input ?? '');
     }
 
     const signature = `${toolName}:${inputSignature}`;
@@ -259,7 +393,7 @@ function buildCanUseTool({ threadId, emitEvent }) {
   };
 }
 
-function mapMessageRole(messageType) {
+function mapMessageRole(messageType: string | undefined): 'assistant' | 'user' | 'system' {
   if (messageType === 'assistant') return 'assistant';
   if (messageType === 'user') return 'user';
   return 'system';
@@ -277,7 +411,7 @@ export async function runStudioAgentStream({
   mentions = [],
   signal,
   abortController,
-}) {
+}: RunStudioAgentStreamInput): Promise<void> {
   const sessionDir = getSessionDir(thread.id);
   await fs.mkdir(sessionDir, { recursive: true });
 

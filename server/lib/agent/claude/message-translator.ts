@@ -32,9 +32,11 @@ type SdkMessage = {
   usage?: unknown;
 };
 
-type StudioEvent =
+export type StudioEvent =
   | { type: 'text_delta'; content: string; sessionId: string | null }
   | { type: 'tool_started'; tool_call_id?: string; tool_name: string; arguments: Record<string, unknown>; sessionId: string | null }
+  | { type: 'tool_completed'; tool_call_id?: string; tool_name?: string; sessionId: string | null }
+  | { type: 'tool_failed'; tool_call_id?: string; tool_name?: string; error?: string; sessionId: string | null }
   | { type: 'status'; status?: string; tool_call_id?: string; tool_name?: string; elapsed_seconds?: number; sessionId: string | null }
   | { type: 'response_end'; is_error: boolean; subtype?: string; result: unknown; errors: unknown; usage: unknown; sessionId: string | null }
   | { type: 'error'; error: string; sessionId: string | null };

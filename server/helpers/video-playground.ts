@@ -1,15 +1,127 @@
-// @ts-nocheck
-// TODO: Add proper type annotations to this file
 /**
  * Video Playground API Helpers
  * Handles CRUD operations for topics, sessions, and generations
  */
 
+import type { SqlClient } from "../lib/db.js";
+import type { GoogleGenAI } from "@google/genai";
+
+// =============================================================================
+// Database Row Types (snake_case from Postgres)
+// =============================================================================
+
+interface TopicRow {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  title: string | null;
+  cover_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SessionRow {
+  id: string;
+  topic_id: string;
+  user_id: string;
+  organization_id: string | null;
+  model: string;
+  prompt: string;
+  aspect_ratio: string;
+  resolution: string;
+  reference_image_url: string | null;
+  created_at: string;
+}
+
+interface GenerationRow {
+  id: string;
+  session_id: string;
+  user_id: string;
+  status: "pending" | "generating" | "success" | "error";
+  video_url: string | null;
+  duration: number | null;
+  error_message: string | null;
+  created_at: string;
+}
+
+// =============================================================================
+// API Response Types (camelCase for frontend)
+// =============================================================================
+
+export interface Topic {
+  id: string;
+  userId: string;
+  organizationId: string | null;
+  title: string | null;
+  coverUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VideoAsset {
+  url: string;
+  duration: number | null;
+}
+
+export interface Generation {
+  id: string;
+  sessionId: string;
+  userId: string;
+  status: "pending" | "generating" | "success" | "error";
+  asset: VideoAsset | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+export interface Session {
+  id: string;
+  topicId: string;
+  userId: string;
+  organizationId: string | null;
+  model: string;
+  prompt: string;
+  aspectRatio: string;
+  resolution: string;
+  referenceImageUrl: string | null;
+  createdAt: string;
+  generations: Generation[];
+}
+
+// =============================================================================
+// Input Types
+// =============================================================================
+
+export interface TopicUpdates {
+  title?: string | null;
+  coverUrl?: string | null;
+}
+
+export interface CreateSessionData {
+  topicId: string;
+  model: string;
+  prompt: string;
+  aspectRatio?: string;
+  resolution?: string;
+  referenceImageUrl?: string | null;
+}
+
+export interface GenerationUpdates {
+  status?: "pending" | "generating" | "success" | "error";
+  videoUrl?: string | null;
+  duration?: number | null;
+  errorMessage?: string | null;
+}
+
+export interface CreateSessionResult {
+  session: Session;
+  generation: Generation;
+}
+
 // =============================================================================
 // Helpers
 // =============================================================================
 
-function mapTopic(r) {
+function mapTopic(r: TopicRow | null | undefined): Topic | null {
   if (!r) return null;
   return {
     id: r.id,
@@ -22,7 +134,7 @@ function mapTopic(r) {
   };
 }
 
-function mapSession(r) {
+function mapSession(r: SessionRow | null | undefined): Session | null {
   if (!r) return null;
   return {
     id: r.id,
@@ -39,7 +151,7 @@ function mapSession(r) {
   };
 }
 
-function mapGeneration(r) {
+function mapGeneration(r: GenerationRow | null | undefined): Generation | null {
   if (!r) return null;
   return {
     id: r.id,
@@ -56,10 +168,14 @@ function mapGeneration(r) {
 // Topics
 // =============================================================================
 
-export async function getTopics(sql, userId, organizationId) {
+export async function getTopics(
+  sql: SqlClient,
+  userId: string,
+  organizationId: string | null,
+): Promise<Topic[]> {
   const orgId = organizationId || null;
 
-  const rows = orgId
+  const rows = (orgId
     ? await sql`
         SELECT * FROM video_generation_topics
         WHERE organization_id = ${orgId}
@@ -70,40 +186,56 @@ export async function getTopics(sql, userId, organizationId) {
         WHERE user_id = ${userId}
         AND organization_id IS NULL
         ORDER BY updated_at DESC
-      `;
-  return rows.map(mapTopic);
+      `) as TopicRow[];
+  return rows.map(mapTopic).filter((t): t is Topic => t !== null);
 }
 
-export async function createTopic(sql, userId, organizationId, title = null) {
-  const [r] = await sql`
+export async function createTopic(
+  sql: SqlClient,
+  userId: string,
+  organizationId: string | null,
+  title: string | null = null,
+): Promise<Topic | null> {
+  const rows = (await sql`
     INSERT INTO video_generation_topics (user_id, organization_id, title)
     VALUES (${userId}, ${organizationId}, ${title})
     RETURNING *
-  `;
-  return mapTopic(r);
+  `) as TopicRow[];
+  return mapTopic(rows[0]);
 }
 
-export async function updateTopic(sql, topicId, userId, updates, organizationId) {
+export async function updateTopic(
+  sql: SqlClient,
+  topicId: string,
+  userId: string,
+  updates: TopicUpdates,
+  organizationId: string | null,
+): Promise<Topic | null> {
   const { title, coverUrl } = updates;
   const orgId = organizationId || null;
 
-  const [topic] = orgId
+  const rows = (orgId
     ? await sql`
         UPDATE video_generation_topics
-        SET title = COALESCE(${title}, title), cover_url = COALESCE(${coverUrl}, cover_url), updated_at = NOW()
+        SET title = COALESCE(${title ?? null}, title), cover_url = COALESCE(${coverUrl ?? null}, cover_url), updated_at = NOW()
         WHERE id = ${topicId} AND organization_id = ${orgId}
         RETURNING *
       `
     : await sql`
         UPDATE video_generation_topics
-        SET title = COALESCE(${title}, title), cover_url = COALESCE(${coverUrl}, cover_url), updated_at = NOW()
+        SET title = COALESCE(${title ?? null}, title), cover_url = COALESCE(${coverUrl ?? null}, cover_url), updated_at = NOW()
         WHERE id = ${topicId} AND user_id = ${userId}
         RETURNING *
-      `;
-  return mapTopic(topic);
+      `) as TopicRow[];
+  return mapTopic(rows[0]);
 }
 
-export async function deleteTopic(sql, topicId, userId, organizationId) {
+export async function deleteTopic(
+  sql: SqlClient,
+  topicId: string,
+  userId: string,
+  organizationId: string | null,
+): Promise<void> {
   const orgId = organizationId || null;
   // Cascade deletes will handle sessions and generations
   if (orgId) {
@@ -117,11 +249,17 @@ export async function deleteTopic(sql, topicId, userId, organizationId) {
 // Sessions
 // =============================================================================
 
-export async function getSessions(sql, topicId, userId, organizationId, limit = 100) {
+export async function getSessions(
+  sql: SqlClient,
+  topicId: string,
+  userId: string,
+  organizationId: string | null,
+  limit: number = 100,
+): Promise<Session[]> {
   const orgId = organizationId || null;
 
   // Get sessions
-  const sessionRows = orgId
+  const sessionRows = (orgId
     ? await sql`
         SELECT * FROM video_generation_sessions
         WHERE topic_id = ${topicId} AND organization_id = ${orgId}
@@ -133,76 +271,112 @@ export async function getSessions(sql, topicId, userId, organizationId, limit = 
         WHERE topic_id = ${topicId} AND user_id = ${userId}
         ORDER BY created_at DESC
         LIMIT ${limit}
-      `;
+      `) as SessionRow[];
 
   if (sessionRows.length === 0) return [];
 
   // Get generations for all sessions
   const sessionIds = sessionRows.map((s) => s.id);
-  const generationRows = await sql`
+  const generationRows = (await sql`
     SELECT * FROM video_generations
     WHERE session_id = ANY(${sessionIds})
     ORDER BY created_at ASC
-  `;
+  `) as GenerationRow[];
 
   // Map generations to sessions
-  const generationsBySession = {};
+  const generationsBySession: Record<string, Generation[]> = {};
   for (const gen of generationRows) {
-    if (!generationsBySession[gen.session_id]) {
-      generationsBySession[gen.session_id] = [];
+    const sessionId = gen.session_id;
+    if (!generationsBySession[sessionId]) {
+      generationsBySession[sessionId] = [];
     }
-    generationsBySession[gen.session_id].push(mapGeneration(gen));
+    const mapped = mapGeneration(gen);
+    if (mapped) {
+      generationsBySession[sessionId].push(mapped);
+    }
   }
 
-  return sessionRows.map((session) => ({
-    ...mapSession(session),
-    generations: generationsBySession[session.id] || [],
-  }));
+  return sessionRows
+    .map((session) => {
+      const mapped = mapSession(session);
+      if (!mapped) return null;
+      return {
+        ...mapped,
+        generations: generationsBySession[session.id] || [],
+      };
+    })
+    .filter((s): s is Session => s !== null);
 }
 
-export async function createSession(sql, data, userId, organizationId) {
+export async function createSession(
+  sql: SqlClient,
+  data: CreateSessionData,
+  userId: string,
+  organizationId: string | null,
+): Promise<CreateSessionResult> {
   const { topicId, model, prompt, aspectRatio, resolution, referenceImageUrl } = data;
 
   // Ensure aspectRatio is a plain string
-  const aspectRatioStr = String(aspectRatio || '9:16');
-  const resolutionStr = String(resolution || '720p');
+  const aspectRatioStr = String(aspectRatio || "9:16");
+  const resolutionStr = String(resolution || "720p");
 
   // Structured logging is handled by the route layer
 
-  const [session] = await sql`
+  const sessionRows = (await sql`
     INSERT INTO video_generation_sessions (topic_id, user_id, organization_id, model, prompt, aspect_ratio, resolution, reference_image_url)
     VALUES (${topicId}, ${userId}, ${organizationId}, ${model}, ${prompt}, ${aspectRatioStr}, ${resolutionStr}, ${referenceImageUrl || null})
     RETURNING *
-  `;
+  `) as SessionRow[];
+  const session = sessionRows[0];
+
+  if (!session) {
+    throw new Error("Failed to create session");
+  }
 
   // Create a pending generation record
-  const [generation] = await sql`
+  const generationRows = (await sql`
     INSERT INTO video_generations (session_id, user_id, status)
     VALUES (${session.id}, ${userId}, 'pending')
     RETURNING *
-  `;
+  `) as GenerationRow[];
+  const generation = generationRows[0];
 
   // Update topic's updated_at
   await sql`UPDATE video_generation_topics SET updated_at = NOW() WHERE id = ${topicId}`;
 
+  const sessionRow = session as SessionRow | undefined;
+  const generationRow = generation as GenerationRow | undefined;
+  const mappedSession = mapSession(sessionRow);
+  const mappedGeneration = mapGeneration(generationRow);
+
+  if (!mappedSession || !mappedGeneration) {
+    throw new Error("Failed to create session or generation");
+  }
+
   return {
-    session: { ...mapSession(session), generations: [mapGeneration(generation)] },
-    generation: mapGeneration(generation),
+    session: { ...mappedSession, generations: [mappedGeneration] },
+    generation: mappedGeneration,
   };
 }
 
-export async function updateGeneration(sql, generationId, updates, userId, organizationId) {
+export async function updateGeneration(
+  sql: SqlClient,
+  generationId: string,
+  updates: GenerationUpdates,
+  userId: string,
+  organizationId: string | null,
+): Promise<Generation | null> {
   const { status, videoUrl, duration, errorMessage } = updates;
   const orgId = organizationId || null;
 
-  const [gen] = orgId
+  const rows = (orgId
     ? await sql`
       UPDATE video_generations g
       SET
-        status = COALESCE(${status}, g.status),
-        video_url = COALESCE(${videoUrl}, g.video_url),
-        duration = COALESCE(${duration}, g.duration),
-        error_message = COALESCE(${errorMessage}, g.error_message)
+        status = COALESCE(${status ?? null}, g.status),
+        video_url = COALESCE(${videoUrl ?? null}, g.video_url),
+        duration = COALESCE(${duration ?? null}, g.duration),
+        error_message = COALESCE(${errorMessage ?? null}, g.error_message)
       FROM video_generation_sessions s
       WHERE g.id = ${generationId}
       AND g.session_id = s.id
@@ -212,17 +386,22 @@ export async function updateGeneration(sql, generationId, updates, userId, organ
     : await sql`
       UPDATE video_generations
       SET
-        status = COALESCE(${status}, status),
-        video_url = COALESCE(${videoUrl}, video_url),
-        duration = COALESCE(${duration}, duration),
-        error_message = COALESCE(${errorMessage}, error_message)
+        status = COALESCE(${status ?? null}, status),
+        video_url = COALESCE(${videoUrl ?? null}, video_url),
+        duration = COALESCE(${duration ?? null}, duration),
+        error_message = COALESCE(${errorMessage ?? null}, error_message)
       WHERE id = ${generationId} AND user_id = ${userId}
       RETURNING *
-    `;
-  return mapGeneration(gen);
+    `) as GenerationRow[];
+  return mapGeneration(rows[0]);
 }
 
-export async function deleteSession(sql, sessionId, userId, organizationId) {
+export async function deleteSession(
+  sql: SqlClient,
+  sessionId: string,
+  userId: string,
+  organizationId: string | null,
+): Promise<void> {
   const orgId = organizationId || null;
   // Cascade deletes will handle generations
   if (orgId) {
@@ -232,7 +411,12 @@ export async function deleteSession(sql, sessionId, userId, organizationId) {
   }
 }
 
-export async function deleteGeneration(sql, generationId, userId, organizationId) {
+export async function deleteGeneration(
+  sql: SqlClient,
+  generationId: string,
+  userId: string,
+  organizationId: string | null,
+): Promise<void> {
   const orgId = organizationId || null;
   if (orgId) {
     await sql`
@@ -251,7 +435,10 @@ export async function deleteGeneration(sql, generationId, userId, organizationId
 // Utility
 // =============================================================================
 
-export async function generateTopicTitle(prompts, genai) {
+export async function generateTopicTitle(
+  prompts: string[],
+  genai: GoogleGenAI,
+): Promise<string> {
   if (!prompts || prompts.length === 0) {
     return "Novo projeto de vídeo";
   }
@@ -276,14 +463,15 @@ Prompts:
       ],
     });
 
-    const text = result.response?.text?.() || result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = result.text;
     if (text) {
       return text.trim().slice(0, 50);
     }
-  } catch (error) {
+  } catch {
     // Title generation is best-effort; fallback below handles failure
   }
 
   // Fallback
-  return prompts[0].split(" ").slice(0, 4).join(" ");
+  const firstPrompt = prompts[0];
+  return firstPrompt ? firstPrompt.split(" ").slice(0, 4).join(" ") : "Novo projeto de vídeo";
 }
