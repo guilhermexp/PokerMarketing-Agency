@@ -1,37 +1,30 @@
 import { clientLogger } from "@/lib/client-logger";
 /**
- * AssistantPanelNew - Versão com Vercel AI SDK
+ * AssistantPanelNew - Versão com Vercel AI SDK (Orchestrator)
  *
- * Mantém a MESMA UI do painel lateral original,
- * mas usando useChat hook do Vercel AI SDK internamente
+ * Delega renderização para sub-componentes:
+ * ChatMessageList, ChatInputArea, ToolResultViewer.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { useChat } from '@ai-sdk/react';
 import {
   isFileUIPart,
-  isTextUIPart,
   isToolUIPart,
   lastAssistantMessageIsCompleteWithApprovalResponses,
   lastAssistantMessageIsCompleteWithToolCalls,
   type CreateUIMessage,
-  type ToolUIPart,
   type UIMessage,
 } from 'ai';
 import type { ChatReferenceImage, BrandProfile, GalleryImage, PendingToolEdit } from '../../types';
 import { useChatImageSync } from '../../hooks/useChatImageSync';
 import { Icon } from '../common/Icon';
-import { Loader } from '../common/Loader';
 import { DataStreamProvider } from './DataStreamProvider';
 import { DataStreamHandler } from './DataStreamHandler';
 import type { DataUIPart } from './DataStreamProvider';
-import { MessageResponse } from './MessageResponse';
-import { MessageActionsEnhanced } from './MessageActionsEnhanced';
-import { ToolWithApproval } from './ToolWithApproval';
-import type { ToolDisplayMetadata } from './ToolWithApproval';
-import { LoadingIndicatorEnhanced } from './LoadingIndicatorEnhanced';
-import { uploadDataUrlToBlob } from '../../services/blobService';
+import { ChatMessageList } from './ChatMessageList';
+import { ChatInputArea } from './ChatInputArea';
 
 interface AssistantPanelNewProps {
   isOpen: boolean;
@@ -41,7 +34,6 @@ interface AssistantPanelNewProps {
   onUpdateReference: (ref: ChatReferenceImage) => void;
   galleryImages: GalleryImage[];
   brandProfile?: BrandProfile;
-  // Tool edit approval
   pendingToolEdit?: PendingToolEdit | null;
   onRequestImageEdit?: (request: {
     toolCallId: string;
@@ -60,603 +52,198 @@ interface AssistantPanelNewProps {
   }) => void;
 }
 
-// Helper: converter File para base64
-const fileToDataUrl = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-  });
-
-// Helper: inferir mediaType da URL da imagem
 const getImageMediaType = (url: string): 'image/jpeg' | 'image/png' | 'image/webp' | 'image/heic' | 'image/heif' => {
-  const lowerUrl = url.toLowerCase();
-  if (lowerUrl.startsWith('data:image/')) {
-    if (lowerUrl.includes('image/jpeg')) return 'image/jpeg';
-    if (lowerUrl.includes('image/webp')) return 'image/webp';
-    if (lowerUrl.includes('image/heic')) return 'image/heic';
-    if (lowerUrl.includes('image/heif')) return 'image/heif';
+  const l = url.toLowerCase();
+  if (l.startsWith('data:image/')) {
+    if (l.includes('image/jpeg')) return 'image/jpeg';
+    if (l.includes('image/webp')) return 'image/webp';
+    if (l.includes('image/heic')) return 'image/heic';
+    if (l.includes('image/heif')) return 'image/heif';
     return 'image/png';
   }
-  if (lowerUrl.includes('.jpg') || lowerUrl.includes('.jpeg')) return 'image/jpeg';
-  if (lowerUrl.includes('.webp')) return 'image/webp';
-  if (lowerUrl.includes('.heic')) return 'image/heic';
-  if (lowerUrl.includes('.heif')) return 'image/heif';
-  return 'image/png'; // default
+  if (l.includes('.jpg') || l.includes('.jpeg')) return 'image/jpeg';
+  if (l.includes('.webp')) return 'image/webp';
+  if (l.includes('.heic')) return 'image/heic';
+  if (l.includes('.heif')) return 'image/heif';
+  return 'image/png';
 };
 
-function isToolDisplayMetadata(value: unknown): value is ToolDisplayMetadata {
-  if (!value || typeof value !== 'object') return false;
-  const metadata = value as Record<string, unknown>;
-
-  return (
-    (metadata.title === undefined || typeof metadata.title === 'string') &&
-    (metadata.description === undefined || typeof metadata.description === 'string') &&
-    (metadata.estimatedTime === undefined || typeof metadata.estimatedTime === 'string') &&
-    (metadata.cost === undefined || typeof metadata.cost === 'string') &&
-    (metadata.icon === undefined || typeof metadata.icon === 'string') &&
-    (
-      metadata.willDo === undefined ||
-      (Array.isArray(metadata.willDo) && metadata.willDo.every((item) => typeof item === 'string'))
-    )
-  );
-}
-
-// ChatBubble component - Apenas renderiza mensagens (approvals são mostrados acima do input)
-const ChatBubble: React.FC<{ message: UIMessage }> = ({ message }) => {
-  const isAssistant = message.role === 'assistant';
-
-  const textParts = message.parts
-    .filter(isTextUIPart)
-    .map((part) => part.text)
-    .join(' ');
-
-  // Extrair imagens/arquivos
-  const fileParts = message.parts.filter(isFileUIPart);
-
-  return (
-    <div className={`flex flex-col ${isAssistant ? 'items-start' : 'items-end'} space-y-2 animate-fade-in-up`}>
-      {/* Renderizar imagens (se houver) */}
-      {fileParts.length > 0 && (
-        <div className={`max-w-[90%] ${isAssistant ? '' : 'flex justify-end'}`}>
-          <div className="space-y-2">
-            {fileParts.map((file, idx) => (
-              <div
-                key={idx}
-                className="relative rounded-xl overflow-hidden border border-border bg-black/20 animate-fade-in-up"
-              >
-                <img
-                  src={file.url}
-                  alt={file.filename || 'Arquivo'}
-                  className="max-w-full max-h-[300px] object-contain"
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                  <p className="text-[10px] text-white/70 truncate">{file.filename || 'Arquivo'}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Renderizar texto (se houver) */}
-      {textParts && (
-        <div className="group max-w-[90%]">
-          {/* Conteúdo da mensagem */}
-          <div
-            className={`${
-              isAssistant
-                ? 'px-1 text-white/90'
-                : 'bg-[#0a0a0a]/60 backdrop-blur-xl border border-border rounded-2xl px-5 py-3.5 text-white/95'
-            }`}
-          >
-            <MessageResponse className="text-[13px] leading-relaxed prose prose-invert">
-              {textParts}
-            </MessageResponse>
-          </div>
-
-          {/* Ações (aparecem no hover, embaixo do texto) */}
-          {isAssistant && (
-            <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <MessageActionsEnhanced
-                messageId={message.id}
-                content={textParts}
-              />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+const MAX_MESSAGES = 12;
 
 export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
   const {
-    isOpen,
-    onClose,
-    referenceImage,
-    onClearReference,
-    onUpdateReference,
-    galleryImages,
-    brandProfile,
-    pendingToolEdit,
-    onShowToolEditPreview
+    isOpen, onClose, referenceImage, onClearReference, onUpdateReference,
+    galleryImages, brandProfile, pendingToolEdit, onShowToolEditPreview
   } = props;
+
   const [input, setInput] = useState('');
   const [dataStream, setDataStream] = useState<DataUIPart[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [chatId] = useState(() => crypto.randomUUID());
-  const [isDragging, setIsDragging] = useState(false);
-  const [isSending, setIsSending] = useState(false); // Estado local para feedback imediato
-  const [includeBrandLogo, setIncludeBrandLogo] = useState(true); // Toggle para incluir logo nas imagens
+  const [isSending, setIsSending] = useState(false);
+  const [includeBrandLogo, setIncludeBrandLogo] = useState(true);
   const handledEditResultsRef = useRef<Set<string>>(new Set());
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastTrimmedLengthRef = useRef(0);
 
-  // Preparar brandProfile efetivo baseado no toggle de logo
-  const effectiveBrandProfile = includeBrandLogo
-    ? brandProfile
-    : brandProfile ? { ...brandProfile, logo: null } : null;
+  // Memoized: brandProfile efetivo
+  const effectiveBrandProfile = useMemo(
+    () => includeBrandLogo ? brandProfile : brandProfile ? { ...brandProfile, logo: null } : null,
+    [includeBrandLogo, brandProfile]
+  );
 
-  // useChat hook do Vercel AI SDK
-  const chatOptions = {
+  const chatOptions = useMemo(() => ({
     id: chatId,
     body: {
       brandProfile: effectiveBrandProfile,
       chatReferenceImage: referenceImage,
       selectedChatModel: brandProfile?.creativeModel || 'gemini-3-flash-preview',
     },
-    sendAutomaticallyWhen: ({ messages }: { messages: UIMessage[] }) =>
-      lastAssistantMessageIsCompleteWithToolCalls({ messages }) ||
-      lastAssistantMessageIsCompleteWithApprovalResponses({ messages }),
+    sendAutomaticallyWhen: ({ messages: msgs }: { messages: UIMessage[] }) =>
+      lastAssistantMessageIsCompleteWithToolCalls({ messages: msgs }) ||
+      lastAssistantMessageIsCompleteWithApprovalResponses({ messages: msgs }),
     onResponse: (response: Response) => {
       clientLogger.info('[AssistantPanel] Response received', response.status);
     },
     onError: (error: Error) => {
       clientLogger.error('[AssistantPanel] Error:', error);
-
-      // Detectar erro de limite de tokens
-      const isTokenLimitError =
-        error.message?.includes('tokens limit exceeded') ||
-        error.message?.includes('context_length_exceeded');
-
-      if (isTokenLimitError) {
-        setErrorMessage('Conversa muito longa. Por favor, inicie uma nova conversa clicando em "Limpar chat".');
-      } else {
-        setErrorMessage(error.message || 'Erro ao processar mensagem. Tente novamente.');
-      }
-
-      // Auto-limpar erro após 8 segundos (mais tempo para erros de token)
-      setTimeout(() => setErrorMessage(null), isTokenLimitError ? 10000 : 5000);
+      const isTokenLimit = error.message?.includes('tokens limit exceeded') || error.message?.includes('context_length_exceeded');
+      setErrorMessage(isTokenLimit
+        ? 'Conversa muito longa. Por favor, inicie uma nova conversa clicando em "Limpar chat".'
+        : error.message || 'Erro ao processar mensagem. Tente novamente.');
+      setTimeout(() => setErrorMessage(null), isTokenLimit ? 10000 : 5000);
     },
     onFinish: ({ message }: { message: UIMessage }) => {
-      clientLogger.info('[AssistantPanel] Message finished:', {
-        role: message.role,
-        partsCount: message.parts?.length || 0,
-      });
+      clientLogger.info('[AssistantPanel] Message finished:', { role: message.role, partsCount: message.parts?.length || 0 });
     },
-  } as unknown as Parameters<typeof useChat>[0];
+  }), [chatId, effectiveBrandProfile, referenceImage, brandProfile?.creativeModel]) as unknown as Parameters<typeof useChat>[0];
 
   const { messages, sendMessage, status, addToolApprovalResponse, setMessages } = useChat<UIMessage>(chatOptions);
-
   const isLoading = status === 'streaming' || status === 'submitted';
 
-  // Helper para mapear estado da tool
-  const mapToolState = (state: ToolUIPart['state']): 'approval-requested' | 'approved' | 'denied' | 'executing' | 'complete' => {
-    switch (state) {
-      case 'approval-requested':
-        return 'approval-requested';
-      case 'output-denied':
-        return 'denied';
-      case 'output-available':
-      case 'approval-responded':
-        return 'complete';
-      default:
-        return 'executing';
-    }
-  };
-
-  // Extrair todos os pending approvals de todas as mensagens
-  const pendingApprovals = messages.flatMap((msg) =>
-    msg.parts
-      .filter(isToolUIPart)
-      .filter((part) => part.state === 'approval-requested' && part.approval?.id)
+  // Memoized derived data
+  const pendingApprovals = useMemo(
+    () => messages.flatMap((msg) =>
+      msg.parts.filter(isToolUIPart).filter((part) => part.state === 'approval-requested' && part.approval?.id)
+    ),
+    [messages]
   );
 
-  // Mostrar loading quando:
-  // 1. Usuário acabou de enviar mensagem (isSending)
-  // 2. Está carregando E não há approvals pendentes (processando após aprovação)
-  const shouldShowLoading = isSending || (isLoading && pendingApprovals.length === 0);
+  const shouldShowLoading = useMemo(
+    () => isSending || (isLoading && pendingApprovals.length === 0),
+    [isSending, isLoading, pendingApprovals.length]
+  );
 
+  // Toast auto-clear
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), 2500);
     return () => clearTimeout(timer);
   }, [toast]);
 
-  // ========================================================================
-  // LIMPEZA AUTOMÁTICA DE MENSAGENS ANTIGAS
-  // ========================================================================
-  // Limita o histórico para evitar exceder limite de tokens do OpenRouter
-  const MAX_MESSAGES = 12; // Máximo de mensagens a manter
-  const lastTrimmedLengthRef = useRef(0);
-
+  // Message trimming
   useEffect(() => {
-    // Evitar loop infinito: só trimmar se tiver mais mensagens do que o limite
-    // E se não acabamos de trimmar (length mudou desde o último trim)
-    if (messages.length <= MAX_MESSAGES) {
-      lastTrimmedLengthRef.current = messages.length;
-      return;
-    }
-
-    // Evitar trimmar novamente se já trimmamos e o length é o esperado
-    if (messages.length === lastTrimmedLengthRef.current) {
-      return;
-    }
-
+    if (messages.length <= MAX_MESSAGES) { lastTrimmedLengthRef.current = messages.length; return; }
+    if (messages.length === lastTrimmedLengthRef.current) return;
     clientLogger.debug(`[AssistantPanel] Trimming messages: ${messages.length} -> ${MAX_MESSAGES}`);
-
-    // Manter apenas as últimas MAX_MESSAGES mensagens
-    const trimmedMessages = messages.slice(-MAX_MESSAGES).map((msg, index, arr) => {
-      // Para mensagens mais antigas (primeiras 50%), remover dados pesados de imagens
-      if (index < arr.length / 2) {
-        const cleanedParts = msg.parts.map(part => {
-          // Remover dados base64 de imagens antigas
-          if (isFileUIPart(part) && part.url?.startsWith('data:')) {
-            return {
-              ...part,
-              url: 'data:image/png;base64,removed' // Placeholder mínimo
-            };
-          }
-          return part;
-        });
-        return { ...msg, parts: cleanedParts };
+    const trimmed = messages.slice(-MAX_MESSAGES).map((msg, i, arr) => {
+      if (i < arr.length / 2) {
+        const cleaned = msg.parts.map(p => isFileUIPart(p) && p.url?.startsWith('data:') ? { ...p, url: 'data:image/png;base64,removed' } : p);
+        return { ...msg, parts: cleaned };
       }
       return msg;
     });
-
-    lastTrimmedLengthRef.current = trimmedMessages.length;
-    setMessages(trimmedMessages);
+    lastTrimmedLengthRef.current = trimmed.length;
+    setMessages(trimmed);
   }, [messages, setMessages]);
 
-  // ========================================================================
-  // SINCRONIZAÇÃO AUTOMÁTICA DE IMAGENS
-  // ========================================================================
-  // Hook para atualizar URLs de imagens quando editadas
+  // Image sync
   useChatImageSync({
-    galleryImages,
-    chatReferenceImage: referenceImage,
-    setChatReferenceImage: (ref) => {
-      if (ref) {
-        onUpdateReference(ref);
-      } else {
-        onClearReference();
-      }
-    },
-    messages,
-    setMessages
+    galleryImages, chatReferenceImage: referenceImage,
+    setChatReferenceImage: (ref) => { if (ref) { onUpdateReference(ref); } else { onClearReference(); } },
+    messages, setMessages
   });
 
-  // ========================================================================
-  // TOOL EDIT APPROVAL FLOW
-  // ========================================================================
-  // Monitora pendingToolEdit e notifica o agente quando aprovado/rejeitado
+  // Tool edit approval flow
   useEffect(() => {
-    if (!pendingToolEdit) {
-      // Limpar cache quando pendingToolEdit for null (reset)
-      // Mas mantém por um tempo para evitar processar múltiplas vezes durante transições
-      return;
-    }
-
+    if (!pendingToolEdit) return;
     const { toolCallId, result, imageUrl, error } = pendingToolEdit;
-
-    // Evitar processar o mesmo resultado múltiplas vezes
-    if (handledEditResultsRef.current.has(toolCallId)) {
-      return;
-    }
-
-    // Verificar se a tool call existe nas mensagens antes de aprovar/rejeitar
-    const allToolCalls = messages.flatMap(msg =>
-      msg.parts.filter(isToolUIPart).map(part => ({
-        id: part.toolCallId,
-        toolName: part.type.replace('tool-', ''),
-        state: part.state
-      }))
-    );
-
-    clientLogger.debug('🔍 [AssistantPanel] All tool calls in messages:', allToolCalls);
-    clientLogger.debug('🔍 [AssistantPanel] Looking for toolCallId:', toolCallId);
-
-    const toolCallExists = allToolCalls.some(tc => tc.id === toolCallId);
-
+    if (handledEditResultsRef.current.has(toolCallId)) return;
+    const toolCallExists = messages.some(msg => msg.parts.filter(isToolUIPart).some(p => p.toolCallId === toolCallId));
     if (!toolCallExists) {
-      clientLogger.warn('❌ [AssistantPanel] Tool call not found in messages:', {
-        toolCallId,
-        availableToolCalls: allToolCalls.map(tc => tc.id),
-        totalMessages: messages.length,
-        totalToolCalls: allToolCalls.length,
-      });
-
-      // Se as mensagens estão vazias mas temos uma edição aprovada com imageUrl,
-      // significa que houve um erro de API (ex: token limit) mas a imagem foi salva.
-      // Neste caso, marcar como handled para não ficar em loop.
-      // A imagem já foi salva com sucesso, apenas não conseguimos notificar o AI.
-      if (messages.length === 0 && result === 'approved' && imageUrl) {
-        clientLogger.warn('⚠️ [AssistantPanel] Messages empty after error but edit was saved. Marking as handled.');
-        handledEditResultsRef.current.add(toolCallId);
-        // A imagem já foi salva - apenas não conseguimos notificar o AI devido ao erro
-        // O usuário já vê a imagem atualizada
-      }
+      if (messages.length === 0 && result === 'approved' && imageUrl) handledEditResultsRef.current.add(toolCallId);
       return;
     }
-
-    clientLogger.debug('✅ [AssistantPanel] Tool call found! Proceeding with approval/rejection');
-
+    handledEditResultsRef.current.add(toolCallId);
     if (result === 'approved' && imageUrl) {
-      clientLogger.debug('✅ [AssistantPanel] Auto-approving tool edit:', {
-        toolCallId,
-        imageUrl,
-        imageUrlType: typeof imageUrl,
-        imageUrlLength: imageUrl?.length,
-      });
-
-      // Marcar como processado antes de chamar addToolApprovalResponse
-      handledEditResultsRef.current.add(toolCallId);
-
-      // Notificar o agente que a edição foi aprovada
-      clientLogger.debug('✅ [AssistantPanel] Calling addToolApprovalResponse with:', {
-        id: toolCallId,
-        approved: true,
-        reason: imageUrl
-      });
-
-      addToolApprovalResponse({
-        id: toolCallId,
-        approved: true,
-        reason: imageUrl
-      });
-
-      clientLogger.debug('✅ [AssistantPanel] addToolApprovalResponse completed');
+      addToolApprovalResponse({ id: toolCallId, approved: true, reason: imageUrl });
     } else if (result === 'rejected') {
-      clientLogger.debug('[AssistantPanel] Auto-denying tool edit:', { toolCallId, error });
-
-      // Marcar como processado antes de chamar addToolApprovalResponse
-      handledEditResultsRef.current.add(toolCallId);
-
-      // Notificar o agente que a edição foi rejeitada
-      addToolApprovalResponse({
-        id: toolCallId,
-        approved: false,
-        reason: error || 'Edição rejeitada pelo usuário'
-      });
+      addToolApprovalResponse({ id: toolCallId, approved: false, reason: error || 'Edição rejeitada pelo usuário' });
     }
   }, [pendingToolEdit, addToolApprovalResponse, messages]);
 
-  // ========================================================================
-  // Debug: monitorar tool parts
-  useEffect(() => {
-    messages.forEach((msg, idx) => {
-      const toolParts = msg.parts.filter(isToolUIPart);
-      if (toolParts.length > 0) {
-        clientLogger.debug(`[Chat] Message ${idx} has tool parts:`, toolParts.map((part) => ({
-          toolName: part.type.replace('tool-', ''),
-          state: part.state,
-          toolCallId: part.toolCallId
-        })));
-      }
-    });
-  }, [messages]);
-
+  // Tool edit preview dispatch
   useEffect(() => {
     if (!onShowToolEditPreview) return;
-
     for (const msg of messages) {
-      const toolParts = msg.parts
-        .filter(isToolUIPart)
-        .filter((part) => part.type === 'tool-editImage');
-      for (const part of toolParts) {
+      for (const part of msg.parts.filter(isToolUIPart).filter(p => p.type === 'tool-editImage')) {
         if (part.state !== 'output-available' || !part.toolCallId) continue;
         if (handledEditResultsRef.current.has(part.toolCallId)) continue;
-        const output = part.output as {
-          imageUrl?: string;
-          prompt?: string;
-          referenceImageId?: string;
-          referenceImageUrl?: string;
-        } | undefined;
+        const output = part.output as { imageUrl?: string; prompt?: string; referenceImageId?: string; referenceImageUrl?: string } | undefined;
         if (!output?.imageUrl) continue;
         handledEditResultsRef.current.add(part.toolCallId);
-        onShowToolEditPreview({
-          toolCallId: part.toolCallId,
-          imageUrl: output.imageUrl,
-          prompt: output.prompt,
-          referenceImageId: output.referenceImageId,
-          referenceImageUrl: output.referenceImageUrl
-        });
+        onShowToolEditPreview({ toolCallId: part.toolCallId, imageUrl: output.imageUrl, prompt: output.prompt, referenceImageId: output.referenceImageId, referenceImageUrl: output.referenceImageUrl });
       }
     }
   }, [messages, onShowToolEditPreview]);
 
   // Auto-scroll
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isLoading]);
 
-  // Enviar mensagem
-  const handleSend = async (e: React.FormEvent) => {
+  // ========================================================================
+  // CALLBACKS
+  // ========================================================================
+
+  const handleSend = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() && !referenceImage) return;
     if (status === 'streaming' || status === 'submitted' || isSending) return;
-
-    // Limpar erro anterior
     setErrorMessage(null);
-
-    // Ativar estado de envio IMEDIATAMENTE (feedback visual instantâneo)
     setIsSending(true);
-
-    // Salvar valor antes de limpar
     const messageText = input || (referenceImage ? 'Veja a imagem anexada' : '');
-
-    // Limpar input IMEDIATAMENTE
     setInput('');
-
     try {
-      // Construir mensagem com parts
-      const messageParts: UIMessage['parts'] = [];
-
-      // Adicionar texto (se houver)
-      if (messageText.trim()) {
-        messageParts.push({
-          type: 'text',
-          text: messageText
-        });
-      }
-
-      // Adicionar imagem de referência (se houver)
-      if (referenceImage) {
-        messageParts.push({
-          type: 'file',
-          mediaType: getImageMediaType(referenceImage.src),
-          filename: referenceImage.id,
-          url: referenceImage.src
-        });
-      }
-
-      // Enviar mensagem com parts
-      const message: CreateUIMessage<UIMessage> = {
-        role: 'user',
-        parts: messageParts
-      };
-      await sendMessage(message);
-
-      // Limpar referência de imagem após enviar (agora está no chat)
-      if (referenceImage) {
-        onClearReference();
-      }
+      const parts: UIMessage['parts'] = [];
+      if (messageText.trim()) parts.push({ type: 'text', text: messageText });
+      if (referenceImage) parts.push({ type: 'file', mediaType: getImageMediaType(referenceImage.src), filename: referenceImage.id, url: referenceImage.src });
+      await sendMessage({ role: 'user', parts } as CreateUIMessage<UIMessage>);
+      if (referenceImage) onClearReference();
     } finally {
-      // Desativar estado de envio após enviar
-      // (o isLoading do SDK assume o controle)
       setTimeout(() => setIsSending(false), 500);
     }
-  };
+  }, [input, referenceImage, status, isSending, sendMessage, onClearReference]);
 
-  // Upload de arquivo
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        const dataUrl = await fileToDataUrl(file);
-        const uploadedUrl = await uploadDataUrlToBlob(dataUrl);
+  const handleSendFileMessage = useCallback(async (message: CreateUIMessage<UIMessage>) => {
+    await sendMessage(message);
+  }, [sendMessage]);
 
-        // Limpar input
-        setInput('');
+  const handleError = useCallback((msg: string) => {
+    setErrorMessage(msg);
+    setTimeout(() => setErrorMessage(null), 5000);
+  }, []);
 
-        // Enviar mensagem com a imagem nos parts
-        const message: CreateUIMessage<UIMessage> = {
-          role: 'user',
-          parts: [
-            {
-              type: 'text',
-              text: 'Carreguei esta referência para usarmos.'
-            },
-            {
-              type: 'file',
-              mediaType: file.type || 'image/png',
-              filename: file.name,
-              url: uploadedUrl
-            }
-          ]
-        };
-        await sendMessage(message);
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Falha ao enviar a imagem. Tente novamente.';
-        setErrorMessage(errorMessage);
-        setTimeout(() => setErrorMessage(null), 5000);
-      }
+  const handleApprove = useCallback((id: string) => {
+    addToolApprovalResponse({ id, approved: true });
+  }, [addToolApprovalResponse]);
 
-      // Limpar file input
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
+  const handleDeny = useCallback((id: string) => {
+    addToolApprovalResponse({ id, approved: false, reason: 'Rejeitado pelo usuário' });
+  }, [addToolApprovalResponse]);
 
-  // Drag-and-Drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    const imageFiles = files.filter(f => f.type.startsWith('image/'));
-
-    if (imageFiles.length === 0) {
-      setErrorMessage('Apenas imagens são suportadas');
-      setTimeout(() => setErrorMessage(null), 5000);
-      return;
-    }
-
-    // Upload do primeiro arquivo
-    const file = imageFiles[0];
-    try {
-      const dataUrl = await fileToDataUrl(file);
-      const uploadedUrl = await uploadDataUrlToBlob(dataUrl);
-
-      // Limpar input
-      setInput('');
-
-      // Enviar mensagem com a imagem nos parts
-      const message: CreateUIMessage<UIMessage> = {
-        role: 'user',
-        parts: [
-          {
-            type: 'text',
-            text: `Carreguei esta imagem via drag-and-drop: ${file.name}`
-          },
-          {
-            type: 'file',
-            mediaType: file.type || 'image/png',
-            filename: file.name,
-            url: uploadedUrl
-          }
-        ]
-      };
-      await sendMessage(message);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Falha ao enviar a imagem. Tente novamente.';
-      setErrorMessage(errorMessage);
-      setTimeout(() => setErrorMessage(null), 5000);
-    }
-  };
-
-  // Aprovar tool
-  const handleApprove = (approvalId: string) => {
-    addToolApprovalResponse({
-      id: approvalId,
-      approved: true
-    });
-  };
-
-  // Negar tool
-  const handleDeny = (approvalId: string) => {
-    addToolApprovalResponse({
-      id: approvalId,
-      approved: false,
-      reason: 'Rejeitado pelo usuário'
-    });
-  };
+  const handleInputChange = useCallback((value: string) => setInput(value), []);
+  const handleToggleBrandLogo = useCallback(() => setIncludeBrandLogo(prev => !prev), []);
 
   if (!isOpen) return null;
 
@@ -664,9 +251,8 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
     <ErrorBoundary>
     <DataStreamProvider dataStream={dataStream} setDataStream={setDataStream}>
       <DataStreamHandler />
-
       <aside className="assistant-panel w-full h-full bg-[#0a0a0a]/95 backdrop-blur-xl border-l border-border flex flex-col flex-shrink-0">
-        {/* Header minimalista */}
+        {/* Header */}
         <div className="flex-shrink-0 h-14 flex items-center justify-between px-4">
           <img src="/icon.png" alt="Socialab" className="w-9 h-9 rounded-xl" />
           <div className="flex items-center gap-1">
@@ -676,196 +262,39 @@ export const AssistantPanelNew: React.FC<AssistantPanelNewProps> = (props) => {
             <button className="p-2 text-muted-foreground hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
               <Icon name="plus" className="w-4 h-4" />
             </button>
-            <button
-              onClick={onClose}
-              className="p-2 text-muted-foreground hover:text-white/80 transition-colors rounded-lg hover:bg-white/5"
-            >
+            <button onClick={onClose} className="p-2 text-muted-foreground hover:text-white/80 transition-colors rounded-lg hover:bg-white/5">
               <Icon name="x" className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Chat Flow */}
-        <div className="flex-1 p-4 space-y-4 overflow-y-auto scroll-smooth custom-scrollbar relative">
-          {toast && (
-            <div className="sticky top-0 z-10 flex justify-center">
-              <div className={`px-3 py-2 rounded-md border text-[11px] backdrop-blur-sm ${toast.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
-                {toast.message}
-              </div>
-            </div>
-          )}
-          {messages.map((msg) => (
-            <ChatBubble key={msg.id} message={msg} />
-          ))}
+        <ChatMessageList
+          messages={messages}
+          toast={toast}
+          errorMessage={errorMessage}
+          shouldShowLoading={shouldShowLoading}
+          isSending={isSending}
+          chatEndRef={chatEndRef}
+        />
 
-          {/* Erro */}
-          {errorMessage && (
-            <div className="flex justify-center animate-fade-in">
-              <div className="rounded-lg px-4 py-3 bg-red-500/10 border border-red-500/20 flex items-center gap-2 max-w-sm">
-                <Icon name="alert-circle" className="w-4 h-4 text-red-400 flex-shrink-0" />
-                <p className="text-xs text-red-400">{errorMessage}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Indicador de loading/processamento */}
-          {shouldShowLoading && (
-            <LoadingIndicatorEnhanced
-              stage={isSending ? 'thinking' : 'generating'}
-              showSkeleton={false}
-            />
-          )}
-          <div ref={chatEndRef} />
-        </div>
-
-        {/* Input Area */}
-        <div className="flex-shrink-0 p-4">
-          {/* Pending Tool Approvals - Fixo acima do input */}
-          {pendingApprovals.length > 0 && (
-            <div className="mb-3 space-y-2 animate-fade-in-up">
-              {pendingApprovals.map((toolPart) => {
-                const toolArgs = (
-                  ('rawInput' in toolPart
-                    ? (toolPart as { rawInput?: unknown }).rawInput
-                    : toolPart.input) || {}
-                ) as Record<string, unknown>;
-                return (
-                  <ToolWithApproval
-                    key={toolPart.toolCallId}
-                    toolCallId={toolPart.toolCallId}
-                    toolName={toolPart.type.replace('tool-', '')}
-                    args={toolArgs}
-                    metadata={
-                      'metadata' in toolPart &&
-                      isToolDisplayMetadata(
-                        (toolPart as { metadata?: { preview?: unknown } }).metadata?.preview,
-                      )
-                        ? (toolPart as { metadata?: { preview?: ToolDisplayMetadata } }).metadata?.preview
-                        : undefined
-                    }
-                    state={mapToolState(toolPart.state)}
-                    approvalId={toolPart.approval?.id}
-                    onApprove={handleApprove}
-                    onDeny={handleDeny}
-                    onAlwaysAllow={(toolName) => clientLogger.info('Always allow:', toolName)}
-                  />
-                );
-              })}
-            </div>
-          )}
-
-          {referenceImage && (
-            <div className="relative mb-3 p-2 bg-primary/10 border border-primary/20 rounded-lg flex items-center gap-3 animate-fade-in-up">
-              <img
-                src={referenceImage.src}
-                alt="Reference"
-                className="w-10 h-10 object-cover rounded-md border border-border"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-medium text-primary">
-                  📎 Imagem anexada
-                </p>
-                <p className="text-[9px] text-muted-foreground">
-                  Será enviada junto com a mensagem
-                </p>
-              </div>
-              <button
-                onClick={onClearReference}
-                className="w-6 h-6 rounded-lg bg-black/40 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-all flex items-center justify-center"
-                title="Remover anexo"
-              >
-                <Icon name="x" className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-
-          <form onSubmit={handleSend} className="relative">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              className="hidden"
-              accept="image/*"
-            />
-
-            <div
-              className="bg-[#0a0a0a]/60 backdrop-blur-xl border border-border rounded-xl overflow-hidden focus-within:border-white/30 transition-colors relative"
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              {/* Drag-and-Drop Overlay */}
-              {isDragging && (
-                <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm z-50 rounded-xl flex items-center justify-center border-2 border-primary border-dashed">
-                  <div className="text-center">
-                    <Icon name="upload" className="w-12 h-12 text-primary mx-auto mb-2" />
-                    <p className="text-sm text-primary font-medium">Solte a imagem para anexar</p>
-                  </div>
-                </div>
-              )}
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend(e);
-                  }
-                }}
-                placeholder="Pergunte, pesquise ou converse..."
-                className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-white placeholder:text-muted-foreground outline-none resize-none min-h-[80px] max-h-[200px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                disabled={isLoading || isSending}
-                rows={2}
-              />
-              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-7 h-7 rounded-lg text-muted-foreground hover:text-white/60 hover:bg-white/5 transition-all flex items-center justify-center"
-                  >
-                    <Icon name="plus" className="w-4 h-4" />
-                  </button>
-                  {brandProfile?.logo && (
-                    <button
-                      type="button"
-                      onClick={() => setIncludeBrandLogo(!includeBrandLogo)}
-                      className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all flex items-center gap-1 ${
-                        includeBrandLogo
-                          ? 'bg-primary/20 text-primary border border-primary/30'
-                          : 'bg-white/5 text-muted-foreground border border-border'
-                      }`}
-                      title={includeBrandLogo ? 'Logo será incluído nas imagens' : 'Logo não será incluído'}
-                    >
-                      <Icon name="image" className="w-3 h-3" />
-                      Logo {includeBrandLogo ? 'ON' : 'OFF'}
-                    </button>
-                  )}
-                </div>
-                <button
-                  type="submit"
-                  className={`w-7 h-7 rounded-lg transition-all flex items-center justify-center ${
-                    (isLoading || isSending)
-                      ? 'bg-primary/20 text-primary/60 cursor-not-allowed'
-                      : input.trim() || referenceImage
-                      ? 'bg-primary text-white hover:bg-primary/90'
-                      : 'text-muted-foreground hover:text-white/60 disabled:text-white/10'
-                  }`}
-                  disabled={(isLoading || isSending) || (!input.trim() && !referenceImage)}
-                  title={(isLoading || isSending) ? 'Aguardando resposta...' : 'Enviar mensagem'}
-                >
-                  {(isLoading || isSending) ? (
-                    <Loader size={16} className="text-muted-foreground" />
-                  ) : (
-                    <Icon name="arrow-up" className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
+        <ChatInputArea
+          input={input}
+          onInputChange={handleInputChange}
+          onSubmit={handleSend}
+          onSendFileMessage={handleSendFileMessage}
+          isLoading={isLoading}
+          isSending={isSending}
+          referenceImage={referenceImage}
+          onClearReference={onClearReference}
+          brandProfile={brandProfile}
+          includeBrandLogo={includeBrandLogo}
+          onToggleBrandLogo={handleToggleBrandLogo}
+          onError={handleError}
+          pendingApprovals={pendingApprovals}
+          onApprove={handleApprove}
+          onDeny={handleDeny}
+          inputRef={inputRef}
+        />
       </aside>
     </DataStreamProvider>
     </ErrorBoundary>
