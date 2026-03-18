@@ -203,7 +203,8 @@ export async function createScheduledPost(payload: CreateScheduledPostParams): P
     RETURNING *
   `) as ScheduledPost[];
 
-  const newPost = result[0]!;
+  const newPost = result[0];
+  if (!newPost) throw new NotFoundError("Scheduled post");
 
   try {
     await schedulePostForPublishing(newPost.id, resolvedUserId, timestampMs);
@@ -277,7 +278,8 @@ export async function updateScheduledPost(id: string, updates: UpdateScheduledPo
     RETURNING *
   `) as ScheduledPost[];
 
-  const updatedPost = result[0]!;
+  const updatedPost = result[0];
+  if (!updatedPost) throw new NotFoundError("Scheduled post");
   if (updates.status === "cancelled") {
     try {
       await cancelScheduledPost(id);
@@ -419,7 +421,8 @@ export async function retryScheduledPost(id: string, userId: string): Promise<Sc
     RETURNING *
   `) as ScheduledPost[];
 
-  const updatedPost = result[0]!;
+  const updatedPost = result[0];
+  if (!updatedPost) throw new NotFoundError("Scheduled post");
 
   try {
     await schedulePostForPublishing(

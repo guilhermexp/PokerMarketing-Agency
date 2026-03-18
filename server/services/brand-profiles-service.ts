@@ -150,7 +150,9 @@ export async function createBrandProfile(payload: CreateBrandProfileParams): Pro
     RETURNING *
   ` as BrandProfile[];
 
-  return result[0]!;
+  const item = result[0];
+  if (!item) throw new NotFoundError("Brand profile");
+  return item;
 }
 
 export interface UpdateBrandProfileParams {
@@ -216,5 +218,7 @@ export async function updateBrandProfile(id: string, payload: UpdateBrandProfile
     RETURNING *
   ` as BrandProfile[];
 
-  return result[0]!;
+  const item = result[0];
+  if (!item) throw new NotFoundError("Brand profile");
+  return item;
 }

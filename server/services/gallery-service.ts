@@ -256,7 +256,9 @@ export async function createGalleryImage(payload: CreateGalleryImageParams): Pro
     RETURNING *
   `) as GalleryImage[];
 
-  return result[0]!;
+  const item = result[0];
+  if (!item) throw new NotFoundError("Gallery image");
+  return item;
 }
 
 export interface UpdateGalleryImageParams {
@@ -293,7 +295,9 @@ export async function updateGalleryImageRecord(id: string, updates: UpdateGaller
     RETURNING *
   `) as GalleryImage[];
 
-  return result[0]!;
+  const item = result[0];
+  if (!item) throw new NotFoundError("Gallery image");
+  return item;
 }
 
 export async function deleteGalleryImageRecord(id: string, userId?: string): Promise<void> {

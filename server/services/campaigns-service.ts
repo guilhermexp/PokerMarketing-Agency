@@ -743,11 +743,9 @@ export async function updateCampaignClipThumbnail(clipId: string, thumbnailUrl: 
     RETURNING *
   `) as VideoClipScript[];
 
-  if (result.length === 0) {
-    throw new NotFoundError("Clip");
-  }
-
-  return result[0]!;
+  const item = result[0];
+  if (!item) throw new NotFoundError("Clip");
+  return item;
 }
 
 export async function updateCampaignSceneImage(clipId: string, sceneNumber: number | string, imageUrl: string | null): Promise<VideoClipScript> {
@@ -780,7 +778,9 @@ export async function updateCampaignSceneImage(clipId: string, sceneNumber: numb
     RETURNING *
   `) as VideoClipScript[];
 
-  return result[0]!;
+  const item = result[0];
+  if (!item) throw new NotFoundError("Clip");
+  return item;
 }
 
 export interface GetCarouselsParams {
@@ -894,11 +894,9 @@ export async function updateCarousel(id: string, { cover_url, caption }: UpdateC
     RETURNING *
   `) as CarouselScript[];
 
-  if (result.length === 0) {
-    throw new NotFoundError("Carousel");
-  }
-
-  return result[0]!;
+  const item = result[0];
+  if (!item) throw new NotFoundError("Carousel");
+  return item;
 }
 
 export async function updateCarouselSlideImage(carouselId: string, slideNumber: number | string, imageUrl: string | null): Promise<CarouselScript> {
@@ -931,5 +929,7 @@ export async function updateCarouselSlideImage(carouselId: string, slideNumber: 
     RETURNING *
   `) as CarouselScript[];
 
-  return result[0]!;
+  const item = result[0];
+  if (!item) throw new NotFoundError("Carousel");
+  return item;
 }
