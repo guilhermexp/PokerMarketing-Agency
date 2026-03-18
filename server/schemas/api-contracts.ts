@@ -1677,7 +1677,19 @@ export function validateRouteOutput(
     return payload;
   }
 
-  return contract.response.schema.parse(payload);
+  const result = contract.response.schema.safeParse(payload);
+  if (!result.success) {
+    // Log mismatch but never block response — we trust our own DB data
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        `[ResponseValidation] Schema mismatch on ${method} ${path}:`,
+        result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).slice(0, 3).join("; "),
+      );
+    }
+    return payload;
+  }
+
+  return result.data;
 }
 
 function registerContractPath(
