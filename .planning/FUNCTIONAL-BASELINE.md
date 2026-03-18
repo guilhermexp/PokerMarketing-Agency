@@ -1,8 +1,8 @@
 # Functional Baseline — Socialab (DirectorAi)
 
 > Última atualização: 2026-03-18
-> Testado por: Claude (opus)
-> Status geral: 🟢
+> Testado por: Claude (opus) + Codex (GPT-5)
+> Status geral: 🟡 Atenção
 
 ---
 
@@ -401,91 +401,60 @@ Automação de criação de conteúdo visual e textual para marketing de poker u
 
 ## 3. Health Matrix
 
-### Features Core
+### Runtime Health Check — 2026-03-18
 
-| # | Feature | Endpoint Principal | Handler | Validação | Error Handling | Status |
-|---|---------|-------------------|---------|-----------|---------------|--------|
-| 1 | Campaign Generation | `POST /api/ai/campaign` | ✅ | ✅ Zod | ✅ | 🟢 OK |
-| 2 | Campaign CRUD | `/api/db/campaigns` | ✅ | ✅ Zod | ✅ | 🟢 OK |
-| 3 | Image Generation | `POST /api/ai/image` | ✅ | ✅ Zod + 25MB | ✅ Retry + Sanitize | 🟢 OK |
-| 4 | Image Studio Topics | `/api/image-playground/*` | ✅ | ✅ Zod | ✅ | 🟢 OK |
-| 5 | Image Studio Generate | `POST /api/image-playground/generate` | ✅ | ✅ Zod + 25MB | ✅ Provider chain | 🟢 OK |
-| 6 | Image Edit | `POST /api/ai/edit-image` | ✅ | ✅ Zod + 25MB | ✅ | 🟢 OK |
-| 7 | Video Generation | `POST /api/ai/video` | ✅ | ✅ Zod | ✅ Retry + Quota | 🟢 OK |
-| 8 | Video Studio Topics | `/api/video-playground/*` | ✅ | ✅ Zod | ✅ | 🟢 OK |
-| 9 | Video Studio Generate | `POST /api/video-playground/generate` | ✅ | ✅ Zod | ✅ | 🟢 OK |
-| 10 | Flyer Generation | `POST /api/ai/flyer` | ✅ | ✅ Zod | ✅ | 🟢 OK |
-| 11 | Tournament CRUD | `/api/db/tournaments` | ✅ | ✅ Zod | ✅ | 🟢 OK |
-| 12 | Gallery CRUD | `/api/db/gallery` | ✅ | ✅ Zod | ✅ | 🟢 OK |
-| 13 | Scheduled Posts CRUD | `/api/db/scheduled-posts` | ✅ | ✅ Zod | ✅ | 🟢 OK |
-| 14 | Scheduled Posts Publisher | BullMQ worker + polling | ✅ | ✅ | ✅ Retry 3x | 🟢 OK |
-| 15 | Carousel Posts | `carousel_image_urls` + publisher | ✅ | ✅ | ✅ | 🟢 OK |
-| 16 | Brand Profile CRUD | `/api/db/brand-profiles` | ✅ | ✅ Zod | ✅ | 🟢 OK |
-| 17 | Instagram Accounts | `/api/db/instagram-accounts` | ✅ | ✅ Zod | ✅ | 🟢 OK |
-| 18 | Rube MCP Proxy | `POST /api/rube` | ✅ | ✅ | ✅ Timeout 15s | 🟢 OK |
-| 19 | AI Text Generation | `POST /api/ai/text` | ✅ | ✅ Zod | ✅ Retry | 🟢 OK |
-| 20 | AI Chat (Vercel AI SDK) | `POST /api/chat` | ✅ | ✅ Zod | ✅ Streaming | 🟢 OK |
-| 21 | Studio Agent (Claude SDK) | `POST /api/agent/studio/stream` | ✅ | ✅ Zod | ✅ Loop guard | 🟢 OK |
-| 22 | Upload Files | `POST /api/upload` | ✅ | ✅ Content-type whitelist | ✅ | 🟢 OK |
-| 23 | Text-to-Speech | `POST /api/ai/speech` | ✅ | ✅ Zod | ✅ | 🟢 OK |
+> Ambiente testado: `npm run dev` em `http://localhost:3002`
+> Observação: não havia `E2E_TEST_EMAIL` nem `E2E_TEST_PASSWORD` carregados no ambiente, então os endpoints protegidos foram validados apenas quanto ao guard de autenticação.
 
-### Admin & Infra
-
-| # | Feature | Endpoint Principal | Handler | Validação | Error Handling | Status |
-|---|---------|-------------------|---------|-----------|---------------|--------|
-| 24 | Admin Stats | `GET /api/admin/stats` | ✅ | ✅ SuperAdmin | ✅ | 🟢 OK |
-| 25 | Admin Users | `GET /api/admin/users` | ✅ | ✅ Zod + SuperAdmin | ✅ | 🟢 OK |
-| 26 | Admin Organizations | `GET /api/admin/organizations` | ✅ | ✅ Zod + SuperAdmin | ✅ | 🟢 OK |
-| 27 | Admin Usage | `GET /api/admin/usage` | ✅ | ✅ Zod + SuperAdmin | ✅ | 🟢 OK |
-| 28 | Admin Logs | `GET /api/admin/logs` | ✅ | ✅ Zod + SuperAdmin | ✅ | 🟢 OK |
-| 29 | CSRF Protection | `/api/csrf-token` | ✅ | ✅ HMAC-SHA256 | ✅ | 🟢 OK |
-| 30 | Init Data | `GET /api/db/init` | ✅ | ✅ Zod | ✅ | 🟢 OK |
-| 31 | Health Check | `GET /health` | ✅ | N/A | ✅ | 🟢 OK |
-| 32 | DB Health | `GET /api/db/health` | ✅ | N/A | ✅ | 🟢 OK |
-
-### Legacy / Deprecated
-
-| # | Feature | Endpoint | Status |
-|---|---------|----------|--------|
-| 33 | Async Image Queue | `POST /api/ai/image/async` | 🟡 PARCIAL — retorna 503 (queue disabled) |
-| 34 | Batch Image Queue | `POST /api/ai/image/async/batch` | 🟡 PARCIAL — retorna 503 (queue disabled) |
-| 35 | Legacy AI Assistant | `POST /api/ai/assistant` | 🟡 PARCIAL — funcional mas deprecated em favor de /api/chat |
+| # | Feature | Request real | Resultado | Shape verificado | Status | Notas |
+|---|---------|--------------|-----------|------------------|--------|-------|
+| 1 | Auth Init / CSRF | `GET /api/csrf-token` | `200` | Envelope `{ data, error, meta }`, `data.csrfToken`, header `X-CSRF-Token`, cookie `csrf_token` | 🟢 OK | Endpoint público respondeu corretamente e emitiu token/cookie |
+| 2 | Campaign List | `GET /api/db/campaigns` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Guard de auth funcionou; sem usuário E2E não foi possível listar campanhas |
+| 3 | Gallery List | `GET /api/db/gallery` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Endpoint protegido corretamente |
+| 4 | Image Generation | `POST /api/ai/image` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Feature core não pôde ser validada sem sessão |
+| 5 | Image Playground Topics | `GET /api/image-playground/topics` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Proteção consistente |
+| 6 | Brand Profiles | `GET /api/db/brand-profiles` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Proteção consistente |
+| 7 | Scheduled Posts | `GET /api/db/scheduled-posts` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Endpoint protegido corretamente |
+| 8 | Admin Stats | `GET /api/admin/stats` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Sem sessão não chegou ao check de super admin; não houve `403` |
+| 9 | Health Check | `GET /health` | `200` | Envelope `{ data, error, meta }` com `data.status = "ok"` | 🟢 OK | Startup validado e rota pública saudável |
+| 10 | DB Health | `GET /api/db/health` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Health do banco existe, mas está atrás de auth |
+| 11 | Upload | `POST /api/upload` multipart | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Upload bloqueado corretamente sem sessão |
+| 12 | Video Playground Topics | `GET /api/video-playground/topics` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Proteção consistente |
+| 13 | Tournament Schedules | `GET /api/db/tournaments/list` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Proteção consistente |
+| 14 | Init Data | `GET /api/db/init` | `401` | `{ data: null, error: { message }, meta: null }` | ⚫ NÃO TESTÁVEL | Não foi possível validar preload inicial |
+| 15 | Runtime Infra | Boot do `npm run dev` | Server sobe; DB aquece; Redis indisponível | Logs reais de startup | 🟡 PARCIAL | App sobe sem crash, mas `scheduled posts` ficam em polling e a fila async de imagem fica desativada |
 
 ---
 
 ## 4. Issues Funcionais
 
 ### P0 — Core Quebrado
-**Nenhum issue P0 encontrado.** Todas as features core estão funcionais.
+**Nenhum P0 confirmado neste check.** O app subiu sem crash e os guards públicos/de autenticação responderam como esperado, mas as features core autenticadas não puderam ser executadas end-to-end.
 
 ### P1 — Importante (Atenção)
 
 | # | Issue | Área | Impacto | Ação |
 |---|-------|------|---------|------|
-| P1-1 | `App.tsx` com ~2,571 linhas | Frontend | Manutenibilidade baixa, risco de regressão | Decompor em módulos menores (já iniciado com últimos commits) |
-| P1-2 | `ClipCard.tsx` com ~5,500 linhas | Frontend | Mesmo problema, componente gigante | Extrair sub-componentes |
-| P1-3 | `apiClient.ts` com ~1,726 linhas | Frontend | Difícil de manter | Já parcialmente resolvido com split em `src/services/api-client/` |
-| P1-4 | 66+ usos de TypeScript `any` | Frontend/Backend | Perde type safety | Substituir por tipos corretos gradualmente |
-| P1-5 | Rate limiter in-memory | Backend | Perdido no restart, não compartilhado entre instâncias | Migrar para Redis-based rate limiter |
-| P1-6 | Provider chain simplificado | Backend | Só Gemini ativo, sem fallback real | FAL/Replicate adapters existem mas não estão na chain |
+| P1-1 | Baseline antigo sobre `src/App.tsx` ficou obsoleto: o arquivo hoje tem 54 linhas físicas e atua como composition root | Frontend | O risco descrito anteriormente não procede mais | Remover esse item como debt funcional aberto |
+| P1-2 | Baseline antigo sobre `src/components/tabs/clips/ClipCard.tsx` ficou obsoleto: o arquivo hoje é um barrel de 4 linhas | Frontend | O “componente gigante” não existe mais nesse path | Remover esse item como debt funcional aberto |
+| P1-3 | Baseline antigo sobre `src/services/apiClient.ts` ficou obsoleto: o arquivo hoje tem 111 linhas e faz re-export modular | Frontend | O problema de arquivo monolítico foi substancialmente resolvido | Manter a API modular e evitar regressão para barrel inchado |
+| P1-4 | O item “66+ usos de any” também ficou desatualizado: no código de app/servidor fora de testes restou 1 uso explícito justificado em `server/lib/agent/claude/tool-registry.ts` | Frontend/Backend | Debt de type safety caiu muito, mas não zerou | Encerrar o issue antigo e decidir se esse `any` residual será removido ou documentado como exceção |
+| P1-5 | Não há credenciais E2E (`E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`) carregadas no ambiente | QA/Auth | Bloqueia validação real das features core autenticadas | Provisionar usuário E2E estável e repetir o health check autenticado |
+| P1-6 | Redis indisponível no boot; app entra em fallback para polling e desliga fila async de imagem | Infra | Degrada scheduled posts e qualquer fluxo que dependa de fila | Subir Redis no ambiente de QA/dev antes da próxima bateria |
 
 ### P2 — Edge Cases
 
 | # | Issue | Área | Impacto | Ação |
 |---|-------|------|---------|------|
-| P2-1 | Imagens data URL legadas no banco | Database | Performance de fetch | Scripts de migração existem (`scripts/migrate-all-data-urls-to-blob.mjs`) |
-| P2-2 | Redis opcional para scheduled posts | Backend | Sem Redis, usa polling de 5 min (menos preciso) | Documentar requisito de Redis para publicação precisa |
-| P2-3 | Publishing hours enforcement | Backend | Posts fora de 7h-23:59 BRT não são publicados pelo polling | Esperado por design, mas pode confundir |
-| P2-4 | Gemini safety block | AI | Prompts bloqueados sem feedback claro ao usuário | Mensagem sanitizada existe ("Tente reformular o prompt") |
-| P2-5 | 25MB limit em referências de imagem | AI | Upload grande falha silenciosamente | Validação existe, mas UX poderia ser melhor |
+| P2-1 | `GET /api/db/health` está atrás de autenticação | Infra/Observability | Monitor externo sem sessão não consegue validar banco | Decidir se isso é intencional ou se deve existir um DB health público/sintético |
+| P2-2 | `GET /api/admin/stats` retornou `401` sem sessão, então neste check não foi possível confirmar o comportamento esperado `403` para usuário autenticado não-admin | Admin/Auth | Cobertura parcial do caso de permissão | Repetir com usuário comum e com super admin |
+| P2-3 | O envelope de resposta está consistente (`data/error/meta`) inclusive em erro | API | Ponto positivo, mas precisa ser validado também nos fluxos 200 autenticados | Revalidar após provisionar credenciais E2E |
 
 ### P3 — Cosmético / Debt
 
 | # | Issue | Área | Impacto | Ação |
 |---|-------|------|---------|------|
-| P3-1 | Async image endpoints retornam 503 | Backend | Endpoints legados confusos na API | Remover ou marcar como deprecated na docs |
-| P3-2 | Legacy assistant endpoint | Backend | Dois endpoints de chat (antigo + novo) | Deprecar `/api/ai/assistant` formalmente |
-| P3-3 | Feedback endpoint depende de serviço externo | Backend | Notes Capture API pode estar offline | Adicionar fallback ou logging |
+| P3-1 | O baseline anterior estava otimista demais e confundia leitura estática com feature validada | Documentação | Pode induzir decisão errada de produto/QA | Manter esta seção sempre baseada em teste real |
 
 ---
 
@@ -494,3 +463,90 @@ Automação de criação de conteúdo visual e textual para marketing de poker u
 | Data | Autor | Mudança |
 |------|-------|---------|
 | 2026-03-18 | Claude (opus) | Criação inicial do Functional Baseline |
+| 2026-03-18 | Codex (GPT-5) | Runtime health check real em `localhost:3002`, atualização da Health Matrix, Issues, parecer e diagramas |
+
+---
+
+## 6. Parecer do Agente
+
+O app sobe de verdade, conecta no banco, responde em `http://localhost:3002` e expõe um `GET /health` saudável. O endpoint público de CSRF também funciona corretamente, com envelope consistente, header `X-CSRF-Token` e cookie `csrf_token`.
+
+O problema do baseline anterior é que ele tratava presença de handler como evidência de feature funcionando. Neste check isso não se sustentou. Sem `E2E_TEST_EMAIL` e `E2E_TEST_PASSWORD`, todas as features core protegidas por sessão ficaram inacessíveis com `401 Authentication required`, então não existe evidência runtime suficiente para afirmar que campanhas, gallery, image generation, upload, init data ou tópicos de playground estejam funcionais end-to-end.
+
+Há ainda um ponto de degradação de ambiente: o boot registrou Redis indisponível, então scheduled posts operam em fallback por polling e a fila assíncrona de imagem não entra no modo nominal. Veredicto honesto: o servidor está saudável para subir e proteger recursos, mas o produto ainda não está funcionalmente comprovado em runtime. A próxima rodada precisa de usuário E2E válido e Redis ativo.
+
+---
+
+## 7. Diagramas
+
+### User Flow
+
+```mermaid
+flowchart TD
+  A[Usuário acessa Socialab] --> B[Frontend React em localhost:3010]
+  B --> C[GET /api/csrf-token]
+  C --> D{Sessão Better Auth existe?}
+  D -- Não --> E[Tela de login / signup]
+  D -- Sim --> F[Entrar nas áreas protegidas]
+  F --> G[Campaigns]
+  F --> H[Gallery]
+  F --> I[Image Studio]
+  F --> J[Video Studio]
+  F --> K[Calendar / Scheduled Posts]
+  F --> L[Brand Profile]
+  G --> M[Requests para /api/db/* e /api/ai/*]
+  H --> M
+  I --> M
+  J --> M
+  K --> M
+  L --> M
+  M --> N{Auth + CSRF válidos?}
+  N -- Não --> O[401 Authentication required]
+  N -- Sim --> P[DB / AI / Upload / Admin]
+```
+
+### Feature Map
+
+```mermaid
+mindmap
+  root((Socialab Runtime Check))
+    Publico 🟢
+      Health 🟢
+      CSRF token 🟢
+    Protegido por Auth ⚫
+      Campaign list ⚫
+      Gallery list ⚫
+      Image generation ⚫
+      Image playground topics ⚫
+      Brand profiles ⚫
+      Scheduled posts ⚫
+      Admin stats ⚫
+      DB health ⚫
+      Upload ⚫
+      Video playground topics ⚫
+      Tournament schedules ⚫
+      Init data ⚫
+    Infra 🟡
+      Server sobe 🟢
+      Banco responde no boot 🟢
+      Redis ausente 🟡
+      Scheduled posts em polling 🟡
+      Fila async de imagem desativada 🟡
+```
+
+### Arquitetura
+
+```mermaid
+flowchart LR
+  U[Usuário real] --> FE[Frontend Vite + React]
+  FE -->|cookies + X-CSRF-Token| BE[Express API]
+  BE --> MW[Auth guard + CSRF + envelope data/error/meta]
+  MW --> DB[(PostgreSQL / Neon)]
+  MW --> AUTH[Better Auth]
+  MW --> BLOB[Vercel Blob]
+  MW --> AI[Gemini / AI providers]
+  MW --> REDIS[(Redis / BullMQ)]
+  REDIS -. indisponível neste check .-> FALLBACK[Polling fallback]
+  MW --> ADMIN[Admin routes]
+  MW --> PLAYGROUND[Image/Video playground routes]
+```
