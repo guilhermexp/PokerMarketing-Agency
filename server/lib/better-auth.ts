@@ -59,19 +59,31 @@ function createRedisSecondaryStorage(): SecondaryStorage | undefined {
 
   return {
     async get(key: string): Promise<string | null> {
-      await ensureConnection();
-      return redis.get(key);
+      try {
+        await ensureConnection();
+        return await redis.get(key);
+      } catch {
+        return null;
+      }
     },
     async set(key: string, value: string, ttl?: number): Promise<unknown> {
-      await ensureConnection();
-      if (ttl && ttl > 0) {
-        return redis.set(key, value, "EX", ttl);
+      try {
+        await ensureConnection();
+        if (ttl && ttl > 0) {
+          return await redis.set(key, value, "EX", ttl);
+        }
+        return await redis.set(key, value);
+      } catch {
+        return null;
       }
-      return redis.set(key, value);
     },
     async delete(key: string): Promise<void> {
-      await ensureConnection();
-      await redis.del(key);
+      try {
+        await ensureConnection();
+        await redis.del(key);
+      } catch {
+        // Redis unavailable — session will be cleaned up on next successful connection
+      }
     },
   };
 }
