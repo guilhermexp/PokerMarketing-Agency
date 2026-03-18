@@ -39,7 +39,7 @@ describe("campaign routes", () => {
     ]);
   });
 
-  it("returns error envelope when output breaks the contract", async () => {
+  it("passes through invalid service output with soft validation", async () => {
     const getCampaignsMock = vi.fn().mockResolvedValue(42);
 
     vi.doMock("../../server/services/campaigns-service.js", () => ({
@@ -61,8 +61,8 @@ describe("campaign routes", () => {
       organization_id: "org-1",
     });
 
-    expect(response.status).toBe(500);
-    expect(response.body.data).toBeNull();
-    expect(response.body.error.message).toBe("Failed to fetch campaigns");
+    // Soft validation: invalid output is passed through (logged, never blocked)
+    expect(response.status).toBe(200);
+    expect(response.body.data).toBe(42);
   });
 });

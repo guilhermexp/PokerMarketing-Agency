@@ -66,7 +66,7 @@ describe("gallery routes", () => {
     );
   });
 
-  it("returns an error envelope when the service payload breaks the output contract", async () => {
+  it("passes through invalid service output with soft validation", async () => {
     const listGalleryMock = vi.fn().mockResolvedValue({
       invalid: true,
     });
@@ -86,8 +86,8 @@ describe("gallery routes", () => {
       user_id: "auth-user-1",
     });
 
-    expect(response.status).toBe(500);
-    expect(response.body.data).toBeNull();
-    expect(response.body.error.message).toBe("Failed to fetch gallery images");
+    // Soft validation: invalid output is passed through (logged, never blocked)
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({ invalid: true });
   });
 });

@@ -23,18 +23,18 @@ describe("API contracts", () => {
   });
 
   it("validates route output against the configured schema", () => {
-    expect(() =>
-      validateRouteOutput("GET", "/health", {
-        status: "ok",
-        timestamp: new Date().toISOString(),
-      }),
-    ).not.toThrow();
+    // Valid payload is returned as-is
+    const valid = validateRouteOutput("GET", "/health", {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+    });
+    expect(valid).toHaveProperty("status", "ok");
 
-    expect(() =>
-      validateRouteOutput("GET", "/health", {
-        status: "ok",
-      }),
-    ).toThrow();
+    // Invalid payload is also returned (soft validation — logs warning, never blocks)
+    const invalid = validateRouteOutput("GET", "/health", {
+      status: "ok",
+    });
+    expect(invalid).toEqual({ status: "ok" });
   });
 
   it("accepts the structured colors payload returned by /api/ai/extract-colors", () => {
