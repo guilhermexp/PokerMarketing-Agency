@@ -1,9 +1,9 @@
 import type { Express } from "express";
-import { AppError, getSql } from "../lib/db.js";
+import { getSql } from "../lib/db.js";
 import { resolveUserId } from "../lib/user-resolver.js";
 import { resolveOrganizationContext } from "../lib/auth.js";
 import { logError } from "../lib/logging-helpers.js";
-import { ValidationError, DatabaseError } from "../lib/errors/index.js";
+import { AppError, ValidationError, DatabaseError } from "../lib/errors/index.js";
 import { OrganizationAccessError } from "../helpers/organization-context.js";
 import logger from "../lib/logger.js";
 import { sanitizeErrorForClient } from "../lib/ai/retry.js";

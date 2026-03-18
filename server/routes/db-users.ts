@@ -1,6 +1,6 @@
 import type { Express } from "express";
-import { AppError, getSql } from "../lib/db.js";
-import { ValidationError, DatabaseError } from "../lib/errors/index.js";
+import { getSql } from "../lib/db.js";
+import { AppError, ValidationError, DatabaseError } from "../lib/errors/index.js";
 import { validateRequest } from "../middleware/validate.js";
 import {
   type UsersQuery,
