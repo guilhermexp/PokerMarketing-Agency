@@ -26,7 +26,7 @@ import logger from "../logger.js";
 // ============================================================================
 
 // Re-export model constants for backward compatibility
-export const DEFAULT_IMAGE_MODEL = IMAGE_MODEL_PRO;
+export const DEFAULT_IMAGE_MODEL = IMAGE_MODEL_STANDARD;
 export const STANDARD_IMAGE_MODEL = IMAGE_MODEL_STANDARD;
 export { FAL_IMAGE_MODEL };
 

@@ -202,30 +202,52 @@ export function registerImagePlaygroundRoutes(
     return { mimeType: match[1], base64: match[2] };
   };
 
+  // Max logo size for Gemini inline_data: 1MB base64 (~750KB binary)
+  const MAX_LOGO_BASE64_LENGTH = 1_000_000;
+
+  const compressLogoIfNeeded = async (base64: string, mimeType: string): Promise<{ base64: string; mimeType: string }> => {
+    if (base64.length <= MAX_LOGO_BASE64_LENGTH) return { base64, mimeType };
+    try {
+      const sharp = (await import("sharp")).default;
+      const inputBuffer = Buffer.from(base64, "base64");
+      const compressed = await sharp(inputBuffer)
+        .resize(512, 512, { fit: "inside", withoutEnlargement: true })
+        .png({ quality: 80, compressionLevel: 9 })
+        .toBuffer();
+      const compressedBase64 = compressed.toString("base64");
+      logger.debug(
+        { originalKb: Math.round(base64.length / 1024), compressedKb: Math.round(compressedBase64.length / 1024) },
+        "[ImagePlayground] Logo compressed for Gemini API",
+      );
+      return { base64: compressedBase64, mimeType: "image/png" };
+    } catch (err) {
+      logger.warn({ err }, "[ImagePlayground] Logo compression failed, using original");
+      return { base64, mimeType };
+    }
+  };
+
   const getLogoInlineImage = async (logoSource: string | null | undefined): Promise<InlineImage | null> => {
     if (!logoSource || typeof logoSource !== "string") return null;
 
     // data URL
     const parsedDataUrl = parseDataUrl(logoSource);
     if (parsedDataUrl) {
-      return {
-        base64: parsedDataUrl.base64,
-        mimeType: parsedDataUrl.mimeType || "image/png",
-      };
+      const compressed = await compressLogoIfNeeded(parsedDataUrl.base64, parsedDataUrl.mimeType || "image/png");
+      return compressed;
     }
 
     // http URL
     if (logoSource.startsWith("http")) {
       const logoBase64 = await urlToBase64(logoSource);
       if (!logoBase64) return null;
-      return {
-        base64: logoBase64,
-        mimeType: inferMimeTypeFromSource(logoSource),
-      };
+      const mimeType = inferMimeTypeFromSource(logoSource);
+      const compressed = await compressLogoIfNeeded(logoBase64, mimeType);
+      return compressed;
     }
 
     // raw base64 fallback
-    return { base64: logoSource, mimeType: "image/png" };
+    const compressed = await compressLogoIfNeeded(logoSource, "image/png");
+    return compressed;
   };
 
   const buildAiInfluencerPrompt = (userPrompt: string): string => {
