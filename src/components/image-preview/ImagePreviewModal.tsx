@@ -108,6 +108,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     handleDiscardEdit,
   } = useAiEdit({
     imageSrc: image.src,
+    originalDimensions,
     getMaskData,
     getMaskRegion,
     clearMask,

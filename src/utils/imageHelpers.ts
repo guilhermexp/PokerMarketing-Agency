@@ -1,4 +1,19 @@
 import { clientLogger } from "@/lib/client-logger";
+
+const SUPPORTED_ASPECT_RATIOS = [
+  "1:1",
+  "2:3",
+  "3:2",
+  "3:4",
+  "4:3",
+  "4:5",
+  "5:4",
+  "9:16",
+  "16:9",
+  "21:9",
+] as const;
+
+export type SupportedAspectRatio = (typeof SUPPORTED_ASPECT_RATIOS)[number];
 export const parseDataUrl = (
   dataUrl: string,
 ): { base64: string; mimeType: string } | null => {
@@ -50,6 +65,43 @@ export const urlToBase64 = async (
     clientLogger.error("[urlToBase64] Failed to convert URL:", src, error);
     return null;
   }
+};
+
+export const getClosestAspectRatio = (
+  width: number,
+  height: number,
+): SupportedAspectRatio => {
+  if (width <= 0 || height <= 0) {
+    return "1:1";
+  }
+
+  const ratio = width / height;
+  let closest: SupportedAspectRatio = "1:1";
+  let minDiff = Number.POSITIVE_INFINITY;
+
+  for (const aspectRatio of SUPPORTED_ASPECT_RATIOS) {
+    const [w, h] = aspectRatio.split(":").map(Number);
+    const currentRatio = (w || 1) / (h || 1);
+    const diff = Math.abs(ratio - currentRatio);
+
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = aspectRatio;
+    }
+  }
+
+  return closest;
+};
+
+export const getImageSizeFromDimensions = (
+  width: number,
+  height: number,
+): "1K" | "2K" | "4K" => {
+  const maxDimension = Math.max(width, height);
+
+  if (maxDimension >= 4096) return "4K";
+  if (maxDimension >= 2048) return "2K";
+  return "1K";
 };
 
 export const resizeBase64Image = async (

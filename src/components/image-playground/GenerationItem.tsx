@@ -148,6 +148,33 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
     setPreviewImage(galleryImage);
   }, [generation]);
 
+  const handlePersistEditedImage = useCallback((newUrl: string) => {
+    const previousAsset = generation.asset;
+    if (!previousAsset) return;
+
+    updateGeneration(topicId, generation.id, {
+      asset: {
+        ...previousAsset,
+        url: newUrl,
+      },
+    });
+    setPreviewImage(null);
+
+    void (async () => {
+      try {
+        const persistedGeneration = await api.updateGenerationAsset(generation.id, {
+          url: newUrl,
+        });
+        updateGeneration(topicId, generation.id, persistedGeneration);
+      } catch (error) {
+        clientLogger.error('[GenerationItem] Failed to persist edited image:', error);
+        updateGeneration(topicId, generation.id, {
+          asset: previousAsset,
+        });
+      }
+    })();
+  }, [generation.asset, generation.id, topicId, updateGeneration]);
+
   const handleDelete = useCallback(async () => {
     if (confirm('Excluir esta imagem?')) {
       await deleteGeneration(generation.id);
@@ -311,12 +338,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
         <ImagePreviewModal
           image={previewImage}
           onClose={() => setPreviewImage(null)}
-          onImageUpdate={(newUrl) => {
-            updateGeneration(topicId, generation.id, {
-              asset: { ...generation.asset!, url: newUrl },
-            });
-            setPreviewImage(null);
-          }}
+          onImageUpdate={handlePersistEditedImage}
           downloadFilename={`generation_${generation.id}${generation.seed ? `_seed${generation.seed}` : ''}.png`}
         />
       )}
@@ -425,4 +447,3 @@ function formatTime(seconds: number): string {
   const secs = seconds % 60;
   return `${mins}m ${secs}s`;
 }
-

@@ -88,6 +88,10 @@ export const imagePlaygroundStatusQuerySchema = z.object({
   asyncTaskId: z.string().trim().min(1).optional(),
 });
 
+export const imagePlaygroundGenerationUpdateBodySchema = z.object({
+  url: nonDataUrlStringSchema,
+});
+
 export const playgroundGenerateTitleBodySchema = z.object({
   prompts: z.array(nonEmptyStringSchema).min(1),
 });
@@ -125,6 +129,7 @@ export type ImagePlaygroundBatchesQuery = z.infer<typeof imagePlaygroundBatchesQ
 export type ImagePlaygroundGenerateBody = z.infer<typeof imagePlaygroundGenerateBodySchema>;
 export type ImagePlaygroundStatusParams = z.infer<typeof imagePlaygroundStatusParamsSchema>;
 export type ImagePlaygroundStatusQuery = z.infer<typeof imagePlaygroundStatusQuerySchema>;
+export type ImagePlaygroundGenerationUpdateBody = z.infer<typeof imagePlaygroundGenerationUpdateBodySchema>;
 export type PlaygroundGenerateTitleBody = z.infer<typeof playgroundGenerateTitleBodySchema>;
 export type VideoPlaygroundSessionsQuery = z.infer<typeof videoPlaygroundSessionsQuerySchema>;
 export type VideoPlaygroundGenerateBody = z.infer<typeof videoPlaygroundGenerateBodySchema>;

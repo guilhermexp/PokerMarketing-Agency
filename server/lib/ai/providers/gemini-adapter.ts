@@ -38,6 +38,8 @@ export interface EditParams {
   imageBase64: string;
   mimeType: string;
   referenceImage?: ImageReference;
+  aspectRatio?: string;
+  imageSize?: string;
   modelTier?: "standard" | "pro";
 }
 
@@ -158,6 +160,8 @@ export async function edit({
   imageBase64,
   mimeType,
   referenceImage,
+  aspectRatio = "1:1",
+  imageSize = "1K",
   modelTier,
 }: EditParams): Promise<ProviderResult> {
   const ai = getGeminiAi();
@@ -175,7 +179,7 @@ export async function edit({
   }
 
   logger.debug(
-    { model, partsCount: parts.length },
+    { model, partsCount: parts.length, aspectRatio: mapAspectRatio(aspectRatio), imageSize },
     "[GeminiAdapter] edit",
   );
 
@@ -187,7 +191,10 @@ export async function edit({
         config: {
           responseModalities: ["TEXT", "IMAGE"],
           temperature: 0.7,
-          imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
+          imageConfig: {
+            aspectRatio: mapAspectRatio(aspectRatio),
+            imageSize,
+          },
         },
       }),
     1,

@@ -405,7 +405,8 @@ export function registerAiImageRoutes(app: Application): void {
 
     try {
       const body = req.body as AiEditImageBody;
-      const { image, prompt, mask, referenceImage } = body;
+      const { image, prompt, mask, referenceImage, aspectRatio, imageSize } = body;
+      const normalizedImageSize = normalizeImageSize(imageSize);
 
       if (!image || !prompt) {
         throw new AppError("image and prompt are required", 400);
@@ -413,11 +414,13 @@ export function registerAiImageRoutes(app: Application): void {
 
       logger.info(
         {
-          imageSize: image.base64?.length,
+          imagePayloadSize: image.base64?.length,
           mimeType: image.mimeType,
           promptLength: prompt.length,
           hasMask: !!mask,
           hasReference: !!referenceImage,
+          aspectRatio: aspectRatio || "1:1",
+          imageSize: normalizedImageSize,
         },
         "[Edit Image API] Editing image",
       );
@@ -443,6 +446,8 @@ export function registerAiImageRoutes(app: Application): void {
         imageBase64: cleanBase64,
         mimeType: image.mimeType,
         referenceImage,
+        aspectRatio,
+        imageSize: normalizedImageSize,
       });
 
       const { usedProvider, usedModel } = result;
@@ -472,12 +477,13 @@ export function registerAiImageRoutes(app: Application): void {
         model: usedModel,
         provider: usedProvider,
         imageCount: 1,
-        imageSize: "1K",
+        imageSize: normalizedImageSize,
         latencyMs: timer(),
         status: "success",
         metadata: {
           hasMask: !!mask,
           hasReference: !!referenceImage,
+          aspectRatio: aspectRatio || "1:1",
           fallbackUsed: usedProvider !== "google",
         },
       });

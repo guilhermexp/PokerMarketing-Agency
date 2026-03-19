@@ -173,6 +173,8 @@ export const editImage = async (
   mask?: { base64: string; mimeType: string },
   referenceImage?: { base64: string; mimeType: string },
   maskRegion?: { x: number; y: number; width: number; height: number; imageWidth: number; imageHeight: number },
+  aspectRatio?: string,
+  imageSize?: ImageSize,
 ): Promise<string> => {
   const response = await apiCall<{ imageUrl: string }>("/api/ai/edit-image", {
     image: { base64: base64ImageData, mimeType },
@@ -180,6 +182,8 @@ export const editImage = async (
     mask,
     maskRegion,
     referenceImage,
+    aspectRatio,
+    imageSize,
   });
 
   return response.imageUrl;

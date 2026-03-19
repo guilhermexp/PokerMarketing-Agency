@@ -57,6 +57,7 @@ describe("phase 4 remediation - batch 1", () => {
       "POST /api/image-playground/generate",
       "GET /api/image-playground/status/:generationId",
       "DELETE /api/image-playground/generations/:id",
+      "PATCH /api/image-playground/generations/:id",
       "POST /api/image-playground/generate-title",
       "GET /api/video-playground/topics",
       "POST /api/video-playground/topics",

@@ -68,6 +68,7 @@ import { initQuerySchema } from "./init-schemas.js";
 import {
   imagePlaygroundBatchesQuerySchema,
   imagePlaygroundGenerateBodySchema,
+  imagePlaygroundGenerationUpdateBodySchema,
   imagePlaygroundStatusParamsSchema,
   imagePlaygroundStatusQuerySchema,
   playgroundGenerateTitleBodySchema,
@@ -1566,6 +1567,22 @@ export const routeContracts: ApiRouteContract[] = [
       description: "Deleted image generation",
     },
     summary: "Delete image generation",
+    tags: ["Image Playground"],
+  },
+  {
+    method: "PATCH",
+    path: "/api/image-playground/generations/:id",
+    request: {
+      params: playgroundIdParamsSchema,
+      body: imagePlaygroundGenerationUpdateBodySchema,
+    },
+    response: {
+      kind: "json",
+      status: 200,
+      schema: genericSuccessSchema.extend({ generation: generationJsonSchema.optional() }),
+      description: "Updated image generation asset",
+    },
+    summary: "Update image generation asset",
     tags: ["Image Playground"],
   },
   {

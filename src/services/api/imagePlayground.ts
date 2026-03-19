@@ -67,6 +67,10 @@ export interface GenerationStatusResponse {
   error?: AsyncTaskError;
 }
 
+export interface UpdateGenerationAssetInput {
+  url: string;
+}
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -237,6 +241,18 @@ export async function retryGeneration(generationId: string): Promise<{
     method: 'POST',
   });
   return response.json();
+}
+
+export async function updateGenerationAsset(
+  generationId: string,
+  updates: UpdateGenerationAssetInput,
+): Promise<Generation> {
+  const response = await fetchWithAuth(`${API_BASE}/generations/${generationId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+  const data = unwrapApiData<{ generation: Generation }>(await response.json());
+  return data.generation;
 }
 
 // =============================================================================

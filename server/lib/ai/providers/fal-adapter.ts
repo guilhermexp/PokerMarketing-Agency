@@ -36,6 +36,8 @@ export interface EditParams {
   imageBase64: string;
   mimeType: string;
   referenceImage?: ImageReference;
+  aspectRatio?: string;
+  imageSize?: string;
   modelTier?: "standard" | "pro";
 }
 

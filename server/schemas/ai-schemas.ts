@@ -96,6 +96,8 @@ export const aiEditImageBodySchema = z.object({
   prompt: z.string().trim().min(1),
   mask: imageReferenceSchema.optional(),
   referenceImage: imageReferenceSchema.optional(),
+  aspectRatio: z.string().trim().min(1).optional(),
+  imageSize: z.enum(["1K", "2K", "4K"]).optional(),
 });
 
 export type AiEditImageBody = z.infer<typeof aiEditImageBodySchema>;

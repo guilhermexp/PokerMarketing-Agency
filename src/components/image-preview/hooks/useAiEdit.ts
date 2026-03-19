@@ -8,13 +8,19 @@ import { clientLogger } from "@/lib/client-logger";
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { editImage } from '../../../services/geminiService';
 import { uploadImageToBlob } from '../../../services/blobService';
-import { resizeBase64Image, urlToBase64 } from '../../../utils/imageHelpers';
+import {
+  getClosestAspectRatio,
+  getImageSizeFromDimensions,
+  resizeBase64Image,
+  urlToBase64,
+} from '../../../utils/imageHelpers';
 import type { EditPreview, MaskRegion, UseAiEditReturn } from '../types';
 import type { ImageFile } from '../types.ts';
 import type { PendingToolEdit } from '../../../types';
 
 interface UseAiEditProps {
   imageSrc: string;
+  originalDimensions: { width: number; height: number };
   getMaskData: () => { base64: string; mimeType: string } | undefined;
   getMaskRegion: () => MaskRegion | undefined;
   clearMask: () => void;
@@ -35,6 +41,7 @@ interface UseAiEditProps {
 
 export function useAiEdit({
   imageSrc,
+  originalDimensions,
   getMaskData,
   getMaskRegion,
   clearMask,
@@ -54,6 +61,14 @@ export function useAiEdit({
   const [isRemovingBackground, setIsRemovingBackground] = useState(false);
   const [editPreview, setEditPreview] = useState<EditPreview | null>(null);
   const initialPreviewAppliedRef = useRef(false);
+  const outputAspectRatio = getClosestAspectRatio(
+    originalDimensions.width,
+    originalDimensions.height,
+  );
+  const outputImageSize = getImageSizeFromDimensions(
+    originalDimensions.width,
+    originalDimensions.height,
+  );
 
   const handleEdit = useCallback(async () => {
     if (!editPrompt.trim()) {
@@ -89,6 +104,8 @@ export function useAiEdit({
         maskData,
         refImageData,
         maskRegion,
+        outputAspectRatio,
+        outputImageSize,
       );
 
       setEditPreview({
@@ -102,7 +119,7 @@ export function useAiEdit({
     } finally {
       setIsEditing(false);
     }
-  }, [editPrompt, imageSrc, getMaskRegion, getMaskData, referenceImage, clearMask, setError]);
+  }, [clearMask, editPrompt, getMaskData, getMaskRegion, imageSrc, outputAspectRatio, outputImageSize, referenceImage, setError]);
 
   const handleRemoveBackground = useCallback(async () => {
     setIsRemovingBackground(true);
@@ -126,6 +143,11 @@ export function useAiEdit({
         imgBase64,
         imgMimeType,
         removeBgPrompt,
+        undefined,
+        undefined,
+        undefined,
+        outputAspectRatio,
+        outputImageSize,
       );
 
       setEditPreview({
@@ -137,7 +159,7 @@ export function useAiEdit({
     } finally {
       setIsRemovingBackground(false);
     }
-  }, [imageSrc, setError]);
+  }, [imageSrc, outputAspectRatio, outputImageSize, setError]);
 
   const handleSaveEdit = useCallback(async () => {
     if (!editPreview) return;

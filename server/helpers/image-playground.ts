@@ -137,6 +137,10 @@ interface GenerationAsset {
   model?: string;
 }
 
+interface GenerationAssetUpdates {
+  url: string;
+}
+
 interface GenerationError {
   code: string;
   message: string;
@@ -581,6 +585,46 @@ export async function deleteGeneration(
       WHERE id = ${generation.batch_id}
     `;
   }
+}
+
+export async function updateGenerationAsset(
+  sql: SqlClient,
+  generationId: string,
+  updates: GenerationAssetUpdates,
+  userId: string,
+  organizationId: string | null,
+): Promise<GenerationJson | null> {
+  const orgId = organizationId || null;
+  const rows = (orgId
+    ? await sql`
+        UPDATE image_generations g
+        SET asset = COALESCE(g.asset::jsonb, '{}'::jsonb) || jsonb_build_object('url', ${updates.url})
+        FROM image_generation_batches b
+        WHERE g.id = ${generationId}
+        AND g.batch_id = b.id
+        AND b.organization_id = ${orgId}
+        RETURNING g.*
+      `
+    : await sql`
+        UPDATE image_generations
+        SET asset = COALESCE(asset::jsonb, '{}'::jsonb) || jsonb_build_object('url', ${updates.url})
+        WHERE id = ${generationId}
+        AND user_id = ${userId}
+        RETURNING *
+      `) as GenerationRow[];
+
+  const row = rows[0];
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    batchId: row.batch_id,
+    userId: row.user_id,
+    asyncTaskId: row.async_task_id,
+    seed: row.seed,
+    asset: row.asset,
+    createdAt: row.created_at,
+  };
 }
 
 export async function getGenerationStatus(

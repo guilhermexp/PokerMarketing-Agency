@@ -48,6 +48,8 @@ export interface EditParams {
   imageBase64: string;
   mimeType: string;
   referenceImage?: ImageReference;
+  aspectRatio?: string;
+  imageSize?: string;
   modelTier?: "standard" | "pro";
 }
 
@@ -214,6 +216,7 @@ export async function edit({
   imageBase64,
   mimeType,
   referenceImage,
+  imageSize = "1K",
 }: EditParams): Promise<ProviderResult> {
   const replicate = getClient();
   // Edit always uses Pro (Standard doesn't support edit well on Replicate)
@@ -233,7 +236,7 @@ export async function edit({
     prompt,
     image_input: imageUrls,
     aspect_ratio: "match_input_image",
-    resolution: "1K",
+    resolution: imageSize,
     output_format: "png",
     safety_filter_level: "block_only_high",
   };

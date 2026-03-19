@@ -16,6 +16,7 @@ import {
   getBatches,
   deleteBatch,
   deleteGeneration,
+  updateGenerationAsset,
   retryGeneration,
   getGenerationStatus,
   createImageBatch,
@@ -25,6 +26,7 @@ import { validateRequest } from "../middleware/validate.js";
 import {
   type ImagePlaygroundBatchesQuery,
   type ImagePlaygroundGenerateBody,
+  type ImagePlaygroundGenerationUpdateBody,
   type ImagePlaygroundStatusParams,
   type ImagePlaygroundStatusQuery,
   type PlaygroundGenerateTitleBody,
@@ -33,6 +35,7 @@ import {
   type PlaygroundTopicUpdateBody,
   imagePlaygroundBatchesQuerySchema,
   imagePlaygroundGenerateBodySchema,
+  imagePlaygroundGenerationUpdateBodySchema,
   imagePlaygroundStatusParamsSchema,
   imagePlaygroundStatusQuerySchema,
   playgroundGenerateTitleBodySchema,
@@ -849,6 +852,37 @@ ${userPrompt}`;
     } catch (error) {
       if (error instanceof AppError) throw error;
       logger.error({ err: error }, "[ImagePlayground] Delete generation error");
+      res.status(500).json({ error: sanitizeErrorForClient(error) });
+    }
+  });
+
+  app.patch("/api/image-playground/generations/:id", validateRequest({ params: playgroundIdParamsSchema, body: imagePlaygroundGenerationUpdateBodySchema }), async (req: Request, res: Response) => {
+    try {
+      const auth = getRequestAuthContext(req);
+      const userId = auth?.userId || null;
+      const orgId = auth?.orgId || null;
+      if (!userId) throw new AppError("Unauthorized", 401);
+
+      const { id } = req.params as PlaygroundIdParams;
+      const { url } = req.body as ImagePlaygroundGenerationUpdateBody;
+      const sql = getSql();
+      const resolvedUserId = await resolveUserId(sql, userId);
+      if (!resolvedUserId) {
+        throw new AppError("User not found", 401);
+      }
+
+      const generation = await updateGenerationAsset(
+        sql,
+        id,
+        { url },
+        resolvedUserId,
+        orgId,
+      );
+
+      res.json({ success: true, generation });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.error({ err: error }, "[ImagePlayground] Update generation asset error");
       res.status(500).json({ error: sanitizeErrorForClient(error) });
     }
   });
