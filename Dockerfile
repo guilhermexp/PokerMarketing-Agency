@@ -8,7 +8,8 @@ COPY package.json package-lock.json* ./
 COPY scripts/ensure-sharp-libvips-link.mjs scripts/
 
 # npm reliably resolves platform-specific optional deps (sharp linux-x64)
-RUN npm install --production --legacy-peer-deps
+# --ignore-scripts avoids running "prepare" (husky) which is a devDependency
+RUN npm install --production --legacy-peer-deps --ignore-scripts
 
 # =============================================================================
 # Stage 2: Build frontend with full deps
