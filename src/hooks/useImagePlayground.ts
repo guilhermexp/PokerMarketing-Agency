@@ -168,8 +168,10 @@ export function useGenerationPolling(
   const [pollInterval, setPollInterval] = useState(1000); // Start at 1s
   const [attempts, setAttempts] = useState(0);
   const isCompleteRef = useRef(false);
+  const startTimeRef = useRef(Date.now());
 
   const MAX_INTERVAL = 30000; // 30s
+  const MAX_POLL_DURATION_MS = 120_000; // 2 minutes max before giving up
 
   const { data, error } = useSWR(
     enabled && !paused && asyncTaskId && !isCompleteRef.current
@@ -194,6 +196,16 @@ export function useGenerationPolling(
             onError?.(result.error);
           }
         } else {
+          // Timeout: stop polling after MAX_POLL_DURATION_MS
+          const elapsed = Date.now() - startTimeRef.current;
+          if (elapsed > MAX_POLL_DURATION_MS) {
+            isCompleteRef.current = true;
+            setPollInterval(0);
+            setStatus('error');
+            onError?.({ message: 'A geração demorou demais. Tente novamente.', code: 'TIMEOUT' });
+            return;
+          }
+
           // Exponential backoff
           setAttempts((prev) => {
             const newAttempts = prev + 1;
