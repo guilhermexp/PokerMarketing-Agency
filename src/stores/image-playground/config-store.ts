@@ -201,13 +201,15 @@ export const useImageConfigStore = create<ConfigStore>()(
 
         // Actions
         setModelAndProvider: (model, provider) => {
-          const currentPrompt = get().parameters.prompt;
+          const { parameters, activeImageSize, activeAspectRatio } = get();
           set({
             model,
             provider,
             parameters: {
               ...defaultParameters,
-              prompt: currentPrompt,
+              prompt: parameters.prompt,
+              imageSize: activeImageSize,
+              aspectRatio: activeAspectRatio || defaultParameters.aspectRatio,
             },
           });
         },
