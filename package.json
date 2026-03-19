@@ -30,6 +30,7 @@
     "test:e2e:headed": "npx playwright test --headed"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^8.4.3",
     "@ai-sdk/google": "^3.0.22",
     "@ai-sdk/react": "^3.0.79",
     "@anthropic-ai/claude-agent-sdk": "^0.2.44",
@@ -96,7 +97,6 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
-    "@asteasolutions/zod-to-openapi": "^8.4.3",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@eslint/js": "^10.0.1",
