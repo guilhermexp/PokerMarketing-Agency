@@ -11,50 +11,53 @@ export const sortIndexSchema = z.coerce.number().int().nonnegative();
 export const mediaUrlSchema = z.string().trim().min(1);
 export const imagePromptSchema = optionalNullableString;
 
+// AI-generated text field: accept empty strings since LLMs may return blank fields
+const aiText = z.string().trim().default("");
+
 export const clipScriptSchema = z.object({
-  title: z.string().trim().min(1),
-  hook: z.string().trim().min(1),
+  title: aiText,
+  hook: aiText,
   image_prompt: optionalNullableString,
   audio_script: optionalNullableString,
   scenes: z.array(z.object({
     scene: z.number().int().nonnegative(),
-    visual: z.string().trim().min(1),
-    narration: z.string().trim().min(1),
+    visual: aiText,
+    narration: aiText,
     image_url: optionalNullableString,
   })).optional(),
-});
+}).passthrough();
 
 export const postSchema = z.object({
-  platform: z.string().trim().min(1),
-  content: z.string().trim().min(1),
+  platform: aiText,
+  content: aiText,
   hashtags: z.union([z.array(z.string()), z.string()]).optional(),
   image_prompt: optionalNullableString,
-});
+}).passthrough();
 
 export const adCreativeSchema = z.object({
-  platform: z.string().trim().min(1),
-  headline: z.string().trim().min(1),
-  body: z.string().trim().min(1),
-  cta: z.string().trim().min(1),
+  platform: aiText,
+  headline: aiText,
+  body: aiText,
+  cta: aiText,
   image_prompt: optionalNullableString,
-});
+}).passthrough();
 
 export const carouselSlideSchema = z.object({
   slide: z.number().int().nonnegative(),
-  title: z.string().trim().min(1),
-  content: z.string().trim().min(1),
+  title: aiText,
+  content: aiText,
   image_prompt: optionalNullableString,
   image_url: optionalNullableString,
-});
+}).passthrough();
 
 export const carouselScriptSchema = z.object({
-  title: z.string().trim().min(1),
-  hook: z.string().trim().min(1),
+  title: aiText,
+  hook: aiText,
   cover_prompt: optionalNullableString,
   cover_url: optionalNullableString,
   caption: optionalNullableString,
   slides: z.array(carouselSlideSchema).optional(),
-});
+}).passthrough();
 
 // Inferred types
 export type OptionalString = z.infer<typeof optionalString>;
