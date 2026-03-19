@@ -118,6 +118,9 @@ export async function withRetry<T>(
     } catch (error) {
       lastError = error;
       const errorObj = error as ErrorLike | undefined;
+      const is500 =
+        errorObj?.status === 500 ||
+        (errorObj?.message?.includes('"code":500') && errorObj?.message?.includes("INTERNAL"));
       const is503 =
         errorObj?.message?.includes("503") ||
         errorObj?.message?.includes("overloaded") ||
@@ -138,7 +141,7 @@ export async function withRetry<T>(
         errorObj?.status === 504;
       // Permanent quota exhaustion (limit: 0, daily cap) — never retry
       const isPermanentQuota = is429 && isPermanentQuotaError(error);
-      const isRetryable = (is503 || is429 || isTimeout) && !isPermanentQuota;
+      const isRetryable = (is500 || is503 || is429 || isTimeout) && !isPermanentQuota;
 
       logger.error(
         {
@@ -157,7 +160,7 @@ export async function withRetry<T>(
         const geminiDelay = is429 ? Math.min(extractRetryDelay(error), 60000) : 0;
         const waitTime = geminiDelay || delayMs * attempt;
         logger.info(
-          { waitTimeMs: waitTime, is429, is503, isTimeout },
+          { waitTimeMs: waitTime, is429, is500, is503, isTimeout },
           "[withRetry] Aguardando antes de tentar novamente",
         );
         await new Promise((resolve) => setTimeout(resolve, waitTime));
