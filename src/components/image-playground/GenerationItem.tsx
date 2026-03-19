@@ -156,6 +156,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       asset: {
         ...previousAsset,
         url: newUrl,
+        thumbnailUrl: newUrl,
       },
     });
     setPreviewImage(null);

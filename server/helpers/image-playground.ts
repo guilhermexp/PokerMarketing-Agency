@@ -133,6 +133,7 @@ interface GenerationAsset {
   url: string;
   width: number;
   height: number;
+  thumbnailUrl?: string | null;
   provider?: string;
   model?: string;
 }
@@ -598,7 +599,7 @@ export async function updateGenerationAsset(
   const rows = (orgId
     ? await sql`
         UPDATE image_generations g
-        SET asset = COALESCE(g.asset::jsonb, '{}'::jsonb) || jsonb_build_object('url', ${updates.url})
+        SET asset = COALESCE(g.asset::jsonb, '{}'::jsonb) || jsonb_build_object('url', ${updates.url}, 'thumbnailUrl', ${updates.url})
         FROM image_generation_batches b
         WHERE g.id = ${generationId}
         AND g.batch_id = b.id
@@ -607,7 +608,7 @@ export async function updateGenerationAsset(
       `
     : await sql`
         UPDATE image_generations
-        SET asset = COALESCE(asset::jsonb, '{}'::jsonb) || jsonb_build_object('url', ${updates.url})
+        SET asset = COALESCE(asset::jsonb, '{}'::jsonb) || jsonb_build_object('url', ${updates.url}, 'thumbnailUrl', ${updates.url})
         WHERE id = ${generationId}
         AND user_id = ${userId}
         RETURNING *

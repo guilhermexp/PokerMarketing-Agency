@@ -20,6 +20,7 @@ describe("image playground helper", () => {
             seed: 123,
             asset: {
               url: "https://cdn.example.com/edited.png",
+              thumbnailUrl: "https://cdn.example.com/edited.png",
               width: 1792,
               height: 768,
               provider: "google",
@@ -60,6 +61,7 @@ describe("image playground helper", () => {
       seed: 123,
       asset: {
         url: "https://cdn.example.com/edited.png",
+        thumbnailUrl: "https://cdn.example.com/edited.png",
         width: 1792,
         height: 768,
         provider: "google",

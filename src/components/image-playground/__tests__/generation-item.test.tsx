@@ -67,6 +67,7 @@ describe("GenerationItem", () => {
       seed: 123,
       asset: {
         url: "https://cdn.example.com/edited.png",
+        thumbnailUrl: "https://cdn.example.com/edited.png",
         width: 1024,
         height: 1024,
         provider: "google",
@@ -89,6 +90,7 @@ describe("GenerationItem", () => {
           createdAt: "2026-03-19T19:00:00.000Z",
           asset: {
             url: "https://cdn.example.com/original.png",
+            thumbnailUrl: "https://cdn.example.com/original-thumb.png",
             width: 1024,
             height: 1024,
             provider: "google",
@@ -113,6 +115,7 @@ describe("GenerationItem", () => {
       expect.objectContaining({
         asset: expect.objectContaining({
           url: "https://cdn.example.com/edited.png",
+          thumbnailUrl: "https://cdn.example.com/edited.png",
         }),
       }),
     );
