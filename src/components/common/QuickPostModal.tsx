@@ -103,22 +103,18 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
     };
 
     const handleShare = async () => {
-        if (!post) return;
-        const text = `${editedContent}\n\n${editedHashtags}`;
+        const text = post ? `${editedContent}\n\n${editedHashtags}` : '';
 
         // Tenta usar Web Share API (funciona bem em mobile)
         if (navigator.share && navigator.canShare) {
             try {
-                // Converte a imagem base64 para File
+                // Converte a imagem para File
                 const response = await fetch(image.src);
                 const blob = await response.blob();
                 const file = new File([blob], 'image.png', { type: 'image/png' });
 
-                const shareData = {
-                    files: [file],
-                    title: brandProfile.name,
-                    text: text,
-                };
+                const shareData: { files: File[]; title: string; text?: string } = { files: [file], title: brandProfile.name };
+                if (text) shareData.text = text;
 
                 if (navigator.canShare(shareData)) {
                     await navigator.share(shareData);
@@ -130,8 +126,9 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
             }
         }
 
-        // Fallback: copia texto e abre Instagram
-        navigator.clipboard.writeText(text).then(() => {
+        // Fallback: copia texto (se houver) e abre Instagram
+        const copyText = text || image.src;
+        navigator.clipboard.writeText(copyText).then(() => {
             setIsCopied(true);
             setTimeout(() => {
                 window.open('https://www.instagram.com/', '_blank');
@@ -409,7 +406,7 @@ export const QuickPostModal: React.FC<QuickPostModalProps> = ({
                                 size="small"
                                 className="flex-1"
                                 icon="share-2"
-                                disabled={isGenerating || !post || isPublishing}
+                                disabled={isGenerating || isPublishing}
                             >
                                 <span className="hidden sm:inline">{isCopied ? 'Copiado!' : 'Compartilhar'}</span>
                             </Button>

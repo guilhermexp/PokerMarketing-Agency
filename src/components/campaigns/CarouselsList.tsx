@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../common/Icon";
 import { Loader } from "../common/Loader";
+import { ImagePreviewModal } from "../common/ImagePreviewModal";
 import { CampaignCarouselCard } from "../carousel/CampaignCarouselCard";
 import { generateAllCampaignCarouselImages } from "../carousel/services/campaignCarouselGeneration";
 import { getCarouselPreviewImages } from "../carousel/utils";
@@ -52,6 +53,11 @@ export function CarouselsList({
   const pausedRef = useRef<Record<string, boolean>>({});
   const localCarouselsRef = useRef<CarouselScript[]>([]);
   const [captions, setCaptions] = useState<Record<string, string>>({});
+  const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
+
+  const handleOpenEditor = useCallback((image: GalleryImage) => {
+    setEditingImage(image);
+  }, []);
 
   useEffect(() => {
     localCarouselsRef.current = localCarousels;
@@ -303,7 +309,7 @@ export function CarouselsList({
                   setPauseState(carouselKey, !pausedRef.current[carouselKey])
                 }
                 onReorder={() => {}}
-                onOpenEditor={() => {}}
+                onOpenEditor={handleOpenEditor}
                 onCaptionChange={(newCaption) =>
                   setCaptions((prev) => ({ ...prev, [carousel.id || ""]: newCaption }))
                 }
@@ -318,6 +324,15 @@ export function CarouselsList({
           );
         })}
       </div>
+
+      {editingImage && (
+        <ImagePreviewModal
+          image={editingImage}
+          onClose={() => setEditingImage(null)}
+          onImageUpdate={() => setEditingImage(null)}
+          downloadFilename={`carrossel-${editingImage.source || "image"}.png`}
+        />
+      )}
     </div>
   );
 }

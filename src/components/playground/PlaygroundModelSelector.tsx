@@ -109,7 +109,7 @@ export const PlaygroundModelSelector: React.FC = () => {
           </div>
           <div>
             <h1 className="text-lg font-semibold text-white tracking-tight">Studio Video</h1>
-            <p className="text-[11px] text-white/35 mt-0.5">Configuracoes de geracao</p>
+            <p className="text-[11px] text-white/35 mt-0.5">Configurações de geração</p>
           </div>
         </div>
       </div>
@@ -251,7 +251,7 @@ export const PlaygroundModelSelector: React.FC = () => {
         <div className="h-px bg-white/[0.06]" />
 
         {/* Aspect Ratio */}
-        <ConfigSection label="Proporcao">
+        <ConfigSection label="Proporção">
           <div className="grid grid-cols-2 gap-2">
             {ASPECT_RATIO_OPTIONS.map((ratio) => (
               <button
@@ -273,7 +273,7 @@ export const PlaygroundModelSelector: React.FC = () => {
         </ConfigSection>
 
         {/* Resolution */}
-        <ConfigSection label="Resolucao">
+        <ConfigSection label="Resolução">
           <div className="grid grid-cols-2 gap-2">
             {RESOLUTION_OPTIONS.map((item) => (
               <button

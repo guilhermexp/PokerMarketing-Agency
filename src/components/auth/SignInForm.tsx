@@ -60,12 +60,12 @@ export function SignInForm({ onSwitchToSignUp }: SignInFormProps) {
       </div>
 
       {/* Middle - Form */}
-      <div className="flex-1 flex flex-col justify-center max-w-lg">
+      <div className="flex-1 flex flex-col justify-center max-w-xl">
         <h1 className="text-5xl sm:text-6xl font-light tracking-tight text-white mb-14">
           Login
         </h1>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 w-full">
           <div className="grid gap-2">
             <Label
               htmlFor="email"
@@ -126,15 +126,6 @@ export function SignInForm({ onSwitchToSignUp }: SignInFormProps) {
               Lembrar de mim
             </Label>
           </div>
-          <button
-            type="button"
-            className="text-sm text-white/30 hover:text-white/60 transition-colors cursor-pointer"
-            onClick={() => {
-              /* TODO: forgot password */
-            }}
-          >
-            Esqueceu?
-          </button>
         </div>
 
         {/* Social login - subtle links */}

@@ -51,7 +51,7 @@ export const Workspace: React.FC = () => {
           <div className="px-6 py-4 border-b border-white/[0.06]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h1 className="text-lg font-semibold text-white tracking-tight">
+                <h1 className="text-lg font-semibold text-white tracking-tight truncate">
                   {activeTopic?.title || 'Novo projeto'}
                 </h1>
                 <p className="text-[11px] text-white/35 mt-0.5">

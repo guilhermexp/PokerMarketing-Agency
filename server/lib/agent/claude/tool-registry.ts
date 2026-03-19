@@ -407,7 +407,7 @@ export function buildStudioToolDefinitions(config: StudioToolConfig): StudioTool
 
     tool(
       'studio_image_get_generation_status',
-      'Consulta status de geracao de imagem.',
+      'Consulta status de geracao de imagem. IMPORTANTE: chame no maximo 2 vezes por geracao. Se o status for "pending" ou "processing", NAO fique chamando em loop — informe ao usuario que a imagem esta sendo processada e ele vera o resultado automaticamente na interface.',
       {
         generationId: z.string(),
         asyncTaskId: z.string().optional(),

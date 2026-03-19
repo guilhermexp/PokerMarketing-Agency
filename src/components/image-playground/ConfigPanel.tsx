@@ -305,7 +305,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
           </div>
           <div>
             <h1 className="text-lg font-semibold text-white tracking-tight">Image Studio</h1>
-            <p className="text-[11px] text-white/35 mt-0.5">Configuracoes de geracao</p>
+            <p className="text-[11px] text-white/35 mt-0.5">Configurações de geração</p>
           </div>
         </div>
       </div>
@@ -567,7 +567,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
 
         {/* Tone Override */}
         <ConfigSection
-          label="Tom da geracao"
+          label="Tom da geração"
           action={!useBrandProfile ? (
             <span className="text-[10px] text-white/25">Ative perfil da marca</span>
           ) : undefined}
@@ -584,7 +584,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
               }`}
             >
               <option value="" className="bg-zinc-900">
-                {defaultBrandTone ? `Padrao da marca (${defaultBrandTone})` : 'Padrao da marca'}
+                {defaultBrandTone ? `Padrão da marca (${defaultBrandTone})` : 'Padrão da marca'}
               </option>
               {TONE_OPTIONS.map((tone) => (
                 <option key={tone} value={tone} className="bg-zinc-900">
@@ -598,7 +598,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
 
         {/* Font Override */}
         <ConfigSection
-          label="Fonte da geracao"
+          label="Fonte da geração"
           action={!useBrandProfile ? (
             <span className="text-[10px] text-white/25">Ative perfil da marca</span>
           ) : undefined}
@@ -617,7 +617,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
               <span className="truncate">
                 {typeof parameters.fontStyleOverride === 'string' && parameters.fontStyleOverride
                   ? parameters.fontStyleOverride
-                  : 'Padrao (bold condensed sans-serif)'}
+                  : 'Padrão (bold condensed sans-serif)'}
               </span>
               <ChevronDown className={`w-4 h-4 text-white/20 transition-transform ${isFontDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -630,7 +630,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
                   className="w-full px-3 py-2.5 hover:bg-white/[0.06] text-left flex items-center justify-between gap-3 transition-colors"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm text-white/90 truncate">Padrao</p>
+                    <p className="text-sm text-white/90 truncate">Padrão</p>
                     <p className="text-[11px] text-white/30 truncate" style={{ fontFamily: '"Oswald", "Arial Narrow", sans-serif' }}>
                       ABC 123 Exemplo
                     </p>
@@ -768,7 +768,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
         <div className="h-px bg-white/[0.06]" />
 
         {/* Resolution */}
-        <ConfigSection label="Resolucao">
+        <ConfigSection label="Resolução">
           <div className="grid grid-cols-3 gap-2">
             {RESOLUTION_OPTIONS.map((res) => (
               <button
@@ -790,7 +790,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ defaultBrandTone }) =>
         </ConfigSection>
 
         {/* Aspect Ratio / Proporção */}
-        <ConfigSection label="Proporcao">
+        <ConfigSection label="Proporção">
           <div className="grid grid-cols-5 gap-1.5">
             {ASPECT_RATIOS.map((ratio) => {
               const [w, h] = ratio.value.split(':').map(Number);

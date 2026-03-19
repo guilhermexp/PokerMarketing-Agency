@@ -204,11 +204,11 @@ export const aiCampaignBodySchema = z.object({
   brandProfile: aiTextBrandProfileSchema,
   transcript: z.string().trim().min(1),
   options: campaignOptionsSchema,
-  productImages: z.array(imageReferenceSchema).optional(),
-  inspirationImages: z.array(imageReferenceSchema).optional(),
-  collabLogo: imageReferenceSchema.optional(),
-  compositionAssets: z.array(imageReferenceSchema).optional(),
-  toneOfVoiceOverride: optionalString,
+  productImages: z.array(imageReferenceSchema).nullable().optional(),
+  inspirationImages: z.array(imageReferenceSchema).nullable().optional(),
+  collabLogo: imageReferenceSchema.nullable().optional(),
+  compositionAssets: z.array(imageReferenceSchema).nullable().optional(),
+  toneOfVoiceOverride: z.string().trim().nullable().optional(),
 });
 
 export type AiCampaignBody = z.infer<typeof aiCampaignBodySchema>;

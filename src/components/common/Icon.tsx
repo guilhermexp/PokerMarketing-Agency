@@ -22,7 +22,6 @@ import {
   Clock,
   Code,
   Copy,
-  Disc3,
   DollarSign,
   Download,
   Edit,
@@ -35,6 +34,7 @@ import {
   FileText,
   Folder,
   FolderOpen,
+  GalleryHorizontal,
   GalleryVerticalEnd,
   Globe,
   Hash,
@@ -43,9 +43,9 @@ import {
   Inbox,
   Info,
   Instagram,
-  Kanban,
   Layers,
   Layout,
+  LayoutGrid,
   Link,
   Loader,
   LogOut,
@@ -59,6 +59,7 @@ import {
   MoreHorizontal,
   Move,
   MousePointer2,
+  Palette,
   Paperclip,
   Pause,
   PenTool,
@@ -163,18 +164,18 @@ const iconMap: Record<string, LucideIconComponent> = {
   audio: AudioLines,
   mic: Mic,
   "mic-off": MicOff,
-  layers: Layers,
-  kanban: Kanban,
+  layers: GalleryHorizontal,
+  kanban: LayoutGrid,
   "folder-open": FolderOpen,
   folder: Folder,
-  "poker-chip": Disc3,
+  "poker-chip": null as unknown as LucideIconComponent, // custom SVG below
   building: Building2,
   user: User,
   mail: Mail,
   "user-plus": UserPlus,
   "log-out": LogOut,
   shield: Shield,
-  palette: PenTool,
+  palette: Palette,
   inbox: Inbox,
   stories: GalleryVerticalEnd,
   "external-link": ExternalLink,
@@ -215,6 +216,39 @@ export function Icon({
   "aria-hidden": ariaHidden = true,
   ...props
 }: IconProps) {
+  // Custom SVG icons not available in lucide-react
+  if (name === "poker-chip") {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+        data-icon={name}
+        aria-hidden={ariaHidden}
+        focusable="false"
+        {...props}
+      >
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="5" />
+        <line x1="12" y1="3" x2="12" y2="7" />
+        <line x1="12" y1="17" x2="12" y2="21" />
+        <line x1="3" y1="12" x2="7" y2="12" />
+        <line x1="17" y1="12" x2="21" y2="12" />
+        <line x1="5.64" y1="5.64" x2="8.46" y2="8.46" />
+        <line x1="15.54" y1="15.54" x2="18.36" y2="18.36" />
+        <line x1="18.36" y1="5.64" x2="15.54" y2="8.46" />
+        <line x1="8.46" y1="15.54" x2="5.64" y2="18.36" />
+      </svg>
+    );
+  }
+
   const IconComponent = iconMap[name] ?? Info;
 
   return (

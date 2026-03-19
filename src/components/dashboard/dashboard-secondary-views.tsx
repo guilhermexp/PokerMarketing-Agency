@@ -70,9 +70,11 @@ export function DashboardSecondaryViews() {
     handleAddImageToGallery,
     handleDeleteGalleryImage,
     handleDeleteScheduledPost,
-    handleMarkGalleryImagePublished,
+    handleMarkGalleryImagePublished: _handleMarkGalleryImagePublished,
     handlePublishToInstagram,
     handleSchedulePost,
+    handleAddStyleReference,
+    handleRemoveStyleReference,
     handleSelectStyleReference,
     handleSetChatReference,
     handleUpdateGalleryImage,
@@ -103,8 +105,8 @@ export function DashboardSecondaryViews() {
             onSetChatReference={handleSetChatReference}
             onRefresh={refreshGallery}
             styleReferences={styleReferences}
-            onAddStyleReference={() => undefined}
-            onRemoveStyleReference={() => undefined}
+            onAddStyleReference={handleAddStyleReference}
+            onRemoveStyleReference={handleRemoveStyleReference}
             onSelectStyleReference={handleSelectStyleReference}
             onPublishToCampaign={() => undefined}
             onQuickPost={setQuickPostImage}

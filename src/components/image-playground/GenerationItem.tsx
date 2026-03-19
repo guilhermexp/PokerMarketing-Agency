@@ -118,27 +118,12 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
       const reader = new FileReader();
       reader.onloadend = () => {
         const dataUrl = reader.result as string;
-        const {
-          addReferenceImage,
-          useBrandIdentityMode,
-          toggleBrandIdentityMode,
-          useBrandProfile,
-          toggleBrandProfile,
-        } = useImagePlaygroundStore.getState();
+        const { addReferenceImage } = useImagePlaygroundStore.getState();
         addReferenceImage({
           id: crypto.randomUUID(),
           dataUrl,
           mimeType,
         });
-
-        // If the user is reusing an existing generation as reference, switch off
-        // style-driven modes so the next action behaves like an edit workflow.
-        if (useBrandIdentityMode) {
-          toggleBrandIdentityMode();
-        }
-        if (useBrandProfile) {
-          toggleBrandProfile();
-        }
       };
       reader.readAsDataURL(blob);
     } catch (error) {
@@ -281,7 +266,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
 
       {/* Hover Overlay */}
       <div
-        className={`absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent transition-opacity duration-200 ${
+        className={`absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10 transition-opacity duration-200 ${
           showActions ? 'opacity-100' : 'opacity-0'
         }`}
       >
@@ -290,21 +275,21 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
           <div className="flex items-center gap-1.5">
             <button
               onClick={handleUseAsReference}
-              className="p-2 bg-white/10 backdrop-blur-xl rounded-lg hover:bg-white/20 transition-colors"
+              className="p-2 bg-black/40 backdrop-blur-xl rounded-lg hover:bg-black/60 transition-colors"
               title="Usar como referencia"
             >
               <ImagePlus className="w-4 h-4 text-white" />
             </button>
             <button
               onClick={handleDownload}
-              className="p-2 bg-white/10 backdrop-blur-xl rounded-lg hover:bg-white/20 transition-colors"
+              className="p-2 bg-black/40 backdrop-blur-xl rounded-lg hover:bg-black/60 transition-colors"
               title="Download"
             >
               <Download className="w-4 h-4 text-white" />
             </button>
             <button
               onClick={handleDelete}
-              className="p-2 bg-white/10 backdrop-blur-xl rounded-lg hover:bg-red-500/30 transition-colors"
+              className="p-2 bg-black/40 backdrop-blur-xl rounded-lg hover:bg-red-500/30 transition-colors"
               title="Excluir"
             >
               <Trash2 className="w-4 h-4 text-white" />
@@ -313,7 +298,7 @@ export const GenerationItem: React.FC<GenerationItemProps> = ({
 
           <button
             onClick={handleOpenPreview}
-            className="p-2 bg-white/10 backdrop-blur-xl rounded-lg hover:bg-white/20 transition-colors"
+            className="p-2 bg-black/40 backdrop-blur-xl rounded-lg hover:bg-black/60 transition-colors"
             title="Ver em tamanho real"
           >
             <ZoomIn className="w-4 h-4 text-white" />
@@ -368,7 +353,7 @@ function GenerationError({ error, onDelete, onRetry, isRetrying }: GenerationErr
     || (message?.toLowerCase().includes('safety') ?? false);
 
   let Icon = AlertCircle;
-  let title = 'Falha na geracao';
+  let title = 'Falha na geração';
   let description = (message && message.length < 200 && !message.startsWith('{'))
     ? message
     : 'Erro desconhecido. Tente novamente.';
@@ -377,11 +362,11 @@ function GenerationError({ error, onDelete, onRetry, isRetrying }: GenerationErr
   if (isQuota) {
     Icon = AlertTriangle;
     title = 'Limite de uso atingido';
-    description = 'O limite de geracao de imagens foi excedido. Tente novamente mais tarde.';
+    description = 'O limite de geração de imagens foi excedido. Tente novamente mais tarde.';
     accentColor = 'amber';
   } else if (isSafety) {
-    title = 'Conteudo bloqueado';
-    description = 'O prompt foi bloqueado por politicas de seguranca. Tente reformular.';
+    title = 'Conteúdo bloqueado';
+    description = 'O prompt foi bloqueado por políticas de segurança. Tente reformular.';
   }
 
   const colorMap: Record<string, { icon: string; text: string; bg: string }> = {

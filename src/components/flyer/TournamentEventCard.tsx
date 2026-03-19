@@ -70,7 +70,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
   onAddImageToGallery: _onAddImageToGallery,
   onUpdateGalleryImage,
   onSetChatReference,
-  onPublishToCampaign,
+  onPublishToCampaign: _onPublishToCampaign,
   userId: _userId,
   instagramContext,
   galleryImages = [],
@@ -285,9 +285,7 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
             onEdit={setEditingFlyer}
             onQuickPost={handleQuickPost}
             onSchedule={handleSchedule}
-            onPublish={(flyer) =>
-              onPublishToCampaign(`Campanha para torneio ${event.name}`, flyer)
-            }
+            onPublish={() => {}}
             onDownload={(flyer, index) => {
               const link = document.createElement('a');
               link.href = flyer.src;
@@ -316,9 +314,6 @@ export const TournamentEventCard: React.FC<TournamentEventCardProps> = ({
           }}
           onSetChatReference={onSetChatReference}
           onQuickPost={setQuickPostFlyer}
-          onPublish={(f) =>
-            onPublishToCampaign(`Campanha para torneio ${event.name}`, f)
-          }
           downloadFilename={`flyer-${event.name.replace(/\s+/g, '-').toLowerCase()}.png`}
         />
       )}

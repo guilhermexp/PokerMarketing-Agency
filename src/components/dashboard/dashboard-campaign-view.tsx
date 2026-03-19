@@ -1,10 +1,10 @@
-import React, { Suspense, lazy, useEffect, useState, useTransition } from "react";
+import React, { Suspense, lazy, useEffect, useMemo, useState, useTransition } from "react";
 import { AnimatePresence } from "framer-motion";
 import { UploadForm } from "../campaigns/UploadForm";
 import { Icon } from "../common/Icon";
 import { GeneratingLoader } from "../ui/quantum-pulse-loade";
 import { IMAGE_GENERATION_MODEL_OPTIONS } from "../../config/imageGenerationModelOptions";
-import type { GalleryImage, ImageModel, MarketingCampaign } from "../../types";
+import type { ImageModel } from "../../types";
 import type { Tab } from "./dashboard-shared";
 import {
   DOT_GRID_STYLE_20,
@@ -145,13 +145,21 @@ export function DashboardCampaignView() {
   } = useGalleryController();
   const [activeTab, setActiveTab] = useState<Tab>("clips");
   const [isTabPending, startTabTransition] = useTransition();
+  const [campaignFilter, setCampaignFilter] = useState<"all" | "videos" | "posts" | "ads">("all");
   const [selectedCampaignImageModel, setSelectedCampaignImageModel] =
     useState<ImageModel>(DEFAULT_CAMPAIGN_IMAGE_MODEL);
+  const filteredCampaigns = useMemo(() => {
+    if (campaignFilter === "all") return campaigns;
+    return campaigns.filter((c) => {
+      if (campaignFilter === "videos") return Number(c.clips_count ?? 0) > 0;
+      if (campaignFilter === "posts") return Number(c.posts_count ?? 0) > 0;
+      if (campaignFilter === "ads") return Number(c.ads_count ?? 0) > 0;
+      return true;
+    });
+  }, [campaigns, campaignFilter]);
+
   const showUploadForm = !campaign && !isGenerating;
 
-  if (!brandProfile) {
-    return null;
-  }
   const hasClips = (campaign?.videoClipScripts?.length ?? 0) > 0;
   const hasPosts = (campaign?.posts?.length ?? 0) > 0;
   const hasAds = (campaign?.adCreatives?.length ?? 0) > 0;
@@ -175,6 +183,10 @@ export function DashboardCampaignView() {
       setActiveTab(availableTabs[0].id);
     }
   }, [activeTab, availableTabs, campaign]);
+
+  if (!brandProfile) {
+    return null;
+  }
 
   const handlePublishCarousel = async (imageUrls: string[], caption: string) => {
     if (!instagramContext?.instagramAccountId) {
@@ -243,18 +255,24 @@ export function DashboardCampaignView() {
             <div className="w-full max-w-6xl mb-0.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <button className="text-[10px] font-semibold text-white border-b border-white/90">
-                    Todas
-                  </button>
-                  <button className="text-[10px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors">
-                    Vídeos
-                  </button>
-                  <button className="text-[10px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors">
-                    Posts
-                  </button>
-                  <button className="text-[10px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors">
-                    Ads
-                  </button>
+                  {([
+                    { key: "all" as const, label: "Todas" },
+                    { key: "videos" as const, label: "Vídeos" },
+                    { key: "posts" as const, label: "Posts" },
+                    { key: "ads" as const, label: "Ads" },
+                  ]).map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setCampaignFilter(tab.key)}
+                      className={`text-[10px] font-medium transition-colors ${
+                        campaignFilter === tab.key
+                          ? "font-semibold text-white border-b border-white/90"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
                 <button
                   onClick={() => onViewChange("campaigns")}
@@ -266,7 +284,7 @@ export function DashboardCampaignView() {
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-6xl">
-              {campaigns.slice(0, 6).map((item) =>
+              {filteredCampaigns.slice(0, 6).map((item) =>
                 renderCampaignPreviewCard(item, onLoadCampaign),
               )}
             </div>

@@ -88,7 +88,7 @@ export const PeriodCard: React.FC<{
     styleReference,
     collabLogos,
     onCloneStyle,
-    onPublishToCampaign,
+    onPublishToCampaign: _onPublishToCampaign,
     userId: _userId,
     instagramContext,
     galleryImages = [],
@@ -356,9 +356,7 @@ export const PeriodCard: React.FC<{
                         onEdit={setEditingFlyer}
                         onQuickPost={setQuickPostFlyer}
                         onSchedule={undefined}
-                        onPublish={(f) =>
-                            onPublishToCampaign(`Campanha para grade ${label}`, f)
-                        }
+                        onPublish={() => {}}
                         onDownload={(f, index) =>
                             handleDownloadFlyer(f.src, `period-${period}-${index}.png`)
                         }
@@ -384,9 +382,6 @@ export const PeriodCard: React.FC<{
                     }}
                     onSetChatReference={onSetChatReference}
                     onQuickPost={setQuickPostFlyer}
-                    onPublish={(f) =>
-                        onPublishToCampaign(`Campanha para grade ${label}`, f)
-                    }
                     onCloneStyle={onCloneStyle}
                     downloadFilename={`period-${period}.png`}
                 />

@@ -236,7 +236,7 @@ export const BatchItem: React.FC<BatchItemProps> = ({ batch, topicId }) => {
                   className="w-full px-3 py-2.5 text-left text-sm text-white/80 hover:bg-white/[0.06] flex items-center gap-2.5 transition-colors"
                 >
                   <Settings2 className="w-4 h-4 text-white/40" />
-                  Reusar configuracoes
+                  Reusar configurações
                 </button>
                 {successCount > 0 && (
                   <button

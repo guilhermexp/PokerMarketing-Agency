@@ -119,7 +119,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ post, onAddToPrompt }) => 
         return (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#000000]/95 border border-red-500/30 p-6 text-center backdrop-blur-2xl">
             <AlertCircle className="w-10 h-10 text-red-500 mb-3 opacity-80" />
-            <p className="text-sm font-bold uppercase tracking-widest text-white mb-1">Erro na Geracao</p>
+            <p className="text-sm font-bold uppercase tracking-widest text-white mb-1">Erro na Geração</p>
             <p className="text-xs text-red-300 line-clamp-3 px-2">{post.errorMessage || "Ocorreu um erro inesperado."}</p>
           </div>
         );

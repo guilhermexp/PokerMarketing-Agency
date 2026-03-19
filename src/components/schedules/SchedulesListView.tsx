@@ -106,7 +106,7 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
               <input
                 type="file"
                 className="hidden"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 onChange={handleFileChange}
                 disabled={isUploading}
               />
@@ -162,7 +162,7 @@ export const SchedulesListView: React.FC<SchedulesListViewProps> = ({
             <input
               type="file"
               className="hidden"
-              accept=".xlsx,.xls"
+              accept=".xlsx,.xls,.csv"
               onChange={handleFileChange}
               disabled={isUploading}
             />

@@ -232,7 +232,7 @@ export const CalendarView = React.memo<CalendarViewProps>(function CalendarView(
           const overdue = pending.filter((p) => p.scheduledTimestamp < now);
           if (overdue.length > 0) {
             new Notification("Posts Pendentes!", {
-              body: `${overdue.length} post(s) aguardando publicacao`,
+              body: `${overdue.length} post(s) aguardando publicação`,
               icon: "/favicon.ico",
             });
           }

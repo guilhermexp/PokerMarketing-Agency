@@ -205,7 +205,7 @@ export function useScheduledPostsHandlers({
             });
           }, 3000);
         } else {
-          throw new Error(result.errorMessage || "Falha na publicacao");
+          throw new Error(result.errorMessage || "Falha na publicação");
         }
       } catch (error) {
         const errorMessage =

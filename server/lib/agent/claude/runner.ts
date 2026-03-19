@@ -159,6 +159,7 @@ const BLOCKED_NATIVE_TOOLS = [
 
 const LOOP_GUARD_WINDOW_SECONDS = 45;
 const LOOP_GUARD_MAX_REPEATS = 8;
+const LOOP_GUARD_MAX_TOOL_CALLS = 12;
 const ASK_USER_TIMEOUT_MS = 60_000;
 
 const pendingInteractionsByThread = new Map<string, Map<string, PendingInteraction>>();
@@ -191,6 +192,12 @@ function renderRuntimeInstructions(): string {
     '4. Para campanhas, confirme os requisitos antes de gerar.',
     '5. Antes de gerar mídia, confirme claramente os requisitos do usuário.',
     '6. Após confirmação, execute diretamente a geração apropriada.',
+    '',
+    'REGRA CRÍTICA — NUNCA FAÇA POLLING:',
+    '- Após studio_image_generate, a geração roda em background e a interface atualiza automaticamente.',
+    '- NUNCA chame studio_image_get_generation_status em loop. No máximo 1 vez para verificar.',
+    '- Se o status for "pending" ou "processing", informe ao usuário que está processando e pare.',
+    '- studio_flyer_generate é síncrono e retorna a URL diretamente — não precisa verificar status.',
     '',
     'Ferramentas interativas AskUserQuestion, EnterPlanMode e ExitPlanMode podem ser usadas quando necessário.',
   ].join('\n');
@@ -281,6 +288,7 @@ function normalizeAskUserQuestions(input: AskUserRawInput = {}): NormalizedQuest
 
 function buildCanUseTool({ threadId, emitEvent }: BuildCanUseToolInput): CanUseToolFn {
   const recentSignatures = new Map<string, { count: number; lastTs: number }>();
+  const recentToolCalls = new Map<string, { count: number; firstTs: number }>();
 
   return async (
     toolName: string,
@@ -361,6 +369,28 @@ function buildCanUseTool({ threadId, emitEvent }: BuildCanUseToolInput): CanUseT
     }
 
     // Loop guard for non-interactive tools
+
+    // 1. Tool-name-level guard: prevent calling the same tool too many times
+    //    regardless of input (catches polling with different IDs).
+    const now = Date.now();
+    const toolBucket = recentToolCalls.get(toolName);
+
+    if (!toolBucket || now - toolBucket.firstTs > LOOP_GUARD_WINDOW_SECONDS * 1000) {
+      recentToolCalls.set(toolName, { count: 1, firstTs: now });
+    } else {
+      toolBucket.count += 1;
+
+      if (toolBucket.count > LOOP_GUARD_MAX_TOOL_CALLS) {
+        return {
+          behavior: 'deny',
+          message:
+            `Loop guard: a tool "${toolName}" foi chamada ${toolBucket.count} vezes em ${LOOP_GUARD_WINDOW_SECONDS}s. ` +
+            'Pare de chamar esta tool. Se a geração está pendente, informe ao usuário que a imagem está sendo processada e ele verá o resultado automaticamente na interface.',
+        };
+      }
+    }
+
+    // 2. Exact-signature guard: prevent identical calls (same tool + same input).
     let inputSignature = '';
     try {
       const inputObj = input ?? {};
@@ -370,7 +400,6 @@ function buildCanUseTool({ threadId, emitEvent }: BuildCanUseToolInput): CanUseT
     }
 
     const signature = `${toolName}:${inputSignature}`;
-    const now = Date.now();
     const bucket = recentSignatures.get(signature);
 
     if (!bucket || now - bucket.lastTs > LOOP_GUARD_WINDOW_SECONDS * 1000) {
@@ -385,7 +414,8 @@ function buildCanUseTool({ threadId, emitEvent }: BuildCanUseToolInput): CanUseT
       return {
         behavior: 'deny',
         message:
-          'Loop guard: chamada repetida detectada. Mude a estratégia ou resuma o que falta para continuar.',
+          'Loop guard: chamada repetida detectada. Pare de chamar esta tool. ' +
+          'Se a geração está pendente, informe ao usuário que a imagem está sendo processada e ele verá o resultado automaticamente na interface.',
       };
     }
 

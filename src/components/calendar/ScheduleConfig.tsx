@@ -166,7 +166,7 @@ export const ScheduleConfig: React.FC<ScheduleConfigProps> = ({
         {/* Header */}
         <div className="p-3 sm:p-4 border-b border-border">
           <div className="flex items-center justify-between mb-2 sm:mb-3">
-            <h3 className="text-xs sm:text-sm font-semibold text-white">Horario</h3>
+            <h3 className="text-xs sm:text-sm font-semibold text-white">Horário</h3>
             <div className="flex gap-1">
               <button
                 onClick={() => onTimeFormatChange('12h')}
@@ -231,7 +231,7 @@ export const ScheduleConfig: React.FC<ScheduleConfigProps> = ({
             disabled={!hasSelectedImages || isTimeInPast}
             className="w-full py-2.5 sm:py-3 bg-white text-black text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-white/20"
           >
-            Agendar Publicacao
+            Agendar Publicação
           </button>
         </div>
       </div>

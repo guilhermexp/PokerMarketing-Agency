@@ -249,7 +249,7 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
                 <Icon name="upload" className="w-4 h-4" />
                 <span className="text-sm">Carregar Nova Planilha</span>
               </div>
-              <input type="file" className="hidden" accept=".xlsx,.xls" onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])} />
+              <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])} />
             </label>
             {onClearExpiredSchedule && (
               <button onClick={onClearExpiredSchedule} className="bg-white/[0.04] border border-white/[0.06] text-white/50 font-medium px-6 py-3 rounded-xl transition-all hover:bg-white/[0.06] hover:text-white/70 active:scale-95">
@@ -270,7 +270,7 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
                 <Icon name="upload" className="w-4 h-4" />
                 <span className="text-sm">Carregar Planilha Excel</span>
               </div>
-              <input type="file" className="hidden" accept=".xlsx,.xls" onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])} />
+              <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])} />
             </label>
             <button onClick={() => setIsManualModalOpen(true)} className="flex items-center gap-2 bg-white/[0.04] border border-white/[0.06] text-white/50 font-medium px-6 py-3 rounded-xl transition-all hover:bg-white/[0.06] hover:text-white/70 active:scale-95">
               <Icon name="edit" className="w-4 h-4" />
@@ -347,7 +347,7 @@ export const FlyerGenerator = React.memo<FlyerGeneratorProps>(function FlyerGene
                     <Icon name="upload" className="w-4 h-4" />
                     <span className="hidden sm:inline">Nova Planilha</span>
                   </div>
-                  <input type="file" className="hidden" accept=".xlsx,.xls" onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])} />
+                  <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0])} />
                 </label>
               )}
               <button onClick={() => setIsManualModalOpen(true)} className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl text-xs sm:text-sm font-medium text-white/50 hover:text-white/70 hover:bg-white/[0.06] transition-all">

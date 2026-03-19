@@ -59,7 +59,7 @@ export const PostFormFields: React.FC<PostFormFieldsProps> = ({
       {/* Content Type */}
       <div>
         <label className="text-xs font-semibold text-white/70 mb-1.5 block">
-          Tipo de Conteudo
+          Tipo de Conteúdo
         </label>
         <div className="grid grid-cols-2 gap-2">
           {CONTENT_TYPE_OPTIONS.map((t) => (
